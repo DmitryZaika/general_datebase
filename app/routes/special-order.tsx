@@ -1,4 +1,4 @@
-function SpecialOrder() {
+export function SpecialOrder() {
   return (
     <main>
       <h1>Special Order Calculator</h1>

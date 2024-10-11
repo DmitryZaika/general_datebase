@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import type { MetaFunction } from "@remix-run/node";
 import ModuleList from "../components/ModuleList";
 import { clsx } from "clsx";
@@ -46,7 +46,7 @@ function Image({ className, src, name }: ImageProps) {
 
 function Document({ children, src }: DocumentProps) {
   return (
-    <a href={src} target="_blank" className="text-center">
+    <a href={src} target="_blank" rel="noreferrer" className="text-center">
       {children}
     </a>
   );
@@ -63,7 +63,7 @@ function Supplier({
   return (
     <li>
       <span className="supplier">
-        <a href={website} target="_blank">
+        <a rel="noreferrer" href={website} target="_blank">
           {supplierName}
         </a>
       </span>
@@ -81,16 +81,12 @@ function getSourceName(source: string, name: string) {
 
   return `./images/${source}/${cleanName}.webp`;
 }
+
 const capitalizeFirstLetter = (str: string) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-function Stones({}) {
-  function getSourceName(source: string, name: string) {
-    const cleanName = name.toLowerCase().replace(/\s+/g, "_");
-
-    return `./images/stones/${source}/${cleanName}.webp`;
-  }
+function Stones() {
   const [stones, setStones] = useState(false);
   const stoneList = {
     granite: [
@@ -136,7 +132,7 @@ function Stones({}) {
                 ].map((item: { name: string }) => (
                   <Image
                     key={item.name}
-                    src={getSourceName(source, item.name)}
+                    src={getSourceName(`stones/${source}`, item.name)}
                     name={item.name}
                   />
                 ))}
@@ -151,14 +147,12 @@ function Stones({}) {
 
 function Sinks() {
   const [sinks, setSinks] = useState(false);
-  const sinkList = {
-    sink: [
-      { name: "Granite Composite Sinks" },
-      { name: "Stainless Steel Sinks 16 Gauge" },
-      { name: "Stainless Steel Sinks 18 Gauge" },
-      { name: "Ceramic Sinks" },
-    ],
-  };
+  const sinkList = [
+    { name: "Granite Composite Sinks" },
+    { name: "Stainless Steel Sinks 16 Gauge" },
+    { name: "Stainless Steel Sinks 18 Gauge" },
+    { name: "Ceramic Sinks" },
+  ];
 
   return (
     <div className="border-2 border-sky-500 select-none">
@@ -167,7 +161,7 @@ function Sinks() {
       </h2>
       <div className={clsx("cursor-pointer", { hidden: !sinks })}>
         <ul>
-          {sinkList.sink.map((item) => (
+          {sinkList.map((item) => (
             <ModuleList key={item.name} name={capitalizeFirstLetter(item.name)}>
               <div className="image-gallery">
                 <Image
@@ -184,7 +178,7 @@ function Sinks() {
   );
 }
 
-function Suppliers({}) {
+function Suppliers() {
   const [suppliers, setSuppliers] = useState(false);
   const supplierList = [
     {
@@ -293,7 +287,7 @@ function Suppliers({}) {
   );
 }
 
-function Supports({}) {
+function Supports() {
   const [supports, setSupports] = useState(false);
   const supportList = {
     supports: [
@@ -318,8 +312,9 @@ function Supports({}) {
       <div className={clsx("cursor-pointer", { hidden: !supports })}>
         <div className="supports-gallery text-center ">
           <ul className="flex">
-            {supportList.supports.map((item) => (
+            {supportList.supports.map((item, index) => (
               <Image
+                key={index}
                 src={getSourceName("supports", item.name)}
                 name={item.name}
               />
@@ -331,7 +326,7 @@ function Supports({}) {
   );
 }
 
-function Documents({}) {
+function Documents() {
   const [documents, setDocuments] = useState(false);
   const documentList = {
     documents: [
@@ -356,8 +351,8 @@ function Documents({}) {
       </h2>
 
       <div className={clsx("cursor-pointer flex", { hidden: !documents })}>
-        {documentList.documents.map((item) => (
-          <Document src={getSourceName("documents", item.name)}>
+        {documentList.documents.map((item, index) => (
+          <Document key={index} src={getSourceName("documents", item.name)}>
             <Image
               src={getSourceName("documents", item.name)}
               name={item.name}
@@ -369,7 +364,7 @@ function Documents({}) {
   );
 }
 
-function Images({}) {
+function Images() {
   const [images, setImages] = useState(false);
   const imageList = [
     { name: "Stainless Steel Sinks" },

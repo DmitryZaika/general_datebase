@@ -35,11 +35,12 @@ export default function Instrucitons() {
 
               <ModuleList name={"After Install"}>
                 <p>
-                  1. Call to the customer, ask about his experience Example
-                  "Hello, [Client's Name]. I wanted to check in and see how the
-                  installation went. Did everything meet your expectations, and
-                  are you satisfied with the results? If you have any questions
-                  or concerns, please let me know. Thank you!"
+                  1. Call to the customer, ask about his experience
+                  Example:&quot; Hello, [Client&apos;s Name]. I wanted to check
+                  in and see how the installation went. Did everything meet your
+                  expectations, and are you satisfied with the results? If you
+                  have any questions or concerns, please let me know. Thank
+                  you!&quot;
                 </p>
               </ModuleList>
 
@@ -71,7 +72,7 @@ export default function Instrucitons() {
           <div className="dropdown-content">
             <ul>
               <ModuleList name={"Customers"}>
-                <div /* className="discount-section" */>
+                <div>
                   <h2>Discounts</h2>
                   <p>
                     You can give these discounts to accommodate situations where
@@ -212,12 +213,12 @@ export default function Instrucitons() {
                       during price discussions.
                     </li>
                     <li>
-                      Don't agree to the customer's initial lower price even if
-                      it fits the conditions.
+                      Don&apos;t agree to the customer&apos;s initial lower
+                      price even if it fits the conditions.
                     </li>
                     <li>
-                      Don't forget to charge a 3% card fee when discounts are
-                      applied.
+                      Don&apos;t forget to charge a 3% card fee when discounts
+                      are applied.
                     </li>
                     <li>
                       If the builder strongly disagrees with the fee, contact
@@ -247,8 +248,8 @@ export default function Instrucitons() {
                       </li>
                       <li>
                         If the builder needs ASAP installation, the price
-                        remains $5200. "ASAP" and "Discount" do not work
-                        together.
+                        remains $5200. &quot;ASAP&quot; and &quot;Discount&quot;
+                        do not work together.
                       </li>
                     </ul>
                   </ul>
@@ -287,7 +288,7 @@ export default function Instrucitons() {
             </div>
             <p>
               <strong>2.</strong> Label each piece, marking front/back, and
-              indicate in Timetree's comments which slab is used.
+              indicate in Timetree&apos;s comments which slab is used.
             </p>
             <p>
               <strong>3.</strong> Maximize material use: cut from the top and
@@ -317,8 +318,8 @@ export default function Instrucitons() {
                   full-height backsplash during the initial template
                   appointment.
                   <strong>
-                    It is the sales representative's responsibility to verify
-                    the estimate after the template is completed.
+                    It is the sales representative&apos;s responsibility to
+                    verify the estimate after the template is completed.
                   </strong>
                 </p>
               </li>
@@ -502,8 +503,8 @@ export default function Instrucitons() {
                 <RemnantText>
                   <p>
                     <strong>Project Size Check:</strong> Sales representatives
-                    must double-check the remnant's size to ensure it covers the
-                    entire project, including backsplash.
+                    must double-check the remnant&apos;s size to ensure it
+                    covers the entire project, including backsplash.
                   </p>
                 </RemnantText>
               </ul>
