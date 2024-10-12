@@ -122,25 +122,27 @@ function Stones() {
       <h2 className="cursor-pointer " onClick={() => setStones(!stones)}>
         Stones
       </h2>
-      <div className={clsx("cursor-pointer", { hidden: !stones })}>
-        <ul>
-          {Object.keys(stoneList).map((source) => (
-            <ModuleList key={source} name={capitalizeFirstLetter(source)}>
-              <div className="image-gallery flex ">
-                {stoneList[
-                  source as "granite" | "quartz" | "quartzite" | "marble"
-                ].map((item: { name: string }) => (
-                  <Image
-                    key={item.name}
-                    src={getSourceName(`stones/${source}`, item.name)}
-                    name={item.name}
-                  />
-                ))}
-              </div>
-            </ModuleList>
-          ))}
-        </ul>
-      </div>
+      {stones && (
+        <div className="cursor-pointer">
+          <ul>
+            {Object.keys(stoneList).map((source) => (
+              <ModuleList key={source} name={capitalizeFirstLetter(source)}>
+                <div className="image-gallery flex ">
+                  {stoneList[
+                    source as "granite" | "quartz" | "quartzite" | "marble"
+                  ].map((item: { name: string }) => (
+                    <Image
+                      key={item.name}
+                      src={getSourceName(`stones/${source}`, item.name)}
+                      name={item.name}
+                    />
+                  ))}
+                </div>
+              </ModuleList>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

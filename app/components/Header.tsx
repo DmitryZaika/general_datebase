@@ -1,31 +1,38 @@
+import { Link } from "@remix-run/react";
+
+interface LinkProps {
+  href: string;
+  children: JSX.Element | string;
+}
+
+function LinkCard({ href, children }: LinkProps) {
+  return (
+    <li className="flex items-center justify-center text-yellow-400  bg-[#333] rounded-[]">
+      <Link to={href}>{children}</Link>
+    </li>
+  );
+}
+
 export function Header() {
   return (
-    <header>
-      <div className="logo">
-        <a href="index.html">
+    <header className="flex content-center flex-col align-middle gap-5">
+      <div className="logo ">
+        <a className="flex justify-center" href="index.html">
           <img src="./images/logo_gd_main.webp" alt="Logo" />
         </a>
       </div>
       <nav className="main-nav">
-        <ul className="main-nav_list">
-          <li>
-            <a href="./index.html">Database</a>
-          </li>
-          <li>
-            <a href="./instructions.html">Instructions</a>
-          </li>
-          <li>
-            <a href="./special-order.html">Special order</a>
-          </li>
-          <li>
-            <a href="./customers.html">Customers</a>
-          </li>
+        <ul className="flex gap-10 h-full flex-col">
+          <LinkCard href="/">Database</LinkCard>
+          <LinkCard href="/instructions">Instructions</LinkCard>
+          <LinkCard href="/special-order">Special Order</LinkCard>
+          <LinkCard href="/customers">Customer</LinkCard>
         </ul>
       </nav>
-      <div className="search">
+      {/* <div className="search">
         <input id="searchInput" type="text" placeholder="Search..." />
         <ul id="searchResults" className="search-results hidden"></ul>
-      </div>
+      </div> */}
     </header>
   );
 }

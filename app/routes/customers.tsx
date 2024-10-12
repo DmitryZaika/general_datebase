@@ -1,3 +1,5 @@
+import { Form } from "@remix-run/react";
+
 interface InputProps {
   name: string;
   type: string;
@@ -16,14 +18,14 @@ export default function Customer() {
     <main>
       <h1>Customer Management</h1>
 
-      <section className="customer-search">
+      {/* <section className="customer-search">
         <input type="text" id="search" placeholder="Search customers..." />
         <ul id="searchResults"></ul>
-      </section>
+      </section> */}
 
       <section className="customer-htmlForm">
         <h2 id="htmlFormTitle">Add New Customer</h2>
-        <form id="customerhtmlForm">
+        <Form id="customerhtmlForm">
           <input type="hidden" id="customerId" />
 
           <Input name="Name" type="text" />
@@ -34,13 +36,13 @@ export default function Customer() {
           <button type="submit" id="submitBtn">
             Add Customer
           </button>
-        </form>
+        </Form>
       </section>
 
-      <section className="customer-list">
+      {/* <section className="customer-list">
         <h2>Customer List</h2>
         <ul id="customerList"></ul>
-      </section>
+      </section> */}
     </main>
   );
 }

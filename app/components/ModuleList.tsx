@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { clsx } from "clsx";
 
 interface ModuleListProps {
   name: string;
@@ -11,7 +10,7 @@ export default function ModuleList({ name, children }: ModuleListProps) {
   return (
     <li>
       <h3 onClick={() => setOpen(!open)}>{name}</h3>
-      <div className={clsx({ hidden: !open })}>{children}</div>
+      {open && <div>{children}</div>}
     </li>
   );
 }
