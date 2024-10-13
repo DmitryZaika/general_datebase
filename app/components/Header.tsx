@@ -37,7 +37,7 @@ function LinkCard({ href, children }: LinkProps) {
 
 export function Header() {
   return (
-    <header className="flex content-center flex-col align-middle gap-5 m-10 md:flex-row">
+    <header className="flex content-center flex-col align-middle gap-5 m-3 md:flex-row">
       <div className="logo ">
         <a className="flex justify-center" href="/">
           <img src="./images/logo_gd_main.webp" alt="Logo" />
