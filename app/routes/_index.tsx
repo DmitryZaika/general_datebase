@@ -1,4 +1,3 @@
-// Index.tsx
 import { useState } from "react";
 import type { MetaFunction } from "@remix-run/node";
 import ModuleList from "../components/ModuleList";
@@ -6,6 +5,7 @@ import { Title } from "../components/Title";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import BlockList from "~/components/BlockList";
+import { PageLayout } from "~/components/PageLayout";
 
 interface ImageProps {
   name?: string;
@@ -189,6 +189,7 @@ export const loader = async () => {
     imageList,
   });
 };
+
 export const meta: MetaFunction = () => {
   return [
     { title: "Granite Depot Database" },
@@ -196,17 +197,57 @@ export const meta: MetaFunction = () => {
   ];
 };
 
-function Image({ className, src, name }: ImageProps) {
+export function Image({ className = "", src, name }: ImageProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleImageClick = () => {
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+  };
+
   return (
-    <div className="text-center">
-      <img
-        src={src}
-        alt={name}
-        className={`w-16 mx-auto ${className || ""}`}
-        loading="lazy"
-      />
-      <p className="text-center font-bold select-text">{name}</p>
-    </div>
+    <>
+      <div className="flex flex-col items-center">
+        <img
+          src={src}
+          alt={name}
+          className={`w-44 h-auto border-2
+             border-blue-500 
+             rounded cursor-pointer 
+             transition duration-300 
+             ease-in-out transform
+              hover:scale-110 hover:shadow-lg
+               hover:border-blue-500
+                hover:bg-gray-300 ${className}`}
+          loading="lazy"
+          onClick={handleImageClick}
+        />
+        <p className="text-center font-bold select-text">{name}</p>
+      </div>
+
+      {isModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90"
+          onClick={closeModal}
+        >
+          <span
+            className="absolute top-4 right-8 text-white text-4xl font-bold cursor-pointer"
+            onClick={closeModal}
+          >
+            &times;
+          </span>
+          <img
+            src={src}
+            alt={name}
+            className="w-1/2 h-auto mx-auto my-auto"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -278,7 +319,7 @@ function Stones({
       <ul className="mt-1 pt-2">
         {Object.keys(stoneList).map((source) => (
           <ModuleList key={source} name={capitalizeFirstLetter(source)}>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="mt-5 p-2.5 border border-gray-300 rounded bg-gray-100 flex flex-wrap gap-2.5 justify-start overflow-x-auto">
               {stoneList[
                 source as "granite" | "quartz" | "quartzite" | "marble"
               ].map((item) => (
@@ -391,18 +432,13 @@ export default function Index() {
   const data = useLoaderData<typeof loader>();
 
   return (
-    <main className="flex-1 p-5 bg-gray-100">
-      <h1 className="text-3xl font-bold text-center mb-8">
-        Granite Depot Database
-      </h1>
-      <section className="flex flex-col gap-8">
-        <Stones stoneList={data.stoneList} />
-        <Sinks sinkList={data.sinkList} />
-        <Suppliers supplierList={data.supplierList} />
-        <Supports supportList={data.supportList} />
-        <Documents documentList={data.documentList} />
-        <Images imageList={data.imageList} />
-      </section>
-    </main>
+    <PageLayout title="Granite Depot DataBase">
+      <Stones stoneList={data.stoneList} />
+      <Sinks sinkList={data.sinkList} />
+      <Suppliers supplierList={data.supplierList} />
+      <Supports supportList={data.supportList} />
+      <Documents documentList={data.documentList} />
+      <Images imageList={data.imageList} />
+    </PageLayout>
   );
 }

@@ -1,5 +1,6 @@
 // Title.tsx
 import React from "react";
+import { Collapsible } from "./Collapsible";
 
 interface TitleProps {
   children: React.ReactNode;
@@ -10,22 +11,14 @@ interface TitleProps {
 
 export function Title({ children, text, state, setState }: TitleProps) {
   return (
-    <div className="bg-white p-5 rounded-lg shadow-lg select-none">
+    <div className="bg-white p-5 rounded-md shadow-[-5px_-5px_15px_rgba(0,0,0,0.1)] select-none">
       <h2
         className="text-2xl font-bold cursor-pointer"
         onClick={() => setState(!state)}
       >
         {text}
       </h2>
-      <div
-        className={`overflow-hidden transition-all ${
-          state
-            ? "duration-[2500ms] max-h-[5000px] opacity-100"
-            : "duration-[500ms] max-h-0 opacity-0"
-        }`}
-      >
-        {children}
-      </div>
+      <Collapsible isOpen={state}>{children}</Collapsible>
     </div>
   );
 }
