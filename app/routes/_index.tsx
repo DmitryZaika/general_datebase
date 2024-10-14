@@ -6,6 +6,7 @@ import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import BlockList from "~/components/BlockList";
 import { PageLayout } from "~/components/PageLayout";
+import { ImageList } from "~/components/ImageList";
 
 interface ImageProps {
   name?: string;
@@ -214,12 +215,16 @@ export function Image({ className = "", src, name }: ImageProps) {
         <img
           src={src}
           alt={name}
-          className={`w-44 h-auto border-2
+          className={`w-full flex-wrap  h-auto border-2
              border-blue-500 
-             rounded cursor-pointer 
-             transition duration-300 
-             ease-in-out transform
-              hover:scale-110 hover:shadow-lg
+             rounded
+              cursor-pointer 
+             transition 
+             duration-300 
+             ease-in-out
+              transform
+              hover:scale-110
+               hover:shadow-lg
                hover:border-blue-500
                 hover:bg-gray-300 ${className}`}
           loading="lazy"
@@ -268,7 +273,16 @@ function Supplier({
   supplierName,
 }: SupplierProps) {
   return (
-    <li className="grid grid-cols-6 gap-2 p-4 mb-4 font-sans text-base text-gray-800 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
+    <li
+      className="grid grid-cols-6 
+    gap-2 p-4 mb-4 
+    font-sans text-base
+     text-gray-800
+      bg-white border
+       border-gray-300 
+       rounded-md shadow-sm
+        hover:bg-gray-50"
+    >
       <span className="col-span-2 text-left font-bold">
         <a
           rel="noreferrer"
@@ -319,7 +333,7 @@ function Stones({
       <ul className="mt-1 pt-2">
         {Object.keys(stoneList).map((source) => (
           <ModuleList key={source} name={capitalizeFirstLetter(source)}>
-            <div className="mt-5 p-2.5 border border-gray-300 rounded bg-gray-100 flex flex-wrap gap-2.5 justify-start overflow-x-auto">
+            <ImageList>
               {stoneList[
                 source as "granite" | "quartz" | "quartzite" | "marble"
               ].map((item) => (
@@ -329,7 +343,7 @@ function Stones({
                   name={item.name}
                 />
               ))}
-            </div>
+            </ImageList>
           </ModuleList>
         ))}
       </ul>
@@ -378,7 +392,7 @@ function Supports({ supportList }: { supportList: { name: string }[] }) {
 
   return (
     <Title text="Supports" state={supportsOpen} setState={setSupportsOpen}>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-1">
+      <ImageList>
         {supportList.map((item, index) => (
           <Image
             key={index}
@@ -386,7 +400,7 @@ function Supports({ supportList }: { supportList: { name: string }[] }) {
             name={item.name}
           />
         ))}
-      </div>
+      </ImageList>
     </Title>
   );
 }
@@ -415,7 +429,7 @@ function Images({ imageList }: { imageList: { name: string }[] }) {
 
   return (
     <Title text="Images" state={imagesOpen} setState={setImagesOpen}>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-1">
+      <ImageList>
         {imageList.map((image, index) => (
           <Image
             key={index}
@@ -423,7 +437,7 @@ function Images({ imageList }: { imageList: { name: string }[] }) {
             name={image.name}
           />
         ))}
-      </div>
+      </ImageList>
     </Title>
   );
 }

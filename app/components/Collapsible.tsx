@@ -15,7 +15,7 @@ export function Collapsible({
   closeDuration = "duration-[1000ms]",
   maxHeight = "max-h-[5000px]",
   children,
-  className = " pl-4",
+  className = " sm:pl-4",
 }: CollapsibleProps) {
   return (
     <div
