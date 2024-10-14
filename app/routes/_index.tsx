@@ -1,9 +1,11 @@
+// Index.tsx
 import { useState } from "react";
 import type { MetaFunction } from "@remix-run/node";
 import ModuleList from "../components/ModuleList";
 import { Title } from "../components/Title";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
+import BlockList from "~/components/BlockList";
 
 interface ImageProps {
   name?: string;
@@ -187,7 +189,6 @@ export const loader = async () => {
     imageList,
   });
 };
-
 export const meta: MetaFunction = () => {
   return [
     { title: "Granite Depot Database" },
@@ -197,11 +198,11 @@ export const meta: MetaFunction = () => {
 
 function Image({ className, src, name }: ImageProps) {
   return (
-    <div className="">
+    <div className="text-center">
       <img
         src={src}
         alt={name}
-        className={`w-16  ${className === undefined ? "" : className}`}
+        className={`w-16 mx-auto ${className || ""}`}
         loading="lazy"
       />
       <p className="text-center font-bold select-text">{name}</p>
@@ -226,24 +227,33 @@ function Supplier({
   supplierName,
 }: SupplierProps) {
   return (
-    <li>
-      <span className="supplier">
-        <a rel="noreferrer" href={website} target="_blank">
+    <li className="grid grid-cols-6 gap-2 p-4 mb-4 font-sans text-base text-gray-800 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
+      <span className="col-span-2 text-left font-bold">
+        <a
+          rel="noreferrer"
+          href={website}
+          target="_blank"
+          className="text-blue-600 hover:underline"
+        >
           {supplierName}
         </a>
       </span>
-      <img src="./images/donde.webp" alt="Checkmark" className="checkbox" />
-      <span className="name"> {name}</span>
-      <span className="phone">{phone}</span>
-      <span className="email">{email} </span>
-      <span className="notes">{notes}</span>
+      <img
+        src="./images/donde.webp"
+        alt="Checkmark"
+        className="w-5 h-5 mx-auto"
+      />
+      <span className="">{name}</span>
+      <span className="">{phone}</span>
+      <span className="">{email}</span>
+      {/* Notes column can be hidden on smaller screens if needed */}
+      <span className="col-span-6 mt-1 text-sm text-gray-600">{notes}</span>
     </li>
   );
 }
 
 function getSourceName(source: string, name: string) {
-  const cleanName = name.toLowerCase().replace(/\s+/g, "_");
-
+  const cleanName = name.toLowerCase().replace(/\s+/g, "_").replace("$", "");
   return `./images/${source}/${cleanName}.webp`;
 }
 
@@ -255,193 +265,124 @@ function Stones({
   stoneList,
 }: {
   stoneList: {
-    granite: {
-      name: string;
-    }[];
-    quartz: {
-      name: string;
-    }[];
-    marble: {
-      name: string;
-    }[];
-    quartzite: {
-      name: string;
-    }[];
+    granite: { name: string }[];
+    quartz: { name: string }[];
+    marble: { name: string }[];
+    quartzite: { name: string }[];
   };
 }) {
-  const [stones, setStones] = useState(false);
+  const [stonesOpen, setStonesOpen] = useState(false);
 
   return (
-    <div className="border-2 border-sky-500 select-none">
-      <h2 className="cursor-pointer " onClick={() => setStones(!stones)}>
-        Stones
-      </h2>
-      {stones && (
-        <div className="cursor-pointer">
-          <ul>
-            {Object.keys(stoneList).map((source) => (
-              <ModuleList key={source} name={capitalizeFirstLetter(source)}>
-                <div className="image-gallery flex ">
-                  {stoneList[
-                    source as "granite" | "quartz" | "quartzite" | "marble"
-                  ].map((item: { name: string }) => (
-                    <Image
-                      key={item.name}
-                      src={getSourceName(`stones/${source}`, item.name)}
-                      name={item.name}
-                    />
-                  ))}
-                </div>
-              </ModuleList>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
+    <Title text="Stones" state={stonesOpen} setState={setStonesOpen}>
+      <ul className="mt-1 pt-2">
+        {Object.keys(stoneList).map((source) => (
+          <ModuleList key={source} name={capitalizeFirstLetter(source)}>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {stoneList[
+                source as "granite" | "quartz" | "quartzite" | "marble"
+              ].map((item) => (
+                <Image
+                  key={item.name}
+                  src={getSourceName(`stones/${source}`, item.name)}
+                  name={item.name}
+                />
+              ))}
+            </div>
+          </ModuleList>
+        ))}
+      </ul>
+    </Title>
   );
 }
 
 function Sinks({ sinkList }: { sinkList: { name: string }[] }) {
-  const [sinks, setSinks] = useState(false);
+  const [sinksOpen, setSinksOpen] = useState(false);
 
   return (
-    <div className="border-2 border-sky-500 select-none">
-      <h2 className="cursor-pointer" onClick={() => setSinks(!sinks)}>
-        Sinks
-      </h2>
-      {sinks && (
-        <div className="cursor-pointer">
-          <ul>
-            {sinkList.map((item) => (
-              <ModuleList
+    <Title text="Sinks" state={sinksOpen} setState={setSinksOpen}>
+      <BlockList>
+        {sinkList.map((item) => (
+          <ModuleList key={item.name} name={capitalizeFirstLetter(item.name)}>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Image
                 key={item.name}
-                name={capitalizeFirstLetter(item.name)}
-              >
-                <div className="image-gallery">
-                  <Image
-                    key={item.name}
-                    src={getSourceName("sinks", item.name)}
-                    name={item.name}
-                  />
-                </div>
-              </ModuleList>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
+                src={getSourceName("sinks", item.name)}
+                name={item.name}
+              />
+            </div>
+          </ModuleList>
+        ))}
+      </BlockList>
+    </Title>
   );
 }
 
-function Suppliers({
-  supplierList,
-}: {
-  supplierList: {
-    name: string;
-    website: string;
-    supplierName: string;
-    phone: string;
-    email: string;
-    notes: string;
-  }[];
-}) {
-  const [suppliers, setSuppliers] = useState(false);
+function Suppliers({ supplierList }: { supplierList: SupplierProps[] }) {
+  const [suppliersOpen, setSuppliersOpen] = useState(false);
 
   return (
-    <div className="border-2 border-sky-500 select-none">
-      <h2 className="cursor-pointer " onClick={() => setSuppliers(!suppliers)}>
-        Suppliers
-      </h2>
-      {suppliers && (
-        <div className="cursor-pointer">
-          <ul className="warehouse-list">
-            {supplierList.map((supplierList, index) => (
-              <Supplier
-                key={index}
-                website={supplierList.website}
-                supplierName={supplierList.supplierName}
-                name={supplierList.name}
-                phone={supplierList.phone}
-                email={supplierList.email}
-                notes={supplierList.notes}
-              />
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
+    <Title text="Suppliers" state={suppliersOpen} setState={setSuppliersOpen}>
+      <BlockList>
+        {supplierList.map((supplier, index) => (
+          <Supplier key={index} {...supplier} />
+        ))}
+      </BlockList>
+    </Title>
   );
 }
 
 function Supports({ supportList }: { supportList: { name: string }[] }) {
-  const [supports, setSupports] = useState(false);
+  const [supportsOpen, setSupportsOpen] = useState(false);
 
   return (
-    <div className="border-2 border-sky-500 select-none">
-      <h2
-        className="module-title cursor-pointer"
-        onClick={() => setSupports(!supports)}
-      >
-        Supports
-      </h2>
-      {supports && (
-        <div className="cursor-pointer">
-          <div className="supports-gallery text-center ">
-            <ul className="flex">
-              {supportList.map((item, index) => (
-                <Image
-                  key={index}
-                  src={getSourceName("supports", item.name)}
-                  name={item.name}
-                />
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-    </div>
+    <Title text="Supports" state={supportsOpen} setState={setSupportsOpen}>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-1">
+        {supportList.map((item, index) => (
+          <Image
+            key={index}
+            src={getSourceName("supports", item.name)}
+            name={item.name}
+          />
+        ))}
+      </div>
+    </Title>
   );
 }
 
 function Documents({ documentList }: { documentList: { name: string }[] }) {
-  const [documents, setDocuments] = useState(false);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
 
   return (
-    <Title text="Documents" setUseState={setDocuments} state={documents}>
-      {documents && (
-        <div className="cursor-pointer flex">
-          {documentList.map((item, index) => (
-            <Document key={index} src={getSourceName("documents", item.name)}>
-              <Image
-                src={getSourceName("documents", item.name)}
-                name={item.name}
-              />
-            </Document>
-          ))}
-        </div>
-      )}
+    <Title text="Documents" state={documentsOpen} setState={setDocumentsOpen}>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-1">
+        {documentList.map((item, index) => (
+          <Document key={index} src={getSourceName("documents", item.name)}>
+            <Image
+              src={getSourceName("documents", item.name)}
+              name={item.name}
+            />
+          </Document>
+        ))}
+      </div>
     </Title>
   );
 }
 
 function Images({ imageList }: { imageList: { name: string }[] }) {
-  const [images, setImages] = useState(false);
+  const [imagesOpen, setImagesOpen] = useState(false);
 
   return (
-    <Title text="Images" setUseState={setImages} state={images}>
-      {images && (
-        <div className="cursor-pointer">
-          <ul className="flex">
-            {imageList.map((image, index) => (
-              <Image
-                key={index}
-                src={getSourceName("images", image.name)}
-                name={image.name}
-              />
-            ))}
-          </ul>
-        </div>
-      )}
+    <Title text="Images" state={imagesOpen} setState={setImagesOpen}>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-1">
+        {imageList.map((image, index) => (
+          <Image
+            key={index}
+            src={getSourceName("images", image.name)}
+            name={image.name}
+          />
+        ))}
+      </div>
     </Title>
   );
 }
@@ -450,9 +391,11 @@ export default function Index() {
   const data = useLoaderData<typeof loader>();
 
   return (
-    <main>
-      <h1>Granite Depot Database</h1>
-      <section className="modules">
+    <main className="flex-1 p-5 bg-gray-100">
+      <h1 className="text-3xl font-bold text-center mb-8">
+        Granite Depot Database
+      </h1>
+      <section className="flex flex-col gap-8">
         <Stones stoneList={data.stoneList} />
         <Sinks sinkList={data.sinkList} />
         <Suppliers supplierList={data.supplierList} />
