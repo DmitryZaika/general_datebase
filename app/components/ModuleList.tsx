@@ -11,10 +11,10 @@ export default function ModuleList({ name, children }: ModuleListProps) {
   const [open, setOpen] = useState(false);
 
   return (
-    <li className="mb-2">
+    <li className="mb-2 sm:mb-0">
       <h3
         onClick={() => setOpen(!open)}
-        className="sm:pl-4 text-lg font-bold cursor-pointer select-none"
+        className="pl-4  text-lg font-bold cursor-pointer select-none"
       >
         {name}
       </h3>
