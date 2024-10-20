@@ -1,12 +1,24 @@
 import { ActionFunctionArgs, json } from "@remix-run/node";
 import { Form, useActionData, useNavigation } from "@remix-run/react";
 import { PageLayout } from "~/components/PageLayout";
-
+import {
+  validateEmail,
+  validatePhone,
+  validateString,
+} from "~/utils/formValidation";
 import { db } from "~/db.server";
 
 interface InputProps {
   name: string;
   type: string;
+  error?: string;
+}
+
+interface FormError {
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -17,56 +29,67 @@ export async function action({ request }: ActionFunctionArgs) {
   const phone = body.get("phone");
   const address = body.get("address");
 
-  console.log({ name, email, phone, address });
+  const errors: FormError = {};
 
+  if (!validateString(name, 2)) {
+    errors.name = "invalid text provider";
+  }
+  if (!validateEmail(email)) {
+    errors.email = "invalid text provider";
+  }
+  if (!validatePhone(phone)) {
+    errors.phone = "invalid text provider";
+  }
+  if (!validateString(address, 10)) {
+    errors.address = "invalid text provider";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return json({ success: false, errors });
+  }
   try {
     const result = await db.execute(
       `INSERT INTO main.customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
       [name, email, phone, address]
     );
     console.log(result);
-
-    return json({ success: true });
   } catch (error) {
-    console.error("Error connecting to the database: ", error);
-    return json({
-      success: false,
-      error: "There was an error processing your request.",
-    });
+    console.error("Error connecting to the database: ", errors);
   }
+  return json({ success: true, errors });
 }
 
-function Input({ name, type }: InputProps) {
+function Input({ name, type, error }: InputProps) {
   return (
-    <label htmlFor={name} className="block mb-2 font-bold text-gray-800">
+    <label htmlFor={name} className="block mb-5 font-bold text-gray-800">
       {name}
       <input
         type={type}
         id={name}
-        className="w-full p-2 border border-gray-300 rounded-md text-base mb-4"
+        className="w-full p-2 border border-gray-300 rounded-md text-base"
         name={name.toLowerCase()}
       />
+      {error && <p className="  text-red-500">{error}</p>}
     </label>
   );
 }
 
 export default function Customer() {
-  const data = useActionData<typeof action>();
+  const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
-  console.log(data?.success);
+  console.log(actionData);
 
   return (
     <PageLayout title="Customers">
       <h2 id="formTitle" className="text-xl mb-4 text-gray-800">
         Add New Customer
       </h2>
-      {data?.success && <h3>Success</h3>}
+      {actionData?.success && <h3>Success</h3>}
       <Form id="customerForm" method="post">
-        <input type="hidden" id="customerId" />
-        <Input name="Name" type="text" />
-        <Input name="Email" type="email" />
-        <Input name="Phone" type="tel" />
-        <Input name="Address" type="text" />
+        <Input name="Name" type="text" error={actionData?.errors.name} />
+        <Input name="Email" type="email" error={actionData?.errors.email} />
+        <Input name="Phone" type="tel" error={actionData?.errors.phone} />
+        <Input name="Address" type="text" error={actionData?.errors.address} />
         <button
           disabled={navigation.state === "submitting"}
           type="submit"
