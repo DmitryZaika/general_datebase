@@ -8,6 +8,9 @@ import BlockList from "~/components/BlockList";
 import { PageLayout } from "~/components/PageLayout";
 import { ImageList } from "~/components/ImageList";
 
+import { db } from "~/db.server";
+import { RowDataPacket } from "mysql2";
+
 interface ImageProps {
   name?: string;
   src: string;
@@ -26,6 +29,12 @@ interface SupplierProps {
 interface DocumentProps {
   src: string;
   children: JSX.Element;
+}
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
 }
 
 export const loader = async () => {
@@ -181,6 +190,15 @@ export const loader = async () => {
     { name: "Special 599$" },
   ];
 
+  let result: User[];
+  try {
+    const [rows] = await db.query<User[] & RowDataPacket[]>("SELECT id, username, email FROM users")
+    result = rows
+  } catch (error) {
+    console.error("Error connecting to the database: ", error)
+    result = []
+  }
+
   return json({
     sinkList,
     stoneList,
@@ -188,6 +206,7 @@ export const loader = async () => {
     supportList,
     documentList,
     imageList,
+    result,
   });
 };
 
@@ -444,6 +463,8 @@ function Images({ imageList }: { imageList: { name: string }[] }) {
 
 export default function Index() {
   const data = useLoaderData<typeof loader>();
+  
+  console.log(data.result);
 
   return (
     <PageLayout title="Granite Depot DataBase">
