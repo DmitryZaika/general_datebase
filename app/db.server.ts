@@ -1,10 +1,11 @@
-import mysql, { PoolOptions } from 'mysql2/promise';
+import mysql, { PoolOptions } from "mysql2/promise";
 
 const access: PoolOptions = {
-  user: 'root',
-  database: 'test',
-  password: 'password',
-  host: 'localhost',
+  user: process.env.DB_USER,
+  database: process.env.DB_DATABASE,
+  password: process.env.DB_PASSWORD,
+  host: process.env.DB_HOST,
 };
+console.log(access);
 
 export const db = mysql.createPool(access);
