@@ -2,6 +2,8 @@ import { ActionFunctionArgs, json } from "@remix-run/node";
 import { Form, useActionData, useNavigation } from "@remix-run/react";
 import { PageLayout } from "~/components/PageLayout";
 
+import { db } from "~/db.server";
+
 interface InputProps {
   name: string;
   type: string;
@@ -9,8 +11,29 @@ interface InputProps {
 
 export async function action({ request }: ActionFunctionArgs) {
   const body = await request.formData();
-  console.log(body);
-  return json({ success: true });
+
+  const name = body.get("name");
+  const email = body.get("email");
+  const phone = body.get("phone");
+  const address = body.get("address");
+
+  console.log({ name, email, phone, address });
+
+  try {
+    const result = await db.execute(
+      `INSERT INTO main.customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
+      [name, email, phone, address]
+    );
+    console.log(result);
+
+    return json({ success: true });
+  } catch (error) {
+    console.error("Error connecting to the database: ", error);
+    return json({
+      success: false,
+      error: "There was an error processing your request.",
+    });
+  }
 }
 
 function Input({ name, type }: InputProps) {
