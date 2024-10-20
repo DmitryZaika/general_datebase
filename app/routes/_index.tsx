@@ -223,7 +223,7 @@ export function Image({ className = "", src, name }: ImageProps) {
              duration-300 
              ease-in-out
               transform
-              hover:scale-110
+              hover:scale-105
                hover:shadow-lg
                hover:border-blue-500
                 hover:bg-gray-300 ${className}`}
@@ -247,7 +247,7 @@ export function Image({ className = "", src, name }: ImageProps) {
           <img
             src={src}
             alt={name}
-            className="w-1/2 h-auto mx-auto my-auto"
+            className="w-auto h-[90%] mx-auto my-auto"
             onClick={(e) => e.stopPropagation()}
           />
         </div>

@@ -84,6 +84,12 @@ export default function Instructions() {
               customers...
             </p>
           </ModuleList>
+          <ModuleList name="Fabrication">
+            <p className="mt-2">
+              Granite: 60$ per sqft Quartz: 70$ per sqft Porclein: 70$ per sqft
+              Quartzite: 80$ per sqft Marble: 80$ per sqft
+            </p>
+          </ModuleList>
         </BlockList>
       </Title>
 
