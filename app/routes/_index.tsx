@@ -9,7 +9,7 @@ import { PageLayout } from "~/components/PageLayout";
 import { ImageList } from "~/components/ImageList";
 
 import { db } from "~/db.server";
-import { RowDataPacket } from "mysql2";
+import { selectMany } from "~/utils/queryHelpers";
 
 interface ImageProps {
   name?: string;
@@ -31,41 +31,17 @@ interface DocumentProps {
   children: JSX.Element;
 }
 
-interface User {
+interface Stone {
   id: number;
   name: string;
-  email: string;
+  type: string;
 }
 
 export const loader = async () => {
-  const stoneList = {
-    granite: [
-      { name: "Aghata Premium" },
-      { name: "American Black" },
-      { name: "Andorra White" },
-      { name: "Atlas" },
-      { name: "Azul Nuevo" },
-      { name: "Black Pearl" },
-      { name: "Bianco Antico" },
-    ],
-    quartz: [
-      { name: "Calacatta Lazio" },
-      { name: "Calacatta Miraggio Cove" },
-      { name: "Calacatta Roma" },
-      { name: "Crystallo" },
-    ],
-    marble: [
-      { name: "Fantasy Brown" },
-      { name: "Fantasy River" },
-      { name: "Mont Blanc" },
-    ],
-    quartzite: [
-      { name: "Cosmopolitan" },
-      { name: "Dumont" },
-      { name: "Sea Pearl" },
-      { name: "Polaris" },
-    ],
-  };
+  const stoneList = await selectMany<Stone>(
+    db,
+    "select id, name, type from stones"
+  );
 
   const sinkList = [
     { name: "Granite Composite Sinks" },
@@ -190,15 +166,6 @@ export const loader = async () => {
     { name: "Special 599$" },
   ];
 
-  let result: User[];
-  try {
-    const [rows] = await db.query<User[] & RowDataPacket[]>("SELECT id, username, email FROM users")
-    result = rows
-  } catch (error) {
-    console.error("Error connecting to the database: ", error)
-    result = []
-  }
-
   return json({
     sinkList,
     stoneList,
@@ -206,7 +173,6 @@ export const loader = async () => {
     supportList,
     documentList,
     imageList,
-    result,
   });
 };
 
@@ -335,17 +301,27 @@ const capitalizeFirstLetter = (str: string) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-function Stones({
-  stoneList,
-}: {
-  stoneList: {
-    granite: { name: string }[];
-    quartz: { name: string }[];
-    marble: { name: string }[];
-    quartzite: { name: string }[];
-  };
-}) {
+function Stones({ values }: { values: Stone[] }) {
   const [stonesOpen, setStonesOpen] = useState(false);
+
+  const stoneList: { [key: string]: { name: string; id: number }[] } =
+    values.reduce(
+      (
+        acc: { [key: string]: { name: string; id: number }[] },
+        stone: Stone
+      ) => {
+        // Проверяем наличие типа в результирующем объекте
+        if (!acc[stone.type]) {
+          acc[stone.type] = [];
+        }
+
+        // Добавляем камень только с именем и id
+        acc[stone.type].push({ name: stone.name, id: stone.id });
+
+        return acc;
+      },
+      {}
+    );
 
   return (
     <Title text="Stones" state={stonesOpen} setState={setStonesOpen}>
@@ -357,7 +333,7 @@ function Stones({
                 source as "granite" | "quartz" | "quartzite" | "marble"
               ].map((item) => (
                 <Image
-                  key={item.name}
+                  key={item.id}
                   src={getSourceName(`stones/${source}`, item.name)}
                   name={item.name}
                 />
@@ -463,12 +439,10 @@ function Images({ imageList }: { imageList: { name: string }[] }) {
 
 export default function Index() {
   const data = useLoaderData<typeof loader>();
-  
-  console.log(data.result);
 
   return (
     <PageLayout title="Granite Depot DataBase">
-      <Stones stoneList={data.stoneList} />
+      <Stones values={data.stoneList} />
       <Sinks sinkList={data.sinkList} />
       <Suppliers supplierList={data.supplierList} />
       <Supports supportList={data.supportList} />
