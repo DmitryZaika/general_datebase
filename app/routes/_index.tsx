@@ -7,7 +7,6 @@ import { useLoaderData } from "@remix-run/react";
 import BlockList from "~/components/BlockList";
 import { PageLayout } from "~/components/PageLayout";
 import { ImageList } from "~/components/ImageList";
-
 import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
 
@@ -17,18 +16,24 @@ interface ImageProps {
   className?: string;
 }
 
-interface SupplierProps {
-  name?: string;
-  phone: string;
-  notes: string;
-  email: string;
-  website: string;
-  supplierName: string;
+interface Supplier {
+  id: number;
+  supplier_name: string;
+  manager?: string;
+  phone?: string;
+  notes?: string;
+  email?: string;
+  website?: string;
 }
 
 interface DocumentProps {
   src: string;
   children: JSX.Element;
+}
+
+interface Support {
+  id: number;
+  name: string;
 }
 
 interface Stone {
@@ -37,134 +42,55 @@ interface Stone {
   type: string;
 }
 
+interface Sink {
+  id: number;
+  name: string;
+}
+
+interface Document {
+  id: number;
+  name: string;
+  src?: string;
+}
+
+interface ImageData {
+  id: number;
+  name: string;
+}
+
+const capitalizeFirstLetter = (str: string) => {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
+function getSourceName(source: string, name: string) {
+  const cleanName = name.toLowerCase().replace(/\s+/g, "_").replace(/\$/g, "");
+  return `./images/${source}/${cleanName}.webp`;
+}
+
 export const loader = async () => {
   const stoneList = await selectMany<Stone>(
     db,
     "select id, name, type from stones"
   );
+  const sinkList = await selectMany<Sink>(db, "select id, name from sinks");
+  const supplierList = await selectMany<Supplier>(
+    db,
+    "select id, website, manager, supplier_name, phone, email from suppliers"
+  );
+  const supportList = await selectMany<Support>(
+    db,
+    "select id, name from supports"
+  );
 
-  const sinkList = [
-    { name: "Granite Composite Sinks" },
-    { name: "Stainless Steel Sinks 16 Gauge" },
-    { name: "Stainless Steel Sinks 18 Gauge" },
-    { name: "Ceramic Sinks" },
-  ];
+  const documentList = await selectMany<Document>(
+    db,
+    "SELECT id, name FROM documents"
+  );
 
-  const supplierList = [
-    {
-      website: "https://www.msisurfaces.com",
-      supplierName: "MSI Surface",
-      name: "Scott Alexander",
-      phone: "(317) 614-3700",
-      email: "",
-      notes: "Supplier in Indianapolis",
-    },
-    {
-      website: "https://www.montsurfaces.com",
-      supplierName: "Mont Surfaces",
-      name: "Gina Bohannon",
-      phone: "(317) 875-5800",
-      email: "gb@montsurfaces.com",
-      notes: "Supplier in Indianapolis",
-    },
-    {
-      website: "https://tritonstone.com",
-      supplierName: "Triton Stone",
-      name: "Aaron Heath - Slabs",
-      phone: "(317) 644-1200",
-      email: "",
-      notes: "Supplier in Indianapolis",
-    },
-    {
-      website: "https://www.stone-design.com",
-      supplierName: "Stone Design",
-      name: "Isaac Martinez",
-      phone: "(317) 546-2300",
-      email: "",
-      notes: "Supplier in Indianapolis",
-    },
-    {
-      website: "https://www.stonemartmarblegranite.com",
-      supplierName: "Stone Mart Marble & Granite",
-      name: "Anthony",
-      phone: "(317) 991-4253",
-      email: "",
-      notes: "Supplier in Indianapolis",
-    },
-    {
-      website: "https://northstarsurfaces.com",
-      supplierName: "North Star Surfaces",
-      name: "Anthony",
-      phone: "(463) 777-6779",
-      email: "",
-      notes: "Supplier in Indianapolis",
-    },
-    {
-      website:
-        "https://xpresscargo365-my.sharepoint.com/:p:/g/personal/stephanie_plutusmarble_com/EYacC2TsdVtDqNqVegBJj04BQMxhlJShsUytpf_1jgoyiQ?rtime=iEMfbfHQ3Eg",
-      supplierName: "Plutus",
-      name: "",
-      phone: "",
-      email: "",
-      notes: "Supplier in Indianapolis",
-    },
-    {
-      website: "http://www.stonebasyx.com",
-      supplierName: "Stone Basyx",
-      name: "Dinarte",
-      phone: "336-529-4350",
-      email: "dcarsoso@stonebasyx.com",
-      notes: "Has only 3cm slabs",
-    },
-    {
-      website: "http://www.stonelandinc.com",
-      supplierName: "Stoneland Inc",
-      name: "Jesse",
-      phone: "859-737-7625",
-      email: "jesse@stonelandinc.com",
-      notes: "Supplier in Indianapolis",
-    },
-    {
-      website: "https://kivastonech.stoneprofitsweb.com",
-      supplierName: "Kiva Stone",
-      name: "",
-      phone: "",
-      email: "",
-      notes: "Warehouse in Chicago, keep only 3cm",
-    },
-  ];
-
-  const supportList = [
-    { name: "Flat Supports" },
-    { name: "Flat Supports Image 1" },
-    { name: "Flat Supports Image 2" },
-    { name: "L Supports Big" },
-    { name: "L Supports Big Image" },
-    { name: "L Supports Image 1" },
-    { name: "L Supports" },
-  ];
-
-  const documentList = [
-    { name: "Care and Maintenance" },
-    { name: "Contract" },
-    { name: "FHBS Reminders" },
-    { name: "Pick Up Form" },
-    { name: "Post Install Check List" },
-    { name: "Template Fill In" },
-    { name: "Template Reminders" },
-    { name: "Warranty" },
-  ];
-
-  const imageList = [
-    { name: "Stainless Steel Sinks" },
-    { name: "Granite Composite Sinks" },
-    { name: "Edges Example" },
-    { name: "Special 1999 Granite" },
-    { name: "Special 2499 Quartz" },
-    { name: "Special 3299 Granite" },
-    { name: "Special 3299 Quartz" },
-    { name: "Special 599$" },
-  ];
+  const imageList = await selectMany<ImageData>(
+    db,
+    "SELECT id, name FROM images"
+  );
 
   return json({
     sinkList,
@@ -249,25 +175,16 @@ function Document({ children, src }: DocumentProps) {
   );
 }
 
-function Supplier({
-  name = "",
+function SupplierInfo({
+  supplier_name,
+  website,
+  manager,
   phone,
   email,
   notes,
-  website,
-  supplierName,
-}: SupplierProps) {
+}: Supplier) {
   return (
-    <li
-      className="grid grid-cols-6 
-    gap-2 p-4 mb-4 
-    font-sans text-base
-     text-gray-800
-      bg-white border
-       border-gray-300 
-       rounded-md shadow-sm
-        hover:bg-gray-50"
-    >
+    <li className="grid grid-cols-6 gap-2 p-4 mb-4 font-sans text-base text-gray-800 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50">
       <span className="col-span-2 text-left font-bold">
         <a
           rel="noreferrer"
@@ -275,7 +192,7 @@ function Supplier({
           target="_blank"
           className="text-blue-600 hover:underline"
         >
-          {supplierName}
+          {supplier_name}
         </a>
       </span>
       <img
@@ -283,23 +200,14 @@ function Supplier({
         alt="Checkmark"
         className="w-5 h-5 mx-auto"
       />
-      <span className="">{name}</span>
-      <span className="">{phone}</span>
-      <span className="">{email}</span>
+      <span>{manager}</span>
+      <span>{phone}</span>
+      <span>{email}</span>
       {/* Notes column can be hidden on smaller screens if needed */}
       <span className="col-span-6 mt-1 text-sm text-gray-600">{notes}</span>
     </li>
   );
 }
-
-function getSourceName(source: string, name: string) {
-  const cleanName = name.toLowerCase().replace(/\s+/g, "_").replace("$", "");
-  return `./images/${source}/${cleanName}.webp`;
-}
-
-const capitalizeFirstLetter = (str: string) => {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-};
 
 function Stones({ values }: { values: Stone[] }) {
   const [stonesOpen, setStonesOpen] = useState(false);
@@ -310,12 +218,10 @@ function Stones({ values }: { values: Stone[] }) {
         acc: { [key: string]: { name: string; id: number }[] },
         stone: Stone
       ) => {
-        // Проверяем наличие типа в результирующем объекте
         if (!acc[stone.type]) {
           acc[stone.type] = [];
         }
 
-        // Добавляем камень только с именем и id
         acc[stone.type].push({ name: stone.name, id: stone.id });
 
         return acc;
@@ -346,21 +252,21 @@ function Stones({ values }: { values: Stone[] }) {
   );
 }
 
-function Sinks({ sinkList }: { sinkList: { name: string }[] }) {
+function Sinks({ sinkList }: { sinkList: Sink[] }) {
   const [sinksOpen, setSinksOpen] = useState(false);
 
   return (
     <Title text="Sinks" state={sinksOpen} setState={setSinksOpen}>
       <BlockList>
         {sinkList.map((item) => (
-          <ModuleList key={item.name} name={capitalizeFirstLetter(item.name)}>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <ModuleList key={item.id} name={capitalizeFirstLetter(item.name)}>
+            <ImageList>
               <Image
-                key={item.name}
+                key={item.id}
                 src={getSourceName("sinks", item.name)}
                 name={item.name}
               />
-            </div>
+            </ImageList>
           </ModuleList>
         ))}
       </BlockList>
@@ -368,29 +274,29 @@ function Sinks({ sinkList }: { sinkList: { name: string }[] }) {
   );
 }
 
-function Suppliers({ supplierList }: { supplierList: SupplierProps[] }) {
+function Suppliers({ supplierList }: { supplierList: Supplier[] }) {
   const [suppliersOpen, setSuppliersOpen] = useState(false);
 
   return (
     <Title text="Suppliers" state={suppliersOpen} setState={setSuppliersOpen}>
       <BlockList>
-        {supplierList.map((supplier, index) => (
-          <Supplier key={index} {...supplier} />
+        {supplierList.map((supplier) => (
+          <SupplierInfo key={supplier.id} {...supplier} />
         ))}
       </BlockList>
     </Title>
   );
 }
 
-function Supports({ supportList }: { supportList: { name: string }[] }) {
+function Supports({ supportList }: { supportList: Support[] }) {
   const [supportsOpen, setSupportsOpen] = useState(false);
 
   return (
     <Title text="Supports" state={supportsOpen} setState={setSupportsOpen}>
       <ImageList>
-        {supportList.map((item, index) => (
+        {supportList.map((item) => (
           <Image
-            key={index}
+            key={item.id}
             src={getSourceName("supports", item.name)}
             name={item.name}
           />
@@ -400,34 +306,34 @@ function Supports({ supportList }: { supportList: { name: string }[] }) {
   );
 }
 
-function Documents({ documentList }: { documentList: { name: string }[] }) {
+function Documents({ documentList }: { documentList: Document[] }) {
   const [documentsOpen, setDocumentsOpen] = useState(false);
 
   return (
     <Title text="Documents" state={documentsOpen} setState={setDocumentsOpen}>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-1">
-        {documentList.map((item, index) => (
-          <Document key={index} src={getSourceName("documents", item.name)}>
+      <ImageList>
+        {documentList.map((item) => (
+          <Document key={item.id} src={getSourceName("documents", item.name)}>
             <Image
               src={getSourceName("documents", item.name)}
               name={item.name}
             />
           </Document>
         ))}
-      </div>
+      </ImageList>
     </Title>
   );
 }
 
-function Images({ imageList }: { imageList: { name: string }[] }) {
+function Images({ imageList }: { imageList: ImageData[] }) {
   const [imagesOpen, setImagesOpen] = useState(false);
 
   return (
     <Title text="Images" state={imagesOpen} setState={setImagesOpen}>
       <ImageList>
-        {imageList.map((image, index) => (
+        {imageList.map((image) => (
           <Image
-            key={index}
+            key={image.id}
             src={getSourceName("images", image.name)}
             name={image.name}
           />
