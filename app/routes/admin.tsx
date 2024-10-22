@@ -55,9 +55,6 @@ export default function AdminPage() {
               >
                 Add New Stone
               </a>
-              <a href="/admin/stones" className="text-blue-500 hover:underline">
-                View All Stones
-              </a>
             </div>
           </ModuleList>
         </BlockList>
