@@ -80,7 +80,11 @@ export default function Customer() {
   console.log(actionData);
 
   return (
-    <PageLayout title="Customers">
+    <PageLayout
+      className="bg-white p-5 rounded-lg shadow-[0px_-0px_5px_rgba(0,0,0,0.15)]  max-w-lg mx-auto my-5"
+      title="Customers
+    "
+    >
       <h2 id="formTitle" className="text-xl mb-4 text-gray-800">
         Add New Customer
       </h2>
