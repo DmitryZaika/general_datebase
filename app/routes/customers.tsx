@@ -1,12 +1,37 @@
 import { ActionFunctionArgs, json } from "@remix-run/node";
-import { Form, useActionData, useNavigation } from "@remix-run/react";
-import { PageLayout } from "~/components/PageLayout";
 import {
-  validateEmail,
-  validatePhone,
-  validateString,
-} from "~/utils/formValidation";
+  Form,
+  useActionData,
+  useNavigation,
+  useSubmit,
+} from "@remix-run/react";
+import { PageLayout } from "~/components/PageLayout";
+import { z } from "zod";
 import { db } from "~/db.server";
+import { Button } from "~/components/ui/button";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRemixForm, getValidatedFormData } from "remix-hook-form";
+import { useForm } from "react-hook-form";
+import {
+  Form as FormProvider,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "../components/ui/form";
+import { Input } from "../components/ui/input";
+
+const customerSchema = z.object({
+  name: z.string().min(5),
+  email: z.string().email(),
+  phoneNumber: z.string().min(10),
+  address: z.string().min(10),
+});
+
+type FormData = z.infer<typeof customerSchema>;
+
+const resolver = zodResolver(customerSchema);
 
 interface InputProps {
   name: string;
@@ -14,43 +39,20 @@ interface InputProps {
   error?: string;
 }
 
-interface FormError {
-  name?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-}
-
 export async function action({ request }: ActionFunctionArgs) {
-  const body = await request.formData();
-
-  const name = body.get("name");
-  const email = body.get("email");
-  const phone = body.get("phone");
-  const address = body.get("address");
-
-  const errors: FormError = {};
-
-  if (!validateString(name, 2)) {
-    errors.name = "invalid text provider";
-  }
-  if (!validateEmail(email)) {
-    errors.email = "invalid text provider";
-  }
-  if (!validatePhone(phone)) {
-    errors.phone = "invalid text provider";
-  }
-  if (!validateString(address, 10)) {
-    errors.address = "invalid text provider";
+  const {
+    errors,
+    data,
+    receivedValues: defaultValues,
+  } = await getValidatedFormData<FormData>(request, resolver);
+  if (errors) {
+    return json({ errors, defaultValues });
   }
 
-  if (Object.keys(errors).length > 0) {
-    return json({ success: false, errors });
-  }
   try {
     const result = await db.execute(
       `INSERT INTO main.customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
-      [name, email, phone, address]
+      [data.name, data.email, data.phoneNumber, data.address]
     );
     console.log(result);
   } catch (error) {
@@ -59,25 +61,15 @@ export async function action({ request }: ActionFunctionArgs) {
   return json({ success: true, errors });
 }
 
-function Input({ name, type, error }: InputProps) {
-  return (
-    <label htmlFor={name} className="block mb-5 font-bold text-gray-800">
-      {name}
-      <input
-        type={type}
-        id={name}
-        className="w-full p-2 border border-gray-300 rounded-md text-base"
-        name={name.toLowerCase()}
-      />
-      {error && <p className="  text-red-500">{error}</p>}
-    </label>
-  );
-}
-
 export default function Customer() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   console.log(actionData);
+  const submit = useSubmit();
+
+  const form = useForm<FormData>({
+    resolver,
+  });
 
   return (
     <PageLayout
@@ -89,25 +81,72 @@ export default function Customer() {
         Add New Customer
       </h2>
       {actionData?.success && <h3>Success</h3>}
-      <Form id="customerForm" method="post">
-        <Input name="Name" type="text" error={actionData?.errors.name} />
-        <Input name="Email" type="email" error={actionData?.errors.email} />
-        <Input name="Phone" type="tel" error={actionData?.errors.phone} />
-        <Input name="Address" type="text" error={actionData?.errors.address} />
-        <button
-          disabled={navigation.state === "submitting"}
-          type="submit"
-          className="w-full p-2
-             bg-gray-800
-              text-yellow-400 
-              rounded-md text-lg 
-              font-bold cursor-pointer 
-              transition duration-300 
-              ease-in-out hover:bg-gray-700"
+      <FormProvider {...form}>
+        <Form
+          id="customerForm"
+          method="post"
+          onSubmit={form.handleSubmit(
+            (data) => {
+              submit(data, { method: "post", encType: "multipart/form-data" });
+            },
+            (errors) => console.log(errors)
+          )}
         >
-          Add Customer
-        </button>
-      </Form>
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="Your name" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input placeholder="Your Email" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="phoneNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone number</FormLabel>
+                <FormControl>
+                  <Input placeholder="Your phone number" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="address"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Address</FormLabel>
+                <FormControl>
+                  <Input placeholder="Your address" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button type="submit">Submit</Button>
+        </Form>
+      </FormProvider>
     </PageLayout>
   );
 }

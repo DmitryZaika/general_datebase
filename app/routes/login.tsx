@@ -11,7 +11,7 @@ export const action: ActionFunction = async ({ request }) => {
 
   // Temporary hardcoded credentials for testing
   const validUsername = "admin";
-  const validPassword = "password123";
+  const validPassword = "1234";
 
   if (username === validUsername && password === validPassword) {
     // Create a session and store the user data

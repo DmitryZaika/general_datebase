@@ -1,5 +1,3 @@
-// app/sessions.ts
-
 import { createCookieSessionStorage } from "@remix-run/node";
 
 const { getSession, commitSession, destroySession } =
