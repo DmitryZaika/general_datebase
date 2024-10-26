@@ -1,23 +1,8 @@
-// app/routes/admin.tsx
-
-import { getSession } from "~/sessions";
-import { LoaderFunction, redirect } from "@remix-run/node";
 import { useState } from "react";
 import { PageLayout } from "~/components/PageLayout";
 import { Title } from "~/components/Title";
 import ModuleList from "~/components/ModuleList";
 import BlockList from "~/components/BlockList";
-
-export const loader: LoaderFunction = async ({ request }) => {
-  const session = await getSession(request.headers.get("Cookie"));
-  const user = session.get("user");
-
-  if (!user) {
-    return redirect("/");
-  }
-
-  return null;
-};
 
 export default function AdminPage() {
   const [instructionsOpen, setInstructionsOpen] = useState(false);
