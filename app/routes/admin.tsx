@@ -1,49 +1,32 @@
-import { useState } from "react";
+import type { MetaFunction } from "@remix-run/node";
+import { Link, Outlet, useLocation } from "@remix-run/react";
 import { PageLayout } from "~/components/PageLayout";
-import { Title } from "~/components/Title";
-import ModuleList from "~/components/ModuleList";
-import BlockList from "~/components/BlockList";
 
-export default function AdminPage() {
-  const [instructionsOpen, setInstructionsOpen] = useState(false);
-  const [stonesOpen, setStonesOpen] = useState(false);
+import { Tabs, TabsList } from "~/components/ui/tabs";
+import { NavTab } from "~/components/molecules/NavTab";
+import { Button } from "~/components/ui/button";
 
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Granite Depot Database" },
+    { name: "description", content: "Welcome to Remix!" },
+  ];
+};
+
+export default function Admin() {
   return (
-    <PageLayout title="Admin Panel">
-      {/* Your admin panel content */}
-      <Title
-        text="Instructions"
-        state={instructionsOpen}
-        setState={setInstructionsOpen}
-      >
-        <BlockList>
-          <ModuleList name="Edit Instructions">
-            <div className="mt-2">
-              <a
-                href="/admin/instructions/edit"
-                className="text-blue-500 hover:underline"
-              >
-                Edit Instructions
-              </a>
-            </div>
-          </ModuleList>
-        </BlockList>
-      </Title>
-
-      <Title text="Stones" state={stonesOpen} setState={setStonesOpen}>
-        <BlockList>
-          <ModuleList name="Manage Stones">
-            <div className="mt-2 space-y-4">
-              <a
-                href="/admin/stones/new"
-                className="text-blue-500 hover:underline"
-              >
-                Add New Stone
-              </a>
-            </div>
-          </ModuleList>
-        </BlockList>
-      </Title>
+    <PageLayout title="Granite Depot DataBase">
+      <Tabs defaultValue="account">
+        <TabsList>
+          <NavTab name="Stones" />
+          <NavTab name="Sinks" />
+          <NavTab name="Suppliers" />
+          <NavTab name="Supports" />
+          <NavTab name="Documents" />
+          <NavTab name="Images" />
+        </TabsList>
+        <Outlet />
+      </Tabs>
     </PageLayout>
   );
 }

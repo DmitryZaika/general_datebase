@@ -1,16 +1,11 @@
 import { ActionFunctionArgs, json } from "@remix-run/node";
-import {
-  Form,
-  useActionData,
-  useNavigation,
-  useSubmit,
-} from "@remix-run/react";
+import { Form, useActionData, useSubmit } from "@remix-run/react";
 import { PageLayout } from "~/components/PageLayout";
 import { z } from "zod";
 import { db } from "~/db.server";
 import { Button } from "~/components/ui/button";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRemixForm, getValidatedFormData } from "remix-hook-form";
+import { getValidatedFormData } from "remix-hook-form";
 import { useForm } from "react-hook-form";
 import {
   Form as FormProvider,
@@ -21,6 +16,7 @@ import {
   FormMessage,
 } from "../components/ui/form";
 import { Input } from "../components/ui/input";
+import { InputItem } from "~/components/molecules/InputItem";
 
 const customerSchema = z.object({
   name: z.string().min(5),
@@ -33,12 +29,6 @@ type FormData = z.infer<typeof customerSchema>;
 
 const resolver = zodResolver(customerSchema);
 
-interface InputProps {
-  name: string;
-  type: string;
-  error?: string;
-}
-
 export async function action({ request }: ActionFunctionArgs) {
   const {
     errors,
@@ -50,21 +40,18 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    const result = await db.execute(
+    await db.execute(
       `INSERT INTO main.customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
       [data.name, data.email, data.phoneNumber, data.address]
     );
-    console.log(result);
   } catch (error) {
-    console.error("Error connecting to the database: ", errors);
+    console.error("Error connecting to the database: ", error);
   }
-  return json({ success: true, errors });
+  return json({ success: true });
 }
 
 export default function Customer() {
   const actionData = useActionData<typeof action>();
-  const navigation = useNavigation();
-  console.log(actionData);
   const submit = useSubmit();
 
   const form = useForm<FormData>({
@@ -96,13 +83,11 @@ export default function Customer() {
             control={form.control}
             name="name"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                  <Input placeholder="Your name" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+              <InputItem
+                name={"Name"}
+                placeholder={"Your name"}
+                field={field}
+              />
             )}
           />
           <FormField

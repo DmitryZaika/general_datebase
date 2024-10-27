@@ -27,7 +27,7 @@ export const loader = async () => {
 export default function Supports() {
   const { supports } = useLoaderData<typeof loader>();
   return (
-    <Accordion type="single">
+    <Accordion type="single" defaultValue="supports">
       <AccordionItem value="supports">
         <AccordionTrigger>Supports</AccordionTrigger>
         <AccordionContent>

@@ -25,7 +25,7 @@ export const loader = async () => {
 export default function Sinks() {
   const { sinks } = useLoaderData<typeof loader>();
   return (
-    <Accordion type="single">
+    <Accordion type="single" defaultValue="sinks">
       <AccordionItem value="sinks">
         <AccordionTrigger>Sinks</AccordionTrigger>
         <AccordionContent>

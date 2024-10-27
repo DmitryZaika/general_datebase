@@ -51,7 +51,7 @@ function Document({ src, name }: DocumentProps) {
 export default function Documents() {
   const { documents } = useLoaderData<typeof loader>();
   return (
-    <Accordion type="single">
+    <Accordion type="single" defaultValue="documents">
       <AccordionItem value="documents">
         <AccordionTrigger>Documents</AccordionTrigger>
         <AccordionContent>
