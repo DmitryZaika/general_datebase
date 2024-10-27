@@ -14,18 +14,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-
 import { db } from "~/db.server";
-import { SelectInput } from "~/components/molecules/SelectItem";
 
-const stoneSchema = z.object({
+const sinkSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
 });
 
-type FormData = z.infer<typeof stoneSchema>;
+type FormData = z.infer<typeof sinkSchema>;
 
-const resolver = zodResolver(stoneSchema);
+const resolver = zodResolver(sinkSchema);
 
 export async function action({ request }: ActionFunctionArgs) {
   const {
@@ -39,8 +36,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const result = await db.execute(
-      `INSERT INTO main.stones (name, type) VALUES (?, ?)`,
-      [data.name, data.type]
+      `INSERT INTO main.sinks (name) VALUES (?)`,
+      [data.name]
     );
     console.log(result);
   } catch (error) {
@@ -49,7 +46,7 @@ export async function action({ request }: ActionFunctionArgs) {
   return redirect("..");
 }
 
-export default function StonesAdd() {
+export default function SinksAdd() {
   const navigate = useNavigate();
 
   const submit = useSubmit();
@@ -67,7 +64,7 @@ export default function StonesAdd() {
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Stone</DialogTitle>
+          <DialogTitle>Add Sink</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
           <Form
@@ -91,24 +88,6 @@ export default function StonesAdd() {
                   name={"Name"}
                   placeholder={"Name of the stone"}
                   field={field}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <SelectInput
-                  field={field}
-                  placeholder="Type of the Stone"
-                  name="Type"
-                  options={[
-                    "Granite",
-                    "Quartz",
-                    "Marble",
-                    "Dolomite",
-                    "Quartzite",
-                  ]}
                 />
               )}
             />

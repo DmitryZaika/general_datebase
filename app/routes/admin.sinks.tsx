@@ -51,7 +51,11 @@ export default function Sinks() {
               <TableCell className="font-medium">{sink.name}</TableCell>
 
               <TableCell>Edit</TableCell>
-              <TableCell className="text-right">Delete</TableCell>
+              <TableCell className="text-right">
+                <Link to={`delete/${sink.id}`} className="text-xl">
+                  Delete
+                </Link>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
