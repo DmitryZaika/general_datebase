@@ -4,12 +4,17 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLoaderData,
 } from "@remix-run/react";
-import type { LinksFunction } from "@remix-run/node";
+import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
-
+import { json } from "@remix-run/node";
+import { Toaster } from "./components/ui/toaster";
 import "./tailwind.css";
+import { commitSession, getSession } from "./sessions";
+import { useToast } from "./hooks/use-toast";
+import { useEffect } from "react";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -24,7 +29,34 @@ export const links: LinksFunction = () => [
   },
 ];
 
+export async function loader({ request }: LoaderFunctionArgs) {
+  const session = await getSession(request.headers.get("Cookie"));
+  const message = session.get("message") || null;
+  return json(
+    { message },
+    {
+      headers: {
+        "Set-Cookie": await commitSession(session),
+      },
+    }
+  );
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
+  const { message } = useLoaderData<typeof loader>();
+  console.log(message);
+
+  const { toast } = useToast();
+  useEffect(() => {
+    if (message !== null) {
+      toast({
+        title: "Success",
+        description: message,
+        variant: "success",
+      });
+    }
+  }, [message]);
+
   return (
     <html lang="en">
       <head>
@@ -36,6 +68,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body>
         <Header />
         {children}
+        <Toaster />
         <ScrollRestoration />
         {/* <Footer /> */}
         <Scripts />

@@ -53,7 +53,11 @@ export default function Stones() {
             <TableRow key={stone.id}>
               <TableCell className="font-medium">{stone.name}</TableCell>
               <TableCell>{stone.type}</TableCell>
-              <TableCell>Edit</TableCell>
+              <TableCell>
+                <Link to={`edit/${stone.id}`} className="text-xl">
+                  Edit
+                </Link>
+              </TableCell>
 
               <TableCell className="text-right">
                 <Link to={`delete/${stone.id}`} className="text-xl">

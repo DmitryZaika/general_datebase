@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { db } from "~/db.server";
+import { commitSession, getSession } from "~/sessions";
 
 const sinkSchema = z.object({
   name: z.string().min(1),
@@ -43,7 +44,11 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }
-  return redirect("..");
+  const session = await getSession(request.headers.get("Cookie"));
+  session.flash("message", `Stone Deleted`);
+  return redirect("..", {
+    headers: { "Set-Cookie": await commitSession(session) },
+  });
 }
 
 export default function SinksAdd() {
