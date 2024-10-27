@@ -17,6 +17,7 @@ import {
 
 import { db } from "~/db.server";
 import { SelectInput } from "~/components/molecules/SelectItem";
+import { commitSession, getSession } from "~/sessions";
 
 const stoneSchema = z.object({
   name: z.string().min(1),
@@ -46,7 +47,11 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }
-  return redirect("..");
+  const session = await getSession(request.headers.get("Cookie"));
+  session.flash("message", `Stone added`);
+  return redirect("..", {
+    headers: { "Set-Cookie": await commitSession(session) },
+  });
 }
 
 export default function StonesAdd() {

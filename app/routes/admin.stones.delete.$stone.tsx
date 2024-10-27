@@ -18,8 +18,9 @@ import {
 } from "~/components/ui/dialog";
 
 import { db } from "~/db.server";
+import { commitSession, getSession } from "~/sessions";
 
-export async function action({ params }: ActionFunctionArgs) {
+export async function action({ params, request }: ActionFunctionArgs) {
   const stoneId = params.stone;
   try {
     const result = await db.execute(`DELETE FROM main.stones WHERE id = ?`, [
@@ -29,7 +30,11 @@ export async function action({ params }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
-  return redirect("..");
+  const session = await getSession(request.headers.get("Cookie"));
+  session.flash("message", `Stone Deleted`);
+  return redirect("..", {
+    headers: { "Set-Cookie": await commitSession(session) },
+  });
 }
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {

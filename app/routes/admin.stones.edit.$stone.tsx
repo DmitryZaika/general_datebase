@@ -18,42 +18,37 @@ import {
 } from "~/components/ui/dialog";
 
 import { db } from "~/db.server";
-import { commitSession, getSession } from "~/sessions";
 
-export async function action({ params, request }: ActionFunctionArgs) {
-  const sinkId = params.sink;
+export async function action({ params }: ActionFunctionArgs) {
+  const stoneId = params.stone;
   try {
-    const result = await db.execute(`DELETE FROM main.sinks WHERE id = ?`, [
-      sinkId,
+    const result = await db.execute(`DELETE FROM main.stones WHERE id = ?`, [
+      stoneId,
     ]);
     console.log(result);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
-  const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", `Sink Deleted`);
-  return redirect("..", {
-    headers: { "Set-Cookie": await commitSession(session) },
-  });
+  return redirect("..");
 }
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
-  if (params.sink === undefined) {
+  if (params.stone === undefined) {
     return json({ name: undefined });
   }
-  const sinkId = parseInt(params.sink);
+  const stoneId = parseInt(params.stone);
 
-  const sink = await selectId<{ name: string }>(
+  const stone = await selectId<{ name: string }>(
     db,
-    "select name from sinks WHERE id = ?",
-    sinkId
+    "select name from stones WHERE id = ?",
+    stoneId
   );
   return json({
-    name: sink?.name,
+    name: stone?.name,
   });
 };
 
-export default function SinksAdd() {
+export default function StonesAdd() {
   const navigate = useNavigate();
   const { name } = useLoaderData<typeof loader>();
 
@@ -66,14 +61,14 @@ export default function SinksAdd() {
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Delete Sink</DialogTitle>
+          <DialogTitle>Delete Stone</DialogTitle>
           <DialogDescription>
             Are you sure you want to delete {name}?
           </DialogDescription>
         </DialogHeader>
         <Form id="customerForm" method="post">
           <DialogFooter>
-            <Button type="submit">Delete Sink</Button>
+            <Button type="submit">Delete Stone</Button>
           </DialogFooter>
         </Form>
       </DialogContent>
