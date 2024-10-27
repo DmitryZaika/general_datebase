@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { useActionData, useSubmit, Form, useNavigate } from "@remix-run/react";
+import { useSubmit, Form, useNavigate } from "@remix-run/react";
 import { Form as FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
@@ -14,7 +14,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "~/components/ui/dialog";
 
 import { db } from "~/db.server";
@@ -22,7 +21,7 @@ import { SelectInput } from "~/components/molecules/SelectItem";
 
 const stoneSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(["granite", "guartz", "garble", "dolomite", "quartzites"]),
+  type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
 });
 
 type FormData = z.infer<typeof stoneSchema>;
@@ -53,7 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function StonesAdd() {
   const navigate = useNavigate();
-  const actionData = useActionData<typeof action>();
+
   const submit = useSubmit();
 
   const form = useForm<FormData>({
@@ -67,9 +66,6 @@ export default function StonesAdd() {
   };
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogTrigger asChild>
-        <Button variant="outline">Edit Profile</Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
@@ -115,7 +111,7 @@ export default function StonesAdd() {
                     "Quartz",
                     "Marble",
                     "Dolomite",
-                    "Quartzites",
+                    "Quartzite",
                   ]}
                 />
               )}
