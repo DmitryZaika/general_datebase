@@ -16,6 +16,7 @@ import {
 } from "~/components/ui/dialog";
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
+import { toastData } from "~/utils/toastHelpers";
 
 const sinkSchema = z.object({
   name: z.string().min(1),
@@ -45,7 +46,7 @@ export async function action({ request }: ActionFunctionArgs) {
     console.error("Error connecting to the database: ", errors);
   }
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", `Stone Deleted`);
+  session.flash("message", toastData("Success", "Sink added"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });

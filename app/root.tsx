@@ -15,6 +15,7 @@ import "./tailwind.css";
 import { commitSession, getSession } from "./sessions";
 import { useToast } from "./hooks/use-toast";
 import { useEffect } from "react";
+import { ToastMessage } from "./utils/toastHelpers";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -31,7 +32,7 @@ export const links: LinksFunction = () => [
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getSession(request.headers.get("Cookie"));
-  const message = session.get("message") || null;
+  const message: ToastMessage = session.get("message") || null;
   return json(
     { message },
     {
@@ -48,14 +49,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const { toast } = useToast();
   useEffect(() => {
-    if (message !== null) {
+    if (message !== null && message !== undefined) {
       toast({
-        title: "Success",
-        description: message,
-        variant: "success",
+        title: message.title,
+        description: message.description,
+        variant: message.variant,
       });
     }
-  }, [message]);
+  }, [message ? message.nonce : null]);
 
   return (
     <html lang="en">
