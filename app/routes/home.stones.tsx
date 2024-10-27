@@ -41,7 +41,7 @@ export default function Stones() {
   );
 
   return (
-    <Accordion type="single">
+    <Accordion type="single" defaultValue="stones">
       <AccordionItem value="stones">
         <AccordionTrigger>Stones</AccordionTrigger>
         <AccordionContent>

@@ -27,7 +27,7 @@ export const loader = async () => {
 export default function Images() {
   const { images } = useLoaderData<typeof loader>();
   return (
-    <Accordion type="single" collapsible>
+    <Accordion type="single" defaultValue="images">
       <AccordionItem value="images">
         <AccordionTrigger>Images</AccordionTrigger>
         <AccordionContent>
