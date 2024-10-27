@@ -19,6 +19,7 @@ import {
 
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
+import { toastData } from "~/utils/toastHelpers";
 
 export async function action({ params, request }: ActionFunctionArgs) {
   const sinkId = params.sink;
@@ -31,7 +32,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
     console.error("Error connecting to the database: ", error);
   }
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", `Sink Deleted`);
+  session.flash("message", toastData("Success", "Sink Deleted"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
