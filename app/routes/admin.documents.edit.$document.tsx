@@ -1,6 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { useSubmit, Form, useNavigate } from "@remix-run/react";
+import {
+  ActionFunctionArgs,
+  json,
+  LoaderFunctionArgs,
+  redirect,
+} from "@remix-run/node";
+import { useSubmit, Form, useNavigate, useLoaderData } from "@remix-run/react";
 import { Form as FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
@@ -14,19 +19,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
+import { selectId } from "~/utils/queryHelpers";
 import { toastData } from "~/utils/toastHelpers";
 
-const sinkSchema = z.object({
+const documentschema = z.object({
   name: z.string().min(1),
 });
 
-type FormData = z.infer<typeof sinkSchema>;
+type FormData = z.infer<typeof documentschema>;
 
-const resolver = zodResolver(sinkSchema);
+const resolver = zodResolver(documentschema);
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {
+  const documentId = params.document;
   const {
     errors,
     data,
@@ -38,29 +46,45 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const result = await db.execute(
-      `INSERT INTO main.sinks (name) VALUES (?)`,
-      [data.name]
+      `UPDATE main.documents SET name = ? WHERE id = ?`,
+      [data.name, documentId]
     );
     console.log(result);
   } catch (error) {
-    console.error("Error connecting to the database: ", error);
+    console.error("Error connecting to the database: ", errors);
   }
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Sink added"));
+  session.flash("message", toastData("Success", "document Edited"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
 
-export default function SinksAdd() {
+export const loader = async ({ params }: LoaderFunctionArgs) => {
+  if (params.document === undefined) {
+    return json({ name: undefined, type: undefined });
+  }
+  const documentId = parseInt(params.document);
+
+  const document = await selectId<{ name: string; type: string }>(
+    db,
+    "select name from documents WHERE id = ?",
+    documentId
+  );
+  return json({
+    name: document?.name,
+    type: document?.type,
+  });
+};
+
+export default function DocumentsEdit() {
   const navigate = useNavigate();
-
+  const { name, type } = useLoaderData<typeof loader>();
   const submit = useSubmit();
-
   const form = useForm<FormData>({
     resolver,
+    defaultValues: documentschema.parse({ name, type }),
   });
-
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
@@ -70,7 +94,7 @@ export default function SinksAdd() {
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Sink</DialogTitle>
+          <DialogTitle>Edit document</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
           <Form
@@ -91,8 +115,8 @@ export default function SinksAdd() {
               name="name"
               render={({ field }) => (
                 <InputItem
-                  name={"Name"}
-                  placeholder={"Name of the Sink"}
+                  name="Name"
+                  placeholder={"Name of the document"}
                   field={field}
                 />
               )}

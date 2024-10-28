@@ -16,12 +16,19 @@ import { Button } from "~/components/ui/button";
 
 interface Supplier {
   id: number;
-  name: string;
-  type: string;
+  website: string;
+  supplier_name: string;
+  manager: string;
+  phone: string;
+  email: string;
+  notes: string;
 }
 
 export const loader = async () => {
-  const suppliers = await selectMany<Supplier>(db, "select * from suppliers");
+  const suppliers = await selectMany<Supplier>(
+    db,
+    "SELECT website, supplier_name, manager, phone, email, notes from suppliers"
+  );
   return json({
     suppliers,
   });
@@ -36,7 +43,7 @@ export default function Suppliers() {
         <Button>Add</Button>
       </Link>
       <Table>
-        <TableCaption>A list of available suppliers.</TableCaption>
+        <TableCaption>A list of your recent invoices.</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[100px]">Invoice</TableHead>
@@ -48,10 +55,25 @@ export default function Suppliers() {
         <TableBody>
           {suppliers.map((supplier) => (
             <TableRow key={supplier.id}>
-              <TableCell className="font-medium">{supplier.name}</TableCell>
+              <TableCell className="font-medium">{supplier.website}</TableCell>
+              <TableCell className="font-medium">
+                {supplier.supplier_name}
+              </TableCell>
+              <TableCell className="font-medium">{supplier.manager}</TableCell>
+              <TableCell className="font-medium">{supplier.phone}</TableCell>
+              <TableCell className="font-medium">{supplier.email}</TableCell>
+              <TableCell className="font-medium">{supplier.notes}</TableCell>
+              <TableCell>
+                <Link to={`edit/${supplier.id}`} className="text-xl">
+                  Edit
+                </Link>
+              </TableCell>
 
-              <TableCell>Edit</TableCell>
-              <TableCell className="text-right">Delete</TableCell>
+              <TableCell className="text-right">
+                <Link to={`delete/${supplier.id}`} className="text-xl">
+                  Delete
+                </Link>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

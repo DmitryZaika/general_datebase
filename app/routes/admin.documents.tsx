@@ -14,24 +14,20 @@ import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 
-interface Support {
+interface Document {
   id: number;
   name: string;
-  type: string;
 }
 
 export const loader = async () => {
-  const supports = await selectMany<Support>(
-    db,
-    "select id, name from supports"
-  );
+  const documents = await selectMany<Document>(db, "select * from documents");
   return json({
-    supports,
+    documents,
   });
 };
 
-export default function Supports() {
-  const { supports } = useLoaderData<typeof loader>();
+export default function Documents() {
+  const { documents } = useLoaderData<typeof loader>();
 
   return (
     <>
@@ -39,7 +35,7 @@ export default function Supports() {
         <Button>Add</Button>
       </Link>
       <Table>
-        <TableCaption>A list of available supports.</TableCaption>
+        <TableCaption>A list of available documents.</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[100px]">Invoice</TableHead>
@@ -49,12 +45,22 @@ export default function Supports() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {supports.map((support) => (
-            <TableRow key={support.id}>
-              <TableCell className="font-medium">{support.name}</TableCell>
+          {documents.map((document) => (
+            <TableRow key={document.id}>
+              <TableCell className="font-medium">{document.name}</TableCell>
 
-              <TableCell>Edit</TableCell>
-              <TableCell className="text-right">Delete</TableCell>
+              <TableCell>
+                {" "}
+                <Link to={`edit/${document.id}`} className="text-xl">
+                  Edit
+                </Link>
+              </TableCell>
+              <TableCell className="text-right">
+                {" "}
+                <Link to={`delete/${document.id}`} className="text-xl">
+                  Delete
+                </Link>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

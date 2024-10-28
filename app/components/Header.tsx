@@ -98,7 +98,7 @@ export function Header() {
         </ul>
       </nav>
       <div className="flex justify-center md:justify-end w-full md:w-auto">
-        {location.pathname === "/admin" ? (
+        {location.pathname === "/admin/stones" ? (
           <Button onClick={handleLogout}>Logout</Button>
         ) : (
           <Dialog>

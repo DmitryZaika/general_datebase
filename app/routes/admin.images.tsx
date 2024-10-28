@@ -50,8 +50,18 @@ export default function Images() {
             <TableRow key={image.id}>
               <TableCell className="font-medium">{image.name}</TableCell>
 
-              <TableCell>Edit</TableCell>
-              <TableCell className="text-right">Delete</TableCell>
+              <TableCell>
+                {" "}
+                <Link to={`edit/${image.id}`} className="text-xl">
+                  Edit
+                </Link>
+              </TableCell>
+              <TableCell className="text-right">
+                {" "}
+                <Link to={`delete/${image.id}`} className="text-xl">
+                  Delete
+                </Link>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

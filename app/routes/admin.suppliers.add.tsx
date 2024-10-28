@@ -18,13 +18,18 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 
-const sinkSchema = z.object({
-  name: z.string().min(1),
+const supplierschema = z.object({
+  website: z.string().url(),
+  supplier_name: z.string().min(1),
+  manager: z.string().min(1).optional(),
+  phone: z.string().min(10).optional(),
+  email: z.string().email().optional(),
+  notes: z.string().optional(),
 });
 
-type FormData = z.infer<typeof sinkSchema>;
+type FormData = z.infer<typeof supplierschema>;
 
-const resolver = zodResolver(sinkSchema);
+const resolver = zodResolver(supplierschema);
 
 export async function action({ request }: ActionFunctionArgs) {
   const {
@@ -38,25 +43,30 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const result = await db.execute(
-      `INSERT INTO main.sinks (name) VALUES (?)`,
-      [data.name]
+      `INSERT INTO main.suppliers  (website, supplier_name, manager,  phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        data.website,
+        data.supplier_name,
+        data.manager ?? null,
+        data.phone ?? null,
+        data.email ?? null,
+        data.notes ?? null,
+      ]
     );
     console.log(result);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Sink added"));
+  session.flash("message", toastData("Success", "supplier added"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
 
-export default function SinksAdd() {
+export default function SuppliersAdd() {
   const navigate = useNavigate();
-
   const submit = useSubmit();
-
   const form = useForm<FormData>({
     resolver,
   });
@@ -70,7 +80,7 @@ export default function SinksAdd() {
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Sink</DialogTitle>
+          <DialogTitle>Add supplier</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
           <Form
@@ -88,13 +98,60 @@ export default function SinksAdd() {
           >
             <FormField
               control={form.control}
-              name="name"
+              name="website"
               render={({ field }) => (
                 <InputItem
-                  name={"Name"}
-                  placeholder={"Name of the Sink"}
+                  name={"Website"}
+                  placeholder={"Website"}
                   field={field}
                 />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="supplier_name"
+              render={({ field }) => (
+                <InputItem
+                  name={"Supplier Name"}
+                  placeholder={"Name of the supplier"}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="manager"
+              render={({ field }) => (
+                <InputItem
+                  name={"Manager"}
+                  placeholder={"Name of the manager"}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <InputItem
+                  name={"Phone Number"}
+                  placeholder={"Phone Number"}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <InputItem name={"Email"} placeholder={"Email"} field={field} />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <InputItem name={"Notes"} placeholder={"Notes"} field={field} />
               )}
             />
             <DialogFooter>
