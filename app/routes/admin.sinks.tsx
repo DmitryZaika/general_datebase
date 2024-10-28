@@ -50,7 +50,12 @@ export default function Sinks() {
             <TableRow key={sink.id}>
               <TableCell className="font-medium">{sink.name}</TableCell>
 
-              <TableCell>Edit</TableCell>
+              <TableCell>
+                {" "}
+                <Link to={`edit/${sink.id}`} className="text-xl">
+                  Edit
+                </Link>
+              </TableCell>
               <TableCell className="text-right">
                 <Link to={`delete/${sink.id}`} className="text-xl">
                   Delete

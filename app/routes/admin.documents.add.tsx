@@ -18,13 +18,13 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 
-const sinkSchema = z.object({
+const documentschema = z.object({
   name: z.string().min(1),
 });
 
-type FormData = z.infer<typeof sinkSchema>;
+type FormData = z.infer<typeof documentschema>;
 
-const resolver = zodResolver(sinkSchema);
+const resolver = zodResolver(documentschema);
 
 export async function action({ request }: ActionFunctionArgs) {
   const {
@@ -38,7 +38,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const result = await db.execute(
-      `INSERT INTO main.sinks (name) VALUES (?)`,
+      `INSERT INTO main.documents (name) VALUES (?)`,
       [data.name]
     );
     console.log(result);
@@ -46,21 +46,18 @@ export async function action({ request }: ActionFunctionArgs) {
     console.error("Error connecting to the database: ", error);
   }
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Sink added"));
+  session.flash("message", toastData("Success", "document added"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
 
-export default function SinksAdd() {
+export default function DocumentsAdd() {
   const navigate = useNavigate();
-
   const submit = useSubmit();
-
   const form = useForm<FormData>({
     resolver,
   });
-
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
@@ -70,7 +67,7 @@ export default function SinksAdd() {
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Sink</DialogTitle>
+          <DialogTitle>Add document</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
           <Form
@@ -92,7 +89,7 @@ export default function SinksAdd() {
               render={({ field }) => (
                 <InputItem
                   name={"Name"}
-                  placeholder={"Name of the Sink"}
+                  placeholder={"Name of the document"}
                   field={field}
                 />
               )}

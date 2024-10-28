@@ -53,8 +53,18 @@ export default function Supports() {
             <TableRow key={support.id}>
               <TableCell className="font-medium">{support.name}</TableCell>
 
-              <TableCell>Edit</TableCell>
-              <TableCell className="text-right">Delete</TableCell>
+              <TableCell>
+                {" "}
+                <Link to={`edit/${support.id}`} className="text-xl">
+                  Edit
+                </Link>
+              </TableCell>
+              <TableCell className="text-right">
+                {" "}
+                <Link to={`delete/${support.id}`} className="text-xl">
+                  Delete
+                </Link>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
