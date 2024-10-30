@@ -1,7 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useSubmit, Form, useNavigate } from "@remix-run/react";
-import { Form as FormProvider, FormField } from "../components/ui/form";
+import {
+  Form as FormProvider,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
@@ -17,9 +24,19 @@ import {
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
+import { Input } from "~/components/ui/input";
 
 const imageschema = z.object({
   name: z.string().min(1),
+});
+
+const formSchema = z.object({
+  file:
+    typeof window === "undefined"
+      ? z.any()
+      : z
+          .instanceof(FileList)
+          .refine((file) => file?.length > 0, "File is required."),
 });
 
 type FormData = z.infer<typeof imageschema>;
@@ -58,6 +75,12 @@ export default function ImagesAdd() {
   const form = useForm<FormData>({
     resolver,
   });
+
+  const fileForm = useForm({
+    resolver: zodResolver(formSchema),
+  });
+  const fileRef = fileForm.register("file");
+
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
@@ -94,6 +117,37 @@ export default function ImagesAdd() {
                 />
               )}
             />
+            <FormProvider {...fileForm}>
+              <form
+                onSubmit={fileForm.handleSubmit((data) => {
+                  console.log(data);
+                })}
+                className="w-full"
+              >
+                <FormField
+                  control={fileForm.control}
+                  name="file"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>File</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="cursor-pointer"
+                          type="file"
+                          placeholder="Upload file"
+                          {...fileRef}
+                          onChange={(event) => {
+                            field.onChange(event.target.files);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit">Upload File</Button>
+              </form>
+            </FormProvider>
             <DialogFooter>
               <Button type="submit">Save changes</Button>
             </DialogFooter>
