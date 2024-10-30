@@ -17,7 +17,6 @@ import { Button } from "~/components/ui/button";
 interface Support {
   id: number;
   name: string;
-  type: string;
 }
 
 export const loader = async () => {
@@ -42,25 +41,23 @@ export default function Supports() {
         <TableCaption>A list of available supports.</TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[100px]">Invoice</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Method</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
+            <TableHead className="w-[200px] text-xl">Support Name</TableHead>
+            <TableHead className="text-right text-xl">Edit Support</TableHead>
+            <TableHead className="text-right text-xl">Delete Support</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {supports.map((support) => (
             <TableRow key={support.id}>
-              <TableCell className="font-medium">{support.name}</TableCell>
-
-              <TableCell>
-                {" "}
+              <TableCell className="font-medium w-[200px]">
+                {support.name}
+              </TableCell>
+              <TableCell className="text-right">
                 <Link to={`edit/${support.id}`} className="text-xl">
                   Edit
                 </Link>
               </TableCell>
-              <TableCell className="text-right">
-                {" "}
+              <TableCell className="text-right w-[200px]">
                 <Link to={`delete/${support.id}`} className="text-xl">
                   Delete
                 </Link>
@@ -70,7 +67,7 @@ export default function Supports() {
         </TableBody>
         <TableFooter>
           <TableRow>
-            <TableCell colSpan={3}>Total</TableCell>
+            <TableCell colSpan={2}>Total</TableCell>
             <TableCell className="text-right">$2,500.00</TableCell>
           </TableRow>
         </TableFooter>

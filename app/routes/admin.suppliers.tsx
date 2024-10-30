@@ -45,11 +45,15 @@ export default function Suppliers() {
       <Table>
         <TableCaption>A list of your recent invoices.</TableCaption>
         <TableHeader>
-          <TableRow>
-            <TableHead className="w-[100px]">Invoice</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Method</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
+          <TableRow className="text-xl">
+            <TableHead className="w-[100px]">WebSite</TableHead>
+            <TableHead>Supplier Name</TableHead>
+            <TableHead>Manager</TableHead>
+            <TableHead>Phone Number</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Notes</TableHead>
+            <TableHead>Edit</TableHead>
+            <TableHead className="text-right">Delete</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

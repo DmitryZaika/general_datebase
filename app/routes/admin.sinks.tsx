@@ -17,7 +17,6 @@ import { Button } from "~/components/ui/button";
 interface Sink {
   id: number;
   name: string;
-  type: string;
 }
 
 export const loader = async () => {
@@ -39,24 +38,23 @@ export default function Sinks() {
         <TableCaption>A list of available sinks.</TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[100px]">Invoice</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Method</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
+            <TableHead className="w-[200px] text-xl">Sink Name</TableHead>
+            <TableHead className="text-right text-xl">Edit Sink</TableHead>
+            <TableHead className="text-right text-xl">Delete Sink</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {sinks.map((sink) => (
             <TableRow key={sink.id}>
-              <TableCell className="font-medium">{sink.name}</TableCell>
-
-              <TableCell>
-                {" "}
+              <TableCell className="font-medium w-[200px]">
+                {sink.name}
+              </TableCell>
+              <TableCell className="text-right">
                 <Link to={`edit/${sink.id}`} className="text-xl">
                   Edit
                 </Link>
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="w-[200px] text-right">
                 <Link to={`delete/${sink.id}`} className="text-xl">
                   Delete
                 </Link>
@@ -66,7 +64,7 @@ export default function Sinks() {
         </TableBody>
         <TableFooter>
           <TableRow>
-            <TableCell colSpan={3}>Total</TableCell>
+            <TableCell colSpan={2}>Total</TableCell>
             <TableCell className="text-right">$2,500.00</TableCell>
           </TableRow>
         </TableFooter>
