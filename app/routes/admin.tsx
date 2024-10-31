@@ -35,6 +35,7 @@ export default function Admin() {
           <NavTab name="Documents" />
           <NavTab name="Images" />
         </TabsList>
+
         <Outlet />
       </Tabs>
     </PageLayout>
