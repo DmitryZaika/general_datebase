@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { useSubmit, Form, useNavigate } from "@remix-run/react";
+import { ActionFunctionArgs, json, redirect, unstable_parseMultipartFormData } from "@remix-run/node";
+import { useSubmit, Form, useNavigate, useActionData } from "@remix-run/react";
 import {
   Form as FormProvider,
   FormField,
@@ -9,7 +9,7 @@ import {
   FormItem,
   FormMessage,
 } from "../components/ui/form";
-import { getValidatedFormData } from "remix-hook-form";
+import { getValidatedFormData, validateFormData } from "remix-hook-form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
 import { Button } from "~/components/ui/button";
@@ -27,18 +27,27 @@ import { SelectInput } from "~/components/molecules/SelectItem";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 
-const formSchema = z.object({
-  file:
-    typeof window === "undefined"
-      ? z.any()
-      : z
-          .instanceof(FileList)
-          .refine((file) => file?.length > 0, "File is required."),
-});
+export const fileUploadHandler =
+  (): UploadHandler =>
+  async ({ data, filename }) => {
+    const chunks = []; 
+    for await (const chunk of data) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+    // If there's no filename, it's a text field and we can return the value directly
+    if (!filename) {
+      const textDecoder = new TextDecoder();
+      return textDecoder.decode(buffer);
+    }
+    // Otherwise, it's a file and we need to return a File object
+    return new File([buffer], filename, { type: "image/jpeg" });
+  };
 
 const stoneSchema = z.object({
   name: z.string().min(1),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
+  file: z.any()
 });
 
 type FormData = z.infer<typeof stoneSchema>;
@@ -46,19 +55,18 @@ type FormData = z.infer<typeof stoneSchema>;
 const resolver = zodResolver(stoneSchema);
 
 export async function action({ request }: ActionFunctionArgs) {
-  const {
-    errors,
-    data,
-    receivedValues: defaultValues,
-  } = await getValidatedFormData<FormData>(request, resolver);
+  const formData = await unstable_parseMultipartFormData(request,
+    fileUploadHandler(),
+  );
+  const { errors, data } = await validateFormData(formData, resolver);
   if (errors) {
-    return json({ errors, defaultValues });
+    return json({ errors });
   }
 
   try {
     const result = await db.execute(
-      `INSERT INTO main.stones (name, type) VALUES (?, ?);`,
-      [data.name, data.type]
+      `INSERT INTO main.stones (name, type, url) VALUES (?, ?, ?);`,
+      [data.name, data.type, data.file.name]
     );
     console.log(result);
   } catch (error) {
@@ -74,16 +82,12 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function StonesAdd() {
   const navigate = useNavigate();
   const submit = useSubmit();
+  const actionData = useActionData<typeof action>();
+  console.log(actionData)
 
   const form = useForm<FormData>({
     resolver,
   });
-
-  const fileForm = useForm({
-    resolver: zodResolver(formSchema),
-  });
-
-  const fileRef = fileForm.register("file");
 
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -104,7 +108,11 @@ export default function StonesAdd() {
             method="post"
             onSubmit={form.handleSubmit(
               (data) => {
-                submit(data, {
+                const formData = new FormData();
+                formData.append("name", data.name);
+                formData.append("type", data.type);
+                formData.append("file", data.file[0]);
+                submit(formData, {
                   method: "post",
                   encType: "multipart/form-data",
                 });
@@ -141,46 +149,33 @@ export default function StonesAdd() {
                 />
               )}
             />
-          </Form>
-        </FormProvider>
-
-        <FormProvider {...fileForm}>
-          <form
-            onSubmit={fileForm.handleSubmit((data) => {
-              console.log(data);
-            })}
-            className="w-full"
-          >
             <FormField
-              control={fileForm.control}
+              control={form.control}
               name="file"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>File</FormLabel>
                   <FormControl>
-                    <Input
-                      className="cursor-pointer"
-                      type="file"
-                      placeholder="Upload file"
-                      {...fileRef}
-                      onChange={(event) => {
-                        field.onChange(event.target.files);
-                      }}
-                    />
+                  <Input
+                  value={field.value?.fileName}
+                  onChange={(event) => {
+                    field.onChange(event.target.files);
+                  }}
+                  type="file"
+                  id="picture"
+                />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit">Upload File</Button>
-          </form>
-        </FormProvider>
-
         <DialogFooter>
           <Button type="submit" form="customerForm">
             Save changes
           </Button>
         </DialogFooter>
+          </Form>
+        </FormProvider>
       </DialogContent>
     </Dialog>
   );
