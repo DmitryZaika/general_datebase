@@ -1,11 +1,21 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
 import {
   ActionFunctionArgs,
   json,
   redirect,
   unstable_parseMultipartFormData,
+  UploadHandler,
+  unstable_createMemoryUploadHandler,
+  unstable_composeUploadHandlers,
 } from "@remix-run/node";
-import { useSubmit, Form, useNavigate, useActionData } from "@remix-run/react";
+import {
+  useSubmit,
+  Form,
+  useNavigate,
+  useNavigation,
+  useActionData,
+} from "@remix-run/react";
 import { FormProvider, FormField } from "../components/ui/form";
 import { validateFormData } from "remix-hook-form";
 import { z } from "zod";
@@ -24,6 +34,8 @@ import { SelectInput } from "~/components/molecules/SelectItem";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 import { FileInput } from "~/components/molecules/FileInput";
+import { s3UploadHandler } from "~/utils/s3.server";
+import { Spinner } from "~/components/atoms/Spinner";
 
 function createFromData(data: StoneData) {
   const formData = new FormData();
@@ -33,23 +45,6 @@ function createFromData(data: StoneData) {
 
   return formData;
 }
-
-export const fileUploadHandler =
-  (): UploadHandler =>
-  async ({ data, filename }) => {
-    const chunks = [];
-    for await (const chunk of data) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-    // If there's no filename, it's a text field and we can return the value directly
-    if (!filename) {
-      const textDecoder = new TextDecoder();
-      return textDecoder.decode(buffer);
-    }
-    // Otherwise, it's a file and we need to return a File object
-    return new File([buffer], filename, { type: "image/jpeg" });
-  };
 
 const stoneSchema = z.object({
   name: z.string().min(1),
@@ -62,9 +57,13 @@ type StoneData = z.infer<typeof stoneSchema>;
 const resolver = zodResolver(stoneSchema);
 
 export async function action({ request }: ActionFunctionArgs) {
+  const uploadHandler: UploadHandler = unstable_composeUploadHandlers(
+    s3UploadHandler,
+    unstable_createMemoryUploadHandler()
+  );
   const formData = await unstable_parseMultipartFormData(
     request,
-    fileUploadHandler()
+    uploadHandler
   );
   const { errors, data } = await validateFormData(formData, resolver);
   if (errors) {
@@ -72,16 +71,17 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    const result = await db.execute(
+    await db.execute(
       `INSERT INTO main.stones (name, type, url) VALUES (?, ?, ?);`,
-      [data.name, data.type, data.file.name]
+      [data.name, data.type, data.file]
     );
-    console.log(result);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
+  console.log("HERE");
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Stone added"));
+  console.log("HERE 2");
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
@@ -90,8 +90,8 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function StonesAdd() {
   const navigate = useNavigate();
   const submit = useSubmit();
-  const actionData = useActionData<typeof action>();
-  console.log(actionData);
+  // const actionData = useActionData<typeof action>();
+  const isSubmitting = useNavigation().state === "submitting";
 
   const form = useForm<StoneData>({
     resolver,
@@ -160,9 +160,7 @@ export default function StonesAdd() {
               )}
             />
             <DialogFooter>
-              <Button type="submit" form="customerForm">
-                Save changes
-              </Button>
+              <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
             </DialogFooter>
           </Form>
         </FormProvider>

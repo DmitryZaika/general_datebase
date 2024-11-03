@@ -8,7 +8,6 @@ import {
 } from "@remix-run/react";
 import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { Header } from "./components/Header";
-import { Footer } from "./components/Footer";
 import { json } from "@remix-run/node";
 import { Toaster } from "./components/ui/toaster";
 import "./tailwind.css";
