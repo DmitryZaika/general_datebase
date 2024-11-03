@@ -1,18 +1,13 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import {
-  useSubmit,
-  Form,
   useNavigate,
   useNavigation,
-  useActionData,
 } from "@remix-run/react";
-import { FormProvider, FormField } from "../components/ui/form";
+import { FormField } from "../components/ui/form";
 
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
-import { useForm } from "react-hook-form";
 import {
   Dialog,
   DialogContent,
@@ -26,26 +21,14 @@ import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
+import { MultiPartForm } from "~/components/molecules/MultiPartForm";
+import { useCustomForm } from "~/utils/useCustomForm";
 
-function createFromData(data: StoneData) {
-  const formData = new FormData();
-  formData.append("name", data.name);
-  formData.append("type", data.type);
-  formData.append("file", data.file[0]);
-
-  return formData;
-}
 
 const stoneSchema = z.object({
   name: z.string().min(1),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
 });
-
-const stoneSchemaFront = stoneSchema.merge();
-
-type StoneData = z.infer<typeof stoneSchema>;
-
-const resolver = zodResolver(stoneSchema);
 
 export async function action({ request }: ActionFunctionArgs) {
   const { errors, data } = await parseMutliForm(request, stoneSchema);
@@ -72,19 +55,18 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function StonesAdd() {
   const navigate = useNavigate();
-  const submit = useSubmit();
   // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
 
-  const form = useForm<StoneData>({
-    resolver,
-  });
+  const form = useCustomForm(stoneSchema);
+  console.log(form.formState.errors);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
     }
   };
+
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -93,19 +75,7 @@ export default function StonesAdd() {
           <DialogTitle>Add Stone</DialogTitle>
         </DialogHeader>
 
-        <FormProvider {...form}>
-          <Form
-            id="customerForm"
-            method="post"
-            onSubmit={form.handleSubmit((data) => {
-              const formData = createFromData(data);
-              submit(formData, {
-                method: "post",
-                encType: "multipart/form-data",
-              });
-              (errors) => console.log(errors);
-            })}
-          >
+          <MultiPartForm form={form}>
             <FormField
               control={form.control}
               name="name"
@@ -145,8 +115,7 @@ export default function StonesAdd() {
             <DialogFooter>
               <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
             </DialogFooter>
-          </Form>
-        </FormProvider>
+        </MultiPartForm>
       </DialogContent>
     </Dialog>
   );

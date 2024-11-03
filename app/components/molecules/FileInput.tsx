@@ -4,7 +4,7 @@ import { Input } from "~/components/ui/input";
 type FileInput = {
   name: string;
   id: string;
-  onChange: (event: FileList | null) => void;
+  onChange: (event: File | undefined) => void;
 };
 
 export function FileInput({ onChange, name, id }: FileInput) {
@@ -14,7 +14,7 @@ export function FileInput({ onChange, name, id }: FileInput) {
       <FormControl>
         <Input
           onChange={(event) => {
-            onChange(event.target.files);
+            onChange(event.target.files?.[0]);
           }}
           type="file"
           id={id}
