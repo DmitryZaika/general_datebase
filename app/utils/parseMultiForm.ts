@@ -1,5 +1,6 @@
 import { validateFormData } from "remix-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { FieldErrors, FieldValues } from "react-hook-form";
 import { z } from "zod";
 import {
   unstable_parseMultipartFormData,
@@ -12,8 +13,13 @@ import { s3UploadHandler } from "~/utils/s3.server";
 const fileSchema = z.object({
   file: z.string(),
 });
+interface ValidatedData<T> {
+  data: z.infer<T & typeof fileSchema> | undefined;
+  errors: FieldErrors<FieldValues> | undefined
+}
 
-export async function parseMutliForm<T>(request: Request, schema: T) {
+
+export async function parseMutliForm<T>(request: Request, schema: T): Promise<ValidatedData<T>> {
   const finalSchema = schema.merge(fileSchema);
   const resolver = zodResolver(finalSchema);
 
@@ -25,5 +31,6 @@ export async function parseMutliForm<T>(request: Request, schema: T) {
     request,
     uploadHandler
   );
-  return await validateFormData(formData, resolver);
+  const { data, errors } = await validateFormData(formData, resolver); 
+  return { data, errors };
 }
