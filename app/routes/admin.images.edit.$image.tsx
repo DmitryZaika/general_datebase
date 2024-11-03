@@ -6,7 +6,7 @@ import {
   redirect,
 } from "@remix-run/node";
 import { useSubmit, Form, useNavigate, useLoaderData } from "@remix-run/react";
-import { Form as FormProvider, FormField } from "../components/ui/form";
+import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";

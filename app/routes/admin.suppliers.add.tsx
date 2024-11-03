@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useSubmit, Form, useNavigate } from "@remix-run/react";
-import { Form as FormProvider, FormField } from "../components/ui/form";
+import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";

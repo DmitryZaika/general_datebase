@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useSubmit, Form, useNavigate } from "@remix-run/react";
 import {
-  Form as FormProvider,
+  FormProvider,
   FormField,
   FormItem,
   FormLabel,
