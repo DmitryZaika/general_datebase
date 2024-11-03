@@ -15,12 +15,13 @@ interface Stone {
   id: number;
   name: string;
   type: string;
+  url: string | null;
 }
 
 export const loader = async () => {
   const stones = await selectMany<Stone>(
     db,
-    "select id, name, type from stones"
+    "select id, name, type, url from stones"
   );
   return json({
     stones,
@@ -59,7 +60,7 @@ export default function Stones() {
                         className="flex flex-col items-center"
                       >
                         <img
-                          src={getSourceName(`stones/${type}`, stone.name)}
+                          src={stone.url || undefined}
                           alt={stone.name}
                           className="w-full h-auto rounded-lg"
                         />
