@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { getValidatedFormData } from "remix-hook-form";
 import { useForm } from "react-hook-form";
 import {
-  Form as FormProvider,
+  FormProvider,
   FormControl,
   FormField,
   FormItem,

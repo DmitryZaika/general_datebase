@@ -1,20 +1,17 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ActionFunctionArgs, json, redirect, unstable_parseMultipartFormData } from "@remix-run/node";
-import { useSubmit, Form, useNavigate, useActionData } from "@remix-run/react";
 import {
-  Form as FormProvider,
-  FormField,
-  FormControl,
-  FormLabel,
-  FormItem,
-  FormMessage,
-} from "../components/ui/form";
-import { getValidatedFormData, validateFormData } from "remix-hook-form";
+  ActionFunctionArgs,
+  json,
+  redirect,
+  unstable_parseMultipartFormData,
+} from "@remix-run/node";
+import { useSubmit, Form, useNavigate, useActionData } from "@remix-run/react";
+import { FormProvider, FormField } from "../components/ui/form";
+import { validateFormData } from "remix-hook-form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
 import { Button } from "~/components/ui/button";
 import { useForm } from "react-hook-form";
-import { Input } from "~/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -26,11 +23,21 @@ import { db } from "~/db.server";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
+import { FileInput } from "~/components/molecules/FileInput";
+
+function createFromData(data: StoneData) {
+  const formData = new FormData();
+  formData.append("name", data.name);
+  formData.append("type", data.type);
+  formData.append("file", data.file[0]);
+
+  return formData;
+}
 
 export const fileUploadHandler =
   (): UploadHandler =>
   async ({ data, filename }) => {
-    const chunks = []; 
+    const chunks = [];
     for await (const chunk of data) {
       chunks.push(chunk);
     }
@@ -47,16 +54,17 @@ export const fileUploadHandler =
 const stoneSchema = z.object({
   name: z.string().min(1),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  file: z.any()
+  file: z.any(),
 });
 
-type FormData = z.infer<typeof stoneSchema>;
+type StoneData = z.infer<typeof stoneSchema>;
 
 const resolver = zodResolver(stoneSchema);
 
 export async function action({ request }: ActionFunctionArgs) {
-  const formData = await unstable_parseMultipartFormData(request,
-    fileUploadHandler(),
+  const formData = await unstable_parseMultipartFormData(
+    request,
+    fileUploadHandler()
   );
   const { errors, data } = await validateFormData(formData, resolver);
   if (errors) {
@@ -83,9 +91,9 @@ export default function StonesAdd() {
   const navigate = useNavigate();
   const submit = useSubmit();
   const actionData = useActionData<typeof action>();
-  console.log(actionData)
+  console.log(actionData);
 
-  const form = useForm<FormData>({
+  const form = useForm<StoneData>({
     resolver,
   });
 
@@ -106,19 +114,14 @@ export default function StonesAdd() {
           <Form
             id="customerForm"
             method="post"
-            onSubmit={form.handleSubmit(
-              (data) => {
-                const formData = new FormData();
-                formData.append("name", data.name);
-                formData.append("type", data.type);
-                formData.append("file", data.file[0]);
-                submit(formData, {
-                  method: "post",
-                  encType: "multipart/form-data",
-                });
-              },
-              (errors) => console.log(errors)
-            )}
+            onSubmit={form.handleSubmit((data) => {
+              const formData = createFromData(data);
+              submit(formData, {
+                method: "post",
+                encType: "multipart/form-data",
+              });
+              (errors) => console.log(errors);
+            })}
           >
             <FormField
               control={form.control}
@@ -153,27 +156,14 @@ export default function StonesAdd() {
               control={form.control}
               name="file"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>File</FormLabel>
-                  <FormControl>
-                  <Input
-                  value={field.value?.fileName}
-                  onChange={(event) => {
-                    field.onChange(event.target.files);
-                  }}
-                  type="file"
-                  id="picture"
-                />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+                <FileInput name="Image" id="image" onChange={field.onChange} />
               )}
             />
-        <DialogFooter>
-          <Button type="submit" form="customerForm">
-            Save changes
-          </Button>
-        </DialogFooter>
+            <DialogFooter>
+              <Button type="submit" form="customerForm">
+                Save changes
+              </Button>
+            </DialogFooter>
           </Form>
         </FormProvider>
       </DialogContent>

@@ -58,7 +58,10 @@ export function Header() {
     <header className="flex content-center flex-col align-middle gap-5 m-3 md:flex-row">
       <div className="logo">
         <a className="flex justify-center" href="/">
-          <img src="./images/logo_gd_main.webp" alt="Logo" />
+          <img
+            src="https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp"
+            alt="Logo"
+          />
         </a>
       </div>
       <nav className="w-full">
