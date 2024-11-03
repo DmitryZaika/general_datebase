@@ -1,14 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
-import {
-  ActionFunctionArgs,
-  json,
-  redirect,
-  unstable_parseMultipartFormData,
-  UploadHandler,
-  unstable_createMemoryUploadHandler,
-  unstable_composeUploadHandlers,
-} from "@remix-run/node";
+import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import {
   useSubmit,
   Form,
@@ -17,10 +9,9 @@ import {
   useActionData,
 } from "@remix-run/react";
 import { FormProvider, FormField } from "../components/ui/form";
-import { validateFormData } from "remix-hook-form";
+
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
-import { Button } from "~/components/ui/button";
 import { useForm } from "react-hook-form";
 import {
   Dialog,
@@ -34,8 +25,7 @@ import { SelectInput } from "~/components/molecules/SelectItem";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 import { FileInput } from "~/components/molecules/FileInput";
-import { s3UploadHandler } from "~/utils/s3.server";
-import { Spinner } from "~/components/atoms/Spinner";
+import { parseMutliForm } from "~/utils/parseMultiForm";
 
 function createFromData(data: StoneData) {
   const formData = new FormData();
@@ -49,23 +39,16 @@ function createFromData(data: StoneData) {
 const stoneSchema = z.object({
   name: z.string().min(1),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  file: z.any(),
 });
+
+const stoneSchemaFront = stoneSchema.merge();
 
 type StoneData = z.infer<typeof stoneSchema>;
 
 const resolver = zodResolver(stoneSchema);
 
 export async function action({ request }: ActionFunctionArgs) {
-  const uploadHandler: UploadHandler = unstable_composeUploadHandlers(
-    s3UploadHandler,
-    unstable_createMemoryUploadHandler()
-  );
-  const formData = await unstable_parseMultipartFormData(
-    request,
-    uploadHandler
-  );
-  const { errors, data } = await validateFormData(formData, resolver);
+  const { errors, data } = await parseMutliForm(request, stoneSchema);
   if (errors) {
     return json({ errors });
   }
