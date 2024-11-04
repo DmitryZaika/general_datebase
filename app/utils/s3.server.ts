@@ -1,5 +1,4 @@
 import { PassThrough } from "stream";
-
 import type { UploadHandler } from "@remix-run/node";
 import { writeAsyncIterableToWritable } from "@remix-run/node";
 import AWS from "aws-sdk";
@@ -28,9 +27,13 @@ const uploadStream = ({ Key }: Pick<AWS.S3.Types.PutObjectRequest, "Key">) => {
   };
 };
 
-export async function uploadStreamToS3(data: any, filename: string) {
+export async function uploadStreamToS3(
+  data: any,
+  folder: string,
+  filename: string
+) {
   const stream = uploadStream({
-    Key: filename,
+    Key: `${folder}/${filename}`,
   });
   await writeAsyncIterableToWritable(data, stream.writeStream);
   const file = await stream.promise;
@@ -41,10 +44,28 @@ export const s3UploadHandler: UploadHandler = async ({
   name,
   filename,
   data,
+  InputName,
 }) => {
+  console.log("Field name:", name);
   if (name !== "file") {
     return undefined;
   }
-  const uploadedFileLocation = await uploadStreamToS3(data, filename!);
+
+  if (!filename) {
+    throw new Error("Filename is missing.");
+  }
+
+  let folder = "granite-database/dynamic-images";
+  if (inputName.includes("sinks")) {
+    folder = "granite-database/Sinks";
+  } else if (inputName.includes("stones")) {
+    folder = "granite-database/Stones";
+  } else if (inputName.includes("supports")) {
+    folder = "granite-database/Supports";
+  } else if (inputName.includes("images")) {
+    folder = "granite-database/Images";
+  }
+
+  const uploadedFileLocation = await uploadStreamToS3(data, folder, filename);
   return uploadedFileLocation;
 };

@@ -1,19 +1,10 @@
-import { zodResolver } from "@hookform/resolvers/zod";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { useSubmit, Form, useNavigate } from "@remix-run/react";
-import {
-  FormProvider,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-} from "../components/ui/form";
-import { getValidatedFormData } from "remix-hook-form";
+import { useNavigate, useNavigation } from "@remix-run/react";
+import { FormField } from "../components/ui/form";
+
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
-import { Button } from "~/components/ui/button";
-import { useForm } from "react-hook-form";
 import {
   Dialog,
   DialogContent,
@@ -24,46 +15,33 @@ import {
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
-import { Input } from "~/components/ui/input";
+import { FileInput } from "~/components/molecules/FileInput";
+import { parseMutliForm } from "~/utils/parseMultiForm";
+import { MultiPartForm } from "~/components/molecules/MultiPartForm";
+import { useCustomForm } from "~/utils/useCustomForm";
 
-const imageschema = z.object({
+const imageSchema = z.object({
   name: z.string().min(1),
 });
 
-const formSchema = z.object({
-  file:
-    typeof window === "undefined"
-      ? z.any()
-      : z
-          .instanceof(FileList)
-          .refine((file) => file?.length > 0, "File is required."),
-});
-
-type FormData = z.infer<typeof imageschema>;
-
-const resolver = zodResolver(imageschema);
-
 export async function action({ request }: ActionFunctionArgs) {
-  const {
-    errors,
-    data,
-    receivedValues: defaultValues,
-  } = await getValidatedFormData<FormData>(request, resolver);
-  if (errors) {
-    return json({ errors, defaultValues });
+  const { errors, data } = await parseMutliForm(request, imageSchema);
+  if (errors || !data) {
+    return json({ errors });
   }
 
   try {
-    const result = await db.execute(
-      `INSERT INTO main.images (name) VALUES (?)`,
-      [data.name]
-    );
-    console.log(result);
+    await db.execute(`INSERT INTO main.images (name, url) VALUES (?,  ?);`, [
+      data.name,
+      data.file,
+    ]);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
+  console.log("HERE");
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "image added"));
+  session.flash("message", toastData("Success", "Stone added"));
+  console.log("HERE 2");
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
@@ -71,88 +49,52 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function ImagesAdd() {
   const navigate = useNavigate();
-  const submit = useSubmit();
-  const form = useForm<FormData>({
-    resolver,
-  });
+  // const actionData = useActionData<typeof action>();
+  const isSubmitting = useNavigation().state === "submitting";
 
-  const fileForm = useForm({
-    resolver: zodResolver(formSchema),
-  });
-  const fileRef = fileForm.register("file");
+  const form = useCustomForm(imageSchema);
+  console.log(form.formState.errors);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
     }
   };
+
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add image</DialogTitle>
+          <DialogTitle>Add Image</DialogTitle>
         </DialogHeader>
-        <FormProvider {...form}>
-          <Form
-            id="customerForm"
-            method="post"
-            onSubmit={form.handleSubmit(
-              (data) => {
-                submit(data, {
-                  method: "post",
-                  encType: "multipart/form-data",
-                });
-              },
-              (errors) => console.log(errors)
+
+        <MultiPartForm form={form}>
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <InputItem
+                name={"Name"}
+                placeholder={"Name of the image"}
+                field={field}
+              />
             )}
-          >
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <InputItem
-                  name={"Name"}
-                  placeholder={"Name of the image"}
-                  field={field}
-                />
-              )}
-            />
-            <FormProvider {...fileForm}>
-              <form
-                onSubmit={fileForm.handleSubmit((data) => {
-                  console.log(data);
-                })}
-                className="w-full"
-              >
-                <FormField
-                  control={fileForm.control}
-                  name="file"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>File</FormLabel>
-                      <FormControl>
-                        <Input
-                          className="cursor-pointer"
-                          type="file"
-                          placeholder="Upload file"
-                          {...fileRef}
-                          onChange={(event) => {
-                            field.onChange(event.target.files);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit">Upload File</Button>
-              </form>
-            </FormProvider>
-            <DialogFooter>
-              <Button type="submit">Save changes</Button>
-            </DialogFooter>
-          </Form>
-        </FormProvider>
+          />
+          <FormField
+            control={form.control}
+            name="file"
+            render={({ field }) => (
+              <FileInput
+                inputName="images"
+                id="image"
+                onChange={field.onChange}
+              />
+            )}
+          />
+          <DialogFooter>
+            <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
+          </DialogFooter>
+        </MultiPartForm>
       </DialogContent>
     </Dialog>
   );

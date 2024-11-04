@@ -45,6 +45,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   try {
+    const query = data.file
+      ? `UPDATE main.sinks SET name = ? WHERE id = ? url = ?`
+      : `UPDATE main.sinks SET name = ? WHERE id = ?`;
+    const params = data.file
+      ? [data.name, data.file, sinkId]
+      : [data.name, sinkId];
     const result = await db.execute(
       `UPDATE main.sinks SET name = ? WHERE id = ?`,
       [data.name, sinkId]
