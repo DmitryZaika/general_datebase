@@ -1,9 +1,6 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import {
-  useNavigate,
-  useNavigation,
-} from "@remix-run/react";
+import { useNavigate, useNavigation } from "@remix-run/react";
 import { FormField } from "../components/ui/form";
 
 import { z } from "zod";
@@ -23,7 +20,6 @@ import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
-
 
 const stoneSchema = z.object({
   name: z.string().min(1),
@@ -67,7 +63,6 @@ export default function StonesAdd() {
     }
   };
 
-
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -75,46 +70,50 @@ export default function StonesAdd() {
           <DialogTitle>Add Stone</DialogTitle>
         </DialogHeader>
 
-          <MultiPartForm form={form}>
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <InputItem
-                  name={"Name"}
-                  placeholder={"Name of the stone"}
-                  field={field}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <SelectInput
-                  field={field}
-                  placeholder="Type of the Stone"
-                  name="Type"
-                  options={[
-                    "Granite",
-                    "Quartz",
-                    "Marble",
-                    "Dolomite",
-                    "Quartzite",
-                  ]}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="file"
-              render={({ field }) => (
-                <FileInput name="Image" id="image" onChange={field.onChange} />
-              )}
-            />
-            <DialogFooter>
-              <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
-            </DialogFooter>
+        <MultiPartForm form={form}>
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <InputItem
+                name={"Name"}
+                placeholder={"Name of the stone"}
+                field={field}
+              />
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+              <SelectInput
+                field={field}
+                placeholder="Type of the Stone"
+                name="Type"
+                options={[
+                  "Granite",
+                  "Quartz",
+                  "Marble",
+                  "Dolomite",
+                  "Quartzite",
+                ]}
+              />
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="file"
+            render={({ field }) => (
+              <FileInput
+                inputName="stones"
+                id="image"
+                onChange={field.onChange}
+              />
+            )}
+          />
+          <DialogFooter>
+            <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
+          </DialogFooter>
         </MultiPartForm>
       </DialogContent>
     </Dialog>
