@@ -30,7 +30,7 @@ interface Supplier {
 export const loader = async () => {
   const suppliers = await selectMany<Supplier>(
     db,
-    "select id, website, manager, supplier_name, phone, email from suppliers"
+    "select id, manager, supplier_name, phone, email from suppliers"
   );
   return json({ suppliers });
 };
@@ -51,7 +51,6 @@ export default function Suppliers() {
                   <TableHead>Manager</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Website</TableHead>
                   <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
@@ -71,20 +70,6 @@ export default function Suppliers() {
                     <TableCell>{supplier.manager || "-"}</TableCell>
                     <TableCell>{supplier.phone || "-"}</TableCell>
                     <TableCell>{supplier.email || "-"}</TableCell>
-                    <TableCell>
-                      {supplier.website ? (
-                        <a
-                          href={supplier.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {supplier.website}
-                        </a>
-                      ) : (
-                        "-"
-                      )}
-                    </TableCell>
                     <TableCell>{supplier.notes || "-"}</TableCell>
                   </TableRow>
                 ))}
