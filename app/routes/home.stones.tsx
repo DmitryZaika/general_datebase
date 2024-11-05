@@ -5,7 +5,6 @@ import {
   AccordionContent,
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
-import { getSourceName } from "~/utils/image";
 import { json } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
@@ -44,7 +43,6 @@ export default function Stones() {
   return (
     <Accordion type="single" defaultValue="stones">
       <AccordionItem value="stones">
-        <AccordionTrigger>Stones</AccordionTrigger>
         <AccordionContent>
           <Accordion type="multiple">
             {Object.keys(stoneList).map((type) => (
