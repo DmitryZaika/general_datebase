@@ -9,6 +9,8 @@ import { json } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "@remix-run/react";
+import { Image } from "~/components/molecules/Image";
+import ModuleList from "~/components/ModuleList";
 
 interface Stone {
   id: number;
@@ -51,21 +53,17 @@ export default function Stones() {
                   {capitalizeFirstLetter(type)}
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  <ModuleList>
                     {stoneList[type].map((stone) => (
-                      <div
-                        key={stone.id}
-                        className="flex flex-col items-center"
-                      >
-                        <img
-                          src={stone.url || undefined}
+                      <div key={stone.id} className=" font-bold items-center">
+                        <Image
+                          src={stone.url}
                           alt={stone.name}
-                          className="w-full h-auto rounded-lg"
+                          name={stone.name}
                         />
-                        <p className="text-sm text-center mt-2">{stone.name}</p>
                       </div>
                     ))}
-                  </div>
+                  </ModuleList>
                 </AccordionContent>
               </AccordionItem>
             ))}

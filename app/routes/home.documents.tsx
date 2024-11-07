@@ -5,10 +5,11 @@ import {
   AccordionItem,
   AccordionContent,
 } from "~/components/ui/accordion";
-
+import { Image } from "~/components/molecules/Image";
 import { db } from "~/db.server";
 
 import { selectMany } from "~/utils/queryHelpers";
+import ModuleList from "~/components/ModuleList";
 
 interface Document {
   id: number;
@@ -33,18 +34,15 @@ export default function Documents() {
         <AccordionContent>
           <Accordion type="multiple">
             <AccordionContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {documents.map((document) => (
-                  <div key={document.id} className="flex flex-col items-center">
-                    <img
-                      src={document.url || undefined}
-                      alt={document.name}
-                      className="w-full h-auto rounded-lg"
-                    />
-                    <p className="text-sm text-center mt-2">{document.name}</p>
-                  </div>
-                ))}
-              </div>
+              {documents.map((document) => (
+                <ModuleList key={document.id}>
+                  <Image
+                    src={document.url}
+                    alt={document.name}
+                    name={document.name}
+                  />
+                </ModuleList>
+              ))}
             </AccordionContent>
           </Accordion>
         </AccordionContent>

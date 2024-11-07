@@ -7,13 +7,12 @@ type FileInput = {
   onChange: (event: File | undefined) => void;
 };
 
-export function FileInput({ onChange, inputName, id }: FileInput) {
+export function FileInput({ onChange, id }: FileInput) {
   return (
     <FormItem>
       <FormLabel>Image</FormLabel>
       <FormControl>
         <Input
-          name={inputName}
           onChange={(event) => {
             onChange(event.target.files?.[0]);
           }}

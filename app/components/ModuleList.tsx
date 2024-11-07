@@ -1,26 +1,14 @@
-// ModuleList.tsx
-import { useState } from "react";
-import { Collapsible } from "./Collapsible";
-
 interface ModuleListProps {
-  name: string;
   children: React.ReactNode;
+  className?: string;
 }
 
-export default function ModuleList({ name, children }: ModuleListProps) {
-  const [open, setOpen] = useState(false);
-
+export default function ModuleList({ children, className }: ModuleListProps) {
   return (
-    <li className="mb-2 sm:mb-0">
-      <h3
-        onClick={() => setOpen(!open)}
-        className="pl-4  text-lg font-bold cursor-pointer select-none"
-      >
-        {name}
-      </h3>
-      <Collapsible isOpen={open} className="mt-2 sm:pl-4">
-        <div className="text-md select-text">{children}</div>
-      </Collapsible>
-    </li>
+    <div
+      className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-2 p-2 ${className}`}
+    >
+      {children}
+    </div>
   );
 }
