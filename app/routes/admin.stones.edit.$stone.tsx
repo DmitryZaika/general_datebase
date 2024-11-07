@@ -25,10 +25,12 @@ import { SelectInput } from "~/components/molecules/SelectItem";
 import { commitSession, getSession } from "~/sessions";
 import { selectId } from "~/utils/queryHelpers";
 import { toastData } from "~/utils/toastHelpers";
+import { FileInput } from "~/components/molecules/FileInput";
 
 const stoneSchema = z.object({
   name: z.string().min(1),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
+  file: z.any(),
 });
 
 type FormData = z.infer<typeof stoneSchema>;
@@ -48,8 +50,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   try {
     const result = await db.execute(
-      `UPDATE main.stones SET name = ?, type = ? WHERE id = ?`,
-      [data.name, data.type, stoneId]
+      `UPDATE main.stones SET name = ?, type = ?, url = ? WHERE id = ?`,
+      [data.name, data.type, data.file, stoneId]
     );
     console.log(result);
   } catch (error) {
@@ -68,20 +70,21 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
   }
   const stoneId = parseInt(params.stone);
 
-  const stone = await selectId<{ name: string; type: string }>(
+  const stone = await selectId<{ name: string; type: string; file: string }>(
     db,
-    "select name, type from stones WHERE id = ?",
+    "select name, type, url from stones WHERE id = ?",
     stoneId
   );
   return json({
     name: stone?.name,
     type: stone?.type,
+    file: stone?.file,
   });
 };
 
 export default function StonesEdit() {
   const navigate = useNavigate();
-  const { name, type } = useLoaderData<typeof loader>();
+  const { name, type, file } = useLoaderData<typeof loader>();
   const submit = useSubmit();
   const form = useForm<FormData>({
     resolver,
@@ -138,6 +141,17 @@ export default function StonesEdit() {
                     "Dolomite",
                     "Quartzite",
                   ]}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="file"
+              render={({ field }) => (
+                <FileInput
+                  inputName="stones"
+                  id="image"
+                  onChange={field.onChange}
                 />
               )}
             />

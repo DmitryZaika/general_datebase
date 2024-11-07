@@ -5,10 +5,11 @@ import {
   AccordionItem,
   AccordionContent,
 } from "~/components/ui/accordion";
-
+import { Image } from "~/components/molecules/Image";
 import { db } from "~/db.server";
 
 import { selectMany } from "~/utils/queryHelpers";
+import ModuleList from "~/components/ModuleList";
 
 interface Image {
   id: number;
@@ -33,18 +34,11 @@ export default function Images() {
         <AccordionContent>
           <Accordion type="multiple">
             <AccordionContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {images.map((image) => (
-                  <div key={image.id} className="flex flex-col items-center">
-                    <img
-                      src={image.url || undefined}
-                      alt={image.name}
-                      className="w-full h-auto rounded-lg"
-                    />
-                    <p className="text-sm text-center mt-2">{image.name}</p>
-                  </div>
-                ))}
-              </div>
+              {images.map((image) => (
+                <ModuleList key={image.id}>
+                  <Image src={image.url} alt={image.name} name={image.name} />
+                </ModuleList>
+              ))}
             </AccordionContent>
           </Accordion>
         </AccordionContent>

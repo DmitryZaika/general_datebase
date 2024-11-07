@@ -69,7 +69,6 @@ export default function StonesAdd() {
         <DialogHeader>
           <DialogTitle>Add Stone</DialogTitle>
         </DialogHeader>
-
         <MultiPartForm form={form}>
           <FormField
             control={form.control}
