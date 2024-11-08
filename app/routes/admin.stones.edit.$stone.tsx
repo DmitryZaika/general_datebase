@@ -5,12 +5,18 @@ import {
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
-import { useSubmit, Form, useNavigate, useLoaderData } from "@remix-run/react";
-import { FormProvider, FormField } from "../components/ui/form";
+import {
+  useSubmit,
+  Form,
+  useNavigate,
+  useLoaderData,
+  useNavigation,
+} from "@remix-run/react";
+import { FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
-import { Button } from "~/components/ui/button";
+
 import { useForm } from "react-hook-form";
 import {
   Dialog,
@@ -25,7 +31,9 @@ import { SelectInput } from "~/components/molecules/SelectItem";
 import { commitSession, getSession } from "~/sessions";
 import { selectId } from "~/utils/queryHelpers";
 import { toastData } from "~/utils/toastHelpers";
+import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { FileInput } from "~/components/molecules/FileInput";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
 
 const stoneSchema = z.object({
   name: z.string().min(1),
@@ -66,7 +74,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
   if (params.stone === undefined) {
-    return json({ name: undefined, type: undefined });
+    return json({ name: undefined, type: undefined, file: undefined });
   }
   const stoneId = parseInt(params.stone);
 
@@ -84,11 +92,12 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
 
 export default function StonesEdit() {
   const navigate = useNavigate();
+  const isSubmitting = useNavigation().state === "submitting";
   const { name, type, file } = useLoaderData<typeof loader>();
   const submit = useSubmit();
   const form = useForm<FormData>({
     resolver,
-    defaultValues: stoneSchema.parse({ name, type }),
+    defaultValues: stoneSchema.parse({ name, type, file }),
   });
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -101,7 +110,7 @@ export default function StonesEdit() {
         <DialogHeader>
           <DialogTitle>Edit Stone</DialogTitle>
         </DialogHeader>
-        <FormProvider {...form}>
+        <MultiPartForm form={form}>
           <Form
             id="customerForm"
             method="post"
@@ -156,10 +165,10 @@ export default function StonesEdit() {
               )}
             />
             <DialogFooter>
-              <Button type="submit">Save changes</Button>
+              <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
             </DialogFooter>
           </Form>
-        </FormProvider>
+        </MultiPartForm>
       </DialogContent>
     </Dialog>
   );
