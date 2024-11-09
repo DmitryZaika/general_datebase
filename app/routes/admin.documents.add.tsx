@@ -25,7 +25,11 @@ const documentSchema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { errors, data } = await parseMutliForm(request, documentSchema);
+  const { errors, data } = await parseMutliForm(
+    request,
+    documentSchema,
+    "documents"
+  );
   if (errors || !data) {
     return json({ errors });
   }

@@ -25,7 +25,7 @@ const sinkSchema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { errors, data } = await parseMutliForm(request, sinkSchema);
+  const { errors, data } = await parseMutliForm(request, sinkSchema, "sinks");
   if (errors || !data) {
     return json({ errors });
   }
