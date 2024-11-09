@@ -15,6 +15,28 @@ if (
   throw new Error(`Storage is missing required configuration.`);
 }
 
+export const deleteFile = async (fileName: string) => {
+  const s3 = new S3({
+    credentials: {
+      accessKeyId: STORAGE_ACCESS_KEY,
+      secretAccessKey: STORAGE_SECRET,
+    },
+    region: STORAGE_REGION,
+  });
+
+  try {
+    const response = await s3.deleteObject({
+      Bucket: STORAGE_BUCKET,
+      Key: fileName,
+    });
+
+    console.log(response);
+    console.log(`File ${fileName} has been deleted.`);
+  } catch (error) {
+    console.error(`Failed to delete file ${fileName}:`, error);
+  }
+};
+
 const uploadStream = ({
   Key,
   ContentType,
@@ -34,14 +56,13 @@ const uploadStream = ({
       client: s3,
 
       params: {
-          Bucket: STORAGE_BUCKET,
-          Key,
-          Body: pass,
-          ContentDisposition: "inline",
-          ContentType: ContentType || "application/octet-stream",
-        },
-    })
-      .done(),
+        Bucket: STORAGE_BUCKET,
+        Key,
+        Body: pass,
+        ContentDisposition: "inline",
+        ContentType: ContentType || "application/octet-stream",
+      },
+    }).done(),
   };
 };
 

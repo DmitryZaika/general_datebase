@@ -7,6 +7,7 @@ import {
 import { Form, useLoaderData, useNavigate } from "@remix-run/react";
 import { selectId } from "~/utils/queryHelpers";
 import { Button } from "~/components/ui/button";
+import { deleteFile } from "~/utils/s3.server";
 
 import {
   Dialog,
@@ -22,7 +23,14 @@ import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 
 export async function action({ params, request }: ActionFunctionArgs) {
-  const stoneId = params.stone;
+  const stoneId = parseInt(params.stone);
+  const stone = await selectId<{ url: string }>(
+    db,
+    "select url from stones WHERE id = ?",
+    stoneId
+  );
+  deleteFile(stone.url);
+
   try {
     const result = await db.execute(`DELETE FROM main.stones WHERE id = ?`, [
       stoneId,
