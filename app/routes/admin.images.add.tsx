@@ -25,7 +25,7 @@ const imageSchema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { errors, data } = await parseMutliForm(request, imageSchema);
+  const { errors, data } = await parseMutliForm(request, imageSchema, "images");
   if (errors || !data) {
     return json({ errors });
   }
