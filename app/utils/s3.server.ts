@@ -2,7 +2,14 @@ import { PassThrough } from "stream";
 import type { UploadHandlerPart } from "@remix-run/node";
 import { writeAsyncIterableToWritable } from "@remix-run/node";
 import { Upload } from "@aws-sdk/lib-storage";
-import { PutObjectCommandInput, S3 } from "@aws-sdk/client-s3";
+import {
+  PutObjectCommandInput,
+  S3,
+  DeleteObjectCommand,
+  S3Client,
+  S3ServiceException,
+  waitUntilObjectNotExists,
+} from "@aws-sdk/client-s3";
 import mime from "mime-types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -15,25 +22,49 @@ if (
   throw new Error(`Storage is missing required configuration.`);
 }
 
-export const deleteFile = async (fileName: string) => {
-  const s3 = new S3({
+const getClient = () => {
+  return new S3({
     credentials: {
       accessKeyId: STORAGE_ACCESS_KEY,
       secretAccessKey: STORAGE_SECRET,
     },
+    // logger: console,
     region: STORAGE_REGION,
   });
+};
 
+export const deleteFile = async (url: string) => {
+  const finalKey = url.replace(
+    `https://${STORAGE_BUCKET}.s3.${STORAGE_REGION}.amazonaws.com/`,
+    ""
+  );
+  const client = getClient();
   try {
-    const response = await s3.deleteObject({
-      Bucket: STORAGE_BUCKET,
-      Key: fileName,
-    });
-
-    console.log(response);
-    console.log(`File ${fileName} has been deleted.`);
-  } catch (error) {
-    console.error(`Failed to delete file ${fileName}:`, error);
+    await client.send(
+      new DeleteObjectCommand({
+        Bucket: STORAGE_BUCKET,
+        Key: finalKey,
+      })
+    );
+    const response = await waitUntilObjectNotExists(
+      { client },
+      { Bucket: STORAGE_BUCKET, Key: finalKey }
+    );
+  } catch (caught) {
+    if (
+      caught instanceof S3ServiceException &&
+      caught.name === "NoSuchBucket"
+    ) {
+      console.error(
+        `Error from S3 while deleting object from ${STORAGE_BUCKET}. The bucket doesn't exist.`
+      );
+    } else if (caught instanceof S3ServiceException) {
+      console.error(
+        `Error from S3 while deleting object from ${STORAGE_BUCKET}.  ${caught.name}: ${caught.message}`
+      );
+    } else {
+      throw caught;
+    }
   }
 };
 
@@ -41,14 +72,7 @@ const uploadStream = ({
   Key,
   ContentType,
 }: Pick<PutObjectCommandInput, "Key" | "ContentType">) => {
-  const s3 = new S3({
-    credentials: {
-      accessKeyId: STORAGE_ACCESS_KEY,
-      secretAccessKey: STORAGE_SECRET,
-    },
-
-    region: STORAGE_REGION,
-  });
+  const s3 = getClient();
   const pass = new PassThrough();
   return {
     writeStream: pass,

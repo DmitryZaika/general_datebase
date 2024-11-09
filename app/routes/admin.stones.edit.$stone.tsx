@@ -27,6 +27,7 @@ import { FileInput } from "~/components/molecules/FileInput";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { useCustomOptionalForm } from "~/utils/useCustomForm";
+import { deleteFile } from "~/utils/s3.server";
 
 const stoneSchema = z.object({
   name: z.string().min(1),
@@ -34,11 +35,20 @@ const stoneSchema = z.object({
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const stoneId = params.stone;
+  const stoneId = parseInt(params.stone);
   const { errors, data } = await parseMutliForm(request, stoneSchema, "stones");
   if (errors || !data) {
     return json({ errors });
   }
+
+
+  // NOTE: THIS IS DANGEROUS
+  const stone = await selectId<{ url: string }>(
+    db,
+    "select url from stones WHERE id = ?",
+    stoneId
+  );
+  deleteFile(stone.url);
 
   try {
     let result;
