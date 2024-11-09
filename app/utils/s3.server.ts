@@ -1,5 +1,5 @@
 import { PassThrough } from "stream";
-import type { UploadHandler } from "@remix-run/node";
+import type { UploadHandlerPart } from "@remix-run/node";
 import { writeAsyncIterableToWritable } from "@remix-run/node";
 import AWS from "aws-sdk";
 import mime from "mime-types";
@@ -32,8 +32,8 @@ const uploadStream = ({
         Bucket: STORAGE_BUCKET,
         Key,
         Body: pass,
-        ContentDisposition: "inline", // Открывает файл в браузере
-        ContentType: ContentType || "application/octet-stream", // MIME-тип по умолчанию
+        ContentDisposition: "inline",
+        ContentType: ContentType || "application/octet-stream",
       })
       .promise(),
   };
@@ -42,7 +42,7 @@ const uploadStream = ({
 export async function uploadStreamToS3(data: any, filename: string) {
   const mimeType = mime.lookup(filename) || "application/octet-stream";
   const stream = uploadStream({
-    Key: `dynamic-images/${filename}`, // Сохраняем все файлы в папке "dynamic-images"
+    Key: `dynamic-images/${filename}`,
     ContentType: mimeType,
   });
   await writeAsyncIterableToWritable(data, stream.writeStream);
@@ -50,11 +50,10 @@ export async function uploadStreamToS3(data: any, filename: string) {
   return file.Location;
 }
 
-export const s3UploadHandler: UploadHandler = async ({
-  name,
-  filename,
-  data,
-}) => {
+export const s3UploadHandler = async (
+  { name, filename, data }: UploadHandlerPart,
+  folder: string
+): Promise<File | string | null | undefined> => {
   console.log("Field name:", name);
   if (name !== "file") {
     return undefined;
@@ -63,7 +62,8 @@ export const s3UploadHandler: UploadHandler = async ({
   if (!filename) {
     throw new Error("Filename is missing.");
   }
+  const finalname = `${folder}/${filename}`;
 
-  const uploadedFileLocation = await uploadStreamToS3(data, filename);
+  const uploadedFileLocation = await uploadStreamToS3(data, finalname);
   return uploadedFileLocation;
 };

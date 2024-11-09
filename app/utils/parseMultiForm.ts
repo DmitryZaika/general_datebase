@@ -15,22 +15,25 @@ const fileSchema = z.object({
 });
 interface ValidatedData<T> {
   data: z.infer<T & typeof fileSchema> | undefined;
-  errors: FieldErrors<FieldValues> | undefined
+  errors: FieldErrors<FieldValues> | undefined;
 }
 
-
-export async function parseMutliForm<T>(request: Request, schema: T): Promise<ValidatedData<T>> {
+export async function parseMutliForm<T>(
+  request: Request,
+  schema: T,
+  folder: string
+): Promise<ValidatedData<T>> {
   const finalSchema = schema.merge(fileSchema);
   const resolver = zodResolver(finalSchema);
 
   const uploadHandler: UploadHandler = unstable_composeUploadHandlers(
-    s3UploadHandler,
+    (value) => s3UploadHandler(value, folder),
     unstable_createMemoryUploadHandler()
   );
   const formData = await unstable_parseMultipartFormData(
     request,
     uploadHandler
   );
-  const { data, errors } = await validateFormData(formData, resolver); 
+  const { data, errors } = await validateFormData(formData, resolver);
   return { data, errors };
 }
