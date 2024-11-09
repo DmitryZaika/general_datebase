@@ -1,7 +1,8 @@
 import { PassThrough } from "stream";
 import type { UploadHandlerPart } from "@remix-run/node";
 import { writeAsyncIterableToWritable } from "@remix-run/node";
-import AWS from "aws-sdk";
+import { Upload } from "@aws-sdk/lib-storage";
+import { PutObjectCommandInput, S3 } from "@aws-sdk/client-s3";
 import mime from "mime-types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -17,26 +18,30 @@ if (
 const uploadStream = ({
   Key,
   ContentType,
-}: Pick<AWS.S3.Types.PutObjectRequest, "Key" | "ContentType">) => {
-  const s3 = new AWS.S3({
+}: Pick<PutObjectCommandInput, "Key" | "ContentType">) => {
+  const s3 = new S3({
     credentials: {
       accessKeyId: STORAGE_ACCESS_KEY,
       secretAccessKey: STORAGE_SECRET,
     },
+
     region: STORAGE_REGION,
   });
   const pass = new PassThrough();
   return {
     writeStream: pass,
-    promise: s3
-      .upload({
-        Bucket: STORAGE_BUCKET,
-        Key,
-        Body: pass,
-        ContentDisposition: "inline",
-        ContentType: ContentType || "application/octet-stream",
-      })
-      .promise(),
+    promise: new Upload({
+      client: s3,
+
+      params: {
+          Bucket: STORAGE_BUCKET,
+          Key,
+          Body: pass,
+          ContentDisposition: "inline",
+          ContentType: ContentType || "application/octet-stream",
+        },
+    })
+      .done(),
   };
 };
 
