@@ -55,13 +55,10 @@ export const s3UploadHandler = async (
   folder: string
 ): Promise<File | string | null | undefined> => {
   console.log("Field name:", name);
-  if (name !== "file") {
+  if (name !== "file" || filename === undefined) {
     return undefined;
   }
 
-  if (!filename) {
-    throw new Error("Filename is missing.");
-  }
   const finalname = `${folder}/${filename}`;
 
   const uploadedFileLocation = await uploadStreamToS3(data, finalname);
