@@ -3,6 +3,7 @@ import type { UploadHandlerPart } from "@remix-run/node";
 import { writeAsyncIterableToWritable } from "@remix-run/node";
 import AWS from "aws-sdk";
 import mime from "mime-types";
+import { v4 as uuidv4 } from "uuid";
 
 const { STORAGE_ACCESS_KEY, STORAGE_SECRET, STORAGE_REGION, STORAGE_BUCKET } =
   process.env;
@@ -58,8 +59,9 @@ export const s3UploadHandler = async (
   if (name !== "file" || filename === undefined) {
     return undefined;
   }
-
-  const finalname = `${folder}/${filename}`;
+  const extensionRegex = /(?:\.([^.]+))?$/;
+  const extension = extensionRegex.exec(filename);
+  const finalname = `${folder}/${uuidv4()}.${extension?.[1]}`;
 
   const uploadedFileLocation = await uploadStreamToS3(data, finalname);
   return uploadedFileLocation;
