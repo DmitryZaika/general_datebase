@@ -16,16 +16,6 @@ interface SessionUser {
 
 import { redirect } from "@remix-run/node";
 
-export async function createUserSession(sessionId: string) {
-  const session = await getSession();
-  session.set("sessionId", sessionId);
-  return redirect("/home", {
-    headers: {
-      "Set-Cookie": await commitSession(session),
-    },
-  });
-}
-
 function getExpirationDate(expiration: number): string {
   const now = new Date();
   const expirationDate = new Date(now.getTime() + expiration * 1000);
@@ -71,7 +61,7 @@ export async function getAdmin(
 ): Promise<undefined | SessionUser> {
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
     `SELECT users.email, users.name FROM users
-        JOIN sessions ON sessions.user_id == user.id
+        JOIN sessions ON sessions.user_id = users.id
         WHERE sessions.id = ?  
             AND sessions.expiration_date > CURRENT_TIMESTAMP
             AND (users.is_admin OR users.is_superuser)`,

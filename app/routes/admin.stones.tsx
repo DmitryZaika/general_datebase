@@ -8,11 +8,13 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json } from "@remix-run/node";
+import { json, redirect, LoaderFunctionArgs } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
+import { getAdmin } from "~/utils/session.server";
+import { getSession } from "~/sessions";
 
 interface Stone {
   id: number;
@@ -20,14 +22,18 @@ interface Stone {
   type: string;
 }
 
-export const loader = async () => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   const stones = await selectMany<Stone>(
     db,
     "select id, name, type from stones"
   );
-  return json({
-    stones,
-  });
+  const session = await getSession(request.headers.get("Cookie"));
+  const cookieHeader = session.get("userId");
+  const user =await getAdmin(cookieHeader);
+  if (user === undefined) {
+    return redirect("/login");
+  }
+  return json({stones, user});
 };
 
 export default function Stones() {
