@@ -1,5 +1,10 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import {
+  ActionFunctionArgs,
+  json,
+  LoaderFunctionArgs,
+  redirect,
+} from "@remix-run/node";
 import { useNavigate, useNavigation } from "@remix-run/react";
 import { FormField } from "../components/ui/form";
 
@@ -20,7 +25,7 @@ import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
-import { AuthenticityTokenInput } from "remix-utils/csrf/react";
+import { getAdmin } from "~/utils/session.server";
 
 const stoneSchema = z.object({
   name: z.string().min(1),
@@ -56,6 +61,15 @@ export async function action({ request }: ActionFunctionArgs) {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const cookieHeader = request.headers.get("userId");
+  const user = getAdmin(cookieHeader);
+  if (user === undefined) {
+    return redirect("/login");
+  }
+  return json({ user });
+};
 
 export default function StonesAdd() {
   const navigate = useNavigate();

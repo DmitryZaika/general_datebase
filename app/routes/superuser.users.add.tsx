@@ -1,4 +1,5 @@
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import { getSession, commitSession } from "~/sessions";
 import { z } from "zod";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { Form, FormProvider, useForm } from "react-hook-form";
@@ -6,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { getValidatedFormData } from "remix-hook-form";
 import { toastData } from "~/utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
-import { login, createUserSession } from "~/utils/session.server";
+import { login, register } from "~/utils/session.server";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
 import { useSubmit } from "@remix-run/react";
@@ -35,15 +36,10 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ errors, defaultValues });
   }
 
-  const value = await login(data.email, data.password, 60 * 60 * 24 * 7);
-  if (value == undefined) {
-    return json({ error: "Unable to login" });
-  }
+  const value = await register(data.email, data.password);
   console.log(value);
-  return createUserSession(value);
 
   const session = await getSession(request.headers.get("Cookie"));
-
   session.flash("message", toastData("Success", "Logged in"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
@@ -91,7 +87,7 @@ export default function Login() {
             />
           )}
         />
-        <Button type="submit">Login</Button>
+        <Button type="submit">Add user</Button>
       </Form>
     </FormProvider>
   );
