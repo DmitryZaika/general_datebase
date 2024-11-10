@@ -87,6 +87,7 @@ export default function SuppliersAdd() {
       navigate("..");
     }
   };
+
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
