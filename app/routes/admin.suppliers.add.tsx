@@ -18,6 +18,7 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
+
 import { csrf } from "~/utils/csrf.server";
 
 const supplierschema = z.object({
@@ -27,7 +28,6 @@ const supplierschema = z.object({
   phone: z.string().min(10).optional(),
   email: z.string().email().optional(),
   notes: z.string().optional(),
-  csrf: z.string(),
 });
 
 type FormData = z.infer<typeof supplierschema>;
@@ -78,8 +78,7 @@ export default function SuppliersAdd() {
   const submit = useSubmit();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
-    resolver,
-    defaultValues: { csrf: token },
+    resolver
   });
 
   const handleChange = (open: boolean) => {
@@ -100,6 +99,7 @@ export default function SuppliersAdd() {
             method="post"
             onSubmit={form.handleSubmit(
               (data) => {
+                data["csrf"] = token;
                 submit(data, {
                   method: "post",
                   encType: "multipart/form-data",
