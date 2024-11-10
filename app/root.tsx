@@ -15,6 +15,8 @@ import { commitSession, getSession } from "./sessions";
 import { useToast } from "./hooks/use-toast";
 import { useEffect } from "react";
 import { ToastMessage } from "./utils/toastHelpers";
+import { csrf } from "~/utils/csrf.server";
+import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -30,20 +32,22 @@ export const links: LinksFunction = () => [
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const [token, cookieHeader] = await csrf.commitToken();
   const session = await getSession(request.headers.get("Cookie"));
   const message: ToastMessage = session.get("message") || null;
   return json(
-    { message },
+    { message, token },
+
     {
       headers: {
-        "Set-Cookie": await commitSession(session),
+        "Set-Cookie": cookieHeader,
       },
     }
   );
 }
 
-export function Layout({ children }: { children: React.ReactNode }) {
-  const { message } = useLoaderData<typeof loader>();
+export default function App() {
+  const { message, token } = useLoaderData<typeof loader>();
   console.log(message);
 
   const { toast } = useToast();
@@ -67,7 +71,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <Header />
-        {children}
+        <AuthenticityTokenProvider token={token}>
+          <Outlet />
+        </AuthenticityTokenProvider>
         <Toaster />
         <ScrollRestoration />
         {/* <Footer /> */}
@@ -75,8 +81,4 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </body>
     </html>
   );
-}
-
-export default function App() {
-  return <Outlet />;
 }

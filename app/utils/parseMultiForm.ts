@@ -9,6 +9,7 @@ import {
   unstable_composeUploadHandlers,
 } from "@remix-run/node";
 import { s3UploadHandler } from "~/utils/s3.server";
+import { csrf } from "~/utils/csrf.server";
 
 const fileSchema = z.object({
   file: z.string(),
@@ -34,6 +35,7 @@ export async function parseMutliForm<T>(
     request,
     uploadHandler
   );
+  csrf.validate(formData, request.headers);
   const { data, errors } = await validateFormData(formData, resolver);
   return { data, errors };
 }
