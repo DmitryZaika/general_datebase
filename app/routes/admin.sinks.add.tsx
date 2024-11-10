@@ -38,7 +38,7 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
-  console.log("HERE");
+
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Stone added"));
   console.log("HERE 2");
