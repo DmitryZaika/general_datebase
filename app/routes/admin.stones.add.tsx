@@ -39,11 +39,18 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
+    const session = await getSession(request.headers.get("Cookie"));
+    session.flash(
+      "message",
+      toastData("Failure", "Database Error Occured", "destructive")
+    );
+    return new Response(JSON.stringify({ error: "Database Error Occured" }), {
+      headers: { "Set-Cookie": await commitSession(session) },
+    });
   }
 
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Stone added"));
-  console.log("HERE 2");
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
