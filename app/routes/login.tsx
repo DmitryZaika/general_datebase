@@ -6,11 +6,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { getValidatedFormData } from "remix-hook-form";
 import { toastData } from "~/utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
-import { login, createUserSession } from "~/utils/session.server";
+import { login } from "~/utils/session.server";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
 import { useSubmit } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
+import { commitSession, getSession } from "~/sessions";
 
 const userSchema = z.object({
   email: z.string().email(),
@@ -39,10 +40,10 @@ export async function action({ request }: ActionFunctionArgs) {
   if (value == undefined) {
     return json({ error: "Unable to login" });
   }
-  console.log(value);
-  return createUserSession(value);
 
   const session = await getSession(request.headers.get("Cookie"));
+  console.log("Value: ", value);
+  session.set("userId", value);
 
   session.flash("message", toastData("Success", "Logged in"));
   return redirect("..", {

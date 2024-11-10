@@ -61,15 +61,6 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const cookieHeader = request.headers.get("userId");
-  const user = getAdmin(cookieHeader);
-  if (user === undefined) {
-    return redirect("/login");
-  }
-  return json({ user });
-};
-
 export default function StonesAdd() {
   const navigate = useNavigate();
   // const actionData = useActionData<typeof action>();
