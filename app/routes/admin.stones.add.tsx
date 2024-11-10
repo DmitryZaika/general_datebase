@@ -32,7 +32,6 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors || !data) {
     return json({ errors });
   }
-
   try {
     await db.execute(
       `INSERT INTO main.stones (name, type, url) VALUES (?, ?, ?);`,
