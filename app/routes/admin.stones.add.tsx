@@ -20,6 +20,7 @@ import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
+import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 
 const stoneSchema = z.object({
   name: z.string().min(1),

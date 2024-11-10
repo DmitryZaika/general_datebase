@@ -39,9 +39,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     { message, token },
 
     {
-      headers: {
-        "Set-Cookie": cookieHeader,
-      },
+      headers: [
+        ["Set-Cookie", cookieHeader || ""],
+        ["Set-Cookie", await commitSession(session)],
+      ],
     }
   );
 }
