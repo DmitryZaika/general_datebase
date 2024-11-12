@@ -2,7 +2,6 @@ import { db } from "~/db.server";
 import { RowDataPacket } from "mysql2";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
-import { getSession, commitSession } from "~/sessions";
 
 interface LoginUser {
   id: number;
@@ -13,8 +12,6 @@ interface SessionUser {
   email: string;
   name: string;
 }
-
-import { redirect } from "@remix-run/node";
 
 function getExpirationDate(expiration: number): string {
   const now = new Date();

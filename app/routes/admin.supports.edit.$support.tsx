@@ -28,74 +28,81 @@ import { parseMutliForm } from "~/utils/parseMultiForm";
 import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { deleteFile } from "~/utils/s3.server";
 
-const supplierSchema = z.object({
-  website: z.string().url(),
-  supplier_name: z.string().min(1),
-  manager: z.string().min(1).optional(),
-  phone: z.string().min(10).optional(),
-  email: z.string().email().optional(),
-  notes: z.string().optional(),
+const supportSchema = z.object({
+  name: z.string().min(1),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const supplierId = parseInt(params.supplier);
+  const supportId = parseInt(params.support);
   const { errors, data } = await parseMutliForm(
     request,
-    supplierSchema,
-    "suppliers"
+    supportSchema,
+    "supports"
   );
   if (errors || !data) {
     return json({ errors });
   }
 
+  // NOTE: THIS IS DANGEROUS
+  const support = await selectId<{ url: string }>(
+    db,
+    "select url from supports WHERE id = ?",
+    supportId
+  );
+  deleteFile(support.url);
+
   try {
-    await db.execute(
-      `UPDATE main.suppliers SET website = ?, supplier_name = ?, manager = ?, phone = ?, email = ?, notes = ?, WHERE id = ?`,
-      [
-        data.website,
-        data.supplier_name,
-        data.manager,
-        data.phone,
-        data.email,
-        data.notes,
-        supplierId,
-      ]
-    );
+    let result;
+    console.log(typeof data.file);
+
+    if (data.file && data.file !== "undefined") {
+      result = await db.execute(
+        `UPDATE main.supports SET name = ?, url = ? WHERE id = ?`,
+        [data.name, data.file, supportId]
+      );
+    } else {
+      result = await db.execute(
+        `UPDATE main.supports SET name = ? WHERE id = ?`,
+        [data.name, supportId]
+      );
+    }
+
+    console.log(result);
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Document Edited"));
+  session.flash("message", toastData("Success", "Support Edited"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
-  if (params.supplier === undefined) {
+  if (params.support === undefined) {
     return json({ name: undefined, url: undefined });
   }
-  const supplierId = parseInt(params.supplier);
+  const supportId = parseInt(params.support);
 
-  const supplier = await selectId<{ name: string; url: string }>(
+  const support = await selectId<{ name: string; url: string }>(
     db,
-    "select name, url from suppliers WHERE id = ?",
-    supplierId
+    "select name, url from supports WHERE id = ?",
+    supportId
   );
   return json({
-    name: supplier?.name,
-    url: supplier?.url,
+    name: support?.name,
+    url: support?.url,
   });
 };
 
-export default function SuppliersEdit() {
+export default function SupportsEdit() {
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state === "submitting";
   const { name, url } = useLoaderData<typeof loader>();
 
   const form = useCustomOptionalForm(
-    supplierSchema,
-    supplierSchema.parse({ name, url })
+    supportSchema,
+    supportSchema.parse({ name, url })
   );
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -107,7 +114,7 @@ export default function SuppliersEdit() {
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Edit Document</DialogTitle>
+          <DialogTitle>Edit Support</DialogTitle>
         </DialogHeader>
         <MultiPartForm form={form}>
           <FormField
@@ -116,7 +123,7 @@ export default function SuppliersEdit() {
             render={({ field }) => (
               <InputItem
                 name="Name"
-                placeholder={"Name of the supplier"}
+                placeholder={"Name of the support"}
                 field={field}
               />
             )}
@@ -127,15 +134,15 @@ export default function SuppliersEdit() {
             name="file"
             render={({ field }) => (
               <FileInput
-                inputName="suppliers"
-                id="supplier"
+                inputName="supports"
+                id="image"
                 onChange={field.onChange}
               />
             )}
           />
           <p>{url}</p>
           <DialogFooter>
-            <LoadingButton loading={isSubmitting}>Edit Document</LoadingButton>
+            <LoadingButton loading={isSubmitting}>Edit Support</LoadingButton>
           </DialogFooter>
         </MultiPartForm>
       </DialogContent>

@@ -27,7 +27,7 @@ interface Supplier {
 export const loader = async () => {
   const suppliers = await selectMany<Supplier>(
     db,
-    "SELECT website, supplier_name, manager, phone, email, notes from suppliers"
+    "SELECT id, website, supplier_name, manager, phone, email, notes from suppliers"
   );
   return json({
     suppliers,

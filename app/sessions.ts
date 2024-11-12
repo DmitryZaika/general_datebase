@@ -1,11 +1,12 @@
 import { createCookieSessionStorage } from "@remix-run/node";
+import { ToastMessage } from "./utils/toastHelpers";
 
 type SessionData = {
   userId: string;
 };
 
 type SessionFlashData = {
-  message: string;
+  message: ToastMessage;
 };
 
 const { getSession, commitSession, destroySession } =
