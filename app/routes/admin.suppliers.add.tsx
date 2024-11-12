@@ -24,9 +24,9 @@ import { csrf } from "~/utils/csrf.server";
 const supplierschema = z.object({
   website: z.string().url(),
   supplier_name: z.string().min(1),
-  manager: z.string().min(1).optional(),
-  phone: z.string().min(10).optional(),
-  email: z.string().email().optional(),
+  manager: z.string().optional(),
+  phone: z.union([z.coerce.string().min(10), z.literal("")]),
+  email: z.union([z.string().email().optional(), z.literal("")]),
   notes: z.string().optional(),
 });
 
@@ -41,13 +41,12 @@ export async function action({ request }: ActionFunctionArgs) {
     return { error: error.code };
   }
 
-  const {
-    errors,
-    data,
-    receivedValues: defaultValues,
-  } = await getValidatedFormData<FormData>(request, resolver);
+  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
+    request,
+    resolver
+  );
   if (errors) {
-    return json({ errors, defaultValues });
+    return json({ errors, receivedValues });
   }
 
   try {
@@ -78,7 +77,15 @@ export default function SuppliersAdd() {
   const submit = useSubmit();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
-    resolver
+    resolver,
+    defaultValues: {
+      website: "",
+      supplier_name: "",
+      manager: "",
+      phone: "",
+      email: "",
+      notes: "",
+    },
   });
 
   const handleChange = (open: boolean) => {

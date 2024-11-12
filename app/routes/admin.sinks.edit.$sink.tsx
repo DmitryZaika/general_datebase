@@ -49,8 +49,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   try {
     let result;
-    console.log(typeof data.file);
-
     if (data.file && data.file !== "undefined") {
       result = await db.execute(
         `UPDATE main.sinks SET name = ?, url = ? WHERE id = ?`,
