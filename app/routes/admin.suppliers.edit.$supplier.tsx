@@ -23,10 +23,8 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
-
 import { csrf } from "~/utils/csrf.server";
 import { selectId } from "~/utils/queryHelpers";
-import { navigationMenuTriggerStyle } from "~/components/ui/navigation-menu";
 
 const supplierschema = z.object({
   website: z.string().url(),
@@ -41,7 +39,7 @@ type FormData = z.infer<typeof supplierschema>;
 
 const resolver = zodResolver(supplierschema);
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
   } catch (error) {
@@ -70,22 +68,22 @@ export async function action({ request }: ActionFunctionArgs) {
     ]
   );
 
-  try {
-    const result = await db.execute(
-      `INSERT INTO main.suppliers  (website, supplier_name, manager,  phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        data.website,
-        data.supplier_name,
-        data.manager ?? null,
-        data.phone ?? null,
-        data.email ?? null,
-        data.notes ?? null,
-      ]
-    );
-    console.log(result);
-  } catch (error) {
-    console.error("Error connecting to the database: ", error);
-  }
+  // try {
+  //   const result = await db.execute(
+  //     `INSERT INTO main.suppliers  (website, supplier_name, manager,  phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)`,
+  //     [
+  //       data.website,
+  //       data.supplier_name,
+  //       data.manager ?? null,
+  //       data.phone ?? null,
+  //       data.email ?? null,
+  //       data.notes ?? null,
+  //     ]
+  //   );
+  //   console.log(result);
+  // } catch (error) {
+  //   console.error("Error connecting to the database: ", error);
+  // }
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Error", "supplier added"));
   return redirect("..", {
