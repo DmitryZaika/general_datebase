@@ -14,12 +14,12 @@ export const meta: MetaFunction = () => {
 
 export const loader: LoaderFunction = async ({ request }) => {
   const url = new URL(request.url);
-  if (["/home", "/home/"].includes(url.pathname)) {
+  if (["/employee", "/employee/"].includes(url.pathname)) {
     return redirect("stones");
   }
   return null;
 };
-export default function Home() {
+export default function Employee() {
   return (
     <PageLayout title="Granite Depot DataBase">
       <Tabs defaultValue="stones">
