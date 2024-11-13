@@ -1,0 +1,6 @@
+CREATE TABLE stones (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    type VARCHAR(50),
+    name VARCHAR(100),
+    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
