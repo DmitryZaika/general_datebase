@@ -1,4 +1,9 @@
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import {
+  ActionFunctionArgs,
+  json,
+  LoaderFunctionArgs,
+  redirect,
+} from "@remix-run/node";
 import { z } from "zod";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { Form, FormProvider, useForm } from "react-hook-form";
@@ -9,7 +14,7 @@ import { csrf } from "~/utils/csrf.server";
 import { login } from "~/utils/session.server";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
-import { useSubmit } from "@remix-run/react";
+import { useLoaderData, useSubmit } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { commitSession, getSession } from "~/sessions";
 
@@ -51,8 +56,15 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 }
 
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { searchParams } = new URL(request.url);
+  const error = searchParams.get("error");
+  return json({ error });
+};
+
 export default function Login() {
   const submit = useSubmit();
+  const { error } = useLoaderData<typeof loader>();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
@@ -60,6 +72,7 @@ export default function Login() {
 
   return (
     <FormProvider {...form}>
+      <p className="text-red-500">{error}</p>
       <Form
         id="customerForm"
         method="post"

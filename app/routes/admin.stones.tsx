@@ -13,8 +13,7 @@ import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
-import { getAdmin } from "~/utils/session.server";
-import { getSession } from "~/sessions";
+import { getAdminUser } from "~/utils/session.server";
 
 interface Stone {
   id: number;
@@ -27,13 +26,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, name, type from stones"
   );
-  const session = await getSession(request.headers.get("Cookie"));
-  const cookieHeader = session.get("userId");
-  const user =await getAdmin(cookieHeader);
-  if (user === undefined) {
-    return redirect("/login");
+  try {
+    const user = getAdminUser(request);
+    return json({ stones, user });
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
   }
-  return json({stones, user});
 };
 
 export default function Stones() {

@@ -2,6 +2,7 @@ import { db } from "~/db.server";
 import { RowDataPacket } from "mysql2";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
+import { getSession } from "~/sessions";
 
 interface LoginUser {
   id: number;
@@ -62,7 +63,7 @@ export async function getUser(
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
     `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser FROM users
         JOIN sessions ON sessions.user_id = users.id
-        WHERE sessions.id = ?  
+        WHERE sessions.id = ?
             AND sessions.expiration_date > CURRENT_TIMESTAMP`,
     [sessionId]
   );
@@ -70,4 +71,18 @@ export async function getUser(
     return undefined;
   }
   return rows[0];
+}
+
+export async function getAdminUser(request: Request): Promise<SessionUser> {
+  const cookie = request.headers.get("Cookie");
+  const session = await getSession(cookie);
+  const cookieHeader = session.get("userId");
+  if (cookieHeader === undefined) {
+    throw TypeError("Cookie Header cannot be undefined");
+  }
+  const user = await getUser(cookieHeader);
+  if (user === undefined || (!user.is_admin && !user.is_superuser)) {
+    throw TypeError("Invalid user permisions");
+  }
+  return user;
 }
