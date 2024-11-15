@@ -55,9 +55,7 @@ export default function DocumentsAdd() {
   const navigate = useNavigate();
   // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
-
   const form = useCustomForm(documentSchema);
-  console.log(form.formState.errors);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
