@@ -53,7 +53,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   try {
     let result;
-    console.log(typeof data.file);
 
     if (data.file && data.file !== "undefined") {
       result = await db.execute(
@@ -66,8 +65,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         [data.name, documentId]
       );
     }
-
-    console.log(result);
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }

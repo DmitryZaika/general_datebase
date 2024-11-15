@@ -50,7 +50,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function App() {
   const { message, token } = useLoaderData<typeof loader>();
-  console.log(message);
 
   const { toast } = useToast();
   useEffect(() => {
