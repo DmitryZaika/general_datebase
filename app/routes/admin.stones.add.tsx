@@ -25,7 +25,7 @@ import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
-import { getAdmin } from "~/utils/session.server";
+import { getAdminUser } from "~/utils/session.server";
 
 const stoneSchema = z.object({
   name: z.string().min(1),
@@ -60,6 +60,15 @@ export async function action({ request }: ActionFunctionArgs) {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    const user = getAdminUser(request);
+    return json({ user });
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
+};
 
 export default function StonesAdd() {
   const navigate = useNavigate();
