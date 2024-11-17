@@ -4,9 +4,12 @@ import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
+import os from "os";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = fileURLToPath(new URL(".", import.meta.url)).replace(
+  /\/$/,
+  ""
+);
 
 dotenv.config();
 const { DB_DATABASE, DB_USER, DB_PASSWORD, DB_HOST } = process.env;
@@ -23,7 +26,7 @@ const sequelize = new Sequelize(DB_DATABASE, DB_USER, DB_PASSWORD, {
 
 const umzug = new Umzug({
   migrations: {
-    glob: path.join(__dirname, "migrations/*.sql"),
+    glob: ["migrations/*.sql", { cwd: __dirname }],
     params: [sequelize.getQueryInterface(), Sequelize],
     resolve: ({ name, path }) => ({
       name,
