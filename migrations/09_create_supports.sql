@@ -1,5 +1,7 @@
 CREATE TABLE supports (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(100),
+    name VARCHAR(100),
+    url VARCHAR(255),
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
