@@ -1,4 +1,5 @@
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
+import { type ControllerRenderProps } from "react-hook-form";
 
 import {
   Select,
@@ -16,7 +17,7 @@ export function SelectInput({
 }: {
   name: string;
   placeholder: string;
-  field: object;
+  field: ControllerRenderProps;
   options: string[];
 }) {
   return (

@@ -16,7 +16,7 @@ export function MultiPartForm({
   form,
 }: {
   children: React.ReactNode;
-  form: UseFormReturn<any>;
+  form: UseFormReturn;
 }) {
   const submit = useSubmit();
   const token = useAuthenticityToken();
@@ -33,7 +33,7 @@ export function MultiPartForm({
             method: "post",
             encType: "multipart/form-data",
           });
-          (errors) => console.log(errors);
+          (errors: object) => console.log(errors);
         })}
       >
         {children}
