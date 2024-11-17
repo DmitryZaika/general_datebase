@@ -31,6 +31,11 @@ const documentSchema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const { errors, data } = await parseMutliForm(
     request,
     documentSchema,
@@ -48,10 +53,8 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
-  console.log("HERE");
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Document added"));
-  console.log("HERE 2");
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });

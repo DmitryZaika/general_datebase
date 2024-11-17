@@ -8,11 +8,12 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
+import { getAdminUser } from "~/utils/session.server";
 
 interface Supplier {
   id: number;
@@ -25,6 +26,11 @@ interface Supplier {
 }
 
 export const loader = async () => {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const suppliers = await selectMany<Supplier>(
     db,
     "SELECT id, website, supplier_name, manager, phone, email, notes from suppliers"

@@ -31,6 +31,11 @@ const imageSchema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const { errors, data } = await parseMutliForm(request, imageSchema, "images");
   if (errors || !data) {
     return json({ errors });

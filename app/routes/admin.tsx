@@ -4,6 +4,7 @@ import { PageLayout } from "~/components/PageLayout";
 
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { redirect } from "@remix-run/node";
+import { getAdminUser } from "~/utils/session.server";
 
 export const meta: MetaFunction = () => {
   return [
@@ -13,6 +14,11 @@ export const meta: MetaFunction = () => {
 };
 
 export const loader: LoaderFunction = async ({ request }) => {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const url = new URL(request.url);
   if (["/admin", "/admin/"].includes(url.pathname)) {
     return redirect("/admin/stones");

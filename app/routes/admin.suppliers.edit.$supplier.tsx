@@ -25,6 +25,7 @@ import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
 import { selectId } from "~/utils/queryHelpers";
+import { getAdminUser } from "~/utils/session.server";
 
 const supplierschema = z.object({
   website: z.string().url(),
@@ -40,6 +41,11 @@ type FormData = z.infer<typeof supplierschema>;
 const resolver = zodResolver(supplierschema);
 
 export async function action({ request, params }: ActionFunctionArgs) {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   try {
     await csrf.validate(request);
   } catch (error) {
@@ -101,6 +107,11 @@ interface Supplier {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   if (params.supplier === undefined) {
     return forceRedirectError(
       request.headers,

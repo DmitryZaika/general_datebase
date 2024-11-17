@@ -20,8 +20,14 @@ import {
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
+import { getAdminUser } from "~/utils/session.server";
 
 export async function action({ params, request }: ActionFunctionArgs) {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const supplierId = params.supplier ? parseInt(params.supplier, 10) : null;
   if (!supplierId) {
     return json({ error: "Invalid supplier ID" }, { status: 400 });
@@ -44,7 +50,12 @@ export async function action({ params, request }: ActionFunctionArgs) {
   });
 }
 
-export const loader = async ({ params }: LoaderFunctionArgs) => {
+export const loader = async ({ params, request }: LoaderFunctionArgs) => {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const supplierId = params.supplier ? parseInt(params.supplier, 10) : null;
   if (!supplierId) {
     return json({ supplier_name: undefined });

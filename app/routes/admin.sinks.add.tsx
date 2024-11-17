@@ -31,6 +31,11 @@ const sinkSchema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const { errors, data } = await parseMutliForm(request, sinkSchema, "sinks");
   if (errors || !data) {
     return json({ errors });
