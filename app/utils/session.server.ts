@@ -74,7 +74,7 @@ async function getUser(sessionId: string): Promise<undefined | SessionUser> {
 async function handlePermissions(
   request: Request,
   validUser: (value: SessionUser) => boolean
-) {
+): Promise<SessionUser> {
   const cookie = request.headers.get("Cookie");
   const session = await getSession(cookie);
   const cookieHeader = session.get("userId");
@@ -92,19 +92,19 @@ async function handlePermissions(
 }
 
 export async function getAdminUser(request: Request): Promise<SessionUser> {
-  return handlePermissions(
+  return await handlePermissions(
     request,
     (user) => user.is_admin || user.is_superuser
   );
 }
 
 export async function getEmployeeUser(request: Request): Promise<SessionUser> {
-  return handlePermissions(
+  return await handlePermissions(
     request,
     (user) => user.is_admin || user.is_superuser || user.is_employee
   );
 }
 
 export async function getSuperUser(request: Request): Promise<SessionUser> {
-  return handlePermissions(request, (user) => user.is_superuser);
+  return await handlePermissions(request, (user) => user.is_superuser);
 }
