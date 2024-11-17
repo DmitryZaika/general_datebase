@@ -33,6 +33,11 @@ const stoneSchema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const { errors, data } = await parseMutliForm(request, stoneSchema, "stones");
   if (errors || !data) {
     return json({ errors });

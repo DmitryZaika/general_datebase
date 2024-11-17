@@ -36,6 +36,11 @@ type FormData = z.infer<typeof customerSchema>;
 const resolver = zodResolver(customerSchema);
 
 export async function action({ request }: ActionFunctionArgs) {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const { errors, data } = await getValidatedFormData<FormData>(
     request,
     resolver

@@ -27,12 +27,18 @@ import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { deleteFile } from "~/utils/s3.server";
+import { getAdminUser } from "~/utils/session.server";
 
 const imageSchema = z.object({
   name: z.string().min(1),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const imageId = parseInt(params.image);
   const { errors, data } = await parseMutliForm(request, imageSchema, "images");
   if (errors || !data) {
@@ -74,7 +80,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
   });
 }
 
-export const loader = async ({ params }: LoaderFunctionArgs) => {
+export const loader = async ({ params, request }: LoaderFunctionArgs) => {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   if (params.image === undefined) {
     return json({ name: undefined, url: undefined });
   }

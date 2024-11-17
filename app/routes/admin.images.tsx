@@ -7,18 +7,24 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json } from "@remix-run/node";
+import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
+import { getAdminUser } from "~/utils/session.server";
 
 interface Image {
   id: number;
   name: string;
 }
 
-export const loader = async () => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const images = await selectMany<Image>(db, "select id, name from images");
   return json({
     images,

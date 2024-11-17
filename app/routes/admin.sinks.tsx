@@ -8,18 +8,24 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json } from "@remix-run/node";
+import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
+import { getAdminUser } from "~/utils/session.server";
 
 interface Sink {
   id: number;
   name: string;
 }
 
-export const loader = async () => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const sinks = await selectMany<Sink>(db, "select id, name from sinks");
   return json({
     sinks,
