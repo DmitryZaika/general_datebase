@@ -5,6 +5,6 @@ CREATE TABLE suppliers (
     manager VARCHAR(255),
     phone VARCHAR(50),
     email VARCHAR(255),
-    notes VARCHAR(255)
+    notes VARCHAR(255),
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
