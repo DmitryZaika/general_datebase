@@ -22,16 +22,17 @@ interface Stone {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  let user;
+  try {
+    user = await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const stones = await selectMany<Stone>(
     db,
     "select id, name, type from stones"
   );
-  try {
-    const user = getAdminUser(request);
-    return json({ stones, user });
-  } catch (error) {
-    return redirect(`/login?error=${error}`);
-  }
+  return json({ stones, user });
 };
 
 export default function Stones() {
