@@ -1,5 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import {
+  ActionFunctionArgs,
+  json,
+  LoaderFunctionArgs,
+  redirect,
+} from "@remix-run/node";
 import { useSubmit, Form, useNavigate } from "@remix-run/react";
 import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
@@ -20,6 +25,7 @@ import { toastData } from "~/utils/toastHelpers";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 
 import { csrf } from "~/utils/csrf.server";
+import { getAdminUser } from "~/utils/session.server";
 
 const supplierschema = z.object({
   website: z.string().url(),
@@ -71,6 +77,15 @@ export async function action({ request }: ActionFunctionArgs) {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    const user = getAdminUser(request);
+    return json({ user });
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
+};
 
 export default function SuppliersAdd() {
   const navigate = useNavigate();
