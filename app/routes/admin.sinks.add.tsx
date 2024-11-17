@@ -55,7 +55,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = getAdminUser(request);
+    const user = await getAdminUser(request);
     return json({ user });
   } catch (error) {
     return redirect(`/login?error=${error}`);
