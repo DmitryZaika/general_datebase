@@ -48,7 +48,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const session = await getSession(request.headers.get("Cookie"));
   console.log("Value: ", value);
-  session.set("userId", value);
+  session.set("sessionId", value);
 
   session.flash("message", toastData("Success", "Logged in"));
   return redirect("..", {
@@ -73,7 +73,6 @@ export default function Login() {
   return (
     <div className="flex justify-center p-20">
       <FormProvider {...form}>
-        <p className="text-red-500">{error}</p>
         <Form
           className="w-full max-w-sm bg-white p-6 shadow-md rounded"
           id="customerForm"
@@ -89,6 +88,7 @@ export default function Login() {
             (errors) => console.log(errors)
           )}
         >
+          <p className="text-red-500">{error}</p>
           <FormField
             control={form.control}
             name="email"

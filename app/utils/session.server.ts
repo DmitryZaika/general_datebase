@@ -62,7 +62,9 @@ async function getUser(sessionId: string): Promise<undefined | SessionUser> {
     `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser FROM users
         JOIN sessions ON sessions.user_id = users.id
         WHERE sessions.id = ?
-            AND sessions.expiration_date > CURRENT_TIMESTAMP`,
+            AND sessions.expiration_date > CURRENT_TIMESTAMP
+            AND sessions.is_deleted = 0`,
+
     [sessionId]
   );
   if (rows.length < 1) {
@@ -77,7 +79,7 @@ async function handlePermissions(
 ): Promise<SessionUser> {
   const cookie = request.headers.get("Cookie");
   const session = await getSession(cookie);
-  const cookieHeader = session.get("userId");
+  const cookieHeader = session.get("sessionId");
   if (cookieHeader === undefined) {
     throw TypeError("Cookie Header cannot be undefined");
   }
