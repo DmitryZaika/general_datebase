@@ -17,6 +17,7 @@ import { InputItem } from "~/components/molecules/InputItem";
 import { useLoaderData, useSubmit } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { commitSession, getSession } from "~/sessions";
+import { PasswordInput } from "~/components/molecules/PasswordInput";
 
 const userSchema = z.object({
   email: z.string().email(),
@@ -100,8 +101,7 @@ export default function Login() {
             control={form.control}
             name="password"
             render={({ field }) => (
-              <InputItem
-                type="password"
+              <PasswordInput
                 name={"Password"}
                 placeholder={"Password"}
                 field={field}
