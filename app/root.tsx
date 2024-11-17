@@ -17,7 +17,6 @@ import { useEffect } from "react";
 import { ToastMessage } from "./utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
-import { log } from "console";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -35,9 +34,10 @@ export const links: LinksFunction = () => [
 export async function loader({ request }: LoaderFunctionArgs) {
   const [token, cookieHeader] = await csrf.commitToken();
   const session = await getSession(request.headers.get("Cookie"));
-  const message: ToastMessage = session.get("message") || null;
+  const activeSession = session.data.sessionId || null;
+  const message: ToastMessage | null = session.get("message") || null;
   return json(
-    { message, token },
+    { message, activeSession, token },
 
     {
       headers: [
@@ -49,8 +49,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function App() {
-  const { message, token } = useLoaderData<typeof loader>();
-
+  const { message, activeSession, token } = useLoaderData<typeof loader>();
   const { toast } = useToast();
   useEffect(() => {
     if (message !== null && message !== undefined) {
@@ -71,7 +70,7 @@ export default function App() {
         <Links />
       </head>
       <body>
-        <Header />
+        {activeSession && <Header activeSession={activeSession} />}
         <AuthenticityTokenProvider token={token}>
           <Outlet />
         </AuthenticityTokenProvider>

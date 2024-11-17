@@ -2,42 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate, useLocation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 
-export function Header() {
-  const [loginError, setLoginError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const navigate = useNavigate();
+export function Header({ activeSession }: { activeSession: string | null }) {
   const location = useLocation();
-
-  const handleLogout = async () => {
-    await fetch("/logout", { method: "POST" });
-    navigate("/");
-  };
-  const handleLoginSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const form = event.currentTarget as HTMLFormElement;
-
-    const formData = new FormData(form);
-    const username = formData.get("username") as string;
-    const password = formData.get("password") as string;
-
-    if (!username || !password) {
-      setLoginError("Please enter both username and password.");
-      return;
-    }
-
-    const response = await fetch("/login", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (response.ok) {
-      setLoginError("");
-      navigate("/admin");
-    } else {
-      const errorText = await response.text();
-      setLoginError(errorText || "Invalid credentials");
-    }
-  };
 
   const isAdminPage = location.pathname.startsWith("/admin");
 
@@ -91,7 +57,16 @@ export function Header() {
           </li>
         </ul>
       </nav>
+      {activeSession && (
+        <Button>
+          <Link to="/logout" className="text-xl">
+            Logout
+          </Link>
+        </Button>
+      )}
       <div className="flex justify-center md:justify-end w-full md:w-auto"></div>
     </header>
   );
 }
+
+// $2a$10$k3mgKHcQ; //WMEW8C1XVPPeoAOYpJP1civMfeQDwvYEoSbFGqD9zda

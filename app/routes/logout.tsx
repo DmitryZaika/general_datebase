@@ -1,11 +1,22 @@
-// app/routes/logout.tsx
-
-import { ActionFunction, redirect } from "@remix-run/node";
+import { LoaderFunction, redirect } from "@remix-run/node";
+import { db } from "~/db.server";
 import { getSession, destroySession } from "~/sessions";
 
-export const action: ActionFunction = async ({ request }) => {
-  const session = await getSession(request.headers.get("Cookie"));
-  return redirect("/", {
+export const loader: LoaderFunction = async ({ request }) => {
+  const cookie = request.headers.get("Cookie");
+  if (!cookie) {
+    return redirect("/");
+  }
+  const session = await getSession(cookie);
+  const sessionId = session.get("sessionId");
+  if (sessionId) {
+    const result = await db.execute(
+      `UPDATE main.sessions SET is_deleted = 1 WHERE id = ?`,
+      [sessionId]
+    );
+  }
+
+  return redirect("/login", {
     headers: {
       "Set-Cookie": await destroySession(session),
     },

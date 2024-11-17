@@ -2,7 +2,7 @@ import { createCookieSessionStorage } from "@remix-run/node";
 import { ToastMessage } from "./utils/toastHelpers";
 
 type SessionData = {
-  userId: string;
+  sessionId: string;
 };
 
 type SessionFlashData = {
@@ -14,7 +14,7 @@ const { getSession, commitSession, destroySession } =
     cookie: {
       name: "__session",
       httpOnly: true,
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7,
       path: "/",
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
