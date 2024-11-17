@@ -3,10 +3,12 @@ import { Umzug, SequelizeStorage } from "umzug";
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+dotenv.config();
 const { DB_DATABASE, DB_USER, DB_PASSWORD, DB_HOST } = process.env;
 console.log({ DB_DATABASE, DB_USER, DB_PASSWORD, DB_HOST });
 if (!DB_DATABASE || !DB_USER || !DB_PASSWORD || !DB_HOST) {
