@@ -71,42 +71,45 @@ export default function Login() {
   });
 
   return (
-    <FormProvider {...form}>
-      <p className="text-red-500">{error}</p>
-      <Form
-        id="customerForm"
-        method="post"
-        onSubmit={form.handleSubmit(
-          (data) => {
-            data["csrf"] = token;
-            submit(data, {
-              method: "post",
-              encType: "multipart/form-data",
-            });
-          },
-          (errors) => console.log(errors)
-        )}
-      >
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <InputItem name={"Email"} placeholder={"Email"} field={field} />
+    <div className="flex justify-center p-20">
+      <FormProvider {...form}>
+        <p className="text-red-500">{error}</p>
+        <Form
+          className="w-full max-w-sm bg-white p-6 shadow-md rounded"
+          id="customerForm"
+          method="post"
+          onSubmit={form.handleSubmit(
+            (data) => {
+              data["csrf"] = token;
+              submit(data, {
+                method: "post",
+                encType: "multipart/form-data",
+              });
+            },
+            (errors) => console.log(errors)
           )}
-        />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <InputItem
-              name={"Password"}
-              placeholder={"Password"}
-              field={field}
-            />
-          )}
-        />
-        <Button type="submit">Login</Button>
-      </Form>
-    </FormProvider>
+        >
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <InputItem name={"Email"} placeholder={"Email"} field={field} />
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <InputItem
+                name={"Password"}
+                placeholder={"Password"}
+                field={field}
+              />
+            )}
+          />
+          <Button type="submit">Login</Button>
+        </Form>
+      </FormProvider>
+    </div>
   );
 }

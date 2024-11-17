@@ -1,5 +1,10 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import {
+  ActionFunctionArgs,
+  json,
+  LoaderFunctionArgs,
+  redirect,
+} from "@remix-run/node";
 import { useNavigate, useNavigation } from "@remix-run/react";
 import { FormField } from "../components/ui/form";
 
@@ -19,6 +24,7 @@ import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
+import { getAdminUser } from "~/utils/session.server";
 
 const imageSchema = z.object({
   name: z.string().min(1),
@@ -46,6 +52,15 @@ export async function action({ request }: ActionFunctionArgs) {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    const user = getAdminUser(request);
+    return json({ user });
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
+};
 
 export default function ImagesAdd() {
   const navigate = useNavigate();

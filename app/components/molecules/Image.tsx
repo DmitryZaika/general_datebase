@@ -21,7 +21,7 @@ export function Image({ className = "", src, name, alt }: ImageProps) {
           <img
             src={src || "/path/to/placeholder.png"}
             alt={alt || name || "Image"}
-            className={`w-full h-auto border-2 border-blue-500 rounded cursor-pointer transition duration-300 ease-in-out transform hover:scale-105 hover:shadow-lg hover:border-blue-500 hover:bg-gray-300 ${className}`}
+            className={`w-full h-auto border-2 border-blue-500 rounded cursor-pointer transition duration-300 ease-in-out transform hover:scale-105 hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300 ${className}`}
             loading="lazy"
           />
         </DialogTrigger>
@@ -42,7 +42,7 @@ export function Image({ className = "", src, name, alt }: ImageProps) {
           />
         </DialogContent>
       </Dialog>
-      <p className="text-center font-bold select-text">{name}</p>
+      <p className="text-center font-bold select-none">{name}</p>
     </div>
   );
 }

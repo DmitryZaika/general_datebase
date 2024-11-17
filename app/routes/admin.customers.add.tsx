@@ -1,5 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import {
+  ActionFunctionArgs,
+  json,
+  LoaderFunctionArgs,
+  redirect,
+} from "@remix-run/node";
 import { useSubmit, Form, useNavigate } from "@remix-run/react";
 import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
@@ -17,6 +22,7 @@ import {
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
+import { getAdminUser } from "~/utils/session.server";
 
 const customerSchema = z.object({
   name: z.string().min(1),
@@ -54,6 +60,15 @@ export async function action({ request }: ActionFunctionArgs) {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    const user = getAdminUser(request);
+    return json({ user });
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
+};
 
 export default function CustomersAdd() {
   const navigate = useNavigate();

@@ -12,7 +12,6 @@ import {
   TableHead,
   TableCell,
 } from "~/components/ui/table";
-import { Button } from "~/components/ui/button";
 import { useLoaderData } from "@remix-run/react";
 import { json } from "@remix-run/node";
 import { db } from "~/db.server";
@@ -42,7 +41,6 @@ export default function Suppliers() {
       <AccordionItem value="suppliers">
         <AccordionTrigger>Suppliers</AccordionTrigger>
         <AccordionContent>
-          <Button className="mb-4">Add New Supplier</Button>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
