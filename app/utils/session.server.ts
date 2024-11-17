@@ -12,9 +12,9 @@ interface LoginUser {
 interface SessionUser {
   email: string;
   name: string;
-  is_employee: string;
-  is_admin: string;
-  is_superuser: string;
+  is_employee: boolean;
+  is_admin: boolean;
+  is_superuser: boolean;
 }
 
 function getExpirationDate(expiration: number): string {
@@ -57,9 +57,7 @@ export async function login(
   return id;
 }
 
-export async function getUser(
-  sessionId: string
-): Promise<undefined | SessionUser> {
+async function getUser(sessionId: string): Promise<undefined | SessionUser> {
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
     `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser FROM users
         JOIN sessions ON sessions.user_id = users.id
@@ -73,41 +71,10 @@ export async function getUser(
   return rows[0];
 }
 
-export async function getSuperUser(
-  sessionId: string
-): Promise<undefined | SessionUser> {
-  const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
-    `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser FROM users
-        JOIN sessions ON sessions.user_id = users.id
-        WHERE sessions.id = ?
-            AND sessions.expiration_date > CURRENT_TIMESTAMP
-       AND users.is_superuser = 1`,
-    [sessionId]
-  );
-  if (rows.length < 1) {
-    return undefined;
-  }
-  return rows[0];
-}
-
-export async function getEmployee(
-  sessionId: string
-): Promise<undefined | SessionUser> {
-  const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
-    `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser FROM users
-        JOIN sessions ON sessions.user_id = users.id
-        WHERE sessions.id = ?
-           AND sessions.expiration_date > CURRENT_TIMESTAMP
-       AND users.is_employee = 1`,
-    [sessionId]
-  );
-  if (rows.length < 1) {
-    return undefined;
-  }
-  return rows[0];
-}
-
-export async function getAdminUser(request: Request): Promise<SessionUser> {
+async function handlePermissions(
+  request: Request,
+  validUser: (value: SessionUser) => boolean
+) {
   const cookie = request.headers.get("Cookie");
   const session = await getSession(cookie);
   const cookieHeader = session.get("userId");
@@ -115,8 +82,29 @@ export async function getAdminUser(request: Request): Promise<SessionUser> {
     throw TypeError("Cookie Header cannot be undefined");
   }
   const user = await getUser(cookieHeader);
-  if (user === undefined || (!user.is_admin && !user.is_superuser)) {
+  if (user === undefined) {
+    throw TypeError("Could not find session");
+  }
+  if (!validUser(user)) {
     throw TypeError("Invalid user permisions");
   }
   return user;
+}
+
+export async function getAdminUser(request: Request): Promise<SessionUser> {
+  return handlePermissions(
+    request,
+    (user) => user.is_admin || user.is_superuser
+  );
+}
+
+export async function getEmployeeUser(request: Request): Promise<SessionUser> {
+  return handlePermissions(
+    request,
+    (user) => user.is_admin || user.is_superuser || user.is_employee
+  );
+}
+
+export async function getSuperUser(request: Request): Promise<SessionUser> {
+  return handlePermissions(request, (user) => user.is_superuser);
 }
