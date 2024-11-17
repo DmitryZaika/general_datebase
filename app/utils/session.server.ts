@@ -73,6 +73,40 @@ export async function getUser(
   return rows[0];
 }
 
+export async function getSuperUser(
+  sessionId: string
+): Promise<undefined | SessionUser> {
+  const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
+    `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser FROM users
+        JOIN sessions ON sessions.user_id = users.id
+        WHERE sessions.id = ?
+            AND sessions.expiration_date > CURRENT_TIMESTAMP
+       AND users.is_superuser = 1`,
+    [sessionId]
+  );
+  if (rows.length < 1) {
+    return undefined;
+  }
+  return rows[0];
+}
+
+export async function getEmployee(
+  sessionId: string
+): Promise<undefined | SessionUser> {
+  const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
+    `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser FROM users
+        JOIN sessions ON sessions.user_id = users.id
+        WHERE sessions.id = ?
+           AND sessions.expiration_date > CURRENT_TIMESTAMP
+       AND users.is_employee = 1`,
+    [sessionId]
+  );
+  if (rows.length < 1) {
+    return undefined;
+  }
+  return rows[0];
+}
+
 export async function getAdminUser(request: Request): Promise<SessionUser> {
   const cookie = request.headers.get("Cookie");
   const session = await getSession(cookie);
