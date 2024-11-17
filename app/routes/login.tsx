@@ -20,7 +20,7 @@ import { commitSession, getSession } from "~/sessions";
 
 const userSchema = z.object({
   email: z.string().email(),
-  password: z.coerce.string(),
+  password: z.coerce.string().min(4),
 });
 type FormData = z.infer<typeof userSchema>;
 const resolver = zodResolver(userSchema);
@@ -101,13 +101,16 @@ export default function Login() {
             name="password"
             render={({ field }) => (
               <InputItem
+                type="password"
                 name={"Password"}
                 placeholder={"Password"}
                 field={field}
               />
             )}
           />
-          <Button type="submit">Login</Button>
+          <Button className="ml-auto" type="submit">
+            Login
+          </Button>
         </Form>
       </FormProvider>
     </div>
