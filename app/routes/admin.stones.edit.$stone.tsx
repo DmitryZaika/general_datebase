@@ -21,7 +21,7 @@ import { db } from "~/db.server";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { commitSession, getSession } from "~/sessions";
 import { selectId } from "~/utils/queryHelpers";
-import { toastData } from "~/utils/toastHelpers";
+import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { FileInput } from "~/components/molecules/FileInput";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
@@ -41,6 +41,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  if (!params.stone) {
+    return forceRedirectError(request.headers, "No document id provided");
+  }
   const stoneId = parseInt(params.stone);
   const { errors, data } = await parseMutliForm(request, stoneSchema, "stones");
   if (errors || !data) {
@@ -53,7 +56,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "select url from stones WHERE id = ?",
     stoneId
   );
-  deleteFile(stone.url);
+  if (stone?.url) {
+    deleteFile(stone.url);
+  }
 
   try {
     let result;
@@ -88,8 +93,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (params.stone === undefined) {
-    return json({ name: undefined, type: undefined, url: undefined });
+  if (!params.stone) {
+    return forceRedirectError(request.headers, "No image id provided");
   }
   const stoneId = parseInt(params.stone);
 

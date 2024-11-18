@@ -19,7 +19,7 @@ import {
 
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
-import { toastData } from "~/utils/toastHelpers";
+import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
 
 export async function action({ params, request }: ActionFunctionArgs) {
@@ -28,7 +28,10 @@ export async function action({ params, request }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  const supplierId = params.supplier ? parseInt(params.supplier, 10) : null;
+  if (!params.stone) {
+    return forceRedirectError(request.headers, "No document id provided");
+  }
+  const supplierId = parseInt(params.stone);
   if (!supplierId) {
     return json({ error: "Invalid supplier ID" }, { status: 400 });
   }

@@ -20,7 +20,7 @@ import {
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { selectId } from "~/utils/queryHelpers";
-import { toastData } from "~/utils/toastHelpers";
+import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { FileInput } from "~/components/molecules/FileInput";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
@@ -39,6 +39,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+
+  if (!params.image) {
+    return forceRedirectError(request.headers, "No document id provided");
+  }
   const imageId = parseInt(params.image);
   const { errors, data } = await parseMutliForm(request, imageSchema, "images");
   if (errors || !data) {
@@ -51,7 +55,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "select url from images WHERE id = ?",
     imageId
   );
-  deleteFile(image.url);
+  if (image?.url) {
+    deleteFile(image.url);
+  }
 
   try {
     let result;
@@ -86,8 +92,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (params.image === undefined) {
-    return json({ name: undefined, url: undefined });
+  if (!params.image) {
+    return forceRedirectError(request.headers, "No image id provided");
   }
   const imageId = parseInt(params.image);
 

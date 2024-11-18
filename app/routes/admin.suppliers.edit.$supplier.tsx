@@ -51,6 +51,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     return { error: error.code };
   }
+  if (!params.supplier) {
+    return forceRedirectError(request.headers, "No document id provided");
+  }
   const supplierId = parseInt(params.supplier);
 
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
@@ -74,22 +77,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     ]
   );
 
-  // try {
-  //   const result = await db.execute(
-  //     `INSERT INTO main.suppliers  (website, supplier_name, manager,  phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)`,
-  //     [
-  //       data.website,
-  //       data.supplier_name,
-  //       data.manager ?? null,
-  //       data.phone ?? null,
-  //       data.email ?? null,
-  //       data.notes ?? null,
-  //     ]
-  //   );
-  //   console.log(result);
-  // } catch (error) {
-  //   console.error("Error connecting to the database: ", error);
-  // }
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Error", "supplier added"));
   return redirect("..", {
@@ -112,11 +99,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (params.supplier === undefined) {
-    return forceRedirectError(
-      request.headers,
-      "No supplier parameter provided"
-    );
+  if (!params.supplier) {
+    return forceRedirectError(request.headers, "No image id provided");
   }
 
   const supplierId = parseInt(params.supplier);

@@ -19,7 +19,7 @@ import {
 
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
-import { toastData } from "~/utils/toastHelpers";
+import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
 
 export async function action({ params, request }: ActionFunctionArgs) {
@@ -53,8 +53,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (params.image === undefined) {
-    return json({ name: undefined });
+  if (!params.image) {
+    return forceRedirectError(request.headers, "No image id provided");
   }
   const imageId = parseInt(params.image);
 
