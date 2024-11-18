@@ -1,6 +1,6 @@
 import { FormProvider } from "~/components/ui/form";
 import { Form, useSubmit } from "@remix-run/react";
-import { UseFormReturn } from "react-hook-form";
+import { FieldValues, UseFormReturn } from 'react-hook-form';
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 
 function createFromData(data: object) {
@@ -11,12 +11,12 @@ function createFromData(data: object) {
   return formData;
 }
 
-export function MultiPartForm({
+export function MultiPartForm<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues extends FieldValues | undefined = undefined>({
   children,
   form,
 }: {
   children: React.ReactNode;
-  form: UseFormReturn;
+  form: UseFormReturn<TFieldValues>;
 }) {
   const submit = useSubmit();
   const token = useAuthenticityToken();
