@@ -20,7 +20,7 @@ import {
 
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
-import { toastData } from "~/utils/toastHelpers";
+import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
 
 export async function action({ params, request }: ActionFunctionArgs) {
@@ -29,13 +29,18 @@ export async function action({ params, request }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  if (!params.stone) {
+    return forceRedirectError(request.headers, "No document id provided");
+  }
   const stoneId = parseInt(params.stone);
   const stone = await selectId<{ url: string }>(
     db,
     "select url from stones WHERE id = ?",
     stoneId
   );
-  deleteFile(stone.url);
+  if (stone?.url) {
+    deleteFile(stone.url);
+  }
 
   try {
     const result = await db.execute(`DELETE FROM main.stones WHERE id = ?`, [
@@ -58,8 +63,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (params.stone === undefined) {
-    return json({ name: undefined });
+  if (!params.stone) {
+    return forceRedirectError(request.headers, "No image id provided");
   }
   const stoneId = parseInt(params.stone);
 

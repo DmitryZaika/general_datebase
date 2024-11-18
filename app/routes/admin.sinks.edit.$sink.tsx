@@ -20,7 +20,7 @@ import {
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { selectId } from "~/utils/queryHelpers";
-import { toastData } from "~/utils/toastHelpers";
+import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { FileInput } from "~/components/molecules/FileInput";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
@@ -39,6 +39,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  if (!params.sink) {
+    return forceRedirectError(request.headers, "No document id provided");
+  }
   const sinkId = parseInt(params.sink);
   const { errors, data } = await parseMutliForm(request, sinkSchema, "sinks");
   if (errors || !data) {
@@ -51,7 +54,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "select url from sinks WHERE id = ?",
     sinkId
   );
-  deleteFile(sink.url);
+  if (sink?.url) {
+    deleteFile(sink.url);
+  }
 
   try {
     let result;
@@ -84,8 +89,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (params.sink === undefined) {
-    return json({ name: undefined, url: undefined });
+  if (!params.sink) {
+    return forceRedirectError(request.headers, "No document id provided");
   }
   const sinkId = parseInt(params.sink);
 

@@ -24,7 +24,10 @@ export function toastData(
   };
 }
 
-export async function forceRedirectError(headers, description: string) {
+export async function forceRedirectError(
+  headers: Headers,
+  description: string
+) {
   const session = await getSession(headers.get("Cookie"));
   session.flash("message", toastData("Error", description, "destructive"));
   return redirect("..", {

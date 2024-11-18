@@ -20,7 +20,7 @@ import {
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { selectId } from "~/utils/queryHelpers";
-import { toastData } from "~/utils/toastHelpers";
+import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { FileInput } from "~/components/molecules/FileInput";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
@@ -39,6 +39,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  if (!params.document) {
+    return forceRedirectError(request.headers, "No document id provided");
+  }
   const documentId = parseInt(params.document);
   const { errors, data } = await parseMutliForm(
     request,
@@ -55,21 +58,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "select url from documents WHERE id = ?",
     documentId
   );
-  deleteFile(document.url);
+  if (document?.url) {
+    deleteFile(document.url);
+  }
 
   try {
-    let result;
-
     if (data.file && data.file !== "undefined") {
-      result = await db.execute(
+      await db.execute(
         `UPDATE main.documents SET name = ?, url = ? WHERE id = ?`,
         [data.name, data.file, documentId]
       );
     } else {
-      result = await db.execute(
-        `UPDATE main.documents SET name = ? WHERE id = ?`,
-        [data.name, documentId]
-      );
+      await db.execute(`UPDATE main.documents SET name = ? WHERE id = ?`, [
+        data.name,
+        documentId,
+      ]);
     }
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
@@ -87,8 +90,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (params.document === undefined) {
-    return json({ name: undefined, url: undefined });
+  if (!params.document) {
+    return forceRedirectError(request.headers, "No image id provided");
   }
   const documentId = parseInt(params.document);
 

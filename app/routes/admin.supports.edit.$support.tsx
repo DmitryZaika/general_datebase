@@ -20,7 +20,7 @@ import {
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { selectId } from "~/utils/queryHelpers";
-import { toastData } from "~/utils/toastHelpers";
+import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { FileInput } from "~/components/molecules/FileInput";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
@@ -39,6 +39,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  if (!params.support) {
+    return forceRedirectError(request.headers, "No document id provided");
+  }
   const supportId = parseInt(params.support);
   const { errors, data } = await parseMutliForm(
     request,
@@ -55,7 +58,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "select url from supports WHERE id = ?",
     supportId
   );
-  deleteFile(support.url);
+  if (support?.url) {
+    deleteFile(support.url);
+  }
 
   try {
     let result;
@@ -90,8 +95,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (params.support === undefined) {
-    return json({ name: undefined, url: undefined });
+  if (!params.support) {
+    return forceRedirectError(request.headers, "No document id provided");
   }
   const supportId = parseInt(params.support);
 
