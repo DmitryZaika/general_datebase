@@ -52,7 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
   console.log("HERE");
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Image added"));
-  console.log("HERE 2");
+
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
