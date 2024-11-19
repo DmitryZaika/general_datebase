@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { getValidatedFormData } from "remix-hook-form";
 import { toastData } from "~/utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
-import { login, register } from "~/utils/session.server";
+import { getSuperUser, register } from "~/utils/session.server";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
 import { useSubmit } from "@remix-run/react";
@@ -21,6 +21,11 @@ type FormData = z.infer<typeof userSchema>;
 const resolver = zodResolver(userSchema);
 
 export async function action({ request }: ActionFunctionArgs) {
+  try {
+    await getSuperUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   try {
     await csrf.validate(request);
   } catch (error) {

@@ -58,9 +58,7 @@ export function Header({ activeSession }: { activeSession: string | null }) {
       </nav>
       {activeSession && (
         <Button>
-          <Link to="/logout" className="text-xl">
-            Logout
-          </Link>
+          <Link to="/logout">Logout</Link>
         </Button>
       )}
       <div className="flex justify-center md:justify-end w-full md:w-auto"></div>
