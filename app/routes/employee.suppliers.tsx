@@ -13,9 +13,10 @@ import {
   TableCell,
 } from "~/components/ui/table";
 import { useLoaderData } from "@remix-run/react";
-import { json } from "@remix-run/node";
+import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
+import { getEmployeeUser } from "~/utils/session.server";
 
 interface Supplier {
   id: number;
@@ -26,7 +27,12 @@ interface Supplier {
   email?: string;
   website?: string;
 }
-export const loader = async () => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    await getEmployeeUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const suppliers = await selectMany<Supplier>(
     db,
     "select id, manager, supplier_name, phone, email from suppliers"

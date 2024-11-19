@@ -5,12 +5,13 @@ import {
   AccordionContent,
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
-import { json } from "@remix-run/node";
+import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "@remix-run/react";
 import { Image } from "~/components/molecules/Image";
 import ModuleList from "~/components/ModuleList";
+import { getEmployeeUser } from "~/utils/session.server";
 
 interface Stone {
   id: number;
@@ -19,7 +20,12 @@ interface Stone {
   url: string | null;
 }
 
-export const loader = async () => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    await getEmployeeUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const stones = await selectMany<Stone>(
     db,
     "select id, name, type, url from stones"
