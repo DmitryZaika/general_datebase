@@ -42,6 +42,11 @@ const resolver = zodResolver(supplierschema);
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
+  try {
     await csrf.validate(request);
   } catch (error) {
     return { error: error.code };
