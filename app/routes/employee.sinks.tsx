@@ -1,4 +1,4 @@
-import { json } from "@remix-run/node";
+import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import {
   Accordion,
@@ -10,6 +10,7 @@ import { db } from "~/db.server";
 
 import { selectMany } from "~/utils/queryHelpers";
 import ModuleList from "~/components/ModuleList";
+import { getEmployeeUser } from "~/utils/session.server";
 
 interface Sink {
   id: number;
@@ -17,7 +18,12 @@ interface Sink {
   url: string | null;
 }
 
-export const loader = async () => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    await getEmployeeUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const sinks = await selectMany<Sink>(db, "select id, name, url from sinks");
   return json({ sinks });
 };

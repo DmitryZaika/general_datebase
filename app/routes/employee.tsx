@@ -5,6 +5,7 @@ import { PageLayout } from "~/components/PageLayout";
 import { Tabs, TabsList } from "~/components/ui/tabs";
 import { NavTab } from "~/components/molecules/NavTab";
 import { redirect } from "@remix-run/node";
+import { getEmployeeUser } from "~/utils/session.server";
 
 export const meta: MetaFunction = () => {
   return [
@@ -14,6 +15,11 @@ export const meta: MetaFunction = () => {
 };
 
 export const loader: LoaderFunction = async ({ request }) => {
+  try {
+    await getEmployeeUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
   const url = new URL(request.url);
   if (["/employee", "/employee/"].includes(url.pathname)) {
     return redirect("/employee/stones");

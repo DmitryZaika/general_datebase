@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json, redirect } from "@remix-run/node";
+import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
@@ -19,7 +19,7 @@ interface Document {
   name: string;
 }
 
-export const loader = async () => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getAdminUser(request);
   } catch (error) {
