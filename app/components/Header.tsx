@@ -16,12 +16,21 @@ export function Header({ activeSession }: { activeSession: string | null }) {
           />
         </a>
       </div>
+      {isAdminPage ? (
+        <Link to="/employee">
+          <Button>Employee</Button>
+        </Link>
+      ) : (
+        <Link to="/admin">
+          <Button>Admin</Button>
+        </Link>
+      )}
       <nav className="w-full">
         <ul className="flex gap-5 h-full flex-col md:flex-row md:justify-center md:items-center">
           <li>
             <Button asChild variant="link">
               <Link
-                to={isAdminPage ? "/admin/stones" : "/"}
+                to={isAdminPage ? "/admin/stones" : "/employee/stones"}
                 className="text-xl"
               >
                 Database
@@ -30,20 +39,25 @@ export function Header({ activeSession }: { activeSession: string | null }) {
           </li>
           <li>
             <Button asChild variant="link">
-              <Link to="/instructions" className="text-xl">
+              <Link
+                to={
+                  isAdminPage ? "/admin/instructions" : "/employee/instructions"
+                }
+                className="text-xl"
+              >
                 Instructions
               </Link>
             </Button>
           </li>
-          <li>
-            <Button asChild variant="link">
-              {isAdminPage || (
+          {isAdminPage || (
+            <li>
+              <Button asChild variant="link">
                 <Link to="/special-order" className="text-xl">
                   Special Order
                 </Link>
-              )}
-            </Button>
-          </li>
+              </Button>
+            </li>
+          )}
           <li>
             <Button asChild variant="link">
               <Link
@@ -57,9 +71,9 @@ export function Header({ activeSession }: { activeSession: string | null }) {
         </ul>
       </nav>
       {activeSession && (
-        <Button>
-          <Link to="/logout">Logout</Link>
-        </Button>
+        <Link to="/logout">
+          <Button>Logout</Button>
+        </Link>
       )}
       <div className="flex justify-center md:justify-end w-full md:w-auto"></div>
     </header>
