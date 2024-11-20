@@ -42,7 +42,7 @@ export default function SpecialOrder() {
       className="bg-white p-5 rounded-lg shadow-[0px_-0px_5px_rgba(0,0,0,0.15)]  max-w-lg mx-auto my-5"
       title="Special Order Calculator"
     >
-      <label htmlFor="price-per-sqft" className="text-base mb-2 block">
+      <label htmlFor="price-per-sqft" className="text-base block">
         Price per Sqft:
       </label>
       <input
@@ -54,10 +54,10 @@ export default function SpecialOrder() {
         className="w-full p-2 border border-gray-300 rounded-md text-base mb-4"
       />
 
-      <label htmlFor="size" className="text-base mb-2 block">
+      <label htmlFor="size" className="text-base  block">
         Size of Slab:
       </label>
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2">
         <input
           type="number"
           id="width"
@@ -78,7 +78,7 @@ export default function SpecialOrder() {
         />
       </div>
 
-      <div className="flex items-center gap-10 mb-4">
+      <div className="flex items-center gap-3 mb-4">
         <label htmlFor="slabs" className="text-base">
           Slabs:
         </label>
@@ -103,13 +103,13 @@ export default function SpecialOrder() {
         </button>
       </div>
 
-      <div className="text-lg mt-5 font-bold text-gray-800">
-        Cost per Sqft $<span>{values.totalPrice}</span> per sqft
+      <div className="text-lg font-bold text-gray-800">
+        Cost $<span>{values.totalPrice}</span> per sqft
       </div>
-      <div className="text-lg mt-2 font-bold text-gray-800">
+      <div className="text-lg  font-bold text-gray-800">
         Total Square Feet: <span>{values.totalSquareFeet}</span> sqft
       </div>
-      <div className="text-xl mt-3 font-bold text-red-700 pt-2">
+      <div className="text-xl  font-bold text-red-700">
         Total Cost $<span>{values.totalCost}</span>
       </div>
     </PageLayout>

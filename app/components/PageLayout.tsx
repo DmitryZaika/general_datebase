@@ -13,7 +13,7 @@ export function PageLayout({ title, children, className }: PageLayoutProps) {
       <h1 className="text-3xl text-center sm:text-left font-bold mb-8">
         {title}
       </h1>
-      <section className={`flex flex-col gap-5 ${className}`}>
+      <section className={`flex flex-col gap-3 ${className}`}>
         {children}
       </section>
     </main>
