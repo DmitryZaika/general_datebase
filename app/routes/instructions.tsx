@@ -10,12 +10,10 @@ export default function Instructions() {
   return (
     <PageLayout title="Instructions">
       <Accordion type="multiple">
-        {/* Leading a Customer */}
         <AccordionItem value="leading-customer">
           <AccordionTrigger>Leading a Customer</AccordionTrigger>
           <AccordionContent>
             <Accordion type="multiple">
-              {/* After Template */}
               <AccordionItem value="after-template">
                 <AccordionTrigger>After Template</AccordionTrigger>
                 <AccordionContent>

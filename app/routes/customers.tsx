@@ -20,9 +20,9 @@ import { InputItem } from "~/components/molecules/InputItem";
 
 const customerSchema = z.object({
   name: z.string().min(5),
-  email: z.string().email(),
-  phoneNumber: z.string().min(10),
-  address: z.string().min(10),
+  email: z.string().email().optional(),
+  phoneNumber: z.string().min(10).optional(),
+  address: z.string().min(10).optional(),
 });
 
 type FormData = z.infer<typeof customerSchema>;

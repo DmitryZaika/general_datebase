@@ -1,7 +1,11 @@
+import { PageLayout } from "~/components/PageLayout";
+
 export default function AdminInstructions() {
   return (
     <>
-      <h1>Admin Instructions</h1>
+      <PageLayout title="Admin Instructions">
+        <h1>Admin Instructions</h1>
+      </PageLayout>
     </>
   );
 }

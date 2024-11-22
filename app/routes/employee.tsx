@@ -36,23 +36,19 @@ export default function Employee() {
     navigate(`/employee/${value}`);
   };
 
-  const isDataBase = location.pathname.startsWith("/employee/stones");
-
   return (
     <PageLayout title="Granite Depot DataBase">
-      {isDataBase ? (
-        <Tabs value={currentTab} onValueChange={handleTabChange}>
-          <TabsList>
-            <NavTab name="Stones" />
-            <NavTab name="Sinks" />
-            <NavTab name="Suppliers" />
-            <NavTab name="Supports" />
-            <NavTab name="Documents" />
-            <NavTab name="Images" />
-          </TabsList>
-          <Outlet />
-        </Tabs>
-      ) : null}
+      <Tabs value={currentTab} onValueChange={handleTabChange}>
+        <TabsList>
+          <NavTab name="Stones" />
+          <NavTab name="Sinks" />
+          <NavTab name="Suppliers" />
+          <NavTab name="Supports" />
+          <NavTab name="Documents" />
+          <NavTab name="Images" />
+        </TabsList>
+        <Outlet />
+      </Tabs>
     </PageLayout>
   );
 }

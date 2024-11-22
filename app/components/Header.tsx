@@ -40,9 +40,7 @@ export function Header({ activeSession }: { activeSession: string | null }) {
           <li>
             <Button asChild variant="link">
               <Link
-                to={
-                  isAdminPage ? "/admin/instructions" : "/employee/instructions"
-                }
+                to={isAdminPage ? "/admin/instructions" : "/instructions"}
                 className="text-xl"
               >
                 Instructions

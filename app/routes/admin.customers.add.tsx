@@ -23,6 +23,7 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 const customerSchema = z.object({
   name: z.string().min(1),
@@ -40,6 +41,11 @@ export async function action({ request }: ActionFunctionArgs) {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: error.code };
   }
   const { errors, data } = await getValidatedFormData<FormData>(
     request,
@@ -152,7 +158,6 @@ export default function CustomersAdd() {
                 />
               )}
             />
-
             <DialogFooter>
               <Button type="submit">Save changes</Button>
             </DialogFooter>
