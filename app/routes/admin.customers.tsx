@@ -14,6 +14,7 @@ import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { getAdminUser } from "~/utils/session.server";
+import { PageLayout } from "~/components/PageLayout";
 
 interface Customer {
   id: number;
@@ -42,9 +43,9 @@ export default function AdminCustomers() {
   const { customers } = useLoaderData<typeof loader>();
 
   return (
-    <>
+    <PageLayout title="Customers List">
       <Link to={`add`} relative="path">
-        <Button>Add</Button>
+        <Button>Add new customer</Button>
       </Link>
       <Table>
         <TableCaption>A list of your recent customers.</TableCaption>
@@ -92,6 +93,6 @@ export default function AdminCustomers() {
         </TableFooter>
       </Table>
       <Outlet />
-    </>
+    </PageLayout>
   );
 }

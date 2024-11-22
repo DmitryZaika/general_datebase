@@ -35,23 +35,29 @@ export default function Admin() {
     navigate(`/admin/${value}`);
   };
 
-  const isDataBase = location.pathname.startsWith("/admin/stones");
+  const isDataBase =
+    location.pathname.startsWith("/admin/stones") ||
+    location.pathname.startsWith("/admin/sinks") ||
+    location.pathname.startsWith("/admin/images") ||
+    location.pathname.startsWith("/admin/supports") ||
+    location.pathname.startsWith("/admin/documents") ||
+    location.pathname.startsWith("/admin/suppliers");
 
-  return (
+  return isDataBase ? (
     <PageLayout title="Granite Depot DataBase">
-      {isDataBase ? (
-        <Tabs value={currentTab} onValueChange={handleTabChange}>
-          <TabsList>
-            <TabsTrigger value="stones">Stones</TabsTrigger>
-            <TabsTrigger value="sinks">Sinks</TabsTrigger>
-            <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
-            <TabsTrigger value="supports">Supports</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="images">Images</TabsTrigger>
-          </TabsList>
-          <Outlet />
-        </Tabs>
-      ) : null}
+      <Tabs value={currentTab} onValueChange={handleTabChange}>
+        <TabsList>
+          <TabsTrigger value="stones">Stones</TabsTrigger>
+          <TabsTrigger value="sinks">Sinks</TabsTrigger>
+          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+          <TabsTrigger value="supports">Supports</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="images">Images</TabsTrigger>
+        </TabsList>
+        <Outlet />
+      </Tabs>
     </PageLayout>
+  ) : (
+    <Outlet />
   );
 }
