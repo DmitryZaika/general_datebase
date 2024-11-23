@@ -25,7 +25,7 @@ function getExpirationDate(expiration: number): string {
 
 export async function register(email: string, password: string) {
   const passwordHash = await bcrypt.hash(password, 10);
-  const result = await db.execute(
+  await db.execute(
     `INSERT INTO main.users  (email, password) VALUES ( ?, ?)`,
     [email, passwordHash]
   );

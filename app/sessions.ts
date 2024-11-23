@@ -20,5 +20,4 @@ const { getSession, commitSession, destroySession } =
       secure: process.env.NODE_ENV === "production",
     },
   });
-
 export { getSession, commitSession, destroySession };
