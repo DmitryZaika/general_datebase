@@ -41,8 +41,12 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ errors, defaultValues });
   }
 
-  const value = await register(data.email, data.password);
-  console.log(value);
+
+  try {
+    const value = await register(data.email, data.password);
+  } catch (error) {
+    console.error(error);
+  }
 
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Logged in"));

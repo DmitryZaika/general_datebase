@@ -1,5 +1,5 @@
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
-import { FieldPath, FieldValues, type ControllerRenderProps } from 'react-hook-form';
+import { FieldValues, type ControllerRenderProps } from 'react-hook-form';
 
 import {
   Select,
@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 
-export function SelectInput<TFieldValues extends FieldValues = FieldValues, TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>>({
+export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   name,
   field,
   placeholder,

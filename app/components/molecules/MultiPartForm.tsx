@@ -11,7 +11,7 @@ function createFromData(data: object) {
   return formData;
 }
 
-export function MultiPartForm<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues extends FieldValues | undefined = undefined>({
+export function MultiPartForm<TFieldValues extends FieldValues = FieldValues>({
   children,
   form,
 }: {
