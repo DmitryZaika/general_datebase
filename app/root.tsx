@@ -13,10 +13,12 @@ import { Toaster } from "./components/ui/toaster";
 import "./tailwind.css";
 import { commitSession, getSession } from "./sessions";
 import { useToast } from "./hooks/use-toast";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ToastMessage } from "./utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
+import { ChatIcon } from "./components/atoms/ChatIcon";
+import { Chat } from "./components/organisms/Chat";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -48,9 +50,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   );
 }
 
+
 export default function App() {
   const { message, activeSession, token } = useLoaderData<typeof loader>();
   const { toast } = useToast();
+  const [chatOpen, setChatOpen] = useState(false);
+
   useEffect(() => {
     if (message !== null && message !== undefined) {
       toast({
@@ -79,6 +84,8 @@ export default function App() {
         {/* <Footer /> */}
         <Scripts />
       </body>
+      {chatOpen ? <Chat />
+      :  <ChatIcon className="absolute bottom-4 right-4 size-16 flex items-center justify-center" onClick={() => setChatOpen(true)}/> }
     </html>
   );
 }

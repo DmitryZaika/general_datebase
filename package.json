@@ -38,6 +38,7 @@
     "isbot": "^4.1.0",
     "lucide-react": "^0.453.0",
     "mysql2": "^3.11.3",
+    "openai": "^4.73.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.53.1",
