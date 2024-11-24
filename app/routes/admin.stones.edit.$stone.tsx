@@ -102,11 +102,11 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     "select name, type, url from stones WHERE id = ?",
     stoneId
   );
-  return json({
+  return {
     name: stone?.name,
     type: stone?.type,
     url: stone?.url,
-  });
+  };
 };
 
 export default function StonesEdit() {

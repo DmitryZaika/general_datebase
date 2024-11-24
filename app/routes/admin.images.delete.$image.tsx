@@ -62,9 +62,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     "select name from images WHERE id = ?",
     imageId
   );
-  return json({
+  return {
     name: image?.name || "this image",
-  });
+  };
 };
 
 export default function ImagesAdd() {

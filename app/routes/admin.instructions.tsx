@@ -24,7 +24,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, title, parent_id, after_id, rich_text from instructions"
   );
-  return json({ instructions, user });
+  return { instructions, user };
 };
 
 

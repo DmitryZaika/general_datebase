@@ -40,7 +40,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   const { errors, data } = await parseMutliForm(request, stoneSchema, "stones");
   if (errors || !data) {
-    return json({ errors });
+    return { errors };
   }
   try {
     await db.execute(
@@ -69,7 +69,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
-    return json({ user });
+    return { user };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }

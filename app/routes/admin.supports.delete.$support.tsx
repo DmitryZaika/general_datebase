@@ -60,9 +60,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     "select name from supports WHERE id = ?",
     supportId
   );
-  return json({
+  return {
     name: support?.name,
-  });
+  };
 };
 
 export default function SupportsAdd() {

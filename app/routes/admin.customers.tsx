@@ -34,9 +34,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select name, email, phone, address from customers"
   );
-  return json({
+  return {
     customers,
-  });
+  };
 };
 
 export default function AdminCustomers() {

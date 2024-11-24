@@ -39,12 +39,12 @@ export async function action({ request }: ActionFunctionArgs) {
     receivedValues: defaultValues,
   } = await getValidatedFormData<FormData>(request, resolver);
   if (errors) {
-    return json({ errors, defaultValues });
+    return { errors, defaultValues };
   }
 
   const value = await login(data.email, data.password, 60 * 60 * 24 * 7);
   if (value == undefined) {
-    return json({ error: "Unable to login" });
+    return { error: "Unable to login" };
   }
 
   const session = await getSession(request.headers.get("Cookie"));
@@ -60,7 +60,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { searchParams } = new URL(request.url);
   const error = searchParams.get("error");
-  return json({ error });
+  return { error };
 };
 
 export default function Login() {

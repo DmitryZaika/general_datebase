@@ -38,7 +38,7 @@ export async function action({ request }: ActionFunctionArgs) {
     receivedValues: defaultValues,
   } = await getValidatedFormData<FormData>(request, resolver);
   if (errors) {
-    return json({ errors, defaultValues });
+    return { errors, defaultValues };
   }
 
 

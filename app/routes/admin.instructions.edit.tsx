@@ -45,7 +45,7 @@ import {
     const sinkId = parseInt(params.sink);
     const { errors, data } = await parseMutliForm(request, sinkSchema, "sinks");
     if (errors || !data) {
-      return json({ errors });
+      return { errors };
     }
   
     // NOTE: THIS IS DANGEROUS
@@ -99,10 +99,10 @@ import {
       "select name, url from sinks WHERE id = ?",
       sinkId
     );
-    return json({
+    return {
       name: sink?.name,
       url: sink?.url,
-    });
+    };
   };
   
   export default function SinksEdit() {

@@ -32,7 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, name, type from stones"
   );
-  return json({ stones, user });
+  return { stones, user };
 };
 
 export default function Stones() {

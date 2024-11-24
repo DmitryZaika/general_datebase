@@ -60,9 +60,9 @@ import {
       "select name from sinks WHERE id = ?",
       sinkId
     );
-    return json({
+    return {
       name: sink?.name,
-    });
+    };
   };
   
   export default function SinksAdd() {

@@ -73,9 +73,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     "select name from stones WHERE id = ?",
     stoneId
   );
-  return json({
+  return {
     name: stone?.name,
-  });
+  };
 };
 
 export default function StonesAdd() {
