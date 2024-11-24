@@ -61,7 +61,6 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ errors, receivedValues });
   }
 
-  console.log(data)
   try {
     const result = await db.execute(
       `INSERT INTO main.suppliers  (website, supplier_name, manager,  phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)`,

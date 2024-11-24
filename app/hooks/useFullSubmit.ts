@@ -24,7 +24,7 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(fo
       // Отправка данных
       submit(sanitizedData, {
         method: "post",
-        encType: "multipart/form-data",
+        encType: "application/x-www-form-urlencoded",
       });
     },
     (errors) => {
