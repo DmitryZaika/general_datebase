@@ -9,7 +9,8 @@
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "remix-serve ./build/server/index.js",
     "typecheck": "tsc",
-    "migrate": "node migrate.js"
+    "migrate": "node migrate.js",
+    "hash-password": "node hash-password.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.688.0",
