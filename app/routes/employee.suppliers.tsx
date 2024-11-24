@@ -37,7 +37,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, manager, supplier_name, phone, email from suppliers"
   );
-  return json({ suppliers });
+  return { suppliers };
 };
 
 export default function Suppliers() {

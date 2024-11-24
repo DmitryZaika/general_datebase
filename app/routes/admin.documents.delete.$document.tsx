@@ -60,9 +60,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     "select name from documents WHERE id = ?",
     documentId
   );
-  return json({
+  return {
     name: document?.name,
-  });
+  }
 };
 
 export default function DocumentsAdd() {

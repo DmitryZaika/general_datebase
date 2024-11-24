@@ -49,7 +49,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "documents"
   );
   if (errors || !data) {
-    return json({ errors });
+    return { errors };
   }
 
   // NOTE: THIS IS DANGEROUS
@@ -100,10 +100,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     "select name, url from documents WHERE id = ?",
     documentId
   );
-  return json({
+  return {
     name: document?.name,
     url: document?.url,
-  });
+  };
 };
 
 export default function DocumentsEdit() {

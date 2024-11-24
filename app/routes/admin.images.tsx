@@ -26,9 +26,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   const images = await selectMany<Image>(db, "select id, name from images");
-  return json({
+  return {
     images,
-  });
+  };
 };
 
 export default function Images() {

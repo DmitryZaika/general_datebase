@@ -61,7 +61,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   }
   const supplierId = params.supplier ? parseInt(params.supplier, 10) : null;
   if (!supplierId) {
-    return json({ supplier_name: undefined });
+    return { supplier_name: undefined };
   }
 
   const supplier = await selectId<{ supplier_name: string }>(
@@ -71,12 +71,12 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   );
 
   if (!supplier) {
-    return json({ supplier_name: undefined });
+    return { supplier_name: undefined };
   }
 
-  return json({
+  return {
     supplier_name: supplier ? supplier.supplier_name : undefined,
-  });
+  };
 };
 
 export default function SuppliersAdd() {

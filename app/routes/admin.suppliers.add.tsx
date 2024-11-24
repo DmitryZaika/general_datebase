@@ -58,7 +58,7 @@ export async function action({ request }: ActionFunctionArgs) {
     resolver
   );
   if (errors) {
-    return json({ errors, receivedValues });
+    return { errors, receivedValues };
   }
 
   try {
@@ -87,7 +87,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
-    return json({ user });
+    return { user };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }

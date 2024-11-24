@@ -46,7 +46,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const imageId = parseInt(params.image);
   const { errors, data } = await parseMutliForm(request, imageSchema, "images");
   if (errors || !data) {
-    return json({ errors });
+    return { errors };
   }
 
   // NOTE: THIS IS DANGEROUS
@@ -102,10 +102,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     "select name, url from images WHERE id = ?",
     imageId
   );
-  return json({
+  return {
     name: image?.name,
     url: image?.url,
-  });
+  };
 };
 
 export default function ImagesEdit() {

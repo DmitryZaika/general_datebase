@@ -38,7 +38,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   const { errors, data } = await parseMutliForm(request, imageSchema, "images");
   if (errors || !data) {
-    return json({ errors });
+    return { errors };
   }
 
   try {
@@ -61,7 +61,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
-    return json({ user });
+    return { user };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }

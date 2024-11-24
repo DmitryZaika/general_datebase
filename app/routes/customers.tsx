@@ -36,7 +36,7 @@ export async function action({ request }: ActionFunctionArgs) {
     receivedValues: defaultValues,
   } = await getValidatedFormData<FormData>(request, resolver);
   if (errors) {
-    return json({ errors, defaultValues });
+    return { errors, defaultValues };
   }
 
   try {
@@ -47,7 +47,7 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
-  return json({ success: true });
+  return { success: true };
 }
 
 export default function Customer() {

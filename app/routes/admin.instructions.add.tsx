@@ -58,7 +58,7 @@ export async function action({ request }: ActionFunctionArgs) {
     resolver
   );
   if (errors) {
-    return json({ errors, receivedValues });
+    return { errors, receivedValues };
   }
 
   try {
@@ -128,14 +128,7 @@ export default function InstructionsAdd() {
     })
   );
   
-  console.log(instructions);
-  console.log(parent_id);
-  for (const item of instructions) {
-    console.log(typeof(item.parent_id), typeof(parent_id))
-    console.log(`${item.parent_id} == ${parent_id}: ${item.parent_id === parent_id}`)
-  }
-  
-  const afterOptions: { key: number; value: string }[] = parent_id ? instructions.filter(item => item.parent_id===parent_id ).map(
+  const afterOptions: { key: number; value: string }[] = parent_id ? instructions.filter(item => item.parent_id=== parseInt(parent_id) ).map(
     (instruction) => ({
       key: instruction.id,
       value: instruction.title,
