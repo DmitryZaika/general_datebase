@@ -84,9 +84,9 @@ export const loader = async ({ request}: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  const instructions = await selectMany<{ title: string; parent_id: number }>(
+  const instructions = await selectMany<{ title: string; id: number }>(
     db,
-    "SELECT parent_id, title FROM instructions"
+    "SELECT id, title FROM instructions"
   );
 
   if (!instructions) {
@@ -108,12 +108,13 @@ export default function InstructionsAdd() {
   const token = useAuthenticityToken();
   const { instructions } = useLoaderData<typeof loader>();
 
-  const instructionsOptions: { key: string; value: string }[] = instructions.map(
+  const instructionsOptions: { key: number; value: string }[] = instructions.map(
     (instruction) => ({
-      key: instruction.parent_id.toString(),
+      key: instruction.id,
       value: instruction.title,
     })
   );
+console.log(instructionsOptions);
 
   const form = useForm<FormData>({
     resolver,
@@ -131,6 +132,7 @@ export default function InstructionsAdd() {
     }
   };
 
+console.log(instructionsOptions.length);
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -156,32 +158,32 @@ export default function InstructionsAdd() {
               />
             )}
           />
-      {  instructions ? ( <FormField
+      <FormField
             control={form.control}
             name="parent_id"
             render={({ field }) => (
               <SelectInput
                 field={field}
-                placeholder="Parent"
+                disabled={instructionsOptions.length===0}
                 name="Parent"
                 options={instructionsOptions}
               />
             )}
-          />): null}
-         {instructions ? (<FormField
+          />
+       <FormField
             control={form.control}
             name="place"
             render={({ field }) => (
               <SelectInput
                 field={field}
-                placeholder="Order"
                 name="Order"
+                disabled={instructionsOptions.length===0}
                 options={
                 instructionsOptions
                 }
               />
             )}
-          />) : null}
+          />
           <FormField
             control={form.control}
             name="rich_text"
