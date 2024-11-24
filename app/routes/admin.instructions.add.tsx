@@ -32,8 +32,8 @@ import { selectMany } from "~/utils/queryHelpers";
 
 const instructionschema = z.object({
   title: z.string(),
-  parent_id: z.union([z.number().positive(), z.null()]).optional(),
-  place: z.coerce.number().optional(),
+  parent_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
+  after_id:  z.union([z.coerce.number().positive(), z.null()]).optional(),
   rich_text: z.string()
 });
 
@@ -62,9 +62,9 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    await db.execute(`INSERT INTO main.instructions (title, parent_id, place, rich_text) VALUES (?,  ?, ?, ?);`, [
+    await db.execute(`INSERT INTO main.instructions (title, parent_id, after_id, rich_text) VALUES (?,  ?, ?, ?);`, [
       data.title,
-      data.parent_id, data.place, data.rich_text
+      data.parent_id, data.after_id, data.rich_text
     ]);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -84,9 +84,9 @@ export const loader = async ({ request}: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  const instructions = await selectMany<{ title: string; id: number }>(
+  const instructions = await selectMany<{ title: string; id: number; parent_id:number }>(
     db,
-    "SELECT id, title FROM instructions"
+    "SELECT id, parent_id, title FROM instructions"
   );
 
   if (!instructions) {
@@ -108,13 +108,7 @@ export default function InstructionsAdd() {
   const token = useAuthenticityToken();
   const { instructions } = useLoaderData<typeof loader>();
 
-  const instructionsOptions: { key: number; value: string }[] = instructions.map(
-    (instruction) => ({
-      key: instruction.id,
-      value: instruction.title,
-    })
-  );
-console.log(instructionsOptions);
+
 
   const form = useForm<FormData>({
     resolver,
@@ -124,6 +118,30 @@ console.log(instructionsOptions);
    
     },
   });
+ 
+  
+  const parent_id = form.getValues("parent_id")
+  const parentOptions: { key: number; value: string }[] = instructions.map(
+    (instruction) => ({
+      key: instruction.id,
+      value: instruction.title,
+    })
+  );
+  
+  console.log(instructions);
+  console.log(parent_id);
+  for (const item of instructions) {
+    console.log(typeof(item.parent_id), typeof(parent_id))
+    console.log(`${item.parent_id} == ${parent_id}: ${item.parent_id === parent_id}`)
+  }
+  
+  const afterOptions: { key: number; value: string }[] = parent_id ? instructions.filter(item => item.parent_id===parent_id ).map(
+    (instruction) => ({
+      key: instruction.id,
+      value: instruction.title,
+    })
+  ): [];
+
   const fullSubmit = useFullSubmit(form, token);
 
   const handleChange = (open: boolean) => {
@@ -132,7 +150,7 @@ console.log(instructionsOptions);
     }
   };
 
-console.log(instructionsOptions.length);
+console.log(parentOptions.length);
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -164,22 +182,22 @@ console.log(instructionsOptions.length);
             render={({ field }) => (
               <SelectInput
                 field={field}
-                disabled={instructionsOptions.length===0}
+                disabled={parentOptions.length===0}
                 name="Parent"
-                options={instructionsOptions}
+                options={parentOptions}
               />
             )}
           />
        <FormField
             control={form.control}
-            name="place"
+            name="after_id"
             render={({ field }) => (
               <SelectInput
                 field={field}
                 name="Order"
-                disabled={instructionsOptions.length===0}
+                disabled={afterOptions.length===0}
                 options={
-                instructionsOptions
+                afterOptions
                 }
               />
             )}

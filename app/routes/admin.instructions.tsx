@@ -22,7 +22,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const instructions = await selectMany<Instructions>(
     db,
-    "select id, title, parent_id, place, rich_text from instructions"
+    "select id, title, parent_id, after_id, rich_text from instructions"
   );
   return json({ instructions, user });
 };
