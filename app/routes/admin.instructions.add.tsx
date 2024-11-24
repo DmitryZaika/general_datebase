@@ -7,6 +7,7 @@ import {
 } from "@remix-run/node";
 import { useNavigate, useNavigation, Form, useSubmit, useLoaderData } from "@remix-run/react";
 import { FormField, FormProvider } from "../components/ui/form";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
 
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
@@ -31,7 +32,7 @@ import { selectMany } from "~/utils/queryHelpers";
 
 const instructionschema = z.object({
   title: z.string(),
-  parent_id: z.coerce.number().optional(),
+  parent_id: z.union([z.number().positive(), z.null()]).optional(),
   place: z.coerce.number().optional(),
   rich_text: z.string()
 });
@@ -105,7 +106,6 @@ export default function InstructionsAdd() {
   // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
   const token = useAuthenticityToken();
-  const submit = useSubmit();
   const { instructions } = useLoaderData<typeof loader>();
 
   const instructionsOptions: { key: string; value: string }[] = instructions.map(
@@ -123,6 +123,7 @@ export default function InstructionsAdd() {
    
     },
   });
+  const fullSubmit = useFullSubmit(form, token);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -142,17 +143,7 @@ export default function InstructionsAdd() {
           <Form
             id="customerForm"
             method="post"
-            onSubmit={form.handleSubmit(
-              (data) => {
-                console.log(data)
-                data["csrf"] = token;
-                submit(data, {
-                  method: "post",
-                  encType: "multipart/form-data",
-                });
-              },
-              (errors) => console.log(errors)
-            )}
+            onSubmit={fullSubmit}
           >
           <FormField
             control={form.control}
