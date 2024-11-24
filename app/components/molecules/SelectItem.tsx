@@ -9,29 +9,36 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 
+type Option = { key: string | number; value: string}
+
 export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   name,
   field,
   placeholder,
+  disabled,
   options,
 }: {
   name: string;
-  placeholder: string;
+  placeholder?: string;
   field: ControllerRenderProps<TFieldValues>;
-  options: string[];
+  disabled?: boolean,
+  options: string[] | Option[]
 }) {
+  const cleanOptions: Option[] = typeof options[0] === "string"
+    ? options.map((option) => ({ key: option, value: option }))
+    : options;
   return (
     <FormItem>
       <FormLabel>{name}</FormLabel>
       <FormControl>
-        <Select {...field} onValueChange={field.onChange}>
+        <Select {...field} onValueChange={field.onChange} disabled={disabled}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
-            {options.map((item) => (
-              <SelectItem key={item} value={item.toLowerCase()}>
-                {item}
+            {cleanOptions.map(({key, value}: Option) => (
+              <SelectItem key={key}  value={key.toString().toLowerCase()}>
+                {value}
               </SelectItem>
             ))}
           </SelectContent>
