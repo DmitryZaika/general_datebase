@@ -12,6 +12,7 @@ import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
 import { useSubmit } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
 
 const userSchema = z.object({
   email: z.string().email(),
@@ -56,27 +57,19 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Login() {
-  const submit = useSubmit();
+
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
   });
+  const fullSubmit = useFullSubmit(form, token);
 
   return (
     <FormProvider {...form}>
       <Form
         id="customerForm"
         method="post"
-        onSubmit={form.handleSubmit(
-          (data) => {
-            data["csrf"] = token;
-            submit(data, {
-              method: "post",
-              encType: "multipart/form-data",
-            });
-          },
-          (errors) => console.log(errors)
-        )}
+        onSubmit={fullSubmit}
       >
         <FormField
           control={form.control}
