@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -42,12 +41,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return redirect(`/login?error=${error}`);
   }
   if (!params.stone) {
-    return forceRedirectError(request.headers, "No document id provided");
+    return forceRedirectError(request.headers, "No stone id provided");
   }
   const stoneId = parseInt(params.stone);
   const { errors, data } = await parseMutliForm(request, stoneSchema, "stones");
   if (errors || !data) {
-    return json({ errors });
+    return { errors };
   }
 
   // NOTE: THIS IS DANGEROUS

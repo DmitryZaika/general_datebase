@@ -5,7 +5,7 @@ import {
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
-import { useNavigate, useNavigation, Form, useSubmit } from "@remix-run/react";
+import { useNavigate, useNavigation, Form, useSubmit, useLoaderData } from "@remix-run/react";
 import { FormField, FormProvider } from "../components/ui/form";
 
 import { z } from "zod";
@@ -19,18 +19,20 @@ import {
 } from "~/components/ui/dialog";
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
-import { toastData } from "~/utils/toastHelpers";
+import {  toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
 import { getValidatedFormData } from "remix-hook-form";
 import { csrf } from "~/utils/csrf.server";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
+import { SelectInput } from "~/components/molecules/SelectItem";
+import { selectMany } from "~/utils/queryHelpers";
 
 const instructionschema = z.object({
   title: z.string(),
   parent_id: z.coerce.number().optional(),
-  place: z.coerce.number(),
+  place: z.coerce.number().optional(),
   rich_text: z.string()
 });
 
@@ -75,22 +77,43 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request}: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
-    return json({ user });
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const instructions = await selectMany<{ title: string; parent_id: number }>(
+    db,
+    "SELECT parent_id, title FROM instructions"
+  );
+
+  if (!instructions) {
+    return { instructions: [] }; 
+  }
+
+  return { instructions };
 };
 
+
+
+
 export default function InstructionsAdd() {
+
+  
   const navigate = useNavigate();
   // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
   const token = useAuthenticityToken();
   const submit = useSubmit();
+  const { instructions } = useLoaderData<typeof loader>();
 
+  const instructionsOptions: { key: string; value: string }[] = instructions.map(
+    (instruction) => ({
+      key: instruction.parent_id.toString(),
+      value: instruction.title,
+    })
+  );
 
   const form = useForm<FormData>({
     resolver,
@@ -106,6 +129,7 @@ export default function InstructionsAdd() {
       navigate("..");
     }
   };
+
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -141,28 +165,32 @@ export default function InstructionsAdd() {
               />
             )}
           />
-          <FormField
+      {  instructions ? ( <FormField
             control={form.control}
             name="parent_id"
             render={({ field }) => (
-              <InputItem
-                name={"Parent"}
-                placeholder={"Name of the instruction"}
+              <SelectInput
                 field={field}
+                placeholder="Parent"
+                name="Parent"
+                options={instructionsOptions}
               />
             )}
-          />
-          <FormField
+          />): null}
+         {instructions ? (<FormField
             control={form.control}
             name="place"
             render={({ field }) => (
-              <InputItem
-                name={"Order"}
-                placeholder={"Name of the instruction"}
+              <SelectInput
                 field={field}
+                placeholder="Order"
+                name="Order"
+                options={
+                instructionsOptions
+                }
               />
             )}
-          />
+          />) : null}
           <FormField
             control={form.control}
             name="rich_text"
