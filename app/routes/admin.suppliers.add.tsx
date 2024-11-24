@@ -5,7 +5,7 @@ import {
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
-import { useSubmit, Form, useNavigate } from "@remix-run/react";
+import { Form, useNavigate } from "@remix-run/react";
 import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
@@ -26,6 +26,7 @@ import { useAuthenticityToken } from "remix-utils/csrf/react";
 
 import { csrf } from "~/utils/csrf.server";
 import { getAdminUser } from "~/utils/session.server";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
 
 const supplierschema = z.object({
   website: z.string().url(),
@@ -60,6 +61,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ errors, receivedValues });
   }
 
+  console.log(data)
   try {
     const result = await db.execute(
       `INSERT INTO main.suppliers  (website, supplier_name, manager,  phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -94,7 +96,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function SuppliersAdd() {
   const navigate = useNavigate();
-  const submit = useSubmit();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
@@ -107,6 +108,7 @@ export default function SuppliersAdd() {
       notes: "",
     },
   });
+  const fullSubmit = useFullSubmit(form, token);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -124,16 +126,7 @@ export default function SuppliersAdd() {
           <Form
             id="customerForm"
             method="post"
-            onSubmit={form.handleSubmit(
-              (data) => {
-                data["csrf"] = token;
-                submit(data, {
-                  method: "post",
-                  encType: "multipart/form-data",
-                });
-              },
-              (errors) => console.log(errors)
-            )}
+            onSubmit={fullSubmit}
           >
             <FormField
               control={form.control}

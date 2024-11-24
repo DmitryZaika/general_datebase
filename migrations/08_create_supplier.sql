@@ -1,5 +1,5 @@
 CREATE TABLE suppliers (
-    id INT PRIMARY KEY,
+    id INT PRIMARY KEY AUTO_INCREMENT,
     website VARCHAR(255),
     supplier_name VARCHAR(255),
     manager VARCHAR(255),
