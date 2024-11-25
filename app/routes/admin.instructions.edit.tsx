@@ -29,8 +29,11 @@ import {
   import { deleteFile } from "~/utils/s3.server";
   import { getAdminUser } from "~/utils/session.server";
   
-  const sinkSchema = z.object({
-    name: z.string().min(1),
+  const instructionschema = z.object({
+    title: z.string(),
+    parent_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
+    after_id:  z.union([z.coerce.number().positive(), z.null()]).optional(),
+    rich_text: z.string()
   });
   
   export async function action({ request, params }: ActionFunctionArgs) {
@@ -39,36 +42,36 @@ import {
     } catch (error) {
       return redirect(`/login?error=${error}`);
     }
-    if (!params.sink) {
-      return forceRedirectError(request.headers, "No document id provided");
+    if (!params.instruction) {
+      return forceRedirectError(request.headers, "No instruction id provided");
     }
-    const sinkId = parseInt(params.sink);
-    const { errors, data } = await parseMutliForm(request, sinkSchema, "sinks");
+    const instructionId = parseInt(params.instruction);
+    const { errors, data } = await parseMutliForm(request, instructionschema, "instructions");
     if (errors || !data) {
       return { errors };
     }
   
     // NOTE: THIS IS DANGEROUS
-    const sink = await selectId<{ url: string }>(
+    const instruction = await selectId<{ url: string }>(
       db,
-      "select url from sinks WHERE id = ?",
-      sinkId
+      "select url from instructions WHERE id = ?",
+      instructionId
     );
-    if (sink?.url) {
-      deleteFile(sink.url);
+    if (instruction?.url) {
+      deleteFile(instruction.url);
     }
   
     try {
       let result;
       if (data.file && data.file !== "undefined") {
         result = await db.execute(
-          `UPDATE main.sinks SET name = ?, url = ? WHERE id = ?`,
-          [data.name, data.file, sinkId]
+          `UPDATE main.instructions SET name = ?, url = ? WHERE id = ?`,
+          [data.name, data.file, instructionId]
         );
       } else {
-        result = await db.execute(`UPDATE main.sinks SET name = ? WHERE id = ?`, [
+        result = await db.execute(`UPDATE main.instructions SET name = ? WHERE id = ?`, [
           data.name,
-          sinkId,
+          instructionId,
         ]);
       }
   
@@ -77,7 +80,7 @@ import {
       console.error("Error connecting to the database: ", errors);
     }
     const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Success", "Sink Edited"));
+    session.flash("message", toastData("Success", "instruction Edited"));
     return redirect("..", {
       headers: { "Set-Cookie": await commitSession(session) },
     });
@@ -89,30 +92,30 @@ import {
     } catch (error) {
       return redirect(`/login?error=${error}`);
     }
-    if (!params.sink) {
+    if (!params.instruction) {
       return forceRedirectError(request.headers, "No document id provided");
     }
-    const sinkId = parseInt(params.sink);
+    const instructionId = parseInt(params.instruction);
   
-    const sink = await selectId<{ name: string; url: string }>(
+    const instruction = await selectId<{ name: string; url: string }>(
       db,
-      "select name, url from sinks WHERE id = ?",
-      sinkId
+      "select name, url from instructions WHERE id = ?",
+      instructionId
     );
     return {
-      name: sink?.name,
-      url: sink?.url,
+      name: instruction?.name,
+      url: instruction?.url,
     };
   };
   
-  export default function SinksEdit() {
+  export default function instructionsEdit() {
     const navigate = useNavigate();
     const isSubmitting = useNavigation().state === "submitting";
     const { name, url } = useLoaderData<typeof loader>();
   
     const form = useCustomOptionalForm(
-      sinkSchema,
-      sinkSchema.parse({ name, url })
+      instructionschema,
+      instructionschema.parse({ name, url })
     );
     const handleChange = (open: boolean) => {
       if (open === false) {
@@ -124,7 +127,7 @@ import {
       <Dialog open={true} onOpenChange={handleChange}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Edit Sink</DialogTitle>
+            <DialogTitle>Edit instruction</DialogTitle>
           </DialogHeader>
           <MultiPartForm form={form}>
             <FormField
@@ -133,7 +136,7 @@ import {
               render={({ field }) => (
                 <InputItem
                   name="Name"
-                  placeholder={"Name of the sink"}
+                  placeholder={"Name of the instruction"}
                   field={field}
                 />
               )}
@@ -144,7 +147,7 @@ import {
               name="file"
               render={({ field }) => (
                 <FileInput
-                  inputName="sinks"
+                  inputName="instructions"
                   id="image"
                   onChange={field.onChange}
                 />
@@ -152,7 +155,7 @@ import {
             />
             <p>{url}</p>
             <DialogFooter>
-              <LoadingButton loading={isSubmitting}>Edit Sink</LoadingButton>
+              <LoadingButton loading={isSubmitting}>Edit instruction</LoadingButton>
             </DialogFooter>
           </MultiPartForm>
         </DialogContent>

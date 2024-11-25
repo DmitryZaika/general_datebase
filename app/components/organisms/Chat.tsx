@@ -15,38 +15,44 @@ interface ChatMessagesProps {
 interface ContextType {
   Instructions: {
     [key: string]: Record<string, string>;
-  }}
-const context = {
-  "Instructions": {
+  };
+}
+
+const context: ContextType = {
+  Instructions: {
     "Leading a Customer": {
-      "After Template": "1. Check difference between customer sqft on the contract and on the template.\n2. If it's a difference more than 1 sqft (For example, 0.99 we don't notify a customer, or 1 we notify a customer).\n3. Send to Tanya [Name] extra 6 sqft, total 58 sqft - $367 Sealer for 6 sqft - $36 Товар/услуга - кол-во sqft (если нужно) - сумма.",
-      "After Install": "1. Call to the customer, ask about their experience.\nExample: \"Hello, [Client's Name]. I wanted to check in and see how the installation went. Did everything meet your expectations, and are you satisfied with the results? If you have any questions or concerns, please let me know. Thank you!\"",
-      "Before Template": "Details about how to handle special or custom orders for customers..."
+      "After Template":
+        "1. Check difference between customer sqft on the contract and on the template.\n2. If it's a difference more than 1 sqft (For example, 0.99 we don't notify a customer, or 1 we notify a customer).\n3. Send to Tanya [Name] extra 6 sqft, total 58 sqft - $367 Sealer for 6 sqft - $36 Товар/услуга - кол-во sqft (если нужно) - сумма.",
+      "After Install":
+        '1. Call to the customer, ask about their experience.\nExample: "Hello, [Client\'s Name]. I wanted to check in and see how the installation went. Did everything meet your expectations, and are you satisfied with the results? If you have any questions or concerns, please let me know. Thank you!"',
+      "Before Template": "Details about how to handle special or custom orders for customers...",
     },
     "Special Order": {
       "Custom Order": "Details about how to handle special or custom orders for customers...",
-      "Fabrication": "Granite: $60 per sqft\nQuartz: $70 per sqft\nPorcelain: $70 per sqft\nQuartzite: $80 per sqft\nMarble: $80 per sqft"
+      Fabrication:
+        "Granite: $60 per sqft\nQuartz: $70 per sqft\nPorcelain: $70 per sqft\nQuartzite: $80 per sqft\nMarble: $80 per sqft",
     },
-    "Discounts": {
-      "Customers": {
-        "content": "You can give these discounts to accommodate situations where providing a discount could be a decisive factor in securing a deal. Follow the prices outlined in the inventory spreadsheet or price list.",
-        "scenarios": {
+    Discounts: {
+      Customers: {
+        content:
+          "You can give these discounts to accommodate situations where providing a discount could be a decisive factor in securing a deal. Follow the prices outlined in the inventory spreadsheet or price list.",
+        scenarios: {
           "$1200-$2000": "Discount up to $100, rounding to nearest hundred.",
           "$2000-$3500": "Discount up to $150, rounding to nearest hundred.",
           "$3500-$5000": "Discount up to $200, rounding to nearest hundred.",
-          "$5000+": "Discuss additional discounts with George."
+          "$5000+": "Discuss additional discounts with George.",
         },
-        "notes": [
+        notes: [
           "Discounts are not applied to specials.",
           "Apply discounts during price discussion.",
           "Charge a 3% card fee when discounts are given.",
-          "Call/text George or Dasha if a customer disagrees with fees."
-        ]
+          "Call/text George or Dasha if a customer disagrees with fees.",
+        ],
       },
-      "Builders": {
-        "Discounts": {
+      Builders: {
+        Discounts: {
           "Quartz and Granite Levels 1-3": "$3 off per sqft",
-          "Quartz and Granite Levels 4+": "$5 off per sqft"
+          "Quartz and Granite Levels 4+": "$5 off per sqft",
         },
         "Sink & Cutout Charges": {
           "Farm Sink": "$150",
@@ -55,69 +61,44 @@ const context = {
           "Cooktop Cutout": "$125",
           "Vanity Sink Cutout": "$75",
           "Small/Zero Radius Sinks": "$300",
-          "Granite Composite Sinks": "$500"
+          "Granite Composite Sinks": "$500",
         },
         "Sealer Offer": "10-year sealer: $3 per sqft when purchased with countertops.",
-        "Project Threshold": "Projects exceeding $10,000 may be discussed with George for additional discounts.",
-        "Deadlines": "Builder's projects can be installed in 5-7 days without additional discounts.",
-        "Example": "Calacatta Laza: $80, builder price: $75. Quoted at $5200, reduce to $5000 if builder asks. ASAP installations do not qualify for discounts."
-      }
+        "Project Threshold":
+          "Projects exceeding $10,000 may be discussed with George for additional discounts.",
+        Deadlines:
+          "Builder's projects can be installed in 5-7 days without additional discounts.",
+        Example:
+          "Calacatta Laza: $80, builder price: $75. Quoted at $5200, reduce to $5000 if builder asks. ASAP installations do not qualify for discounts.",
+      },
     },
-    "Layout": "Follow steps for layout creation, including uploading slab images, labeling pieces, maximizing material use, and marking paperwork. Ensure layout completion after template creation.",
+    Layout:
+      "Follow steps for layout creation, including uploading slab images, labeling pieces, maximizing material use, and marking paperwork. Ensure layout completion after template creation.",
     "Selling Steps": {
       "Walk In": "How to approach and communicate with the customer during the first contact...",
-      "Lead": "Techniques for presenting products and highlighting key benefits...",
-      "Closing": "Strategies to close the sale and ensure customer satisfaction..."
+      Lead: "Techniques for presenting products and highlighting key benefits...",
+      Closing: "Strategies to close the sale and ensure customer satisfaction...",
     },
-    "Responsibilities": {
+    Responsibilities: {
       "Customer Communications": "Guidelines for clear and effective communication with customers...",
       "Order Accuracy": "Ensure all orders and customer data are processed accurately...",
-      "Timely Delivery": "Adhering to deadlines and making sure orders are delivered on time..."
+      "Timely Delivery": "Adhering to deadlines and making sure orders are delivered on time...",
     },
-    "Remnants": {
+    Remnants: {
       "Policy and Procedure": {
-        "Minimum Price": "Remnants start at $35 per sqft."
-      }
+        "Minimum Price": "Remnants start at $35 per sqft.",
+      },
     },
-    "Objections": {
-      "Custom Order": "Details about how to handle special or custom orders for customers..."
-    }
-  }
-}
+    Objections: {
+      "Custom Order": "Details about how to handle special or custom orders for customers...",
+    },
+  },
+};
 
-const ChatMessages = ({ messages, isThinking }) => (
-  <div className="flex flex-col space-y-4 p-4 overflow-y-auto">
-    {messages.map((message, index) => (
-      <div
-        key={index}
-        className={`px-4 py-2 rounded-lg shadow-sm ${
-          message.role === "user"
-            ? "bg-blue-500 text-white self-end"
-            : "bg-gray-200 text-gray-900 self-start"
-        }`}
-        style={{
-          maxWidth: "75%",
-          alignSelf: message.role === "user" ? "flex-end" : "flex-start",
-        }}
-        dangerouslySetInnerHTML={{ __html: message.content }}
-      />
-    ))}
-    {isThinking && (
-      <div className="flex items-center space-x-2 self-start px-4 py-2 bg-gray-200 text-gray-900 rounded-lg shadow-sm">
-        <div className="animate-pulse flex space-x-1">
-          <span className="block w-2 h-2 bg-gray-500 rounded-full"></span>
-          <span className="block w-2 h-2 bg-gray-500 rounded-full"></span>
-          <span className="block w-2 h-2 bg-gray-500 rounded-full"></span>
-        </div>
-      </div>
-    )}
-  </div>
-);
-
-const processHTML = (text) => {
+const processHTML = (text: string): string => {
   const lines = text.split("\n");
   let result = "";
-  let listBuffer = [];
+  let listBuffer: string[] = [];
 
   lines.forEach((line) => {
     const trimmedLine = line.trim();
@@ -142,72 +123,77 @@ const processHTML = (text) => {
   return result;
 };
 
-const askQuestion = async (event) => {
-  event.preventDefault();
+interface MessageBubbleProps {
+  message: Message;
+}
 
-  const messageNew = { role: "user", content: question };
-  addMessage(messageNew);
-  resetInput();
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => (
+  <div
+    className={`px-4 py-2 rounded-lg shadow-sm ${
+      message.role === "user"
+        ? "bg-blue-500 text-white self-end"
+        : "bg-gray-200 text-gray-900 self-start"
+    }`}
+    style={{
+      maxWidth: "75%",
+      alignSelf: message.role === "user" ? "flex-end" : "flex-start",
+    }}
+    dangerouslySetInnerHTML={{ __html: message.content }}
+  />
+);
 
-  setIsThinking(true);
+const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, isThinking }) => (
+  <div className="flex flex-col space-y-4 p-4 overflow-y-auto">
+    {messages.map((message, index) => (
+      <MessageBubble key={index} message={message} />
+    ))}
+    {isThinking && (
+      <div className="flex items-center space-x-2 self-start px-4 py-2 bg-gray-200 text-gray-900 rounded-lg shadow-sm">
+        <div className="animate-pulse flex space-x-1">
+          <span className="block w-2 h-2 bg-gray-500 rounded-full"></span>
+          <span className="block w-2 h-2 bg-gray-500 rounded-full"></span>
+          <span className="block w-2 h-2 bg-gray-500 rounded-full"></span>
+        </div>
+      </div>
+    )}
+  </div>
+);
 
-  const response = await ask({ messages: [...messages, messageNew], context });
-  if (!response) {
-    setIsThinking(false);
-    return;
-  }
-
-  const assistantMessageContent = await processChatResponse({
-    response,
-    onChunk: (value) => {
-      setIsThinking(false);
-      setAnswer((prev) => prev + value);
-    },
-  });
-
-  const formattedContent = processHTML(assistantMessageContent);
-  setAnswer("");
-  addMessage({ role: "assistant", content: formattedContent });
-};
-
-
-
-export function Chat() {
+export const Chat: React.FC = () => {
   const { messages, addMessage } = useChat();
   const { input: question, handleInputChange, resetInput } = useInput();
 
-  const [answer, setAnswer] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  const [isThinking, setIsThinking] = useState(false);
+  const [answer, setAnswer] = useState<string>("");
+  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isThinking, setIsThinking] = useState<boolean>(false);
 
-  const askQuestion = async (event) => {
+  const askQuestion = async (event: FormEvent) => {
     event.preventDefault();
-  
-    const messageNew = { role: "user", content: question };
+
+    const messageNew: Message = { role: "user", content: question };
     addMessage(messageNew);
     resetInput();
-  
+
     setIsThinking(true);
-  
+
     const response = await ask({ messages: [...messages, messageNew], context });
     if (!response) {
       setIsThinking(false);
       return;
     }
-  
+
     const assistantMessageContent = await processChatResponse({
       response,
-      onChunk: (value) => {
+      onChunk: (value: string) => {
         setIsThinking(false);
         setAnswer((prev) => prev + value);
       },
     });
-  
+
     const formattedContent = processHTML(assistantMessageContent);
     setAnswer("");
     addMessage({ role: "assistant", content: formattedContent });
   };
-  
 
   return (
     <>
@@ -239,7 +225,7 @@ export function Chat() {
         }`}
       >
         <div className="bg-gray-100 text-gray-800 font-semibold text-lg py-3 px-4 border-b border-gray-300 relative">
-          ChatGPT Assistant
+          Masha
           <button
             onClick={() => setIsOpen(false)}
             className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 transition"
@@ -252,8 +238,8 @@ export function Chat() {
           <ChatMessages
             messages={[
               ...messages,
-              { role: "assistant", content: answer },
-            ].filter((m) => Boolean(m.content))}
+              ...(answer ? [{ role: "assistant", content: answer }] : []),
+            ]}
             isThinking={isThinking}
           />
         </div>
@@ -280,4 +266,4 @@ export function Chat() {
       </div>
     </>
   );
-}
+};
