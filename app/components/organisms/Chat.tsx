@@ -1,12 +1,21 @@
-import { useState } from "react";
+import React, { useState, FormEvent } from "react";
 import { useChat, useInput } from "~/hooks/chat";
 import { ask, processChatResponse } from "~/utils/chat.client";
 
 interface Message {
-    sender: "user" | "chatgpt";
-    text: string;
+  role: "user" | "assistant";
+  content: string;
 }
 
+interface ChatMessagesProps {
+  messages: Message[];
+  isThinking: boolean;
+}
+
+interface ContextType {
+  Instructions: {
+    [key: string]: Record<string, string>;
+  }}
 const context = {
   "Instructions": {
     "Leading a Customer": {
@@ -76,79 +85,199 @@ const context = {
   }
 }
 
-const ChatMessages = ({ messages }) => (
-  <div className="space-y-4">
+const ChatMessages = ({ messages, isThinking }) => (
+  <div className="flex flex-col space-y-4 p-4 overflow-y-auto">
     {messages.map((message, index) => (
       <div
         key={index}
-        className={`p-2 rounded-lg ${
+        className={`px-4 py-2 rounded-lg shadow-sm ${
           message.role === "user"
             ? "bg-blue-500 text-white self-end"
-            : "bg-gray-300 text-black self-start"
+            : "bg-gray-200 text-gray-900 self-start"
         }`}
-      >
-        {message.content}
-      </div>
+        style={{
+          maxWidth: "75%",
+          alignSelf: message.role === "user" ? "flex-end" : "flex-start",
+        }}
+        dangerouslySetInnerHTML={{ __html: message.content }}
+      />
     ))}
+    {isThinking && (
+      <div className="flex items-center space-x-2 self-start px-4 py-2 bg-gray-200 text-gray-900 rounded-lg shadow-sm">
+        <div className="animate-pulse flex space-x-1">
+          <span className="block w-2 h-2 bg-gray-500 rounded-full"></span>
+          <span className="block w-2 h-2 bg-gray-500 rounded-full"></span>
+          <span className="block w-2 h-2 bg-gray-500 rounded-full"></span>
+        </div>
+      </div>
+    )}
   </div>
 );
 
+const processHTML = (text) => {
+  const lines = text.split("\n");
+  let result = "";
+  let listBuffer = [];
+
+  lines.forEach((line) => {
+    const trimmedLine = line.trim();
+
+    if (/^\d\.\s|^- /.test(trimmedLine)) {
+      listBuffer.push(`<li>${trimmedLine.replace(/^\d\.\s|^- /, "")}</li>`);
+    } else {
+      if (listBuffer.length > 0) {
+        result += `<ul>${listBuffer.join("")}</ul>`;
+        listBuffer = [];
+      }
+      if (trimmedLine) {
+        result += `<p>${trimmedLine}</p>`;
+      }
+    }
+  });
+
+  if (listBuffer.length > 0) {
+    result += `<ul>${listBuffer.join("")}</ul>`;
+  }
+
+  return result;
+};
+
+const askQuestion = async (event) => {
+  event.preventDefault();
+
+  const messageNew = { role: "user", content: question };
+  addMessage(messageNew);
+  resetInput();
+
+  setIsThinking(true);
+
+  const response = await ask({ messages: [...messages, messageNew], context });
+  if (!response) {
+    setIsThinking(false);
+    return;
+  }
+
+  const assistantMessageContent = await processChatResponse({
+    response,
+    onChunk: (value) => {
+      setIsThinking(false);
+      setAnswer((prev) => prev + value);
+    },
+  });
+
+  const formattedContent = processHTML(assistantMessageContent);
+  setAnswer("");
+  addMessage({ role: "assistant", content: formattedContent });
+};
+
+
+
 export function Chat() {
-    const { messages, addMessage } = useChat();
-    const { input: question, handleInputChange, resetInput } = useInput();
+  const { messages, addMessage } = useChat();
+  const { input: question, handleInputChange, resetInput } = useInput();
 
   const [answer, setAnswer] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
 
   const askQuestion = async (event) => {
     event.preventDefault();
-
+  
     const messageNew = { role: "user", content: question };
     addMessage(messageNew);
     resetInput();
-
+  
+    setIsThinking(true);
+  
     const response = await ask({ messages: [...messages, messageNew], context });
-    if (!response) return;
-
+    if (!response) {
+      setIsThinking(false);
+      return;
+    }
+  
     const assistantMessageContent = await processChatResponse({
       response,
-        onChunk: (value) => setAnswer(answer + value),
+      onChunk: (value) => {
+        setIsThinking(false);
+        setAnswer((prev) => prev + value);
+      },
     });
+  
+    const formattedContent = processHTML(assistantMessageContent);
     setAnswer("");
-    addMessage({ role: "assistant", content: assistantMessageContent });
+    addMessage({ role: "assistant", content: formattedContent });
   };
+  
 
-
-    return (
-            <div className="bg-gray-500 absolute h-screen top-0 right-0 w-[30vw] flex flex-col">
-        {/* Messages Section */}
-        <div className="flex-1 overflow-y-auto p-4">
-            <ChatMessages
-                messages={[...messages, { role: "assistant", content: answer }].filter(
-                    (m) => Boolean(m.content)
-                )}
+  return (
+    <>
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-5 right-5 bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 transition"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth="2"
+            stroke="currentColor"
+            className="w-6 h-6"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z"
             />
+          </svg>
+        </button>
+      )}
+
+      <div
+        className={`fixed bottom-0 right-0 w-[30vw] h-[70vh] bg-white border-l border-gray-300 shadow-lg transform transition-transform duration-300 flex flex-col ${
+          isOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="bg-gray-100 text-gray-800 font-semibold text-lg py-3 px-4 border-b border-gray-300 relative">
+          ChatGPT Assistant
+          <button
+            onClick={() => setIsOpen(false)}
+            className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 transition"
+          >
+            ✖
+          </button>
         </div>
 
-        {/* Input Section */}
+        <div className="flex-1 overflow-y-auto">
+          <ChatMessages
+            messages={[
+              ...messages,
+              { role: "assistant", content: answer },
+            ].filter((m) => Boolean(m.content))}
+            isThinking={isThinking}
+          />
+        </div>
+
         <form
-            onSubmit={askQuestion}
-            className="p-4 border-t border-gray-400 bg-gray-600 flex items-center gap-2"
+          onSubmit={askQuestion}
+          className="p-4 bg-gray-100 border-t border-gray-300 flex items-center gap-2"
         >
-            <label className="flex-1">
-                <input
-                    value={question}
-                    onChange={handleInputChange}
-                    placeholder="Type your question..."
-                    className="w-full p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-            </label>
-            <button
-                type="submit"
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-            >
-                Ask
-            </button>
+          <label className="flex-1">
+            <input
+              value={question}
+              onChange={handleInputChange}
+              placeholder="Type your message..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+            />
+          </label>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-blue-500 text-white font-semibold rounded-full shadow-md hover:bg-blue-600 transition-all"
+          >
+            Send
+          </button>
         </form>
-    </div>
-    );
+      </div>
+    </>
+  );
 }
