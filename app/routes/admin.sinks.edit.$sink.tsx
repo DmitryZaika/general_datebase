@@ -40,7 +40,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return redirect(`/login?error=${error}`);
   }
   if (!params.sink) {
-    return forceRedirectError(request.headers, "No document id provided");
+    return forceRedirectError(request.headers, "No Sink id provided");
   }
   const sinkId = parseInt(params.sink);
   const { errors, data } = await parseMutliForm(request, sinkSchema, "sinks");
@@ -72,7 +72,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       ]);
     }
 
-    console.log(result);
+
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }
@@ -90,7 +90,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   if (!params.sink) {
-    return forceRedirectError(request.headers, "No document id provided");
+    return forceRedirectError(request.headers, "No Sink id provided");
   }
   const sinkId = parseInt(params.sink);
 

@@ -27,18 +27,17 @@ import { csrf } from "~/utils/csrf.server";
 import { selectId } from "~/utils/queryHelpers";
 import { getAdminUser } from "~/utils/session.server";
 
-const supplierschema = z.object({
-  website: z.string().url(),
-  supplier_name: z.string().min(1),
-  manager: z.string().optional(),
-  phone: z.union([z.coerce.string().min(10), z.literal("")]),
-  email: z.union([z.string().email().optional(), z.literal("")]),
-  notes: z.string().optional(),
+const instructionSchema = z.object({
+  id: z.coerce.number().positive(),
+  title: z.string().min(1),
+  parent_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
+  after_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
+  rich_text: z.string().min(1),
 });
 
-type FormData = z.infer<typeof supplierschema>;
+type FormData = z.infer<typeof instructionSchema>;
 
-const resolver = zodResolver(supplierschema);
+const resolver = zodResolver(instructionSchema);
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
@@ -46,15 +45,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+
   try {
     await csrf.validate(request);
   } catch (error) {
     return { error: error.code };
   }
-  if (!params.supplier) {
-    return forceRedirectError(request.headers, "No supplier id provided");
+
+  if (!params.instruction) {
+    return forceRedirectError(request.headers, "No Instruction id provided");
   }
-  const supplierId = parseInt(params.supplier);
+  const instructionId = parseInt(params.instruction);
 
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
@@ -64,86 +65,80 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { errors, receivedValues };
   }
 
-  await db.execute(
-    `UPDATE main.suppliers SET website = ?, supplier_name = ?, manager = ?, phone= ?, email = ?, notes= ? WHERE id = ?`,
-    [
-      data.website,
-      data.supplier_name,
-      data.manager,
-      data.phone,
-      data.email,
-      data.notes,
-      supplierId,
-    ]
-  );
+  try {
+    await db.execute(
+      `UPDATE main.instructions SET title = ?, parent_id = ?, after_id = ?, rich_text = ? WHERE id = ?;`,
+      [
+        data.title,
+        data.parent_id || null,
+        data.after_id || null,
+        data.rich_text,
+        instructionId,
+      ]
+    );
+  } catch (error) {
+    console.error("Error updating the database: ", error);
+  }
 
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Error", "supplier added"));
+  session.flash("message", toastData("Success", "Instruction updated"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
 
-interface Supplier {
-  website: string;
-  supplier_name: string;
-  manager: string;
-  email: string;
-  phone: string;
-  notes: string;
+interface Instruction {
+  id: number;
+  title: string;
+  parent_id: number;
+  after_id: number;
+  rich_text: string;
+
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   try {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (!params.supplier) {
-    return forceRedirectError(request.headers, "No image id provided");
+
+  if (!params.inctruction) {
+    return forceRedirectError(request.headers, "No instruction id provided");
+  }
+  const instructionId = parseInt(params.inctruction);
+
+  if (isNaN(instructionId)) {
+    return forceRedirectError(request.headers, "Invalid instruction id");
   }
 
-  const supplierId = parseInt(params.supplier);
-
-  if (isNaN(supplierId)) {
-    return forceRedirectError(request.headers, "Invalid supplier id");
-  }
-
-  const supplier = await selectId<Supplier>(
+  const instruction = await selectId<Instruction>(
     db,
-    "select website, supplier_name, manager, phone, email, notes from suppliers WHERE id = ?",
-    supplierId
+    "SELECT title, parent_id, after_id, rich_text FROM instructions WHERE id = ?",
+    instructionId
   );
 
-  if (!supplier) {
+  if (!instruction) {
     return forceRedirectError(request.headers, "Invalid supplier id");
   }
-  const { website, supplier_name, manager, email, phone, notes } = supplier;
+  const { title, parent_id, after_id, rich_text } = instruction;
   return {
-    website,
-    supplier_name,
-    manager,
-    email,
-    phone,
-    notes,
+    title, parent_id, after_id, rich_text
   };
 };
 
-export default function SuppliersAdd() {
+export default function InstructionsEdit() {
   const navigate = useNavigate();
   const submit = useSubmit();
-  const { website, supplier_name, manager, email, phone, notes } =
-    useLoaderData<typeof loader>();
+  const { title,  parent_id, after_id, rich_text } = useLoaderData<typeof loader>()
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
-      website,
-      supplier_name,
-      manager,
-      phone,
-      email,
-      notes,
+    title,
+    parent_id,
+    after_id,
+    rich_text
     },
   });
 
@@ -151,16 +146,16 @@ export default function SuppliersAdd() {
     if (open === false) {
       navigate("..");
     }
-  };
+  }
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add supplier</DialogTitle>
+          <DialogTitle>Edit Instruction</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form
+        <Form
             id="customerForm"
             method="post"
             onSubmit={form.handleSubmit(
@@ -176,62 +171,49 @@ export default function SuppliersAdd() {
           >
             <FormField
               control={form.control}
-              name="website"
+              name="title"
               render={({ field }) => (
                 <InputItem
-                  name={"Website"}
-                  placeholder={"Website"}
+                  name={"Title"}
+                  placeholder={"Title"}
                   field={field}
                 />
               )}
             />
             <FormField
               control={form.control}
-              name="supplier_name"
+              name="parent_id"
               render={({ field }) => (
                 <InputItem
-                  name={"Supplier Name"}
-                  placeholder={"Name of the supplier"}
+                  name={"Parent"}
+                  placeholder={"Parent"}
                   field={field}
                 />
               )}
             />
             <FormField
               control={form.control}
-              name="manager"
+              name="after_id"
               render={({ field }) => (
                 <InputItem
-                  name={"Manager"}
-                  placeholder={"Name of the manager"}
+                  name={"after_id"}
+                  placeholder={"Order"}
                   field={field}
                 />
               )}
             />
             <FormField
               control={form.control}
-              name="phone"
+              name="rich_text"
               render={({ field }) => (
                 <InputItem
-                  name={"Phone Number"}
-                  placeholder={"Phone Number"}
+                  name={"Text"}
+                  placeholder={"Your Text"}
                   field={field}
                 />
               )}
             />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <InputItem name={"Email"} placeholder={"Email"} field={field} />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <InputItem name={"Notes"} placeholder={"Notes"} field={field} />
-              )}
-            />
+
             <DialogFooter>
               <Button type="submit">Save changes</Button>
             </DialogFooter>
