@@ -103,10 +103,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
 
-  if (!params.inctruction) {
+  if (!params.instruction) {
     return forceRedirectError(request.headers, "No instruction id provided");
   }
-  const instructionId = parseInt(params.inctruction);
+  const instructionId = parseInt(params.instruction);
 
   if (isNaN(instructionId)) {
     return forceRedirectError(request.headers, "Invalid instruction id");
