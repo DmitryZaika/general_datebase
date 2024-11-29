@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -51,7 +50,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   if (!params.sink) {
-    return forceRedirectError(request.headers, "No document id provided");
+    return forceRedirectError(request.headers, "No Sink id provided");
   }
   const sinkId = parseInt(params.sink);
 
@@ -65,7 +64,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   };
 };
 
-export default function SinksAdd() {
+export default function SinksDelete() {
   const navigate = useNavigate();
   const { name } = useLoaderData<typeof loader>();
 

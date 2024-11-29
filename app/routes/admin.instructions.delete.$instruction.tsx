@@ -1,6 +1,5 @@
 import {
     ActionFunctionArgs,
-    json,
     LoaderFunctionArgs,
     redirect,
   } from "@remix-run/node";
@@ -28,17 +27,17 @@ import {
     } catch (error) {
       return redirect(`/login?error=${error}`);
     }
-    const sinkId = params.sink;
+    const instructionId = params.instruction;
     try {
-      const result = await db.execute(`DELETE FROM main.sinks WHERE id = ?`, [
-        sinkId,
+      const result = await db.execute(`DELETE FROM main.instructions WHERE id = ?`, [
+        instructionId,
       ]);
       console.log(result);
     } catch (error) {
       console.error("Error connecting to the database: ", error);
     }
     const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Success", "Sink Deleted"));
+    session.flash("message", toastData("Success", "instruction Deleted"));
     return redirect("..", {
       headers: { "Set-Cookie": await commitSession(session) },
     });
@@ -50,24 +49,24 @@ import {
     } catch (error) {
       return redirect(`/login?error=${error}`);
     }
-    if (!params.sink) {
-      return forceRedirectError(request.headers, "No document id provided");
+    if (!params.instruction) {
+      return forceRedirectError(request.headers, "No instruction id provided");
     }
-    const sinkId = parseInt(params.sink);
+    const instructionId = parseInt(params.instruction);
   
-    const sink = await selectId<{ name: string }>(
+    const instruction = await selectId<{ title: string }>(
       db,
-      "select name from sinks WHERE id = ?",
-      sinkId
+      "select title from instructions WHERE id = ?",
+      instructionId
     );
     return {
-      name: sink?.name,
+      title: instruction?.title
     };
   };
   
-  export default function SinksAdd() {
+  export default function InstructionsDelete() {
     const navigate = useNavigate();
-    const { name } = useLoaderData<typeof loader>();
+    const { title } = useLoaderData<typeof loader>();
   
     const handleChange = (open: boolean) => {
       if (open === false) {
@@ -78,14 +77,14 @@ import {
       <Dialog open={true} onOpenChange={handleChange}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Delete Sink</DialogTitle>
+            <DialogTitle>Delete Instruction</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {name}?
+              Are you sure you want to delete {title}?
             </DialogDescription>
           </DialogHeader>
           <Form id="customerForm" method="post">
             <DialogFooter>
-              <Button type="submit">Delete Sink</Button>
+              <Button type="submit">Delete Instruction</Button>
             </DialogFooter>
           </Form>
         </DialogContent>

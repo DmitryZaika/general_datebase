@@ -29,10 +29,12 @@ import { useForm } from "react-hook-form";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { selectMany } from "~/utils/queryHelpers";
+import { InstructionsBasic,parentOptions, afterOptions } from "~/utils/instructionsHelpers";
+
 
 const instructionschema = z.object({
   title: z.string(),
-  parent_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
+  parent_id: z.union([z.coerce.number(),z.null()]).optional(),
   after_id:  z.union([z.coerce.number().positive(), z.null()]).optional(),
   rich_text: z.string()
 });
@@ -61,11 +63,25 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, receivedValues };
   }
 
+
+  let  insertId : null | number = null 
   try {
-    await db.execute(`INSERT INTO main.instructions (title, parent_id, after_id, rich_text) VALUES (?,  ?, ?, ?);`, [
+    const result = await db.execute(`INSERT INTO main.instructions (title, parent_id, after_id, rich_text) VALUES (?,  ?, ?, ?);`, [
       data.title,
-      data.parent_id, data.after_id, data.rich_text
+      data.parent_id || null, data.after_id, data.rich_text
     ]);
+    insertId =  result[0].insertId
+  } catch (error) {
+    console.error("Error connecting to the database: ", error);
+  }
+
+  try {
+    const result = await db.execute(`UPDATE main.instructions SET after_id = ? WHERE after_id = ? AND id != ?;`, [
+     insertId,
+   data.after_id,
+  insertId
+    ]);
+ 
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
@@ -84,7 +100,7 @@ export const loader = async ({ request}: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  const instructions = await selectMany<{ title: string; id: number; parent_id:number }>(
+  const instructions = await selectMany<InstructionsBasic>(
     db,
     "SELECT id, parent_id, title FROM instructions"
   );
@@ -121,19 +137,10 @@ export default function InstructionsAdd() {
  
   
   const parent_id = form.getValues("parent_id")
-  const parentOptions: { key: number; value: string }[] = instructions.map(
-    (instruction) => ({
-      key: instruction.id,
-      value: instruction.title,
-    })
-  );
-  
-  const afterOptions: { key: number; value: string }[] = parent_id ? instructions.filter(item => item.parent_id=== parseInt(parent_id) ).map(
-    (instruction) => ({
-      key: instruction.id,
-      value: instruction.title,
-    })
-  ): [];
+  const parentValues =  parentOptions(instructions)  
+  const afterValues = afterOptions(parent_id, instructions)
+console.log(parentValues);
+
 
   const fullSubmit = useFullSubmit(form, token);
 
@@ -143,7 +150,6 @@ export default function InstructionsAdd() {
     }
   };
 
-console.log(parentOptions.length);
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -175,9 +181,9 @@ console.log(parentOptions.length);
             render={({ field }) => (
               <SelectInput
                 field={field}
-                disabled={parentOptions.length===0}
+                disabled={parentValues.length===0}
                 name="Parent"
-                options={parentOptions}
+                options={parentValues}
               />
             )}
           />
@@ -187,10 +193,10 @@ console.log(parentOptions.length);
             render={({ field }) => (
               <SelectInput
                 field={field}
-                name="Order"
-                disabled={afterOptions.length===0}
+                name="After"
+                disabled={afterValues.length===0}
                 options={
-                afterOptions
+                afterValues
                 }
               />
             )}
