@@ -5,7 +5,13 @@ import {
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
-import { useNavigate, useNavigation, Form, useSubmit, useLoaderData } from "@remix-run/react";
+import {
+  useNavigate,
+  useNavigation,
+  Form,
+  useSubmit,
+  useLoaderData,
+} from "@remix-run/react";
 import { FormField, FormProvider } from "../components/ui/form";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 
@@ -20,7 +26,7 @@ import {
 } from "~/components/ui/dialog";
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
-import {  toastData } from "~/utils/toastHelpers";
+import { toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
 import { getValidatedFormData } from "remix-hook-form";
 import { csrf } from "~/utils/csrf.server";
@@ -29,14 +35,17 @@ import { useForm } from "react-hook-form";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { selectMany } from "~/utils/queryHelpers";
-import { InstructionsBasic,parentOptions, afterOptions } from "~/utils/instructionsHelpers";
-
+import {
+  InstructionsBasic,
+  parentOptions,
+  afterOptions,
+} from "~/utils/instructionsHelpers";
 
 const instructionschema = z.object({
   title: z.string(),
-  parent_id: z.union([z.coerce.number(),z.null()]).optional(),
-  after_id:  z.union([z.coerce.number().positive(), z.null()]).optional(),
-  rich_text: z.string()
+  parent_id: z.union([z.coerce.number(), z.null()]).optional(),
+  after_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
+  rich_text: z.string(),
 });
 
 type FormData = z.infer<typeof instructionschema>;
@@ -63,25 +72,35 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, receivedValues };
   }
 
-
-  let  insertId : null | number = null 
+  let insertId: null | number = null;
+  let parentId = data.parent_id || null;
   try {
-    const result = await db.execute(`INSERT INTO main.instructions (title, parent_id, after_id, rich_text) VALUES (?,  ?, ?, ?);`, [
-      data.title,
-      data.parent_id || null, data.after_id, data.rich_text
-    ]);
-    insertId =  result[0].insertId
+    const result = await db.execute(
+      `INSERT INTO main.instructions (title, parent_id, after_id, rich_text) VALUES (?,  ?, ?, ?);`,
+      [data.title, parentId, data.after_id, data.rich_text]
+    );
+    insertId = result[0].insertId;
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
 
+  console.log({ insertId, afterId: data.after_id, insertId, parentId });
   try {
-    const result = await db.execute(`UPDATE main.instructions SET after_id = ? WHERE after_id = ? AND id != ?;`, [
-     insertId,
-   data.after_id,
-  insertId
+    const query = `UPDATE main.instructions
+SET after_id = ?
+WHERE 
+  (after_id = ? OR (after_id IS NULL AND ? IS NULL))
+  AND id != ?
+  AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL));`;
+
+    const result = await db.execute(query, [
+      insertId,
+      data.after_id,
+      data.after_id,
+      insertId,
+      parentId,
+      parentId,
     ]);
- 
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
@@ -94,7 +113,7 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 }
 
-export const loader = async ({ request}: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
   } catch (error) {
@@ -106,41 +125,31 @@ export const loader = async ({ request}: LoaderFunctionArgs) => {
   );
 
   if (!instructions) {
-    return { instructions: [] }; 
+    return { instructions: [] };
   }
 
   return { instructions };
 };
 
-
-
-
 export default function InstructionsAdd() {
-
-  
   const navigate = useNavigate();
   // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
   const token = useAuthenticityToken();
   const { instructions } = useLoaderData<typeof loader>();
 
-
-
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
       title: "",
       rich_text: "",
-   
     },
   });
- 
-  
-  const parent_id = form.watch("parent_id")
-  const parentValues =  parentOptions(instructions)  
-  const afterValues = afterOptions(parent_id, instructions)
-console.log(parentValues);
 
+  const parent_id = form.watch("parent_id");
+  const parentValues = parentOptions(instructions);
+  const afterValues = afterOptions(parent_id, instructions);
+  console.log(parentValues);
 
   const fullSubmit = useFullSubmit(form, token);
 
@@ -150,7 +159,6 @@ console.log(parentValues);
     }
   };
 
-
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -159,64 +167,60 @@ console.log(parentValues);
         </DialogHeader>
 
         <FormProvider {...form}>
-          <Form
-            id="customerForm"
-            method="post"
-            onSubmit={fullSubmit}
-          >
-          <FormField
-            control={form.control}
-            name="title"
-            render={({ field }) => (
-              <InputItem
-                name={"Title"}
-                placeholder={"Name of the instruction"}
-                field={field}
-              />
-            )}
-          />
-      <FormField
-            control={form.control}
-            name="parent_id"
-            render={({ field }) => (
-              <SelectInput
-                field={field}
-                disabled={parentValues.length===0}
-                name="Parent"
-                options={parentValues}
-              />
-            )}
-          />
-       <FormField
-            control={form.control}
-            name="after_id"
-            render={({ field }) => (
-              <SelectInput
-                field={field}
-                name="After"
-                disabled={afterValues.length===0}
-                options={
-                afterValues
-                }
-              />
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="rich_text"
-            render={({ field }) => (
-              <InputItem
-                name={"Text"}
-                placeholder={"Name of the instruction"}
-                field={field}
-              />
-            )}
-          />
-        
-          <DialogFooter>
-            <LoadingButton loading={isSubmitting}>Add Instruciton</LoadingButton>
-          </DialogFooter>
-        </Form>
+          <Form id="customerForm" method="post" onSubmit={fullSubmit}>
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <InputItem
+                  name={"Title"}
+                  placeholder={"Name of the instruction"}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="parent_id"
+              render={({ field }) => (
+                <SelectInput
+                  field={field}
+                  disabled={parentValues.length === 0}
+                  name="Parent"
+                  options={parentValues}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="after_id"
+              render={({ field }) => (
+                <SelectInput
+                  field={field}
+                  name="After"
+                  disabled={afterValues.length === 0}
+                  options={afterValues}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="rich_text"
+              render={({ field }) => (
+                <InputItem
+                  name={"Text"}
+                  placeholder={"Name of the instruction"}
+                  field={field}
+                />
+              )}
+            />
+
+            <DialogFooter>
+              <LoadingButton loading={isSubmitting}>
+                Add Instruciton
+              </LoadingButton>
+            </DialogFooter>
+          </Form>
         </FormProvider>
       </DialogContent>
     </Dialog>
