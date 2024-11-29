@@ -25,10 +25,12 @@ const context: ContextType = {
         "1. Check difference between customer sqft on the contract and on the template.\n2. If it's a difference more than 1 sqft (For example, 0.99 we don't notify a customer, or 1 we notify a customer).\n3. Send to Tanya [Name] extra 6 sqft, total 58 sqft - $367 Sealer for 6 sqft - $36 Товар/услуга - кол-во sqft (если нужно) - сумма.",
       "After Install":
         '1. Call to the customer, ask about their experience.\nExample: "Hello, [Client\'s Name]. I wanted to check in and see how the installation went. Did everything meet your expectations, and are you satisfied with the results? If you have any questions or concerns, please let me know. Thank you!"',
-      "Before Template": "Details about how to handle special or custom orders for customers...",
+      "Before Template":
+        "Details about how to handle special or custom orders for customers...",
     },
     "Special Order": {
-      "Custom Order": "Details about how to handle special or custom orders for customers...",
+      "Custom Order":
+        "Details about how to handle special or custom orders for customers...",
       Fabrication:
         "Granite: $60 per sqft\nQuartz: $70 per sqft\nPorcelain: $70 per sqft\nQuartzite: $80 per sqft\nMarble: $80 per sqft",
     },
@@ -63,7 +65,8 @@ const context: ContextType = {
           "Small/Zero Radius Sinks": "$300",
           "Granite Composite Sinks": "$500",
         },
-        "Sealer Offer": "10-year sealer: $3 per sqft when purchased with countertops.",
+        "Sealer Offer":
+          "10-year sealer: $3 per sqft when purchased with countertops.",
         "Project Threshold":
           "Projects exceeding $10,000 may be discussed with George for additional discounts.",
         Deadlines:
@@ -75,14 +78,19 @@ const context: ContextType = {
     Layout:
       "Follow steps for layout creation, including uploading slab images, labeling pieces, maximizing material use, and marking paperwork. Ensure layout completion after template creation.",
     "Selling Steps": {
-      "Walk In": "How to approach and communicate with the customer during the first contact...",
+      "Walk In":
+        "How to approach and communicate with the customer during the first contact...",
       Lead: "Techniques for presenting products and highlighting key benefits...",
-      Closing: "Strategies to close the sale and ensure customer satisfaction...",
+      Closing:
+        "Strategies to close the sale and ensure customer satisfaction...",
     },
     Responsibilities: {
-      "Customer Communications": "Guidelines for clear and effective communication with customers...",
-      "Order Accuracy": "Ensure all orders and customer data are processed accurately...",
-      "Timely Delivery": "Adhering to deadlines and making sure orders are delivered on time...",
+      "Customer Communications":
+        "Guidelines for clear and effective communication with customers...",
+      "Order Accuracy":
+        "Ensure all orders and customer data are processed accurately...",
+      "Timely Delivery":
+        "Adhering to deadlines and making sure orders are delivered on time...",
     },
     Remnants: {
       "Policy and Procedure": {
@@ -90,7 +98,8 @@ const context: ContextType = {
       },
     },
     Objections: {
-      "Custom Order": "Details about how to handle special or custom orders for customers...",
+      "Custom Order":
+        "Details about how to handle special or custom orders for customers...",
     },
   },
 };
@@ -142,7 +151,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => (
   />
 );
 
-const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, isThinking }) => (
+const ChatMessages: React.FC<ChatMessagesProps> = ({
+  messages,
+  isThinking,
+}) => (
   <div className="flex flex-col space-y-4 p-4 overflow-y-auto">
     {messages.map((message, index) => (
       <MessageBubble key={index} message={message} />
@@ -164,7 +176,7 @@ export const Chat: React.FC = () => {
   const { input: question, handleInputChange, resetInput } = useInput();
 
   const [answer, setAnswer] = useState<string>("");
-  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isOpen, setIsOpen] = useState<boolean>(true);
   const [isThinking, setIsThinking] = useState<boolean>(false);
 
   const askQuestion = async (event: FormEvent) => {
@@ -176,7 +188,10 @@ export const Chat: React.FC = () => {
 
     setIsThinking(true);
 
-    const response = await ask({ messages: [...messages, messageNew], context });
+    const response = await ask({
+      messages: [...messages, messageNew],
+      context,
+    });
     if (!response) {
       setIsThinking(false);
       return;
@@ -197,28 +212,6 @@ export const Chat: React.FC = () => {
 
   return (
     <>
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-5 right-5 bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 transition"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth="2"
-            stroke="currentColor"
-            className="w-6 h-6"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z"
-            />
-          </svg>
-        </button>
-      )}
-
       <div
         className={`fixed bottom-0 right-0 w-[30vw] h-[70vh] bg-white border-l border-gray-300 shadow-lg transform transition-transform duration-300 flex flex-col ${
           isOpen ? "translate-x-0" : "translate-x-full"

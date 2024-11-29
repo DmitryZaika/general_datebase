@@ -80,9 +80,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     console.error("Error updating the database: ", error);
   }
 
-  
-
-
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Instruction updated"));
   return redirect("..", {
@@ -96,7 +93,6 @@ interface Instruction {
   parent_id: number;
   after_id: number;
   rich_text: string;
-
 }
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
@@ -121,32 +117,38 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     instructionId
   );
 
-  const instructions = await selectMany<{ title: string; id: number; parent_id:number }>(
-    db,
-    "SELECT id, parent_id, title FROM instructions"
-  );
+  const instructions = await selectMany<{
+    title: string;
+    id: number;
+    parent_id: number;
+  }>(db, "SELECT id, parent_id, title FROM instructions");
 
   if (!instruction) {
     return forceRedirectError(request.headers, "Invalid supplier id");
   }
   const { title, parent_id, after_id, rich_text } = instruction;
   return {
-    title, parent_id, after_id, rich_text, instructions
+    title,
+    parent_id,
+    after_id,
+    rich_text,
+    instructions,
   };
 };
 
 export default function InstructionsEdit() {
   const navigate = useNavigate();
   const submit = useSubmit();
-  const { title,  parent_id, after_id, rich_text } = useLoaderData<typeof loader>()
+  const { title, parent_id, after_id, rich_text } =
+    useLoaderData<typeof loader>();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
-    title,
-    parent_id,
-    after_id,
-    rich_text
+      title,
+      parent_id,
+      after_id,
+      rich_text,
     },
   });
 
@@ -154,7 +156,7 @@ export default function InstructionsEdit() {
     if (open === false) {
       navigate("..");
     }
-  }
+  };
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -163,7 +165,7 @@ export default function InstructionsEdit() {
           <DialogTitle>Edit Instruction</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-        <Form
+          <Form
             id="customerForm"
             method="post"
             onSubmit={form.handleSubmit(
@@ -181,11 +183,7 @@ export default function InstructionsEdit() {
               control={form.control}
               name="title"
               render={({ field }) => (
-                <InputItem
-                  name={"Title"}
-                  placeholder={"Title"}
-                  field={field}
-                />
+                <InputItem name={"Title"} placeholder={"Title"} field={field} />
               )}
             />
             <FormField
