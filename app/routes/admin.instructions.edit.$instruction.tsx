@@ -24,7 +24,7 @@ import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
-import { selectId } from "~/utils/queryHelpers";
+import { selectId, selectMany } from "~/utils/queryHelpers";
 import { getAdminUser } from "~/utils/session.server";
 
 const instructionSchema = z.object({
@@ -80,6 +80,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     console.error("Error updating the database: ", error);
   }
 
+  
+
+
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Instruction updated"));
   return redirect("..", {
@@ -118,12 +121,17 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     instructionId
   );
 
+  const instructions = await selectMany<{ title: string; id: number; parent_id:number }>(
+    db,
+    "SELECT id, parent_id, title FROM instructions"
+  );
+
   if (!instruction) {
     return forceRedirectError(request.headers, "Invalid supplier id");
   }
   const { title, parent_id, after_id, rich_text } = instruction;
   return {
-    title, parent_id, after_id, rich_text
+    title, parent_id, after_id, rich_text, instructions
   };
 };
 
