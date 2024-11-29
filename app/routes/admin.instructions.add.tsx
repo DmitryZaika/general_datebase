@@ -136,7 +136,7 @@ export default function InstructionsAdd() {
   });
  
   
-  const parent_id = form.getValues("parent_id")
+  const parent_id = form.watch("parent_id")
   const parentValues =  parentOptions(instructions)  
   const afterValues = afterOptions(parent_id, instructions)
 console.log(parentValues);
