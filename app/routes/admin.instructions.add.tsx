@@ -43,8 +43,8 @@ import {
 
 const instructionschema = z.object({
   title: z.string(),
-  parent_id: z.union([z.coerce.number(), z.null()]).optional(),
-  after_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
+  parent_id: z.coerce.number(),
+  after_id: z.coerce.number(),
   rich_text: z.string(),
 });
 
@@ -131,6 +131,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { instructions };
 };
 
+function cleanId(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return parseInt(value);
+}
+
 export default function InstructionsAdd() {
   const navigate = useNavigate();
   // const actionData = useActionData<typeof action>();
@@ -143,10 +150,12 @@ export default function InstructionsAdd() {
     defaultValues: {
       title: "",
       rich_text: "",
+      after_id: "0" as unknown as number,
+      parent_id: "0" as unknown as number,
     },
   });
 
-  const parent_id = form.watch("parent_id");
+  const parent_id = cleanId(form.watch("parent_id") as unknown as string);
   const parentValues = parentOptions(instructions);
   const afterValues = afterOptions(parent_id, instructions);
   console.log(parentValues);

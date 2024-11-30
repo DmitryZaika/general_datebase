@@ -1,5 +1,5 @@
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
-import { FieldValues, type ControllerRenderProps } from 'react-hook-form';
+import { FieldValues, type ControllerRenderProps } from "react-hook-form";
 
 import {
   Select,
@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 
-type Option = { key: string | number; value: string}
+type Option = { key: string | number; value: string };
 
 export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   name,
@@ -21,12 +21,21 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   name: string;
   placeholder?: string;
   field: ControllerRenderProps<TFieldValues>;
-  disabled?: boolean,
-  options: string[] | Option[]
+  disabled?: boolean;
+  options: string[] | Option[];
 }) {
-  const cleanOptions: Option[] = typeof options[0] === "string"
-    ? options.map((option) => ({ key: option, value: option }))
-    : options;
+  const cleanOptions: Option[] =
+    typeof options[0] === "string"
+      ? options.map((option) => ({ key: option, value: option }))
+      : options;
+
+  function cleanValue(value: string | number) {
+    if (typeof value === "string") {
+      return value.toLowerCase();
+    }
+    return value.toString();
+  }
+
   return (
     <FormItem>
       <FormLabel>{name}</FormLabel>
@@ -36,8 +45,8 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
-            {cleanOptions.map(({key, value}: Option) => (
-              <SelectItem key={key}  value={key.toString().toLowerCase()}>
+            {cleanOptions.map(({ key, value }: Option) => (
+              <SelectItem key={key} value={cleanValue(key)}>
                 {value}
               </SelectItem>
             ))}
