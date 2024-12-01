@@ -28,7 +28,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, name, url from images"
   );
-  return json({ images });
+  return { images };
 };
 
 export default function Images() {
