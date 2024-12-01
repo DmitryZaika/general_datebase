@@ -25,7 +25,12 @@ type InstructionTree = Record<number, InstructionNode>;
 interface InstructionNode {
   title: string;
   text: string;
+  after_id: number | null;
   children?: InstructionTree;
+}
+
+interface InstructionItemProps {
+  instruction: InstructionNode;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -41,38 +46,48 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { instructions };
 };
 
+const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => (
+  <li key={instruction.id} className="ml-5">
+    {instruction.title}
+    <p className="text-red-500">{instruction.text}</p>
+    {instruction.children && (
+      <ul>
+        {Object.values(instruction.children).map((childInstruction) => (
+          <InstructionItem
+            key={childInstruction.id}
+            instruction={childInstruction}
+          />
+        ))}
+      </ul>
+    )}
+  </li>
+);
+
 export default function Instructions() {
   const { instructions } = useLoaderData<typeof loader>();
   function cleanData(instructions: Instruction[]): InstructionTree {
-    // Create a map to hold all instruction nodes by their id
     const nodeMap: Map<number, InstructionNode> = new Map();
 
-    // Initialize each instruction node and store it in the map
     instructions.forEach((item) => {
       nodeMap.set(item.id, {
         title: item.title,
         text: item.rich_text,
+        after_id: item.after_id,
         children: {},
       });
     });
 
-    // Initialize the root nodes (instructions with no parent)
     const rootNodes: InstructionTree = {};
 
-    // Link each instruction node to its parent
     instructions.forEach((item) => {
       const node = nodeMap.get(item.id)!;
       if (item.parent_id === null) {
-        // This is a root node
         rootNodes[item.id] = node;
       } else {
-        // Find the parent node
         const parentNode = nodeMap.get(item.parent_id);
         if (parentNode) {
-          // Attach the current node to its parent's children
           parentNode.children[item.id] = node;
         } else {
-          // Handle the case where the parent is not found
           console.warn(
             `Parent with id ${item.parent_id} not found for item id ${item.id}`
           );
@@ -87,18 +102,14 @@ export default function Instructions() {
   console.log(finalInstructions);
 
   return (
-    <Accordion type="single" defaultValue="Instructions">
-      <AccordionItem value="Instructions">
-        <AccordionContent>
-          <Accordion type="multiple">
-            <AccordionContent>
-              {instructions.map((instruction) => (
-                <ModuleList key={instruction.id}></ModuleList>
-              ))}
-            </AccordionContent>
-          </Accordion>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+    <>
+      {Object.keys(finalInstructions).map((id) => (
+        <ModuleList key={id}>
+          <ul className="list-inside ml-5">
+            <InstructionItem instruction={finalInstructions[id]} />
+          </ul>
+        </ModuleList>
+      ))}
+    </>
   );
 }
