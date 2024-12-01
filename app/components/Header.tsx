@@ -40,7 +40,9 @@ export function Header({ activeSession }: { activeSession: string | null }) {
           <li>
             <Button asChild variant="link">
               <Link
-                to={isAdminPage ? "/admin/instructions" : "/instructions"}
+                to={
+                  isAdminPage ? "/admin/instructions" : "/employee/instructions"
+                }
                 className="text-xl"
               >
                 Instructions
@@ -50,7 +52,7 @@ export function Header({ activeSession }: { activeSession: string | null }) {
           {isAdminPage || (
             <li>
               <Button asChild variant="link">
-                <Link to="/special-order" className="text-xl">
+                <Link to="/employee/special-order" className="text-xl">
                   Special Order
                 </Link>
               </Button>
@@ -59,7 +61,7 @@ export function Header({ activeSession }: { activeSession: string | null }) {
           <li>
             <Button asChild variant="link">
               <Link
-                to={isAdminPage ? "/admin/customers" : "/customers"}
+                to={isAdminPage ? "/admin/customers" : "/employee/customers"}
                 className="text-xl"
               >
                 Customer
