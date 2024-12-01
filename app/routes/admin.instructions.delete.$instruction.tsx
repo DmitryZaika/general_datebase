@@ -33,7 +33,6 @@ export async function action({ params, request }: ActionFunctionArgs) {
       `DELETE FROM main.instructions WHERE id = ?`,
       [instructionId]
     );
-    console.log(result);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }

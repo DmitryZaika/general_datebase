@@ -62,7 +62,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    const result = await db.execute(
+    await db.execute(
       `INSERT INTO main.suppliers  (website, supplier_name, manager,  phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)`,
       [
         data.website,
@@ -73,7 +73,6 @@ export async function action({ request }: ActionFunctionArgs) {
         data.notes ?? null,
       ]
     );
-    console.log(result);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
@@ -122,11 +121,7 @@ export default function SuppliersAdd() {
           <DialogTitle>Add supplier</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form
-            id="customerForm"
-            method="post"
-            onSubmit={fullSubmit}
-          >
+          <Form id="customerForm" method="post" onSubmit={fullSubmit}>
             <FormField
               control={form.control}
               name="website"

@@ -29,10 +29,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   const sinkId = params.sink;
   try {
-    const result = await db.execute(`DELETE FROM main.sinks WHERE id = ?`, [
-      sinkId,
-    ]);
-    console.log(result);
+    await db.execute(`DELETE FROM main.sinks WHERE id = ?`, [sinkId]);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }

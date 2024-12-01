@@ -30,10 +30,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   const documentId = params.document;
   try {
-    const result = await db.execute(`DELETE FROM main.documents WHERE id = ?`, [
-      documentId,
-    ]);
-    console.log(result);
+    await db.execute(`DELETE FROM main.documents WHERE id = ?`, [documentId]);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
@@ -62,7 +59,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   );
   return {
     name: document?.name,
-  }
+  };
 };
 
 export default function DocumentsAdd() {

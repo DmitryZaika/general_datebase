@@ -60,22 +60,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   try {
-    let result;
-    console.log(typeof data.file);
-
     if (data.file && data.file !== "undefined") {
-      result = await db.execute(
+      await db.execute(
         `UPDATE main.images SET name = ?, url = ? WHERE id = ?`,
         [data.name, data.file, imageId]
       );
     } else {
-      result = await db.execute(
-        `UPDATE main.images SET name = ? WHERE id = ?`,
-        [data.name, imageId]
-      );
+      await db.execute(`UPDATE main.images SET name = ? WHERE id = ?`, [
+        data.name,
+        imageId,
+      ]);
     }
-
-    console.log(result);
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }

@@ -63,22 +63,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   try {
-    let result;
-    console.log(typeof data.file);
-
     if (data.file && data.file !== "undefined") {
-      result = await db.execute(
+      await db.execute(
         `UPDATE main.supports SET name = ?, url = ? WHERE id = ?`,
         [data.name, data.file, supportId]
       );
     } else {
-      result = await db.execute(
-        `UPDATE main.supports SET name = ? WHERE id = ?`,
-        [data.name, supportId]
-      );
+      await db.execute(`UPDATE main.supports SET name = ? WHERE id = ?`, [
+        data.name,
+        supportId,
+      ]);
     }
-
-    console.log(result);
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }

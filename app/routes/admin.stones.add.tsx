@@ -81,7 +81,6 @@ export default function StonesAdd() {
   const isSubmitting = useNavigation().state === "submitting";
 
   const form = useCustomForm(stoneSchema);
-  console.log(form.formState.errors);
 
   const handleChange = (open: boolean) => {
     if (open === false) {

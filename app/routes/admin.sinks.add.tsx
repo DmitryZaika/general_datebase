@@ -73,7 +73,6 @@ export default function SinksAdd() {
   const isSubmitting = useNavigation().state === "submitting";
 
   const form = useCustomForm(sinkSchema);
-  console.log(form.formState.errors);
 
   const handleChange = (open: boolean) => {
     if (open === false) {

@@ -48,7 +48,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const session = await getSession(request.headers.get("Cookie"));
-  console.log("Value: ", value);
+
   session.set("sessionId", value);
 
   session.flash("message", toastData("Success", "Logged in"));

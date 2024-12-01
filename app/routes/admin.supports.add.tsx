@@ -75,7 +75,6 @@ export default function SupportsAdd() {
   const isSubmitting = useNavigation().state === "submitting";
 
   const form = useCustomForm(supportSchema);
-  console.log(form.formState.errors);
 
   const handleChange = (open: boolean) => {
     if (open === false) {

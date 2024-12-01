@@ -37,10 +37,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
 
   try {
-    const result = await db.execute(`DELETE FROM main.suppliers WHERE id = ?`, [
-      supplierId,
-    ]);
-    console.log(result);
+    await db.execute(`DELETE FROM main.suppliers WHERE id = ?`, [supplierId]);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
     return json({ error: "Failed to delete supplier" }, { status: 500 });

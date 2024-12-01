@@ -33,7 +33,6 @@ export async function action({ params, request }: ActionFunctionArgs) {
     const result = await db.execute(`DELETE FROM main.supports WHERE id = ?`, [
       supportId,
     ]);
-    console.log(result);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }

@@ -60,22 +60,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   try {
-    let result;
-    console.log(typeof data.file);
-
     if (data.file && data.file !== "undefined") {
-      result = await db.execute(
+      await db.execute(
         `UPDATE main.stones SET name = ?, type = ?, url = ? WHERE id = ?`,
         [data.name, data.type, data.file, stoneId]
       );
     } else {
-      result = await db.execute(
+      await db.execute(
         `UPDATE main.stones SET name = ?, type = ? WHERE id = ?`,
         [data.name, data.type, stoneId]
       );
     }
-
-    console.log(result);
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }
