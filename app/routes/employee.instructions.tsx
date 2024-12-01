@@ -94,7 +94,6 @@ export default function Instructions() {
         }
       }
     });
-
     return rootNodes;
   }
 
