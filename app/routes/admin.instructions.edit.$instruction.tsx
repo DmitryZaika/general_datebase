@@ -26,12 +26,12 @@ import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
 import { selectId, selectMany } from "~/utils/queryHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
 
 const instructionSchema = z.object({
-  id: z.coerce.number().positive(),
   title: z.string().min(1),
-  parent_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
-  after_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
+  parent_id: z.coerce.number(),
+  after_id: z.coerce.number(),
   rich_text: z.string().min(1),
 });
 
@@ -146,17 +146,19 @@ export default function InstructionsEdit() {
     resolver,
     defaultValues: {
       title,
-      parent_id,
-      after_id,
+      parent_id: parent_id || 0,
+      after_id: after_id || 0,
       rich_text,
     },
   });
+  const fullSubmit = useFullSubmit(form, token);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
     }
   };
+  console.log(form.formState.errors);
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -165,20 +167,7 @@ export default function InstructionsEdit() {
           <DialogTitle>Edit Instruction</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form
-            id="customerForm"
-            method="post"
-            onSubmit={form.handleSubmit(
-              (data) => {
-                data["csrf"] = token;
-                submit(data, {
-                  method: "post",
-                  encType: "multipart/form-data",
-                });
-              },
-              (errors) => console.log(errors)
-            )}
-          >
+          <Form id="customerForm" method="post" onSubmit={fullSubmit}>
             <FormField
               control={form.control}
               name="title"
