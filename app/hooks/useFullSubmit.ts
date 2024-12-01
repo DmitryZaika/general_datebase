@@ -1,7 +1,10 @@
 import { useSubmit } from "@remix-run/react";
 import { UseFormReturn, FieldValues } from "react-hook-form";
 
-export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(form: UseFormReturn<TFieldValues>, token: string) {
+export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
+  form: UseFormReturn<TFieldValues>,
+  token: string
+) {
   const submit = useSubmit();
 
   // Функция для очистки данных: заменяет undefined на null
@@ -27,9 +30,7 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(fo
         encType: "application/x-www-form-urlencoded",
       });
     },
-    (errors) => {
-      console.log(errors); // Лог ошибок
-    }
+    (errors) => {}
   );
 
   return fullSubmit;

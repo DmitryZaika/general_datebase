@@ -84,7 +84,6 @@ export async function action({ request }: ActionFunctionArgs) {
     console.error("Error connecting to the database: ", error);
   }
 
-  console.log({ insertId, afterId: data.after_id, insertId, parentId });
   try {
     const query = `UPDATE main.instructions
 SET after_id = ?

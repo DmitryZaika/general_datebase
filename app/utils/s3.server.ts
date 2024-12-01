@@ -105,7 +105,6 @@ export const s3UploadHandler = async (
   { name, filename, data }: UploadHandlerPart,
   folder: string
 ): Promise<File | string | null | undefined> => {
-  console.log("Field name:", name);
   if (name !== "file" || filename === undefined) {
     return undefined;
   }

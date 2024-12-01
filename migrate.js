@@ -13,7 +13,7 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url)).replace(
 
 dotenv.config();
 const { DB_DATABASE, DB_USER, DB_PASSWORD, DB_HOST } = process.env;
-console.log({ DB_DATABASE, DB_USER, DB_PASSWORD, DB_HOST });
+
 if (!DB_DATABASE || !DB_USER || !DB_PASSWORD || !DB_HOST) {
   throw new Error(
     "Не указаны все переменные окружения для подключения к базе данных"

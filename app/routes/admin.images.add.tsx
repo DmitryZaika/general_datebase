@@ -49,7 +49,7 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
-  console.log("HERE");
+
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Image added"));
 
@@ -73,7 +73,6 @@ export default function ImagesAdd() {
   const isSubmitting = useNavigation().state === "submitting";
 
   const form = useCustomForm(imageSchema);
-  console.log(form.formState.errors);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
