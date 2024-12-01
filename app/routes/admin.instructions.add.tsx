@@ -74,14 +74,20 @@ export async function action({ request }: ActionFunctionArgs) {
 
   let insertId: null | number = null;
   let parentId = data.parent_id || null;
+  let afterId = data.after_id || null;
   try {
     const result = await db.execute(
       `INSERT INTO main.instructions (title, parent_id, after_id, rich_text) VALUES (?,  ?, ?, ?);`,
-      [data.title, parentId, data.after_id, data.rich_text]
+      [data.title, parentId, afterId, data.rich_text]
     );
     insertId = result[0].insertId;
   } catch (error) {
-    console.error("Error connecting to the database: ", error);
+    console.error("Db error: ", error, {
+      title: data.title,
+      parentId,
+      afterId,
+      text: data.rich_text,
+    });
   }
 
   try {
