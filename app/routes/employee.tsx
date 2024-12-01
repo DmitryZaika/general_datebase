@@ -2,8 +2,7 @@ import type { LoaderFunction, MetaFunction } from "@remix-run/node";
 import { useLocation, useNavigate, Outlet } from "@remix-run/react";
 import { PageLayout } from "~/components/PageLayout";
 
-import { Tabs, TabsList } from "~/components/ui/tabs";
-import { NavTab } from "~/components/molecules/NavTab";
+import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { redirect } from "@remix-run/node";
 import { getEmployeeUser } from "~/utils/session.server";
 
@@ -36,19 +35,29 @@ export default function Employee() {
     navigate(`/employee/${value}`);
   };
 
-  return (
+  const isDataBase =
+    location.pathname.startsWith("/employee/stones") ||
+    location.pathname.startsWith("/employee/sinks") ||
+    location.pathname.startsWith("/employee/suppliers") ||
+    location.pathname.startsWith("/employee/supports") ||
+    location.pathname.startsWith("/employee/documents") ||
+    location.pathname.startsWith("/employee/images");
+
+  return isDataBase ? (
     <PageLayout title="Granite Depot DataBase">
       <Tabs value={currentTab} onValueChange={handleTabChange}>
         <TabsList>
-          <NavTab name="Stones" />
-          <NavTab name="Sinks" />
-          <NavTab name="Suppliers" />
-          <NavTab name="Supports" />
-          <NavTab name="Documents" />
-          <NavTab name="Images" />
+          <TabsTrigger value="stones">Stones</TabsTrigger>
+          <TabsTrigger value="sinks">Sinks</TabsTrigger>
+          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+          <TabsTrigger value="supports">Supports</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="images">Images</TabsTrigger>
         </TabsList>
         <Outlet />
       </Tabs>
     </PageLayout>
+  ) : (
+    <Outlet />
   );
 }
