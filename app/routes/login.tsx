@@ -18,6 +18,7 @@ import { useLoaderData, useSubmit } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { commitSession, getSession } from "~/sessions";
 import { PasswordInput } from "~/components/molecules/PasswordInput";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
 
 const userSchema = z.object({
   email: z.string().email(),
@@ -70,6 +71,7 @@ export default function Login() {
   const form = useForm<FormData>({
     resolver,
   });
+  const fullSubmit = useFullSubmit(form, token);
 
   return (
     <div className="flex justify-center p-20">
@@ -78,16 +80,7 @@ export default function Login() {
           className="w-full max-w-sm bg-white p-6 shadow-md rounded"
           id="customerForm"
           method="post"
-          onSubmit={form.handleSubmit(
-            (data) => {
-              data["csrf"] = token;
-              submit(data, {
-                method: "post",
-                encType: "multipart/form-data",
-              });
-            },
-            (errors) => console.log(errors)
-          )}
+          onSubmit={fullSubmit}
         >
           <p className="text-red-500">{error}</p>
           <FormField

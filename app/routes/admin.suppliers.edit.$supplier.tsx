@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
@@ -26,6 +27,7 @@ import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
 import { selectId } from "~/utils/queryHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
 
 const supplierschema = z.object({
   website: z.string().url(),
@@ -146,6 +148,7 @@ export default function SuppliersAdd() {
       notes,
     },
   });
+  const fullSubmit = useFullSubmit(form, token);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -160,20 +163,7 @@ export default function SuppliersAdd() {
           <DialogTitle>Add supplier</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form
-            id="customerForm"
-            method="post"
-            onSubmit={form.handleSubmit(
-              (data) => {
-                data["csrf"] = token;
-                submit(data, {
-                  method: "post",
-                  encType: "multipart/form-data",
-                });
-              },
-              (errors) => console.log(errors)
-            )}
-          >
+          <Form id="customerForm" method="post" onSubmit={fullSubmit}>
             <FormField
               control={form.control}
               name="website"

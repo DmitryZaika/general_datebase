@@ -163,7 +163,6 @@ export default function InstructionsAdd() {
   const parent_id = cleanId(form.watch("parent_id") as unknown as string);
   const parentValues = parentOptions(instructions);
   const afterValues = afterOptions(parent_id, instructions);
-  console.log(parentValues);
 
   const fullSubmit = useFullSubmit(form, token);
 

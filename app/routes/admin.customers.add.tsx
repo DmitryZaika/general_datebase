@@ -24,6 +24,8 @@ import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { useAuthenticityToken } from "remix-utils/csrf/react";
 
 const customerSchema = z.object({
   name: z.string().min(1),
@@ -84,9 +86,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function CustomersAdd() {
   const navigate = useNavigate();
   const submit = useSubmit();
+  const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
   });
+
+  const fullSubmit = useFullSubmit(form, token);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -101,19 +106,7 @@ export default function CustomersAdd() {
           <DialogTitle>Add Customer</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form
-            id="customerForm"
-            method="post"
-            onSubmit={form.handleSubmit(
-              (data) => {
-                submit(data, {
-                  method: "post",
-                  encType: "multipart/form-data",
-                });
-              },
-              (errors) => console.log(errors)
-            )}
-          >
+          <Form id="customerForm" method="post" onSubmit={fullSubmit}>
             <FormField
               control={form.control}
               name="name"
