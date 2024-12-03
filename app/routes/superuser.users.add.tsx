@@ -10,7 +10,6 @@ import { csrf } from "~/utils/csrf.server";
 import { getSuperUser, register } from "~/utils/session.server";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
-import { useSubmit } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 
@@ -42,7 +41,6 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, defaultValues };
   }
 
-
   try {
     const value = await register(data.email, data.password);
   } catch (error) {
@@ -57,7 +55,6 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Login() {
-
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
@@ -66,11 +63,7 @@ export default function Login() {
 
   return (
     <FormProvider {...form}>
-      <Form
-        id="customerForm"
-        method="post"
-        onSubmit={fullSubmit}
-      >
+      <Form id="customerForm" method="post" onSubmit={fullSubmit}>
         <FormField
           control={form.control}
           name="email"

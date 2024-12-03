@@ -158,7 +158,6 @@ export default function InstructionsEdit() {
       navigate("..");
     }
   };
-  console.log(form.formState.errors);
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
