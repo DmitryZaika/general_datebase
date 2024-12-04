@@ -27,6 +27,8 @@ import { csrf } from "~/utils/csrf.server";
 import { selectId, selectMany } from "~/utils/queryHelpers";
 import { getAdminUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { SelectInput } from "~/components/molecules/SelectItem";
+import { afterOptions, parentOptions } from "~/utils/instructionsHelpers";
 
 const instructionSchema = z.object({
   title: z.string().min(1),
@@ -138,10 +140,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 export default function InstructionsEdit() {
   const navigate = useNavigate();
-  const submit = useSubmit();
   const { title, parent_id, after_id, rich_text } =
     useLoaderData<typeof loader>();
   const token = useAuthenticityToken();
+  const { instructions } = useLoaderData<typeof loader>();
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
@@ -151,6 +153,9 @@ export default function InstructionsEdit() {
       rich_text,
     },
   });
+
+  const parentValues = parentOptions(instructions);
+  const afterValues = afterOptions(parent_id, instructions);
   const fullSubmit = useFullSubmit(form, token);
 
   const handleChange = (open: boolean) => {
@@ -178,10 +183,11 @@ export default function InstructionsEdit() {
               control={form.control}
               name="parent_id"
               render={({ field }) => (
-                <InputItem
-                  name={"Parent"}
-                  placeholder={"Parent"}
+                <SelectInput
                   field={field}
+                  disabled={true}
+                  name="Parent"
+                  options={parentValues}
                 />
               )}
             />
@@ -189,10 +195,11 @@ export default function InstructionsEdit() {
               control={form.control}
               name="after_id"
               render={({ field }) => (
-                <InputItem
-                  name={"after_id"}
-                  placeholder={"Order"}
+                <SelectInput
                   field={field}
+                  name="After"
+                  disabled={true}
+                  options={afterValues}
                 />
               )}
             />
@@ -202,7 +209,7 @@ export default function InstructionsEdit() {
               render={({ field }) => (
                 <InputItem
                   name={"Text"}
-                  placeholder={"Your Text"}
+                  placeholder={"Name of the instruction"}
                   field={field}
                 />
               )}
