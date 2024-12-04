@@ -45,7 +45,38 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            ul: {
+              listStyleType: "disc",
+              paddingLeft: "1.5rem",
+            },
+            ol: {
+              listStyleType: "decimal",
+              paddingLeft: "1.5rem",
+            },
+            "ul > li::marker": {
+              color: "#6366F1",
+            },
+            "ol > li::marker": {
+              color: "#10B981",
+            },
+            code: {
+              backgroundColor: "#F3F4F6",
+              padding: "0.2rem 0.4rem",
+              borderRadius: "0.25rem",
+              color: "#D6336C",
+            },
+            pre: {
+              backgroundColor: "#F3F4F6",
+              padding: "1rem",
+              borderRadius: "0.5rem",
+            },
+          },
+        },
+      },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
 } satisfies Config;

@@ -13,7 +13,7 @@ import { Toaster } from "./components/ui/toaster";
 import "./tailwind.css";
 import { commitSession, getSession } from "./sessions";
 import { useToast } from "./hooks/use-toast";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { ToastMessage } from "./utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
