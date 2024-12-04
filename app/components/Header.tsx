@@ -7,31 +7,34 @@ export function Header({ activeSession }: { activeSession: string | null }) {
   const isAdminPage = location.pathname.startsWith("/admin");
 
   return (
-    <header className="flex content-center flex-col align-middle gap-5 m-3 md:flex-row">
+    <header className="flex flex-col md:flex-row items-center justify-between p-4 gap-4 m-3 md:gap-5">
       <div className="logo">
         <a className="flex justify-center" href="/">
           <img
             src="https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp"
             alt="Logo"
+            className="h-12 md:h-16 object-contain"
           />
         </a>
       </div>
-      {isAdminPage ? (
-        <Link to="/employee">
-          <Button>Employee</Button>
-        </Link>
-      ) : (
-        <Link to="/admin">
-          <Button>Admin</Button>
-        </Link>
-      )}
-      <nav className="w-full">
-        <ul className="flex gap-5 h-full flex-col md:flex-row md:justify-center md:items-center">
+      <div className="flex gap-4">
+        {isAdminPage ? (
+          <Link to="/employee">
+            <Button>Employee</Button>
+          </Link>
+        ) : (
+          <Link to="/admin">
+            <Button>Admin</Button>
+          </Link>
+        )}
+      </div>
+      <nav className="flex-1">
+        <ul className="flex flex-wrap justify-center md:justify-center gap-4">
           <li>
             <Button asChild variant="link">
               <Link
                 to={isAdminPage ? "/admin/stones" : "/employee/stones"}
-                className="text-xl"
+                className="text-lg md:text-xl"
               >
                 Database
               </Link>
@@ -43,7 +46,7 @@ export function Header({ activeSession }: { activeSession: string | null }) {
                 to={
                   isAdminPage ? "/admin/instructions" : "/employee/instructions"
                 }
-                className="text-xl"
+                className="text-lg md:text-xl"
               >
                 Instructions
               </Link>
@@ -52,7 +55,10 @@ export function Header({ activeSession }: { activeSession: string | null }) {
           {isAdminPage || (
             <li>
               <Button asChild variant="link">
-                <Link to="/employee/special-order" className="text-xl">
+                <Link
+                  to="/employee/special-order"
+                  className="text-lg md:text-xl"
+                >
                   Special Order
                 </Link>
               </Button>
@@ -62,7 +68,7 @@ export function Header({ activeSession }: { activeSession: string | null }) {
             <Button asChild variant="link">
               <Link
                 to={isAdminPage ? "/admin/customers" : "/employee/customers"}
-                className="text-xl"
+                className="text-lg md:text-xl"
               >
                 Customer
               </Link>

@@ -143,7 +143,7 @@ export const Chat: React.FC = () => {
       )}
 
       <div
-        className={`fixed bottom-0 right-0 h-[100%] w-[100%] sm:w-[40%] sm:h-3/4 bg-white border-l border-gray-300 shadow-lg transform transition-transform duration-300 flex flex-col ${
+        className={`fixed bottom-0 right-0 h-[100%] w-[100%] md:w-[35%] md:h-3/4 bg-white border-l border-gray-300 shadow-lg transform transition-transform duration-300 flex flex-col ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
