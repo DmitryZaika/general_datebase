@@ -71,7 +71,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function SupportsAdd() {
   const navigate = useNavigate();
-  // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
 
   const form = useCustomForm(supportSchema);
