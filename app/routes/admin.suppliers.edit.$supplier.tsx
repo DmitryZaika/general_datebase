@@ -133,19 +133,18 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export default function SuppliersAdd() {
   const navigate = useNavigate();
-  const submit = useSubmit();
   const { website, supplier_name, manager, email, phone, notes } =
     useLoaderData<typeof loader>();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
-      website,
-      supplier_name,
-      manager,
-      phone,
-      email,
-      notes,
+      website: website || "",
+      supplier_name: supplier_name || "",
+      manager: manager || "",
+      phone: phone || "",
+      email: email || "",
+      notes: notes || "",
     },
   });
   const fullSubmit = useFullSubmit(form, token);

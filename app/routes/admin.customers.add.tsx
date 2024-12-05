@@ -54,7 +54,7 @@ export async function action({ request }: ActionFunctionArgs) {
     resolver
   );
   if (errors) {
-    return json({ errors }, { status: 400 });
+    return { errors };
   }
 
   try {

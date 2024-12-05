@@ -28,12 +28,12 @@ export async function action({ params, request }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (!params.stone) {
+  if (!params.supplier) {
     return forceRedirectError(request.headers, "No document id provided");
   }
-  const supplierId = parseInt(params.stone);
+  const supplierId = parseInt(params.supplier);
   if (!supplierId) {
-    return json({ error: "Invalid supplier ID" }, { status: 400 });
+    return { supplier_name: undefined };
   }
 
   try {
