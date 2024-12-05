@@ -54,7 +54,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function Customer() {
   const actionData = useActionData<typeof action>();
-  const submit = useSubmit();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,

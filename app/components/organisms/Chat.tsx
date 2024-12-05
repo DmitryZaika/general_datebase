@@ -15,9 +15,9 @@ interface ChatMessagesProps {
 }
 
 const processHTML = async (text: string | Promise<string>): Promise<string> => {
-  const resolvedText = await text; // Ждем разрешения Promise
-  const markdown = marked(resolvedText); // Конвертируем Markdown в HTML
-  const cleanHTML = DOMPurify.sanitize(markdown); // Очищаем HTML
+  const resolvedText = await text;
+  const markdown = marked(resolvedText);
+  const cleanHTML = DOMPurify.sanitize(markdown);
   return cleanHTML;
 };
 
@@ -89,7 +89,7 @@ export const Chat: React.FC = () => {
 
     if (question.trim().length === 0) return;
 
-    const userMessage: Message = { role: "user", content: question };
+    const userMessage: Message = { role: "user", content: question as string };
     addMessage(userMessage);
     resetInput();
 
@@ -97,6 +97,7 @@ export const Chat: React.FC = () => {
 
     const response = await ask({
       messages: [...messages, userMessage],
+      context: {}, // NEED TO PROVIDE CONTEXT
     });
 
     if (!response) {
@@ -160,7 +161,9 @@ export const Chat: React.FC = () => {
         <ChatMessages
           messages={[
             ...messages,
-            ...(answer ? [{ role: "assistant", content: answer }] : []),
+            ...(answer
+              ? [{ role: "assistant" as const, content: answer }]
+              : []),
           ]}
           isThinking={isThinking}
         />
