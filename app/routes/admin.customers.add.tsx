@@ -85,14 +85,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function CustomersAdd() {
   const navigate = useNavigate();
-  const submit = useSubmit();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
   });
-
   const fullSubmit = useFullSubmit(form, token);
-
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
