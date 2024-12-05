@@ -47,7 +47,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: error.code };
+    return { error: "Invalid CSRF token" };
   }
   const { errors, data } = await getValidatedFormData<FormData>(
     request,

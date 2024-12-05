@@ -29,7 +29,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, name, url from supports"
   );
-  return json({ supports });
+  return { supports };
 };
 
 export default function Supports() {

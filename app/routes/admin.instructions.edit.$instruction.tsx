@@ -51,7 +51,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: error.code };
+    return { error: "Invalid CSRF token" };
   }
 
   if (!params.instruction) {

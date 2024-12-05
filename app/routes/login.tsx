@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -14,7 +13,7 @@ import { csrf } from "~/utils/csrf.server";
 import { login } from "~/utils/session.server";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
-import { useLoaderData, useSubmit } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { commitSession, getSession } from "~/sessions";
 import { PasswordInput } from "~/components/molecules/PasswordInput";
@@ -31,7 +30,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: error.code };
+    return { error: "Invalid CSRF token" };
   }
 
   const {
@@ -65,7 +64,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function Login() {
-  const submit = useSubmit();
   const { error } = useLoaderData<typeof loader>();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
