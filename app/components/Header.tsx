@@ -1,5 +1,6 @@
 import { Link, useLocation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
+import { TodoList } from "../components/TodoList";
 
 export function Header({ activeSession }: { activeSession: string | null }) {
   const location = useLocation();
@@ -7,7 +8,7 @@ export function Header({ activeSession }: { activeSession: string | null }) {
   const isAdminPage = location.pathname.startsWith("/admin");
 
   return (
-    <header className="flex flex-col md:flex-row items-center justify-between p-4 gap-4 m-3 md:gap-5">
+    <header className="flex flex-col relative md:flex-row items-center justify-between p-4 gap-4 m-3 md:gap-5">
       <div className="logo">
         <a className="flex justify-center" href="/">
           <img
@@ -76,6 +77,8 @@ export function Header({ activeSession }: { activeSession: string | null }) {
           </li>
         </ul>
       </nav>
+      <TodoList />
+
       {activeSession && (
         <Link to="/logout">
           <Button>Logout</Button>
