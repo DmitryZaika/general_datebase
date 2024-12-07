@@ -1,12 +1,21 @@
+// utils/session.server.ts
 import { db } from "~/db.server";
 import { RowDataPacket } from "mysql2";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
-import { getSession } from "~/sessions";
+import { getSession } from "~/sessions"; // Adjust the path if needed
 
 interface LoginUser {
   id: number;
   password: string;
+}
+
+export interface User {
+  email: string;
+  name: string;
+  is_employee: boolean;
+  is_admin: boolean;
+  is_superuser: boolean;
 }
 
 interface SessionUser {
@@ -25,10 +34,10 @@ function getExpirationDate(expiration: number): string {
 
 export async function register(email: string, password: string) {
   const passwordHash = await bcrypt.hash(password, 10);
-  await db.execute(
-    `INSERT INTO main.users  (email, password) VALUES ( ?, ?)`,
-    [email, passwordHash]
-  );
+  await db.execute(`INSERT INTO main.users (email, password) VALUES (?, ?)`, [
+    email,
+    passwordHash,
+  ]);
   return true;
 }
 
@@ -45,26 +54,25 @@ export async function login(
     return undefined;
   }
   const user = rows[0];
-  if (!bcrypt.compare(password, user.password)) {
+  if (!(await bcrypt.compare(password, user.password))) {
     return undefined;
   }
   const id = uuidv4();
-  const result = await db.execute(
-    `INSERT INTO main.sessions  (id, user_id, expiration_date) VALUES ( ?, ?, ?)`,
+  await db.execute(
+    `INSERT INTO main.sessions (id, user_id, expiration_date) VALUES (?, ?, ?)`,
     [id, user.id, getExpirationDate(expiration)]
   );
 
   return id;
 }
 
-async function getUser(sessionId: string): Promise<undefined | SessionUser> {
+async function getUser(sessionId: string): Promise<SessionUser | undefined> {
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
     `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser FROM users
-        JOIN sessions ON sessions.user_id = users.id
-        WHERE sessions.id = ?
-            AND sessions.expiration_date > CURRENT_TIMESTAMP
-            AND sessions.is_deleted = 0`,
-
+     JOIN sessions ON sessions.user_id = users.id
+     WHERE sessions.id = ?
+       AND sessions.expiration_date > CURRENT_TIMESTAMP
+       AND sessions.is_deleted = 0`,
     [sessionId]
   );
   if (rows.length < 1) {
@@ -79,16 +87,16 @@ async function handlePermissions(
 ): Promise<SessionUser> {
   const cookie = request.headers.get("Cookie");
   const session = await getSession(cookie);
-  const cookieHeader = session.get("sessionId");
-  if (cookieHeader === undefined) {
-    throw TypeError("Cookie Header cannot be undefined");
+  const sessionId = session.get("sessionId");
+  if (sessionId === undefined) {
+    throw new TypeError("Session ID cannot be undefined");
   }
-  const user = await getUser(cookieHeader);
+  const user = await getUser(sessionId);
   if (user === undefined) {
-    throw TypeError("Could not find session");
+    throw new TypeError("Could not find session");
   }
   if (!validUser(user)) {
-    throw TypeError("Invalid user permisions");
+    throw new TypeError("Invalid user permissions");
   }
   return user;
 }
@@ -103,7 +111,7 @@ export async function getAdminUser(request: Request): Promise<SessionUser> {
 export async function getEmployeeUser(request: Request): Promise<SessionUser> {
   return await handlePermissions(
     request,
-    (user) => user.is_admin || user.is_superuser || user.is_employee
+    (user) => user.is_employee || user.is_admin || user.is_superuser
   );
 }
 

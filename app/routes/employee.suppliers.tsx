@@ -13,7 +13,7 @@ import {
   TableCell,
 } from "~/components/ui/table";
 import { useLoaderData } from "@remix-run/react";
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
 import { getEmployeeUser } from "~/utils/session.server";

@@ -1,6 +1,3 @@
-import { MessageSquare } from "lucide-react";
-import clsx from "clsx";
-
 export function ChatIcon({
   className,
   onClick,
