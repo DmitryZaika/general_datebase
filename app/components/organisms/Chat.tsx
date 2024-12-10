@@ -97,7 +97,7 @@ export const Chat: React.FC = () => {
 
     const response = await ask({
       messages: [...messages, userMessage],
-      context: {}, // NEED TO PROVIDE CONTEXT
+      context: {}, //NEED TO PROVIDE CONTEXT
     });
 
     if (!response) {

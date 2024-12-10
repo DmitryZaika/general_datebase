@@ -91,7 +91,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   if (!params.document) {
-    return forceRedirectError(request.headers, "No image id provided");
+    return forceRedirectError(request.headers, "No document id provided");
   }
   const documentId = parseInt(params.document);
 
