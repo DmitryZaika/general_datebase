@@ -65,19 +65,21 @@ export function Header({ activeSession }: { activeSession: string | null }) {
               </Button>
             </li>
           )}
-          <li>
-            <Button asChild variant="link">
-              <Link
-                to={isAdminPage ? "/admin/customers" : "/employee/customers"}
-                className="text-lg md:text-xl"
-              >
-                Customer
-              </Link>
-            </Button>
-          </li>
+          {isAdminPage || (
+            <li>
+              <Button asChild variant="link">
+                <Link
+                  to={isAdminPage ? "" : "/employee/customers"}
+                  className="text-lg md:text-xl"
+                >
+                  Customer
+                </Link>
+              </Button>
+            </li>
+          )}
         </ul>
       </nav>
-      <TodoList />
+      {/* <TodoList /> */}
 
       {activeSession && (
         <Link to="/logout">
