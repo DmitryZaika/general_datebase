@@ -54,7 +54,7 @@ export async function action({ request }: ActionFunctionArgs) {
     console.error("Error connecting to the database: ", error);
   }
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Stone added"));
+  session.flash("message", toastData("Success", "Support added"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
@@ -71,7 +71,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function SupportsAdd() {
   const navigate = useNavigate();
-  // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
 
   const form = useCustomForm(supportSchema);

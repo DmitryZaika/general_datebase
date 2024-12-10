@@ -26,12 +26,14 @@ import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
 import { selectId, selectMany } from "~/utils/queryHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { SelectInput } from "~/components/molecules/SelectItem";
+import { afterOptions, parentOptions } from "~/utils/instructionsHelpers";
 
 const instructionSchema = z.object({
-  id: z.coerce.number().positive(),
   title: z.string().min(1),
-  parent_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
-  after_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
+  parent_id: z.coerce.number(),
+  after_id: z.coerce.number(),
   rich_text: z.string().min(1),
 });
 
@@ -49,7 +51,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: error.code };
+    return { error: "Invalid CSRF token" };
   }
 
   if (!params.instruction) {
@@ -138,19 +140,23 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 export default function InstructionsEdit() {
   const navigate = useNavigate();
-  const submit = useSubmit();
   const { title, parent_id, after_id, rich_text } =
     useLoaderData<typeof loader>();
   const token = useAuthenticityToken();
+  const { instructions } = useLoaderData<typeof loader>();
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
       title,
-      parent_id,
-      after_id,
+      parent_id: parent_id || 0,
+      after_id: after_id || 0,
       rich_text,
     },
   });
+
+  const parentValues = parentOptions(instructions);
+  const afterValues = afterOptions(parent_id, instructions);
+  const fullSubmit = useFullSubmit(form, token);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -165,20 +171,7 @@ export default function InstructionsEdit() {
           <DialogTitle>Edit Instruction</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form
-            id="customerForm"
-            method="post"
-            onSubmit={form.handleSubmit(
-              (data) => {
-                data["csrf"] = token;
-                submit(data, {
-                  method: "post",
-                  encType: "multipart/form-data",
-                });
-              },
-              (errors) => console.log(errors)
-            )}
-          >
+          <Form id="customerForm" method="post" onSubmit={fullSubmit}>
             <FormField
               control={form.control}
               name="title"
@@ -190,10 +183,11 @@ export default function InstructionsEdit() {
               control={form.control}
               name="parent_id"
               render={({ field }) => (
-                <InputItem
-                  name={"Parent"}
-                  placeholder={"Parent"}
+                <SelectInput
                   field={field}
+                  disabled={true}
+                  name="Parent"
+                  options={parentValues}
                 />
               )}
             />
@@ -201,10 +195,11 @@ export default function InstructionsEdit() {
               control={form.control}
               name="after_id"
               render={({ field }) => (
-                <InputItem
-                  name={"after_id"}
-                  placeholder={"Order"}
+                <SelectInput
                   field={field}
+                  name="After"
+                  disabled={true}
+                  options={afterValues}
                 />
               )}
             />
@@ -214,7 +209,7 @@ export default function InstructionsEdit() {
               render={({ field }) => (
                 <InputItem
                   name={"Text"}
-                  placeholder={"Your Text"}
+                  placeholder={"Name of the instruction"}
                   field={field}
                 />
               )}
