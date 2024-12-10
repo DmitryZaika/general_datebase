@@ -1,5 +1,6 @@
 import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { Link, Outlet, useLoaderData } from "@remix-run/react";
+import { PageLayout } from "~/components/PageLayout";
 import { Button } from "~/components/ui/button";
 import {
   TableBody,
@@ -39,7 +40,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminInstructions() {
   const { instructions } = useLoaderData<typeof loader>();
   return (
-    <>
+    <PageLayout title="Instructions">
       <Link to={`add`} relative="path">
         <Button>Add</Button>
       </Link>
@@ -81,6 +82,6 @@ export default function AdminInstructions() {
         </TableBody>
       </Table>
       <Outlet />
-    </>
+    </PageLayout>
   );
 }
