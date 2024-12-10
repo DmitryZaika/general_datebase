@@ -148,7 +148,7 @@ export const Chat: React.FC = () => {
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="bg-gray-100 text-gray-800 font-semibold text-lg py-3 px-4 border-b border-gray-300 flex justify-between items-center">
+        <div className="bg-gray-100 text-gray-800 font-semibold text-lg py-3 px-4 border border-gray-300 flex justify-between items-center">
           <span>Chat</span>
           <button
             onClick={() => setIsOpen(false)}

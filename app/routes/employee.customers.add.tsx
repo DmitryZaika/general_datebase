@@ -29,9 +29,9 @@ import { useAuthenticityToken } from "remix-utils/csrf/react";
 
 const customerSchema = z.object({
   name: z.string().min(1),
-  email: z.string().email(),
-  phone: z.string().min(10),
-  address: z.string().min(10),
+  email: z.string().email().optional(),
+  phone: z.string().min(10).optional(),
+  address: z.string().min(10).optional(),
 });
 
 type FormData = z.infer<typeof customerSchema>;
