@@ -1,4 +1,4 @@
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import {
   Accordion,
@@ -25,7 +25,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   const sinks = await selectMany<Sink>(db, "select id, name, url from sinks");
-  return json({ sinks });
+  return { sinks };
 };
 
 export default function Sinks() {

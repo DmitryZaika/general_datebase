@@ -1,7 +1,6 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -42,7 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
     "supports"
   );
   if (errors || !data) {
-    return json({ errors });
+    return { errors };
   }
 
   try {
@@ -63,7 +62,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
-    return json({ user });
+    return { user };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
