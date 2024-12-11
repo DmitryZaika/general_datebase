@@ -3,7 +3,7 @@ import { db } from "~/db.server";
 import { RowDataPacket } from "mysql2";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
-import { getSession } from "~/sessions"; // Adjust the path if needed
+import { getSession } from "~/sessions";
 
 interface LoginUser {
   id: number;

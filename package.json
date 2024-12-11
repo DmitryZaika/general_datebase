@@ -59,6 +59,7 @@
   },
   "devDependencies": {
     "@remix-run/dev": "^2.12.1",
+    "@types/bcryptjs": "^2.4.6",
     "@types/mime-types": "^2.1.4",
     "@types/node": "^22.7.7",
     "@types/react": "^18.3.11",
