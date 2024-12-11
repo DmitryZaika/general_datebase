@@ -13,7 +13,7 @@ import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
-import { getEmployeeUser } from "~/utils/session.server";
+import { getAdminUser, getEmployeeUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
 
 interface Customer {
