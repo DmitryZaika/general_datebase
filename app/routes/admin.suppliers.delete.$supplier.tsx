@@ -40,7 +40,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
     await db.execute(`DELETE FROM main.suppliers WHERE id = ?`, [supplierId]);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
-    return json({ error: "Failed to delete supplier" }, { status: 500 });
+    return { error: "Failed to delete supplier" };
   }
 
   const session = await getSession(request.headers.get("Cookie"));
