@@ -118,3 +118,9 @@ export async function getEmployeeUser(request: Request): Promise<SessionUser> {
 export async function getSuperUser(request: Request): Promise<SessionUser> {
   return await handlePermissions(request, (user) => user.is_superuser);
 }
+
+export async function getUserBySessionId(
+  sessionId: string
+): Promise<SessionUser | undefined> {
+  return await getUser(sessionId);
+}
