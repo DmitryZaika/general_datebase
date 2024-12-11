@@ -41,7 +41,7 @@ export default function Stones() {
   return (
     <>
       <Link to={`add`} relative="path">
-        <Button>Add</Button>
+        <Button>Add Stone</Button>
       </Link>
       <Table>
         <TableCaption>A list of your recent stones.</TableCaption>

@@ -14,9 +14,8 @@ interface ChatMessagesProps {
   isThinking: boolean;
 }
 
-const processHTML = async (text: string | Promise<string>): Promise<string> => {
-  const resolvedText = await text;
-  const markdown = marked(resolvedText);
+const processHTML = (text: string): string => {
+  const markdown = marked(text);
   const cleanHTML = DOMPurify.sanitize(markdown);
   return cleanHTML;
 };
@@ -30,7 +29,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
   useEffect(() => {
     const formatContent = async () => {
-      const content = await processHTML(message.content);
+      const content = processHTML(message.content);
       setFormattedContent(content);
     };
     formatContent();
@@ -125,7 +124,6 @@ export const Chat: React.FC = () => {
           onClick={() => setIsOpen(true)}
           className="fixed bottom-5 right-5 bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 transition"
         >
-          {/* Иконка чата */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"

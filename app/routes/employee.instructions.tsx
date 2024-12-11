@@ -9,13 +9,12 @@ import {
 import { db } from "~/db.server";
 
 import { selectMany } from "~/utils/queryHelpers";
-import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
 
 interface Instruction {
   id: number;
-  title: string | null; // Updated to allow null titles
+  title: string | null;
   parent_id: number | null;
   after_id: number | null;
   rich_text: string;
@@ -49,14 +48,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
   if (instruction.title) {
-    // If title exists, render as an accordion item
     return (
       <AccordionItem value={instruction.id.toString()}>
         <AccordionTrigger className="font-medium text-xl underline underline-offset-4 py-4">
           {instruction.title}
         </AccordionTrigger>
         <AccordionContent>
-          <p className="text-black-500">{instruction.text}</p>
+          <p className="text-black-500 pl-5">{instruction.text}</p>
           {instruction.children.length > 0 && (
             <Accordion type="multiple" className="ml-5">
               {instruction.children.map((childInstruction) => (
@@ -71,7 +69,6 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
       </AccordionItem>
     );
   } else {
-    // If title is missing, display the text directly in black
     return (
       <div className="py-4">
         <p className="text-black">{instruction.text}</p>
