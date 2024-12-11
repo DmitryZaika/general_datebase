@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
@@ -30,9 +30,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, name from supports"
   );
-  return json({
+  return {
     supports,
-  });
+  };
 };
 
 export default function Supports() {

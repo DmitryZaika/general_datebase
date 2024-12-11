@@ -44,15 +44,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = await getUserBySessionId(activeSession);
   }
 
-  return json(
-    { message, activeSession, token, user },
-    {
-      headers: [
-        ["Set-Cookie", cookieHeader || ""],
-        ["Set-Cookie", await commitSession(session)],
-      ],
-    }
-  );
+  return {
+    message,
+    activeSession,
+    token,
+    user,
+    headers: {
+      "Set-Cookie": [cookieHeader || "", await commitSession(session)]
+        .filter(Boolean)
+        .join(", "),
+    },
+  };
 }
 
 export default function App() {

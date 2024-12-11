@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -49,7 +48,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "supports"
   );
   if (errors || !data) {
-    return json({ errors });
+    return { errors };
   }
 
   // NOTE: THIS IS DANGEROUS
@@ -100,10 +99,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     "select name, url from supports WHERE id = ?",
     supportId
   );
-  return json({
+  return {
     name: support?.name,
     url: support?.url,
-  });
+  };
 };
 
 export default function SupportsEdit() {

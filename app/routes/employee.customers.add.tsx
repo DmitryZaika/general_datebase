@@ -1,7 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -64,7 +63,7 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
-    return json({ error: "Database error" }, { status: 500 });
+    return { error: "Database error" };
   }
 
   const session = await getSession(request.headers.get("Cookie"));
