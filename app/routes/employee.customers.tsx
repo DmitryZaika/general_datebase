@@ -13,7 +13,7 @@ import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
-import { getAdminUser } from "~/utils/session.server";
+import { getEmployeeUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
 
 interface Customer {
@@ -26,7 +26,7 @@ interface Customer {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    await getAdminUser(request);
+    await getEmployeeUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }

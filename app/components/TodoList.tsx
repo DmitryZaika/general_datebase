@@ -20,7 +20,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const todos = await selectMany<Todo>(
     db,
-    "select id, name, is_done from todolist"
+    "SELECT id, name, is_done from todolist"
   );
   return {
     todos,

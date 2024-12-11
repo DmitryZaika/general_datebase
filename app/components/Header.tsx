@@ -1,10 +1,18 @@
 import { Link, useLocation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
-import { TodoList } from "../components/TodoList";
 
-export function Header({ activeSession }: { activeSession: string | null }) {
+export function Header({
+  activeSession,
+  isAdmin,
+  isSuperUser,
+  isEmployee,
+}: {
+  activeSession: string | null;
+  isAdmin: boolean;
+  isSuperUser: boolean;
+  isEmployee: boolean;
+}) {
   const location = useLocation();
-
   const isAdminPage = location.pathname.startsWith("/admin");
 
   return (
@@ -19,15 +27,17 @@ export function Header({ activeSession }: { activeSession: string | null }) {
         </a>
       </div>
       <div className="flex gap-4">
-        {isAdminPage ? (
-          <Link to="/employee">
-            <Button>Employee</Button>
-          </Link>
-        ) : (
-          <Link to="/admin">
-            <Button>Admin</Button>
-          </Link>
-        )}
+        {isAdmin || isSuperUser ? (
+          isAdminPage ? (
+            <Link to="/employee">
+              <Button>Employee</Button>
+            </Link>
+          ) : (
+            <Link to="/admin">
+              <Button>Admin</Button>
+            </Link>
+          )
+        ) : null}
       </div>
       <nav className="flex-1">
         <ul className="flex flex-wrap justify-center md:justify-center gap-4">
@@ -53,7 +63,7 @@ export function Header({ activeSession }: { activeSession: string | null }) {
               </Link>
             </Button>
           </li>
-          {isAdminPage || (
+          {!isAdminPage && (
             <li>
               <Button asChild variant="link">
                 <Link
@@ -65,13 +75,10 @@ export function Header({ activeSession }: { activeSession: string | null }) {
               </Button>
             </li>
           )}
-          {isAdminPage || (
+          {!isAdminPage && (
             <li>
               <Button asChild variant="link">
-                <Link
-                  to={isAdminPage ? "" : "/employee/customers"}
-                  className="text-lg md:text-xl"
-                >
+                <Link to="/employee/customers" className="text-lg md:text-xl">
                   Customer
                 </Link>
               </Button>
@@ -79,7 +86,6 @@ export function Header({ activeSession }: { activeSession: string | null }) {
           )}
         </ul>
       </nav>
-      {/* <TodoList /> */}
 
       {activeSession && (
         <Link to="/logout">
@@ -90,5 +96,3 @@ export function Header({ activeSession }: { activeSession: string | null }) {
     </header>
   );
 }
-
-// $2a$10$k3mgKHcQ; //WMEW8C1XVPPeoAOYpJP1civMfeQDwvYEoSbFGqD9zda
