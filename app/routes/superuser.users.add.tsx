@@ -1,4 +1,4 @@
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import { ActionFunctionArgs, redirect } from "@remix-run/node";
 import { getSession, commitSession } from "~/sessions";
 import { z } from "zod";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
