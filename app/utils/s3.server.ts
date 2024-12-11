@@ -6,7 +6,6 @@ import {
   PutObjectCommandInput,
   S3,
   DeleteObjectCommand,
-  S3Client,
   S3ServiceException,
   waitUntilObjectNotExists,
 } from "@aws-sdk/client-s3";
@@ -46,9 +45,9 @@ export const deleteFile = async (url: string) => {
         Key: finalKey,
       })
     );
-    const response = await waitUntilObjectNotExists(
-      { client },
-      { Bucket: STORAGE_BUCKET, Key: finalKey }
+    await waitUntilObjectNotExists(
+      { client, maxWaitTime: 30 },
+      { Bucket: STORAGE_BUCKET!, Key: finalKey }
     );
   } catch (caught) {
     if (

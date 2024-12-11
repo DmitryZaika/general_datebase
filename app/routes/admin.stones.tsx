@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json, redirect, LoaderFunctionArgs } from "@remix-run/node";
+import { redirect, LoaderFunctionArgs } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
@@ -41,7 +41,7 @@ export default function Stones() {
   return (
     <>
       <Link to={`add`} relative="path">
-        <Button>Add</Button>
+        <Button>Add Stone</Button>
       </Link>
       <Table>
         <TableCaption>A list of your recent stones.</TableCaption>

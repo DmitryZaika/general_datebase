@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -28,19 +27,19 @@ export async function action({ params, request }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (!params.stone) {
+  if (!params.supplier) {
     return forceRedirectError(request.headers, "No document id provided");
   }
-  const supplierId = parseInt(params.stone);
+  const supplierId = parseInt(params.supplier);
   if (!supplierId) {
-    return json({ error: "Invalid supplier ID" }, { status: 400 });
+    return { supplier_name: undefined };
   }
 
   try {
     await db.execute(`DELETE FROM main.suppliers WHERE id = ?`, [supplierId]);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
-    return json({ error: "Failed to delete supplier" }, { status: 500 });
+    return { error: "Failed to delete supplier" };
   }
 
   const session = await getSession(request.headers.get("Cookie"));

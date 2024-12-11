@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -30,7 +29,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   const imageId = params.image ? parseInt(params.image, 10) : null;
   if (!imageId) {
-    return json({ error: "Invalid image ID" }, { status: 400 });
+    return { error: "Invalid image ID" };
   }
   try {
     const result = await db.execute(`DELETE FROM main.images WHERE id = ?`, [

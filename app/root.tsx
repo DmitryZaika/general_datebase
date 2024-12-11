@@ -13,12 +13,12 @@ import { Toaster } from "./components/ui/toaster";
 import "./tailwind.css";
 import { commitSession, getSession } from "./sessions";
 import { useToast } from "./hooks/use-toast";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { ToastMessage } from "./utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
-import { ChatIcon } from "./components/atoms/ChatIcon";
 import { Chat } from "./components/organisms/Chat";
+import { getUserBySessionId } from "./utils/session.server";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -38,23 +38,29 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getSession(request.headers.get("Cookie"));
   const activeSession = session.data.sessionId || null;
   const message: ToastMessage | null = session.get("message") || null;
-  return json(
-    { message, activeSession, token },
 
-    {
-      headers: [
-        ["Set-Cookie", cookieHeader || ""],
-        ["Set-Cookie", await commitSession(session)],
-      ],
-    }
-  );
+  let user = null;
+  if (activeSession) {
+    user = await getUserBySessionId(activeSession);
+  }
+
+  return {
+    message,
+    activeSession,
+    token,
+    user,
+    headers: {
+      "Set-Cookie": [cookieHeader || "", await commitSession(session)]
+        .filter(Boolean)
+        .join(", "),
+    },
+  };
 }
 
-
 export default function App() {
-  const { message, activeSession, token } = useLoaderData<typeof loader>();
+  const { message, activeSession, token, user } =
+    useLoaderData<typeof loader>();
   const { toast } = useToast();
-  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     if (message !== null && message !== undefined) {
@@ -75,7 +81,18 @@ export default function App() {
         <Links />
       </head>
       <body>
-        {activeSession && <Header activeSession={activeSession} />}
+        {activeSession && (
+          <Header
+            activeSession={activeSession}
+            isAdmin={user ? user.is_admin : false}
+            isSuperUser={user ? user.is_superuser : false}
+            isEmployee={
+              user
+                ? user.is_employee || user.is_admin || user.is_superuser
+                : false
+            }
+          />
+        )}
         <AuthenticityTokenProvider token={token}>
           <Outlet />
         </AuthenticityTokenProvider>
@@ -84,8 +101,8 @@ export default function App() {
         {/* <Footer /> */}
         <Scripts />
       </body>
-      {chatOpen ? <Chat />
-      :  <ChatIcon className="absolute bottom-4 right-4 size-16 flex items-center justify-center" onClick={() => setChatOpen(true)}/> }
+
+      <Chat />
     </html>
   );
 }
