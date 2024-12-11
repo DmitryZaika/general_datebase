@@ -23,7 +23,7 @@ export async function parseMutliForm<T>(
   request: Request,
   schema: T,
   folder: string
-): Promise<ValidatedData<T>> {
+): Promise<ValidatedData<typeof schema & typeof fileSchema>> {
   const finalSchema = schema.merge(fileSchema);
   const resolver = zodResolver(finalSchema);
 
@@ -35,7 +35,9 @@ export async function parseMutliForm<T>(
     request,
     uploadHandler
   );
+
   csrf.validate(formData, request.headers);
+
   const { data, errors } = await validateFormData(formData, resolver);
-  return { data, errors };
+  return { data: data as z.infer<typeof finalSchema>, errors };
 }

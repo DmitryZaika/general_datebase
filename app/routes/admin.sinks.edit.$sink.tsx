@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -71,8 +70,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         sinkId,
       ]);
     }
-
-
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }
