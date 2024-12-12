@@ -13,6 +13,7 @@ import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 interface Image {
   id: number;
@@ -24,6 +25,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
   }
   const images = await selectMany<Image>(db, "select id, name from images");
   return {
