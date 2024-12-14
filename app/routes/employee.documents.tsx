@@ -28,7 +28,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, name, url from documents"
   );
-  return json({ documents });
+  return { documents };
 };
 
 export default function Documents() {

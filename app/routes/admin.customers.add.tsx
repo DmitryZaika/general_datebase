@@ -45,8 +45,12 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: error.code };
+    if (error instanceof Error) {
+      return { error: (error as any).code };
+    }
+    return { error: "Unknown error" };
   }
+  
   const { errors, data } = await getValidatedFormData<FormData>(
     request,
     resolver
