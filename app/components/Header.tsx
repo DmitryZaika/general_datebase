@@ -1,5 +1,6 @@
 import { Link, useLocation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
+import { TodoList } from "./TodoList";
 
 export function Header({
   activeSession,
@@ -86,7 +87,7 @@ export function Header({
           )}
         </ul>
       </nav>
-
+      {/* <TodoList /> */}
       {activeSession && (
         <Link to="/logout">
           <Button>Logout</Button>
