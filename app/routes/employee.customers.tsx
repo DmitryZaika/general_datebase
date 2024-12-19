@@ -13,7 +13,7 @@ import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
-import { getAdminUser, getEmployeeUser } from "~/utils/session.server";
+import { getEmployeeUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
 
 interface Customer {
@@ -32,7 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const customers = await selectMany<Customer>(
     db,
-    "select name, email, phone, address from customers"
+    "select id name, email, phone, address from customers"
   );
   return {
     customers,
@@ -56,7 +56,7 @@ export default function AdminCustomers() {
             </TableHead>{" "}
             <TableHead className="text-xl">Phone Number</TableHead>
             <TableHead className="text-xl pr-4">Email</TableHead>{" "}
-            <TableHead className="text-xl">Addressr</TableHead>
+            <TableHead className="text-xl">Address</TableHead>
             <TableHead className="text-right text-xl">Edit Customer</TableHead>
             <TableHead className="text-right text-xl">
               Delete customer
@@ -85,12 +85,7 @@ export default function AdminCustomers() {
             </TableRow>
           ))}
         </TableBody>
-        <TableFooter>
-          <TableRow>
-            <TableCell colSpan={3}>Total</TableCell>
-            <TableCell className="text-right">$2,500.00</TableCell>
-          </TableRow>
-        </TableFooter>
+        <TableFooter></TableFooter>
       </Table>
       <Outlet />
     </PageLayout>

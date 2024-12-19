@@ -21,15 +21,15 @@ import {
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
-import { getAdminUser } from "~/utils/session.server";
-import { csrf } from "~/utils/csrf.server";
+import { getAdminUser, getEmployeeUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
+import { csrf } from "~/utils/csrf.server";
 
 const customerSchema = z.object({
   name: z.string().min(1),
   email: z.string().email().optional(),
-  phone: z.string().min(10).optional(),
+  phone: z.union([z.coerce.string().min(10), z.literal("")]),
   address: z.string().min(10).optional(),
 });
 
@@ -39,7 +39,7 @@ const resolver = zodResolver(customerSchema);
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    await getAdminUser(request);
+    await getEmployeeUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -75,7 +75,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request);
+    const user = await getEmployeeUser(request);
     return { user };
   } catch (error) {
     return redirect(`/login?error=${error}`);

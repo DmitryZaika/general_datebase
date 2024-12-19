@@ -31,7 +31,7 @@ const supplierschema = z.object({
   website: z.string().url(),
   supplier_name: z.string().min(1),
   manager: z.string().optional(),
-  phone: z.union([z.coerce.string().min(10), z.literal("")]),
+  phone: z.union([z.coerce.string().min(10), z.literal("")]).optional(),
   email: z.union([z.string().email().optional(), z.literal("")]),
   notes: z.string().optional(),
 });

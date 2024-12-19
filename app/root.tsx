@@ -8,7 +8,6 @@ import {
 } from "@remix-run/react";
 import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { Header } from "./components/Header";
-import { json } from "@remix-run/node";
 import { Toaster } from "./components/ui/toaster";
 import "./tailwind.css";
 import { commitSession, getSession } from "./sessions";
@@ -19,6 +18,7 @@ import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
 import { Chat } from "./components/organisms/Chat";
 import { getUserBySessionId } from "./utils/session.server";
+import { Footer } from "./components/Footer";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
