@@ -14,11 +14,13 @@ interface ChatMessagesProps {
   isThinking: boolean;
 }
 
+/*
 const processHTML = (text: string): string => {
   const markdown = marked(text);
   const cleanHTML = DOMPurify.sanitize(markdown);
   return cleanHTML;
 };
+*/
 
 interface MessageBubbleProps {
   message: Message;
@@ -29,8 +31,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
   useEffect(() => {
     const formatContent = async () => {
-      const content = processHTML(message.content);
-      setFormattedContent(content);
+      // const content = processHTML(message.content);
+      setFormattedContent(message.content);
     };
     formatContent();
   }, [message.content]);
@@ -61,7 +63,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   messages,
   isThinking,
 }) => (
-  <div className="flex flex-col p-4 overflow-y-auto h-full">
+  <div className="flex flex-col p-4 overflow-y-auto h-full text-wrap whitespace-pre-wrap">
     {messages.map((message, index) => (
       <MessageBubble key={index} message={message} />
     ))}
@@ -112,7 +114,8 @@ export const Chat: React.FC = () => {
       },
     });
 
-    const formattedContent = await processHTML(assistantMessageContent);
+    // const formattedContent = await processHTML(assistantMessageContent);
+    const formattedContent = assistantMessageContent;
     setAnswer("");
     addMessage({ role: "assistant", content: formattedContent });
   };

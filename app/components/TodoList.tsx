@@ -4,33 +4,11 @@ import { useLoaderData } from "@remix-run/react";
 import { getEmployeeUser } from "~/utils/session.server";
 import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
-import { db } from "~/db.server";
 import { TableBody, TableCell, TableRow } from "./ui/table";
-
-interface Todo {
-  id: number;
-  name: string;
-  is_done: boolean;
-}
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  try {
-    await getEmployeeUser(request);
-  } catch (error) {
-    return redirect(`/login?error=${error}`);
-  }
-  const todos = await selectMany<Todo>(
-    db,
-    "SELECT id, name, is_done from todolist"
-  );
-  return {
-    todos,
-  };
-};
 
 export function TodoList() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const { todos } = useLoaderData<typeof loader>() || { todos: [] };
+  const { todos } = useLoaderData<typeof loader>();
 
   return (
     <>
@@ -73,7 +51,7 @@ export function TodoList() {
         </div>
         <div className="overflow-y-auto max-h-60">
           <TableBody>
-            {todos.map((todo) => (
+            {(todos || []).map((todo) => (
               <TableRow key={todo.id}>
                 <TableCell className="font-medium w-[200px]">
                   {todo.name}

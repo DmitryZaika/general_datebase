@@ -58,7 +58,7 @@ export default function Customer() {
   const form = useForm<FormData>({
     resolver,
   });
-  const fullSubmit = useFullSubmit(form, token);
+  const fullSubmit = useFullSubmit(form);
 
   return (
     <PageLayout

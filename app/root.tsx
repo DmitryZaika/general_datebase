@@ -1,7 +1,9 @@
 import {
+  json,
   Links,
   Meta,
   Outlet,
+  redirect,
   Scripts,
   ScrollRestoration,
   useLoaderData,
@@ -17,8 +19,10 @@ import { ToastMessage } from "./utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
 import { Chat } from "./components/organisms/Chat";
-import { getUserBySessionId } from "./utils/session.server";
-import { Footer } from "./components/Footer";
+import { getEmployeeUser, getUserBySessionId } from "./utils/session.server";
+import { selectMany } from "./utils/queryHelpers";
+import { db } from "~/db.server";
+import { Todo } from "~/types";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -39,26 +43,36 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const activeSession = session.data.sessionId || null;
   const message: ToastMessage | null = session.get("message") || null;
 
+  try {
+    await getEmployeeUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
+  const todos = await selectMany<Todo>(
+    db,
+    "SELECT id, name, is_done from todolist"
+  );
+  console.log(todos);
+
   let user = null;
   if (activeSession) {
     user = await getUserBySessionId(activeSession);
   }
 
-  return {
-    message,
-    activeSession,
-    token,
-    user,
-    headers: {
-      "Set-Cookie": [cookieHeader || "", await commitSession(session)]
-        .filter(Boolean)
-        .join(", "),
-    },
-  };
+  return json(
+    { message, activeSession, token, user, todos },
+
+    {
+      headers: [
+        ["Set-Cookie", cookieHeader || ""],
+        ["Set-Cookie", await commitSession(session)],
+      ],
+    }
+  );
 }
 
 export default function App() {
-  const { message, activeSession, token, user } =
+  const { message, activeSession, token, user, todos } =
     useLoaderData<typeof loader>();
   const { toast } = useToast();
 
@@ -83,6 +97,7 @@ export default function App() {
       <body>
         {activeSession && (
           <Header
+            todos={todos}
             activeSession={activeSession}
             isAdmin={user ? user.is_admin : false}
             isSuperUser={user ? user.is_superuser : false}

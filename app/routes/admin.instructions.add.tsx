@@ -162,7 +162,7 @@ export default function InstructionsAdd() {
   const parentValues = parentOptions(instructions);
   const afterValues = afterOptions(parent_id, instructions);
 
-  const fullSubmit = useFullSubmit(form, token);
+  const fullSubmit = useFullSubmit(form);
 
   const handleChange = (open: boolean) => {
     if (open === false) {

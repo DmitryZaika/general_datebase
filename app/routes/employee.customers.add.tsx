@@ -88,7 +88,7 @@ export default function CustomersAdd() {
   const form = useForm<FormData>({
     resolver,
   });
-  const fullSubmit = useFullSubmit(form, token);
+  const fullSubmit = useFullSubmit(form);
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");

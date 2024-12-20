@@ -1,17 +1,20 @@
 import { Link, useLocation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { TodoList } from "./TodoList";
+import { Todo } from "~/types";
 
 export function Header({
   activeSession,
   isAdmin,
   isSuperUser,
   isEmployee,
+  todos,
 }: {
   activeSession: string | null;
   isAdmin: boolean;
   isSuperUser: boolean;
   isEmployee: boolean;
+  todos: Todo;
 }) {
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
@@ -87,7 +90,7 @@ export function Header({
           )}
         </ul>
       </nav>
-      {/* <TodoList /> */}
+      <TodoList todos={todos} />
       {activeSession && (
         <Link to="/logout">
           <Button>Logout</Button>

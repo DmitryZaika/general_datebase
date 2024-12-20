@@ -105,7 +105,7 @@ export default function SuppliersAdd() {
       notes: "",
     },
   });
-  const fullSubmit = useFullSubmit(form, token);
+  const fullSubmit = useFullSubmit(form);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
