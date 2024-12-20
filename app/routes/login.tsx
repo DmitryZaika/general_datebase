@@ -65,11 +65,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Login() {
   const { error } = useLoaderData<typeof loader>();
-  const token = useAuthenticityToken();
+
   const form = useForm<FormData>({
     resolver,
   });
-  const fullSubmit = useFullSubmit(form, token);
+  const fullSubmit = useFullSubmit(form);
 
   return (
     <div className="flex justify-center p-20">

@@ -1,7 +1,9 @@
 export const ask = ({ messages, context }) => {
   const contextMessage = {
     role: "system",
-    content: `Here is the context for this conversation:\n${JSON.stringify(context)}`,
+    content: `Here is the context for this conversation:\n${JSON.stringify(
+      context
+    )}`,
   };
   return fetch("/api/chat", {
     method: "POST",
@@ -19,11 +21,11 @@ export const processChatResponse = async ({ response, onChunk }) => {
     const chunks = stream?.value
       .replaceAll(/^data: /gm, "")
       .split("\n")
-      .filter((c) => Boolean(c.length) && c !== "[DONE]")
+      .filter((c) => Boolean(c.length) && c !== "[DONE]");
 
-    const composed = chunks.join('')
-    string += composed
-    onChunk(composed)
+    const composed = chunks.join("");
+    string += composed;
+    onChunk(composed);
   }
   return string;
 };
