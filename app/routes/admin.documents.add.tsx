@@ -24,6 +24,7 @@ import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 const documentSchema = z.object({
   name: z.string().min(1),
@@ -34,6 +35,11 @@ export async function action({ request }: ActionFunctionArgs) {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
   }
   const { errors, data } = await parseMutliForm(
     request,

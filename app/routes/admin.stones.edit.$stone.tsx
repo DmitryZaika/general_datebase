@@ -28,6 +28,7 @@ import { parseMutliForm } from "~/utils/parseMultiForm";
 import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { deleteFile } from "~/utils/s3.server";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 const stoneSchema = z.object({
   name: z.string().min(1),
@@ -39,6 +40,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
   }
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");

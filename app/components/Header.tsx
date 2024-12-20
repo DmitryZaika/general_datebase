@@ -7,7 +7,6 @@ export function Header({
   activeSession,
   isAdmin,
   isSuperUser,
-  isEmployee,
   todos,
 }: {
   activeSession: string | null;

@@ -56,7 +56,6 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-
   try {
     await csrf.validate(request);
   } catch (error) {
