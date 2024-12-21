@@ -30,7 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const stones = await selectMany<Stone>(
     db,
-    "select id, name, type from stones"
+    "select id, name, type, height, width from stones"
   );
   return { stones, user };
 };

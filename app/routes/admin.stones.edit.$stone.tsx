@@ -33,6 +33,8 @@ import { csrf } from "~/utils/csrf.server";
 const stoneSchema = z.object({
   name: z.string().min(1),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
+  height: z.string().optional(),
+  width: z.string().optional(),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -68,13 +70,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     if (data.file && data.file !== "undefined") {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ?, url = ? WHERE id = ?`,
+        `UPDATE main.stones SET name = ?, type = ?, url = ?, height = ?, widht = ? WHERE id = ?`,
         [data.name, data.type, data.file, stoneId]
       );
     } else {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ? WHERE id = ?`,
-        [data.name, data.type, stoneId]
+        `UPDATE main.stones SET name = ?, type = ?, height = ?, widht = ? WHERE id = ?`,
+        [data.name, data.type, data.height, data.width, stoneId]
       );
     }
   } catch (error) {
@@ -98,15 +100,23 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   }
   const stoneId = parseInt(params.stone);
 
-  const stone = await selectId<{ name: string; type: string; url: string }>(
+  const stone = await selectId<{
+    name: string;
+    type: string;
+    url: string;
+    height: string;
+    width: string;
+  }>(
     db,
-    "select name, type, url from stones WHERE id = ?",
+    "select name, type, url, height, width from stones WHERE id = ?",
     stoneId
   );
   return {
     name: stone?.name,
     type: stone?.type,
     url: stone?.url,
+    height: stone?.height,
+    width: stone?.width,
   };
 };
 
@@ -173,6 +183,31 @@ export default function StonesEdit() {
             )}
           />
           <p>{url}</p>
+          <div className="flex">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <InputItem
+                  name={"Height"}
+                  placeholder={"Height of the stone"}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <InputItem
+                  name={"Width"}
+                  placeholder={"Width of the stone"}
+                  field={field}
+                />
+              )}
+            />
+          </div>
+
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
           </DialogFooter>
