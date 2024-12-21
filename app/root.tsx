@@ -52,7 +52,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     db,
     "SELECT id, name, is_done from todolist"
   );
-  console.log(todos);
 
   let user = null;
   if (activeSession) {
