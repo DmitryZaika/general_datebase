@@ -31,10 +31,16 @@ import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 
 const stoneSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  height: z.string().optional(),
-  width: z.string().optional(),
+  height: z
+    .string()
+    .optional()
+    .refine((val) => !val || !isNaN(Number(val)), "Height must be a number"),
+  width: z
+    .string()
+    .optional()
+    .refine((val) => !val || !isNaN(Number(val)), "Width must be a number"),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -70,12 +76,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     if (data.file && data.file !== "undefined") {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ?, url = ?, height = ?, widht = ? WHERE id = ?`,
-        [data.name, data.type, data.file, stoneId]
+        `UPDATE main.stones SET name = ?, type = ?, url = ?, height = ?, width = ? WHERE id = ?`,
+        [data.name, data.type, data.file, data.height, data.width, stoneId]
       );
     } else {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ?, height = ?, widht = ? WHERE id = ?`,
+        `UPDATE main.stones SET name = ?, type = ?, height = ?, width = ? WHERE id = ?`,
         [data.name, data.type, data.height, data.width, stoneId]
       );
     }
@@ -186,7 +192,7 @@ export default function StonesEdit() {
           <div className="flex">
             <FormField
               control={form.control}
-              name="name"
+              name="height"
               render={({ field }) => (
                 <InputItem
                   name={"Height"}
@@ -197,7 +203,7 @@ export default function StonesEdit() {
             />
             <FormField
               control={form.control}
-              name="name"
+              name="width"
               render={({ field }) => (
                 <InputItem
                   name={"Width"}
