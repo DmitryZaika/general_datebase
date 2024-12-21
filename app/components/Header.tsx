@@ -13,7 +13,7 @@ export function Header({
   isAdmin: boolean;
   isSuperUser: boolean;
   isEmployee: boolean;
-  todos: Todo;
+  todos: Todo[];
 }) {
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
