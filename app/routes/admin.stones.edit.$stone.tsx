@@ -33,14 +33,8 @@ import { csrf } from "~/utils/csrf.server";
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  height: z
-    .string()
-    .optional()
-    .refine((val) => !val || !isNaN(Number(val)), "Height must be a number"),
-  width: z
-    .string()
-    .optional()
-    .refine((val) => !val || !isNaN(Number(val)), "Width must be a number"),
+  height: z.number().optional(),
+  width: z.number().optional(),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {

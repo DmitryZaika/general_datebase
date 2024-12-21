@@ -7,13 +7,13 @@ export function Header({
   activeSession,
   isAdmin,
   isSuperUser,
-  todos,
-}: {
+}: // todos,
+{
   activeSession: string | null;
   isAdmin: boolean;
   isSuperUser: boolean;
   isEmployee: boolean;
-  todos: Todo[];
+  // todos: Todo[];
 }) {
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
@@ -89,7 +89,7 @@ export function Header({
           )}
         </ul>
       </nav>
-      <TodoList todos={todos} />
+      {/* <TodoList todos={todos} /> */}
       {activeSession && (
         <Link to="/logout">
           <Button>Logout</Button>

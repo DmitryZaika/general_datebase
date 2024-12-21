@@ -43,15 +43,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const activeSession = session.data.sessionId || null;
   const message: ToastMessage | null = session.get("message") || null;
 
-  try {
-    await getEmployeeUser(request);
-  } catch (error) {
-    return redirect(`/login?error=${error}`);
-  }
-  const todos = await selectMany<Todo>(
-    db,
-    "SELECT id, name, is_done from todolist"
-  );
+  // try {
+  //   await getEmployeeUser(request);
+  // } catch (error) {
+  //   return redirect(`/login?error=${error}`);
+  // }
+  // const todos = await selectMany<Todo>(
+  //   db,
+  //   "SELECT id, name, is_done from todolist"
+  // );
 
   let user = null;
   if (activeSession) {
@@ -59,7 +59,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   return json(
-    { message, activeSession, token, user, todos },
+    { message, activeSession, token, user /* todos */ },
 
     {
       headers: [
@@ -71,7 +71,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function App() {
-  const { message, activeSession, token, user, todos } =
+  const { message, activeSession, token, user /* todos*/ } =
     useLoaderData<typeof loader>();
   const { toast } = useToast();
 
@@ -96,7 +96,7 @@ export default function App() {
       <body>
         {activeSession && (
           <Header
-            todos={todos}
+            // todos={todos}
             activeSession={activeSession}
             isAdmin={user ? user.is_admin : false}
             isSuperUser={user ? user.is_superuser : false}
