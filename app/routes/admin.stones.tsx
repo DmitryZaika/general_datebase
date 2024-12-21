@@ -19,6 +19,8 @@ interface Stone {
   id: number;
   name: string;
   type: string;
+  height: string | null;
+  width: string | null;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -47,21 +49,25 @@ export default function Stones() {
         <TableCaption>A list of your recent stones.</TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead className="text-xl w-[200px]">Name of Stone</TableHead>{" "}
+            <TableHead className="text-xl w-[200px]">Name of Stone</TableHead>
             <TableHead className="text-xl">Type</TableHead>
+            <TableHead className="text-xl">Height</TableHead>
+            <TableHead className="text-xl">Width</TableHead>
             <TableHead className="text-xl text-right pr-4">
               Edit Stone
-            </TableHead>{" "}
+            </TableHead>
             <TableHead className="text-right text-xl">Delete Stone</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {stones.map((stone) => (
             <TableRow key={stone.id}>
-              <TableCell className=" font-medium w-[200px]">
+              <TableCell className="font-medium w-[200px]">
                 {stone.name}
-              </TableCell>{" "}
+              </TableCell>
               <TableCell>{stone.type}</TableCell>
+              <TableCell>{stone.height}</TableCell>
+              <TableCell>{stone.width}</TableCell>
               <TableCell className="text-right pr-4">
                 <Link to={`edit/${stone.id}`} className="text-xl">
                   Edit
@@ -77,11 +83,12 @@ export default function Stones() {
         </TableBody>
         <TableFooter>
           <TableRow>
-            <TableCell colSpan={3}>Total</TableCell>
+            <TableCell colSpan={5}>Total</TableCell>
             <TableCell className="text-right">$2,500.00</TableCell>
           </TableRow>
         </TableFooter>
       </Table>
+
       <Outlet />
     </>
   );
