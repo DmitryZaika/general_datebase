@@ -23,7 +23,9 @@ export function useCustomForm<TFieldValues extends FieldValues = FieldValues>(
   });
 }
 
-export function useCustomOptionalForm<TFieldValues extends FieldValues = FieldValues>(
+export function useCustomOptionalForm<
+  TFieldValues extends FieldValues = FieldValues
+>(
   schema: TFieldValues,
   defaultValues?: object
 ): UseFormReturn<z.infer<TFieldValues & typeof optionalFileSchema>> {
