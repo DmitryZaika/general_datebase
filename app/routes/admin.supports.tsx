@@ -44,7 +44,7 @@ export default function Supports() {
         <Button>Add</Button>
       </Link>
       <Table>
-        <TableCaption>A list of available supports.</TableCaption>
+        <TableCaption>A list of supports.</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[200px] text-xl">Support Name</TableHead>

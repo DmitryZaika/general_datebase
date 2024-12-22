@@ -46,7 +46,7 @@ export default function Stones() {
         <Button>Add Stone</Button>
       </Link>
       <Table>
-        <TableCaption>A list of your recent stones.</TableCaption>
+        <TableCaption>A list of stones.</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="text-xl w-[200px]">Name of Stone</TableHead>
@@ -81,14 +81,7 @@ export default function Stones() {
             </TableRow>
           ))}
         </TableBody>
-        <TableFooter>
-          <TableRow>
-            <TableCell colSpan={5}>Total</TableCell>
-            <TableCell className="text-right">$2,500.00</TableCell>
-          </TableRow>
-        </TableFooter>
       </Table>
-
       <Outlet />
     </>
   );

@@ -44,7 +44,7 @@ export default function AdminInstructions() {
         <Button>Add</Button>
       </Link>
       <Table>
-        <TableCaption>A list of your Instructions</TableCaption>
+        <TableCaption>A list of Instructions</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="text-xl w-[200px]">Title</TableHead>{" "}
