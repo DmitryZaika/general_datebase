@@ -1,5 +1,6 @@
 import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
+import { Document, Page, pdfjs } from "react-pdf";
 import {
   Accordion,
   AccordionItem,
@@ -17,6 +18,11 @@ interface Document {
   name: string;
   url: string | null;
 }
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
@@ -42,11 +48,9 @@ export default function Documents() {
             <AccordionContent>
               {documents.map((document) => (
                 <ModuleList key={document.id}>
-                  <Image
-                    src={document.url}
-                    alt={document.name}
-                    name={document.name}
-                  />
+                  <Document file={document.url}>
+                    <Page pageNumber={1} />
+                  </Document>
                 </ModuleList>
               ))}
             </AccordionContent>

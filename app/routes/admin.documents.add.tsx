@@ -79,6 +79,8 @@ export default function DocumentsAdd() {
   // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
   const form = useCustomForm(documentSchema);
+  console.log(form.formState.errors);
+  console.log(form.watch("file"));
 
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -110,8 +112,10 @@ export default function DocumentsAdd() {
             name="file"
             render={({ field }) => (
               <FileInput
+                label="Document"
                 inputName="documents"
                 id="document"
+                type="pdf"
                 onChange={field.onChange}
               />
             )}
