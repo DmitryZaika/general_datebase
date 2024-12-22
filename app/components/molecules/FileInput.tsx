@@ -6,6 +6,8 @@ import { Input } from "~/components/ui/input";
 type FileInput = {
   inputName?: string;
   id: string;
+  label?: string;
+  type: "image" | "pdf";
   onChange: (event: File | undefined) => void;
 };
 
@@ -20,10 +22,8 @@ function getQuality(size: number): number {
   return 1;
 }
 
-export function FileInput({ onChange, id }: FileInput) {
-  function compressImage(file: File | undefined) {
-    if (!file) return;
-
+export function FileInput({ onChange, id, label = "Image", type }: FileInput) {
+  function compressImage(file: File) {
     new Compressor(file, {
       quality: getQuality(file.size),
       success(result) {
@@ -40,12 +40,21 @@ export function FileInput({ onChange, id }: FileInput) {
     });
   }
 
+  function handleChange(file: File | undefined) {
+    if (!file) return;
+    if (type === "image") {
+      compressImage(file);
+    } else {
+      onChange(file);
+    }
+  }
+
   return (
     <FormItem>
-      <FormLabel>Image</FormLabel>
+      <FormLabel>{label}</FormLabel>
       <FormControl>
         <Input
-          onChange={(event) => compressImage(event.target.files?.[0])}
+          onChange={(event) => handleChange(event.target.files?.[0])}
           type="file"
           id={id}
         />
