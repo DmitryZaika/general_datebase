@@ -12,7 +12,7 @@ import {
   TableHead,
   TableCell,
 } from "~/components/ui/table";
-import { useLoaderData } from "@remix-run/react";
+import { Link, useLoaderData } from "@remix-run/react";
 import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
@@ -35,7 +35,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const suppliers = await selectMany<Supplier>(
     db,
-    "select id, manager, supplier_name, phone, email from suppliers"
+    "select id,website, supplier_name,  manager, phone, email from suppliers"
   );
   return { suppliers };
 };
