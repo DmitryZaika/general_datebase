@@ -49,7 +49,7 @@ export default function Suppliers() {
         <Button>Add</Button>
       </Link>
       <Table>
-        <TableCaption>A list of your recent invoices.</TableCaption>
+        <TableCaption>A list of suppliers.</TableCaption>
         <TableHeader>
           <TableRow className="text-xl">
             <TableHead className="w-[100px]">WebSite</TableHead>
@@ -87,12 +87,6 @@ export default function Suppliers() {
             </TableRow>
           ))}
         </TableBody>
-        <TableFooter>
-          <TableRow>
-            <TableCell colSpan={3}>Total</TableCell>
-            <TableCell className="text-right">$2,500.00</TableCell>
-          </TableRow>
-        </TableFooter>
       </Table>
       <Outlet />
     </>
