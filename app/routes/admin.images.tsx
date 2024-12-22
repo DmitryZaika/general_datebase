@@ -26,15 +26,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  try {
-    await csrf.validate(request);
-  } catch (error) {
-    return { error: "Invalid CSRF token" };
-  }
+
   const images = await selectMany<Image>(db, "select id, name from images");
-  return {
-    images,
-  };
+  return { images };
 };
 
 export default function Images() {

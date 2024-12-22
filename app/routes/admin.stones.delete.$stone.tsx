@@ -29,11 +29,11 @@ export async function action({ params, request }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  try {
-    await csrf.validate(request);
-  } catch (error) {
-    return { error: "Invalid CSRF token" };
-  }
+  // try {
+  //   await csrf.validate(request);
+  // } catch (error) {
+  //   return { error: "Invalid CSRF token" };
+  // }
   if (!params.stone) {
     return forceRedirectError(request.headers, "No document id provided");
   }
