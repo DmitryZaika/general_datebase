@@ -178,6 +178,7 @@ export default function StonesEdit() {
               <FileInput
                 inputName="stones"
                 id="image"
+                type="image"
                 onChange={field.onChange}
               />
             )}

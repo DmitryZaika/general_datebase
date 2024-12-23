@@ -150,6 +150,7 @@ export default function SinksEdit() {
                 inputName="sinks"
                 id="image"
                 onChange={field.onChange}
+                type="image"
               />
             )}
           />

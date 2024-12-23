@@ -137,6 +137,7 @@ export default function StonesAdd() {
             render={({ field }) => (
               <FileInput
                 inputName="stones"
+                type="image"
                 id="image"
                 onChange={field.onChange}
               />

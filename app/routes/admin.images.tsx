@@ -37,7 +37,7 @@ export default function Images() {
   return (
     <>
       <Link to={`add`} relative="path">
-        <Button>Add</Button>
+        <Button>Add Image</Button>
       </Link>
       <Table>
         <TableCaption>A list of available images.</TableCaption>

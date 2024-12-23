@@ -113,6 +113,7 @@ export default function SupportsAdd() {
                 inputName="supports"
                 id="image"
                 onChange={field.onChange}
+                type="image"
               />
             )}
           />

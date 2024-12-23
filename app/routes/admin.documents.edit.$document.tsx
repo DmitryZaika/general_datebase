@@ -153,6 +153,7 @@ export default function DocumentsEdit() {
                 inputName="documents"
                 id="document"
                 onChange={field.onChange}
+                type="pdf"
               />
             )}
           />

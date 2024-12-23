@@ -48,13 +48,13 @@ export default function Documents() {
         <AccordionContent>
           <Accordion type="multiple">
             <AccordionContent>
-              {documents.map((document) => (
-                <ModuleList key={document.id}>
-                  <Document file={document.url}>
+              <ModuleList>
+                {documents.map((document) => (
+                  <Document key={document.id} file={document.url}>
                     <Page pageNumber={1} />
                   </Document>
-                </ModuleList>
-              ))}
+                ))}
+              </ModuleList>
             </AccordionContent>
           </Accordion>
         </AccordionContent>
