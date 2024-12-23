@@ -46,7 +46,7 @@ export default function Suppliers() {
   return (
     <>
       <Link to={`add`} relative="path">
-        <Button>Add</Button>
+        <Button>Add Supplier</Button>
       </Link>
       <Table>
         <TableCaption>A list of suppliers.</TableCaption>
