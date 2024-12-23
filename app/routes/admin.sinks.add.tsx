@@ -112,6 +112,7 @@ export default function SinksAdd() {
                 inputName="sinks"
                 id="image"
                 onChange={field.onChange}
+                type="image"
               />
             )}
           />

@@ -150,6 +150,7 @@ export default function SupportsEdit() {
             name="file"
             render={({ field }) => (
               <FileInput
+                type="image"
                 inputName="supports"
                 id="image"
                 onChange={field.onChange}

@@ -112,6 +112,7 @@ export default function ImagesAdd() {
                 inputName="images"
                 id="image"
                 onChange={field.onChange}
+                type="image"
               />
             )}
           />

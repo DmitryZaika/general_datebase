@@ -147,6 +147,7 @@ export default function ImagesEdit() {
             name="file"
             render={({ field }) => (
               <FileInput
+                type="image"
                 inputName="images"
                 id="image"
                 onChange={field.onChange}
