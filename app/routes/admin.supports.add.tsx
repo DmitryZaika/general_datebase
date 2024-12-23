@@ -118,7 +118,7 @@ export default function SupportsAdd() {
             )}
           />
           <DialogFooter>
-            <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
+            <LoadingButton loading={isSubmitting}>Add Support</LoadingButton>
           </DialogFooter>
         </MultiPartForm>
       </DialogContent>

@@ -21,6 +21,7 @@ import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
+import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
@@ -89,6 +90,7 @@ export default function SupportsAdd() {
         </DialogHeader>
         <Form id="customerForm" method="post">
           <DialogFooter>
+            <AuthenticityTokenInput />
             <Button type="submit">Delete support</Button>
           </DialogFooter>
         </Form>

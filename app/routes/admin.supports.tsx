@@ -41,7 +41,7 @@ export default function Supports() {
   return (
     <>
       <Link to={`add`} relative="path">
-        <Button>Add</Button>
+        <Button>Add Support</Button>
       </Link>
       <Table>
         <TableCaption>A list of supports.</TableCaption>
