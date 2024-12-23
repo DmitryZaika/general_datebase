@@ -28,10 +28,13 @@ import { parseMutliForm } from "~/utils/parseMultiForm";
 import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { deleteFile } from "~/utils/s3.server";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 const stoneSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
+  height: z.number().optional(),
+  width: z.number().optional(),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -39,6 +42,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
   }
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
@@ -62,13 +70,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     if (data.file && data.file !== "undefined") {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ?, url = ? WHERE id = ?`,
-        [data.name, data.type, data.file, stoneId]
+        `UPDATE main.stones SET name = ?, type = ?, url = ?, height = ?, width = ? WHERE id = ?`,
+        [data.name, data.type, data.file, data.height, data.width, stoneId]
       );
     } else {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ? WHERE id = ?`,
-        [data.name, data.type, stoneId]
+        `UPDATE main.stones SET name = ?, type = ?, height = ?, width = ? WHERE id = ?`,
+        [data.name, data.type, data.height, data.width, stoneId]
       );
     }
   } catch (error) {
@@ -92,15 +100,23 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   }
   const stoneId = parseInt(params.stone);
 
-  const stone = await selectId<{ name: string; type: string; url: string }>(
+  const stone = await selectId<{
+    name: string;
+    type: string;
+    url: string;
+    height: string;
+    width: string;
+  }>(
     db,
-    "select name, type, url from stones WHERE id = ?",
+    "select name, type, url, height, width from stones WHERE id = ?",
     stoneId
   );
   return {
     name: stone?.name,
     type: stone?.type,
     url: stone?.url,
+    height: stone?.height,
+    width: stone?.width,
   };
 };
 
@@ -167,6 +183,31 @@ export default function StonesEdit() {
             )}
           />
           <p>{url}</p>
+          <div className="flex">
+            <FormField
+              control={form.control}
+              name="height"
+              render={({ field }) => (
+                <InputItem
+                  name={"Height"}
+                  placeholder={"Height of the stone"}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="width"
+              render={({ field }) => (
+                <InputItem
+                  name={"Width"}
+                  placeholder={"Width of the stone"}
+                  field={field}
+                />
+              )}
+            />
+          </div>
+
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
           </DialogFooter>

@@ -7,12 +7,13 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 interface Image {
   id: number;
@@ -25,10 +26,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+
   const images = await selectMany<Image>(db, "select id, name from images");
-  return {
-    images,
-  };
+  return { images };
 };
 
 export default function Images() {

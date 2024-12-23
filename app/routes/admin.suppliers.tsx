@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
@@ -35,9 +35,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "SELECT id, website, supplier_name, manager, phone, email, notes from suppliers"
   );
-  return json({
+  return {
     suppliers,
-  });
+  };
 };
 
 export default function Suppliers() {
@@ -49,7 +49,7 @@ export default function Suppliers() {
         <Button>Add</Button>
       </Link>
       <Table>
-        <TableCaption>A list of your recent invoices.</TableCaption>
+        <TableCaption>A list of suppliers.</TableCaption>
         <TableHeader>
           <TableRow className="text-xl">
             <TableHead className="w-[100px]">WebSite</TableHead>
@@ -87,12 +87,6 @@ export default function Suppliers() {
             </TableRow>
           ))}
         </TableBody>
-        <TableFooter>
-          <TableRow>
-            <TableCell colSpan={3}>Total</TableCell>
-            <TableCell className="text-right">$2,500.00</TableCell>
-          </TableRow>
-        </TableFooter>
       </Table>
       <Outlet />
     </>

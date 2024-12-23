@@ -1,7 +1,6 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -9,12 +8,11 @@ import {
   useNavigate,
   useNavigation,
   Form,
-  useSubmit,
   useLoaderData,
 } from "@remix-run/react";
 import { FormField, FormProvider } from "../components/ui/form";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
-
+import { ResultSetHeader } from "mysql2";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
 import {
@@ -58,11 +56,10 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: error.code };
+    return { error: "Invalid CSRF token" };
   }
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
@@ -76,11 +73,11 @@ export async function action({ request }: ActionFunctionArgs) {
   let parentId = data.parent_id || null;
   let afterId = data.after_id || null;
   try {
-    const result = await db.execute(
-      `INSERT INTO main.instructions (title, parent_id, after_id, rich_text) VALUES (?,  ?, ?, ?);`,
+    const [result] = await db.execute<ResultSetHeader>(
+      `INSERT INTO main.instructions (title, parent_id, after_id, rich_text) VALUES (?, ?, ?, ?)`,
       [data.title, parentId, afterId, data.rich_text]
     );
-    insertId = result[0].insertId;
+    insertId = result.insertId;
   } catch (error) {
     console.error("Db error: ", error, {
       title: data.title,
@@ -163,9 +160,8 @@ export default function InstructionsAdd() {
   const parent_id = cleanId(form.watch("parent_id") as unknown as string);
   const parentValues = parentOptions(instructions);
   const afterValues = afterOptions(parent_id, instructions);
-  console.log(parentValues);
 
-  const fullSubmit = useFullSubmit(form, token);
+  const fullSubmit = useFullSubmit(form);
 
   const handleChange = (open: boolean) => {
     if (open === false) {

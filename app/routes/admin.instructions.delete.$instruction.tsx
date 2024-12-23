@@ -20,12 +20,19 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
+import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
   }
   const instructionId = params.instruction;
   try {
@@ -84,6 +91,7 @@ export default function InstructionsDelete() {
         </DialogHeader>
         <Form id="customerForm" method="post">
           <DialogFooter>
+            <AuthenticityTokenInput />
             <Button type="submit">Delete Instruction</Button>
           </DialogFooter>
         </Form>

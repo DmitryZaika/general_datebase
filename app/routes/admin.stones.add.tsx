@@ -1,7 +1,6 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -26,10 +25,13 @@ import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 const stoneSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
+  height: z.coerce.number().optional(),
+  width: z.coerce.number().optional(),
 });
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -38,14 +40,19 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
+  }
   const { errors, data } = await parseMutliForm(request, stoneSchema, "stones");
   if (errors || !data) {
     return { errors };
   }
   try {
     await db.execute(
-      `INSERT INTO main.stones (name, type, url) VALUES (?, ?, ?);`,
-      [data.name, data.type, data.file]
+      `INSERT INTO main.stones (name, type, url, height, width) VALUES (?, ?, ?, ?, ?);`,
+      [data.name, data.type, data.file, data.height, data.width]
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -135,6 +142,31 @@ export default function StonesAdd() {
               />
             )}
           />
+          <div className="flex">
+            <FormField
+              control={form.control}
+              name="height"
+              render={({ field }) => (
+                <InputItem
+                  name={"Height"}
+                  placeholder={"Height of the stone"}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="width"
+              render={({ field }) => (
+                <InputItem
+                  name={"Width"}
+                  placeholder={"Width of the stone"}
+                  field={field}
+                />
+              )}
+            />
+          </div>
+
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
           </DialogFooter>

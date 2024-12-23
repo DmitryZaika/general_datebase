@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -28,6 +27,7 @@ import { parseMutliForm } from "~/utils/parseMultiForm";
 import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { deleteFile } from "~/utils/s3.server";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 const sinkSchema = z.object({
   name: z.string().min(1),
@@ -38,6 +38,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
   }
   if (!params.sink) {
     return forceRedirectError(request.headers, "No Sink id provided");
@@ -71,8 +76,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         sinkId,
       ]);
     }
-
-
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }

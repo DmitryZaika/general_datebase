@@ -24,14 +24,12 @@ export function afterOptions(
   parent_id: number | undefined,
   instructions: InstructionsBasic[]
 ): InstructionsReturn[] {
-  let values = parent_id
-    ? instructions
-        .filter((item) => item.parent_id === (parent_id || null))
-        .map((instruction) => ({
-          key: instruction.id,
-          value: instruction.title,
-        }))
-    : [];
+  let values = instructions
+    .filter((item) => item.parent_id === (parent_id || null))
+    .map((instruction) => ({
+      key: instruction.id,
+      value: instruction.title,
+    }));
   values.unshift({ key: 0, value: "First" });
   return values;
 }
