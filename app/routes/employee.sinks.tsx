@@ -37,11 +37,16 @@ export default function Sinks() {
         <AccordionContent>
           <Accordion type="multiple">
             <AccordionContent>
-              {sinks.map((sink) => (
-                <ModuleList key={sink.id}>
-                  <Image src={sink.url} alt={sink.name} name={sink.name} />
-                </ModuleList>
-              ))}
+              <ModuleList>
+                {sinks.map((sink) => (
+                  <Image
+                    key={sink.id}
+                    src={sink.url}
+                    alt={sink.name}
+                    name={sink.name}
+                  />
+                ))}
+              </ModuleList>
             </AccordionContent>
           </Accordion>
         </AccordionContent>

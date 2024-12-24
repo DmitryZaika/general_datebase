@@ -33,8 +33,9 @@ import { csrf } from "~/utils/csrf.server";
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  height: z.number().optional(),
-  width: z.number().optional(),
+  // height: z.coerce.number().optional(),
+  // width: z.coerce.number().optional(),
+  // amount: z.coerce.number().optional(),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -70,13 +71,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     if (data.file && data.file !== "undefined") {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ?, url = ?, height = ?, width = ? WHERE id = ?`,
-        [data.name, data.type, data.file, data.height, data.width, stoneId]
+        `UPDATE main.stones SET name = ?, type = ?, url = ? WHERE id = ?`,
+        [data.name, data.type, data.file, stoneId]
       );
     } else {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ?, height = ?, width = ? WHERE id = ?`,
-        [data.name, data.type, data.height, data.width, stoneId]
+        `UPDATE main.stones SET name = ?, type = ? WHERE id = ?`,
+        [data.name, data.type, stoneId]
       );
     }
   } catch (error) {
@@ -96,7 +97,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   if (!params.stone) {
-    return forceRedirectError(request.headers, "No image id provided");
+    return forceRedirectError(request.headers, "No stone id provided");
   }
   const stoneId = parseInt(params.stone);
 
@@ -104,19 +105,21 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     name: string;
     type: string;
     url: string;
-    height: string;
-    width: string;
+    // height: string;
+    // width: string;
+    // amount: string;
   }>(
     db,
-    "select name, type, url, height, width from stones WHERE id = ?",
+    "select name, type, url, height, width, amount from stones WHERE id = ?",
     stoneId
   );
   return {
     name: stone?.name,
     type: stone?.type,
     url: stone?.url,
-    height: stone?.height,
-    width: stone?.width,
+    // height: stone?.height,
+    // width: stone?.width,
+    // amount: stone?.amount,
   };
 };
 
@@ -184,7 +187,7 @@ export default function StonesEdit() {
             )}
           />
           <p>{url}</p>
-          <div className="flex">
+          {/* <div className="flex gap-2">
             <FormField
               control={form.control}
               name="height"
@@ -208,6 +211,17 @@ export default function StonesEdit() {
               )}
             />
           </div>
+          <FormField
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <InputItem
+                name={"Amount"}
+                placeholder={"Amount of the stone"}
+                field={field}
+              />
+            )}
+          /> */}
 
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>

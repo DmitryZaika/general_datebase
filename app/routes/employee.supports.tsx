@@ -41,15 +41,16 @@ export default function Supports() {
         <AccordionContent>
           <Accordion type="multiple">
             <AccordionContent>
-              {supports.map((support) => (
-                <ModuleList key={support.id}>
+              <ModuleList>
+                {supports.map((support) => (
                   <Image
+                    key={support.id}
                     src={support.url}
                     alt={support.name}
                     name={support.name}
                   />
-                </ModuleList>
-              ))}
+                ))}
+              </ModuleList>
             </AccordionContent>
           </Accordion>
         </AccordionContent>

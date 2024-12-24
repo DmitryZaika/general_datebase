@@ -26,14 +26,7 @@ export function Image({ className = "", src, name, alt }: ImageProps) {
           />
         </DialogTrigger>
         <DialogContent className="p-0 bg-transparent">
-          <DialogClose asChild>
-            <button
-              className="absolute top-4 right-4 text-white"
-              aria-label="Close"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </DialogClose>
+          <DialogClose asChild className="text-white"></DialogClose>
           <img
             src={src || "/path/to/placeholder.png"}
             alt={alt || name || "Image"}
