@@ -32,7 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const customers = await selectMany<Customer>(
     db,
-    "select id name, email, phone, address from customers"
+    "select id name, email, phone_number, address from customers"
   );
   return {
     customers,
