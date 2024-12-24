@@ -26,11 +26,10 @@ export function Image({ className = "", src, name, alt }: ImageProps) {
           />
         </DialogTrigger>
         <DialogContent className="p-0 bg-transparent">
-          <DialogClose asChild className="text-white"></DialogClose>
           <img
             src={src || "/path/to/placeholder.png"}
             alt={alt || name || "Image"}
-            className="w-auto h-auto max-w-full max-h-screen mx-auto my-auto"
+            className="w-full h-full max-w-full max-h-screen mx-auto my-auto"
             onClick={(e) => e.stopPropagation()}
           />
         </DialogContent>
