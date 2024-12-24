@@ -30,8 +30,9 @@ import { csrf } from "~/utils/csrf.server";
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  height: z.coerce.number().optional(),
-  width: z.coerce.number().optional(),
+  // height: z.coerce.number().optional(),
+  // width: z.coerce.number().optional(),
+  // amount: z.coerce.number().optional(),
 });
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -51,8 +52,8 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   try {
     await db.execute(
-      `INSERT INTO main.stones (name, type, url, height, width) VALUES (?, ?, ?, ?, ?);`,
-      [data.name, data.type, data.file, data.height, data.width]
+      `INSERT INTO main.stones (name, type, url, height, width, amount) VALUES (?, ?, ?, );`,
+      [data.name, data.type, data.file]
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -143,7 +144,7 @@ export default function StonesAdd() {
               />
             )}
           />
-          <div className="flex">
+          {/* <div className="flex gap-2">
             <FormField
               control={form.control}
               name="height"
@@ -167,6 +168,17 @@ export default function StonesAdd() {
               )}
             />
           </div>
+          <FormField
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <InputItem
+                name={"Amount"}
+                placeholder={"Amount of the stone"}
+                field={field}
+              />
+            )}
+          /> */}
 
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>

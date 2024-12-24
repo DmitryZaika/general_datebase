@@ -21,6 +21,7 @@ interface Stone {
   type: string;
   height: string | null;
   width: string | null;
+  amount: string | null;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -32,7 +33,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const stones = await selectMany<Stone>(
     db,
-    "select id, name, type, height, width from stones"
+    "select id, name, type, height, width, amount from stones"
   );
   return { stones, user };
 };
@@ -51,8 +52,9 @@ export default function Stones() {
           <TableRow>
             <TableHead className="text-xl w-[200px]">Name of Stone</TableHead>
             <TableHead className="text-xl">Type</TableHead>
-            <TableHead className="text-xl">Height</TableHead>
+            {/* <TableHead className="text-xl">Height</TableHead>
             <TableHead className="text-xl">Width</TableHead>
+            <TableHead className="text-xl">Amount</TableHead> */}
             <TableHead className="text-xl text-right pr-4">
               Edit Stone
             </TableHead>
@@ -66,8 +68,9 @@ export default function Stones() {
                 {stone.name}
               </TableCell>
               <TableCell>{stone.type}</TableCell>
-              <TableCell>{stone.height}</TableCell>
+              {/* <TableCell>{stone.height}</TableCell>
               <TableCell>{stone.width}</TableCell>
+              <TableCell>{stone.amount}</TableCell> */}
               <TableCell className="text-right pr-4">
                 <Link to={`edit/${stone.id}`} className="text-xl">
                   Edit

@@ -40,11 +40,16 @@ export default function Images() {
         <AccordionContent>
           <Accordion type="multiple">
             <AccordionContent>
-              {images.map((image) => (
-                <ModuleList key={image.id}>
-                  <Image src={image.url} alt={image.name} name={image.name} />
-                </ModuleList>
-              ))}
+              <ModuleList>
+                {images.map((image) => (
+                  <Image
+                    key={image.id}
+                    src={image.url}
+                    alt={image.name}
+                    name={image.name}
+                  />
+                ))}
+              </ModuleList>
             </AccordionContent>
           </Accordion>
         </AccordionContent>

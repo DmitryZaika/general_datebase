@@ -61,13 +61,12 @@ export default function Stones() {
                 <AccordionContent>
                   <ModuleList>
                     {stoneList[type].map((stone) => (
-                      <div key={stone.id} className=" font-bold items-center">
-                        <Image
-                          src={stone.url}
-                          alt={stone.name}
-                          name={stone.name}
-                        />
-                      </div>
+                      <Image
+                        key={stone.id}
+                        src={stone.url}
+                        alt={stone.name}
+                        name={stone.name}
+                      />
                     ))}
                   </ModuleList>
                 </AccordionContent>
