@@ -32,6 +32,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { SelectInput } from "~/components/molecules/SelectItem";
+import { QuillInput } from "~/components/molecules/QuillInput";
 import { selectMany } from "~/utils/queryHelpers";
 import {
   InstructionsBasic,
@@ -171,7 +172,7 @@ export default function InstructionsAdd() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="!max-w-[calc(100vw*0.75)] !max-h-[calc(100vh*0.75)] !h-[calc(100vh*0.75)]">
         <DialogHeader>
           <DialogTitle>Add instruction</DialogTitle>
         </DialogHeader>
@@ -217,15 +218,11 @@ export default function InstructionsAdd() {
               control={form.control}
               name="rich_text"
               render={({ field }) => (
-                <InputItem
-                  name={"Text"}
-                  placeholder={"Name of the instruction"}
-                  field={field}
-                />
+                <QuillInput name="Text" field={field} />
               )}
             />
 
-            <DialogFooter>
+            <DialogFooter className="relative bottom-4">
               <LoadingButton loading={isSubmitting}>
                 Add Instruciton
               </LoadingButton>
