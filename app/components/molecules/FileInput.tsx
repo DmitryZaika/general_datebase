@@ -11,6 +11,12 @@ type FileInput = {
   onChange: (event: File | undefined) => void;
 };
 
+const acceptsMap = {
+  image:
+    "image/png, image/jpeg, image/gif, image/webp, image/svg+xml, image/tiff, image/bmp, image/x-icon, image/heif, image/x-canon-cr2, image/x-nikon-nef",
+  pdf: "application/pdf",
+};
+
 function getQuality(size: number): number {
   const THREE_MB = 3 * 1024 * 1024;
   const FIVE_HUNDRED_KB = 500 * 1024;
@@ -56,6 +62,7 @@ export function FileInput({ onChange, id, label = "Image", type }: FileInput) {
         <Input
           onChange={(event) => handleChange(event.target.files?.[0])}
           type="file"
+          accept={acceptsMap[type]}
           id={id}
         />
       </FormControl>

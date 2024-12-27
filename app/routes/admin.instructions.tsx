@@ -41,7 +41,7 @@ export default function AdminInstructions() {
   return (
     <PageLayout title="Instructions">
       <Link to={`add`} relative="path">
-        <Button>Add</Button>
+        <Button>Add Instruction</Button>
       </Link>
       <Table>
         <TableCaption>A list of Instructions</TableCaption>

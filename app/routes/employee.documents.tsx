@@ -49,10 +49,20 @@ export default function Documents() {
           <Accordion type="multiple">
             <AccordionContent>
               <ModuleList>
-                {documents.map((document) => (
-                  <Document key={document.id} file={document.url}>
-                    <Page pageNumber={1} />
-                  </Document>
+                {documents.map(({ url, id, name }) => (
+                  <div className=" w-[100px] h-[1500px]">
+                    <Document
+                      key={id}
+                      file={url}
+                      className=""
+                      onClick={() => window.open(url || "")}
+                    >
+                      <Page pageNumber={1} scale={0.2} />
+                      <p className="text-center font-bold select-none">
+                        {name}
+                      </p>
+                    </Document>
+                  </div>
                 ))}
               </ModuleList>
             </AccordionContent>
