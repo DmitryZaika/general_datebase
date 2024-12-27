@@ -3,6 +3,7 @@ import { useChat, useInput } from "~/hooks/chat";
 import { ask, processChatResponse } from "~/utils/chat.client";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import { InstructionSlim } from "~/types";
 
 interface Message {
   role: "user" | "assistant";
@@ -77,7 +78,9 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   </div>
 );
 
-export const Chat: React.FC = () => {
+export const Chat: React.FC<{ instructions: InstructionSlim[] }> = ({
+  instructions,
+}) => {
   const { messages, addMessage } = useChat();
   const { input: question, handleInputChange, resetInput } = useInput();
 
@@ -98,7 +101,7 @@ export const Chat: React.FC = () => {
 
     const response = await ask({
       messages: [...messages, userMessage],
-      context: {}, //NEED TO PROVIDE CONTEXT
+      context: { instructions }, //NEED TO PROVIDE CONTEXT
     });
 
     if (!response) {

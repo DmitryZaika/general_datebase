@@ -11,15 +11,7 @@ import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
 import { getEmployeeUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
-
-interface Instruction {
-  id: number;
-  title: string | null;
-  parent_id: number | null;
-  after_id: number | null;
-  rich_text: string;
-  children?: Instruction[];
-}
+import { Instruction } from "~/types";
 
 interface InstructionNode {
   id: number;
@@ -71,7 +63,9 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
   } else {
     return (
       <div className="py-4">
-        <p className="text-black">{instruction.text}</p>
+        <p className="text-black overflow-auto break-words w-full">
+          {instruction.text}
+        </p>
         {instruction.children.length > 0 && (
           <div className="ml-5">
             {instruction.children.map((childInstruction) => (
