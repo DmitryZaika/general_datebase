@@ -121,7 +121,7 @@ export default function DocumentsAdd() {
             )}
           />
           <DialogFooter>
-            <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
+            <LoadingButton loading={isSubmitting}>Add Document</LoadingButton>
           </DialogFooter>
         </MultiPartForm>
       </DialogContent>
