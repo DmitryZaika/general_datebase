@@ -22,8 +22,7 @@ import { Chat } from "./components/organisms/Chat";
 import { getEmployeeUser, getUserBySessionId } from "./utils/session.server";
 import { selectMany } from "./utils/queryHelpers";
 import { db } from "~/db.server";
-import { Todo } from "~/types";
-
+import { Todo, InstructionSlim } from "~/types";
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
@@ -51,7 +50,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // const todos = await selectMany<Todo>(
   //   db,
   //   "SELECT id, name, is_done from todolist"
-  // );
+  // )
+  const instructions = await selectMany<InstructionSlim>(
+    db,
+    "SELECT id, title, rich_text from instructions"
+  );
 
   let user = null;
   if (activeSession) {
@@ -59,7 +62,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   return json(
-    { message, activeSession, token, user /* todos */ },
+    { message, activeSession, token, user, instructions /* todos */ },
 
     {
       headers: [
@@ -71,7 +74,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function App() {
-  const { message, activeSession, token, user /* todos*/ } =
+  const { message, activeSession, token, user, instructions /* todos*/ } =
     useLoaderData<typeof loader>();
   const { toast } = useToast();
 
@@ -116,7 +119,7 @@ export default function App() {
         <Scripts />
       </body>
 
-      <Chat />
+      <Chat instructions={instructions} />
     </html>
   );
 }
