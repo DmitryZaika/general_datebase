@@ -52,7 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   try {
     await db.execute(
-      `INSERT INTO main.stones (name, type, url, height, width, amount) VALUES (?, ?, ?, );`,
+      `INSERT INTO main.stones (name, type, url) VALUES (?, ?, ?);`,
       [data.name, data.type, data.file]
     );
   } catch (error) {

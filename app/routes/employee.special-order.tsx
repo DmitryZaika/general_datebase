@@ -78,7 +78,7 @@ export default function SpecialOrder() {
         />
       </div>
 
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center w-64 gap-3 mb-4">
         <label htmlFor="slabs" className="text-base">
           Slabs:
         </label>
@@ -90,7 +90,7 @@ export default function SpecialOrder() {
         >
           -
         </button>
-        <span id="slabs-amount" className="text-lg font-bold">
+        <span id="slabs-amount" className="text-lg w-3 font-bold">
           {slabs}
         </span>
         <button
