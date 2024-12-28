@@ -101,7 +101,7 @@ export const Chat: React.FC<{ instructions: InstructionSlim[] }> = ({
 
     const response = await ask({
       messages: [...messages, userMessage],
-      context: { instructions }, //NEED TO PROVIDE CONTEXT
+      context: { instructions },
     });
 
     if (!response) {
