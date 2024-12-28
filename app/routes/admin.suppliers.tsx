@@ -58,8 +58,8 @@ export default function Suppliers() {
             <TableHead>Phone Number</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Notes</TableHead>
-            <TableHead>Edit</TableHead>
-            <TableHead className="text-right">Delete</TableHead>
+            <TableHead>Edit Supplier</TableHead>
+            <TableHead className="text-right">Delete Supplier</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
