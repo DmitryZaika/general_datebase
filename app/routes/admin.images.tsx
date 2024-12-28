@@ -44,8 +44,8 @@ export default function Images() {
         <TableHeader>
           <TableRow className="text-xl">
             <TableHead className="w-[200px]">Image Name</TableHead>
-            <TableHead className="text-right ">Edit</TableHead>
-            <TableHead className="text-right ">Delete</TableHead>
+            <TableHead className="text-right ">Edit Image</TableHead>
+            <TableHead className="text-right ">Delete Image</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

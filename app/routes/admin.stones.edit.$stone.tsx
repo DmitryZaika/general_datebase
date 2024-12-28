@@ -186,7 +186,7 @@ export default function StonesEdit() {
               />
             )}
           />
-          <p>{url}</p>
+          <img src={url} alt={name} className="w-48 mt-4 mx-auto" />
           {/* <div className="flex gap-2">
             <FormField
               control={form.control}

@@ -157,7 +157,7 @@ export default function SupportsEdit() {
               />
             )}
           />
-          <p>{url}</p>
+          <img src={url} alt={name} className="w-48 mt-4 mx-auto" />
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Edit Support</LoadingButton>
           </DialogFooter>

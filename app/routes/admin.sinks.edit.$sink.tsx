@@ -154,7 +154,7 @@ export default function SinksEdit() {
               />
             )}
           />
-          <p>{url}</p>
+          <img src={url} alt={name} className="w-48 mt-4 mx-auto" />
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Edit Sink</LoadingButton>
           </DialogFooter>
