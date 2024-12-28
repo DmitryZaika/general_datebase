@@ -62,20 +62,23 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     return { error: "Invalid CSRF token" };
   }
-  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
+
+  const { errors, data } = await getValidatedFormData<FormData>(
     request,
     resolver
   );
   if (errors) {
-    return { errors, receivedValues };
+    return { errors };
   }
 
   let insertId: null | number = null;
-  let parentId = data.parent_id || null;
-  let afterId = data.after_id || null;
+  const parentId = data.parent_id || null;
+  const afterId = data.after_id || null;
+
   try {
     const [result] = await db.execute<ResultSetHeader>(
-      `INSERT INTO main.instructions (title, parent_id, after_id, rich_text) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO main.instructions (title, parent_id, after_id, rich_text)
+       VALUES (?, ?, ?, ?)`,
       [data.title, parentId, afterId, data.rich_text]
     );
     insertId = result.insertId;
@@ -90,13 +93,12 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const query = `UPDATE main.instructions
-SET after_id = ?
-WHERE 
-  (after_id = ? OR (after_id IS NULL AND ? IS NULL))
-  AND id != ?
-  AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL));`;
-
-    const result = await db.execute(query, [
+      SET after_id = ?
+      WHERE 
+        (after_id = ? OR (after_id IS NULL AND ? IS NULL))
+        AND id != ?
+        AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL));`;
+    await db.execute(query, [
       insertId,
       data.after_id,
       data.after_id,
@@ -109,7 +111,7 @@ WHERE
   }
 
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Stone added"));
+  session.flash("message", toastData("Success", "Instruction added"));
 
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
@@ -118,7 +120,7 @@ WHERE
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request);
+    await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -126,11 +128,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "SELECT id, parent_id, title FROM instructions"
   );
-
   if (!instructions) {
     return { instructions: [] };
   }
-
   return { instructions };
 };
 
@@ -143,7 +143,6 @@ function cleanId(value: string | undefined): number | undefined {
 
 export default function InstructionsAdd() {
   const navigate = useNavigate();
-  // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
   const token = useAuthenticityToken();
   const { instructions } = useLoaderData<typeof loader>();
@@ -165,27 +164,34 @@ export default function InstructionsAdd() {
   const fullSubmit = useFullSubmit(form);
 
   const handleChange = (open: boolean) => {
-    if (open === false) {
+    if (!open) {
       navigate("..");
     }
   };
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="!max-w-[calc(100vw*0.75)] !max-h-[calc(100vh*0.75)] !h-[calc(100vh*0.75)]">
+      <DialogContent
+        className="
+    !max-w-[calc(100vw*0.75)]
+    !max-h-[calc(100vh*0.75)]
+    overflow-y-auto
+  "
+      >
         <DialogHeader>
           <DialogTitle>Add instruction</DialogTitle>
         </DialogHeader>
 
         <FormProvider {...form}>
           <Form id="customerForm" method="post" onSubmit={fullSubmit}>
+            <input type="hidden" name="csrf" value={token} />
             <FormField
               control={form.control}
               name="title"
               render={({ field }) => (
                 <InputItem
-                  name={"Title"}
-                  placeholder={"Name of the instruction"}
+                  name="Title"
+                  placeholder="Name of the instruction"
                   field={field}
                 />
               )}
@@ -218,13 +224,13 @@ export default function InstructionsAdd() {
               control={form.control}
               name="rich_text"
               render={({ field }) => (
-                <QuillInput name="Text" field={field} />
+                <QuillInput className="min-h-28" name="Text" field={field} />
               )}
             />
 
-            <DialogFooter className="relative bottom-4">
+            <DialogFooter className="relative bottom-4 ">
               <LoadingButton loading={isSubmitting}>
-                Add Instruciton
+                Add Instruction
               </LoadingButton>
             </DialogFooter>
           </Form>
