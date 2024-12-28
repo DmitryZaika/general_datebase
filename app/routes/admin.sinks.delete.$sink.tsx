@@ -89,7 +89,9 @@ export default function SinksDelete() {
         <Form id="customerForm" method="post">
           <DialogFooter>
             <AuthenticityTokenInput />
-            <Button type="submit">Delete Sink</Button>
+            <Button autoFocus type="submit">
+              Delete Sink
+            </Button>
           </DialogFooter>
         </Form>
       </DialogContent>

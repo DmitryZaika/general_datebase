@@ -103,7 +103,9 @@ export default function SuppliersAdd() {
         <Form id="customerForm" method="post">
           <DialogFooter>
             <AuthenticityTokenInput />
-            <Button type="submit">Delete supplier</Button>
+            <Button autoFocus type="submit">
+              Delete supplier
+            </Button>
           </DialogFooter>
         </Form>
       </DialogContent>

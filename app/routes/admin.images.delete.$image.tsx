@@ -94,7 +94,9 @@ export default function ImagesAdd() {
         <Form id="customerForm" method="post">
           <DialogFooter>
             <AuthenticityTokenInput />
-            <Button type="submit">Delete image</Button>
+            <Button autoFocus type="submit">
+              Delete image
+            </Button>
           </DialogFooter>
         </Form>
       </DialogContent>

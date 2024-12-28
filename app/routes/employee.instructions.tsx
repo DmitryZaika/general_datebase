@@ -43,12 +43,12 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
   if (hasTitle) {
     return (
       <AccordionItem value={instruction.id.toString()}>
-        <AccordionTrigger className="font-medium text-xl underline underline-offset-4 py-4">
+        <AccordionTrigger className="py-4 underline underline-offset-4">
           {instruction.title}
         </AccordionTrigger>
         <AccordionContent>
           <div
-            className="text-black-500 pl-5"
+            className="prose max-w-none w-full"
             dangerouslySetInnerHTML={{ __html: instruction.text }}
           />
           {instruction.children.length > 0 && (
@@ -68,7 +68,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
     return (
       <div className="py-4">
         <div
-          className="text-black overflow-auto break-words w-full"
+          className="prose overflow-auto break-words w-full"
           dangerouslySetInnerHTML={{ __html: instruction.text }}
         />
         {instruction.children.length > 0 && (
@@ -98,6 +98,7 @@ function cleanData(instructions: Instruction[]): InstructionNode[] {
     });
   });
   const rootNodes: InstructionNode[] = [];
+
   const insertNodeInOrder = (
     nodes: InstructionNode[],
     node: InstructionNode
@@ -113,6 +114,7 @@ function cleanData(instructions: Instruction[]): InstructionNode[] {
       }
     }
   };
+
   instructions.forEach((item) => {
     const node = nodeMap.get(item.id)!;
     if (item.parent_id === null) {
@@ -128,12 +130,14 @@ function cleanData(instructions: Instruction[]): InstructionNode[] {
       }
     }
   });
+
   return rootNodes;
 }
 
 export default function Instructions() {
   const { instructions } = useLoaderData<typeof loader>();
   const finalInstructions = cleanData(instructions);
+
   return (
     <PageLayout title="Instructions">
       <Accordion type="multiple">

@@ -90,9 +90,16 @@ export default function InstructionsDelete() {
           </DialogDescription>
         </DialogHeader>
         <Form id="customerForm" method="post">
+          <input
+            type="text"
+            name="_hidden_focus_trick"
+            className="absolute left-[-9999px]"
+          />
           <DialogFooter>
             <AuthenticityTokenInput />
-            <Button type="submit">Delete Instruction</Button>
+            <Button type="submit" autoFocus>
+              Delete Instruction
+            </Button>
           </DialogFooter>
         </Form>
       </DialogContent>

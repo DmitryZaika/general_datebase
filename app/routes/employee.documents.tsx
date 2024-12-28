@@ -50,7 +50,7 @@ export default function Documents() {
             <AccordionContent>
               <ModuleList>
                 {documents.map(({ url, id, name }) => (
-                  <div className=" w-[100px] h-[1500px]">
+                  <div className=" w-[50px] h-[1500px]">
                     <Document
                       key={id}
                       file={url}
