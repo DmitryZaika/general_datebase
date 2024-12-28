@@ -7,6 +7,7 @@ export function QuillInput({
 }: {
   name: string;
   field: object;
+  className?: string;
 }) {
   return (
     <FormItem>
