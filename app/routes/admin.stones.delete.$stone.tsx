@@ -102,7 +102,9 @@ export default function StonesAdd() {
         <Form id="customerForm" method="post">
           <DialogFooter>
             <AuthenticityTokenInput />
-            <Button type="submit">Delete Stone</Button>
+            <Button type="submit" autoFocus>
+              Delete Stone
+            </Button>
           </DialogFooter>
         </Form>
       </DialogContent>

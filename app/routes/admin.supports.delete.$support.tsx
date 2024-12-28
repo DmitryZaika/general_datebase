@@ -91,7 +91,9 @@ export default function SupportsAdd() {
         <Form id="customerForm" method="post">
           <DialogFooter>
             <AuthenticityTokenInput />
-            <Button type="submit">Delete support</Button>
+            <Button autoFocus type="submit">
+              Delete support
+            </Button>
           </DialogFooter>
         </Form>
       </DialogContent>

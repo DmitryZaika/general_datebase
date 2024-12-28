@@ -89,7 +89,9 @@ export default function DocumentsAdd() {
         <Form id="customerForm" method="post">
           <DialogFooter>
             <AuthenticityTokenInput />
-            <Button type="submit">Delete document</Button>
+            <Button autoFocus type="submit">
+              Delete document
+            </Button>
           </DialogFooter>
         </Form>
       </DialogContent>

@@ -28,6 +28,7 @@ import { getAdminUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { afterOptions, parentOptions } from "~/utils/instructionsHelpers";
+import { QuillInput } from "~/components/molecules/QuillInput";
 
 const instructionSchema = z.object({
   title: z.string().min(1),
@@ -164,7 +165,13 @@ export default function InstructionsEdit() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent
+        className="
+    !max-w-[calc(100vw*0.75)]
+    !max-h-[calc(100vh*0.75)]
+    overflow-y-auto
+  "
+      >
         <DialogHeader>
           <DialogTitle>Edit Instruction</DialogTitle>
         </DialogHeader>
@@ -205,11 +212,7 @@ export default function InstructionsEdit() {
               control={form.control}
               name="rich_text"
               render={({ field }) => (
-                <InputItem
-                  name={"Text"}
-                  placeholder={"Name of the instruction"}
-                  field={field}
-                />
+                <QuillInput className="min-h-28" name="Text" field={field} />
               )}
             />
 
