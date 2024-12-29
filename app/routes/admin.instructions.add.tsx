@@ -41,7 +41,7 @@ import {
 } from "~/utils/instructionsHelpers";
 
 const instructionschema = z.object({
-  title: z.string(),
+  title: z.string().min(1),
   parent_id: z.coerce.number(),
   after_id: z.coerce.number(),
   rich_text: z.string(),
@@ -173,8 +173,8 @@ export default function InstructionsAdd() {
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent
         className="
-    !max-w-[calc(100vw*0.75)]
-    !max-h-[calc(100vh*0.75)]
+    !max-w-[calc(100vw*0.90)]
+    !max-h-[calc(100vh*0.90)]
     overflow-y-auto
   "
       >

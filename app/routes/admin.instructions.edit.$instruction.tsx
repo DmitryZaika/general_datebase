@@ -167,8 +167,8 @@ export default function InstructionsEdit() {
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent
         className="
-    !max-w-[calc(100vw*0.75)]
-    !max-h-[calc(100vh*0.75)]
+    !max-w-[calc(100vw*0.90)]
+    !max-h-[calc(100vh*0.90)]
     overflow-y-auto
   "
       >
