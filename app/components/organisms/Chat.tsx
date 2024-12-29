@@ -4,6 +4,7 @@ import { ask, processChatResponse } from "~/utils/chat.client";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { InstructionSlim } from "~/types";
+import { reminders, help } from "~/lib/instructions";
 
 interface Message {
   role: "user" | "assistant";
@@ -98,10 +99,9 @@ export const Chat: React.FC<{ instructions: InstructionSlim[] }> = ({
     resetInput();
 
     setIsThinking(true);
-
     const response = await ask({
       messages: [...messages, userMessage],
-      context: { instructions },
+      context: { instructions, help, reminders },
     });
 
     if (!response) {
