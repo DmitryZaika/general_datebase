@@ -17,12 +17,14 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   placeholder,
   disabled,
   options,
+  className,
 }: {
   name: string;
   placeholder?: string;
   field: ControllerRenderProps<TFieldValues>;
   disabled?: boolean;
   options: string[] | Option[];
+  className?: string;
 }) {
   const cleanOptions: Option[] = (options as (string | Option)[]).map(
     (option) =>
@@ -38,7 +40,7 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   }
 
   return (
-    <FormItem>
+    <FormItem className={className}>
       <FormLabel>{name}</FormLabel>
       <FormControl>
         <Select {...field} onValueChange={field.onChange} disabled={disabled}>
