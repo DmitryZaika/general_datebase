@@ -184,30 +184,33 @@ export default function InstructionsEdit() {
                 <InputItem name={"Title"} placeholder={"Title"} field={field} />
               )}
             />
-            <FormField
-              control={form.control}
-              name="parent_id"
-              render={({ field }) => (
-                <SelectInput
-                  field={field}
-                  disabled={true}
-                  name="Parent"
-                  options={parentValues}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="after_id"
-              render={({ field }) => (
-                <SelectInput
-                  field={field}
-                  name="After"
-                  disabled={true}
-                  options={afterValues}
-                />
-              )}
-            />
+            <div className="flex">
+              <FormField
+                control={form.control}
+                name="parent_id"
+                render={({ field }) => (
+                  <SelectInput
+                    field={field}
+                    disabled={true}
+                    name="Parent"
+                    options={parentValues}
+                  />
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="after_id"
+                render={({ field }) => (
+                  <SelectInput
+                    className="ml-2"
+                    field={field}
+                    name="After"
+                    disabled={true}
+                    options={afterValues}
+                  />
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="rich_text"
