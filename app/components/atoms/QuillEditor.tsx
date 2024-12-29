@@ -1,14 +1,14 @@
-import { useEffect } from 'react';
-import { useQuill } from 'react-quilljs';
+import { useEffect } from "react";
+import { useQuill } from "react-quilljs";
 
-import 'quill/dist/quill.snow.css';
+import "quill/dist/quill.snow.css";
 
 interface IQuillEditorProps {
   value: string;
   onChange: (value: string) => void;
 }
 
-export function QuillEditor({value, onChange}: IQuillEditorProps) {
+export function QuillEditor({ value, onChange }: IQuillEditorProps) {
   const { quill, quillRef } = useQuill();
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export function QuillEditor({value, onChange}: IQuillEditorProps) {
 
   useEffect(() => {
     if (quill) {
-      quill.on('text-change', (delta, oldDelta, source) => {
+      quill.on("text-change", (delta, oldDelta, source) => {
         /*
         console.log(quill.getText());
         console.log(quill.getContents());
@@ -32,8 +32,8 @@ export function QuillEditor({value, onChange}: IQuillEditorProps) {
   }, [quill]);
 
   return (
-    <div>
+    <div className="h-64">
       <div ref={quillRef} />
     </div>
   );
-};
+}

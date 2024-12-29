@@ -175,6 +175,7 @@ export default function InstructionsAdd() {
         className="
     !max-w-[calc(100vw*0.90)]
     !max-h-[calc(100vh*0.90)]
+    h-[calc(100vh*.90)]
     overflow-y-auto
   "
       >
@@ -196,39 +197,42 @@ export default function InstructionsAdd() {
                 />
               )}
             />
-            <FormField
-              control={form.control}
-              name="parent_id"
-              render={({ field }) => (
-                <SelectInput
-                  field={field}
-                  disabled={parentValues.length === 0}
-                  name="Parent"
-                  options={parentValues}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="after_id"
-              render={({ field }) => (
-                <SelectInput
-                  field={field}
-                  name="After"
-                  disabled={afterValues.length === 0}
-                  options={afterValues}
-                />
-              )}
-            />
+            <div className="flex">
+              <FormField
+                control={form.control}
+                name="parent_id"
+                render={({ field }) => (
+                  <SelectInput
+                    field={field}
+                    disabled={parentValues.length === 0}
+                    name="Parent"
+                    options={parentValues}
+                  />
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="after_id"
+                render={({ field }) => (
+                  <SelectInput
+                    field={field}
+                    name="After"
+                    className="ml-2"
+                    disabled={afterValues.length === 0}
+                    options={afterValues}
+                  />
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="rich_text"
               render={({ field }) => (
-                <QuillInput className="min-h-28" name="Text" field={field} />
+                <QuillInput className="mb-24" name="Text" field={field} />
               )}
             />
 
-            <DialogFooter className="relative bottom-4 ">
+            <DialogFooter className="sticky bottom-0 p-0">
               <LoadingButton loading={isSubmitting}>
                 Add Instruction
               </LoadingButton>
