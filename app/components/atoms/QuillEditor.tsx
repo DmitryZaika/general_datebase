@@ -20,12 +20,6 @@ export function QuillEditor({ value, onChange }: IQuillEditorProps) {
   useEffect(() => {
     if (quill) {
       quill.on("text-change", (delta, oldDelta, source) => {
-        /*
-        console.log(quill.getText());
-        console.log(quill.getContents());
-        console.log(quill.root.innerHTML);
-        console.log(quillRef.current.firstChild.innerHTML);
-         */
         onChange(quill.root.innerHTML);
       });
     }

@@ -21,12 +21,6 @@ export function Header({
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
 
-  const handleSearch = (query: string) => {
-    // Логика обработки поиска, например, логирование или аналитика
-    console.log("Header получил запрос поиска:", query);
-    // Переадресация осуществляется в SearchBar через navigate
-  };
-
   return (
     <header className="flex flex-col relative md:flex-row items-center justify-between p-4 gap-4 m-3 md:gap-5">
       <div className="logo">
