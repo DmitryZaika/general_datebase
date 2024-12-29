@@ -11,6 +11,7 @@ import { selectMany } from "~/utils/queryHelpers";
 import { getEmployeeUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
 import { Instruction } from "~/types";
+import "~/styles/instructions.css";
 
 interface InstructionNode {
   id: number;
@@ -48,7 +49,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
         </AccordionTrigger>
         <AccordionContent>
           <div
-            className="prose max-w-none w-full"
+            className="prose max-w-none w-full instructions"
             dangerouslySetInnerHTML={{ __html: instruction.text }}
           />
           {instruction.children.length > 0 && (

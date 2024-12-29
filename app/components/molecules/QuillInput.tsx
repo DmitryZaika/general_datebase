@@ -4,13 +4,14 @@ import { QuillEditor } from "../atoms/QuillEditor";
 export function QuillInput({
   name,
   field,
+  className,
 }: {
   name: string;
-  field: object;
+  field: object & { onChange: (value: string) => void; value: string };
   className?: string;
 }) {
   return (
-    <FormItem>
+    <FormItem className={className}>
       <FormLabel>{name}</FormLabel>
       <FormControl>
         <QuillEditor {...field} />
