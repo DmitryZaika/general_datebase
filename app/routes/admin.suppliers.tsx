@@ -58,7 +58,7 @@ export default function Suppliers() {
             <TableHead>Phone Number</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Notes</TableHead>
-            <TableHead>Edit Supplier</TableHead>
+            <TableHead className="text-right text-xl">Edit Supplier</TableHead>
             <TableHead className="text-right">Delete Supplier</TableHead>
           </TableRow>
         </TableHeader>
@@ -74,7 +74,7 @@ export default function Suppliers() {
               <TableCell className="font-medium">{supplier.email}</TableCell>
               <TableCell className="font-medium">{supplier.notes}</TableCell>
               <TableCell>
-                <Link to={`edit/${supplier.id}`} className="text-xl">
+                <Link to={`edit/${supplier.id}`} className="text-xl text-right">
                   Edit
                 </Link>
               </TableCell>

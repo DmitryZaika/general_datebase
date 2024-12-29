@@ -88,6 +88,18 @@ export function Header({
               </Button>
             </li>
           )}
+          {/* {isAdminPage && (
+            <li>
+              <Button asChild variant="link">
+                <Link
+                  to="/admin/ai-instructions"
+                  className="text-lg md:text-xl"
+                >
+                  AI Instructions
+                </Link>
+              </Button>
+            </li>
+          )} */}
           {/* {!isAdminPage && (
             <li>
               <Button asChild variant="link">
