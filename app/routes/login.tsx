@@ -4,7 +4,6 @@ import {
   redirect,
 } from "@remix-run/node";
 import { z } from "zod";
-import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { Form, FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { getValidatedFormData } from "remix-hook-form";
@@ -13,7 +12,7 @@ import { csrf } from "~/utils/csrf.server";
 import { login } from "~/utils/session.server";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
-import { useLoaderData } from "@remix-run/react";
+import { useActionData, useLoaderData } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { commitSession, getSession } from "~/sessions";
 import { PasswordInput } from "~/components/molecules/PasswordInput";
@@ -65,9 +64,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Login() {
   const { error } = useLoaderData<typeof loader>();
+  const data = useActionData<typeof action>();
+  console.log(error);
 
   const form = useForm<FormData>({
     resolver,
+    defaultValues: { email: "", password: "" },
   });
   const fullSubmit = useFullSubmit(form);
 
@@ -80,7 +82,7 @@ export default function Login() {
           method="post"
           onSubmit={fullSubmit}
         >
-          <p className="text-red-500">{error}</p>
+          <p className="text-red-500">{error || data?.error || ""}</p>
           <FormField
             control={form.control}
             name="email"
