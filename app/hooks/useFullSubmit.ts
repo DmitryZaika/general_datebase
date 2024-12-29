@@ -1,11 +1,12 @@
 import { useSubmit } from "@remix-run/react";
 import { UseFormReturn, FieldValues } from "react-hook-form";
+import { useAuthenticityToken } from "remix-utils/csrf/react";
 
 export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
-  form: UseFormReturn<TFieldValues>,
-  token: string
+  form: UseFormReturn<TFieldValues>
 ) {
   const submit = useSubmit();
+  const token = useAuthenticityToken();
 
   // Функция для очистки данных: заменяет undefined на null
   const cleanData = (data: object) => {

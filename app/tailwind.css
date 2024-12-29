@@ -1,3 +1,18 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .highlight {
+    animation: highlight-animation 2s forwards;
+  }
+
+  @keyframes highlight-animation {
+    from {
+      background-color: yellow;
+    }
+    to {
+      background-color: transparent;
+    }
+  }
+}

@@ -5,7 +5,7 @@ import {
   AccordionContent,
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "@remix-run/react";
@@ -30,9 +30,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, name, type, url from stones"
   );
-  return json({
+  return {
     stones,
-  });
+  };
 };
 
 export default function Stones() {
@@ -61,13 +61,12 @@ export default function Stones() {
                 <AccordionContent>
                   <ModuleList>
                     {stoneList[type].map((stone) => (
-                      <div key={stone.id} className=" font-bold items-center">
-                        <Image
-                          src={stone.url}
-                          alt={stone.name}
-                          name={stone.name}
-                        />
-                      </div>
+                      <Image
+                        key={stone.id}
+                        src={stone.url}
+                        alt={stone.name}
+                        name={stone.name}
+                      />
                     ))}
                   </ModuleList>
                 </AccordionContent>

@@ -28,10 +28,14 @@ import { parseMutliForm } from "~/utils/parseMultiForm";
 import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { deleteFile } from "~/utils/s3.server";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 const stoneSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
+  // height: z.coerce.number().optional(),
+  // width: z.coerce.number().optional(),
+  // amount: z.coerce.number().optional(),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -39,6 +43,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
   }
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
@@ -88,19 +97,29 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   if (!params.stone) {
-    return forceRedirectError(request.headers, "No image id provided");
+    return forceRedirectError(request.headers, "No stone id provided");
   }
   const stoneId = parseInt(params.stone);
 
-  const stone = await selectId<{ name: string; type: string; url: string }>(
+  const stone = await selectId<{
+    name: string;
+    type: string;
+    url: string;
+    // height: string;
+    // width: string;
+    // amount: string;
+  }>(
     db,
-    "select name, type, url from stones WHERE id = ?",
+    "select name, type, url, height, width, amount from stones WHERE id = ?",
     stoneId
   );
   return {
     name: stone?.name,
     type: stone?.type,
     url: stone?.url,
+    // height: stone?.height,
+    // width: stone?.width,
+    // amount: stone?.amount,
   };
 };
 
@@ -162,11 +181,48 @@ export default function StonesEdit() {
               <FileInput
                 inputName="stones"
                 id="image"
+                type="image"
                 onChange={field.onChange}
               />
             )}
           />
-          <p>{url}</p>
+          <img src={url} alt={name} className="w-48 mt-4 mx-auto" />
+          {/* <div className="flex gap-2">
+            <FormField
+              control={form.control}
+              name="height"
+              render={({ field }) => (
+                <InputItem
+                  name={"Height"}
+                  placeholder={"Height of the stone"}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="width"
+              render={({ field }) => (
+                <InputItem
+                  name={"Width"}
+                  placeholder={"Width of the stone"}
+                  field={field}
+                />
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <InputItem
+                name={"Amount"}
+                placeholder={"Amount of the stone"}
+                field={field}
+              />
+            )}
+          /> */}
+
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
           </DialogFooter>

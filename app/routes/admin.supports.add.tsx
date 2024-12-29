@@ -1,7 +1,6 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -25,6 +24,7 @@ import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 const supportSchema = z.object({
   name: z.string().min(1),
@@ -36,13 +36,18 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
+  }
   const { errors, data } = await parseMutliForm(
     request,
     supportSchema,
     "supports"
   );
   if (errors || !data) {
-    return json({ errors });
+    return { errors };
   }
 
   try {
@@ -54,7 +59,7 @@ export async function action({ request }: ActionFunctionArgs) {
     console.error("Error connecting to the database: ", error);
   }
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Stone added"));
+  session.flash("message", toastData("Success", "Support added"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
@@ -63,7 +68,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
-    return json({ user });
+    return { user };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -71,7 +76,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function SupportsAdd() {
   const navigate = useNavigate();
-  // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
 
   const form = useCustomForm(supportSchema);
@@ -109,11 +113,12 @@ export default function SupportsAdd() {
                 inputName="supports"
                 id="image"
                 onChange={field.onChange}
+                type="image"
               />
             )}
           />
           <DialogFooter>
-            <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
+            <LoadingButton loading={isSubmitting}>Add Support</LoadingButton>
           </DialogFooter>
         </MultiPartForm>
       </DialogContent>

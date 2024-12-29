@@ -1,7 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -26,12 +25,15 @@ import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
 import { selectId, selectMany } from "~/utils/queryHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { SelectInput } from "~/components/molecules/SelectItem";
+import { afterOptions, parentOptions } from "~/utils/instructionsHelpers";
+import { QuillInput } from "~/components/molecules/QuillInput";
 
 const instructionSchema = z.object({
-  id: z.coerce.number().positive(),
   title: z.string().min(1),
-  parent_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
-  after_id: z.union([z.coerce.number().positive(), z.null()]).optional(),
+  parent_id: z.coerce.number(),
+  after_id: z.coerce.number(),
   rich_text: z.string().min(1),
 });
 
@@ -45,11 +47,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: error.code };
+    return { error: "Invalid CSRF token" };
   }
 
   if (!params.instruction) {
@@ -138,19 +139,23 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 export default function InstructionsEdit() {
   const navigate = useNavigate();
-  const submit = useSubmit();
   const { title, parent_id, after_id, rich_text } =
     useLoaderData<typeof loader>();
   const token = useAuthenticityToken();
+  const { instructions } = useLoaderData<typeof loader>();
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
       title,
-      parent_id,
-      after_id,
+      parent_id: parent_id || 0,
+      after_id: after_id || 0,
       rich_text,
     },
   });
+
+  const parentValues = parentOptions(instructions);
+  const afterValues = afterOptions(parent_id, instructions);
+  const fullSubmit = useFullSubmit(form);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -160,25 +165,18 @@ export default function InstructionsEdit() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent
+        className="
+    !max-w-[calc(100vw*0.90)]
+    !max-h-[calc(100vh*0.90)]
+    overflow-y-auto
+  "
+      >
         <DialogHeader>
           <DialogTitle>Edit Instruction</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form
-            id="customerForm"
-            method="post"
-            onSubmit={form.handleSubmit(
-              (data) => {
-                data["csrf"] = token;
-                submit(data, {
-                  method: "post",
-                  encType: "multipart/form-data",
-                });
-              },
-              (errors) => console.log(errors)
-            )}
-          >
+          <Form id="customerForm" method="post" onSubmit={fullSubmit}>
             <FormField
               control={form.control}
               name="title"
@@ -186,37 +184,38 @@ export default function InstructionsEdit() {
                 <InputItem name={"Title"} placeholder={"Title"} field={field} />
               )}
             />
-            <FormField
-              control={form.control}
-              name="parent_id"
-              render={({ field }) => (
-                <InputItem
-                  name={"Parent"}
-                  placeholder={"Parent"}
-                  field={field}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="after_id"
-              render={({ field }) => (
-                <InputItem
-                  name={"after_id"}
-                  placeholder={"Order"}
-                  field={field}
-                />
-              )}
-            />
+            <div className="flex">
+              <FormField
+                control={form.control}
+                name="parent_id"
+                render={({ field }) => (
+                  <SelectInput
+                    field={field}
+                    disabled={true}
+                    name="Parent"
+                    options={parentValues}
+                  />
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="after_id"
+                render={({ field }) => (
+                  <SelectInput
+                    className="ml-2"
+                    field={field}
+                    name="After"
+                    disabled={true}
+                    options={afterValues}
+                  />
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="rich_text"
               render={({ field }) => (
-                <InputItem
-                  name={"Text"}
-                  placeholder={"Your Text"}
-                  field={field}
-                />
+                <QuillInput className="min-h-28" name="Text" field={field} />
               )}
             />
 

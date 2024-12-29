@@ -1,11 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
-import { useSubmit, Form, useNavigate, useLoaderData } from "@remix-run/react";
+import { Form, useNavigate, useLoaderData } from "@remix-run/react";
 import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
@@ -19,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
@@ -26,6 +26,7 @@ import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
 import { selectId } from "~/utils/queryHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
 
 const supplierschema = z.object({
   website: z.string().url(),
@@ -49,7 +50,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: error.code };
+    return { error: "Invalid CSRF token" };
   }
   if (!params.supplier) {
     return forceRedirectError(request.headers, "No supplier id provided");
@@ -131,21 +132,21 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export default function SuppliersAdd() {
   const navigate = useNavigate();
-  const submit = useSubmit();
   const { website, supplier_name, manager, email, phone, notes } =
     useLoaderData<typeof loader>();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
-      website,
-      supplier_name,
-      manager,
-      phone,
-      email,
-      notes,
+      website: website || "",
+      supplier_name: supplier_name || "",
+      manager: manager || "",
+      phone: phone || "",
+      email: email || "",
+      notes: notes || "",
     },
   });
+  const fullSubmit = useFullSubmit(form);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -160,20 +161,7 @@ export default function SuppliersAdd() {
           <DialogTitle>Add supplier</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form
-            id="customerForm"
-            method="post"
-            onSubmit={form.handleSubmit(
-              (data) => {
-                data["csrf"] = token;
-                submit(data, {
-                  method: "post",
-                  encType: "multipart/form-data",
-                });
-              },
-              (errors) => console.log(errors)
-            )}
-          >
+          <Form id="customerForm" method="post" onSubmit={fullSubmit}>
             <FormField
               control={form.control}
               name="website"

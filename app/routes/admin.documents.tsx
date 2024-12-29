@@ -40,7 +40,7 @@ export default function Documents() {
   return (
     <>
       <Link to={`add`} relative="path">
-        <Button>Add</Button>
+        <Button>Add Document</Button>
       </Link>
       <Table>
         <TableCaption>A list of available documents.</TableCaption>

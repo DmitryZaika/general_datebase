@@ -3,11 +3,11 @@ import { useForm, UseFormReturn, FieldValues } from "react-hook-form";
 import { z } from "zod";
 
 const fileSchema = z.object({
-  file: z.instanceof(Blob),
+  file: z.instanceof(File),
 });
 
 const optionalFileSchema = z.object({
-  file: z.instanceof(Blob).optional(),
+  file: z.instanceof(File).optional(),
 });
 
 export function useCustomForm<TFieldValues extends FieldValues = FieldValues>(
@@ -23,7 +23,9 @@ export function useCustomForm<TFieldValues extends FieldValues = FieldValues>(
   });
 }
 
-export function useCustomOptionalForm<TFieldValues extends FieldValues = FieldValues>(
+export function useCustomOptionalForm<
+  TFieldValues extends FieldValues = FieldValues
+>(
   schema: TFieldValues,
   defaultValues?: object
 ): UseFormReturn<z.infer<TFieldValues & typeof optionalFileSchema>> {

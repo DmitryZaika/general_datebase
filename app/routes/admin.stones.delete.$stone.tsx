@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -22,12 +21,19 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
+import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
   }
   if (!params.stone) {
     return forceRedirectError(request.headers, "No document id provided");
@@ -95,7 +101,10 @@ export default function StonesAdd() {
         </DialogHeader>
         <Form id="customerForm" method="post">
           <DialogFooter>
-            <Button type="submit">Delete Stone</Button>
+            <AuthenticityTokenInput />
+            <Button type="submit" autoFocus>
+              Delete Stone
+            </Button>
           </DialogFooter>
         </Form>
       </DialogContent>

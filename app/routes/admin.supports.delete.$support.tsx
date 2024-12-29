@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -21,12 +20,19 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
+import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
   }
   const supportId = params.support;
   try {
@@ -84,7 +90,10 @@ export default function SupportsAdd() {
         </DialogHeader>
         <Form id="customerForm" method="post">
           <DialogFooter>
-            <Button type="submit">Delete support</Button>
+            <AuthenticityTokenInput />
+            <Button autoFocus type="submit">
+              Delete support
+            </Button>
           </DialogFooter>
         </Form>
       </DialogContent>
