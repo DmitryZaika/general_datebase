@@ -1,4 +1,4 @@
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import {
   Accordion,
@@ -25,7 +25,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   const sinks = await selectMany<Sink>(db, "select id, name, url from sinks");
-  return json({ sinks });
+  return { sinks };
 };
 
 export default function Sinks() {
@@ -37,11 +37,16 @@ export default function Sinks() {
         <AccordionContent>
           <Accordion type="multiple">
             <AccordionContent>
-              {sinks.map((sink) => (
-                <ModuleList key={sink.id}>
-                  <Image src={sink.url} alt={sink.name} name={sink.name} />
-                </ModuleList>
-              ))}
+              <ModuleList>
+                {sinks.map((sink) => (
+                  <Image
+                    key={sink.id}
+                    src={sink.url}
+                    alt={sink.name}
+                    name={sink.name}
+                  />
+                ))}
+              </ModuleList>
             </AccordionContent>
           </Accordion>
         </AccordionContent>

@@ -1,4 +1,4 @@
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import { ActionFunctionArgs, redirect } from "@remix-run/node";
 import { getSession, commitSession } from "~/sessions";
 import { z } from "zod";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
@@ -10,7 +10,6 @@ import { csrf } from "~/utils/csrf.server";
 import { getSuperUser, register } from "~/utils/session.server";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
-import { useSubmit } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 
@@ -30,7 +29,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: error.code };
+    return { error: "Invalid CSRF token" };
   }
 
   const {
@@ -41,7 +40,6 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors) {
     return { errors, defaultValues };
   }
-
 
   try {
     const value = await register(data.email, data.password);
@@ -57,20 +55,15 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Login() {
-
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
   });
-  const fullSubmit = useFullSubmit(form, token);
+  const fullSubmit = useFullSubmit(form);
 
   return (
     <FormProvider {...form}>
-      <Form
-        id="customerForm"
-        method="post"
-        onSubmit={fullSubmit}
-      >
+      <Form id="customerForm" method="post" onSubmit={fullSubmit}>
         <FormField
           control={form.control}
           name="email"

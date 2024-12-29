@@ -1,7 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -29,10 +28,10 @@ import { getAdminUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 
 const supplierschema = z.object({
-  website: z.string().url(),
+  website: z.union([z.string().url().optional(), z.literal("")]),
   supplier_name: z.string().min(1),
   manager: z.string().optional(),
-  phone: z.union([z.coerce.string().min(10), z.literal("")]),
+  phone: z.union([z.coerce.string().min(10), z.literal("")]).optional(),
   email: z.union([z.string().email().optional(), z.literal("")]),
   notes: z.string().optional(),
 });
@@ -50,7 +49,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: error.code };
+    return { error: "Invalid CSRF token" };
   }
 
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
@@ -106,7 +105,7 @@ export default function SuppliersAdd() {
       notes: "",
     },
   });
-  const fullSubmit = useFullSubmit(form, token);
+  const fullSubmit = useFullSubmit(form);
 
   const handleChange = (open: boolean) => {
     if (open === false) {

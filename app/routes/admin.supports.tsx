@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
@@ -30,9 +30,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, name from supports"
   );
-  return json({
+  return {
     supports,
-  });
+  };
 };
 
 export default function Supports() {
@@ -41,10 +41,10 @@ export default function Supports() {
   return (
     <>
       <Link to={`add`} relative="path">
-        <Button>Add</Button>
+        <Button>Add Support</Button>
       </Link>
       <Table>
-        <TableCaption>A list of available supports.</TableCaption>
+        <TableCaption>A list of supports.</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[200px] text-xl">Support Name</TableHead>
@@ -71,12 +71,6 @@ export default function Supports() {
             </TableRow>
           ))}
         </TableBody>
-        <TableFooter>
-          <TableRow>
-            <TableCell colSpan={2}>Total</TableCell>
-            <TableCell className="text-right">$2,500.00</TableCell>
-          </TableRow>
-        </TableFooter>
       </Table>
       <Outlet />
     </>

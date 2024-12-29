@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -21,6 +20,8 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
+import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
@@ -28,19 +29,24 @@ export async function action({ params, request }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (!params.stone) {
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
+  }
+  if (!params.supplier) {
     return forceRedirectError(request.headers, "No document id provided");
   }
-  const supplierId = parseInt(params.stone);
+  const supplierId = parseInt(params.supplier);
   if (!supplierId) {
-    return json({ error: "Invalid supplier ID" }, { status: 400 });
+    return { supplier_name: undefined };
   }
 
   try {
     await db.execute(`DELETE FROM main.suppliers WHERE id = ?`, [supplierId]);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
-    return json({ error: "Failed to delete supplier" }, { status: 500 });
+    return { error: "Failed to delete supplier" };
   }
 
   const session = await getSession(request.headers.get("Cookie"));
@@ -96,7 +102,10 @@ export default function SuppliersAdd() {
         </DialogHeader>
         <Form id="customerForm" method="post">
           <DialogFooter>
-            <Button type="submit">Delete supplier</Button>
+            <AuthenticityTokenInput />
+            <Button autoFocus type="submit">
+              Delete supplier
+            </Button>
           </DialogFooter>
         </Form>
       </DialogContent>

@@ -7,12 +7,13 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 interface Image {
   id: number;
@@ -25,10 +26,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+
   const images = await selectMany<Image>(db, "select id, name from images");
-  return {
-    images,
-  };
+  return { images };
 };
 
 export default function Images() {
@@ -37,15 +37,15 @@ export default function Images() {
   return (
     <>
       <Link to={`add`} relative="path">
-        <Button>Add</Button>
+        <Button>Add Image</Button>
       </Link>
       <Table>
         <TableCaption>A list of available images.</TableCaption>
         <TableHeader>
           <TableRow className="text-xl">
             <TableHead className="w-[200px]">Image Name</TableHead>
-            <TableHead className="text-right ">Edit</TableHead>
-            <TableHead className="text-right ">Delete</TableHead>
+            <TableHead className="text-right ">Edit Image</TableHead>
+            <TableHead className="text-right ">Delete Image</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

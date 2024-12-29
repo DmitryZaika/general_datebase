@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -28,6 +27,7 @@ import { parseMutliForm } from "~/utils/parseMultiForm";
 import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { deleteFile } from "~/utils/s3.server";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
 
 const documentSchema = z.object({
   name: z.string().min(1),
@@ -38,6 +38,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
     await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
   }
   if (!params.document) {
     return forceRedirectError(request.headers, "No document id provided");
@@ -91,7 +96,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   if (!params.document) {
-    return forceRedirectError(request.headers, "No image id provided");
+    return forceRedirectError(request.headers, "No document id provided");
   }
   const documentId = parseInt(params.document);
 
@@ -148,10 +153,11 @@ export default function DocumentsEdit() {
                 inputName="documents"
                 id="document"
                 onChange={field.onChange}
+                type="pdf"
               />
             )}
           />
-          <p>{url}</p>
+          <p> {url}</p>
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Edit Document</LoadingButton>
           </DialogFooter>

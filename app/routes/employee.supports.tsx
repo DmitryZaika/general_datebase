@@ -1,4 +1,4 @@
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import {
   Accordion,
@@ -29,7 +29,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, name, url from supports"
   );
-  return json({ supports });
+  return { supports };
 };
 
 export default function Supports() {
@@ -41,15 +41,16 @@ export default function Supports() {
         <AccordionContent>
           <Accordion type="multiple">
             <AccordionContent>
-              {supports.map((support) => (
-                <ModuleList key={support.id}>
+              <ModuleList>
+                {supports.map((support) => (
                   <Image
+                    key={support.id}
                     src={support.url}
                     alt={support.name}
                     name={support.name}
                   />
-                </ModuleList>
-              ))}
+                ))}
+              </ModuleList>
             </AccordionContent>
           </Accordion>
         </AccordionContent>

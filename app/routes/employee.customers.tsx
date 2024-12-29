@@ -1,137 +1,93 @@
-import { ActionFunctionArgs, json } from "@remix-run/node";
-import { Form, useActionData, useSubmit } from "@remix-run/react";
-import { PageLayout } from "~/components/PageLayout";
-import { z } from "zod";
-import { db } from "~/db.server";
-import { Button } from "~/components/ui/button";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { getValidatedFormData } from "remix-hook-form";
-import { useForm } from "react-hook-form";
 import {
-  FormProvider,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "../components/ui/form";
-import { Input } from "../components/ui/input";
-import { InputItem } from "~/components/molecules/InputItem";
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "~/components/ui/table";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { selectMany } from "~/utils/queryHelpers";
+import { db } from "~/db.server";
+import { useLoaderData, Outlet, Link } from "@remix-run/react";
+import { Button } from "~/components/ui/button";
+import { getEmployeeUser } from "~/utils/session.server";
+import { PageLayout } from "~/components/PageLayout";
 
-const customerSchema = z.object({
-  name: z.string().min(5),
-  email: z.string().email().optional(),
-  phoneNumber: z.string().min(10).optional(),
-  address: z.string().min(10).optional(),
-});
-
-type FormData = z.infer<typeof customerSchema>;
-
-const resolver = zodResolver(customerSchema);
-
-export async function action({ request }: ActionFunctionArgs) {
-  const {
-    errors,
-    data,
-    receivedValues: defaultValues,
-  } = await getValidatedFormData<FormData>(request, resolver);
-  if (errors) {
-    return { errors, defaultValues };
-  }
-
-  try {
-    await db.execute(
-      `INSERT INTO main.customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
-      [data.name, data.email, data.phoneNumber, data.address]
-    );
-  } catch (error) {
-    console.error("Error connecting to the database: ", error);
-  }
-  return { success: true };
+interface Customer {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
 }
 
-export default function Customer() {
-  const actionData = useActionData<typeof action>();
-  const submit = useSubmit();
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    await getEmployeeUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
+  const customers = await selectMany<Customer>(
+    db,
+    "select id name, email, phone_number, address from customers"
+  );
+  return {
+    customers,
+  };
+};
 
-  const form = useForm<FormData>({
-    resolver,
-  });
+export default function AdminCustomers() {
+  const { customers } = useLoaderData<typeof loader>();
 
   return (
-    <PageLayout
-      className="bg-white p-5 rounded-lg shadow-[0px_-0px_5px_rgba(0,0,0,0.15)]  max-w-lg mx-auto my-5"
-      title="Customers
-    "
-    >
-      <h2 id="formTitle" className="text-xl mb-4 text-gray-800">
-        Add New Customer
-      </h2>
-      {actionData?.success && <h3>Success</h3>}
-      <FormProvider {...form}>
-        <Form
-          id="customerForm"
-          method="post"
-          onSubmit={form.handleSubmit(
-            (data) => {
-              submit(data, { method: "post", encType: "multipart/form-data" });
-            },
-            (errors) => console.log(errors)
-          )}
-        >
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <InputItem
-                name={"Name"}
-                placeholder={"Your name"}
-                field={field}
-              />
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input placeholder="Your Email" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="phoneNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Phone number</FormLabel>
-                <FormControl>
-                  <Input placeholder="Your phone number" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="address"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Address</FormLabel>
-                <FormControl>
-                  <Input placeholder="Your address" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <Button type="submit">Submit</Button>
-        </Form>
-      </FormProvider>
+    <PageLayout title="Customers List">
+      <Link to={`add`} relative="path">
+        <Button>Add new customer</Button>
+      </Link>
+      <Table>
+        <TableCaption>A list of your recent customers.</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-xl w-[200px]">
+              Name of customer
+            </TableHead>{" "}
+            <TableHead className="text-xl">Phone Number</TableHead>
+            <TableHead className="text-xl pr-4">Email</TableHead>{" "}
+            <TableHead className="text-xl">Address</TableHead>
+            <TableHead className="text-right text-xl">Edit Customer</TableHead>
+            <TableHead className="text-right text-xl">
+              Delete customer
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {customers.map((customer) => (
+            <TableRow key={customer.id}>
+              <TableCell className=" font-medium w-[200px]">
+                {customer.name}
+              </TableCell>{" "}
+              <TableCell>{customer.phone}</TableCell>
+              <TableCell>{customer.email}</TableCell>
+              <TableCell>{customer.address}</TableCell>
+              <TableCell className="text-right pr-4">
+                <Link to={`edit/${customer.id}`} className="text-xl">
+                  Edit
+                </Link>
+              </TableCell>
+              <TableCell className="text-right w-[200px]">
+                <Link to={`delete/${customer.id}`} className="text-xl">
+                  Delete
+                </Link>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+        <TableFooter></TableFooter>
+      </Table>
+      <Outlet />
     </PageLayout>
   );
 }

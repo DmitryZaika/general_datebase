@@ -1,11 +1,9 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
 import { z } from "zod";
-import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { Form, FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { getValidatedFormData } from "remix-hook-form";
@@ -14,10 +12,11 @@ import { csrf } from "~/utils/csrf.server";
 import { login } from "~/utils/session.server";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
-import { useLoaderData, useSubmit } from "@remix-run/react";
+import { useActionData, useLoaderData } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { commitSession, getSession } from "~/sessions";
 import { PasswordInput } from "~/components/molecules/PasswordInput";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
 
 const userSchema = z.object({
   email: z.string().email(),
@@ -30,7 +29,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: error.code };
+    return { error: "Invalid CSRF token" };
   }
 
   const {
@@ -64,12 +63,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function Login() {
-  const submit = useSubmit();
   const { error } = useLoaderData<typeof loader>();
-  const token = useAuthenticityToken();
+  const data = useActionData<typeof action>();
+  console.log(error);
+
   const form = useForm<FormData>({
     resolver,
+    defaultValues: { email: "", password: "" },
   });
+  const fullSubmit = useFullSubmit(form);
 
   return (
     <div className="flex justify-center p-20">
@@ -78,18 +80,9 @@ export default function Login() {
           className="w-full max-w-sm bg-white p-6 shadow-md rounded"
           id="customerForm"
           method="post"
-          onSubmit={form.handleSubmit(
-            (data) => {
-              data["csrf"] = token;
-              submit(data, {
-                method: "post",
-                encType: "multipart/form-data",
-              });
-            },
-            (errors) => console.log(errors)
-          )}
+          onSubmit={fullSubmit}
         >
-          <p className="text-red-500">{error}</p>
+          <p className="text-red-500">{error || data?.error || ""}</p>
           <FormField
             control={form.control}
             name="email"

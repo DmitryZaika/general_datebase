@@ -6,36 +6,50 @@ import { Input } from "~/components/ui/input";
 type FileInput = {
   inputName?: string;
   id: string;
-  onChange: (event: Blob | undefined) => void;
+  label?: string;
+  type: "image" | "pdf";
+  onChange: (event: File | undefined) => void;
 };
 
-export function FileInput({ onChange, id }: FileInput) {
-  function compressImage(file: File | undefined) {
+const acceptsMap = {
+  image:
+    "image/png, image/jpeg, image/gif, image/webp, image/svg+xml, image/tiff, image/bmp, image/x-icon, image/heif, image/x-canon-cr2, image/x-nikon-nef",
+  pdf: "application/pdf",
+};
+
+function getQuality(size: number): number {
+  const THREE_MB = 3 * 1024 * 1024;
+  const FIVE_HUNDRED_KB = 500 * 1024;
+  if (size > THREE_MB) {
+    return 0.2;
+  } else if (size > FIVE_HUNDRED_KB) {
+    return 0.3;
+  }
+  return 1;
+}
+
+export function FileInput({ onChange, id, label = "Image", type }: FileInput) {
+  function compressImage(file: File) {
+    new Compressor(file, {
+      quality: getQuality(file.size),
+      success(result) {
+        if (result instanceof File) {
+          onChange(result);
+        } else {
+          const tempFile = new File([result], "temp.jpg");
+          onChange(tempFile);
+        }
+      },
+      error(err) {
+        console.error(err.message);
+      },
+    });
+  }
+
+  function handleChange(file: File | undefined) {
     if (!file) return;
-
-    const THREE_MB = 3 * 1024 * 1024;
-    const FIVE_HUNDRED_KB = 500 * 1024;
-
-    if (file.size > THREE_MB) {
-      new Compressor(file, {
-        quality: 0.2,
-        success(result) {
-          onChange(result);
-        },
-        error(err) {
-          console.error(err.message);
-        },
-      });
-    } else if (file.size > FIVE_HUNDRED_KB) {
-      new Compressor(file, {
-        quality: 0.3,
-        success(result) {
-          onChange(result);
-        },
-        error(err) {
-          console.error(err.message);
-        },
-      });
+    if (type === "image") {
+      compressImage(file);
     } else {
       onChange(file);
     }
@@ -43,11 +57,12 @@ export function FileInput({ onChange, id }: FileInput) {
 
   return (
     <FormItem>
-      <FormLabel>Image</FormLabel>
+      <FormLabel>{label}</FormLabel>
       <FormControl>
         <Input
-          onChange={(event) => compressImage(event.target.files?.[0])}
+          onChange={(event) => handleChange(event.target.files?.[0])}
           type="file"
+          accept={acceptsMap[type]}
           id={id}
         />
       </FormControl>

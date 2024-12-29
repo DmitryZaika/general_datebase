@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { json, redirect, LoaderFunctionArgs } from "@remix-run/node";
+import { redirect, LoaderFunctionArgs } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "@remix-run/react";
@@ -19,6 +19,9 @@ interface Stone {
   id: number;
   name: string;
   type: string;
+  height: string | null;
+  width: string | null;
+  amount: string | null;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -30,7 +33,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const stones = await selectMany<Stone>(
     db,
-    "select id, name, type from stones"
+    "select id, name, type, height, width, amount from stones"
   );
   return { stones, user };
 };
@@ -41,27 +44,33 @@ export default function Stones() {
   return (
     <>
       <Link to={`add`} relative="path">
-        <Button>Add</Button>
+        <Button>Add Stone</Button>
       </Link>
       <Table>
-        <TableCaption>A list of your recent stones.</TableCaption>
+        <TableCaption>A list of stones.</TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead className="text-xl w-[200px]">Name of Stone</TableHead>{" "}
+            <TableHead className="text-xl w-[200px]">Name of Stone</TableHead>
             <TableHead className="text-xl">Type</TableHead>
+            {/* <TableHead className="text-xl">Height</TableHead>
+            <TableHead className="text-xl">Width</TableHead>
+            <TableHead className="text-xl">Amount</TableHead> */}
             <TableHead className="text-xl text-right pr-4">
               Edit Stone
-            </TableHead>{" "}
+            </TableHead>
             <TableHead className="text-right text-xl">Delete Stone</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {stones.map((stone) => (
             <TableRow key={stone.id}>
-              <TableCell className=" font-medium w-[200px]">
+              <TableCell className="font-medium w-[200px]">
                 {stone.name}
-              </TableCell>{" "}
+              </TableCell>
               <TableCell>{stone.type}</TableCell>
+              {/* <TableCell>{stone.height}</TableCell>
+              <TableCell>{stone.width}</TableCell>
+              <TableCell>{stone.amount}</TableCell> */}
               <TableCell className="text-right pr-4">
                 <Link to={`edit/${stone.id}`} className="text-xl">
                   Edit
@@ -75,12 +84,6 @@ export default function Stones() {
             </TableRow>
           ))}
         </TableBody>
-        <TableFooter>
-          <TableRow>
-            <TableCell colSpan={3}>Total</TableCell>
-            <TableCell className="text-right">$2,500.00</TableCell>
-          </TableRow>
-        </TableFooter>
       </Table>
       <Outlet />
     </>

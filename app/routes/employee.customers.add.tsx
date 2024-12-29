@@ -1,11 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
-import { useSubmit, Form, useNavigate } from "@remix-run/react";
+import { Form, useNavigate } from "@remix-run/react";
 import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
@@ -22,14 +21,16 @@ import {
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
-import { getAdminUser } from "~/utils/session.server";
+import { getAdminUser, getEmployeeUser } from "~/utils/session.server";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
 
 const customerSchema = z.object({
   name: z.string().min(1),
-  email: z.string().email(),
-  phone: z.string().min(10),
-  address: z.string().min(10),
+  email: z.string().email().optional(),
+  phone: z.union([z.coerce.string().min(10), z.literal("")]),
+  address: z.string().min(10).optional(),
 });
 
 type FormData = z.infer<typeof customerSchema>;
@@ -38,17 +39,14 @@ const resolver = zodResolver(customerSchema);
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    await getAdminUser(request);
+    await getEmployeeUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
   try {
     await csrf.validate(request);
   } catch (error) {
-    if (error instanceof Error) {
-      return { error: (error as any).code };
-    }
-    return { error: "Unknown error" };
+    return { error: "Invalid CSRF token" };
   }
   
   const { errors, data } = await getValidatedFormData<FormData>(
@@ -56,7 +54,7 @@ export async function action({ request }: ActionFunctionArgs) {
     resolver
   );
   if (errors) {
-    return json({ errors }, { status: 400 });
+    return { errors };
   }
 
   try {
@@ -66,7 +64,7 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
-    return json({ error: "Database error" }, { status: 500 });
+    return { error: "Database error" };
   }
 
   const session = await getSession(request.headers.get("Cookie"));
@@ -78,8 +76,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request);
-    return json({ user });
+    const user = await getEmployeeUser(request);
+    return { user };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -87,11 +85,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function CustomersAdd() {
   const navigate = useNavigate();
-  const submit = useSubmit();
+  const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
   });
-
+  const fullSubmit = useFullSubmit(form);
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
@@ -105,19 +103,7 @@ export default function CustomersAdd() {
           <DialogTitle>Add Customer</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form
-            id="customerForm"
-            method="post"
-            onSubmit={form.handleSubmit(
-              (data) => {
-                submit(data, {
-                  method: "post",
-                  encType: "multipart/form-data",
-                });
-              },
-              (errors) => console.log(errors)
-            )}
-          >
+          <Form id="customerForm" method="post" onSubmit={fullSubmit}>
             <FormField
               control={form.control}
               name="name"

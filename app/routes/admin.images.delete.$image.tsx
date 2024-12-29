@@ -1,6 +1,5 @@
 import {
   ActionFunctionArgs,
-  json,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
@@ -21,6 +20,8 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { csrf } from "~/utils/csrf.server";
+import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
@@ -28,9 +29,14 @@ export async function action({ params, request }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
+  }
   const imageId = params.image ? parseInt(params.image, 10) : null;
   if (!imageId) {
-    return json({ error: "Invalid image ID" }, { status: 400 });
+    return { error: "Invalid image ID" };
   }
   try {
     const result = await db.execute(`DELETE FROM main.images WHERE id = ?`, [
@@ -87,7 +93,10 @@ export default function ImagesAdd() {
         </DialogHeader>
         <Form id="customerForm" method="post">
           <DialogFooter>
-            <Button type="submit">Delete image</Button>
+            <AuthenticityTokenInput />
+            <Button autoFocus type="submit">
+              Delete image
+            </Button>
           </DialogFooter>
         </Form>
       </DialogContent>

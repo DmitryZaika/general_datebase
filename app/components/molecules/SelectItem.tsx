@@ -17,18 +17,21 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   placeholder,
   disabled,
   options,
+  className,
 }: {
   name: string;
   placeholder?: string;
   field: ControllerRenderProps<TFieldValues>;
   disabled?: boolean;
   options: string[] | Option[];
+  className?: string;
 }) {
-  const cleanOptions: Option[] =
-    typeof options[0] === "string"
-      ? options.map((option) => ({ key: option, value: option }))
-      : options;
-
+  const cleanOptions: Option[] = (options as (string | Option)[]).map(
+    (option) =>
+      typeof option === "string"
+        ? { key: option, value: option }
+        : { key: option.key, value: option.value }
+  );
   function cleanValue(value: string | number) {
     if (typeof value === "string") {
       return value.toLowerCase();
@@ -37,7 +40,7 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   }
 
   return (
-    <FormItem>
+    <FormItem className={className}>
       <FormLabel>{name}</FormLabel>
       <FormControl>
         <Select {...field} onValueChange={field.onChange} disabled={disabled}>
