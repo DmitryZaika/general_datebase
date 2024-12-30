@@ -1,6 +1,6 @@
-CREATE TABLE supports (
+CREATE TABLE company (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(100),
-    url VARCHAR(255),
+    name VARCHAR(100) NOT NULL,
+    address VARCHAR(255),
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
