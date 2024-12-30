@@ -19,9 +19,6 @@ interface Stone {
   id: number;
   name: string;
   type: string;
-  height: string | null;
-  width: string | null;
-  amount: string | null;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -33,7 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const stones = await selectMany<Stone>(
     db,
-    "select id, name, type, height, width, amount from stones"
+    "select id, name, type from stones"
   );
   return { stones, user };
 };
