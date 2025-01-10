@@ -1,0 +1,9 @@
+CREATE TABLE todolist (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    rich_text VARCHAR(255) NOT NULL,      
+    is_done BOOLEAN NOT NULL DEFAULT FALSE,
+    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    user_id INT NOT NULL,
+    CONSTRAINT fk_user
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
