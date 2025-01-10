@@ -59,10 +59,10 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors) {
     return { errors, receivedValues };
   }
-
+  let user = getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.suppliers  (website, supplier_name, manager,  phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO main.suppliers  (website, supplier_name, manager,  phone, email, notes, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         data.website,
         data.supplier_name,
@@ -70,6 +70,7 @@ export async function action({ request }: ActionFunctionArgs) {
         data.phone ?? null,
         data.email ?? null,
         data.notes ?? null,
+        (await user).company_id,
       ]
     );
   } catch (error) {

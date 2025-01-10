@@ -3,10 +3,11 @@ import { RowDataPacket } from "mysql2";
 
 export async function selectMany<T>(
   db: mysql.Pool,
-  query: string
+  query: string,
+  params: any[] = []
 ): Promise<T[]> {
   try {
-    const [rows] = await db.query<T[] & RowDataPacket[]>(query);
+    const [rows] = await db.query<T[] & RowDataPacket[]>(query, params);
     return rows;
   } catch (error) {
     console.error("Error connecting to the database: ", error);

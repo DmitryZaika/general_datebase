@@ -26,9 +26,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const user = await getAdminUser(request);
   const supports = await selectMany<Support>(
     db,
-    "select id, name from supports"
+    "select id, name from supports WHERE company_id = ?",
+    [user.company_id]
   );
   return {
     supports,
