@@ -46,15 +46,15 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors };
   }
 
+  let user = getAdminUser(request);
   try {
-    await db.execute(`INSERT INTO main.images (name, url) VALUES (?,  ?);`, [
-      data.name,
-      data.file,
-    ]);
+    await db.execute(
+      `INSERT INTO main.images (name, url, company_id) VALUES (?,  ?, ?);`,
+      [data.name, data.file, (await user).company_id]
+    );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
-
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Image added"));
 

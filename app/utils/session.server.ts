@@ -11,19 +11,23 @@ interface LoginUser {
 }
 
 export interface User {
+  id: number;
   email: string;
   name: string;
   is_employee: boolean;
   is_admin: boolean;
   is_superuser: boolean;
+  company_id: number;
 }
 
 interface SessionUser {
+  id: number;
   email: string;
   name: string;
   is_employee: boolean;
   is_admin: boolean;
   is_superuser: boolean;
+  company_id: number;
 }
 
 function getExpirationDate(expiration: number): string {
@@ -68,7 +72,7 @@ export async function login(
 
 async function getUser(sessionId: string): Promise<SessionUser | undefined> {
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
-    `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser FROM users
+    `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser, users.company_id FROM users
      JOIN sessions ON sessions.user_id = users.id
      WHERE sessions.id = ?
        AND sessions.expiration_date > CURRENT_TIMESTAMP

@@ -41,6 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     return { error: "Invalid CSRF token" };
   }
+
   const { errors, data } = await parseMutliForm(
     request,
     documentSchema,
@@ -49,12 +50,12 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
-
+  let user = getAdminUser(request);
   try {
-    await db.execute(`INSERT INTO main.documents (name, url) VALUES (?,  ?);`, [
-      data.name,
-      data.file,
-    ]);
+    await db.execute(
+      `INSERT INTO main.documents (name, url, company_id) VALUES (?,  ?, ?);`,
+      [data.name, data.file, (await user).company_id]
+    );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
