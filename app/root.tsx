@@ -8,21 +8,33 @@ import {
   ScrollRestoration,
   useLoaderData,
 } from "@remix-run/react";
-import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
+import { z } from "zod";
+import type {
+  ActionFunctionArgs,
+  LinksFunction,
+  LoaderFunctionArgs,
+} from "@remix-run/node";
 import { Header } from "./components/Header";
 import { Toaster } from "./components/ui/toaster";
 import "./tailwind.css";
 import { commitSession, getSession } from "./sessions";
 import { useToast } from "./hooks/use-toast";
 import { useEffect } from "react";
-import { ToastMessage } from "./utils/toastHelpers";
+import { toastData, ToastMessage } from "./utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
 import { Chat } from "./components/organisms/Chat";
-import { getEmployeeUser, getUserBySessionId } from "./utils/session.server";
+import {
+  getAdminUser,
+  getEmployeeUser,
+  getUserBySessionId,
+} from "./utils/session.server";
 import { selectMany } from "./utils/queryHelpers";
 import { db } from "~/db.server";
 import { Todo, InstructionSlim } from "~/types";
+import { getValidatedFormData } from "remix-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
@@ -36,33 +48,72 @@ export const links: LinksFunction = () => [
   },
 ];
 
+const todolistschema = z.object({
+  rich_text: z.string(),
+});
+
+type FormData = z.infer<typeof todolistschema>;
+
+const resolver = zodResolver(todolistschema);
+
+export async function action({ request }: ActionFunctionArgs) {
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
+  }
+
+  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
+    request,
+    resolver
+  );
+
+  if (errors) {
+    return { errors, receivedValues };
+  }
+
+  let user = getAdminUser(request);
+
+  try {
+    await db.execute(
+      `INSERT INTO main.todolist (rich_text, user_id) VALUES (?, ?)`,
+      [data.rich_text, (await user).id]
+    );
+  } catch (error) {
+    console.error("Error connecting to the database: ", error);
+  }
+
+  const session = await getSession(request.headers.get("Cookie"));
+  session.flash("message", toastData("Success", "New todo added"));
+
+  return redirect("..", {
+    headers: { "Set-Cookie": await commitSession(session) },
+  });
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const [token, cookieHeader] = await csrf.commitToken();
   const session = await getSession(request.headers.get("Cookie"));
   const activeSession = session.data.sessionId || null;
   const message: ToastMessage | null = session.get("message") || null;
-
-  // try {
-  //   await getEmployeeUser(request);
-  // } catch (error) {
-  //   return redirect(`/login?error=${error}`);
-  // }
-  // const todos = await selectMany<Todo>(
-  //   db,
-  //   "SELECT id, name, is_done from todolist"
-  // )
-  const instructions = await selectMany<InstructionSlim>(
-    db,
-    "SELECT id, title, rich_text from instructions"
-  );
-
   let user = null;
   if (activeSession) {
     user = await getUserBySessionId(activeSession);
   }
 
+  // const userId = await getEmployeeUser(request);
+  // const todos = await selectMany<Todo>(
+  //   db,
+  //   "SELECT id, rich_text, is_done from todolist WHERE user_id = ?",
+  //   [userId.id]
+  // );
+  const instructions = await selectMany<InstructionSlim>(
+    db,
+    "SELECT id, title, rich_text from instructions"
+  );
+
   return json(
-    { message, activeSession, token, user, instructions /* todos */ },
+    { message, activeSession, token, user, instructions /*todos*/ },
 
     {
       headers: [

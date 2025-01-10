@@ -1,8 +1,8 @@
 // src/components/Header.tsx
 import { Link, useLocation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
-// import { TodoList } from "./TodoList";
-// import { Todo } from "~/types";
+import { TodoList } from "./TodoList";
+import { Todo } from "~/types";
 
 interface HeaderProps {
   activeSession: string | null;
@@ -17,7 +17,8 @@ export function Header({
   isAdmin,
   isSuperUser,
   isEmployee,
-}: HeaderProps) {
+}: // todos,
+HeaderProps) {
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
 
@@ -36,9 +37,14 @@ export function Header({
       <div className="flex gap-4">
         {isAdmin || isSuperUser ? (
           isAdminPage ? (
-            <Link to="/employee">
-              <Button>Employee</Button>
-            </Link>
+            <div className=" flex gap-4">
+              <Link to="/employee">
+                <Button>Employee</Button>
+              </Link>
+              {/* <Link to="/admin/users">
+                <Button>Users</Button>
+              </Link> */}
+            </div>
           ) : (
             <Link to="/admin">
               <Button>Admin</Button>
