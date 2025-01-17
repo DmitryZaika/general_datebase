@@ -56,6 +56,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
+  const newFile = data.file && data.file !== "undefined";
 
   // NOTE: THIS IS DANGEROUS
   const support = await selectId<{ url: string }>(

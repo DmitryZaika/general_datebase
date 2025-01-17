@@ -58,23 +58,26 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { errors };
   }
 
+  const newFile = data.file && data.file !== "undefined";
+
   // NOTE: THIS IS DANGEROUS
   const stone = await selectId<{ url: string }>(
     db,
     "select url from stones WHERE id = ?",
     stoneId
   );
-  if (stone?.url) {
-    deleteFile(stone.url);
-  }
 
   try {
-    if (data.file && data.file !== "undefined") {
+    if (newFile) {
+      console.log("FILE ADDED");
+      console.log(data);
       await db.execute(
         `UPDATE main.stones SET name = ?, type = ?, url = ? WHERE id = ?`,
         [data.name, data.type, data.file, stoneId]
       );
     } else {
+      console.log("NO FILE ADDED");
+      console.log(data);
       await db.execute(
         `UPDATE main.stones SET name = ?, type = ? WHERE id = ?`,
         [data.name, data.type, stoneId]
@@ -83,7 +86,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }
-  console.log(stone);
+
+  if (stone?.url && newFile) {
+    deleteFile(stone.url);
+  }
+
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Stone Edited"));
   return redirect("..", {
