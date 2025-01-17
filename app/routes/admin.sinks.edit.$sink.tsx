@@ -52,6 +52,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
+  const newFile = data.file && data.file !== "undefined";
 
   // NOTE: THIS IS DANGEROUS
   const sink = await selectId<{ url: string }>(
@@ -59,13 +60,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "select url from sinks WHERE id = ?",
     sinkId
   );
-  if (sink?.url) {
-    deleteFile(sink.url);
-  }
 
   try {
     let result;
-    if (data.file && data.file !== "undefined") {
+    if (newFile) {
       result = await db.execute(
         `UPDATE main.sinks SET name = ?, url = ? WHERE id = ?`,
         [data.name, data.file, sinkId]
@@ -78,6 +76,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
+  }
+  if (sink?.url && newFile) {
+    deleteFile(sink.url);
   }
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Sink Edited"));
