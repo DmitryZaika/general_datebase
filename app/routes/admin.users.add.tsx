@@ -26,6 +26,7 @@ import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
 import { getAdminUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { SelectInput } from "~/components/molecules/SelectItem";
 
 const userschema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -153,7 +154,18 @@ export default function UsersAdd() {
                 />
               )}
             />
-
+            <FormField
+              control={form.control}
+              name="company"
+              render={({ field }) => (
+                <SelectInput
+                  field={field}
+                  placeholder="Type of the Stone"
+                  name="Type"
+                  options={[companies]}
+                />
+              )}
+            />
             <DialogFooter>
               <Button type="submit">Add user</Button>
             </DialogFooter>
