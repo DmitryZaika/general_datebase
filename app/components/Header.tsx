@@ -40,9 +40,14 @@ export function Header({
               <Button>Employee</Button>
             </Link>
           ) : (
-            <Link to="/admin">
-              <Button>Admin</Button>
-            </Link>
+            <>
+              <Link to="/admin">
+                <Button>Admin</Button>
+              </Link>
+              <Link to="/admin/users">
+                <Button>Admin</Button>
+              </Link>
+            </>
           )
         ) : null}
       </div>
