@@ -57,9 +57,6 @@ export default function Stones() {
     {}
   );
 
-  console.log(Object.keys(stoneList));
-  console.log(Object.keys(stoneList).sort(customSort));
-
   return (
     <Accordion type="single" defaultValue="stones">
       <AccordionItem value="stones">
