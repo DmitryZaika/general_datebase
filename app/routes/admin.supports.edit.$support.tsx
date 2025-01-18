@@ -56,6 +56,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
+  const newFile = data.file && data.file !== "undefined";
 
   // NOTE: THIS IS DANGEROUS
   const support = await selectId<{ url: string }>(
@@ -63,12 +64,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "select url from supports WHERE id = ?",
     supportId
   );
-  if (support?.url) {
-    deleteFile(support.url);
-  }
 
   try {
-    if (data.file && data.file !== "undefined") {
+    if (newFile) {
       await db.execute(
         `UPDATE main.supports SET name = ?, url = ? WHERE id = ?`,
         [data.name, data.file, supportId]
@@ -81,6 +79,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
+  }
+  if (support?.url && newFile) {
+    deleteFile(support.url);
   }
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Support Edited"));

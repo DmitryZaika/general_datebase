@@ -46,7 +46,7 @@ export default function Employee() {
   return isDataBase ? (
     <PageLayout title="Granite Depot DataBase">
       <Tabs value={currentTab} onValueChange={handleTabChange}>
-        <TabsList>
+        <TabsList className="">
           <TabsTrigger value="stones">Stones</TabsTrigger>
           <TabsTrigger value="sinks">Sinks</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>

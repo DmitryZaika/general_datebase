@@ -53,22 +53,20 @@ export async function action({ request, params }: ActionFunctionArgs) {
     documentSchema,
     "documents"
   );
+
   if (errors || !data) {
     return { errors };
   }
-
+  const newFile = data.file && data.file !== "undefined";
   // NOTE: THIS IS DANGEROUS
   const document = await selectId<{ url: string }>(
     db,
     "select url from documents WHERE id = ?",
     documentId
   );
-  if (document?.url) {
-    deleteFile(document.url);
-  }
 
   try {
-    if (data.file && data.file !== "undefined") {
+    if (newFile) {
       await db.execute(
         `UPDATE main.documents SET name = ?, url = ? WHERE id = ?`,
         [data.name, data.file, documentId]
@@ -81,6 +79,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
+  }
+
+  if (document?.url && newFile) {
+    deleteFile(document.url);
   }
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Document Edited"));

@@ -74,12 +74,12 @@ export async function action({ request }: ActionFunctionArgs) {
   let insertId: null | number = null;
   const parentId = data.parent_id || null;
   const afterId = data.after_id || null;
-
+  let user = await getAdminUser(request);
   try {
     const [result] = await db.execute<ResultSetHeader>(
-      `INSERT INTO main.instructions (title, parent_id, after_id, rich_text)
-       VALUES (?, ?, ?, ?)`,
-      [data.title, parentId, afterId, data.rich_text]
+      `INSERT INTO main.instructions (title, parent_id, after_id, rich_text, company_id)
+       VALUES (?, ?, ?, ?, ?)`,
+      [data.title, parentId, afterId, data.rich_text, user.company_id]
     );
     insertId = result.insertId;
   } catch (error) {

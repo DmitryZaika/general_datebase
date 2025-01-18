@@ -71,7 +71,6 @@ export default function Login() {
     defaultValues: { email: "", password: "" },
   });
   const fullSubmit = useFullSubmit(form);
-
   return (
     <div className="flex justify-center p-20">
       <FormProvider {...form}>

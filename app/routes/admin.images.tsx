@@ -27,10 +27,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
 
-  const images = await selectMany<Image>(db, "select id, name from images");
+  const user = await getAdminUser(request);
+  const images = await selectMany<Image>(
+    db,
+    "SELECT id, name, url FROM images WHERE company_id = ?",
+    [user.company_id]
+  );
   return { images };
 };
-
 export default function Images() {
   const { images } = useLoaderData<typeof loader>();
 
