@@ -36,12 +36,18 @@ function getExpirationDate(expiration: number): string {
   return expirationDate.toISOString().slice(0, 19).replace("T", " ");
 }
 
-export async function register(email: string, password: string) {
+export async function register(
+  email: string,
+  password: string,
+  company_id: number,
+  isEmployee: number = 1,
+  isAdmin: number = 0
+) {
   const passwordHash = await bcrypt.hash(password, 10);
-  await db.execute(`INSERT INTO main.users (email, password) VALUES (?, ?)`, [
-    email,
-    passwordHash,
-  ]);
+  await db.execute(
+    `INSERT INTO main.users (email, password, company_id, isEmployee, isAdmin) VALUES (?, ?, ?, ?, ?)`,
+    [email, passwordHash, company_id, isEmployee, isAdmin]
+  );
   return true;
 }
 
