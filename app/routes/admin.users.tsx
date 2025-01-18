@@ -13,7 +13,7 @@ import {
 } from "~/components/ui/table";
 import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
-import { getAdminUser } from "~/utils/session.server";
+import { getSuperUser } from "~/utils/session.server";
 interface Users {
   id: number;
   name: string;
@@ -23,16 +23,18 @@ interface Users {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    await getAdminUser(request);
+    await getSuperUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  const user = await getAdminUser(request);
+  const user = await getSuperUser(request);
   const users = await selectMany<Users>(
     db,
     "select id, name, email, phone_number from users WHERE company_id = ?",
     [user.company_id]
   );
+  console.log(user.company_id);
+
   return { users };
 };
 
