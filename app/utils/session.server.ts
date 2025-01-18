@@ -24,6 +24,7 @@ interface SessionUser {
   is_employee: boolean;
   is_admin: boolean;
   is_superuser: boolean;
+  company_id: number;
 }
 
 function getExpirationDate(expiration: number): string {
