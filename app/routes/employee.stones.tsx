@@ -20,6 +20,13 @@ interface Stone {
   url: string | null;
 }
 
+const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
+function customSort(a: string, b: string) {
+  return (
+    customOrder.indexOf(a.toLowerCase()) - customOrder.indexOf(b.toLowerCase())
+  );
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getEmployeeUser(request);
@@ -50,30 +57,35 @@ export default function Stones() {
     {}
   );
 
+  console.log(Object.keys(stoneList));
+  console.log(Object.keys(stoneList).sort(customSort));
+
   return (
     <Accordion type="single" defaultValue="stones">
       <AccordionItem value="stones">
         <AccordionContent>
           <Accordion type="multiple">
-            {Object.keys(stoneList).map((type) => (
-              <AccordionItem key={type} value={type}>
-                <AccordionTrigger>
-                  {capitalizeFirstLetter(type)}
-                </AccordionTrigger>
-                <AccordionContent>
-                  <ModuleList>
-                    {stoneList[type].map((stone) => (
-                      <Image
-                        key={stone.id}
-                        src={stone.url}
-                        alt={stone.name}
-                        name={stone.name}
-                      />
-                    ))}
-                  </ModuleList>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
+            {Object.keys(stoneList)
+              .sort(customSort)
+              .map((type) => (
+                <AccordionItem key={type} value={type}>
+                  <AccordionTrigger>
+                    {capitalizeFirstLetter(type)}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ModuleList>
+                      {stoneList[type].map((stone) => (
+                        <Image
+                          key={stone.id}
+                          src={stone.url}
+                          alt={stone.name}
+                          name={stone.name}
+                        />
+                      ))}
+                    </ModuleList>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
           </Accordion>
         </AccordionContent>
       </AccordionItem>
