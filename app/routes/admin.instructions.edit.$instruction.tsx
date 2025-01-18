@@ -220,7 +220,9 @@ export default function InstructionsEdit() {
             />
 
             <DialogFooter>
-              <Button type="submit">Save changes</Button>
+              <Button className="mt-6" type="submit">
+                Save changes
+              </Button>
             </DialogFooter>
           </Form>
         </FormProvider>

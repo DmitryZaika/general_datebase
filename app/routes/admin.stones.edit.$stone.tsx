@@ -57,6 +57,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
+  const newFile = data.file && data.file !== "undefined";
 
   // NOTE: THIS IS DANGEROUS
   const stone = await selectId<{ url: string }>(
@@ -64,17 +65,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "select url from stones WHERE id = ?",
     stoneId
   );
-  if (stone?.url) {
-    deleteFile(stone.url);
-  }
 
   try {
-    if (data.file && data.file !== "undefined") {
+    if (newFile) {
+      console.log("FILE ADDED");
+      console.log(data);
       await db.execute(
         `UPDATE main.stones SET name = ?, type = ?, url = ? WHERE id = ?`,
         [data.name, data.type, data.file, stoneId]
       );
     } else {
+      console.log("NO FILE ADDED");
+      console.log(data);
       await db.execute(
         `UPDATE main.stones SET name = ?, type = ? WHERE id = ?`,
         [data.name, data.type, stoneId]
@@ -83,6 +85,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
   }
+
+  if (stone?.url && newFile) {
+    deleteFile(stone.url);
+  }
+
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Stone Edited"));
   return redirect("..", {
@@ -108,15 +115,12 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     // height: string;
     // width: string;
     // amount: string;
-  }>(
-    db,
-    "select name, type, url, height, width, amount from stones WHERE id = ?",
-    stoneId
-  );
+  }>(db, "select name, type, url from stones WHERE id = ?", stoneId);
   return {
     name: stone?.name,
     type: stone?.type,
     url: stone?.url,
+
     // height: stone?.height,
     // width: stone?.width,
     // amount: stone?.amount,

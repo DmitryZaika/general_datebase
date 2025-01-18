@@ -29,7 +29,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
   } catch (error) {
-    return { error: "Invalid CSRF token" };
+    return { error };
   }
 
   const {
@@ -65,14 +65,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function Login() {
   const { error } = useLoaderData<typeof loader>();
   const data = useActionData<typeof action>();
-  console.log(error);
 
   const form = useForm<FormData>({
     resolver,
     defaultValues: { email: "", password: "" },
   });
   const fullSubmit = useFullSubmit(form);
-
   return (
     <div className="flex justify-center p-20">
       <FormProvider {...form}>

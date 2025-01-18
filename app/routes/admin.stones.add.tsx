@@ -50,13 +50,15 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
+  let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.stones (name, type, url) VALUES (?, ?, ?);`,
-      [data.name, data.type, data.file]
+      `INSERT INTO main.stones (name,type, url, company_id) VALUES (?, ?, ?, ?);`,
+      [data.name, data.type, data.file, user.company_id]
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
+
     const session = await getSession(request.headers.get("Cookie"));
     session.flash(
       "message",
