@@ -30,8 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getSuperUser(request);
   const users = await selectMany<Users>(
     db,
-    "select id, name, email, phone_number from users WHERE company_id = ?",
-    [user.company_id]
+    "select id, name, email, phone_number from users"
   );
   console.log(user.company_id);
 

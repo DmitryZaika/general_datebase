@@ -31,7 +31,6 @@ import { useFullSubmit } from "~/hooks/useFullSubmit";
 const userschema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.union([z.string().email(), z.literal("")]),
-  password: z.string().min(6, "Password must be at least 6 characters long"),
   phone_number: z.union([z.coerce.string().min(10), z.literal("")]).optional(),
 });
 
@@ -117,7 +116,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function UsersAdd() {
   const navigate = useNavigate();
   const { name, email, phone_number } = useLoaderData<typeof loader>();
-  const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
@@ -133,6 +131,8 @@ export default function UsersAdd() {
       navigate("..");
     }
   };
+
+  console.log(form.formState.errors);
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
