@@ -25,13 +25,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+
+  const user = await getAdminUser(request);
   const documents = await selectMany<Document>(
     db,
-    "select id, name from documents"
+    "SELECT id, name FROM documents WHERE company_id = ?",
+    [user.company_id]
   );
-  return {
-    documents,
-  };
+  return { documents };
 };
 
 export default function Documents() {
