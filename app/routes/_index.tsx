@@ -1,5 +1,12 @@
-import { redirect } from "@remix-run/node";
+import { LoaderFunction, redirect } from "@remix-run/node";
+import { getSession } from "~/sessions";
+import { getEmployeeUser } from "~/utils/session.server";
 
-export const loader = async () => {
+export const loader: LoaderFunction = async ({ request }) => {
+  try {
+    await getEmployeeUser(request);
+  } catch (error) {
+    return redirect(`/login`);
+  }
   return redirect("/employee");
 };

@@ -32,9 +32,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const user = await getEmployeeUser(request);
   const documents = await selectMany<Document>(
     db,
-    "select id, name, url from documents"
+    "SELECT id, name, url FROM documents WHERE company_id = ?",
+    [user.company_id]
   );
   return { documents };
 };

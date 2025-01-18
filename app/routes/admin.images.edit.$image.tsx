@@ -53,6 +53,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
+  const newFile = data.file && data.file !== "undefined";
 
   // NOTE: THIS IS DANGEROUS
   const image = await selectId<{ url: string }>(
@@ -60,12 +61,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "select url from images WHERE id = ?",
     imageId
   );
-  if (image?.url) {
-    deleteFile(image.url);
-  }
 
   try {
-    if (data.file && data.file !== "undefined") {
+    if (newFile) {
       await db.execute(
         `UPDATE main.images SET name = ?, url = ? WHERE id = ?`,
         [data.name, data.file, imageId]
@@ -78,6 +76,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
   } catch (error) {
     console.error("Error connecting to the database: ", errors);
+  }
+  if (image?.url && newFile) {
+    deleteFile(image.url);
   }
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Image Edited"));

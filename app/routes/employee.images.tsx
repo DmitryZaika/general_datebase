@@ -24,9 +24,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const user = await getEmployeeUser(request);
   const images = await selectMany<Image>(
     db,
-    "select id, name, url from images"
+    "SELECT id, name, url FROM images WHERE company_id = ?",
+    [user.company_id]
   );
   return { images };
 };
