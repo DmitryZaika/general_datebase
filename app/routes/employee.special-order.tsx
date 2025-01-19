@@ -6,7 +6,7 @@ export default function SpecialOrder() {
   const [width, setWidth] = useState<number | undefined>();
   const [length, setLength] = useState<number | undefined>();
   const [slabs, setSlabs] = useState(1);
-
+  const [deliveryCost, setDeliveryCost] = useState<number | undefined>();
   const taxRate = 0.07;
 
   const minusSlab = () => {
@@ -19,11 +19,10 @@ export default function SpecialOrder() {
     const areaPerSlab = ((width || 0) * (length || 0)) / 144;
     const totalSquareFeet = areaPerSlab * slabs;
     const materialCost = areaPerSlab * (price || 0) * slabs * (1 + taxRate);
-
-    const deliveryFee = slabs * 30;
-    const totalCost = materialCost + deliveryFee;
-
-    const costPerSqftWithDelivery = totalCost / totalSquareFeet;
+    const totalCost = materialCost + (deliveryCost || 0);
+    const costPerSqftWithDelivery = totalSquareFeet
+      ? totalCost / totalSquareFeet
+      : 0;
 
     return {
       totalSquareFeet: isFinite(totalSquareFeet)
@@ -35,11 +34,12 @@ export default function SpecialOrder() {
         : "0.00",
     };
   }
+
   const values = calculateTotal();
 
   return (
     <PageLayout
-      className="bg-white p-5 rounded-lg shadow-[0px_-0px_5px_rgba(0,0,0,0.15)]  max-w-lg mx-auto my-5"
+      className="bg-white p-5 rounded-lg shadow-[0px_-0px_5px_rgba(0,0,0,0.15)] max-w-lg mx-auto my-5"
       title="Special Order Calculator"
     >
       <label htmlFor="price-per-sqft" className="text-base block">
@@ -54,7 +54,7 @@ export default function SpecialOrder() {
         className="w-full p-2 border border-gray-300 rounded-md text-base mb-4"
       />
 
-      <label htmlFor="size" className="text-base  block">
+      <label htmlFor="size" className="text-base block">
         Size of Slab:
       </label>
       <div className="flex gap-2">
@@ -77,6 +77,18 @@ export default function SpecialOrder() {
           className="w-1/2 p-2 border border-gray-300 rounded-md text-base"
         />
       </div>
+
+      <label htmlFor="delivery-cost" className="text-base block">
+        Delivery cost (total):
+      </label>
+      <input
+        type="number"
+        id="delivery-cost"
+        placeholder="Enter total delivery cost"
+        value={deliveryCost === undefined ? "" : deliveryCost}
+        onChange={(e) => setDeliveryCost(parseInt(e.target.value))}
+        className="w-full p-2 border border-gray-300 rounded-md text-base mb-4"
+      />
 
       <div className="flex items-center w-64 gap-3 mb-4">
         <label htmlFor="slabs" className="text-base">
@@ -106,10 +118,10 @@ export default function SpecialOrder() {
       <div className="text-lg font-bold text-gray-800">
         Cost $<span>{values.totalPrice}</span> per sqft
       </div>
-      <div className="text-lg  font-bold text-gray-800">
+      <div className="text-lg font-bold text-gray-800">
         Total Square Feet: <span>{values.totalSquareFeet}</span> sqft
       </div>
-      <div className="text-xl  font-bold text-red-700">
+      <div className="text-xl font-bold text-red-700">
         Total Cost $<span>{values.totalCost}</span>
       </div>
     </PageLayout>
