@@ -141,7 +141,6 @@ export default function InstructionsEdit() {
   const navigate = useNavigate();
   const { title, parent_id, after_id, rich_text } =
     useLoaderData<typeof loader>();
-  const token = useAuthenticityToken();
   const { instructions } = useLoaderData<typeof loader>();
   const form = useForm<FormData>({
     resolver,

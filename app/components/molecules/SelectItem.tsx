@@ -1,6 +1,5 @@
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
-import { FieldValues, type ControllerRenderProps } from "react-hook-form";
-
+import { FieldValues, ControllerRenderProps } from "react-hook-form";
 import {
   Select,
   SelectContent,
@@ -23,33 +22,31 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   placeholder?: string;
   field: ControllerRenderProps<TFieldValues>;
   disabled?: boolean;
-  options: string[] | Option[];
+  options: Array<string | Option>;
   className?: string;
 }) {
-  const cleanOptions: Option[] = (options as (string | Option)[]).map(
-    (option) =>
-      typeof option === "string"
-        ? { key: option, value: option }
-        : { key: option.key, value: option.value }
+  // Приводим все варианты options к массиву { key, value }
+  const cleanOptions: Option[] = options.map((option) =>
+    typeof option === "string"
+      ? { key: option, value: option }
+      : { key: option.key, value: option.value }
   );
-  function cleanValue(value: string | number) {
-    if (typeof value === "string") {
-      return value.toLowerCase();
-    }
-    return value.toString();
-  }
 
   return (
     <FormItem className={className}>
       <FormLabel>{name}</FormLabel>
       <FormControl>
-        <Select {...field} onValueChange={field.onChange} disabled={disabled}>
+        <Select
+          value={String(field.value ?? "")}
+          onValueChange={(val) => field.onChange(Number(val))}
+          disabled={disabled}
+        >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
-            {cleanOptions.map(({ key, value }: Option) => (
-              <SelectItem key={key} value={cleanValue(key)}>
+            {cleanOptions.map(({ key, value }) => (
+              <SelectItem key={key} value={String(key)}>
                 {value}
               </SelectItem>
             ))}
