@@ -57,7 +57,7 @@ export async function login(
   expiration: number
 ): Promise<string | undefined> {
   const [rows] = await db.query<LoginUser[] & RowDataPacket[]>(
-    "SELECT id, password FROM users WHERE email = ? AND is_deleted = 0",
+    "SELECT id, password FROM users WHERE email = ? AND is_deleted = 1",
     [email]
   );
   if (rows.length < 1) {
