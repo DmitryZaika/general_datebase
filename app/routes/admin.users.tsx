@@ -30,15 +30,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getSuperUser(request);
   const users = await selectMany<Users>(
     db,
-    "select id, name, email, phone_number from users"
+    " select id, name, email, phone_number from main.users WHERE is_deleted = 0"
   );
-  console.log(user.company_id);
-
+  console.log("Loaded users:", users);
   return { users };
 };
 
 export default function Adminusers() {
   const { users } = useLoaderData<typeof loader>();
+  console.log("Loaded users:", users);
   return (
     <PageLayout title="Users">
       <Link to={`add`} relative="path">

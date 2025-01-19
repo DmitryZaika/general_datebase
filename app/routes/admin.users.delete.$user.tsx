@@ -6,7 +6,6 @@ import {
 import { Form, useLoaderData, useNavigate } from "@remix-run/react";
 import { selectId } from "~/utils/queryHelpers";
 import { Button } from "~/components/ui/button";
-
 import {
   Dialog,
   DialogContent,
@@ -15,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
@@ -39,21 +37,23 @@ export async function action({ params, request }: ActionFunctionArgs) {
   if (!params.user) {
     return forceRedirectError(request.headers, "No user id provided");
   }
+
   const userId = parseInt(params.user, 10);
   if (!userId) {
     return { name: undefined };
   }
 
   try {
-    await db.execute(`DELETE FROM main.users WHERE id = ?`, [userId]);
+    await db.execute(`UPDATE main.users SET is_deleted = 1 WHERE id = ?`, [
+      userId,
+    ]);
   } catch (error) {
-    console.error("Error connecting to the database: ", error);
-    return { error: "Failed to delete user" };
+    console.error("Error soft-deleting user: ", error);
+    return { error: "Failed to soft-delete user" };
   }
 
-  // Добавляем флэш-сообщение об успехе
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "User deleted"));
+  session.flash("message", toastData("Success", "User deleted (soft)"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
@@ -73,16 +73,12 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   const user = await selectId<{ name: string }>(
     db,
-    "select name from users WHERE id = ?",
+    "SELECT name FROM main.users WHERE id = ?",
     userId
   );
 
-  if (!user) {
-    return { name: undefined };
-  }
-
   return {
-    name: user.name,
+    name: user?.name,
   };
 };
 
@@ -91,7 +87,7 @@ export default function DeleteUser() {
   const { name } = useLoaderData<typeof loader>();
 
   const handleChange = (open: boolean) => {
-    if (open === false) {
+    if (!open) {
       navigate("..");
     }
   };
@@ -107,7 +103,6 @@ export default function DeleteUser() {
         </DialogHeader>
         <Form method="post">
           <DialogFooter>
-            {/* Поле CSRF-токена */}
             <AuthenticityTokenInput />
             <Button autoFocus type="submit">
               Delete user

@@ -55,6 +55,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors) {
     return { errors, defaultValues } as ActionData;
   }
+
   const sessionId = await login(data.email, data.password, 60 * 60 * 24 * 7);
   if (!sessionId) {
     return { error: "Unable to login", defaultValues } as ActionData;
