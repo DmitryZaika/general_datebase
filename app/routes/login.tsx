@@ -57,6 +57,12 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const session = getSession(request.headers.get("Cookie"));
+
+  if ((await session).has("sessionId")) {
+    return redirect("/");
+  }
+
   const { searchParams } = new URL(request.url);
   const error = searchParams.get("error");
   return { error };
