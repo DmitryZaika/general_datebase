@@ -57,7 +57,7 @@ export async function login(
   expiration: number
 ): Promise<string | undefined> {
   const [rows] = await db.query<LoginUser[] & RowDataPacket[]>(
-    "SELECT id, password FROM users WHERE email = ?",
+    "SELECT id, password FROM users WHERE email = ? AND is_deleted = 1",
     [email]
   );
   if (rows.length < 1) {
@@ -78,11 +78,13 @@ export async function login(
 
 async function getUser(sessionId: string): Promise<SessionUser | undefined> {
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
-    `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser, users.company_id FROM users
+    `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
      JOIN sessions ON sessions.user_id = users.id
      WHERE sessions.id = ?
        AND sessions.expiration_date > CURRENT_TIMESTAMP
-       AND sessions.is_deleted = 0`,
+       AND sessions.is_deleted = 0
+       AND users.is_deleted = 0`,
+
     [sessionId]
   );
   if (rows.length < 1) {
