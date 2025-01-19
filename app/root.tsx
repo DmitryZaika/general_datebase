@@ -51,14 +51,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
   //   db,
   //   "SELECT id, name, is_done from todolist"
   // )
-  const instructions = await selectMany<InstructionSlim>(
-    db,
-    "SELECT id, title, rich_text from instructions"
-  );
+
+  let instructions: InstructionSlim[] = [];
 
   let user = null;
   if (activeSession) {
-    user = await getUserBySessionId(activeSession);
+    user = (await getUserBySessionId(activeSession)) || null;
+    if (user) {
+      instructions = await selectMany<InstructionSlim>(
+        db,
+        "SELECT id, title, rich_text from instructions WHERE company_id = ?",
+        [user.company_id]
+      );
+    }
   }
 
   return json(
