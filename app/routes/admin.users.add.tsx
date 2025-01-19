@@ -28,6 +28,8 @@ import { getSuperUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { selectMany } from "~/utils/queryHelpers";
+import bcrypt from "bcryptjs";
+import { SwitchItem } from "~/components/molecules/SwitchItem";
 
 interface Company {
   id: number;
@@ -36,11 +38,11 @@ interface Company {
 
 const userschema = z.object({
   name: z.string().min(1),
-
   phone_number: z.union([z.coerce.string().min(10), z.literal("")]).optional(),
   email: z.union([z.string().email().optional(), z.literal("")]),
   password: z.coerce.string().min(4),
   company_id: z.coerce.number(),
+  is_employee: z.boolean(),
   is_admin: z.boolean(),
 });
 
@@ -66,10 +68,19 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors) {
     return { errors, receivedValues };
   }
+  const password = await bcrypt.hash(data.password, 10);
   try {
     await db.execute(
-      `INSERT INTO main.users  (name,  phone_number, email, password, company_id) VALUES (?, ?, ?, ?, ?)`,
-      [data.name, data.phone_number, data.email, data.password, data.company_id]
+      `INSERT INTO main.users (name, phone_number, email, password, company_id, is_employee, is_admin)
+       VALUES (?, ?, ?, ?, ?, 1, ?)`,
+      [
+        data.name,
+        data.phone_number,
+        data.email,
+        password,
+        data.company_id,
+        data.is_admin,
+      ]
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -96,8 +107,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function UsersAdd() {
   const navigate = useNavigate();
-
   const { companies } = useLoaderData<typeof loader>();
+  const cleanCompanies = companies.map((company) => ({
+    key: company.id,
+    value: company.name,
+  }));
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
@@ -106,8 +120,9 @@ export default function UsersAdd() {
       phone_number: "",
       email: "",
       password: "",
-      companies: "",
-      is_admin: "",
+      company_id: 0,
+      is_employee: false,
+      is_admin: false,
     },
   });
   const fullSubmit = useFullSubmit(form);
@@ -167,16 +182,23 @@ export default function UsersAdd() {
             />
             <FormField
               control={form.control}
-              name="companies"
+              name="company_id"
               render={({ field }) => (
                 <SelectInput
                   field={field}
-                  name="Companies"
-                  className="ml-2"
-                  options={companies}
+                  name="Company"
+                  options={cleanCompanies}
                 />
               )}
             />
+            <FormField
+              control={form.control}
+              name="is_admin"
+              render={({ field }) => (
+                <SwitchItem field={field} name="  Admin" />
+              )}
+            />
+
             <DialogFooter>
               <Button type="submit">Save changes</Button>
             </DialogFooter>
