@@ -62,7 +62,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   return json(
-    { message, activeSession, token, user, instructions /* todos */ },
+    { message, token, user, instructions /* todos */ },
 
     {
       headers: [
@@ -74,7 +74,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function App() {
-  const { message, activeSession, token, user, instructions /* todos*/ } =
+  const { message, token, user, instructions /* todos*/ } =
     useLoaderData<typeof loader>();
   const { toast } = useToast();
 
@@ -97,10 +97,10 @@ export default function App() {
         <Links />
       </head>
       <body>
-        {activeSession && (
+        {user && (
           <Header
             // todos={todos}
-            activeSession={activeSession}
+            user={user}
             isAdmin={user ? user.is_admin : false}
             isSuperUser={user ? user.is_superuser : false}
             isEmployee={
@@ -119,7 +119,7 @@ export default function App() {
         <Scripts />
       </body>
 
-      <Chat instructions={instructions} />
+      {user && <Chat instructions={instructions} />}
     </html>
   );
 }

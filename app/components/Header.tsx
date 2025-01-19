@@ -5,7 +5,7 @@ import { Button } from "~/components/ui/button";
 // import { Todo } from "~/types";
 
 interface HeaderProps {
-  activeSession: string | null;
+  user: object | null;
   isAdmin: boolean;
   isSuperUser: boolean;
   isEmployee: boolean;
@@ -13,7 +13,7 @@ interface HeaderProps {
 }
 
 export function Header({
-  activeSession,
+  user,
   isAdmin,
   isSuperUser,
   isEmployee,
@@ -114,7 +114,7 @@ export function Header({
       </nav>
       {/* <TodoList todos={todos} /> */}
 
-      {activeSession && (
+      {user !== null && (
         <Link to="/logout">
           <Button>Logout</Button>
         </Link>

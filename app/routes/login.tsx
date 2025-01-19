@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { getValidatedFormData } from "remix-hook-form";
 import { toastData } from "~/utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
-import { login } from "~/utils/session.server";
+import { getEmployeeUser, login } from "~/utils/session.server";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
 import { useActionData, useLoaderData } from "@remix-run/react";
@@ -57,11 +57,12 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const session = getSession(request.headers.get("Cookie"));
+  const session = await getSession(request.headers.get("Cookie"));
 
-  if ((await session).has("sessionId")) {
-    return redirect("/");
-  }
+  try {
+    await getEmployeeUser(request);
+    return redirect(`/employee`);
+  } catch (error) {}
 
   const { searchParams } = new URL(request.url);
   const error = searchParams.get("error");
