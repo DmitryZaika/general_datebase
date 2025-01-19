@@ -40,15 +40,17 @@ export function Header({
               <Button>Employee</Button>
             </Link>
           ) : (
-            <>
-              <Link to="/admin">
-                <Button>Admin</Button>
-              </Link>
-              <Link to="/admin/users">
-                <Button>Admin</Button>
-              </Link>
-            </>
+            <Link to="/admin">
+              <Button>Admin</Button>
+            </Link>
           )
+        ) : null}
+        {isSuperUser ? (
+          isAdminPage ? (
+            <Link to="/admin/users">
+              <Button>Add User</Button>
+            </Link>
+          ) : null
         ) : null}
       </div>
       <nav className="text-center flex-1">
