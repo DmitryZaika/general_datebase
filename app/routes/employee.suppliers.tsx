@@ -36,7 +36,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getEmployeeUser(request);
   const suppliers = await selectMany<Supplier>(
     db,
-    "select id,website, supplier_name,  manager, phone, email from suppliers WHERE company_id = ?",
+    "select id,website, supplier_name,  manager, phone, email, notes from suppliers WHERE company_id = ?",
     [user.company_id]
   );
   return { suppliers };
