@@ -26,6 +26,7 @@ import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
+import { TypeSelect } from "~/components/molecules/TypeInput";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -87,7 +88,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function StonesAdd() {
   const navigate = useNavigate();
-  // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
 
   const form = useCustomForm(stoneSchema);
@@ -120,7 +120,7 @@ export default function StonesAdd() {
             control={form.control}
             name="type"
             render={({ field }) => (
-              <SelectInput
+              <TypeSelect
                 field={field}
                 placeholder="Type of the Stone"
                 name="Type"

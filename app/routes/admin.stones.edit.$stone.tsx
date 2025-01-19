@@ -29,6 +29,7 @@ import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { deleteFile } from "~/utils/s3.server";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
+import { TypeSelect } from "~/components/molecules/TypeInput";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -164,7 +165,7 @@ export default function StonesEdit() {
             control={form.control}
             name="type"
             render={({ field }) => (
-              <SelectInput
+              <TypeSelect
                 field={field}
                 placeholder="Type of the Stone"
                 name="Type"
