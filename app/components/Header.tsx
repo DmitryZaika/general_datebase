@@ -48,7 +48,7 @@ export function Header({
         {isSuperUser ? (
           isAdminPage ? (
             <Link to="/admin/users">
-              <Button>Add User</Button>
+              <Button>User Panel</Button>
             </Link>
           ) : null
         ) : null}
