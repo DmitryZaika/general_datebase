@@ -101,7 +101,7 @@ export const Chat: React.FC<{ instructions: InstructionSlim[] }> = ({
     setIsThinking(true);
     const response = await ask({
       messages: [...messages, userMessage],
-      context: { instructions, help, reminders },
+      context: { instructions /* help, reminders */ },
     });
 
     if (!response) {
