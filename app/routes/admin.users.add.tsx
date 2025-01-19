@@ -4,7 +4,7 @@ import {
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
-import { Form, useNavigate } from "@remix-run/react";
+import { Form, useLoaderData, useNavigate } from "@remix-run/react";
 import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
@@ -24,25 +24,32 @@ import { toastData } from "~/utils/toastHelpers";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 
 import { csrf } from "~/utils/csrf.server";
-import { getAdminUser } from "~/utils/session.server";
+import { getSuperUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 import { SelectInput } from "~/components/molecules/SelectItem";
+import { selectMany } from "~/utils/queryHelpers";
+
+interface Company {
+  id: number;
+  name: string;
+}
 
 const userschema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.union([z.string().email(), z.literal("")]),
-  password: z.string().min(6, "Password must be at least 6 characters long"),
+  name: z.string().min(1),
+
   phone_number: z.union([z.coerce.string().min(10), z.literal("")]).optional(),
-  is_employee: z.union([z.coerce.string(), z.literal("")]).optional(),
+  email: z.union([z.string().email().optional(), z.literal("")]),
+  password: z.coerce.string().min(4),
+  company_id: z.coerce.number(),
+  is_admin: z.boolean(),
 });
 
 type FormData = z.infer<typeof userschema>;
-
 const resolver = zodResolver(userschema);
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    await getAdminUser(request);
+    await getSuperUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -59,23 +66,16 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors) {
     return { errors, receivedValues };
   }
-  let user = getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.users  (name, email,password, phone_number, is_employee, company_id) VALUES (?, ?, ?, ?, 1, ?)`,
-      [
-        data.name,
-        data.email,
-        data.password,
-        data.phone_number ?? null,
-        (await user).company_id,
-      ]
+      `INSERT INTO main.users  (name,  phone_number, email, password, company_id) VALUES (?, ?, ?, ?, ?)`,
+      [data.name, data.phone_number, data.email, data.password, data.company_id]
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "User added"));
+  session.flash("message", toastData("Success", "user added"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
@@ -83,38 +83,44 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request);
-    return { user };
+    await getSuperUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const companies = await selectMany<Company>(
+    db,
+    "select id, name from company"
+  );
+  return { companies };
 };
 
 export default function UsersAdd() {
   const navigate = useNavigate();
+
+  const { companies } = useLoaderData<typeof loader>();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
       name: "",
+      phone_number: "",
       email: "",
       password: "",
-      phone_number: "",
+      companies: "",
+      is_admin: "",
     },
   });
   const fullSubmit = useFullSubmit(form);
-
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
     }
   };
-
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add User</DialogTitle>
+          <DialogTitle>Add user</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
           <Form id="customerForm" method="post" onSubmit={fullSubmit}>
@@ -122,16 +128,14 @@ export default function UsersAdd() {
               control={form.control}
               name="name"
               render={({ field }) => (
-                <InputItem name={"Name"} placeholder={"Name"} field={field} />
+                <InputItem
+                  name={"User Name"}
+                  placeholder={"Name"}
+                  field={field}
+                />
               )}
             />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <InputItem name={"Email"} placeholder={"Email"} field={field} />
-              )}
-            />
+
             <FormField
               control={form.control}
               name="phone_number"
@@ -141,6 +145,13 @@ export default function UsersAdd() {
                   placeholder={"Phone Number"}
                   field={field}
                 />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <InputItem name={"Email"} placeholder={"Email"} field={field} />
               )}
             />
             <FormField
@@ -156,18 +167,18 @@ export default function UsersAdd() {
             />
             <FormField
               control={form.control}
-              name="company"
+              name="companies"
               render={({ field }) => (
                 <SelectInput
                   field={field}
-                  placeholder="Type of the Stone"
-                  name="Type"
-                  options={[companies]}
+                  name="Companies"
+                  className="ml-2"
+                  options={companies}
                 />
               )}
             />
             <DialogFooter>
-              <Button type="submit">Add user</Button>
+              <Button type="submit">Save changes</Button>
             </DialogFooter>
           </Form>
         </FormProvider>
