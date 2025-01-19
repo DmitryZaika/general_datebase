@@ -20,12 +20,14 @@ const acceptsMap = {
 function getQuality(size: number): number {
   const THREE_MB = 3 * 1024 * 1024;
   const ONE_MB = 1 * 1024 * 1024;
+
   if (size > THREE_MB) {
     return 0.2;
   } else if (size > ONE_MB) {
     return 0.3;
+  } else {
+    return 0.5;
   }
-  return 1;
 }
 
 export function FileInput({ onChange, id, label = "Image", type }: FileInput) {
