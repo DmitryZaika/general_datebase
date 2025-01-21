@@ -30,7 +30,6 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
       ? { key: option, value: option }
       : { key: option.key, value: option.value }
   );
-  console.log(cleanOptions);
 
   return (
     <FormItem className={className}>
