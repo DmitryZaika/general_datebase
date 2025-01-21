@@ -32,13 +32,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     " select id, name, email, phone_number from main.users WHERE is_deleted = 0"
   );
-  console.log("Loaded users:", users);
+
   return { users };
 };
 
 export default function Adminusers() {
   const { users } = useLoaderData<typeof loader>();
-  console.log("Loaded users:", users);
+
   return (
     <PageLayout title="Users">
       <Link to={`add`} relative="path">

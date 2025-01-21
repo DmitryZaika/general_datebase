@@ -68,15 +68,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   try {
     if (newFile) {
-      console.log("FILE ADDED");
-      console.log(data);
       await db.execute(
         `UPDATE main.stones SET name = ?, type = ?, url = ? WHERE id = ?`,
         [data.name, data.type, data.file, stoneId]
       );
     } else {
-      console.log("NO FILE ADDED");
-      console.log(data);
       await db.execute(
         `UPDATE main.stones SET name = ?, type = ? WHERE id = ?`,
         [data.name, data.type, stoneId]

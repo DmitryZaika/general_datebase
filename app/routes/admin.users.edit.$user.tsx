@@ -141,7 +141,7 @@ export default function User() {
     user: User;
     companies: Array<{ key: number; value: string }>;
   }>();
-  console.log(companies);
+
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
@@ -153,7 +153,7 @@ export default function User() {
       is_admin: user.is_admin === 1,
     },
   });
-  console.log(user.company_id);
+
   const fullSubmit = useFullSubmit(form);
   const handleChange = (open: boolean) => {
     if (!open) {
