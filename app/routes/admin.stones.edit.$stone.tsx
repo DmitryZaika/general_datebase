@@ -29,6 +29,7 @@ import { deleteFile } from "~/utils/s3.server";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { TypeSelect } from "~/components/molecules/TypeInput";
+import { SelectInput } from "~/components/molecules/SelectItem";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -160,7 +161,7 @@ export default function StonesEdit() {
             control={form.control}
             name="type"
             render={({ field }) => (
-              <TypeSelect
+              <SelectInput
                 field={field}
                 placeholder="Type of the Stone"
                 name="Type"
