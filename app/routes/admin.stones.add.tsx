@@ -120,7 +120,7 @@ export default function StonesAdd() {
             control={form.control}
             name="type"
             render={({ field }) => (
-              <TypeSelect
+              <SelectInput
                 field={field}
                 placeholder="Type of the Stone"
                 name="Type"
@@ -130,7 +130,7 @@ export default function StonesAdd() {
                   "Marble",
                   "Dolomite",
                   "Quartzite",
-                ]}
+                ].map((item) => ({ key: item.toLowerCase(), value: item }))}
               />
             )}
           />

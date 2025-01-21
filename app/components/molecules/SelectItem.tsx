@@ -25,12 +25,12 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   options: Array<string | Option>;
   className?: string;
 }) {
-  // Приводим все варианты options к массиву { key, value }
   const cleanOptions: Option[] = options.map((option) =>
     typeof option === "string"
       ? { key: option, value: option }
       : { key: option.key, value: option.value }
   );
+  console.log(cleanOptions);
 
   return (
     <FormItem className={className}>
@@ -38,7 +38,7 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
       <FormControl>
         <Select
           value={String(field.value ?? "")}
-          onValueChange={(val) => field.onChange(Number(val))}
+          onValueChange={(val) => field.onChange(val)}
           disabled={disabled}
         >
           <SelectTrigger className="w-[180px]">
