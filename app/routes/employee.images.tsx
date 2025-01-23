@@ -37,7 +37,7 @@ export default function Images() {
   const { images } = useLoaderData<typeof loader>();
 
   return (
-    <Accordion type="single" defaultValue="images">
+    <Accordion type="single" defaultValue="images" className="pt-24 sm:pt-0">
       <AccordionItem value="images">
         <AccordionContent>
           <Accordion type="multiple">

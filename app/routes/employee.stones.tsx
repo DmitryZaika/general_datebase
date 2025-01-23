@@ -58,7 +58,7 @@ export default function Stones() {
   );
 
   return (
-    <Accordion type="single" defaultValue="stones">
+    <Accordion type="single" defaultValue="stones" className="pt-24 sm:pt-0">
       <AccordionItem value="stones">
         <AccordionContent>
           <Accordion type="multiple">
