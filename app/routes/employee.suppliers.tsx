@@ -45,7 +45,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function Suppliers() {
   const { suppliers } = useLoaderData<typeof loader>();
   return (
-    <Accordion type="single" defaultValue="suppliers">
+    <Accordion type="single" defaultValue="suppliers" className="pt-24 sm:pt-0">
       <AccordionItem value="suppliers">
         <AccordionTrigger>Suppliers</AccordionTrigger>
         <AccordionContent>

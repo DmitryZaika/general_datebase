@@ -38,7 +38,7 @@ export default function Supports() {
   const { supports } = useLoaderData<typeof loader>();
 
   return (
-    <Accordion type="single" defaultValue="supports">
+    <Accordion type="single" defaultValue="supports" className="pt-24 sm:pt-0">
       <AccordionItem value="supports">
         <AccordionContent>
           <Accordion type="multiple">

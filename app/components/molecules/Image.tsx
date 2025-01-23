@@ -15,13 +15,13 @@ interface ImageProps {
 
 export function Image({ className = "", src, name, alt }: ImageProps) {
   return (
-    <div className="flex  gap-2 flex-col items-center">
+    <div className="flex  gap-2 flex-col items-center ">
       <Dialog>
-        <DialogTrigger asChild>
+        <DialogTrigger asChild className="">
           <img
             src={src || "/path/to/placeholder.png"}
             alt={alt || name || "Image"}
-            className={`w-auto h-auto border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300 ${className}`}
+            className={`object-cover w-40 h-40 border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300 ${className}`}
             loading="lazy"
           />
         </DialogTrigger>

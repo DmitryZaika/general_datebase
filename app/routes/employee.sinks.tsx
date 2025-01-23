@@ -37,7 +37,7 @@ export default function Sinks() {
   const { sinks } = useLoaderData<typeof loader>();
 
   return (
-    <Accordion type="single" defaultValue="sinks">
+    <Accordion type="single" defaultValue="sinks" className="pt-24 sm:pt-0">
       <AccordionItem value="sinks">
         <AccordionContent>
           <Accordion type="multiple">
