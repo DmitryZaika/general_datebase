@@ -11,13 +11,30 @@ interface ImageProps {
   src: string | null;
   alt?: string;
   className?: string;
+  isOpen: boolean;
+  id: number;
+  setImage: (value: undefined | number) => void;
 }
 
-export function Image({ className = "", src, name, alt }: ImageProps) {
+export function Image({
+  className = "",
+  src,
+  name,
+  alt,
+  isOpen,
+  id,
+  setImage,
+}: ImageProps) {
+  const handleOpenChange = (open: boolean) => {
+    if (open === false) {
+      setImage(undefined);
+    }
+  };
+
   return (
     <div className="flex  gap-2 flex-col items-center ">
-      <Dialog>
-        <DialogTrigger asChild className="">
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+        <DialogTrigger asChild onClick={() => setImage(id)}>
           <img
             src={src || "/path/to/placeholder.png"}
             alt={alt || name || "Image"}
