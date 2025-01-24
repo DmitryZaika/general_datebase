@@ -12,6 +12,7 @@ import { useLoaderData } from "@remix-run/react";
 import { Image } from "~/components/molecules/Image";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
+import { useArrowToggle } from "~/hooks/useArrowToggle";
 
 interface Stone {
   id: number;
@@ -44,8 +45,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
+function stoneIds(stones: Stone[], stoneId: number): number[] {
+  const stoneType = stones.find((item) => item.id === stoneId)?.type;
+  return stones
+    .filter((item) => item.type === stoneType)
+    .map((item) => item.id);
+}
+
 export default function Stones() {
   const { stones } = useLoaderData<typeof loader>();
+  const { currentId, setCurrentId } = useArrowToggle(
+    (value: number | undefined) => (value ? stoneIds(stones, value) : [])
+  );
   const stoneList = stones.reduce(
     (acc: { [key: string]: Stone[] }, stone: Stone) => {
       if (!acc[stone.type]) {
@@ -73,10 +84,13 @@ export default function Stones() {
                     <ModuleList>
                       {stoneList[type].map((stone) => (
                         <Image
+                          id={stone.id}
                           key={stone.id}
                           src={stone.url}
                           alt={stone.name}
                           name={stone.name}
+                          setImage={setCurrentId}
+                          isOpen={currentId === stone.id}
                         />
                       ))}
                     </ModuleList>
