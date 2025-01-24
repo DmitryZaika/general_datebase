@@ -12,6 +12,7 @@ import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
+import { useArrowToggle } from "~/hooks/useArrowToggle";
 
 interface Support {
   id: number;
@@ -36,7 +37,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Supports() {
   const { supports } = useLoaderData<typeof loader>();
-
+  const ids = supports.map((item) => item.id);
+  const { currentId, setCurrentId } = useArrowToggle(ids);
   return (
     <Accordion type="single" defaultValue="supports" className="pt-24 sm:pt-0">
       <AccordionItem value="supports">
@@ -46,10 +48,13 @@ export default function Supports() {
               <ModuleList>
                 {supports.map((support) => (
                   <Image
+                    id={support.id}
                     key={support.id}
                     src={support.url}
                     alt={support.name}
                     name={support.name}
+                    setImage={setCurrentId}
+                    isOpen={currentId === support.id}
                   />
                 ))}
               </ModuleList>
