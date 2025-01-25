@@ -45,7 +45,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             : "bg-gray-200 text-gray-900"
         }`}
       >
-        <ReactMarkdown>{formattedContent}</ReactMarkdown>
+        <ReactMarkdown>{message.content}</ReactMarkdown>
       </div>
     </div>
   );
@@ -83,6 +83,7 @@ export const Chat: React.FC<{ instructions: InstructionSlim[] }> = ({
     event.preventDefault();
 
     const formData = new FormData(event.target as HTMLFormElement);
+    console.log(formData);
     const query = formData.get("query");
 
     const sse = new EventSource(`/api/chat?query=${query}`);
@@ -152,6 +153,7 @@ export const Chat: React.FC<{ instructions: InstructionSlim[] }> = ({
           className="p-4 bg-gray-100 border-t border-gray-300 flex items-center gap-2"
         >
           <input
+            name="query"
             value={question}
             onChange={handleInputChange}
             placeholder="Type your message..."

@@ -6,28 +6,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_SECRET_KEY,
 });
 
-let processData = function (data: { toString: () => string }, send: Function) {
-  const lines = data
-    .toString()
-    .split("\n")
-    .filter((line: string) => line.trim() !== "");
-
-  for (const line of lines) {
-    const message = line.toString().replace(/^data: /, "");
-    if (message === "[DONE]") {
-      return; // Stream finished
-    }
-    try {
-      // console.log("Message", message);
-      const parsed = JSON.parse(message);
-      let delta = parsed.choices[0].delta?.content;
-      if (delta) send({ data: delta });
-    } catch (error) {
-      console.error("Could not JSON parse stream message", message, error);
-    }
-  }
-};
-
 export async function loader({ request }: LoaderFunctionArgs) {
   let query = new URL(request.url).searchParams.get("query");
 
@@ -40,7 +18,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 
   let response = await openai.chat.completions.create({
-    model: "gpt-4",
+    model: "gpt-4o-mini-2024-07-18",
     messages: messages,
     temperature: 0,
     max_tokens: 1024,
@@ -50,7 +28,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return eventStream(request.signal, function setup(send) {
     (async () => {
       for await (const chunk of response) {
-        processData(chunk, send);
+        send({ data: chunk.choices[0].delta.content || "" });
       }
     })();
 
