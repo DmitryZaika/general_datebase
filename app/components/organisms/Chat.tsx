@@ -2,7 +2,6 @@ import React, { useState, useEffect, FormEvent } from "react";
 import { useChat, useInput } from "~/hooks/chat";
 import { ask, processChatResponse } from "~/utils/chat.client";
 import { marked } from "marked";
-import DOMPurify from "dompurify";
 import { InstructionSlim } from "~/types";
 import { reminders, help } from "~/lib/instructions";
 import ReactMarkdown from "react-markdown";
@@ -16,14 +15,6 @@ interface ChatMessagesProps {
   messages: Message[];
   isThinking: boolean;
 }
-
-/*
-const processHTML = (text: string): string => {
-  const markdown = marked(text);
-  const cleanHTML = DOMPurify.sanitize(markdown);
-  return cleanHTML;
-};
-*/
 
 interface MessageBubbleProps {
   message: Message;
@@ -45,7 +36,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             : "bg-gray-200 text-gray-900"
         }`}
       >
-        <ReactMarkdown>{message.content}</ReactMarkdown>
+        <div>{message.content}</div>
       </div>
     </div>
   );
@@ -69,9 +60,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   </div>
 );
 
-export const Chat: React.FC<{ instructions: InstructionSlim[] }> = ({
-  instructions,
-}) => {
+export const Chat = () => {
   const { messages, addMessage } = useChat();
   const { input: question, handleInputChange, resetInput } = useInput();
 
@@ -83,13 +72,17 @@ export const Chat: React.FC<{ instructions: InstructionSlim[] }> = ({
     event.preventDefault();
 
     const formData = new FormData(event.target as HTMLFormElement);
-    console.log(formData);
     const query = formData.get("query");
+    if (answer) {
+      addMessage({ role: "assisstant", content: answer });
+      setAnswer("");
+    }
+    addMessage({ role: "user", content: query });
 
     const sse = new EventSource(`/api/chat?query=${query}`);
 
     sse.addEventListener("message", (event) => {
-      // console.log("event: ", event);
+      console.log(event.data);
       setAnswer((prevResults) => prevResults + event.data);
     });
 
@@ -98,6 +91,7 @@ export const Chat: React.FC<{ instructions: InstructionSlim[] }> = ({
       sse.close();
     });
   };
+  console.log(answer);
 
   return (
     <>

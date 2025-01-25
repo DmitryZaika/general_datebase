@@ -1,21 +1,46 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { eventStream } from "remix-utils/sse/server";
+import { commitSession, getSession } from "../sessions";
 import OpenAI from "openai";
+import { getEmployeeUser, getUserBySessionId } from "../utils/session.server";
+import { selectMany } from "../utils/queryHelpers";
+import { Todo, InstructionSlim } from "~/types";
+import { db } from "~/db.server";
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_SECRET_KEY,
 });
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const session = await getSession(request.headers.get("Cookie"));
+  const activeSession = session.data.sessionId || null;
   let query = new URL(request.url).searchParams.get("query");
 
-  console.log(`GET: Completion Loader called with query: ${query}`);
+  let instructions: InstructionSlim[] = [];
 
-  let messages: any[] = [];
-  messages.push({
-    role: "user",
-    content: `Answer the question as best yoyu can.\n\nQuestion: ${query}\n\nAnswer:`,
-  });
+  let user = null;
+  if (activeSession) {
+    user = (await getUserBySessionId(activeSession)) || null;
+    if (user) {
+      instructions = await selectMany<InstructionSlim>(
+        db,
+        "SELECT id, title, rich_text from instructions WHERE company_id = ?",
+        [user.company_id]
+      );
+    }
+  }
+
+  let messages: any[] = [
+    {
+      role: "system",
+      content: `Here is your context: ${JSON.stringify(instructions)}`,
+    },
+    {
+      role: "user",
+      content: `Answer the question as best yoyu can.\n\nQuestion: ${query}\n\nAnswer:`,
+    },
+  ];
+  console.log(messages);
 
   let response = await openai.chat.completions.create({
     model: "gpt-4o-mini-2024-07-18",

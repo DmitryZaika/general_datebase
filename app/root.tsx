@@ -52,22 +52,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   //   "SELECT id, name, is_done from todolist"
   // )
 
-  let instructions: InstructionSlim[] = [];
-
   let user = null;
   if (activeSession) {
     user = (await getUserBySessionId(activeSession)) || null;
-    if (user) {
-      instructions = await selectMany<InstructionSlim>(
-        db,
-        "SELECT id, title, rich_text from instructions WHERE company_id = ?",
-        [user.company_id]
-      );
-    }
   }
 
   return json(
-    { message, token, user, instructions /* todos */ },
+    { message, token, user /* todos */ },
 
     {
       headers: [
@@ -79,8 +70,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function App() {
-  const { message, token, user, instructions /* todos*/ } =
-    useLoaderData<typeof loader>();
+  const { message, token, user /* todos*/ } = useLoaderData<typeof loader>();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -124,7 +114,7 @@ export default function App() {
         <Scripts />
       </body>
 
-      {user && <Chat instructions={instructions} />}
+      {user && <Chat />}
     </html>
   );
 }
