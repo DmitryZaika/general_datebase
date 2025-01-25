@@ -5,6 +5,7 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { InstructionSlim } from "~/types";
 import { reminders, help } from "~/lib/instructions";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -31,14 +32,6 @@ interface MessageBubbleProps {
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const [formattedContent, setFormattedContent] = useState<string>("");
 
-  useEffect(() => {
-    const formatContent = async () => {
-      // const content = processHTML(message.content);
-      setFormattedContent(message.content);
-    };
-    formatContent();
-  }, [message.content]);
-
   return (
     <div
       className={`flex ${
@@ -52,10 +45,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             : "bg-gray-200 text-gray-900"
         }`}
       >
-        <div
-          className="prose"
-          dangerouslySetInnerHTML={{ __html: formattedContent }}
-        />
+        <ReactMarkdown>{formattedContent}</ReactMarkdown>
       </div>
     </div>
   );
@@ -89,38 +79,23 @@ export const Chat: React.FC<{ instructions: InstructionSlim[] }> = ({
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isThinking, setIsThinking] = useState<boolean>(false);
 
-  const askQuestion = async (event: FormEvent) => {
+  const handleFormSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (question.trim().length === 0) return;
+    const formData = new FormData(event.target as HTMLFormElement);
+    const query = formData.get("query");
 
-    const userMessage: Message = { role: "user", content: question as string };
-    addMessage(userMessage);
-    resetInput();
+    const sse = new EventSource(`/api/chat?query=${query}`);
 
-    setIsThinking(true);
-    const response = await ask({
-      messages: [...messages, userMessage],
-      context: { instructions /* help, reminders */ },
+    sse.addEventListener("message", (event) => {
+      // console.log("event: ", event);
+      setAnswer((prevResults) => prevResults + event.data);
     });
 
-    if (!response) {
-      setIsThinking(false);
-      return;
-    }
-
-    const assistantMessageContent = await processChatResponse({
-      response,
-      onChunk: (value: string) => {
-        setIsThinking(false);
-        setAnswer((prev) => prev + value);
-      },
+    sse.addEventListener("error", (event) => {
+      console.log("error: ", event);
+      sse.close();
     });
-
-    // const formattedContent = await processHTML(assistantMessageContent);
-    const formattedContent = assistantMessageContent;
-    setAnswer("");
-    addMessage({ role: "assistant", content: formattedContent });
   };
 
   return (
@@ -173,7 +148,7 @@ export const Chat: React.FC<{ instructions: InstructionSlim[] }> = ({
         />
 
         <form
-          onSubmit={askQuestion}
+          onSubmit={handleFormSubmit}
           className="p-4 bg-gray-100 border-t border-gray-300 flex items-center gap-2"
         >
           <input
