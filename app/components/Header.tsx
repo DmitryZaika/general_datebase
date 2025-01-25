@@ -100,8 +100,8 @@ export function Header({
                 </Link>
               </Button>
             </li>
-          )} */}
-          {/* {!isAdminPage && (
+          )}
+          {!isAdminPage && (
             <li>
               <Button asChild variant="link">
                 <Link to="/employee/customers" className="text-lg md:text-xl">
