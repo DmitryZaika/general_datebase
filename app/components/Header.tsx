@@ -1,4 +1,5 @@
 // src/components/Header.tsx
+
 import { Link, useLocation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { TodoList } from "./TodoList";
@@ -9,7 +10,7 @@ interface HeaderProps {
   isAdmin: boolean;
   isSuperUser: boolean;
   isEmployee: boolean;
-  // todos: Todo[];
+  todos: Todo[];
 }
 
 export function Header({
@@ -17,8 +18,8 @@ export function Header({
   isAdmin,
   isSuperUser,
   isEmployee,
-}: // todos,
-HeaderProps) {
+  todos,
+}: HeaderProps) {
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
 
@@ -41,9 +42,9 @@ HeaderProps) {
               <Link to="/employee">
                 <Button>Employee</Button>
               </Link>
-              {/* <Link to="/admin/users">
+              <Link to="/admin/users">
                 <Button>Users</Button>
-              </Link> */}
+              </Link>
             </div>
           ) : (
             <Link to="/admin">
@@ -52,6 +53,7 @@ HeaderProps) {
           )
         ) : null}
       </div>
+
       <nav className="flex-1">
         <ul className="flex flex-wrap justify-center md:justify-center gap-4">
           <li>
@@ -88,7 +90,7 @@ HeaderProps) {
               </Button>
             </li>
           )}
-          {/* {isAdminPage && (
+          {isAdminPage && (
             <li>
               <Button asChild variant="link">
                 <Link
@@ -99,8 +101,8 @@ HeaderProps) {
                 </Link>
               </Button>
             </li>
-          )} */}
-          {/* {!isAdminPage && (
+          )}
+          {!isAdminPage && (
             <li>
               <Button asChild variant="link">
                 <Link to="/employee/customers" className="text-lg md:text-xl">
@@ -108,10 +110,11 @@ HeaderProps) {
                 </Link>
               </Button>
             </li>
-          )} */}
+          )}
         </ul>
       </nav>
-      {/* <TodoList todos={todos} /> */}
+
+      <TodoList todos={todos} />
 
       {activeSession && (
         <Link to="/logout">
