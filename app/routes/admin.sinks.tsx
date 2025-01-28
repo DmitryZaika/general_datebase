@@ -26,7 +26,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  const sinks = await selectMany<Sink>(db, "select id, name from sinks");
+
+  const user = await getAdminUser(request);
+  const sinks = await selectMany<Sink>(
+    db,
+    "SELECT id, name, url FROM sinks WHERE company_id = ?",
+    [user.company_id]
+  );
   return {
     sinks,
   };

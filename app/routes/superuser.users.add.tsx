@@ -16,6 +16,7 @@ import { useFullSubmit } from "~/hooks/useFullSubmit";
 const userSchema = z.object({
   email: z.string().email(),
   password: z.coerce.string(),
+  company_id: z.number(),
 });
 type FormData = z.infer<typeof userSchema>;
 const resolver = zodResolver(userSchema);
@@ -42,7 +43,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    const value = await register(data.email, data.password);
+    const value = await register(data.email, data.password, data.company_id);
   } catch (error) {
     console.error(error);
   }
@@ -80,6 +81,20 @@ export default function Login() {
               placeholder={"Password"}
               field={field}
             />
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="company_id"
+          render={({ field }) => (
+            <InputItem name={"Company"} placeholder={"Company"} field={field} />
+          )}
+        />
+        <FormField
+          control={form.control}
+          name=""
+          render={({ field }) => (
+            <InputItem name={"Company"} placeholder={"Company"} field={field} />
           )}
         />
         <Button type="submit">Add user</Button>

@@ -6,7 +6,7 @@ import { TodoList } from "./TodoList";
 import { Todo } from "~/types";
 
 interface HeaderProps {
-  activeSession: string | null;
+  user: object | null;
   isAdmin: boolean;
   isSuperUser: boolean;
   isEmployee: boolean;
@@ -14,7 +14,7 @@ interface HeaderProps {
 }
 
 export function Header({
-  activeSession,
+  user,
   isAdmin,
   isSuperUser,
   isEmployee,
@@ -24,7 +24,7 @@ export function Header({
   const isAdminPage = location.pathname.startsWith("/admin");
 
   return (
-    <header className="flex flex-col relative md:flex-row items-center justify-between p-4 gap-4 m-3 md:gap-5">
+    <header className="flex flex-col relative md:flex-row items-center gap-5  md:gap-0 justify-between p-4 m-3 ">
       <div className="logo">
         <a className="flex justify-center" href="/">
           <img
@@ -52,15 +52,21 @@ export function Header({
             </Link>
           )
         ) : null}
+        {isSuperUser ? (
+          isAdminPage ? (
+            <Link to="/admin/users">
+              <Button>User Panel</Button>
+            </Link>
+          ) : null
+        ) : null}
       </div>
-
-      <nav className="flex-1">
-        <ul className="flex flex-wrap justify-center md:justify-center gap-4">
+      <nav className="text-center flex-1">
+        <ul className="flex-col md:flex-row flex flex-wrap justify-center ali md:justify-center gap-4">
           <li>
             <Button asChild variant="link">
               <Link
                 to={isAdminPage ? "/admin/stones" : "/employee/stones"}
-                className="text-lg md:text-xl"
+                className="text-xl md:text-xl"
               >
                 Database
               </Link>
@@ -72,7 +78,7 @@ export function Header({
                 to={
                   isAdminPage ? "/admin/instructions" : "/employee/instructions"
                 }
-                className="text-lg md:text-xl"
+                className="text-xl md:text-xl"
               >
                 Instructions
               </Link>
@@ -83,7 +89,7 @@ export function Header({
               <Button asChild variant="link">
                 <Link
                   to="/employee/special-order"
-                  className="text-lg md:text-xl"
+                  className="text-xl md:text-xl"
                 >
                   Special Order
                 </Link>
@@ -116,7 +122,7 @@ export function Header({
 
       <TodoList todos={todos} />
 
-      {activeSession && (
+      {user !== null && (
         <Link to="/logout">
           <Button>Logout</Button>
         </Link>

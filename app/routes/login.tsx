@@ -4,72 +4,76 @@ import {
   redirect,
 } from "@remix-run/node";
 import { z } from "zod";
-import { Form, FormProvider, useForm } from "react-hook-form";
+import { Form, useLoaderData, useActionData } from "@remix-run/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { getValidatedFormData } from "remix-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
+import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
-import { login } from "~/utils/session.server";
+import { getEmployeeUser, login } from "~/utils/session.server";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
-import { useActionData, useLoaderData } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
-import { commitSession, getSession } from "~/sessions";
 import { PasswordInput } from "~/components/molecules/PasswordInput";
-import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { Button } from "~/components/ui/button";
 
 const userSchema = z.object({
   email: z.string().email(),
   password: z.coerce.string().min(4),
 });
+
 type FormData = z.infer<typeof userSchema>;
-const resolver = zodResolver(userSchema);
+
+interface ActionData {
+  error?: string;
+  errors?: Record<string, any>;
+  defaultValues?: Partial<FormData>;
+}
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    await getEmployeeUser(request);
+    return redirect("/employee");
+  } catch {}
+  const { searchParams } = new URL(request.url);
+  const error = searchParams.get("error");
+  return { error };
+};
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
     await csrf.validate(request);
-  } catch (error) {
-    return { error: "Invalid CSRF token" };
+  } catch (e) {
+    return { error: String(e) } as ActionData;
   }
-
   const {
     errors,
     data,
     receivedValues: defaultValues,
-  } = await getValidatedFormData<FormData>(request, resolver);
+  } = await getValidatedFormData<FormData>(request, zodResolver(userSchema));
   if (errors) {
-    return { errors, defaultValues };
+    return { errors, defaultValues } as ActionData;
   }
 
-  const value = await login(data.email, data.password, 60 * 60 * 24 * 7);
-  if (value == undefined) {
-    return { error: "Unable to login" };
+  const sessionId = await login(data.email, data.password, 60 * 60 * 24 * 7);
+  if (!sessionId) {
+    return { error: "Unable to login", defaultValues } as ActionData;
   }
-
   const session = await getSession(request.headers.get("Cookie"));
-
-  session.set("sessionId", value);
-
+  session.set("sessionId", sessionId);
   session.flash("message", toastData("Success", "Logged in"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { searchParams } = new URL(request.url);
-  const error = searchParams.get("error");
-  return { error };
-};
-
 export default function Login() {
-  const { error } = useLoaderData<typeof loader>();
-  const data = useActionData<typeof action>();
-  console.log(error);
-
+  const { error } = useLoaderData<{ error: string | null }>();
+  const actionData = useActionData<ActionData>();
   const form = useForm<FormData>({
-    resolver,
-    defaultValues: { email: "", password: "" },
+    resolver: zodResolver(userSchema),
+    defaultValues: actionData?.defaultValues || { email: "", password: "" },
   });
   const fullSubmit = useFullSubmit(form);
 
@@ -78,16 +82,15 @@ export default function Login() {
       <FormProvider {...form}>
         <Form
           className="w-full max-w-sm bg-white p-6 shadow-md rounded"
-          id="customerForm"
           method="post"
           onSubmit={fullSubmit}
         >
-          <p className="text-red-500">{error || data?.error || ""}</p>
+          <p className="text-red-500">{error || actionData?.error || ""}</p>
           <FormField
             control={form.control}
             name="email"
             render={({ field }) => (
-              <InputItem name={"Email"} placeholder={"Email"} field={field} />
+              <InputItem name="Email" placeholder="Email" field={field} />
             )}
           />
           <FormField
@@ -95,8 +98,8 @@ export default function Login() {
             name="password"
             render={({ field }) => (
               <PasswordInput
-                name={"Password"}
-                placeholder={"Password"}
+                name="password"
+                placeholder="Password"
                 field={field}
               />
             )}

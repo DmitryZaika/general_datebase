@@ -32,9 +32,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const user = await getEmployeeUser(request);
   const documents = await selectMany<Document>(
     db,
-    "select id, name, url from documents"
+    "SELECT id, name, url FROM documents WHERE company_id = ?",
+    [user.company_id]
   );
   return { documents };
 };
@@ -43,25 +45,22 @@ export default function Documents() {
   const { documents } = useLoaderData<typeof loader>();
 
   return (
-    <Accordion type="single" defaultValue="documents">
+    <Accordion type="single" defaultValue="documents" className="pt-24 sm:pt-0">
       <AccordionItem value="documents">
         <AccordionContent>
           <Accordion type="multiple">
             <AccordionContent>
               <ModuleList>
                 {documents.map(({ url, id, name }) => (
-                  <div className=" w-[50px] h-auto">
+                  <div className=" w-[118px] h-auto">
                     <Document
                       key={id}
                       file={url}
-                      className=""
                       onClick={() => window.open(url || "")}
                     >
                       <Page pageNumber={1} scale={0.2} />
-                      <p className="text-center font-bold select-none">
-                        {name}
-                      </p>
                     </Document>
+                    <p className="text-center font-bold select-none">{name}</p>
                   </div>
                 ))}
               </ModuleList>

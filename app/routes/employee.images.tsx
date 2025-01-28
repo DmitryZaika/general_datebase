@@ -11,6 +11,8 @@ import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
+import { useEffect, useState } from "react";
+import { useArrowToggle } from "~/hooks/useArrowToggle";
 
 interface Image {
   id: number;
@@ -24,18 +26,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const user = await getEmployeeUser(request);
   const images = await selectMany<Image>(
     db,
-    "select id, name, url from images"
+    "SELECT id, name, url FROM images WHERE company_id = ?",
+    [user.company_id]
   );
   return { images };
 };
 
 export default function Images() {
   const { images } = useLoaderData<typeof loader>();
+  const ids = images.map((item) => item.id);
+  const { currentId, setCurrentId } = useArrowToggle(ids);
 
   return (
-    <Accordion type="single" defaultValue="images">
+    <Accordion type="single" defaultValue="images" className="pt-24 sm:pt-0">
       <AccordionItem value="images">
         <AccordionContent>
           <Accordion type="multiple">
@@ -43,10 +49,13 @@ export default function Images() {
               <ModuleList>
                 {images.map((image) => (
                   <Image
+                    id={image.id}
                     key={image.id}
                     src={image.url}
                     alt={image.name}
                     name={image.name}
+                    setImage={setCurrentId}
+                    isOpen={currentId === image.id}
                   />
                 ))}
               </ModuleList>

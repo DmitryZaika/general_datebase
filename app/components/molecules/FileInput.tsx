@@ -13,19 +13,27 @@ type FileInput = {
 
 const acceptsMap = {
   image:
-    "image/png, image/jpeg, image/gif, image/webp, image/svg+xml, image/tiff, image/bmp, image/x-icon, image/heif, image/x-canon-cr2, image/x-nikon-nef",
+    "image/png, image/jpeg, image/jpg, image/gif, image/webp, image/svg+xml, image/tiff, image/bmp, image/x-icon, image/heif, image/x-canon-cr2, image/x-nikon-nef",
   pdf: "application/pdf",
 };
 
 function getQuality(size: number): number {
+  const SEVEN_MB = 7 * 1024 * 1024;
+  const FIVE_MB = 5 * 1024 * 1024;
   const THREE_MB = 3 * 1024 * 1024;
-  const FIVE_HUNDRED_KB = 500 * 1024;
-  if (size > THREE_MB) {
-    return 0.2;
-  } else if (size > FIVE_HUNDRED_KB) {
+  const ONE_MB = 1 * 1024 * 1024;
+
+  if (size > SEVEN_MB) {
     return 0.3;
+  } else if (size > FIVE_MB) {
+    return 0.35;
+  } else if (size > THREE_MB) {
+    return 0.4;
+  } else if (size > ONE_MB) {
+    return 0.5;
+  } else {
+    return 0.7;
   }
-  return 1;
 }
 
 export function FileInput({ onChange, id, label = "Image", type }: FileInput) {
