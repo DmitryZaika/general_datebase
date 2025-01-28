@@ -1,12 +1,17 @@
+// src/components/TodoList.tsx
+
 import { useState } from "react";
 import { Button } from "./ui/button";
-import { useLoaderData } from "@remix-run/react";
 import { TableBody, TableCell, TableRow } from "./ui/table";
 import { PencilIcon, TrashIcon } from "lucide-react";
+import { Todo } from "~/types";
 
-export function TodoList() {
+interface TodoListProps {
+  todos: Todo[];
+}
+
+export function TodoList({ todos }: TodoListProps) {
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const { todos } = useLoaderData<typeof loader>();
 
   return (
     <>
@@ -20,6 +25,7 @@ export function TodoList() {
       >
         Todo List
       </Button>
+
       <div
         className={`absolute flex flex-col top-[calc(100%)] right-0 transform -translate-x-1/2 w-[400px] bg-white border rounded shadow-lg p-4 z-50 transition-all duration-300 ease-out ${
           isOpen
@@ -37,6 +43,7 @@ export function TodoList() {
             ✕
           </button>
         </div>
+
         <div className="flex items-center space-x-2 mb-4">
           <textarea
             placeholder="Add new task"
@@ -52,20 +59,21 @@ export function TodoList() {
             Add
           </button>
         </div>
+
         <div className="overflow-y-auto max-h-60">
           <TableBody>
-            {(todos || []).map((todo) => (
+            {todos.map((todo) => (
               <TableRow key={todo.id}>
-                <TableCell className="font-medium w-full ">
-                  {todo.name}
+                <TableCell className="font-medium w-full">
+                  {todo.rich_text}
                 </TableCell>
-                <TableCell className=" text-right">
-                  <button className=" p-1 hover:bg-gray-100 rounded">
+                <TableCell className="text-right">
+                  <button className="p-1 hover:bg-gray-100 rounded">
                     <PencilIcon />
                   </button>
                 </TableCell>
-                <TableCell className=" text-right">
-                  <button className=" p-1 hover:bg-gray-100 rounded">
+                <TableCell className="text-right">
+                  <button className="p-1 hover:bg-gray-100 rounded">
                     <TrashIcon />
                   </button>
                 </TableCell>
