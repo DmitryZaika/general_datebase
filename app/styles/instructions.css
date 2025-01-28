@@ -47,7 +47,7 @@
 }
 
 .instructions ol > li::marker {
-  color: #10B981;
+  color: #000000;
 }
 
 .instructions a {

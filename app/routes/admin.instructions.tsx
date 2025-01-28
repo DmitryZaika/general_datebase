@@ -23,17 +23,18 @@ interface Instructions {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user;
   try {
-    user = await getAdminUser(request);
+    await getAdminUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const user = await getAdminUser(request);
   const instructions = await selectMany<Instructions>(
     db,
-    "select id, title, parent_id, after_id, rich_text from instructions"
+    "select id, title, parent_id, after_id, rich_text from instructions WHERE company_id = ?",
+    [user.company_id]
   );
-  return { instructions, user };
+  return { instructions };
 };
 
 export default function AdminInstructions() {

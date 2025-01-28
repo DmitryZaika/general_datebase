@@ -4,7 +4,7 @@ import {
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
-import { Form, useNavigate } from "@remix-run/react";
+import { Form, useLoaderData, useNavigate } from "@remix-run/react";
 import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
@@ -24,25 +24,34 @@ import { toastData } from "~/utils/toastHelpers";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 
 import { csrf } from "~/utils/csrf.server";
-import { getAdminUser } from "~/utils/session.server";
+import { getSuperUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { SelectInput } from "~/components/molecules/SelectItem";
+import { selectMany } from "~/utils/queryHelpers";
+import bcrypt from "bcryptjs";
+import { SwitchItem } from "~/components/molecules/SwitchItem";
 
-const supplierschema = z.object({
-  website: z.union([z.string().url().optional(), z.literal("")]),
-  supplier_name: z.string().min(1),
-  manager: z.string().optional(),
-  phone: z.union([z.coerce.string().min(10), z.literal("")]).optional(),
+interface Company {
+  id: number;
+  name: string;
+}
+
+const userschema = z.object({
+  name: z.string().min(1),
+  phone_number: z.union([z.coerce.string().min(10), z.literal("")]).optional(),
   email: z.union([z.string().email().optional(), z.literal("")]),
-  notes: z.string().optional(),
+  password: z.coerce.string().min(4),
+  company_id: z.coerce.number(),
+  is_employee: z.boolean(),
+  is_admin: z.boolean(),
 });
 
-type FormData = z.infer<typeof supplierschema>;
-
-const resolver = zodResolver(supplierschema);
+type FormData = z.infer<typeof userschema>;
+const resolver = zodResolver(userschema);
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    await getAdminUser(request);
+    await getSuperUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -59,25 +68,25 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors) {
     return { errors, receivedValues };
   }
-  let user = getAdminUser(request);
+  const password = await bcrypt.hash(data.password, 10);
   try {
     await db.execute(
-      `INSERT INTO main.suppliers  (website, supplier_name, manager,  phone, email, notes, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO main.users (name, phone_number, email, password, company_id, is_employee, is_admin)
+       VALUES (?, ?, ?, ?, ?, 1, ?)`,
       [
-        data.website,
-        data.supplier_name,
-        data.manager ?? null,
-        data.phone ?? null,
-        data.email ?? null,
-        data.notes ?? null,
-        (await user).company_id,
+        data.name,
+        data.phone_number,
+        data.email,
+        password,
+        data.company_id,
+        data.is_admin,
       ]
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "supplier added"));
+  session.flash("message", toastData("Success", "user added"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
@@ -85,79 +94,66 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request);
-    return { user };
+    await getSuperUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const companies = await selectMany<Company>(
+    db,
+    "select id, name from company"
+  );
+  return { companies };
 };
 
-export default function SuppliersAdd() {
+export default function UsersAdd() {
   const navigate = useNavigate();
+  const { companies } = useLoaderData<typeof loader>();
+  const cleanCompanies = companies.map((company) => ({
+    key: company.id,
+    value: company.name,
+  }));
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
-      website: "",
-      supplier_name: "",
-      manager: "",
-      phone: "",
+      name: "",
+      phone_number: "",
       email: "",
-      notes: "",
+      password: "",
+      company_id: 0,
+      is_employee: false,
+      is_admin: false,
     },
   });
   const fullSubmit = useFullSubmit(form);
-
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
     }
   };
-
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add supplier</DialogTitle>
+          <DialogTitle>Add user</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
           <Form id="customerForm" method="post" onSubmit={fullSubmit}>
             <FormField
               control={form.control}
-              name="website"
+              name="name"
               render={({ field }) => (
                 <InputItem
-                  name={"Website"}
-                  placeholder={"Website"}
+                  name={"User Name"}
+                  placeholder={"Name"}
                   field={field}
                 />
               )}
             />
+
             <FormField
               control={form.control}
-              name="supplier_name"
-              render={({ field }) => (
-                <InputItem
-                  name={"Supplier Name"}
-                  placeholder={"Name of the supplier"}
-                  field={field}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="manager"
-              render={({ field }) => (
-                <InputItem
-                  name={"Manager"}
-                  placeholder={"Name of the manager"}
-                  field={field}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="phone"
+              name="phone_number"
               render={({ field }) => (
                 <InputItem
                   name={"Phone Number"}
@@ -175,11 +171,34 @@ export default function SuppliersAdd() {
             />
             <FormField
               control={form.control}
-              name="notes"
+              name="password"
               render={({ field }) => (
-                <InputItem name={"Notes"} placeholder={"Notes"} field={field} />
+                <InputItem
+                  name={"Password"}
+                  placeholder={"Password"}
+                  field={field}
+                />
               )}
             />
+            <FormField
+              control={form.control}
+              name="company_id"
+              render={({ field }) => (
+                <SelectInput
+                  field={field}
+                  name="Company"
+                  options={cleanCompanies}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="is_admin"
+              render={({ field }) => (
+                <SwitchItem field={field} name="  Admin" />
+              )}
+            />
+
             <DialogFooter>
               <Button type="submit">Save changes</Button>
             </DialogFooter>

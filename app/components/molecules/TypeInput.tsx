@@ -1,3 +1,4 @@
+// app/components/molecules/TypeSelect.tsx
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { FieldValues, ControllerRenderProps } from "react-hook-form";
 import {
@@ -8,9 +9,9 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 
-type Option = { key: string | number; value: string };
+type Option = { key: string; value: string };
 
-export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
+export function TypeSelect<TFieldValues extends FieldValues = FieldValues>({
   name,
   field,
   placeholder,
@@ -27,8 +28,8 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
 }) {
   const cleanOptions: Option[] = options.map((option) =>
     typeof option === "string"
-      ? { key: option, value: option }
-      : { key: option.key, value: option.value }
+      ? { key: option.toLowerCase(), value: option }
+      : { key: option.key.toLowerCase(), value: option.value }
   );
 
   return (
@@ -36,7 +37,7 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
       <FormLabel>{name}</FormLabel>
       <FormControl>
         <Select
-          value={String(field.value ?? "")}
+          value={field.value || ""}
           onValueChange={(val) => field.onChange(val)}
           disabled={disabled}
         >
@@ -45,7 +46,7 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
           </SelectTrigger>
           <SelectContent>
             {cleanOptions.map(({ key, value }) => (
-              <SelectItem key={key} value={String(key)}>
+              <SelectItem key={key} value={key}>
                 {value}
               </SelectItem>
             ))}

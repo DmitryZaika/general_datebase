@@ -26,6 +26,7 @@ import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
+import { TypeSelect } from "~/components/molecules/TypeInput";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -50,13 +51,15 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
+  let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.stones (name, type, url) VALUES (?, ?, ?);`,
-      [data.name, data.type, data.file]
+      `INSERT INTO main.stones (name,type, url, company_id) VALUES (?, ?, ?, ?);`,
+      [data.name, data.type, data.file, user.company_id]
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
+
     const session = await getSession(request.headers.get("Cookie"));
     session.flash(
       "message",
@@ -85,7 +88,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function StonesAdd() {
   const navigate = useNavigate();
-  // const actionData = useActionData<typeof action>();
   const isSubmitting = useNavigation().state === "submitting";
 
   const form = useCustomForm(stoneSchema);
@@ -128,7 +130,7 @@ export default function StonesAdd() {
                   "Marble",
                   "Dolomite",
                   "Quartzite",
-                ]}
+                ].map((item) => ({ key: item.toLowerCase(), value: item }))}
               />
             )}
           />

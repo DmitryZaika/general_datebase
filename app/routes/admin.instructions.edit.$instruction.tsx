@@ -141,7 +141,6 @@ export default function InstructionsEdit() {
   const navigate = useNavigate();
   const { title, parent_id, after_id, rich_text } =
     useLoaderData<typeof loader>();
-  const token = useAuthenticityToken();
   const { instructions } = useLoaderData<typeof loader>();
   const form = useForm<FormData>({
     resolver,
@@ -220,7 +219,9 @@ export default function InstructionsEdit() {
             />
 
             <DialogFooter>
-              <Button type="submit">Save changes</Button>
+              <Button className="mt-6" type="submit">
+                Save changes
+              </Button>
             </DialogFooter>
           </Form>
         </FormProvider>

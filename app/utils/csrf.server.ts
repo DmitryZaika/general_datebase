@@ -4,13 +4,13 @@ import { createCookie } from "@remix-run/node";
 export const cookie = createCookie("csrf", {
   path: "/",
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
+  secure: false,
   sameSite: "lax",
-  secrets: [process.env.COOKIE_SECRET || ""],
+  secrets: [process.env.SESSION_SECRET || ""],
 });
 
 export const csrf = new CSRF({
   cookie,
   formDataKey: "csrf",
-  secret: process.env.COOKIE_SECRET || "",
+  secret: process.env.SESSION_SECRET,
 });

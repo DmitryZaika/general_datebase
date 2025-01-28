@@ -10,7 +10,9 @@
     "start": "remix-serve ./build/server/index.js",
     "typecheck": "tsc",
     "migrate": "node migrate.js",
-    "hash-password": "node hash-password.js"
+    "hash-password": "node hash-password.js",
+    "prod-deploy": "remix vite:build && export $(grep -v '^#' .env | xargs -0) && nohup remix-serve ./build/server/index.js > build.log 2>&1 &",
+    "prod-kill": "kill -9 $(lsof -t -i:3000)"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.717.0",
@@ -27,6 +29,7 @@
     "@radix-ui/react-navigation-menu": "^1.2.3",
     "@radix-ui/react-select": "^2.1.4",
     "@radix-ui/react-slot": "^1.1.1",
+    "@radix-ui/react-switch": "^1.1.2",
     "@radix-ui/react-tabs": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.1.6",

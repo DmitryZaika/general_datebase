@@ -33,9 +33,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const user = await getEmployeeUser(request);
   const suppliers = await selectMany<Supplier>(
     db,
-    "select id,website, supplier_name,  manager, phone, email from suppliers"
+    "select id,website, supplier_name,  manager, phone, email, notes from suppliers WHERE company_id = ?",
+    [user.company_id]
   );
   return { suppliers };
 };
@@ -43,7 +45,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function Suppliers() {
   const { suppliers } = useLoaderData<typeof loader>();
   return (
-    <Accordion type="single" defaultValue="suppliers">
+    <Accordion type="single" defaultValue="suppliers" className="pt-24 sm:pt-0">
       <AccordionItem value="suppliers">
         <AccordionTrigger>Suppliers</AccordionTrigger>
         <AccordionContent>
