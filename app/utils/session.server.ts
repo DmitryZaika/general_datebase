@@ -78,7 +78,7 @@ export async function login(
 
 async function getUser(sessionId: string): Promise<SessionUser | undefined> {
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
-    `SELECT users.email, users.name, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
+    `SELECT user.id, users.email, users.name, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
      JOIN sessions ON sessions.user_id = users.id
      WHERE sessions.id = ?
        AND sessions.expiration_date > CURRENT_TIMESTAMP
