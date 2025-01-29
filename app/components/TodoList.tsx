@@ -1,10 +1,8 @@
-// src/components/TodoList.tsx
-
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "./ui/button";
 import { TableBody, TableCell, TableRow } from "./ui/table";
-import { PencilIcon, TrashIcon } from "lucide-react";
-import { Todo } from "~/types";
+import { PencilIcon, TrashIcon, CheckIcon } from "lucide-react";
+import type { Todo } from "~/types";
 
 interface TodoListProps {
   todos: Todo[];
@@ -12,6 +10,16 @@ interface TodoListProps {
 
 export function TodoList({ todos }: TodoListProps) {
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState<string>("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingId !== null && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingId]);
 
   return (
     <>
@@ -44,41 +52,112 @@ export function TodoList({ todos }: TodoListProps) {
           </button>
         </div>
 
-        <div className="flex items-center space-x-2 mb-4">
+        <form
+          method="post"
+          action="/todoList"
+          className="flex items-center space-x-2 mb-4"
+        >
           <textarea
+            name="rich_text"
             placeholder="Add new task"
             className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
             rows={1}
             onInput={(e) => {
-              const target = e.target as HTMLTextAreaElement;
+              const target = e.currentTarget;
               target.style.height = "auto";
               target.style.height = target.scrollHeight + "px";
             }}
-          ></textarea>
-          <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
+          />
+          <button
+            type="submit"
+            name="intent"
+            value="ADD"
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+          >
             Add
           </button>
-        </div>
+        </form>
 
         <div className="overflow-y-auto max-h-60">
           <TableBody>
-            {todos.map((todo) => (
-              <TableRow key={todo.id}>
-                <TableCell className="font-medium w-full">
-                  {todo.rich_text}
-                </TableCell>
-                <TableCell className="text-right">
-                  <button className="p-1 hover:bg-gray-100 rounded">
-                    <PencilIcon />
-                  </button>
-                </TableCell>
-                <TableCell className="text-right">
-                  <button className="p-1 hover:bg-gray-100 rounded">
-                    <TrashIcon />
-                  </button>
-                </TableCell>
-              </TableRow>
-            ))}
+            {todos.map((todo) => {
+              const isEditing = editingId === todo.id;
+
+              return (
+                <TableRow key={todo.id}>
+                  <TableCell className="font-medium w-full">
+                    {isEditing ? (
+                      <input
+                        name="rich_text"
+                        className="w-full border px-2 py-1 rounded focus:outline-none"
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        ref={inputRef}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const form = e.currentTarget.form;
+                            if (form) {
+                              form.submit();
+                            }
+                          }
+                        }}
+                      />
+                    ) : (
+                      todo.rich_text
+                    )}
+                  </TableCell>
+
+                  <TableCell className="text-right">
+                    {isEditing ? (
+                      <form method="post" action="/todoList">
+                        <input type="hidden" name="intent" value="EDIT" />
+                        <input type="hidden" name="id" value={todo.id} />
+                        <input
+                          type="hidden"
+                          name="rich_text"
+                          value={editingText}
+                        />
+                        <button
+                          type="submit"
+                          className="p-1 hover:bg-gray-100 rounded"
+                          title="Save"
+                        >
+                          <CheckIcon />
+                        </button>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        className="p-1 hover:bg-gray-100 rounded"
+                        title="Edit"
+                        onClick={() => {
+                          setEditingId(todo.id);
+                          setEditingText(todo.rich_text);
+                        }}
+                      >
+                        <PencilIcon />
+                      </button>
+                    )}
+                  </TableCell>
+
+                  <TableCell className="text-right">
+                    <form method="post" action="/todoList">
+                      <input type="hidden" name="id" value={todo.id} />
+                      <button
+                        type="submit"
+                        name="intent"
+                        value="DELETE"
+                        className="p-1 hover:bg-gray-100 rounded"
+                        title="Delete"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </form>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </div>
       </div>
