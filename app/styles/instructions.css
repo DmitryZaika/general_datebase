@@ -43,7 +43,7 @@
 }
 
 .instructions ul > li::marker {
-  color: #6366F1;
+  color: #6366f1;
 }
 
 .instructions ol > li::marker {
@@ -51,23 +51,23 @@
 }
 
 .instructions a {
-  color: #6366F1;
+  color: #6366f1;
   text-decoration: underline;
 }
 
 .instructions a:hover {
-  color: #4F46E5;
+  color: #4f46e5;
 }
 
 .instructions code {
-  background-color: #F3F4F6;
+  background-color: #f3f4f6;
   padding: 0.2rem 0.4rem;
   border-radius: 0.25rem;
-  color: #D6336C;
+  color: #d6336c;
 }
 
 .instructions pre {
-  background-color: #F3F4F6;
+  background-color: #f3f4f6;
   padding: 1rem;
   border-radius: 0.5rem;
   margin-top: 1em;
@@ -77,7 +77,7 @@
 }
 
 .instructions blockquote {
-  border-left-color: #D1D5DB;
+  border-left-color: #d1d5db;
   border-left-width: 4px;
   padding-left: 1rem;
   font-style: italic;
@@ -86,7 +86,7 @@
 }
 
 .instructions hr {
-  border-color: #E5E7EB;
+  border-color: #e5e7eb;
   margin-top: 1em;
   margin-bottom: 1em;
 }
@@ -99,11 +99,11 @@
 }
 
 .instructions thead {
-  border-bottom: 2px solid #E5E7EB;
+  border-bottom: 2px solid #e5e7eb;
 }
 
 .instructions tbody tr {
-  border-bottom: 1px solid #E5E7EB;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .instructions th {
@@ -123,4 +123,3 @@
   max-width: 100%;
   height: auto;
 }
-
