@@ -1,31 +1,42 @@
+// admin.stones.tsx
+
 import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "~/components/ui/table";
-import { redirect, LoaderFunctionArgs } from "@remix-run/node";
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "~/components/ui/accordion";
+import { capitalizeFirstLetter } from "~/utils/words";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData, Outlet, Link } from "@remix-run/react";
+import { useLoaderData, Link, Outlet } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
+import { FaPencilAlt, FaTimes } from "react-icons/fa";
+import { Image } from "~/components/molecules/Image";
 import { getAdminUser } from "~/utils/session.server";
+import { useArrowToggle } from "~/hooks/useArrowToggle";
 
 interface Stone {
   id: number;
   name: string;
   type: string;
+  url: string | null;
+}
+
+const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
+
+function customSort(a: string, b: string) {
+  return (
+    customOrder.indexOf(a.toLowerCase()) - customOrder.indexOf(b.toLowerCase())
+  );
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getAdminUser(request);
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${encodeURIComponent(String(error))}`);
   }
   const user = await getAdminUser(request);
   const stones = await selectMany<Stone>(
@@ -33,57 +44,94 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     "SELECT id, name, type, url FROM stones WHERE company_id = ?",
     [user.company_id]
   );
-  return { stones, user };
+  return { stones };
 };
 
-export default function Stones() {
+export default function AdminStones() {
   const { stones } = useLoaderData<typeof loader>();
+
+  const { currentId, setCurrentId } = useArrowToggle(
+    (value: number | undefined) => (value ? [value] : [])
+  );
+
+  const stoneList = stones.reduce(
+    (acc: { [key: string]: Stone[] }, stone: Stone) => {
+      if (!acc[stone.type]) {
+        acc[stone.type] = [];
+      }
+      acc[stone.type].push(stone);
+      return acc;
+    },
+    {}
+  );
 
   return (
     <>
+      {" "}
       <Link to={`add`} relative="path">
         <Button>Add Stone</Button>
       </Link>
-      <Table>
-        <TableCaption>A list of stones.</TableCaption>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-xl w-[200px]">Name of Stone</TableHead>
-            <TableHead className="text-xl">Type</TableHead>
-            {/* <TableHead className="text-xl">Height</TableHead>
-            <TableHead className="text-xl">Width</TableHead>
-            <TableHead className="text-xl">Amount</TableHead> */}
-            <TableHead className="text-xl text-right pr-4">
-              Edit Stone
-            </TableHead>
-            <TableHead className="text-right text-xl">Delete Stone</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {stones.map((stone) => (
-            <TableRow key={stone.id}>
-              <TableCell className="font-medium w-[200px]">
-                {stone.name}
-              </TableCell>
-              <TableCell>{stone.type}</TableCell>
-              {/* <TableCell>{stone.height}</TableCell>
-              <TableCell>{stone.width}</TableCell>
-              <TableCell>{stone.amount}</TableCell> */}
-              <TableCell className="text-right pr-4">
-                <Link to={`edit/${stone.id}`} className="text-xl">
-                  Edit
-                </Link>
-              </TableCell>
-              <TableCell className="text-right w-[200px]">
-                <Link to={`delete/${stone.id}`} className="text-xl">
-                  Delete
-                </Link>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      <Outlet />
+      <div className="pt-24 sm:pt-0">
+        {/* Аккордеон по типам камней */}
+        <Accordion type="single" defaultValue="stones" className="w-full">
+          <AccordionItem value="stones">
+            <AccordionContent>
+              <Accordion type="multiple">
+                {Object.keys(stoneList)
+                  .sort(customSort)
+                  .map((type) => (
+                    <AccordionItem key={type} value={type}>
+                      <AccordionTrigger>
+                        {capitalizeFirstLetter(type)}
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 lg:grid-cols-10 gap-3">
+                          {stoneList[type].map((stone) => (
+                            <div key={stone.id} className="relative group">
+                              <Image
+                                id={stone.id}
+                                src={stone.url}
+                                alt={stone.name}
+                                className="w-full h-12 object-cover rounded"
+                                isOpen={currentId === stone.id}
+                                setImage={setCurrentId}
+                              />
+                              <div className="absolute inset-0 flex justify-between items-start p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <Link
+                                  to={`edit/${stone.id}`}
+                                  className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
+                                  title="Edit Stone"
+                                  aria-label={`Edit ${stone.name}`}
+                                >
+                                  <FaPencilAlt />
+                                </Link>
+
+                                <Link
+                                  to={`delete/${stone.id}`}
+                                  className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
+                                  title="Delete Stone"
+                                  aria-label={`Delete ${stone.name}`}
+                                >
+                                  <FaTimes />
+                                </Link>
+                              </div>
+                              <div className="mt-2 text-center">
+                                <h3 className="text-lg font-semibold">
+                                  {stone.name}
+                                </h3>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+              </Accordion>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+        <Outlet />
+      </div>
     </>
   );
 }
