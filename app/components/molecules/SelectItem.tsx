@@ -50,7 +50,6 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
           value={selectValue}
           onValueChange={(val) => field.onChange(val)}
           disabled={disabled}
-          id={field.name}
         >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder={placeholder} />
