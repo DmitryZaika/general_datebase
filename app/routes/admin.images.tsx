@@ -47,39 +47,41 @@ export default function AdminImages() {
       </Link>
       <div className="pt-24 sm:pt-0">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 lg:grid-cols-10 gap-3">
-          {images.map((image) => (
-            <div key={image.id} className="relative group">
-              <Image
-                id={image.id}
-                src={image.url}
-                alt={image.name}
-                className="w-full h-48 object-cover rounded"
-                isOpen={currentId === image.id}
-                setImage={setCurrentId}
-              />
-              <div className="absolute inset-0 flex justify-between items-start p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <Link
-                  to={`edit/${image.id}`}
-                  className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
-                  title="Edit Image"
-                  aria-label={`Edit ${image.name}`}
-                >
-                  <FaPencilAlt />
-                </Link>
-                <Link
-                  to={`delete/${image.id}`}
-                  className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
-                  title="Delete Image"
-                  aria-label={`Delete ${image.name}`}
-                >
-                  <FaTimes />
-                </Link>
+          {images
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((image) => (
+              <div key={image.id} className="relative group">
+                <Image
+                  id={image.id}
+                  src={image.url}
+                  alt={image.name}
+                  className="w-full h-48 object-cover rounded"
+                  isOpen={currentId === image.id}
+                  setImage={setCurrentId}
+                />
+                <div className="absolute inset-0 flex justify-between items-start p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <Link
+                    to={`edit/${image.id}`}
+                    className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
+                    title="Edit Image"
+                    aria-label={`Edit ${image.name}`}
+                  >
+                    <FaPencilAlt />
+                  </Link>
+                  <Link
+                    to={`delete/${image.id}`}
+                    className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
+                    title="Delete Image"
+                    aria-label={`Delete ${image.name}`}
+                  >
+                    <FaTimes />
+                  </Link>
+                </div>
+                <div className="mt-2 text-center">
+                  <h3 className="text-lg font-semibold">{image.name}</h3>
+                </div>
               </div>
-              <div className="mt-2 text-center">
-                <h3 className="text-lg font-semibold">{image.name}</h3>
-              </div>
-            </div>
-          ))}
+            ))}
         </div>
       </div>
       <Outlet />
