@@ -10,7 +10,6 @@ interface HeaderProps {
   isAdmin: boolean;
   isSuperUser: boolean;
   isEmployee: boolean;
-  todos: Todo[];
 }
 
 export function Header({
@@ -18,7 +17,6 @@ export function Header({
   isAdmin,
   isSuperUser,
   isEmployee,
-  todos,
 }: HeaderProps) {
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
@@ -120,7 +118,7 @@ export function Header({
         </ul>
       </nav>
 
-      <TodoList todos={todos} />
+      <TodoList />
 
       {user !== null && (
         <Link to="/logout">
