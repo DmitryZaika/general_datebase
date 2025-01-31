@@ -42,16 +42,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const activeSession = session.data.sessionId || null;
   const message: ToastMessage | null = session.get("message") || null;
 
-  // try {
-  //   await getEmployeeUser(request);
-  // } catch (error) {
-  //   return redirect(`/login?error=${error}`);
-  // }
-  // const todos = await selectMany<Todo>(
-  //   db,
-  //   "SELECT id, name, is_done from todolist"
-  // )
-
   let instructions: InstructionSlim[] = [];
 
   let user = null;
