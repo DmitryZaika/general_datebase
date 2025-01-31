@@ -55,23 +55,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect(`/login?error=${error}`);
   }
 
-  const todos = await selectMany<Todo>(
-    db,
-    "SELECT id, rich_text, is_done FROM todolist WHERE user_id = ?",
-    [user.id]
-  );
   console.log(user);
-  let instructions: InstructionSlim[] = [];
-  if (user && activeSession) {
-    instructions = await selectMany<InstructionSlim>(
-      db,
-      "SELECT id, title, rich_text FROM instructions WHERE company_id = ?",
-      [user.company_id]
-    );
-  }
 
   return json(
-    { message, token, user, instructions, todos },
+    { message, token, user, instructions: [] as InstructionSlim[] },
     {
       headers: [
         ["Set-Cookie", cookieHeader || ""],
@@ -82,8 +69,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function App() {
-  const { message, token, user, instructions, todos } =
-    useLoaderData<typeof loader>();
+  const { message, token, user, instructions } = useLoaderData<typeof loader>();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -106,7 +92,6 @@ export default function App() {
       <body>
         {user && (
           <Header
-            todos={todos}
             user={user}
             isAdmin={user.is_admin}
             isSuperUser={user.is_superuser}

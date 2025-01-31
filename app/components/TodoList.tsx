@@ -4,15 +4,18 @@ import { TableBody, TableCell, TableRow } from "./ui/table";
 import { PencilIcon, TrashIcon, CheckIcon } from "lucide-react";
 import type { Todo } from "~/types";
 
-interface TodoListProps {
-  todos: Todo[];
-}
-
-export function TodoList({ todos }: TodoListProps) {
+export function TodoList() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingText, setEditingText] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [data, setData] = useState<Todo[]>([]);
+
+  useEffect(() => {
+    fetch("/todoList")
+      .then(async (res) => await res.json())
+      .then(setData);
+  }, []);
 
   useEffect(() => {
     if (editingId !== null && inputRef.current) {
@@ -80,7 +83,7 @@ export function TodoList({ todos }: TodoListProps) {
 
         <div className="overflow-y-auto max-h-60">
           <TableBody>
-            {todos.map((todo) => {
+            {data.map((todo) => {
               const isEditing = editingId === todo.id;
 
               return (
