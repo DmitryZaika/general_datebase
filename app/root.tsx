@@ -24,7 +24,11 @@ import { toastData, ToastMessage } from "./utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
 import { Chat } from "./components/organisms/Chat";
-import { getAdminUser, getEmployeeUser } from "./utils/session.server";
+import {
+  getAdminUser,
+  getEmployeeUser,
+  getUserBySessionId,
+} from "./utils/session.server";
 import { selectMany } from "./utils/queryHelpers";
 import { db } from "~/db.server";
 import { Todo, InstructionSlim } from "~/types";
@@ -48,11 +52,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const activeSession = session.data.sessionId || null;
   const message: ToastMessage | null = session.get("message") || null;
 
-  let user;
-  try {
-    user = await getEmployeeUser(request);
-  } catch (error) {
-    return redirect(`/login?error=${error}`);
+  let instructions: InstructionSlim[] = [];
+
+  let user = null;
+  if (activeSession) {
+    user = (await getUserBySessionId(activeSession)) || null;
+    if (user) {
+      instructions = await selectMany<InstructionSlim>(
+        db,
+        "SELECT id, title, rich_text from instructions WHERE company_id = ?",
+        [user.company_id]
+      );
+    }
   }
 
   console.log(user);
