@@ -50,7 +50,8 @@ export default function SpecialOrder() {
         id="price-per-sqft"
         placeholder="Enter price per sqft"
         value={price === undefined ? "" : price}
-        onChange={(e) => setPrice(parseInt(e.target.value))}
+        onChange={(e) => setPrice(parseFloat(e.target.value))}
+        step="0.01"
         className="w-full p-2 border border-gray-300 rounded-md text-base mb-4"
       />
 
@@ -64,7 +65,8 @@ export default function SpecialOrder() {
           placeholder="Width (inches)"
           min="0"
           value={width === undefined ? "" : width}
-          onChange={(e) => setWidth(parseInt(e.target.value))}
+          onChange={(e) => setWidth(parseFloat(e.target.value))}
+          step="0.01"
           className="w-1/2 p-2 border border-gray-300 rounded-md text-base"
         />
         <input
@@ -73,7 +75,8 @@ export default function SpecialOrder() {
           placeholder="Length (inches)"
           min="0"
           value={length === undefined ? "" : length}
-          onChange={(e) => setLength(parseInt(e.target.value))}
+          onChange={(e) => setLength(parseFloat(e.target.value))}
+          step="0.01"
           className="w-1/2 p-2 border border-gray-300 rounded-md text-base"
         />
       </div>
@@ -86,7 +89,8 @@ export default function SpecialOrder() {
         id="delivery-cost"
         placeholder="Enter total delivery cost"
         value={deliveryCost === undefined ? "" : deliveryCost}
-        onChange={(e) => setDeliveryCost(parseInt(e.target.value))}
+        onChange={(e) => setDeliveryCost(parseFloat(e.target.value))}
+        step="0.01"
         className="w-full p-2 border border-gray-300 rounded-md text-base mb-4"
       />
 
