@@ -6,17 +6,26 @@ export function InputItem({
   placeholder,
   field,
   type,
+  className,
+  formClassName,
 }: {
-  name: string;
-  placeholder: string;
+  name?: string;
+  placeholder?: string;
   field: object;
   type?: string;
+  className?: string;
+  formClassName?: string;
 }) {
   return (
-    <FormItem>
-      <FormLabel>{name}</FormLabel>
+    <FormItem className={formClassName}>
+      {name && <FormLabel>{name}</FormLabel>}
       <FormControl>
-        <Input type={type} placeholder={placeholder} {...field} />
+        <Input
+          className={className}
+          type={type}
+          placeholder={placeholder}
+          {...field}
+        />
       </FormControl>
       <FormMessage />
     </FormItem>

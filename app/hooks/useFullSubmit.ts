@@ -3,12 +3,13 @@ import { UseFormReturn, FieldValues } from "react-hook-form";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 
 export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
-  form: UseFormReturn<TFieldValues>
+  form: UseFormReturn<TFieldValues>,
+  action: undefined | string = undefined,
+  method: "POST" | "DELETE" = "POST"
 ) {
   const submit = useSubmit();
   const token = useAuthenticityToken();
 
-  // Функция для очистки данных: заменяет undefined на null
   const cleanData = (data: object) => {
     return Object.fromEntries(
       Object.entries(data).map(([key, value]) => [
@@ -18,17 +19,16 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
     );
   };
 
-  // Обёртка над form.handleSubmit
   const fullSubmit = form.handleSubmit(
     (data) => {
-      // Добавляем токен CSRF
       const sanitizedData = cleanData(data);
       sanitizedData["csrf"] = token;
 
-      // Отправка данных
       submit(sanitizedData, {
-        method: "post",
+        method: method,
+        action: action,
         encType: "application/x-www-form-urlencoded",
+        navigate: false,
       });
     },
     (errors) => {}

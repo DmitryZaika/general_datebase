@@ -3,13 +3,88 @@ import { Button } from "./ui/button";
 import { TableBody, TableCell, TableRow } from "./ui/table";
 import { PencilIcon, TrashIcon, CheckIcon } from "lucide-react";
 import type { Todo } from "~/types";
+import { Input } from "./ui/input";
+import { Form, FormProvider, useForm } from "react-hook-form";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { FormField } from "./ui/form";
+import { InputItem } from "./molecules/InputItem";
+
+interface EditFormProps {
+  todo: Todo;
+}
+
+const todoListSchema = z.object({
+  rich_text: z.string().min(1),
+});
+
+type FormData = z.infer<typeof todoListSchema>;
+
+function AddForm() {
+  const form = useForm<FormData>({
+    resolver: zodResolver(todoListSchema),
+    defaultValues: { rich_text: "" },
+  });
+
+  const fullSubmit = useFullSubmit(form, "/todoList");
+  return (
+    <FormProvider {...form}>
+      <Form onSubmit={fullSubmit} className="flex items-center space-x-2 ">
+        <FormField
+          control={form.control}
+          name="rich_text"
+          render={({ field }) => (
+            <InputItem
+              placeholder="Add new task"
+              className="resize-none min-h-9 h-9 p-[2px]"
+              formClassName="mb-0"
+              field={field}
+            />
+          )}
+        />
+        <Button type="submit" variant={"blue"}>
+          Add
+        </Button>
+      </Form>
+    </FormProvider>
+  );
+}
+
+function EditForm({ todo }: EditFormProps) {
+  const form = useForm<FormData>({
+    resolver: zodResolver(todoListSchema),
+    defaultValues: { rich_text: todo.rich_text },
+  });
+  const fullSubmit = useFullSubmit(form, `/todoList/${todo.id}`, "POST");
+  return (
+    <FormProvider {...form}>
+      <Form onSubmit={fullSubmit} className="flex items-center space-x-2 ">
+        <FormField
+          control={form.control}
+          name="rich_text"
+          render={({ field }) => (
+            <InputItem
+              className="resize-none min-h-9 h-9 p-[2px]"
+              formClassName="mb-0"
+              field={field}
+            />
+          )}
+        />
+        <Button type="submit" title="Save">
+          <CheckIcon />
+        </Button>
+      </Form>
+    </FormProvider>
+  );
+}
 
 export function TodoList() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingText, setEditingText] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const [data, setData] = useState<Todo[]>([]);
+  const [data, setData] = useState<{ todos: Todo[] } | undefined>();
 
   useEffect(() => {
     fetch("/todoList")
@@ -55,35 +130,11 @@ export function TodoList() {
           </button>
         </div>
 
-        <form
-          method="post"
-          action="/todoList"
-          className="flex items-center space-x-2 mb-4"
-        >
-          <textarea
-            name="rich_text"
-            placeholder="Add new task"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
-            rows={1}
-            onInput={(e) => {
-              const target = e.currentTarget;
-              target.style.height = "auto";
-              target.style.height = target.scrollHeight + "px";
-            }}
-          />
-          <button
-            type="submit"
-            name="intent"
-            value="ADD"
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
-          >
-            Add
-          </button>
-        </form>
+        <AddForm />
 
         <div className="overflow-y-auto max-h-60">
           <TableBody>
-            {data.map((todo) => {
+            {data?.todos?.map((todo) => {
               const isEditing = editingId === todo.id;
 
               return (
@@ -113,22 +164,7 @@ export function TodoList() {
 
                   <TableCell className="text-right">
                     {isEditing ? (
-                      <form method="post" action="/todoList">
-                        <input type="hidden" name="intent" value="EDIT" />
-                        <input type="hidden" name="id" value={todo.id} />
-                        <input
-                          type="hidden"
-                          name="rich_text"
-                          value={editingText}
-                        />
-                        <button
-                          type="submit"
-                          className="p-1 hover:bg-gray-100 rounded"
-                          title="Save"
-                        >
-                          <CheckIcon />
-                        </button>
-                      </form>
+                      <EditForm todo={todo} />
                     ) : (
                       <button
                         type="button"
