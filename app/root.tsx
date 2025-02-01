@@ -66,8 +66,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
-  console.log(user);
-
   return json(
     { message, token, user, instructions: [] as InstructionSlim[] },
     {
@@ -101,16 +99,17 @@ export default function App() {
         <Links />
       </head>
       <body>
-        {user && (
-          <Header
-            user={user}
-            isAdmin={user.is_admin}
-            isSuperUser={user.is_superuser}
-            isEmployee={user.is_employee || user.is_admin || user.is_superuser}
-          />
-        )}
-
         <AuthenticityTokenProvider token={token}>
+          {user && (
+            <Header
+              user={user}
+              isAdmin={user.is_admin}
+              isSuperUser={user.is_superuser}
+              isEmployee={
+                user.is_employee || user.is_admin || user.is_superuser
+              }
+            />
+          )}
           <Outlet />
         </AuthenticityTokenProvider>
 
