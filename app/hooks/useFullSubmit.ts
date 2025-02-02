@@ -5,7 +5,8 @@ import { useAuthenticityToken } from "remix-utils/csrf/react";
 export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
   form: UseFormReturn<TFieldValues>,
   action: undefined | string = undefined,
-  method: "POST" | "DELETE" = "POST"
+  method: "POST" | "DELETE" = "POST",
+  callback: undefined | (() => void) = undefined
 ) {
   const submit = useSubmit();
   const token = useAuthenticityToken();
@@ -30,6 +31,9 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
         encType: "application/x-www-form-urlencoded",
         navigate: false,
       });
+      if (callback) {
+        callback();
+      }
     },
     (errors) => {}
   );
