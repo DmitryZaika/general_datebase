@@ -1,15 +1,15 @@
 // src/components/Header.tsx
+
 import { Link, useLocation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
-// import { TodoList } from "./TodoList";
-// import { Todo } from "~/types";
+import { TodoList } from "./TodoList";
+import { Todo } from "~/types";
 
 interface HeaderProps {
   user: object | null;
   isAdmin: boolean;
   isSuperUser: boolean;
   isEmployee: boolean;
-  // todos: Todo[];
 }
 
 export function Header({
@@ -36,9 +36,14 @@ export function Header({
       <div className="flex gap-4">
         {isAdmin || isSuperUser ? (
           isAdminPage ? (
-            <Link to="/employee">
-              <Button>Employee</Button>
-            </Link>
+            <div className=" flex gap-4">
+              <Link to="/employee">
+                <Button>Employee</Button>
+              </Link>
+              <Link to="/admin/users">
+                <Button>Users</Button>
+              </Link>
+            </div>
           ) : (
             <Link to="/admin">
               <Button>Admin</Button>
@@ -89,7 +94,7 @@ export function Header({
               </Button>
             </li>
           )}
-          {/* {isAdminPage && (
+          {isAdminPage && (
             <li>
               <Button asChild variant="link">
                 <Link
@@ -109,10 +114,11 @@ export function Header({
                 </Link>
               </Button>
             </li>
-          )} */}
+          )}
         </ul>
       </nav>
-      {/* <TodoList todos={todos} /> */}
+
+      <TodoList />
 
       {user !== null && (
         <Link to="/logout">

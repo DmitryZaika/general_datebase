@@ -9,7 +9,7 @@ export function LoadingButton({
   children: JSX.Element | string;
 }) {
   return (
-    <Button type="submit" form="customerForm">
+    <Button type="submit">
       {loading ? <Spinner size={20} /> : <>{children}</>}
     </Button>
   );

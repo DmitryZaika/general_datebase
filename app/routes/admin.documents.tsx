@@ -55,23 +55,25 @@ export default function Documents() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {documents.map((document) => (
-            <TableRow key={document.id}>
-              <TableCell className="font-medium w-[200px]">
-                {document.name}
-              </TableCell>
-              <TableCell className="text-right">
-                <Link to={`edit/${document.id}`} className="text-xl">
-                  Edit
-                </Link>
-              </TableCell>
-              <TableCell className="w-[200px] text-right">
-                <Link to={`delete/${document.id}`} className="text-xl">
-                  Delete
-                </Link>
-              </TableCell>
-            </TableRow>
-          ))}
+          {documents
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((document) => (
+              <TableRow key={document.id}>
+                <TableCell className="font-medium w-[200px]">
+                  {document.name}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Link to={`edit/${document.id}`} className="text-xl">
+                    Edit
+                  </Link>
+                </TableCell>
+                <TableCell className="w-[200px] text-right">
+                  <Link to={`delete/${document.id}`} className="text-xl">
+                    Delete
+                  </Link>
+                </TableCell>
+              </TableRow>
+            ))}
         </TableBody>
       </Table>
       <Outlet />

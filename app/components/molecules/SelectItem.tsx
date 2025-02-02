@@ -1,3 +1,4 @@
+import React from "react";
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { FieldValues, ControllerRenderProps } from "react-hook-form";
 import {
@@ -10,6 +11,15 @@ import {
 
 type Option = { key: string | number; value: string };
 
+interface SelectInputProps<TFieldValues extends FieldValues = FieldValues> {
+  name: string;
+  placeholder?: string;
+  field: ControllerRenderProps<TFieldValues>;
+  disabled?: boolean;
+  options: Array<string | Option>;
+  className?: string;
+}
+
 export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   name,
   field,
@@ -17,26 +27,27 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   disabled,
   options,
   className,
-}: {
-  name: string;
-  placeholder?: string;
-  field: ControllerRenderProps<TFieldValues>;
-  disabled?: boolean;
-  options: Array<string | Option>;
-  className?: string;
-}) {
-  const cleanOptions: Option[] = options.map((option) =>
-    typeof option === "string"
-      ? { key: option, value: option }
-      : { key: option.key, value: option.value }
-  );
+}: SelectInputProps<TFieldValues>) {
+  const cleanOptions: Option[] = options.map((option) => {
+    if (typeof option === "string") {
+      return { key: option.toLowerCase(), value: option };
+    } else {
+      const { key, value } = option;
+      return {
+        key: typeof key === "string" ? key.toLowerCase() : String(key),
+        value,
+      };
+    }
+  });
+
+  const selectValue = String(field.value ?? "");
 
   return (
     <FormItem className={className}>
-      <FormLabel>{name}</FormLabel>
+      <FormLabel htmlFor={field.name}>{name}</FormLabel>
       <FormControl>
         <Select
-          value={String(field.value ?? "")}
+          value={selectValue}
           onValueChange={(val) => field.onChange(val)}
           disabled={disabled}
         >
@@ -45,7 +56,7 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
           </SelectTrigger>
           <SelectContent>
             {cleanOptions.map(({ key, value }) => (
-              <SelectItem key={key} value={String(key)}>
+              <SelectItem key={key} value={key}>
                 {value}
               </SelectItem>
             ))}

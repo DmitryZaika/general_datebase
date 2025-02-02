@@ -1,9 +1,9 @@
+// app/root.tsx (for example)
 import {
   json,
   Links,
   Meta,
   Outlet,
-  redirect,
   Scripts,
   ScrollRestoration,
   useLoaderData,
@@ -19,10 +19,8 @@ import { ToastMessage } from "./utils/toastHelpers";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
 import { Chat } from "./components/organisms/Chat";
-import { getEmployeeUser, getUserBySessionId } from "./utils/session.server";
-import { selectMany } from "./utils/queryHelpers";
-import { db } from "~/db.server";
-import { Todo, InstructionSlim } from "~/types";
+import { getUserBySessionId } from "./utils/session.server";
+
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
@@ -32,7 +30,7 @@ export const links: LinksFunction = () => [
   },
   {
     rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+    href: "https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap",
   },
 ];
 
@@ -42,23 +40,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const activeSession = session.data.sessionId || null;
   const message: ToastMessage | null = session.get("message") || null;
 
-  // try {
-  //   await getEmployeeUser(request);
-  // } catch (error) {
-  //   return redirect(`/login?error=${error}`);
-  // }
-  // const todos = await selectMany<Todo>(
-  //   db,
-  //   "SELECT id, name, is_done from todolist"
-  // )
-
   let user = null;
   if (activeSession) {
     user = (await getUserBySessionId(activeSession)) || null;
   }
 
   return json(
-    { message, token, user /* todos */ },
+    { message, token, user },
 
     {
       headers: [
@@ -70,7 +58,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function App() {
-  const { message, token, user /* todos*/ } = useLoaderData<typeof loader>();
+  const { message, token, user } = useLoaderData<typeof loader>();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -81,40 +69,36 @@ export default function App() {
         variant: message.variant,
       });
     }
-  }, [message ? message.nonce : null]);
+  }, [message?.nonce]);
 
   return (
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
       </head>
       <body>
-        {user && (
-          <Header
-            // todos={todos}
-            user={user}
-            isAdmin={user ? user.is_admin : false}
-            isSuperUser={user ? user.is_superuser : false}
-            isEmployee={
-              user
-                ? user.is_employee || user.is_admin || user.is_superuser
-                : false
-            }
-          />
-        )}
         <AuthenticityTokenProvider token={token}>
+          {user && (
+            <Header
+              user={user}
+              isAdmin={user.is_admin}
+              isSuperUser={user.is_superuser}
+              isEmployee={
+                user.is_employee || user.is_admin || user.is_superuser
+              }
+            />
+          )}
           <Outlet />
         </AuthenticityTokenProvider>
+
         <Toaster />
         <ScrollRestoration />
-        {/* <Footer /> */}
         <Scripts />
-      </body>
 
-      {user && <Chat />}
+        {user && <Chat />}
+      </body>
     </html>
   );
 }

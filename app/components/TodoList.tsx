@@ -1,12 +1,160 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "./ui/button";
-import { useLoaderData } from "@remix-run/react";
 import { TableBody, TableCell, TableRow } from "./ui/table";
-import { PencilIcon, TrashIcon } from "lucide-react";
+import { PencilIcon, TrashIcon, CheckIcon } from "lucide-react";
+import type { Todo } from "~/types";
+import { Form, FormProvider, useForm } from "react-hook-form";
+import { useFullFetcher } from "~/hooks/useFullFetcher";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { FormField } from "./ui/form";
+import { InputItem } from "./molecules/InputItem";
+import { todoListSchema, TTodoListSchema } from "~/schemas/general";
+import { LoadingButton } from "./molecules/LoadingButton";
 
+interface EditFormProps {
+  todo: Todo;
+  refresh: (() => void) | ((callback: () => void) => void);
+}
+
+function AddForm({ refresh }: { refresh: () => void }) {
+  const form = useForm<TTodoListSchema>({
+    resolver: zodResolver(todoListSchema),
+    defaultValues: { rich_text: "" },
+  });
+  const { fullSubmit, fetcher } = useFullFetcher(form, "/todoList");
+
+  useEffect(() => {
+    if (fetcher.state === "idle") {
+      refresh();
+      form.reset();
+    }
+  }, [fetcher.state]);
+
+  return (
+    <FormProvider {...form}>
+      <Form onSubmit={fullSubmit} className="flex items-center space-x-2 ">
+        <FormField
+          control={form.control}
+          name="rich_text"
+          render={({ field }) => (
+            <InputItem
+              placeholder="Add new task"
+              className="resize-none min-h-9 h-9 p-[2px]"
+              formClassName="mb-0"
+              field={field}
+            />
+          )}
+        />
+        <Button type="submit" variant={"blue"}>
+          Add
+        </Button>
+      </Form>
+    </FormProvider>
+  );
+}
+
+function EditForm({ refresh, todo }: EditFormProps) {
+  const form = useForm<TTodoListSchema>({
+    resolver: zodResolver(todoListSchema),
+    defaultValues: { rich_text: todo.rich_text },
+  });
+  const { fullSubmit, fetcher } = useFullFetcher(form, `/todoList/${todo.id}`);
+  const [isEditing, setEditing] = useState<boolean>(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (fetcher.state === "idle") {
+      refresh(() => setEditing(false));
+    }
+  }, [fetcher.state]);
+
+  /*
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+    }
+  }, [isEditing]);
+  */
+
+  return (
+    <FormProvider {...form}>
+      <Form
+        onSubmit={fullSubmit}
+        className="flex items-center space-x-2 w-full flex-grow"
+      >
+        <div className="flex-grow">
+          {isEditing ? (
+            <FormField
+              control={form.control}
+              name="rich_text"
+              render={({ field }) => (
+                <InputItem
+                  className="resize-none min-h-9 h-9 p-[2px]"
+                  formClassName="mb-0"
+                  field={field}
+                  ref={inputRef}
+                />
+              )}
+            />
+          ) : (
+            <p>{todo.rich_text}</p>
+          )}
+        </div>
+        {isEditing ? (
+          <LoadingButton loading={fetcher.state !== "idle"}>
+            <CheckIcon />
+          </LoadingButton>
+        ) : (
+          <Button
+            variant="ghost"
+            className="ml-auto"
+            onClick={() => setEditing(true)}
+          >
+            <PencilIcon />
+          </Button>
+        )}
+      </Form>
+    </FormProvider>
+  );
+}
+
+function DeleteForm({ refresh, todo }: EditFormProps) {
+  const form = useForm();
+  const { fullSubmit, fetcher } = useFullFetcher(
+    form,
+    `/todoList/${todo.id}`,
+    "DELETE"
+  );
+  useEffect(() => {
+    if (fetcher.state === "idle") {
+      refresh();
+    }
+  }, [fetcher.state]);
+
+  return (
+    <FormProvider {...form}>
+      <Form onSubmit={fullSubmit}>
+        <Button variant="ghost">
+          <TrashIcon />
+        </Button>
+      </Form>
+    </FormProvider>
+  );
+}
 export function TodoList() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const { todos } = useLoaderData<typeof loader>();
+  const [data, setData] = useState<{ todos: Todo[] } | undefined>();
+
+  const getTodos = (callback: undefined | (() => void) = undefined) => {
+    fetch("/todoList")
+      .then(async (res) => await res.json())
+      .then(setData)
+      .then(() => callback && callback());
+  };
+
+  useEffect(() => {
+    getTodos();
+  }, []);
 
   return (
     <>
@@ -20,6 +168,7 @@ export function TodoList() {
       >
         Todo List
       </Button>
+
       <div
         className={`absolute flex flex-col top-[calc(100%)] right-0 transform -translate-x-1/2 w-[400px] bg-white border rounded shadow-lg p-4 z-50 transition-all duration-300 ease-out ${
           isOpen
@@ -37,41 +186,18 @@ export function TodoList() {
             ✕
           </button>
         </div>
-        <div className="flex items-center space-x-2 mb-4">
-          <textarea
-            placeholder="Add new task"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
-            rows={1}
-            onInput={(e) => {
-              const target = e.target as HTMLTextAreaElement;
-              target.style.height = "auto";
-              target.style.height = target.scrollHeight + "px";
-            }}
-          ></textarea>
-          <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
-            Add
-          </button>
-        </div>
+
+        <AddForm refresh={getTodos} />
+
         <div className="overflow-y-auto max-h-60">
-          <TableBody>
-            {(todos || []).map((todo) => (
-              <TableRow key={todo.id}>
-                <TableCell className="font-medium w-full ">
-                  {todo.name}
-                </TableCell>
-                <TableCell className=" text-right">
-                  <button className=" p-1 hover:bg-gray-100 rounded">
-                    <PencilIcon />
-                  </button>
-                </TableCell>
-                <TableCell className=" text-right">
-                  <button className=" p-1 hover:bg-gray-100 rounded">
-                    <TrashIcon />
-                  </button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
+          {data?.todos?.map((todo) => {
+            return (
+              <div className="flex" key={todo.id}>
+                <EditForm todo={todo} refresh={getTodos} />
+                <DeleteForm todo={todo} refresh={getTodos} />
+              </div>
+            );
+          })}
         </div>
       </div>
     </>
