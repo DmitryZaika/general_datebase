@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useChat, useInput } from "~/hooks/chat";
 import { DONE_KEY } from "~/utils/constants";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 
 interface Message {
   role: "user" | "assistant";
@@ -79,7 +80,6 @@ export const Chat = () => {
     const sse = new EventSource(`/api/chat?query=${query}`);
 
     sse.addEventListener("message", (event) => {
-      console.log(event.data);
       if (event.data === DONE_KEY) {
         sse.close();
         setIsThinking(false);
@@ -89,12 +89,9 @@ export const Chat = () => {
     });
 
     sse.addEventListener("error", (event) => {
-      console.log("error: ", event);
       sse.close();
     });
   };
-
-  console.log({ isThinking });
 
   return (
     <>
@@ -149,17 +146,18 @@ export const Chat = () => {
           onSubmit={handleFormSubmit}
           className="p-4 bg-gray-100 border-t border-gray-300 flex items-center gap-2"
         >
-          <input
+          <Input
             name="query"
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder="Type your message..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+            className="rounded-full"
           />
           <Button
             disabled={input.length === 0 || isThinking}
             variant="blue"
             type="submit"
+            className="rounded-full"
           >
             Send
           </Button>
