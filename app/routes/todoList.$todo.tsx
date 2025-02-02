@@ -27,15 +27,13 @@ const editAction = async (
   );
 };
 
-const deleteAction = async (
-  formData: FormData,
-  userId: number
-): Promise<void> => {
+const deleteAction = async (todoId: number, userId: number): Promise<void> => {
   console.log("deleteAction userId:", userId);
   await db.execute(
     `DELETE FROM main.todolist 
-     WHERE id = ?;`,
-    [formData.get("id")]
+     WHERE id = ?
+     AND user_id = ?;`,
+    [todoId, userId]
   );
 };
 
@@ -70,7 +68,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
 
   if (request.method === "DELETE") {
-    await deleteAction(formData, user.id);
+    await deleteAction(todoId, user.id);
     return { success: true };
   }
 

@@ -13,7 +13,7 @@ import { LoadingButton } from "./molecules/LoadingButton";
 
 interface EditFormProps {
   todo: Todo;
-  refresh: (callback: () => void) => void;
+  refresh: (() => void) | ((callback: () => void) => void);
 }
 
 function AddForm({ refresh }: { refresh: () => void }) {
@@ -60,12 +60,21 @@ function EditForm({ refresh, todo }: EditFormProps) {
   });
   const { fullSubmit, fetcher } = useFullFetcher(form, `/todoList/${todo.id}`);
   const [isEditing, setEditing] = useState<boolean>(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (fetcher.state === "idle") {
       refresh(() => setEditing(false));
     }
   }, [fetcher.state]);
+
+  /*
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+    }
+  }, [isEditing]);
+  */
 
   return (
     <FormProvider {...form}>
@@ -83,6 +92,7 @@ function EditForm({ refresh, todo }: EditFormProps) {
                   className="resize-none min-h-9 h-9 p-[2px]"
                   formClassName="mb-0"
                   field={field}
+                  ref={inputRef}
                 />
               )}
             />
@@ -108,9 +118,31 @@ function EditForm({ refresh, todo }: EditFormProps) {
   );
 }
 
+function DeleteForm({ refresh, todo }: EditFormProps) {
+  const form = useForm();
+  const { fullSubmit, fetcher } = useFullFetcher(
+    form,
+    `/todoList/${todo.id}`,
+    "DELETE"
+  );
+  useEffect(() => {
+    if (fetcher.state === "idle") {
+      refresh();
+    }
+  }, [fetcher.state]);
+
+  return (
+    <FormProvider {...form}>
+      <Form onSubmit={fullSubmit}>
+        <Button variant="ghost">
+          <TrashIcon />
+        </Button>
+      </Form>
+    </FormProvider>
+  );
+}
 export function TodoList() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const inputRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<{ todos: Todo[] } | undefined>();
 
   const getTodos = (callback: undefined | (() => void) = undefined) => {
@@ -162,18 +194,7 @@ export function TodoList() {
             return (
               <div className="flex" key={todo.id}>
                 <EditForm todo={todo} refresh={getTodos} />
-                <form method="post" action="/todoList" className="ml-auto">
-                  <input type="hidden" name="id" value={todo.id} />
-                  <button
-                    type="submit"
-                    name="intent"
-                    value="DELETE"
-                    className="p-1 hover:bg-gray-100 rounded"
-                    title="Delete"
-                  >
-                    <TrashIcon />
-                  </button>
-                </form>
+                <DeleteForm todo={todo} refresh={getTodos} />
               </div>
             );
           })}
