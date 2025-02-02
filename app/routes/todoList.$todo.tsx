@@ -17,7 +17,6 @@ const editAction = async (
   todoId: number,
   userId: number
 ): Promise<void> => {
-  console.log("editAction userId:", userId);
   await db.execute(
     `UPDATE main.todolist 
      SET rich_text = ?  
@@ -28,7 +27,6 @@ const editAction = async (
 };
 
 const deleteAction = async (todoId: number, userId: number): Promise<void> => {
-  console.log("deleteAction userId:", userId);
   await db.execute(
     `DELETE FROM main.todolist 
      WHERE id = ?
@@ -61,7 +59,6 @@ export async function action({ params, request }: ActionFunctionArgs) {
     if (errors) {
       return { errors, defaultValues };
     }
-    console.log(data.rich_text, todoId, user.id);
 
     await editAction(data.rich_text, todoId, user.id);
     return { success: true };
