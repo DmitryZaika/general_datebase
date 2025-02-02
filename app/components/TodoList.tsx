@@ -6,22 +6,18 @@ import type { Todo } from "~/types";
 import { Form, FormProvider, useForm } from "react-hook-form";
 import { useFullFetcher } from "~/hooks/useFullFetcher";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { FormField } from "./ui/form";
 import { InputItem } from "./molecules/InputItem";
+import { todoListSchema, TTodoListSchema } from "~/schemas/general";
+import { LoadingButton } from "./molecules/LoadingButton";
 
 interface EditFormProps {
   todo: Todo;
+  refresh: (callback: () => void) => void;
 }
 
-const todoListSchema = z.object({
-  rich_text: z.string().min(1),
-});
-
-type FormData = z.infer<typeof todoListSchema>;
-
 function AddForm({ refresh }: { refresh: () => void }) {
-  const form = useForm<FormData>({
+  const form = useForm<TTodoListSchema>({
     resolver: zodResolver(todoListSchema),
     defaultValues: { rich_text: "" },
   });
@@ -34,7 +30,6 @@ function AddForm({ refresh }: { refresh: () => void }) {
     }
   }, [fetcher.state]);
 
-  console.log(fetcher.state);
   return (
     <FormProvider {...form}>
       <Form onSubmit={fullSubmit} className="flex items-center space-x-2 ">
@@ -58,29 +53,56 @@ function AddForm({ refresh }: { refresh: () => void }) {
   );
 }
 
-function EditForm({ todo }: EditFormProps) {
-  const form = useForm<FormData>({
+function EditForm({ refresh, todo }: EditFormProps) {
+  const form = useForm<TTodoListSchema>({
     resolver: zodResolver(todoListSchema),
     defaultValues: { rich_text: todo.rich_text },
   });
-  const fullSubmit = useFullFetcher(form, `/todoList/${todo.id}`, "POST");
+  const { fullSubmit, fetcher } = useFullFetcher(form, `/todoList/${todo.id}`);
+  const [isEditing, setEditing] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (fetcher.state === "idle") {
+      refresh(() => setEditing(false));
+    }
+  }, [fetcher.state]);
+
   return (
     <FormProvider {...form}>
-      <Form onSubmit={fullSubmit} className="flex items-center space-x-2 ">
-        <FormField
-          control={form.control}
-          name="rich_text"
-          render={({ field }) => (
-            <InputItem
-              className="resize-none min-h-9 h-9 p-[2px]"
-              formClassName="mb-0"
-              field={field}
+      <Form
+        onSubmit={fullSubmit}
+        className="flex items-center space-x-2 w-full flex-grow"
+      >
+        <div className="flex-grow">
+          {isEditing ? (
+            <FormField
+              control={form.control}
+              name="rich_text"
+              render={({ field }) => (
+                <InputItem
+                  className="resize-none min-h-9 h-9 p-[2px]"
+                  formClassName="mb-0"
+                  field={field}
+                />
+              )}
             />
+          ) : (
+            <p>{todo.rich_text}</p>
           )}
-        />
-        <Button type="submit" title="Save">
-          <CheckIcon />
-        </Button>
+        </div>
+        {isEditing ? (
+          <LoadingButton loading={fetcher.state !== "idle"}>
+            <CheckIcon />
+          </LoadingButton>
+        ) : (
+          <Button
+            variant="ghost"
+            className="ml-auto"
+            onClick={() => setEditing(true)}
+          >
+            <PencilIcon />
+          </Button>
+        )}
       </Form>
     </FormProvider>
   );
@@ -88,27 +110,19 @@ function EditForm({ todo }: EditFormProps) {
 
 export function TodoList() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editingText, setEditingText] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<{ todos: Todo[] } | undefined>();
 
-  const getTodos = () => {
+  const getTodos = (callback: undefined | (() => void) = undefined) => {
     fetch("/todoList")
       .then(async (res) => await res.json())
-      .then(setData);
+      .then(setData)
+      .then(() => callback && callback());
   };
 
   useEffect(() => {
     getTodos();
   }, []);
-
-  useEffect(() => {
-    if (editingId !== null && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editingId]);
 
   return (
     <>
@@ -144,71 +158,25 @@ export function TodoList() {
         <AddForm refresh={getTodos} />
 
         <div className="overflow-y-auto max-h-60">
-          <TableBody>
-            {data?.todos?.map((todo) => {
-              const isEditing = editingId === todo.id;
-
-              return (
-                <TableRow key={todo.id}>
-                  <TableCell className="font-medium w-full">
-                    {isEditing ? (
-                      <input
-                        name="rich_text"
-                        className="w-full border px-2 py-1 rounded focus:outline-none"
-                        value={editingText}
-                        onChange={(e) => setEditingText(e.target.value)}
-                        ref={inputRef}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            const form = e.currentTarget.form;
-                            if (form) {
-                              form.submit();
-                            }
-                          }
-                        }}
-                      />
-                    ) : (
-                      todo.rich_text
-                    )}
-                  </TableCell>
-
-                  <TableCell className="text-right">
-                    {isEditing ? (
-                      <EditForm todo={todo} />
-                    ) : (
-                      <button
-                        type="button"
-                        className="p-1 hover:bg-gray-100 rounded"
-                        title="Edit"
-                        onClick={() => {
-                          setEditingId(todo.id);
-                          setEditingText(todo.rich_text);
-                        }}
-                      >
-                        <PencilIcon />
-                      </button>
-                    )}
-                  </TableCell>
-
-                  <TableCell className="text-right">
-                    <form method="post" action="/todoList">
-                      <input type="hidden" name="id" value={todo.id} />
-                      <button
-                        type="submit"
-                        name="intent"
-                        value="DELETE"
-                        className="p-1 hover:bg-gray-100 rounded"
-                        title="Delete"
-                      >
-                        <TrashIcon />
-                      </button>
-                    </form>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
+          {data?.todos?.map((todo) => {
+            return (
+              <div className="flex" key={todo.id}>
+                <EditForm todo={todo} refresh={getTodos} />
+                <form method="post" action="/todoList" className="ml-auto">
+                  <input type="hidden" name="id" value={todo.id} />
+                  <button
+                    type="submit"
+                    name="intent"
+                    value="DELETE"
+                    className="p-1 hover:bg-gray-100 rounded"
+                    title="Delete"
+                  >
+                    <TrashIcon />
+                  </button>
+                </form>
+              </div>
+            );
+          })}
         </div>
       </div>
     </>

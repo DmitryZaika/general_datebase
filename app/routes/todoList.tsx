@@ -1,20 +1,34 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ActionFunctionArgs,
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
+import { getValidatedFormData } from "remix-hook-form";
 import { db } from "~/db.server";
+import { todoListSchema, TTodoListSchema } from "~/schemas/general";
 import { Todo } from "~/types";
 import { selectMany } from "~/utils/queryHelpers";
 import { getEmployeeUser } from "~/utils/session.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request);
-  const formData = await request.formData();
+
+  const {
+    errors,
+    data,
+    receivedValues: defaultValues,
+  } = await getValidatedFormData<TTodoListSchema>(
+    request,
+    zodResolver(todoListSchema)
+  );
+  if (errors) {
+    return { errors, defaultValues };
+  }
 
   await db.execute(
     `INSERT INTO main.todolist (rich_text, user_id) VALUES (?, ?);`,
-    [formData.get("rich_text"), user.id]
+    [data.rich_text, user.id]
   );
   return { success: true };
 }
