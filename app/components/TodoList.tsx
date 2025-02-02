@@ -21,13 +21,18 @@ const todoListSchema = z.object({
 
 type FormData = z.infer<typeof todoListSchema>;
 
-function AddForm() {
+function AddForm({ refresh }: { refresh: () => void }) {
   const form = useForm<FormData>({
     resolver: zodResolver(todoListSchema),
     defaultValues: { rich_text: "" },
   });
 
-  const fullSubmit = useFullSubmit(form, "/todoList");
+  const handleRefresh = () => {
+    refresh();
+    form.reset();
+  };
+
+  const fullSubmit = useFullSubmit(form, "/todoList", "POST", handleRefresh);
   return (
     <FormProvider {...form}>
       <Form onSubmit={fullSubmit} className="flex items-center space-x-2 ">
@@ -86,10 +91,14 @@ export function TodoList() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<{ todos: Todo[] } | undefined>();
 
-  useEffect(() => {
+  const getTodos = () => {
     fetch("/todoList")
       .then(async (res) => await res.json())
       .then(setData);
+  };
+
+  useEffect(() => {
+    getTodos();
   }, []);
 
   useEffect(() => {
@@ -130,7 +139,7 @@ export function TodoList() {
           </button>
         </div>
 
-        <AddForm />
+        <AddForm refresh={getTodos} />
 
         <div className="overflow-y-auto max-h-60">
           <TableBody>
