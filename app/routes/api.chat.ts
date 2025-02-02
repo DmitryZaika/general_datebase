@@ -41,7 +41,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       content: `Answer the question as best yoyu can.\n\nQuestion: ${query}\n\nAnswer:`,
     },
   ];
-  console.log(messages);
 
   let response = await openai.chat.completions.create({
     model: "gpt-4o-mini-2024-07-18",
