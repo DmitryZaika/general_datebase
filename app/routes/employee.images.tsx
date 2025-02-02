@@ -47,17 +47,19 @@ export default function Images() {
           <Accordion type="multiple">
             <AccordionContent>
               <ModuleList>
-                {images.map((image) => (
-                  <Image
-                    id={image.id}
-                    key={image.id}
-                    src={image.url}
-                    alt={image.name}
-                    name={image.name}
-                    setImage={setCurrentId}
-                    isOpen={currentId === image.id}
-                  />
-                ))}
+                {images
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((image) => (
+                    <Image
+                      id={image.id}
+                      key={image.id}
+                      src={image.url}
+                      alt={image.name}
+                      name={image.name}
+                      setImage={setCurrentId}
+                      isOpen={currentId === image.id}
+                    />
+                  ))}
               </ModuleList>
             </AccordionContent>
           </Accordion>

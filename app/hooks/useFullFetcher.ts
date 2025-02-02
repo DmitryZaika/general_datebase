@@ -1,13 +1,13 @@
-import { useSubmit } from "@remix-run/react";
+import { useFetcher } from "@remix-run/react";
 import { UseFormReturn, FieldValues } from "react-hook-form";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 
-export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
+export function useFullFetcher<TFieldValues extends FieldValues = FieldValues>(
   form: UseFormReturn<TFieldValues>,
   action: undefined | string = undefined,
   method: "POST" | "DELETE" = "POST"
 ) {
-  const submit = useSubmit();
+  const fetcher = useFetcher();
   const token = useAuthenticityToken();
 
   const cleanData = (data: object) => {
@@ -24,15 +24,14 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
       const sanitizedData = cleanData(data);
       sanitizedData["csrf"] = token;
 
-      submit(sanitizedData, {
+      fetcher.submit(sanitizedData, {
         method: method,
         action: action,
         encType: "application/x-www-form-urlencoded",
-        navigate: false,
       });
     },
     (errors) => {}
   );
 
-  return fullSubmit;
+  return { fullSubmit, fetcher };
 }

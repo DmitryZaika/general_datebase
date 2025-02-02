@@ -51,18 +51,21 @@ export default function Documents() {
           <Accordion type="multiple">
             <AccordionContent>
               <ModuleList>
-                {documents.map(({ url, id, name }) => (
-                  <div className=" w-[118px] h-auto">
-                    <Document
-                      key={id}
-                      file={url}
-                      onClick={() => window.open(url || "")}
-                    >
-                      <Page pageNumber={1} scale={0.2} />
-                    </Document>
-                    <p className="text-center font-bold select-none">{name}</p>
-                  </div>
-                ))}
+                {documents
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(({ url, id, name }) => (
+                    <div key={id} className="w-[118px] h-auto">
+                      <Document
+                        file={url}
+                        onClick={() => window.open(url || "")}
+                      >
+                        <Page pageNumber={1} scale={0.2} />
+                      </Document>
+                      <p className="text-center font-bold select-none">
+                        {name}
+                      </p>
+                    </div>
+                  ))}
               </ModuleList>
             </AccordionContent>
           </Accordion>
