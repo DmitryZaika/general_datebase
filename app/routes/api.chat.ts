@@ -6,6 +6,7 @@ import { getEmployeeUser, getUserBySessionId } from "../utils/session.server";
 import { selectMany } from "../utils/queryHelpers";
 import { Todo, InstructionSlim } from "~/types";
 import { db } from "~/db.server";
+import { DONE_KEY } from "~/utils/constants";
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_SECRET_KEY,
@@ -55,6 +56,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       for await (const chunk of response) {
         send({ data: chunk.choices[0].delta.content || "" });
       }
+      send({ data: DONE_KEY });
     })();
 
     return function clear() {};

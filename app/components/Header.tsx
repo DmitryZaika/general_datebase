@@ -3,7 +3,6 @@
 import { Link, useLocation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { TodoList } from "./TodoList";
-import { Todo } from "~/types";
 
 interface HeaderProps {
   user: object | null;
@@ -106,7 +105,7 @@ export function Header({
               </Button>
             </li>
           )}
-          {!isAdminPage && (
+          {/* {!isAdminPage && (
             <li>
               <Button asChild variant="link">
                 <Link to="/employee/customers" className="text-lg md:text-xl">
@@ -114,7 +113,7 @@ export function Header({
                 </Link>
               </Button>
             </li>
-          )}
+          )} */}
         </ul>
       </nav>
 

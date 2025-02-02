@@ -1,10 +1,7 @@
-import React, { useState, useEffect, FormEvent } from "react";
+import React, { useState } from "react";
 import { useChat, useInput } from "~/hooks/chat";
-import { ask, processChatResponse } from "~/utils/chat.client";
-import { marked } from "marked";
-import { InstructionSlim } from "~/types";
-import { reminders, help } from "~/lib/instructions";
-import ReactMarkdown from "react-markdown";
+import { DONE_KEY } from "~/utils/constants";
+import { Button } from "../ui/button";
 
 interface Message {
   role: "user" | "assistant";
@@ -21,8 +18,6 @@ interface MessageBubbleProps {
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
-  const [formattedContent, setFormattedContent] = useState<string>("");
-
   return (
     <div
       className={`flex ${
@@ -62,13 +57,15 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 
 export const Chat = () => {
   const { messages, addMessage } = useChat();
-  const { input: question, handleInputChange, resetInput } = useInput();
+  const [input, setInput] = useState<string>("");
 
   const [answer, setAnswer] = useState<string>("");
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isThinking, setIsThinking] = useState<boolean>(false);
 
   const handleFormSubmit = async (event: React.FormEvent) => {
+    setIsThinking(true);
+    setInput("");
     event.preventDefault();
 
     const formData = new FormData(event.target as HTMLFormElement);
@@ -83,7 +80,12 @@ export const Chat = () => {
 
     sse.addEventListener("message", (event) => {
       console.log(event.data);
-      setAnswer((prevResults) => prevResults + event.data);
+      if (event.data === DONE_KEY) {
+        sse.close();
+        setIsThinking(false);
+      } else {
+        setAnswer((prevResults) => prevResults + event.data);
+      }
     });
 
     sse.addEventListener("error", (event) => {
@@ -91,7 +93,8 @@ export const Chat = () => {
       sse.close();
     });
   };
-  console.log(answer);
+
+  console.log({ isThinking });
 
   return (
     <>
@@ -139,7 +142,7 @@ export const Chat = () => {
               ? [{ role: "assistant" as const, content: answer }]
               : []),
           ]}
-          isThinking={isThinking}
+          isThinking={isThinking && !answer}
         />
 
         <form
@@ -148,22 +151,18 @@ export const Chat = () => {
         >
           <input
             name="query"
-            value={question}
-            onChange={handleInputChange}
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
             placeholder="Type your message..."
             className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
           />
-          <button
-            disabled={question.trim().length === 0}
+          <Button
+            disabled={input.length === 0 || isThinking}
+            variant="blue"
             type="submit"
-            className={`px-4 py-2 font-semibold rounded-full shadow-md transition-all ${
-              question.trim().length === 0
-                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                : "bg-blue-500 text-white hover:bg-blue-600"
-            }`}
           >
             Send
-          </button>
+          </Button>
         </form>
       </div>
     </>
