@@ -3,9 +3,8 @@ import { Button } from "./ui/button";
 import { TableBody, TableCell, TableRow } from "./ui/table";
 import { PencilIcon, TrashIcon, CheckIcon } from "lucide-react";
 import type { Todo } from "~/types";
-import { Input } from "./ui/input";
 import { Form, FormProvider, useForm } from "react-hook-form";
-import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { useFullFetcher } from "~/hooks/useFullFetcher";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { FormField } from "./ui/form";
@@ -26,13 +25,16 @@ function AddForm({ refresh }: { refresh: () => void }) {
     resolver: zodResolver(todoListSchema),
     defaultValues: { rich_text: "" },
   });
+  const { fullSubmit, fetcher } = useFullFetcher(form, "/todoList");
 
-  const handleRefresh = () => {
-    refresh();
-    form.reset();
-  };
+  useEffect(() => {
+    if (fetcher.state === "idle") {
+      refresh();
+      form.reset();
+    }
+  }, [fetcher.state]);
 
-  const fullSubmit = useFullSubmit(form, "/todoList", "POST", handleRefresh);
+  console.log(fetcher.state);
   return (
     <FormProvider {...form}>
       <Form onSubmit={fullSubmit} className="flex items-center space-x-2 ">
@@ -61,7 +63,7 @@ function EditForm({ todo }: EditFormProps) {
     resolver: zodResolver(todoListSchema),
     defaultValues: { rich_text: todo.rich_text },
   });
-  const fullSubmit = useFullSubmit(form, `/todoList/${todo.id}`, "POST");
+  const fullSubmit = useFullFetcher(form, `/todoList/${todo.id}`, "POST");
   return (
     <FormProvider {...form}>
       <Form onSubmit={fullSubmit} className="flex items-center space-x-2 ">
