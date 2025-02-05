@@ -39,9 +39,6 @@ export function Header({
               <Link to="/employee">
                 <Button>Employee</Button>
               </Link>
-              <Link to="/admin/users">
-                <Button>Users</Button>
-              </Link>
             </div>
           ) : (
             <Link to="/admin">
@@ -93,7 +90,7 @@ export function Header({
               </Button>
             </li>
           )}
-          {isAdminPage && (
+          {/* {isAdminPage && (
             <li>
               <Button asChild variant="link">
                 <Link
@@ -104,7 +101,7 @@ export function Header({
                 </Link>
               </Button>
             </li>
-          )}
+          )} */}
           {/* {!isAdminPage && (
             <li>
               <Button asChild variant="link">
