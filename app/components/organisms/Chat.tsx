@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useChat, useInput } from "~/hooks/chat";
 import { DONE_KEY } from "~/utils/constants";
 import { Button } from "../ui/button";
@@ -59,10 +59,17 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 export const Chat = () => {
   const { messages, addMessage } = useChat();
   const [input, setInput] = useState<string>("");
-
   const [answer, setAnswer] = useState<string>("");
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isThinking, setIsThinking] = useState<boolean>(false);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
 
   const handleFormSubmit = async (event: React.FormEvent) => {
     setIsThinking(true);
@@ -152,6 +159,7 @@ export const Chat = () => {
             onChange={(event) => setInput(event.target.value)}
             placeholder="Type your message..."
             className="rounded-full"
+            ref={inputRef}
           />
           <Button
             disabled={input.length === 0 || isThinking}
