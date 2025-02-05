@@ -23,6 +23,7 @@ interface InstructionNode {
 
 interface InstructionItemProps {
   instruction: InstructionNode;
+  className?: string;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -51,13 +52,14 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
         </AccordionTrigger>
         <AccordionContent>
           <div
-            className="prose max-w-none w-full instructions"
+            className="prose max-w-none w-full instructions ml-5"
             dangerouslySetInnerHTML={{ __html: instruction.text }}
           />
           {instruction.children.length > 0 && (
-            <Accordion type="multiple" className="ml-5">
+            <Accordion type="multiple" className="">
               {instruction.children.map((childInstruction) => (
                 <InstructionItem
+                  className="ml-5"
                   key={childInstruction.id}
                   instruction={childInstruction}
                 />
