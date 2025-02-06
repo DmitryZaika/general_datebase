@@ -3,13 +3,14 @@ import { Button } from "./ui/button";
 import { TableBody, TableCell, TableRow } from "./ui/table";
 import { PencilIcon, TrashIcon, CheckIcon } from "lucide-react";
 import type { Todo } from "~/types";
-import { Form, FormProvider, useForm } from "react-hook-form";
+import { Controller, Form, FormProvider, useForm } from "react-hook-form";
 import { useFullFetcher } from "~/hooks/useFullFetcher";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FormField } from "./ui/form";
 import { InputItem } from "./molecules/InputItem";
 import { todoListSchema, TTodoListSchema } from "~/schemas/general";
 import { LoadingButton } from "./molecules/LoadingButton";
+import { Checkbox } from "@radix-ui/react-checkbox";
 
 interface EditFormProps {
   todo: Todo;
@@ -39,8 +40,8 @@ function AddForm({ refresh }: { refresh: () => void }) {
           render={({ field }) => (
             <InputItem
               placeholder="Add new task"
-              className="resize-none min-h-9 h-9 p-[2px]"
-              formClassName="mb-0"
+              className="resize-none min-h-9 h-9 p-[4px]"
+              formClassName="mb-0 w-full p-[2px] flex justify-center"
               field={field}
             />
           )}
@@ -75,29 +76,50 @@ function EditForm({ refresh, todo }: EditFormProps) {
     }
   }, [isEditing]);
   */
+  // async function handleCheckboxChange(isDone: boolean) {
+  //   await fetch(/todoList/${todo.id}, {
+  //     method: "PATCH",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify({ isDone }),
+  //   });
+  //   refresh();
+  // }
 
   return (
     <FormProvider {...form}>
       <Form
         onSubmit={fullSubmit}
-        className="flex items-center space-x-2 w-full flex-grow"
+        className="flex items-center space-x-2  flex-grow"
       >
-        <div className="flex-grow">
+        {/* <Controller
+          control={form.control}
+          name="is_done"
+          render={({ field }) => (
+            <Checkbox
+              checked={field.value}
+              onCheckedChange={(checked) => {
+                handleCheckboxChange(Boolean(checked));
+              }}
+              className="h-6 w-6 mr-2"
+            />
+          )}
+        /> */}
+        <div className="flex-grow w-full">
           {isEditing ? (
             <FormField
               control={form.control}
               name="rich_text"
               render={({ field }) => (
                 <InputItem
-                  className="resize-none min-h-9 h-9 p-[2px]"
-                  formClassName="mb-0"
+                  className="resize-none min-h-9 h-9 w-full border-none focus:ring-0 p-[0px]"
+                  formClassName="mb-0 w-full p-[2px] flex justify-center"
                   field={field}
                   ref={inputRef}
                 />
               )}
             />
           ) : (
-            <p>{todo.rich_text}</p>
+            <p className="break-words max-w-[262px] ">{todo.rich_text}</p>
           )}
         </div>
         {isEditing ? (
@@ -192,7 +214,7 @@ export function TodoList() {
         <div className="overflow-y-auto max-h-60">
           {data?.todos?.map((todo) => {
             return (
-              <div className="flex" key={todo.id}>
+              <div className="flex  items-center" key={todo.id}>
                 <EditForm todo={todo} refresh={getTodos} />
                 <DeleteForm todo={todo} refresh={getTodos} />
               </div>
