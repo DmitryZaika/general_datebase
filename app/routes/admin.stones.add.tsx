@@ -27,10 +27,12 @@ import { useCustomForm } from "~/utils/useCustomForm";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { TypeSelect } from "~/components/molecules/TypeInput";
+import { SwitchItem } from "~/components/molecules/SwitchItem";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
+  is_display: z.boolean(),
   // height: z.coerce.number().optional(),
   // width: z.coerce.number().optional(),
   // amount: z.coerce.number().optional(),
@@ -54,8 +56,8 @@ export async function action({ request }: ActionFunctionArgs) {
   let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.stones (name,type, url, company_id) VALUES (?, ?, ?, ?);`,
-      [data.name, data.type, data.file, user.company_id]
+      `INSERT INTO main.stones (name,type, url, company_id, is_display) VALUES (?, ?, ?, ?, ?);`,
+      [data.name, data.type, data.file, user.company_id, data.is_display]
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -90,7 +92,11 @@ export default function StonesAdd() {
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state === "submitting";
 
-  const form = useCustomForm(stoneSchema);
+  const form = useCustomForm(stoneSchema, {
+    defaultValues: {
+      is_display: true,
+    },
+  });
 
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -145,6 +151,12 @@ export default function StonesAdd() {
                 onChange={field.onChange}
               />
             )}
+          />
+          <FormField
+            defaultValue={true}
+            control={form.control}
+            name="is_display"
+            render={({ field }) => <SwitchItem field={field} name=" Display" />}
           />
           {/* <div className="flex gap-2">
             <FormField
