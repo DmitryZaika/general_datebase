@@ -180,22 +180,35 @@ export function TodoList() {
   return (
     <>
       <Button
-        className={`transform -translate-x-1/2 transition-all duration-300 ease-out ${
-          isOpen
-            ? "opacity-0 scale-90 pointer-events-none"
-            : "opacity-100 scale-100"
-        } -mb-4 right-40 absolute bottom-0`}
+        className={`
+          absolute bottom-0
+          left-1/2 -translate-x-1/2
+          -mb-4
+          transform transition-all duration-300 ease-out
+          ${
+            isOpen
+              ? "opacity-0 scale-90 pointer-events-none"
+              : "opacity-100 scale-100"
+          }
+          sm:left-auto sm:-translate-x-0 sm:right-40
+        `}
         onClick={() => setIsOpen(true)}
       >
         Todo List
       </Button>
 
       <div
-        className={`absolute flex flex-col top-[calc(100%)] right-0 transform -translate-x-1/2 w-[400px] bg-white border rounded shadow-lg p-4 z-50 transition-all duration-300 ease-out ${
-          isOpen
-            ? "opacity-100 scale-100"
-            : "opacity-0 scale-90 pointer-events-none"
-        }`}
+        className={`
+    absolute flex flex-col top-[calc(100%)] w-[400px] bg-white border rounded shadow-lg p-4 z-50 transform transition-all duration-300 ease-out
+    ${
+      isOpen
+        ? "opacity-100 scale-100"
+        : "opacity-0 scale-90 pointer-events-none"
+    }
+    /* По умолчанию — по центру */
+    left-1/2 -translate-x-1/2
+    sm:right-0 sm:left-auto
+  `}
       >
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">Todo List</h2>
@@ -213,7 +226,7 @@ export function TodoList() {
         <div className="overflow-y-auto max-h-60">
           {data?.todos?.map((todo) => {
             return (
-              <div className="flex  items-center" key={todo.id}>
+              <div className="flex items-center" key={todo.id}>
                 <EditForm todo={todo} refresh={getTodos} />
                 <DeleteForm todo={todo} refresh={getTodos} />
               </div>
