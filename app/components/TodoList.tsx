@@ -69,13 +69,12 @@ function EditForm({ refresh, todo }: EditFormProps) {
     }
   }, [fetcher.state]);
 
-  /*
   useEffect(() => {
     if (isEditing) {
       inputRef.current?.focus();
     }
   }, [isEditing]);
-  */
+
   // async function handleCheckboxChange(isDone: boolean) {
   //   await fetch(/todoList/${todo.id}, {
   //     method: "PATCH",
