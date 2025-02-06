@@ -47,7 +47,7 @@ export default function AdminSupports() {
         <Button>Add Support</Button>
       </Link>
       <div className="pt-24 sm:pt-0">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 lg:grid-cols-10 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
           {supports.map((support) => (
             <div key={support.id} className="relative group">
               <Image

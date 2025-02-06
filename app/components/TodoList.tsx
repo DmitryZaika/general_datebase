@@ -10,7 +10,6 @@ import { FormField } from "./ui/form";
 import { InputItem } from "./molecules/InputItem";
 import { todoListSchema, TTodoListSchema } from "~/schemas/general";
 import { LoadingButton } from "./molecules/LoadingButton";
-import { Checkbox } from "@radix-ui/react-checkbox";
 
 interface EditFormProps {
   todo: Todo;
