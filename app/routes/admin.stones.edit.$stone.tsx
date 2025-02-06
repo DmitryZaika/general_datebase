@@ -30,10 +30,12 @@ import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { TypeSelect } from "~/components/molecules/TypeInput";
 import { SelectInput } from "~/components/molecules/SelectItem";
+import { SwitchItem } from "~/components/molecules/SwitchItem";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
+  is_display: z.boolean(),
   // height: z.coerce.number().optional(),
   // width: z.coerce.number().optional(),
   // amount: z.coerce.number().optional(),
@@ -70,13 +72,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     if (newFile) {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ?, url = ? WHERE id = ?`,
-        [data.name, data.type, data.file, stoneId]
+        `UPDATE main.stones SET name = ?, type = ?, url = ?, is_display = ? WHERE id = ?`,
+        [data.name, data.type, data.file, data.is_display, stoneId]
       );
     } else {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ? WHERE id = ?`,
-        [data.name, data.type, stoneId]
+        `UPDATE main.stones SET name = ?, type = ?, is_display = ? WHERE id = ?`,
+        [data.name, data.type, data.is_display, stoneId]
       );
     }
   } catch (error) {
@@ -109,14 +111,20 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     name: string;
     type: string;
     url: string;
+    is_display: boolean;
     // height: string;
     // width: string;
     // amount: string;
-  }>(db, "select name, type, url from stones WHERE id = ?", stoneId);
+  }>(
+    db,
+    "select name, type, url, is_display from stones WHERE id = ?",
+    stoneId
+  );
   return {
     name: stone?.name,
     type: stone?.type,
     url: stone?.url,
+    is_display: stone?.is_display,
 
     // height: stone?.height,
     // width: stone?.width,
@@ -127,11 +135,18 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 export default function StonesEdit() {
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state === "submitting";
-  const { name, type, url } = useLoaderData<typeof loader>();
+  const { name, type, url, is_display } = useLoaderData<typeof loader>();
+
+  const defaultValues = {
+    name,
+    type,
+    url,
+    is_display: is_display,
+  };
 
   const form = useCustomOptionalForm(
     stoneSchema,
-    stoneSchema.parse({ name, type, url })
+    stoneSchema.parse(defaultValues)
   );
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -187,7 +202,13 @@ export default function StonesEdit() {
               />
             )}
           />
+          <FormField
+            control={form.control}
+            name="is_display"
+            render={({ field }) => <SwitchItem field={field} name=" Display" />}
+          />
           <img src={url} alt={name} className="w-48 mt-4 mx-auto" />
+
           {/* <div className="flex gap-2">
             <FormField
               control={form.control}
