@@ -87,7 +87,7 @@ function EditForm({ refresh, todo }: EditFormProps) {
     <FormProvider {...form}>
       <Form
         onSubmit={fullSubmit}
-        className="flex items-center space-x-2  flex-grow"
+        className="flex items-center space-x-2  grow"
       >
         {/* <Controller
           control={form.control}
@@ -102,7 +102,7 @@ function EditForm({ refresh, todo }: EditFormProps) {
             />
           )}
         /> */}
-        <div className="flex-grow w-full">
+        <div className="grow w-full">
           {isEditing ? (
             <FormField
               control={form.control}
@@ -213,7 +213,7 @@ export function TodoList() {
           <h2 className="text-lg font-bold">Todo List</h2>
           <button
             onClick={() => setIsOpen(false)}
-            className="transition text-gray-500 hover:text-gray-700 text-xl focus:outline-none"
+            className="transition text-gray-500 hover:text-gray-700 text-xl focus:outline-hidden"
             aria-label="Close"
           >
             ✕
