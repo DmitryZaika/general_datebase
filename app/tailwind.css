@@ -6,6 +6,10 @@
   animation: highlight-animation 2s forwards;
 }
 
+* {
+ border-color: lightgray
+}
+
 @layer components {
   @keyframes highlight-animation {
     from {
@@ -13,6 +17,37 @@
     }
     to {
       background-color: transparent;
+    }
+  }
+}
+
+@theme {
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --border-radius-lg: "var(--radius)";
+  --border-radius-md: "calc(var(--radius) - 2px)";
+  --border-radius-sm: "calc(var(--radius) - 4px)";
+  --border-color: white;
+
+
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+
+    to {
+      height: "0";
     }
   }
 }
