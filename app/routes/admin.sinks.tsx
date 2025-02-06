@@ -43,17 +43,13 @@ export default function AdminSinks() {
 
   return (
     <>
-      {/* Add Sink Button */}
       <Link to={`add`} relative="path" className="mb-6 inline-block">
         <Button>Add Sink</Button>
       </Link>
-
       <div className="pt-24 sm:pt-0">
-        {/* Sinks Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 lg:grid-cols-10 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
           {sinks.map((sink) => (
             <div key={sink.id} className="relative group">
-              {/* Sink Image */}
               <Image
                 id={sink.id}
                 src={sink.url}
@@ -63,9 +59,7 @@ export default function AdminSinks() {
                 setImage={setCurrentId}
               />
 
-              {/* Overlay for Edit and Delete Icons */}
               <div className="absolute inset-0 flex justify-between items-start p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                {/* Edit Icon */}
                 <Link
                   to={`edit/${sink.id}`}
                   className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
@@ -75,7 +69,6 @@ export default function AdminSinks() {
                   <FaPencilAlt />
                 </Link>
 
-                {/* Delete Icon */}
                 <Link
                   to={`delete/${sink.id}`}
                   className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
@@ -86,7 +79,6 @@ export default function AdminSinks() {
                 </Link>
               </div>
 
-              {/* Sink Name */}
               <div className="mt-2 text-center">
                 <h3 className="text-lg font-semibold">{sink.name}</h3>
               </div>
@@ -94,8 +86,6 @@ export default function AdminSinks() {
           ))}
         </div>
       </div>
-
-      {/* Outlet for Nested Routes */}
       <Outlet />
     </>
   );
