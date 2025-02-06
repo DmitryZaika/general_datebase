@@ -105,7 +105,7 @@ export const Chat = () => {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-5 right-5 bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 transition"
+          className="fixed bottom-5 right-5 cursor-pointer bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 transition"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
