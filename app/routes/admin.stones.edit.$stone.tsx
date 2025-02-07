@@ -28,14 +28,17 @@ import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { deleteFile } from "~/utils/s3.server";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
-import { TypeSelect } from "~/components/molecules/TypeInput";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  is_display: z.boolean(),
+  is_display: z.union([
+    z.boolean(),
+    z.number().transform((val) => val === 1),
+    z.enum(["true", "false"]).transform((val) => val === "true"),
+  ]),
   // height: z.coerce.number().optional(),
   // width: z.coerce.number().optional(),
   // amount: z.coerce.number().optional(),
@@ -148,6 +151,7 @@ export default function StonesEdit() {
     stoneSchema,
     stoneSchema.parse(defaultValues)
   );
+  console.log(form.watch("is_display"));
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");

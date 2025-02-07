@@ -60,19 +60,12 @@ function EditForm({ refresh, todo }: EditFormProps) {
   });
   const { fullSubmit, fetcher } = useFullFetcher(form, `/todoList/${todo.id}`);
   const [isEditing, setEditing] = useState<boolean>(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (fetcher.state === "idle") {
       refresh(() => setEditing(false));
     }
   }, [fetcher.state]);
-
-  useEffect(() => {
-    if (isEditing) {
-      inputRef.current?.focus();
-    }
-  }, [isEditing]);
 
   // async function handleCheckboxChange(isDone: boolean) {
   //   await fetch(/todoList/${todo.id}, {
@@ -85,10 +78,7 @@ function EditForm({ refresh, todo }: EditFormProps) {
 
   return (
     <FormProvider {...form}>
-      <Form
-        onSubmit={fullSubmit}
-        className="flex items-center space-x-2  grow"
-      >
+      <Form onSubmit={fullSubmit} className="flex items-center space-x-2  grow">
         {/* <Controller
           control={form.control}
           name="is_done"
@@ -112,7 +102,7 @@ function EditForm({ refresh, todo }: EditFormProps) {
                   className="resize-none min-h-9 h-9 w-full border-none focus:ring-0 p-[0px]"
                   formClassName="mb-0 w-full p-[2px] flex justify-center"
                   field={field}
-                  ref={inputRef}
+                  inputAutoFocus={true}
                 />
               )}
             />
@@ -211,13 +201,15 @@ export function TodoList() {
       >
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">Todo List</h2>
-          <button
+          <Button
             onClick={() => setIsOpen(false)}
-            className="transition text-gray-500 hover:text-gray-700 text-xl focus:outline-hidden"
+            variant="ghost"
             aria-label="Close"
+            size="icon"
+            className="text-lg"
           >
             ✕
-          </button>
+          </Button>
         </div>
 
         <AddForm refresh={getTodos} />
