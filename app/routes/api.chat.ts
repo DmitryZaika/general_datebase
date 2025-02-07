@@ -1,10 +1,10 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { eventStream } from "remix-utils/sse/server";
-import { commitSession, getSession } from "../sessions";
+import { getSession } from "../sessions";
 import OpenAI from "openai";
-import { getEmployeeUser, getUserBySessionId } from "../utils/session.server";
+import { getUserBySessionId } from "../utils/session.server";
 import { selectMany } from "../utils/queryHelpers";
-import { Todo, InstructionSlim } from "~/types";
+import { InstructionSlim } from "~/types";
 import { db } from "~/db.server";
 import { DONE_KEY } from "~/utils/constants";
 
@@ -38,7 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     },
     {
       role: "user",
-      content: `Answer the question as best yoyu can.\n\nQuestion: ${query}\n\nAnswer:`,
+      content: `Answer the question as best as you can.\n\nQuestion: ${query}\n\nAnswer:`,
     },
   ];
 
