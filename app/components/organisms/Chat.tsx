@@ -131,12 +131,15 @@ export const Chat = () => {
       >
         <div className="bg-gray-100 text-gray-800 font-semibold text-lg py-3 px-4 border border-gray-300 flex justify-between items-center">
           <span>Chat</span>
-          <button
+          <Button
             onClick={() => setIsOpen(false)}
-            className="text-gray-500 hover:text-gray-800 transition"
+            variant="ghost"
+            aria-label="Close"
+            size="icon"
+            className="text-2xl"
           >
-            ✖
-          </button>
+            ✕
+          </Button>
         </div>
 
         <ChatMessages

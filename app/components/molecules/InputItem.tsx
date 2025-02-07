@@ -9,26 +9,33 @@ interface InputItemProps {
   type?: string;
   className?: string;
   formClassName?: string;
+  inputAutoFocus?: boolean;
 }
 
-export const InputItem = forwardRef<HTMLInputElement, InputItemProps>(
-  ({ name, placeholder, field, type, className, formClassName }, inputRef) => {
-    return (
-      <FormItem className={formClassName}>
-        {name && <FormLabel>{name}</FormLabel>}
-        <FormControl>
-          <Input
-            ref={inputRef}
-            className={className}
-            type={type}
-            placeholder={placeholder}
-            {...field}
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    );
-  }
-);
+export const InputItem = ({
+  name,
+  placeholder,
+  field,
+  type,
+  className,
+  formClassName,
+  inputAutoFocus,
+}: InputItemProps) => {
+  return (
+    <FormItem className={formClassName}>
+      {name && <FormLabel>{name}</FormLabel>}
+      <FormControl>
+        <Input
+          className={className}
+          type={type}
+          placeholder={placeholder}
+          autoFocus={inputAutoFocus}
+          {...field}
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  );
+};
 
 InputItem.displayName = "InputItem";
