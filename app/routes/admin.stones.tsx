@@ -72,7 +72,6 @@ export default function AdminStones() {
         <Button>Add Stone</Button>
       </Link>
       <div className="pt-24 sm:pt-0">
-        {/* Аккордеон по типам камней */}
         <Accordion type="single" defaultValue="stones" className="w-full">
           <AccordionItem value="stones">
             <AccordionContent>
