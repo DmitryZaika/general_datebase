@@ -26,13 +26,16 @@ import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
-import { TypeSelect } from "~/components/molecules/TypeInput";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  is_display: z.boolean(),
+  is_display: z.union([
+    z.boolean(),
+    z.number().transform((val) => val === 1),
+    z.enum(["true", "false"]).transform((val) => val === "true"),
+  ]),
   // height: z.coerce.number().optional(),
   // width: z.coerce.number().optional(),
   // amount: z.coerce.number().optional(),
@@ -49,6 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     return { error: "Invalid CSRF token" };
   }
+
   const { errors, data } = await parseMutliForm(request, stoneSchema, "stones");
   if (errors || !data) {
     return { errors };
@@ -97,7 +101,7 @@ export default function StonesAdd() {
       is_display: true,
     },
   });
-
+  console.log(form.watch("is_display"));
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
