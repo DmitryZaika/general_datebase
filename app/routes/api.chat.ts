@@ -7,6 +7,7 @@ import { selectMany } from "../utils/queryHelpers";
 import { InstructionSlim } from "~/types";
 import { db } from "~/db.server";
 import { DONE_KEY } from "~/utils/constants";
+import { c } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_SECRET_KEY,
@@ -17,39 +18,55 @@ interface Message {
   content: string;
 }
 
-async function getContext(user_id: number, query: string): Promise<Message[]> {
-  const history = await selectMany<{ history: string }>(
+async function getContext(
+  user_id: number,
+  query: string
+): Promise<{ messages: Message[]; id: number }> {
+  const history = await selectMany<{ history: Message[]; id: number }>(
     db,
-    "SELECT history from chat_history WHERE user_id = ?",
+    "SELECT id, history from chat_history WHERE user_id = ?",
     [user_id]
   );
-  const currentConvo = JSON.parse(history[0].history);
+  const currentConvo = history[0].history;
   currentConvo.push({ role: "user", content: query });
-  return currentConvo;
+  return { messages: currentConvo, id: history[0].id };
 }
 
 async function newContext(
+  user_id: number,
   company_id: number,
   query: string
-): Promise<Message[]> {
+): Promise<{ history: Message[]; id: number | undefined }> {
   const instructions = await selectMany<InstructionSlim>(
     db,
     "SELECT id, title, rich_text from instructions WHERE company_id = ?",
     [company_id]
   );
-  return [
-    {
-      role: "system",
-      content: `Here is your context: ${JSON.stringify(instructions)}`,
-    },
-    {
-      role: "user",
-      content: `Answer the question as best as you can.\n\nQuestion: ${query}\n\nAnswer:`,
-    },
-  ];
+  const chatHistory = await selectMany<{ id: number }>(
+    db,
+    "SELECT id from chat_history WHERE user_id = ?",
+    [user_id]
+  );
+  let chatHistoryId = undefined;
+  if (chatHistory.length > 0) {
+    chatHistoryId = chatHistory[0].id;
+  }
+  return {
+    history: [
+      {
+        role: "system",
+        content: `Here is your context: ${JSON.stringify(instructions)}`,
+      },
+      {
+        role: "user",
+        content: `Answer the question as best as you can.\n\nQuestion: ${query}\n\nAnswer:`,
+      },
+    ],
+    id: chatHistoryId,
+  };
 }
 
-async function updateContext(
+async function insertContext(
   user_id: number,
   messages: Message[],
   answer: string
@@ -57,7 +74,20 @@ async function updateContext(
   messages.push({ role: "assistant", content: answer });
   await db.execute(
     `INSERT INTO main.chat_history (history, user_id) VALUES (?, ?);`,
-    [messages, user_id]
+    [JSON.stringify(messages), user_id]
+  );
+}
+
+async function updateContext(
+  userId: number,
+  chatHistoryId: number,
+  messages: Message[],
+  answer: string
+) {
+  messages.push({ role: "assistant", content: answer });
+  await db.execute(
+    `UPDATE main.chat_history SET history = ? WHERE id = ? AND user_id = ?;`,
+    [JSON.stringify(messages), chatHistoryId, userId]
   );
 }
 
@@ -77,11 +107,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   let messages: Message[] = [];
+  let chatHistoryId: number | undefined = undefined;
 
   if (isNew) {
-    messages = await newContext(user.company_id, query);
+    const result = await newContext(user.id, user.company_id, query);
+    messages = result.history;
+    chatHistoryId = result.id;
   } else {
-    messages = await getContext(user.id, query);
+    const result = await getContext(user.id, query);
+    messages = result.messages;
+    chatHistoryId = result.id;
   }
 
   let response = await openai.chat.completions.create({
@@ -103,7 +138,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
         }
       }
       send({ data: DONE_KEY });
-      updateContext(user.id, messages, answer);
+      if (chatHistoryId) {
+        updateContext(user.id, chatHistoryId, messages, answer);
+      } else {
+        insertContext(user.id, messages, answer);
+      }
     })();
 
     return function clear() {};
