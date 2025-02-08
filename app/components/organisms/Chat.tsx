@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useChat, useInput } from "~/hooks/chat";
 import { DONE_KEY } from "~/utils/constants";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -57,13 +56,15 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 );
 
 export const Chat = () => {
-  const { messages, addMessage } = useChat();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
   const [answer, setAnswer] = useState<string>("");
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isThinking, setIsThinking] = useState<boolean>(false);
-
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const addMessage = (message: Message) =>
+    setMessages((prevMessages) => [...prevMessages, message]);
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -77,14 +78,16 @@ export const Chat = () => {
     event.preventDefault();
 
     const formData = new FormData(event.target as HTMLFormElement);
-    const query = formData.get("query");
+    const query = formData.get("query") as string | null;
     if (answer) {
-      addMessage({ role: "assisstant", content: answer });
+      addMessage({ role: "assistant", content: answer });
       setAnswer("");
     }
-    addMessage({ role: "user", content: query });
+    addMessage({ role: "user", content: query || "" });
 
-    const sse = new EventSource(`/api/chat?query=${query}`);
+    const sse = new EventSource(
+      `/api/chat?query=${query}&isNew=${messages.length === 0}`
+    );
 
     sse.addEventListener("message", (event) => {
       if (event.data === DONE_KEY) {
