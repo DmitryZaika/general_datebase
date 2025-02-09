@@ -8,10 +8,11 @@ import { Button } from "~/components/ui/button";
 import { Input, type InputProps } from "../ui/input";
 import { cn } from "~/lib/utils";
 
-const PasswordInput = React.forwardRef<
-  HTMLInputElement,
-  InputProps & { field: object }
->(({ className, field, ...props }, ref) => {
+const PasswordInput = ({
+  className,
+  field,
+  ...props
+}: InputProps & { field: object }) => {
   const [showPassword, setShowPassword] = React.useState(false);
 
   return (
@@ -23,7 +24,6 @@ const PasswordInput = React.forwardRef<
             name="password"
             type={showPassword ? "text" : "password"}
             className={cn("hide-password-toggle pr-10", className)}
-            ref={ref}
             {...field}
             {...props}
           />
@@ -57,7 +57,7 @@ const PasswordInput = React.forwardRef<
       <FormMessage />
     </FormItem>
   );
-});
+};
 PasswordInput.displayName = "PasswordInput";
 
 export { PasswordInput };

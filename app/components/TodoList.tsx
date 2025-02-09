@@ -1,15 +1,15 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
-import { TableBody, TableCell, TableRow } from "./ui/table";
 import { PencilIcon, TrashIcon, CheckIcon } from "lucide-react";
 import type { Todo } from "~/types";
-import { Controller, Form, FormProvider, useForm } from "react-hook-form";
+import { Form, FormProvider, useForm } from "react-hook-form";
 import { useFullFetcher } from "~/hooks/useFullFetcher";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FormField } from "./ui/form";
 import { InputItem } from "./molecules/InputItem";
 import { todoListSchema, TTodoListSchema } from "~/schemas/general";
 import { LoadingButton } from "./molecules/LoadingButton";
+import { Checkbox } from "~/components/ui/checkbox";
 
 interface EditFormProps {
   todo: Todo;
@@ -21,7 +21,7 @@ function AddForm({ refresh }: { refresh: () => void }) {
     resolver: zodResolver(todoListSchema),
     defaultValues: { rich_text: "" },
   });
-  const { fullSubmit, fetcher } = useFullFetcher(form, "/todoList");
+  const { fullSubmit, fetcher } = useFullFetcher(form, "/api/todoList");
 
   useEffect(() => {
     if (fetcher.state === "idle") {
@@ -58,7 +58,10 @@ function EditForm({ refresh, todo }: EditFormProps) {
     resolver: zodResolver(todoListSchema),
     defaultValues: { rich_text: todo.rich_text },
   });
-  const { fullSubmit, fetcher } = useFullFetcher(form, `/todoList/${todo.id}`);
+  const { fullSubmit, fetcher } = useFullFetcher(
+    form,
+    `/api/todoList/${todo.id}`
+  );
   const [isEditing, setEditing] = useState<boolean>(false);
 
   useEffect(() => {
@@ -67,31 +70,9 @@ function EditForm({ refresh, todo }: EditFormProps) {
     }
   }, [fetcher.state]);
 
-  // async function handleCheckboxChange(isDone: boolean) {
-  //   await fetch(/todoList/${todo.id}, {
-  //     method: "PATCH",
-  //     headers: { "Content-Type": "application/json" },
-  //     body: JSON.stringify({ isDone }),
-  //   });
-  //   refresh();
-  // }
-
   return (
     <FormProvider {...form}>
       <Form onSubmit={fullSubmit} className="flex items-center space-x-2  grow">
-        {/* <Controller
-          control={form.control}
-          name="is_done"
-          render={({ field }) => (
-            <Checkbox
-              checked={field.value}
-              onCheckedChange={(checked) => {
-                handleCheckboxChange(Boolean(checked));
-              }}
-              className="h-6 w-6 mr-2"
-            />
-          )}
-        /> */}
         <div className="grow w-full">
           {isEditing ? (
             <FormField
@@ -107,7 +88,7 @@ function EditForm({ refresh, todo }: EditFormProps) {
               )}
             />
           ) : (
-            <p className="break-words max-w-[262px] ">{todo.rich_text}</p>
+            <p className="break-words max-w-[233px] ">{todo.rich_text}</p>
           )}
         </div>
         {isEditing ? (
@@ -132,7 +113,7 @@ function DeleteForm({ refresh, todo }: EditFormProps) {
   const form = useForm();
   const { fullSubmit, fetcher } = useFullFetcher(
     form,
-    `/todoList/${todo.id}`,
+    `/api/todoList/${todo.id}`,
     "DELETE"
   );
   useEffect(() => {
@@ -151,12 +132,41 @@ function DeleteForm({ refresh, todo }: EditFormProps) {
     </FormProvider>
   );
 }
+
+function FinishForm({ refresh, todo }: EditFormProps) {
+  const [checked, setChecked] = useState<boolean>(Boolean(todo.is_done));
+
+  async function handleCheckboxChange(isDone: boolean) {
+    const formData = new FormData();
+    formData.append("isDone", String(isDone));
+
+    await fetch(`/api/todoList/${todo.id}`, {
+      method: "PATCH",
+      body: formData,
+    });
+    refresh();
+  }
+
+  async function handleToggle(value: boolean) {
+    setChecked(Boolean(value));
+    await handleCheckboxChange(value);
+  }
+
+  return (
+    <Checkbox
+      checked={checked}
+      onCheckedChange={handleToggle}
+      className="size-5 mr-2"
+    />
+  );
+}
+
 export function TodoList() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [data, setData] = useState<{ todos: Todo[] } | undefined>();
 
   const getTodos = (callback: undefined | (() => void) = undefined) => {
-    fetch("/todoList")
+    fetch("/api/todoList")
       .then(async (res) => await res.json())
       .then(setData)
       .then(() => callback && callback());
@@ -218,6 +228,7 @@ export function TodoList() {
           {data?.todos?.map((todo) => {
             return (
               <div className="flex items-center" key={todo.id}>
+                <FinishForm todo={todo} refresh={getTodos} />
                 <EditForm todo={todo} refresh={getTodos} />
                 <DeleteForm todo={todo} refresh={getTodos} />
               </div>

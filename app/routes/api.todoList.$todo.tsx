@@ -1,9 +1,5 @@
 // app/routes/todoList.ts
-import {
-  ActionFunctionArgs,
-  LoaderFunctionArgs,
-  redirect,
-} from "@remix-run/node";
+import { ActionFunctionArgs } from "@remix-run/node";
 import { db } from "~/db.server";
 import { getValidatedFormData } from "remix-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,19 +22,19 @@ const editAction = async (
   );
 };
 
-// const updateDoneAction = async (
-//   todoId: number,
-//   isDone: boolean,
-//   userId: number
-// ) => {
-//   await db.execute(
-//     `UPDATE main.todolist
-//      SET is_done = ?
-//      WHERE id = ?
-//      AND user_id = ?;`,
-//     [isDone, todoId, userId]
-//   );
-// };
+const updateDoneAction = async (
+  todoId: number,
+  isDone: boolean,
+  userId: number
+): Promise<void> => {
+  await db.execute(
+    `UPDATE main.todolist
+     SET is_done = ?
+     WHERE id = ?
+     AND user_id = ?;`,
+    [isDone, todoId, userId]
+  );
+};
 
 const deleteAction = async (todoId: number, userId: number): Promise<void> => {
   await db.execute(
@@ -82,6 +78,13 @@ export async function action({ params, request }: ActionFunctionArgs) {
     await deleteAction(todoId, user.id);
     return { success: true };
   }
+  if (request.method === "PATCH") {
+    const formData = await request.formData();
+    const isDone = formData.get("isDone") === "true";
+    await updateDoneAction(todoId, isDone, user.id);
+    return { success: true };
+  }
+  6;
 
   return { success: false };
 }
