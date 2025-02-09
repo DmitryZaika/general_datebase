@@ -107,14 +107,14 @@ export const Chat = () => {
 
   return (
     <Dialog modal={false}>
-      <DialogTrigger className="fixed rounded-full bottom-5 right-5 bg-blue-500 text-white size-16 flex items-center align-center justify-center">
+      <DialogTrigger className="fixed rounded-full bottom-5 right-5 bg-blue-500 hover:bg-blue-600 duration-200 text-white size-14 flex items-center align-center justify-center cursor-pointer">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"
           strokeWidth={2}
           stroke="currentColor"
-          className="size-8"
+          className="size-6"
         >
           <path
             strokeLinecap="round"
