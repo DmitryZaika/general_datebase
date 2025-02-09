@@ -26,23 +26,18 @@ interface InstructionItemProps {
   className?: string;
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  try {
-    await getEmployeeUser(request);
-  } catch (error) {
-    return redirect(`/login?error=${error}`);
-  }
-  const user = await getEmployeeUser(request);
-  const instructions = await selectMany<Instruction>(
-    db,
-    "select id, title, parent_id, after_id, rich_text from instructions WHERE company_id = ?",
-    [user.company_id]
-  );
-  return { instructions };
-};
+function isHtmlEmpty(html: string): boolean {
+  const cleaned = html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, "")
+    .replace(/\s/g, "")
+    .trim();
+  return cleaned.length === 0;
+}
 
 const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
   const hasTitle = Boolean(instruction.title);
+  const isEmptyText = isHtmlEmpty(instruction.text);
 
   if (hasTitle) {
     return (
@@ -51,15 +46,16 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
           {instruction.title}
         </AccordionTrigger>
         <AccordionContent>
-          <div
-            className="prose max-w-none w-full instructions ml-5"
-            dangerouslySetInnerHTML={{ __html: instruction.text }}
-          />
+          {!isEmptyText && (
+            <div
+              className="prose max-w-none w-full instructions ml-5"
+              dangerouslySetInnerHTML={{ __html: instruction.text }}
+            />
+          )}
           {instruction.children.length > 0 && (
-            <Accordion type="multiple" className="">
+            <Accordion type="multiple" className="ml-5">
               {instruction.children.map((childInstruction) => (
                 <InstructionItem
-                  className="ml-5"
                   key={childInstruction.id}
                   instruction={childInstruction}
                 />
@@ -72,10 +68,12 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
   } else {
     return (
       <div className="py-4">
-        <div
-          className="prose overflow-auto break-words w-full"
-          dangerouslySetInnerHTML={{ __html: instruction.text }}
-        />
+        {!isEmptyText && (
+          <div
+            className="prose overflow-auto break-words w-full ml-5"
+            dangerouslySetInnerHTML={{ __html: instruction.text }}
+          />
+        )}
         {instruction.children.length > 0 && (
           <div className="ml-5">
             {instruction.children.map((childInstruction) => (
@@ -92,7 +90,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
 };
 
 function cleanData(instructions: Instruction[]): InstructionNode[] {
-  const nodeMap: Map<number, InstructionNode> = new Map();
+  const nodeMap = new Map<number, InstructionNode>();
   instructions.forEach((item) => {
     nodeMap.set(item.id, {
       id: item.id,
@@ -103,7 +101,6 @@ function cleanData(instructions: Instruction[]): InstructionNode[] {
     });
   });
   const rootNodes: InstructionNode[] = [];
-
   const insertNodeInOrder = (
     nodes: InstructionNode[],
     node: InstructionNode
@@ -119,7 +116,6 @@ function cleanData(instructions: Instruction[]): InstructionNode[] {
       }
     }
   };
-
   instructions.forEach((item) => {
     const node = nodeMap.get(item.id)!;
     if (item.parent_id === null) {
@@ -128,16 +124,26 @@ function cleanData(instructions: Instruction[]): InstructionNode[] {
       const parentNode = nodeMap.get(item.parent_id);
       if (parentNode) {
         insertNodeInOrder(parentNode.children, node);
-      } else {
-        console.warn(
-          `Parent with id ${item.parent_id} not found for item id ${item.id}`
-        );
       }
     }
   });
-
   return rootNodes;
 }
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    await getEmployeeUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
+  const user = await getEmployeeUser(request);
+  const instructions = await selectMany<Instruction>(
+    db,
+    "SELECT id, title, parent_id, after_id, rich_text FROM instructions WHERE company_id = ?",
+    [user.company_id]
+  );
+  return { instructions };
+};
 
 export default function Instructions() {
   const { instructions } = useLoaderData<typeof loader>();

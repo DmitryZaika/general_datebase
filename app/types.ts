@@ -1,7 +1,7 @@
 export interface Todo {
   id: number;
   rich_text: string;
-  is_done: boolean;
+  is_done: number;
 }
 
 export interface InstructionSlim {
