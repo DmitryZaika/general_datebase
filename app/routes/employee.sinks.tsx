@@ -45,17 +45,19 @@ export default function Sinks() {
           <Accordion type="multiple">
             <AccordionContent>
               <ModuleList>
-                {sinks.map((sink) => (
-                  <Image
-                    id={sink.id}
-                    key={sink.id}
-                    src={sink.url}
-                    alt={sink.name}
-                    name={sink.name}
-                    setImage={setCurrentId}
-                    isOpen={currentId === sink.id}
-                  />
-                ))}
+                {sinks
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((sink) => (
+                    <Image
+                      id={sink.id}
+                      key={sink.id}
+                      src={sink.url}
+                      alt={sink.name}
+                      name={sink.name}
+                      setImage={setCurrentId}
+                      isOpen={currentId === sink.id}
+                    />
+                  ))}
               </ModuleList>
             </AccordionContent>
           </Accordion>

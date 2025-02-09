@@ -39,7 +39,7 @@ export default function Documents() {
   const { documents } = useLoaderData<typeof loader>();
 
   return (
-    <>
+    <div className="pt-24 sm:pt-0">
       <Link to={`add`} relative="path">
         <Button>Add Document</Button>
       </Link>
@@ -77,6 +77,6 @@ export default function Documents() {
         </TableBody>
       </Table>
       <Outlet />
-    </>
+    </div>
   );
 }
