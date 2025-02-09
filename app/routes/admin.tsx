@@ -1,7 +1,6 @@
 import type { LoaderFunction, MetaFunction } from "@remix-run/node";
 import { useLocation, useNavigate, Outlet } from "@remix-run/react";
 import { PageLayout } from "~/components/PageLayout";
-
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { redirect } from "@remix-run/node";
 import { getAdminUser } from "~/utils/session.server";
@@ -38,21 +37,50 @@ export default function Admin() {
   const isDataBase =
     location.pathname.startsWith("/admin/stones") ||
     location.pathname.startsWith("/admin/sinks") ||
-    location.pathname.startsWith("/admin/images") ||
+    location.pathname.startsWith("/admin/suppliers") ||
     location.pathname.startsWith("/admin/supports") ||
     location.pathname.startsWith("/admin/documents") ||
-    location.pathname.startsWith("/admin/suppliers");
+    location.pathname.startsWith("/admin/images");
+
+  const getTabClassName = (tab: string) =>
+    `relative px-4 py-2 text-sm font-medium rounded-md transition-all duration-300 ${
+      currentTab === tab
+        ? "text-blue-600 decoration-2"
+        : "text-gray-600 hover:text-blue-500"
+    }`;
 
   return isDataBase ? (
     <PageLayout title="Granite Depot DataBase">
-      <Tabs value={currentTab} onValueChange={handleTabChange}>
-        <TabsList className="cursor-pointer">
-          <TabsTrigger value="stones">Stones</TabsTrigger>
-          <TabsTrigger value="sinks">Sinks</TabsTrigger>
-          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
-          <TabsTrigger value="supports">Supports</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="images">Images</TabsTrigger>
+      <Tabs
+        value={currentTab}
+        onValueChange={handleTabChange}
+        orientation="vertical"
+      >
+        <TabsList className="flex flex-col pt-20 sm:pt-0 pb-5 sm:flex-row sm:justify-start">
+          <TabsTrigger value="stones" className={getTabClassName("stones")}>
+            Stones
+          </TabsTrigger>
+          <TabsTrigger value="sinks" className={getTabClassName("sinks")}>
+            Sinks
+          </TabsTrigger>
+          <TabsTrigger
+            value="suppliers"
+            className={getTabClassName("suppliers")}
+          >
+            Suppliers
+          </TabsTrigger>
+          <TabsTrigger value="supports" className={getTabClassName("supports")}>
+            Supports
+          </TabsTrigger>
+          <TabsTrigger
+            value="documents"
+            className={getTabClassName("documents")}
+          >
+            Documents
+          </TabsTrigger>
+          <TabsTrigger value="images" className={getTabClassName("images")}>
+            Images
+          </TabsTrigger>
         </TabsList>
         <Outlet />
       </Tabs>

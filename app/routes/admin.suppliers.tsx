@@ -46,7 +46,7 @@ export default function Suppliers() {
   const { suppliers } = useLoaderData<typeof loader>();
 
   return (
-    <>
+    <div className="pt-24 sm:pt-0">
       <Link to={`add`} relative="path">
         <Button>Add Supplier</Button>
       </Link>
@@ -91,6 +91,6 @@ export default function Suppliers() {
         </TableBody>
       </Table>
       <Outlet />
-    </>
+    </div>
   );
 }
