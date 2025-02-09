@@ -130,7 +130,7 @@ export const Chat = () => {
           e.preventDefault();
         }}
       >
-        <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col">
+        <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto">
           <div className="bg-gray-100 text-gray-800 font-semibold text-lg py-3 px-4 border border-gray-300 flex justify-between items-center">
             <span>Chat</span>
             <DialogClose>
