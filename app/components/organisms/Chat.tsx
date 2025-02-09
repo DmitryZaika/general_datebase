@@ -1,4 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+  DialogTrigger,
+} from "~/components/ui/dialog";
 import { DONE_KEY } from "~/utils/constants";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -59,7 +68,6 @@ export const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
   const [answer, setAnswer] = useState<string>("");
-  const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isThinking, setIsThinking] = useState<boolean>(false);
 
   const addMessage = (message: Message) =>
@@ -97,44 +105,38 @@ export const Chat = () => {
   };
 
   return (
-    <>
-      {!isOpen ? (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-5 right-5 cursor-pointer bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 transition"
+    <Dialog modal={false}>
+      <DialogTrigger className="fixed rounded-full bottom-5 right-5 bg-blue-500 text-white size-16 flex items-center align-center justify-center">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+          stroke="currentColor"
+          className="size-8"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            className="w-6 h-6"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z"
-            />
-          </svg>
-        </button>
-      ) : (
-        <div
-          className={`fixed bottom-0 right-0 h-[100%] w-[100%] md:w-[40%] md:h-full bg-white border-l border-gray-300 shadow-lg transform transition-transform duration-300 flex flex-col ${
-            isOpen ? "translate-x-0" : "translate-x-full"
-          }`}
-        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z"
+          />
+        </svg>
+      </DialogTrigger>
+      <DialogContent
+        className="h-screen"
+        position="br"
+        onInteractOutside={(e) => {
+          e.preventDefault();
+        }}
+      >
+        <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col">
           <div className="bg-gray-100 text-gray-800 font-semibold text-lg py-3 px-4 border border-gray-300 flex justify-between items-center">
             <span>Chat</span>
-            <Button
-              onClick={() => setIsOpen(false)}
-              variant="ghost"
-              aria-label="Close"
-              size="icon"
-              className="text-2xl"
-            >
-              ✕
-            </Button>
+            <DialogClose>
+              <Button variant="ghost" size="icon" className="text-2xl">
+                ✕
+              </Button>
+            </DialogClose>
           </div>
 
           <ChatMessages
@@ -169,7 +171,7 @@ export const Chat = () => {
             </Button>
           </form>
         </div>
-      )}
-    </>
+      </DialogContent>
+    </Dialog>
   );
 };
