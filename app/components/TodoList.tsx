@@ -205,13 +205,12 @@ export function TodoList() {
 
       <div
         className={`
-    absolute flex flex-col top-[calc(100%)] w-[400px] bg-white border rounded shadow-lg p-4 z-50 transform transition-all duration-300 ease-out
+    absolute flex flex-col top-[calc(100%)] w-[400px] bg-white border rounded shadow-lg p-4 z-10  transform transition-all duration-300 ease-out
     ${
       isOpen
         ? "opacity-100 scale-100"
         : "opacity-0 scale-90 pointer-events-none"
     }
-    /* По умолчанию — по центру */
     left-1/2 -translate-x-1/2
     sm:right-0 sm:left-auto
   `}

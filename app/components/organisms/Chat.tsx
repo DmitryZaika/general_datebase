@@ -11,6 +11,7 @@ import {
 import { DONE_KEY } from "~/utils/constants";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import clsx from "clsx";
 
 interface Message {
   role: "user" | "assistant";
@@ -124,7 +125,6 @@ export const Chat = () => {
       </DialogTrigger>
       <DialogContent
         className="h-screen"
-        position="br"
         onInteractOutside={(e) => {
           e.preventDefault();
         }}
