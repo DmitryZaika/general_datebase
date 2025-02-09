@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
+import { clsx } from "clsx";
 import { PencilIcon, TrashIcon, CheckIcon } from "lucide-react";
 import type { Todo } from "~/types";
 import { Form, FormProvider, useForm } from "react-hook-form";
@@ -88,7 +89,13 @@ function EditForm({ refresh, todo }: EditFormProps) {
               )}
             />
           ) : (
-            <p className="break-words max-w-[233px] ">{todo.rich_text}</p>
+            <p
+              className={clsx("break-words max-w-[233px]", {
+                "line-through": todo.is_done,
+              })}
+            >
+              {todo.rich_text}
+            </p>
           )}
         </div>
         {isEditing ? (
