@@ -100,7 +100,6 @@ export default function Stones() {
                             setImage={setCurrentId}
                             isOpen={currentId === stone.id}
                           />
-
                           <div
                             className="absolute bottom-0 left-0 w-full p-2 
                                           opacity-0 group-hover:opacity-100 
@@ -115,12 +114,6 @@ export default function Stones() {
                               <strong>Size:</strong> {stone.width ?? "—"} x{" "}
                               {stone.height ?? "—"}
                             </p>
-                          </div>
-
-                          <div className="mt-1 text-center">
-                            <h3 className="text-sm font-semibold">
-                              {stone.name}
-                            </h3>
                           </div>
                         </div>
                       ))}
