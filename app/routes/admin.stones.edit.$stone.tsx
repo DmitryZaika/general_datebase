@@ -39,9 +39,9 @@ const stoneSchema = z.object({
     z.number().transform((val) => val === 1),
     z.enum(["true", "false"]).transform((val) => val === "true"),
   ]),
-  // height: z.coerce.number().optional(),
-  // width: z.coerce.number().optional(),
-  // amount: z.coerce.number().optional(),
+  height: z.coerce.number().optional(),
+  width: z.coerce.number().optional(),
+  amount: z.coerce.number().optional(),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -75,13 +75,34 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     if (newFile) {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ?, url = ?, is_display = ? WHERE id = ?`,
-        [data.name, data.type, data.file, data.is_display, stoneId]
+        `UPDATE main.stones
+         SET name = ?, type = ?, url = ?, is_display = ?, height = ?, width = ?, amount = ?
+         WHERE id = ?`,
+        [
+          data.name,
+          data.type,
+          data.file,
+          data.is_display,
+          data.height,
+          data.width,
+          data.amount,
+          stoneId,
+        ]
       );
     } else {
       await db.execute(
-        `UPDATE main.stones SET name = ?, type = ?, is_display = ? WHERE id = ?`,
-        [data.name, data.type, data.is_display, stoneId]
+        `UPDATE main.stones
+         SET name = ?, type = ?, is_display = ?, height = ?, width = ?, amount = ?
+         WHERE id = ?`,
+        [
+          data.name,
+          data.type,
+          data.is_display,
+          data.height,
+          data.width,
+          data.amount,
+          stoneId,
+        ]
       );
     }
   } catch (error) {
@@ -115,12 +136,12 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     type: string;
     url: string;
     is_display: boolean;
-    // height: string;
-    // width: string;
-    // amount: string;
+    height: string;
+    width: string;
+    amount: string;
   }>(
     db,
-    "select name, type, url, is_display from stones WHERE id = ?",
+    "select name, type, url, is_display, height, width, amount from stones WHERE id = ?",
     stoneId
   );
   return {
@@ -129,22 +150,26 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     url: stone?.url,
     is_display: stone?.is_display,
 
-    // height: stone?.height,
-    // width: stone?.width,
-    // amount: stone?.amount,
+    height: stone?.height,
+    width: stone?.width,
+    amount: stone?.amount,
   };
 };
 
 export default function StonesEdit() {
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state === "submitting";
-  const { name, type, url, is_display } = useLoaderData<typeof loader>();
+  const { name, type, url, is_display, height, width, amount } =
+    useLoaderData<typeof loader>();
 
   const defaultValues = {
     name,
     type,
     url,
     is_display: is_display,
+    height,
+    width,
+    amount,
   };
 
   const form = useCustomOptionalForm(
@@ -213,7 +238,7 @@ export default function StonesEdit() {
           />
           <img src={url} alt={name} className="w-48 mt-4 mx-auto" />
 
-          {/* <div className="flex gap-2">
+          <div className="flex gap-2">
             <FormField
               control={form.control}
               name="height"
@@ -247,7 +272,7 @@ export default function StonesEdit() {
                 field={field}
               />
             )}
-          /> */}
+          />
 
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
