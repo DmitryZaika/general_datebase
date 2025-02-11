@@ -101,7 +101,7 @@ export default function Stones() {
                             isOpen={currentId === stone.id}
                           />
                           <div
-                            className="absolute bottom-0 left-0 w-full p-2 
+                            className="absolute bottom-6 left-0 w-full p-2 
                                           opacity-0 group-hover:opacity-100 
                                           transition-opacity duration-300
                                           bg-gray-800 bg-opacity-70 
