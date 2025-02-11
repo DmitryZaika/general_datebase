@@ -36,9 +36,9 @@ const stoneSchema = z.object({
     z.number().transform((val) => val === 1),
     z.enum(["true", "false"]).transform((val) => val === "true"),
   ]),
-  // height: z.coerce.number().optional(),
-  // width: z.coerce.number().optional(),
-  // amount: z.coerce.number().optional(),
+  height: z.coerce.number().optional(),
+  width: z.coerce.number().optional(),
+  amount: z.coerce.number().optional(),
 });
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -60,8 +60,17 @@ export async function action({ request }: ActionFunctionArgs) {
   let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.stones (name,type, url, company_id, is_display) VALUES (?, ?, ?, ?, ?);`,
-      [data.name, data.type, data.file, user.company_id, data.is_display]
+      `INSERT INTO main.stones (name,type, url, company_id, is_display, width, height, amount) VALUES (?, ?, ?, ?, ?,? ,?,?);`,
+      [
+        data.name,
+        data.type,
+        data.file,
+        user.company_id,
+        data.is_display,
+        data.width,
+        data.height,
+        data.amount,
+      ]
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -162,7 +171,7 @@ export default function StonesAdd() {
             name="is_display"
             render={({ field }) => <SwitchItem field={field} name=" Display" />}
           />
-          {/* <div className="flex gap-2">
+          <div className="flex gap-2">
             <FormField
               control={form.control}
               name="height"
@@ -196,7 +205,7 @@ export default function StonesAdd() {
                 field={field}
               />
             )}
-          /> */}
+          />
 
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>

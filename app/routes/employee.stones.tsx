@@ -1,3 +1,5 @@
+// app/routes/stones.tsx (пример вашего файла)
+
 import {
   Accordion,
   AccordionItem,
@@ -19,6 +21,10 @@ interface Stone {
   name: string;
   type: string;
   url: string | null;
+  is_display: boolean | number;
+  height: number | null;
+  width: number | null;
+  amount: number | null;
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
@@ -35,14 +41,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   const user = await getEmployeeUser(request);
+
   const stones = await selectMany<Stone>(
     db,
-    "SELECT id, name, type, url FROM stones WHERE company_id = ? AND is_display = 1",
+    `
+      SELECT id, name, type, url, is_display, height, width, amount
+      FROM stones
+      WHERE company_id = ? AND is_display = 1
+    `,
     [user.company_id]
   );
-  return {
-    stones,
-  };
+
+  return { stones };
 };
 
 function stoneIds(stones: Stone[], stoneId: number): number[] {
@@ -57,16 +67,14 @@ export default function Stones() {
   const { currentId, setCurrentId } = useArrowToggle(
     (value: number | undefined) => (value ? stoneIds(stones, value) : [])
   );
-  const stoneList = stones.reduce(
-    (acc: { [key: string]: Stone[] }, stone: Stone) => {
-      if (!acc[stone.type]) {
-        acc[stone.type] = [];
-      }
-      acc[stone.type].push(stone);
-      return acc;
-    },
-    {}
-  );
+
+  const stoneList = stones.reduce((acc: { [key: string]: Stone[] }, stone) => {
+    if (!acc[stone.type]) {
+      acc[stone.type] = [];
+    }
+    acc[stone.type].push(stone);
+    return acc;
+  }, {});
 
   return (
     <Accordion type="single" defaultValue="stones" className="pt-24 sm:pt-0">
@@ -83,15 +91,38 @@ export default function Stones() {
                   <AccordionContent>
                     <ModuleList>
                       {stoneList[type].map((stone) => (
-                        <Image
-                          id={stone.id}
-                          key={stone.id}
-                          src={stone.url}
-                          alt={stone.name}
-                          name={stone.name}
-                          setImage={setCurrentId}
-                          isOpen={currentId === stone.id}
-                        />
+                        <div key={stone.id} className="relative group w-full">
+                          <Image
+                            id={stone.id}
+                            src={stone.url}
+                            alt={stone.name}
+                            name={stone.name}
+                            setImage={setCurrentId}
+                            isOpen={currentId === stone.id}
+                          />
+
+                          <div
+                            className="absolute bottom-0 left-0 w-full p-2 
+                                          opacity-0 group-hover:opacity-100 
+                                          transition-opacity duration-300
+                                          bg-gray-800 bg-opacity-70 
+                                          text-white text-xs rounded-t"
+                          >
+                            <p>
+                              <strong>Amount:</strong> {stone.amount ?? "—"}
+                            </p>
+                            <p>
+                              <strong>Size:</strong> {stone.width ?? "—"} x{" "}
+                              {stone.height ?? "—"}
+                            </p>
+                          </div>
+
+                          <div className="mt-1 text-center">
+                            <h3 className="text-sm font-semibold">
+                              {stone.name}
+                            </h3>
+                          </div>
+                        </div>
                       ))}
                     </ModuleList>
                   </AccordionContent>
