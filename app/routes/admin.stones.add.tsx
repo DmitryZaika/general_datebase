@@ -36,9 +36,9 @@ const stoneSchema = z.object({
     z.number().transform((val) => val === 1),
     z.enum(["true", "false"]).transform((val) => val === "true"),
   ]),
-  height: z.coerce.number().default(0) || null,
-  width: z.coerce.number().default(0) || null,
-  amount: z.coerce.number().default(0) || null,
+  height: z.coerce.number().default(0),
+  width: z.coerce.number().default(0),
+  amount: z.coerce.number().default(0),
 });
 
 export async function action({ request }: ActionFunctionArgs) {

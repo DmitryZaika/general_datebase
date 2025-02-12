@@ -90,33 +90,35 @@ export default function Stones() {
                   </AccordionTrigger>
                   <AccordionContent>
                     <ModuleList>
-                      {stoneList[type].map((stone) => (
-                        <div key={stone.id} className="relative group w-full">
-                          <Image
-                            id={stone.id}
-                            src={stone.url}
-                            alt={stone.name}
-                            name={stone.name}
-                            setImage={setCurrentId}
-                            isOpen={currentId === stone.id}
-                          />
-                          <div
-                            className="absolute bottom-6 left-0 w-full p-2 
+                      {stoneList[type]
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((stone) => (
+                          <div key={stone.id} className="relative group w-full">
+                            <Image
+                              id={stone.id}
+                              src={stone.url}
+                              alt={stone.name}
+                              name={stone.name}
+                              setImage={setCurrentId}
+                              isOpen={currentId === stone.id}
+                            />
+                            <div
+                              className="absolute bottom-6 left-0 w-full p-2 
                                           opacity-0 group-hover:opacity-100 
                                           transition-opacity duration-300
                                           bg-gray-800 bg-opacity-70 
                                           text-white text-xs rounded-t"
-                          >
-                            <p>
-                              <strong>Amount:</strong> {stone.amount ?? "—"}
-                            </p>
-                            <p>
-                              <strong>Size:</strong> {stone.width ?? "—"} x{" "}
-                              {stone.height ?? "—"}
-                            </p>
+                            >
+                              <p>
+                                <strong>Amount:</strong> {stone.amount ?? "—"}
+                              </p>
+                              <p>
+                                <strong>Size:</strong> {stone.width ?? "—"} x{" "}
+                                {stone.height ?? "—"}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
                     </ModuleList>
                   </AccordionContent>
                 </AccordionItem>
