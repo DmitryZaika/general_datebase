@@ -1,4 +1,4 @@
-// app/routes/stones.tsx (пример вашего файла)
+// app/routes/stones.tsx
 
 import {
   Accordion,
@@ -55,10 +55,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { stones };
 };
 
+/**
+ * Функция теперь отбирает все камни нужного типа, сортирует их по имени
+ * и возвращает массив id, что соответствует отображаемому порядку.
+ */
 function stoneIds(stones: Stone[], stoneId: number): number[] {
   const stoneType = stones.find((item) => item.id === stoneId)?.type;
+  if (!stoneType) return [];
   return stones
     .filter((item) => item.type === stoneType)
+    .sort((a, b) => a.name.localeCompare(b.name))
     .map((item) => item.id);
 }
 
@@ -68,6 +74,7 @@ export default function Stones() {
     (value: number | undefined) => (value ? stoneIds(stones, value) : [])
   );
 
+  // Группируем камни по типу
   const stoneList = stones.reduce((acc: { [key: string]: Stone[] }, stone) => {
     if (!acc[stone.type]) {
       acc[stone.type] = [];
@@ -93,7 +100,16 @@ export default function Stones() {
                       {stoneList[type]
                         .sort((a, b) => a.name.localeCompare(b.name))
                         .map((stone) => (
-                          <div key={stone.id} className="relative group w-full">
+                          <div
+                            key={stone.id}
+                            className="relative group w-full"
+                            onAuxClick={(e) => {
+                              if (e.button === 1 && stone.url) {
+                                e.preventDefault();
+                                window.open(stone.url, "_blank");
+                              }
+                            }}
+                          >
                             <Image
                               id={stone.id}
                               src={stone.url}
@@ -104,10 +120,10 @@ export default function Stones() {
                             />
                             <div
                               className="absolute bottom-6 left-0 w-full p-2 
-                                          opacity-0 group-hover:opacity-100 
-                                          transition-opacity duration-300
-                                          bg-gray-800 bg-opacity-70 
-                                          text-white text-xs rounded-t"
+                                opacity-0 group-hover:opacity-100 
+                                transition-opacity duration-300
+                                bg-gray-800 bg-opacity-70 
+                                text-white text-xs rounded-t"
                             >
                               <p>
                                 <strong>Amount:</strong> {stone.amount ?? "—"}
