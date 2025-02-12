@@ -113,8 +113,9 @@ export default function Stones() {
                                 <strong>Amount:</strong> {stone.amount ?? "—"}
                               </p>
                               <p>
-                                <strong>Size:</strong> {stone.width ?? "—"} x{" "}
-                                {stone.height ?? "—"}
+                                <strong>Size:</strong>{" "}
+                                {stone.width === 0 ? "—" : stone.width ?? "—"} x{" "}
+                                {stone.height === 0 ? "—" : stone.height ?? "—"}
                               </p>
                             </div>
                           </div>
