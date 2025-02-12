@@ -55,10 +55,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { stones };
 };
 
-/**
- * Функция теперь отбирает все камни нужного типа, сортирует их по имени
- * и возвращает массив id, что соответствует отображаемому порядку.
- */
 function stoneIds(stones: Stone[], stoneId: number): number[] {
   const stoneType = stones.find((item) => item.id === stoneId)?.type;
   if (!stoneType) return [];
@@ -74,7 +70,6 @@ export default function Stones() {
     (value: number | undefined) => (value ? stoneIds(stones, value) : [])
   );
 
-  // Группируем камни по типу
   const stoneList = stones.reduce((acc: { [key: string]: Stone[] }, stone) => {
     if (!acc[stone.type]) {
       acc[stone.type] = [];
