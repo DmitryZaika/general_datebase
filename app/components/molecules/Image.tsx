@@ -66,7 +66,7 @@ export function Image({
           />
         </DialogContentImage>
       </Dialog>
-      <p className="text-center font-bold font-sans">{name}</p>
+      {name && <p className="text-center font-bold font-sans">{name}</p>}
     </div>
   );
 }

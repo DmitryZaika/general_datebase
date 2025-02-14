@@ -4,7 +4,12 @@ import {
   redirect,
 } from "@remix-run/node";
 import { z } from "zod";
-import { Form, useLoaderData, useActionData } from "@remix-run/react";
+import {
+  Form,
+  useLoaderData,
+  useActionData,
+  useNavigation,
+} from "@remix-run/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { getValidatedFormData } from "remix-hook-form";
 import { useForm, FormProvider } from "react-hook-form";
@@ -17,6 +22,8 @@ import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
 import { PasswordInput } from "~/components/molecules/PasswordInput";
 import { Button } from "~/components/ui/button";
+import { DialogFooter } from "~/components/ui/dialog";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
 
 const userSchema = z.object({
   email: z.string().email(),
@@ -69,6 +76,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Login() {
+  const navigation = useNavigation();
   const { error } = useLoaderData<{ error: string | null }>();
   const actionData = useActionData<ActionData>();
   const form = useForm<FormData>({
@@ -76,6 +84,7 @@ export default function Login() {
     defaultValues: actionData?.defaultValues || { email: "", password: "" },
   });
   const fullSubmit = useFullSubmit(form);
+  const isSubmitting = navigation.state !== "idle";
 
   return (
     <div className="flex justify-center p-20">
@@ -104,9 +113,9 @@ export default function Login() {
               />
             )}
           />
-          <Button className="ml-auto" type="submit">
-            Login
-          </Button>
+          <DialogFooter>
+            <LoadingButton loading={isSubmitting}>Login</LoadingButton>
+          </DialogFooter>
         </Form>
       </FormProvider>
     </div>
