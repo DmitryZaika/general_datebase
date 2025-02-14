@@ -1,5 +1,3 @@
-// app/routes/stones.tsx
-
 import {
   Accordion,
   AccordionItem,
@@ -15,6 +13,7 @@ import { Image } from "~/components/molecules/Image";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
 import { useArrowToggle } from "~/hooks/useArrowToggle";
+import { ImageCard } from "~/components/organisms/ImageCard";
 
 interface Stone {
   id: number;
@@ -105,30 +104,23 @@ export default function Stones() {
                               }
                             }}
                           >
-                            <Image
-                              id={stone.id}
-                              src={stone.url}
-                              alt={stone.name}
-                              name={stone.name}
-                              setImage={setCurrentId}
-                              isOpen={currentId === stone.id}
-                            />
-                            <div
-                              className="absolute bottom-6 left-0 w-full p-2 
-                                opacity-0 group-hover:opacity-100 
-                                transition-opacity duration-300
-                                bg-gray-800 bg-opacity-70 
-                                text-white text-xs rounded-t"
+                            <ImageCard
+                              fieldList={{
+                                Amount: `${stone.amount || "—"}`,
+                                Size: `${stone.width || "—"} x  ${
+                                  stone.height || "—"
+                                }`,
+                              }}
+                              title={stone.name}
                             >
-                              <p>
-                                <strong>Amount:</strong> {stone.amount ?? "—"}
-                              </p>
-                              <p>
-                                <strong>Size:</strong>{" "}
-                                {stone.width === 0 ? "—" : stone.width ?? "—"} x{" "}
-                                {stone.height === 0 ? "—" : stone.height ?? "—"}
-                              </p>
-                            </div>
+                              <Image
+                                id={stone.id}
+                                src={stone.url}
+                                alt={stone.name}
+                                setImage={setCurrentId}
+                                isOpen={currentId === stone.id}
+                              />
+                            </ImageCard>
                           </div>
                         ))}
                     </ModuleList>
