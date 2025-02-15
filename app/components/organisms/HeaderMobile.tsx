@@ -18,8 +18,6 @@ export function BurgerMenu({
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
   const [open, setOpen] = useState(false);
-  // console.log(isAdminPage);
-  console.log(isSuperUser);
   return (
     <>
       <Button
@@ -28,8 +26,9 @@ export function BurgerMenu({
         className="p-6"
         aria-label="Open menu"
       >
-        <Menu size={24} />
+        <Menu style={{ width: "25px", height: "25px" }} />
       </Button>
+
       {open && (
         <div
           onClick={() => setOpen(false)}
@@ -52,7 +51,7 @@ export function BurgerMenu({
             className="absolute top-1 right-1"
             aria-label="Закрыть меню"
           >
-            <X className="" size={24} />
+            <X className="" style={{ width: "25px", height: "25px" }} />
           </Button>
 
           <nav className="flex flex-col space-y-2 pt-1">
