@@ -142,6 +142,7 @@ export function HeaderMobile({
           />
         </a>
       </div>
+      <TodoList />
       <BurgerMenu
         user={user}
         isAdmin={isAdmin}
