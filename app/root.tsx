@@ -86,9 +86,6 @@ export default function App() {
               user={user}
               isAdmin={user.is_admin}
               isSuperUser={user.is_superuser}
-              isEmployee={
-                user.is_employee || user.is_admin || user.is_superuser
-              }
             />
           )}
           <Outlet />
