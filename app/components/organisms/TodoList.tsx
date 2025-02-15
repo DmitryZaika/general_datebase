@@ -186,10 +186,19 @@ export function TodoList() {
 
   return (
     <Dialog modal={false}>
-      <DialogTrigger className="fixed top-2 md:top-22 right-20 md:right-36">
+      <DialogTrigger
+        className="fixed top-2 md:top-22 right-20 md:right-36"
+        asChild
+      >
         <Button>Todo List</Button>
       </DialogTrigger>
-      <DialogContent className="h-screen p-0 gap-0" position="br">
+      <DialogContent
+        className="h-screen p-0 gap-0"
+        position="br"
+        onInteractOutside={(e) => {
+          e.preventDefault();
+        }}
+      >
         <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto">
           <DialogFullHeader>Todo List</DialogFullHeader>
 
