@@ -231,15 +231,17 @@ export function TodoList() {
         <AddForm refresh={getTodos} />
 
         <div className="overflow-y-auto max-h-60">
-          {data?.todos?.map((todo) => {
-            return (
-              <div className="flex items-center" key={todo.id}>
-                <FinishForm todo={todo} refresh={getTodos} />
-                <EditForm todo={todo} refresh={getTodos} />
-                <DeleteForm todo={todo} refresh={getTodos} />
-              </div>
-            );
-          })}
+          {data?.todos
+            ?.sort((a, b) => (a.is_done === b.is_done ? 0 : a.is_done ? 1 : -1))
+            .map((todo) => {
+              return (
+                <div className="flex items-center" key={todo.id}>
+                  <FinishForm todo={todo} refresh={getTodos} />
+                  <EditForm todo={todo} refresh={getTodos} />
+                  <DeleteForm todo={todo} refresh={getTodos} />
+                </div>
+              );
+            })}
         </div>
       </div>
     </>

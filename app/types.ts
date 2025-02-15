@@ -15,3 +15,9 @@ export interface Instruction extends InstructionSlim {
   after_id: number | null;
   children?: Instruction[];
 }
+
+export interface HeaderProps {
+  user: object | null;
+  isAdmin: boolean;
+  isSuperUser: boolean;
+}
