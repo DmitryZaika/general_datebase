@@ -9,13 +9,13 @@ export function Header({ user, isAdmin, isSuperUser }: HeaderProps) {
     <>
       {" "}
       <HeaderDesktop
-        className="hidden sm:flex"
+        className="hidden md:flex"
         user={user}
         isAdmin={isAdmin}
         isSuperUser={isSuperUser}
       />
       <HeaderMobile
-        className="block sm:hidden"
+        className="block md:hidden"
         user={user}
         isAdmin={isAdmin}
         isSuperUser={isSuperUser}
