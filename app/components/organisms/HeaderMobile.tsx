@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@remix-run/react";
-import { TodoList } from "../TodoList";
+import { TodoList } from "../organisms/TodoList";
 import { HeaderProps } from "~/types";
 
 interface HeaderMobileProps extends HeaderProps {
