@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
-import { TodoList } from "../TodoList";
+import { TodoList } from "../organisms/TodoList";
 import clsx from "clsx";
 import { HeaderProps } from "~/types";
 

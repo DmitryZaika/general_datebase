@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react";
-import { Button } from "./ui/button";
+import { Button } from "../ui/button";
 import { clsx } from "clsx";
 import { PencilIcon, TrashIcon, CheckIcon } from "lucide-react";
 import type { Todo } from "~/types";
 import { Form, FormProvider, useForm } from "react-hook-form";
 import { useFullFetcher } from "~/hooks/useFullFetcher";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FormField } from "./ui/form";
-import { InputItem } from "./molecules/InputItem";
+import { FormField } from "../ui/form";
+import { InputItem } from "../molecules/InputItem";
 import { todoListSchema, TTodoListSchema } from "~/schemas/general";
-import { LoadingButton } from "./molecules/LoadingButton";
+import { LoadingButton } from "../molecules/LoadingButton";
 import { Checkbox } from "~/components/ui/checkbox";
+import { DialogFullHeader } from "../molecules/DialogFullHeader";
+import { Dialog, DialogContent, DialogTrigger } from "~/components/ui/dialog";
 
 interface EditFormProps {
   todo: Todo;
@@ -169,7 +171,6 @@ function FinishForm({ refresh, todo }: EditFormProps) {
 }
 
 export function TodoList() {
-  const [isOpen, setIsOpen] = useState<boolean>(false);
   const [data, setData] = useState<{ todos: Todo[] } | undefined>();
 
   const getTodos = (callback: undefined | (() => void) = undefined) => {
@@ -184,66 +185,35 @@ export function TodoList() {
   }, []);
 
   return (
-    <>
-      <Button
-        className={`
-          absolute bottom-0
-          left-1/2 -translate-x-1/2
-          -mb-4
-          transform transition-all duration-300 ease-out
-          ${
-            isOpen
-              ? "opacity-0 scale-90 pointer-events-none"
-              : "opacity-100 scale-100"
-          }
-          sm:left-auto sm:-translate-x-0 sm:right-40
-        `}
-        onClick={() => setIsOpen(true)}
-      >
-        Todo List
-      </Button>
+    <Dialog modal={false}>
+      <DialogTrigger className="fixed top-2 md:top-22 right-36">
+        <Button>Todo List</Button>
+      </DialogTrigger>
+      <DialogContent className="h-screen p-0 gap-0" position="br">
+        <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto">
+          <DialogFullHeader>Todo List</DialogFullHeader>
 
-      <div
-        className={`
-    absolute flex flex-col top-[calc(100%)] w-[400px] bg-white border rounded shadow-lg p-4 z-10  transform transition-all duration-300 ease-out
-    ${
-      isOpen
-        ? "opacity-100 scale-100"
-        : "opacity-0 scale-90 pointer-events-none"
-    }
-    left-1/2 -translate-x-1/2
-    sm:right-0 sm:left-auto
-  `}
-      >
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold">Todo List</h2>
-          <Button
-            onClick={() => setIsOpen(false)}
-            variant="ghost"
-            aria-label="Close"
-            size="icon"
-            className="text-lg"
-          >
-            ✕
-          </Button>
+          <div className="px-2">
+            <AddForm refresh={getTodos} />
+
+            <div className="overflow-y-auto max-h-60">
+              {data?.todos
+                ?.sort((a, b) =>
+                  a.is_done === b.is_done ? 0 : a.is_done ? 1 : -1
+                )
+                .map((todo) => {
+                  return (
+                    <div className="flex items-center" key={todo.id}>
+                      <FinishForm todo={todo} refresh={getTodos} />
+                      <EditForm todo={todo} refresh={getTodos} />
+                      <DeleteForm todo={todo} refresh={getTodos} />
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
         </div>
-
-        <AddForm refresh={getTodos} />
-
-        <div className="overflow-y-auto max-h-60">
-          {data?.todos
-            ?.sort((a, b) => (a.is_done === b.is_done ? 0 : a.is_done ? 1 : -1))
-            .map((todo) => {
-              return (
-                <div className="flex items-center" key={todo.id}>
-                  <FinishForm todo={todo} refresh={getTodos} />
-                  <EditForm todo={todo} refresh={getTodos} />
-                  <DeleteForm todo={todo} refresh={getTodos} />
-                </div>
-              );
-            })}
-        </div>
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }
