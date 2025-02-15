@@ -1,17 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-  DialogTrigger,
-} from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger } from "~/components/ui/dialog";
 import { DONE_KEY } from "~/utils/constants";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import clsx from "clsx";
+import { DialogFullHeader } from "../molecules/DialogFullHeader";
 
 interface Message {
   role: "user" | "assistant";
@@ -131,15 +124,7 @@ export const Chat = () => {
         }}
       >
         <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto">
-          <div className="bg-gray-100 text-gray-800 font-semibold text-lg py-3 px-4 border border-gray-300 flex justify-between items-center">
-            <span>Chat</span>
-            <DialogClose>
-              <Button variant="ghost" size="icon" className="text-2xl">
-                ✕
-              </Button>
-            </DialogClose>
-          </div>
-
+          <DialogFullHeader>Chat</DialogFullHeader>
           <ChatMessages
             messages={[
               ...messages,
