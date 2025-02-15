@@ -12,6 +12,9 @@
 * {
   border-color: lightgray;
 }
+html {
+  overflow-y: scroll;
+}
 
 @layer components {
   @keyframes highlight-animation {
