@@ -110,7 +110,6 @@ export default function StonesAdd() {
       is_display: true,
     },
   });
-  console.log(form.watch("is_display"));
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");

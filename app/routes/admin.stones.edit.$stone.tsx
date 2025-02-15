@@ -176,7 +176,6 @@ export default function StonesEdit() {
     stoneSchema,
     stoneSchema.parse(defaultValues)
   );
-  console.log(form.watch("is_display"));
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");

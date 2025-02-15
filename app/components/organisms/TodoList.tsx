@@ -196,7 +196,7 @@ export function TodoList() {
           <div className="px-2">
             <AddForm refresh={getTodos} />
 
-            <div className="overflow-y-auto max-h-60">
+            <div className="overflow-y-auto">
               {data?.todos
                 ?.sort((a, b) =>
                   a.is_done === b.is_done ? 0 : a.is_done ? 1 : -1

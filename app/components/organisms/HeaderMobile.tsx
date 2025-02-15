@@ -5,10 +5,28 @@ import { HeaderProps } from "~/types";
 interface HeaderMobileProps extends HeaderProps {
   className: string;
 }
+interface BurgerLinkProps {
+  setOpen: (value: boolean) => void;
+  to: string;
+  children: JSX.Element;
+  className?: string;
+}
 import React, { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Menu, X } from "lucide-react";
 import clsx from "clsx";
+
+function BurgerLink({ setOpen, to, children, className }: BurgerLinkProps) {
+  return (
+    <Link
+      className={clsx("uppercase text-lg font-bold", className)}
+      to={to}
+      onClick={() => setOpen(false)}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export function BurgerMenu({
   user,
@@ -60,60 +78,53 @@ export function BurgerMenu({
               {" "}
               {isAdmin || isSuperUser ? (
                 isAdminPage ? (
-                  <Link
-                    className="uppercase text-lg font-bold mb-10"
+                  <BurgerLink
                     to="/employee"
+                    className="pb-10"
+                    setOpen={setOpen}
                   >
                     <Button>Employee</Button>
-                  </Link>
+                  </BurgerLink>
                 ) : (
-                  <Link
-                    className="uppercase text-lg font-bold mb-10"
-                    to="/admin"
-                  >
-                    <Button>Admin</Button>
-                  </Link>
+                  <BurgerLink to="/admin" className="pb-10" setOpen={setOpen}>
+                    <Button> Admin</Button>
+                  </BurgerLink>
                 )
               ) : null}
               {isSuperUser ? (
                 isAdminPage ? (
-                  <Link
-                    className="uppercase text-lg font-bold"
-                    to="/admin/users"
-                  >
-                    <Button>User Panel</Button>
-                  </Link>
+                  <BurgerLink to="/admin/users" setOpen={setOpen}>
+                    <Button>Users</Button>
+                  </BurgerLink>
                 ) : null
               ) : null}
             </div>
 
-            <Link
+            <BurgerLink
               to={isAdminPage ? "/admin/stones" : "/employee/stones"}
-              className="uppercase text-lg font-bold"
+              setOpen={setOpen}
             >
               Database
-            </Link>
+            </BurgerLink>
 
-            <Link
+            <BurgerLink
               to={
                 isAdminPage ? "/admin/instructions" : "/employee/instructions"
               }
-              className="uppercase text-lg font-bold"
+              setOpen={setOpen}
             >
-              Instructions
-            </Link>
+              Instruction
+            </BurgerLink>
+
             {!isAdminPage && (
-              <Link
-                to="/employee/special-order"
-                className="uppercase text-lg font-bold"
-              >
+              <BurgerLink to="/employee/special-order" setOpen={setOpen}>
                 Special Order
-              </Link>
+              </BurgerLink>
             )}
             {user !== null && (
-              <Link className="uppercase text-lg font-bold mt-10" to="/logout">
+              <BurgerLink to="/logout" className="pt-10" setOpen={setOpen}>
                 <Button> Logout</Button>
-              </Link>
+              </BurgerLink>
             )}
           </nav>
         </div>
