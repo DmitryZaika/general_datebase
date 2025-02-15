@@ -186,7 +186,7 @@ export function TodoList() {
 
   return (
     <Dialog modal={false}>
-      <DialogTrigger className="fixed top-2 md:top-22 right-36">
+      <DialogTrigger className="fixed top-2 md:top-22 right-20 md:right-36">
         <Button>Todo List</Button>
       </DialogTrigger>
       <DialogContent className="h-screen p-0 gap-0" position="br">
