@@ -13,6 +13,7 @@ import { LoadingButton } from "../molecules/LoadingButton";
 import { Checkbox } from "~/components/ui/checkbox";
 import { DialogFullHeader } from "../molecules/DialogFullHeader";
 import { Dialog, DialogContent, DialogTrigger } from "~/components/ui/dialog";
+import { DialogInsertFooter } from "../molecules/DialogInsertFooter";
 
 interface EditFormProps {
   todo: Todo;
@@ -33,27 +34,7 @@ function AddForm({ refresh }: { refresh: () => void }) {
     }
   }, [fetcher.state]);
 
-  return (
-    <FormProvider {...form}>
-      <Form onSubmit={fullSubmit} className="flex items-center space-x-2 ">
-        <FormField
-          control={form.control}
-          name="rich_text"
-          render={({ field }) => (
-            <InputItem
-              placeholder="Add new task"
-              className="resize-none min-h-9 h-9 p-[4px]"
-              formClassName="mb-0 w-full p-[2px] flex justify-center"
-              field={field}
-            />
-          )}
-        />
-        <Button type="submit" variant={"blue"}>
-          Add
-        </Button>
-      </Form>
-    </FormProvider>
-  );
+  return <DialogInsertFooter form={form} handleSubmit={fullSubmit} />;
 }
 
 function EditForm({ refresh, todo }: EditFormProps) {
@@ -187,7 +168,7 @@ export function TodoList() {
   return (
     <Dialog modal={false}>
       <DialogTrigger
-        className="fixed top-2 md:top-22 right-20 md:right-36"
+        className="absolute top-2 right-25 md:top-12 md:right-36"
         asChild
       >
         <Button>Todo List</Button>
@@ -202,10 +183,10 @@ export function TodoList() {
         <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto">
           <DialogFullHeader>Todo List</DialogFullHeader>
 
-          <div className="px-2">
+          <div className="px-2  flex flex-col">
             <AddForm refresh={getTodos} />
 
-            <div className="overflow-y-auto">
+            <div className="order-first md:order-last overflow-y-auto max-h-60 md:max-h-full">
               {data?.todos
                 ?.sort((a, b) =>
                   a.is_done === b.is_done ? 0 : a.is_done ? 1 : -1
