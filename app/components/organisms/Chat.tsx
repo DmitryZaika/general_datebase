@@ -117,7 +117,7 @@ export const Chat = () => {
         </svg>
       </DialogTrigger>
       <DialogContent
-        className="h-screen p-0 gap-0"
+        className="h-full p-0 gap-0"
         position="br"
         onInteractOutside={(e) => {
           e.preventDefault();
