@@ -3,7 +3,12 @@ import {
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
-import { useNavigate, useLoaderData, useNavigation } from "@remix-run/react";
+import {
+  useNavigate,
+  useLoaderData,
+  useNavigation,
+  Outlet,
+} from "@remix-run/react";
 import { FormField } from "../components/ui/form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
@@ -30,7 +35,7 @@ import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
@@ -156,12 +161,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   };
 };
 
-export default function StonesEdit() {
+function StoneInformation({ data }: { data: any }) {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
-  const { name, type, url, is_display, height, width, amount } =
-    useLoaderData<typeof loader>();
-
+  const isSubmitting = navigate.state === "submitting";
+  const { name, type, url, is_display, height, width, amount } = data;
   const defaultValues = {
     name,
     type,
@@ -171,11 +174,104 @@ export default function StonesEdit() {
     width,
     amount,
   };
-
   const form = useCustomOptionalForm(
     stoneSchema,
     stoneSchema.parse(defaultValues)
   );
+
+  return (
+    <MultiPartForm form={form}>
+      <FormField
+        control={form.control}
+        name="name"
+        render={({ field }) => (
+          <InputItem
+            name="Name"
+            placeholder={"Name of the stone"}
+            field={field}
+          />
+        )}
+      />
+      <div className="flex gap-2">
+        <FormField
+          control={form.control}
+          name="type"
+          render={({ field }) => (
+            <SelectInput
+              field={field}
+              placeholder="Type of the Stone"
+              name="Type"
+              options={["Granite", "Quartz", "Marble", "Dolomite", "Quartzite"]}
+            />
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="file"
+          render={({ field }) => (
+            <FileInput
+              inputName="stones"
+              id="image"
+              type="image"
+              onChange={field.onChange}
+            />
+          )}
+        />
+      </div>
+      <FormField
+        control={form.control}
+        name="is_display"
+        render={({ field }) => <SwitchItem field={field} name=" Display" />}
+      />
+      <img src={url} alt={name} className="w-48 mt-4 mx-auto" />
+
+      <div className="flex gap-2">
+        <FormField
+          control={form.control}
+          name="height"
+          render={({ field }) => (
+            <InputItem
+              name={"Height"}
+              placeholder={"Height of the stone"}
+              field={field}
+            />
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="width"
+          render={({ field }) => (
+            <InputItem
+              name={"Width"}
+              placeholder={"Width of the stone"}
+              field={field}
+            />
+          )}
+        />
+      </div>
+      <FormField
+        control={form.control}
+        name="amount"
+        render={({ field }) => (
+          <InputItem
+            name={"Amount"}
+            placeholder={"Amount of the stone"}
+            field={field}
+          />
+        )}
+      />
+
+      <DialogFooter>
+        <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
+      </DialogFooter>
+    </MultiPartForm>
+  );
+}
+
+export default function StonesEdit() {
+  const navigate = useNavigate();
+  const data = useLoaderData<typeof loader>();
+
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
@@ -184,99 +280,28 @@ export default function StonesEdit() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Stone</DialogTitle>
         </DialogHeader>
-        <MultiPartForm form={form}>
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <InputItem
-                name="Name"
-                placeholder={"Name of the stone"}
-                field={field}
-              />
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <SelectInput
-                field={field}
-                placeholder="Type of the Stone"
-                name="Type"
-                options={[
-                  "Granite",
-                  "Quartz",
-                  "Marble",
-                  "Dolomite",
-                  "Quartzite",
-                ]}
-              />
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="file"
-            render={({ field }) => (
-              <FileInput
-                inputName="stones"
-                id="image"
-                type="image"
-                onChange={field.onChange}
-              />
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="is_display"
-            render={({ field }) => <SwitchItem field={field} name=" Display" />}
-          />
-          <img src={url} alt={name} className="w-48 mt-4 mx-auto" />
-
-          <div className="flex gap-2">
-            <FormField
-              control={form.control}
-              name="height"
-              render={({ field }) => (
-                <InputItem
-                  name={"Height"}
-                  placeholder={"Height of the stone"}
-                  field={field}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="width"
-              render={({ field }) => (
-                <InputItem
-                  name={"Width"}
-                  placeholder={"Width of the stone"}
-                  field={field}
-                />
-              )}
-            />
-          </div>
-          <FormField
-            control={form.control}
-            name="amount"
-            render={({ field }) => (
-              <InputItem
-                name={"Amount"}
-                placeholder={"Amount of the stone"}
-                field={field}
-              />
-            )}
-          />
-
-          <DialogFooter>
-            <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
-          </DialogFooter>
-        </MultiPartForm>
+        <Tabs
+          defaultValue="information"
+          onValueChange={(value) => {
+            console.log(value);
+            if (value === "images") navigate("images");
+          }}
+        >
+          <TabsList>
+            <TabsTrigger value="information">Stone Information</TabsTrigger>
+            <TabsTrigger value="images">Images</TabsTrigger>
+          </TabsList>
+          <TabsContent value="information">
+            <StoneInformation data={data} />
+          </TabsContent>
+          <TabsContent value="images">
+            <Outlet />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
