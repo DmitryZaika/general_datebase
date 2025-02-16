@@ -13,7 +13,6 @@ import { LoadingButton } from "../molecules/LoadingButton";
 import { Checkbox } from "~/components/ui/checkbox";
 import { DialogFullHeader } from "../molecules/DialogFullHeader";
 import { Dialog, DialogContent, DialogTrigger } from "~/components/ui/dialog";
-import { DialogInsertFooter } from "../molecules/DialogInsertFooter";
 
 interface EditFormProps {
   todo: Todo;
@@ -34,7 +33,27 @@ function AddForm({ refresh }: { refresh: () => void }) {
     }
   }, [fetcher.state]);
 
-  return <DialogInsertFooter form={form} handleSubmit={fullSubmit} />;
+  return (
+    <FormProvider {...form}>
+      <Form onSubmit={fullSubmit} className="flex items-center space-x-2 ">
+        <FormField
+          control={form.control}
+          name="rich_text"
+          render={({ field }) => (
+            <InputItem
+              placeholder="Add new task"
+              className="resize-none min-h-9 h-9 p-[4px]"
+              formClassName="mb-0 w-full p-[2px] flex justify-center"
+              field={field}
+            />
+          )}
+        />
+        <Button type="submit" variant={"blue"}>
+          Add
+        </Button>
+      </Form>
+    </FormProvider>
+  );
 }
 
 function EditForm({ refresh, todo }: EditFormProps) {
@@ -174,7 +193,7 @@ export function TodoList() {
         <Button>Todo List</Button>
       </DialogTrigger>
       <DialogContent
-        className="h-screen p-0 gap-0"
+        className="h-full p-0 gap-0"
         position="br"
         onInteractOutside={(e) => {
           e.preventDefault();
@@ -186,7 +205,7 @@ export function TodoList() {
           <div className="px-2  flex flex-col">
             <AddForm refresh={getTodos} />
 
-            <div className="order-first md:order-last overflow-y-auto max-h-60 md:max-h-full">
+            <div className="overflow-y-auto md:max-h-full">
               {data?.todos
                 ?.sort((a, b) =>
                   a.is_done === b.is_done ? 0 : a.is_done ? 1 : -1

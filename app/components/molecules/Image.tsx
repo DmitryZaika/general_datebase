@@ -38,7 +38,7 @@ export function Image({
 
   return (
     <div className="flex gap-2 flex-col items-center">
-      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <Dialog open={isOpen} onOpenChange={handleOpenChange} modal={false}>
         <DialogTrigger asChild>
           <img
             src={src || "/path/to/placeholder.png"}
