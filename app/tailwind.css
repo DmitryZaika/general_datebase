@@ -5,15 +5,12 @@
 /* This is to disable dark mode */
 @custom-variant dark (&:where(.dark, .dark *));
 
-@utility highlight {
+@utility highlitght {
   animation: highlight-animation 2s forwards;
 }
 
 * {
   border-color: lightgray;
-}
-html {
-  overflow-y: scroll;
 }
 
 @layer components {
