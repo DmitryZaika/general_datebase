@@ -199,13 +199,13 @@ export function TodoList() {
           e.preventDefault();
         }}
       >
-        <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col ">
+        <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto">
           <DialogFullHeader>Todo List</DialogFullHeader>
 
           <div className="px-2  flex flex-col">
             <AddForm refresh={getTodos} />
 
-            <div className="overflow-y-auto">
+            <div className="overflow-y-auto md:max-h-full">
               {data?.todos
                 ?.sort((a, b) =>
                   a.is_done === b.is_done ? 0 : a.is_done ? 1 : -1
