@@ -30,12 +30,12 @@ const DialogOverlay = React.forwardRef<
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const dialogVariants = cva(
-  "fixed z-50 grid w-full max-w-lg gap-4 bg-white p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out sm:rounded-lg dark:border-zinc-800 dark:bg-zinc-950",
+  "fixed z-50 grid w-full max-w-lg bg-white gap-4  p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out sm:rounded-lg dark:border-zinc-800 dark:bg-zinc-950",
   {
     variants: {
       position: {
         default:
-          "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:fade-out [state=open]:fade-in",
+          "left-[50%] top-[50%]  translate-x-[-50%] translate-y-[-50%] data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:fade-out [state=open]:fade-in",
         br: "right-0 bottom-0  data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
       },
     },
