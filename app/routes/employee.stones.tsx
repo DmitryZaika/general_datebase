@@ -14,6 +14,7 @@ import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
 import { useArrowToggle } from "~/hooks/useArrowToggle";
 import { ImageCard } from "~/components/organisms/ImageCard";
+import { ChildrenImagesDialog } from "~/components/organisms/ChildrenImagesDialog";
 
 interface Stone {
   id: number;
@@ -113,7 +114,7 @@ export default function Stones() {
                               }}
                               title={stone.name}
                             >
-                              <Image
+                              <ChildrenImagesDialog
                                 id={stone.id}
                                 src={stone.url}
                                 alt={stone.name}
