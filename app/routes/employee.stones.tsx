@@ -54,12 +54,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { stones };
 };
 
+// Обновлённая функция для навигации: карточки с amount = 0 перемещаются в конец
 function stoneIds(stones: Stone[], stoneId: number): number[] {
   const stoneType = stones.find((item) => item.id === stoneId)?.type;
   if (!stoneType) return [];
   return stones
     .filter((item) => item.type === stoneType)
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => {
+      if ((a.amount ?? 0) === 0 && (b.amount ?? 0) !== 0) return 1;
+      if ((a.amount ?? 0) !== 0 && (b.amount ?? 0) === 0) return -1;
+      return a.name.localeCompare(b.name);
+    })
     .map((item) => item.id);
 }
 
@@ -92,11 +97,19 @@ export default function Stones() {
                   <AccordionContent>
                     <ModuleList>
                       {stoneList[type]
-                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .sort((a, b) => {
+                          if ((a.amount ?? 0) === 0 && (b.amount ?? 0) !== 0)
+                            return 1;
+                          if ((a.amount ?? 0) !== 0 && (b.amount ?? 0) === 0)
+                            return -1;
+                          return a.name.localeCompare(b.name);
+                        })
                         .map((stone) => (
                           <div
                             key={stone.id}
-                            className="relative group w-full"
+                            className={`relative group w-full ${
+                              (stone.amount ?? 0) === 0 ? "opacity-50" : ""
+                            }`}
                             onAuxClick={(e) => {
                               if (e.button === 1 && stone.url) {
                                 e.preventDefault();
