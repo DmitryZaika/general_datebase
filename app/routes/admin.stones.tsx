@@ -55,6 +55,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { stones };
 };
 
+// Функция навигации остаётся без изменений
+function stoneIds(stones: Stone[], stoneId: number): number[] {
+  const stoneType = stones.find((item) => item.id === stoneId)?.type;
+  if (!stoneType) return [];
+  return stones
+    .filter((item) => item.type === stoneType)
+    .sort((a, b) => {
+      if ((a.amount ?? 0) === 0 && (b.amount ?? 0) !== 0) return 1;
+      if ((a.amount ?? 0) !== 0 && (b.amount ?? 0) === 0) return -1;
+      return a.name.localeCompare(b.name);
+    })
+    .map((item) => item.id);
+}
+
 export default function AdminStones() {
   const { stones } = useLoaderData<typeof loader>();
 
@@ -90,14 +104,30 @@ export default function AdminStones() {
                       <AccordionContent>
                         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
                           {stoneList[type]
-                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .sort((a, b) => {
+                              const amountA = a.amount ?? 0;
+                              const amountB = b.amount ?? 0;
+                              // Сначала перемещаем карточки с amount = 0 в конец
+                              if (amountA === 0 && amountB !== 0) return 1;
+                              if (amountA !== 0 && amountB === 0) return -1;
+                              // Затем сортируем по имени
+                              return a.name.localeCompare(b.name);
+                            })
                             .map((stone) => {
                               return (
                                 <div
                                   key={stone.id}
-                                  className={`relative group ${
-                                    !stone.is_display ? "opacity-50" : ""
+                                  className={`relative group w-full ${
+                                    (stone.amount ?? 0) === 0
+                                      ? "opacity-50"
+                                      : ""
                                   }`}
+                                  onAuxClick={(e) => {
+                                    if (e.button === 1 && stone.url) {
+                                      e.preventDefault();
+                                      window.open(stone.url, "_blank");
+                                    }
+                                  }}
                                 >
                                   <Image
                                     id={stone.id}
@@ -138,6 +168,12 @@ export default function AdminStones() {
                                       <FaTimes />
                                     </Link>
                                   </div>
+
+                                  {!stone.is_display && (
+                                    <div className="absolute top-0 left-0 bg-red-500 text-white text-xs font-bold px-1 py-0.5">
+                                      Not Displayed
+                                    </div>
+                                  )}
 
                                   <div className="mt-2 text-center">
                                     <h3 className="text-lg font-semibold">
