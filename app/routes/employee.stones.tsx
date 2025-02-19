@@ -9,7 +9,6 @@ import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "@remix-run/react";
-import { Image } from "~/components/molecules/Image";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
 import { useArrowToggle } from "~/hooks/useArrowToggle";
