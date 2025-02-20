@@ -158,7 +158,7 @@ export default function SelectImages() {
   return (
     <>
       <AddImage />
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+      <div className="grid grid-cols-2  md:grid-cols-3 gap-4 mt-4">
         {stones.map((stone) => (
           <div key={stone.id} className="relative group">
             <img src={stone.url} alt="" className="w-full h-32 object-cover" />
