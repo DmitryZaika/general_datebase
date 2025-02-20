@@ -4,9 +4,8 @@ import {
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
-import { useNavigate, useNavigation } from "@remix-run/react";
+import { useNavigate, useNavigation, Outlet } from "@remix-run/react";
 import { FormField } from "../components/ui/form";
-
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
 import {
@@ -27,6 +26,7 @@ import { useCustomForm } from "~/utils/useCustomForm";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -60,7 +60,7 @@ export async function action({ request }: ActionFunctionArgs) {
   let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.stones (name,type, url, company_id, is_display, width, height, amount) VALUES (?, ?, ?, ?, ?,? ,?,?);`,
+      `INSERT INTO main.stones (name, type, url, company_id, is_display, width, height, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
         data.type,
@@ -110,6 +110,7 @@ export default function StonesAdd() {
       is_display: true,
     },
   });
+
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate("..");
@@ -122,94 +123,111 @@ export default function StonesAdd() {
         <DialogHeader>
           <DialogTitle>Add Stone</DialogTitle>
         </DialogHeader>
-        <MultiPartForm form={form}>
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <InputItem
-                name={"Name"}
-                placeholder={"Name of the stone"}
-                field={field}
+        <Tabs
+          defaultValue="information"
+          onValueChange={(value) => {
+            if (value === "images") navigate("images");
+          }}
+        >
+          <TabsList>
+            <TabsTrigger value="information">Stone Information</TabsTrigger>
+            <TabsTrigger value="images">Images</TabsTrigger>
+          </TabsList>
+          <TabsContent value="information">
+            <MultiPartForm form={form}>
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <InputItem
+                    name={"Name"}
+                    placeholder={"Name of the stone"}
+                    field={field}
+                  />
+                )}
               />
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <SelectInput
-                field={field}
-                placeholder="Type of the Stone"
-                name="Type"
-                options={[
-                  "Granite",
-                  "Quartz",
-                  "Marble",
-                  "Dolomite",
-                  "Quartzite",
-                ].map((item) => ({ key: item.toLowerCase(), value: item }))}
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <SelectInput
+                    field={field}
+                    placeholder="Type of the Stone"
+                    name="Type"
+                    options={[
+                      "Granite",
+                      "Quartz",
+                      "Marble",
+                      "Dolomite",
+                      "Quartzite",
+                    ].map((item) => ({ key: item.toLowerCase(), value: item }))}
+                  />
+                )}
               />
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="file"
-            render={({ field }) => (
-              <FileInput
-                inputName="stones"
-                type="image"
-                id="image"
-                onChange={field.onChange}
+              <FormField
+                control={form.control}
+                name="file"
+                render={({ field }) => (
+                  <FileInput
+                    inputName="stones"
+                    type="image"
+                    id="image"
+                    onChange={field.onChange}
+                  />
+                )}
               />
-            )}
-          />
-          <FormField
-            defaultValue={true}
-            control={form.control}
-            name="is_display"
-            render={({ field }) => <SwitchItem field={field} name=" Display" />}
-          />
-          <div className="flex gap-2">
-            <FormField
-              control={form.control}
-              name="height"
-              render={({ field }) => (
-                <InputItem
-                  name={"Height"}
-                  placeholder={"Height of the stone"}
-                  field={field}
+              <FormField
+                defaultValue={true}
+                control={form.control}
+                name="is_display"
+                render={({ field }) => (
+                  <SwitchItem field={field} name="Display" />
+                )}
+              />
+              <div className="flex gap-2">
+                <FormField
+                  control={form.control}
+                  name="height"
+                  render={({ field }) => (
+                    <InputItem
+                      name={"Height"}
+                      placeholder={"Height of the stone"}
+                      field={field}
+                    />
+                  )}
                 />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="width"
-              render={({ field }) => (
-                <InputItem
-                  name={"Width"}
-                  placeholder={"Width of the stone"}
-                  field={field}
+                <FormField
+                  control={form.control}
+                  name="width"
+                  render={({ field }) => (
+                    <InputItem
+                      name={"Width"}
+                      placeholder={"Width of the stone"}
+                      field={field}
+                    />
+                  )}
                 />
-              )}
-            />
-          </div>
-          <FormField
-            control={form.control}
-            name="amount"
-            render={({ field }) => (
-              <InputItem
-                name={"Amount"}
-                placeholder={"Amount of the stone"}
-                field={field}
+              </div>
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <InputItem
+                    name={"Amount"}
+                    placeholder={"Amount of the stone"}
+                    field={field}
+                  />
+                )}
               />
-            )}
-          />
-
-          <DialogFooter>
-            <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
-          </DialogFooter>
-        </MultiPartForm>
+              <DialogFooter>
+                <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
+              </DialogFooter>
+            </MultiPartForm>
+          </TabsContent>
+          <TabsContent value="images">
+            <Outlet />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
