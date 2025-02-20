@@ -51,8 +51,9 @@ export default function SpecialOrder() {
         placeholder="Enter price per sqft"
         value={price === undefined ? "" : price}
         onChange={(e) => setPrice(parseFloat(e.target.value))}
-        step="0.01"
+        step="1"
         className="w-full p-2 border border-gray-300 rounded-md text-base mb-4"
+        onWheel={(e) => e.preventDefault()}
       />
 
       <label htmlFor="size" className="text-base block">
@@ -66,8 +67,9 @@ export default function SpecialOrder() {
           min="0"
           value={width === undefined ? "" : width}
           onChange={(e) => setWidth(parseFloat(e.target.value))}
-          step="0.01"
+          step="1"
           className="w-1/2 p-2 border border-gray-300 rounded-md text-base"
+          onWheel={(e) => e.preventDefault()}
         />
         <input
           type="number"
@@ -76,8 +78,9 @@ export default function SpecialOrder() {
           min="0"
           value={length === undefined ? "" : length}
           onChange={(e) => setLength(parseFloat(e.target.value))}
-          step="0.01"
+          step="1"
           className="w-1/2 p-2 border border-gray-300 rounded-md text-base"
+          onWheel={(e) => e.preventDefault()}
         />
       </div>
 
@@ -90,8 +93,9 @@ export default function SpecialOrder() {
         placeholder="Enter total delivery cost"
         value={deliveryCost === undefined ? "" : deliveryCost}
         onChange={(e) => setDeliveryCost(parseFloat(e.target.value))}
-        step="0.01"
+        step="1"
         className="w-full p-2 border border-gray-300 rounded-md text-base mb-4"
+        onWheel={(e) => e.preventDefault()}
       />
 
       <div className="flex items-center w-64 gap-3 mb-4">

@@ -123,111 +123,93 @@ export default function StonesAdd() {
         <DialogHeader>
           <DialogTitle>Add Stone</DialogTitle>
         </DialogHeader>
-        <Tabs
-          defaultValue="information"
-          onValueChange={(value) => {
-            if (value === "images") navigate("images");
-          }}
-        >
-          <TabsList>
-            <TabsTrigger value="information">Stone Information</TabsTrigger>
-            <TabsTrigger value="images">Images</TabsTrigger>
-          </TabsList>
-          <TabsContent value="information">
-            <MultiPartForm form={form}>
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <InputItem
-                    name={"Name"}
-                    placeholder={"Name of the stone"}
-                    field={field}
-                  />
-                )}
+        <MultiPartForm form={form}>
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <InputItem
+                name={"Name"}
+                placeholder={"Name of the stone"}
+                field={field}
               />
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <SelectInput
-                    field={field}
-                    placeholder="Type of the Stone"
-                    name="Type"
-                    options={[
-                      "Granite",
-                      "Quartz",
-                      "Marble",
-                      "Dolomite",
-                      "Quartzite",
-                    ].map((item) => ({ key: item.toLowerCase(), value: item }))}
-                  />
-                )}
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+              <SelectInput
+                field={field}
+                placeholder="Type of the Stone"
+                name="Type"
+                options={[
+                  "Granite",
+                  "Quartz",
+                  "Marble",
+                  "Dolomite",
+                  "Quartzite",
+                ].map((item) => ({ key: item.toLowerCase(), value: item }))}
               />
-              <FormField
-                control={form.control}
-                name="file"
-                render={({ field }) => (
-                  <FileInput
-                    inputName="stones"
-                    type="image"
-                    id="image"
-                    onChange={field.onChange}
-                  />
-                )}
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="file"
+            render={({ field }) => (
+              <FileInput
+                inputName="stones"
+                type="image"
+                id="image"
+                onChange={field.onChange}
               />
-              <FormField
-                defaultValue={true}
-                control={form.control}
-                name="is_display"
-                render={({ field }) => (
-                  <SwitchItem field={field} name="Display" />
-                )}
-              />
-              <div className="flex gap-2">
-                <FormField
-                  control={form.control}
-                  name="height"
-                  render={({ field }) => (
-                    <InputItem
-                      name={"Height"}
-                      placeholder={"Height of the stone"}
-                      field={field}
-                    />
-                  )}
+            )}
+          />
+          <FormField
+            defaultValue={true}
+            control={form.control}
+            name="is_display"
+            render={({ field }) => <SwitchItem field={field} name="Display" />}
+          />
+          <div className="flex gap-2">
+            <FormField
+              control={form.control}
+              name="height"
+              render={({ field }) => (
+                <InputItem
+                  name={"Height"}
+                  placeholder={"Height of the stone"}
+                  field={field}
                 />
-                <FormField
-                  control={form.control}
-                  name="width"
-                  render={({ field }) => (
-                    <InputItem
-                      name={"Width"}
-                      placeholder={"Width of the stone"}
-                      field={field}
-                    />
-                  )}
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="width"
+              render={({ field }) => (
+                <InputItem
+                  name={"Width"}
+                  placeholder={"Width of the stone"}
+                  field={field}
                 />
-              </div>
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <InputItem
-                    name={"Amount"}
-                    placeholder={"Amount of the stone"}
-                    field={field}
-                  />
-                )}
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <InputItem
+                name={"Amount"}
+                placeholder={"Amount of the stone"}
+                field={field}
               />
-              <DialogFooter>
-                <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
-              </DialogFooter>
-            </MultiPartForm>
-          </TabsContent>
-          <TabsContent value="images">
-            <Outlet />
-          </TabsContent>
-        </Tabs>
+            )}
+          />
+          <DialogFooter>
+            <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
+          </DialogFooter>
+        </MultiPartForm>
       </DialogContent>
     </Dialog>
   );

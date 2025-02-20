@@ -54,17 +54,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { stones };
 };
 
-// Обновлённая функция для навигации: карточки с amount = 0 перемещаются в конец
+function amountSort(a: Stone, b: Stone) {
+  if ((a.amount ?? 0) === 0 && (b.amount ?? 0) !== 0) return 1;
+  if ((a.amount ?? 0) !== 0 && (b.amount ?? 0) === 0) return -1;
+  return a.name.localeCompare(b.name);
+}
+
 function stoneIds(stones: Stone[], stoneId: number): number[] {
   const stoneType = stones.find((item) => item.id === stoneId)?.type;
   if (!stoneType) return [];
   return stones
     .filter((item) => item.type === stoneType)
-    .sort((a, b) => {
-      if ((a.amount ?? 0) === 0 && (b.amount ?? 0) !== 0) return 1;
-      if ((a.amount ?? 0) !== 0 && (b.amount ?? 0) === 0) return -1;
-      return a.name.localeCompare(b.name);
-    })
+    .sort(amountSort)
     .map((item) => item.id);
 }
 
@@ -96,46 +97,38 @@ export default function Stones() {
                   </AccordionTrigger>
                   <AccordionContent>
                     <ModuleList>
-                      {stoneList[type]
-                        .sort((a, b) => {
-                          if ((a.amount ?? 0) === 0 && (b.amount ?? 0) !== 0)
-                            return 1;
-                          if ((a.amount ?? 0) !== 0 && (b.amount ?? 0) === 0)
-                            return -1;
-                          return a.name.localeCompare(b.name);
-                        })
-                        .map((stone) => (
-                          <div
-                            key={stone.id}
-                            className={`relative group w-full ${
-                              (stone.amount ?? 0) === 0 ? "opacity-50" : ""
-                            }`}
-                            onAuxClick={(e) => {
-                              if (e.button === 1 && stone.url) {
-                                e.preventDefault();
-                                window.open(stone.url, "_blank");
-                              }
+                      {stoneList[type].sort(amountSort).map((stone) => (
+                        <div
+                          key={stone.id}
+                          className={`relative group w-full ${
+                            (stone.amount ?? 0) === 0 ? "opacity-50" : ""
+                          }`}
+                          onAuxClick={(e) => {
+                            if (e.button === 1 && stone.url) {
+                              e.preventDefault();
+                              window.open(stone.url, "_blank");
+                            }
+                          }}
+                        >
+                          <ImageCard
+                            fieldList={{
+                              Amount: `${stone.amount || "—"}`,
+                              Size: `${stone.width || "—"} x  ${
+                                stone.height || "—"
+                              }`,
                             }}
+                            title={stone.name}
                           >
-                            <ImageCard
-                              fieldList={{
-                                Amount: `${stone.amount || "—"}`,
-                                Size: `${stone.width || "—"} x  ${
-                                  stone.height || "—"
-                                }`,
-                              }}
-                              title={stone.name}
-                            >
-                              <ChildrenImagesDialog
-                                id={stone.id}
-                                src={stone.url}
-                                alt={stone.name}
-                                setImage={setCurrentId}
-                                isOpen={currentId === stone.id}
-                              />
-                            </ImageCard>
-                          </div>
-                        ))}
+                            <ChildrenImagesDialog
+                              id={stone.id}
+                              src={stone.url}
+                              alt={stone.name}
+                              setImage={setCurrentId}
+                              isOpen={currentId === stone.id}
+                            />
+                          </ImageCard>
+                        </div>
+                      ))}
                     </ModuleList>
                   </AccordionContent>
                 </AccordionItem>
