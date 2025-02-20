@@ -107,10 +107,8 @@ export default function AdminStones() {
                             .sort((a, b) => {
                               const amountA = a.amount ?? 0;
                               const amountB = b.amount ?? 0;
-                              // Сначала перемещаем карточки с amount = 0 в конец
                               if (amountA === 0 && amountB !== 0) return 1;
                               if (amountA !== 0 && amountB === 0) return -1;
-                              // Затем сортируем по имени
                               return a.name.localeCompare(b.name);
                             })
                             .map((stone) => {
@@ -152,7 +150,7 @@ export default function AdminStones() {
                                   <div className="absolute inset-0 flex justify-between items-start p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                     <Link
                                       to={`edit/${stone.id}`}
-                                      className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
+                                      className="text-white z-10 bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
                                       title="Edit Stone"
                                       aria-label={`Edit ${stone.name}`}
                                     >
@@ -170,7 +168,7 @@ export default function AdminStones() {
                                   </div>
 
                                   {!stone.is_display && (
-                                    <div className="absolute top-0 left-0 bg-red-500 text-white text-xs font-bold px-1 py-0.5">
+                                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-1 py-0.5 whitespace-nowrap">
                                       Not Displayed
                                     </div>
                                   )}
