@@ -1,9 +1,8 @@
-// Dialog.tsx
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Cross2Icon } from "@radix-ui/react-icons";
 
-import { cn } from "~/lib/utils"; // Убедитесь, что этот путь корректен
+import { cn } from "~/lib/utils"; // Ensure this path is correct
 import { cva, type VariantProps } from "class-variance-authority";
 
 const Dialog = DialogPrimitive.Root;
@@ -61,9 +60,9 @@ const DialogContent = React.forwardRef<
       className={cn(dialogVariants({ position, className }))}
       {...props}
     >
-      <DialogPrimitive.Close className="absolute -top-10 -right-10 text-white bg-transparent opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none">
-        <Cross2Icon className="w-6 h-6" />
-        <span className="sr-only">Закрыть</span>
+      <DialogPrimitive.Close className="absolute cursor-pointer top-5 right-5 w-7 h-7 flex items-center justify-center rounded-full text-white bg-black opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none">
+        <Cross2Icon className="w-5 h-5" />
+        <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
 
       {children}
@@ -155,7 +154,7 @@ export {
   DialogTrigger,
   DialogClose,
   DialogContent,
-  DialogContentImage, // Экспортируем новый компонент
+  DialogContentImage, // Exporting the new component
   DialogHeader,
   DialogFooter,
   DialogTitle,

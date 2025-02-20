@@ -50,6 +50,14 @@ export function ChildrenImagesDialog({
       .then(setData);
   };
 
+  const handleMouseEnter = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+  };
+
+  const handleMouseLeaveContainer = () => {
+    setSelectedImage(src);
+  };
+
   return (
     <div className="flex gap-2 flex-col items-center">
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -59,9 +67,6 @@ export function ChildrenImagesDialog({
             alt={alt || name || "Image"}
             className={`object-cover w-40 h-40 border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300 ${className}`}
             loading="lazy"
-            onAuxClick={(e) => {
-              if (e.button === 1) window.open(src || "", "_blank");
-            }}
             onClick={() => setImage(id)}
           />
         </DialogTrigger>
@@ -84,7 +89,10 @@ export function ChildrenImagesDialog({
             />
           </div>
 
-          <div className="flex justify-center overflow-x-auto overflow-y-hidden md:overflow-hidden w-screen gap-1">
+          <div
+            className="flex justify-center overflow-x-auto overflow-y-hidden md:overflow-hidden w-screen gap-1"
+            onMouseLeave={handleMouseLeaveContainer}
+          >
             {data?.images.map((image) => (
               <img
                 key={image.id}
@@ -92,7 +100,13 @@ export function ChildrenImagesDialog({
                 className="w-10 h-10 cursor-pointer"
                 alt={name || "Image"}
                 onClick={() => setSelectedImage(image.url)}
-                onMouseEnter={() => setSelectedImage(image.url)}
+                onMouseEnter={() => handleMouseEnter(image.url)}
+                onAuxClick={(e) => {
+                  if (e.button === 1) {
+                    e.preventDefault();
+                    window.open(image.url, "_blank");
+                  }
+                }}
               />
             ))}
           </div>

@@ -280,7 +280,7 @@ export default function StonesEdit() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px] max-h-[95vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[425px] overflow-auto max-h-[95vh]">
         <DialogHeader>
           <DialogTitle>Edit Stone</DialogTitle>
         </DialogHeader>
