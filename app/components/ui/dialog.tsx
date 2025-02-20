@@ -50,8 +50,8 @@ export interface DialogContentProps
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  DialogContentProps
->(({ className, children, position, ...props }, ref) => (
+  DialogContentProps & { hideClose?: boolean }
+>(({ className, children, position, hideClose = false, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
 
@@ -60,10 +60,12 @@ const DialogContent = React.forwardRef<
       className={cn(dialogVariants({ position, className }))}
       {...props}
     >
-      <DialogPrimitive.Close className="absolute cursor-pointer top-5 right-5 w-7 h-7 flex items-center justify-center rounded-full text-white bg-black opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none">
-        <Cross2Icon className="w-5 h-5" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
+      {!hideClose && (
+        <DialogPrimitive.Close className="absolute cursor-pointer top-5 right-5 w-7 h-7 flex items-center justify-center rounded-full text-white bg-black opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none">
+          <Cross2Icon className="w-5 h-5 " />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      )}
 
       {children}
     </DialogPrimitive.Content>
