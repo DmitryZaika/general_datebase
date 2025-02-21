@@ -91,6 +91,10 @@
     "sequelize": "^6.37.5",
     "sequelize-cli": "^6.6.2"
   },
+  "optionalDependencies": {
+    "@esbuild/linux-x64": "0.25.0",
+    "lightningcss-linux-x64-gnu": "^1.29.1"
+  },
   "engines": {
     "node": ">=20.0.0"
   }
