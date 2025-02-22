@@ -174,7 +174,7 @@ export default function AdminStones() {
                                     </Link>
                                   </div>
                                   {stone.amount === 0 && (
-                                    <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="absolute bottom-22 right-2 flex items-center justify-center">
                                       <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45">
                                         Out of Stock
                                       </div>
