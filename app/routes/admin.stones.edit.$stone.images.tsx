@@ -54,8 +54,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return forceRedirectError(request.headers, "No id provided");
     }
     const sid = parseInt(id.toString());
+    const result = await selectId<{ url: string | null }>(
+      db,
+      "SELECT url FROM installed_stones WHERE id = ?",
+      sid
+    );
     await db.execute(`DELETE FROM main.installed_stones WHERE id = ?`, [sid]);
     const session = await getSession(request.headers.get("Cookie"));
+    if (result?.url) {
+      deleteFile(result.url);
+    }
     session.flash("message", toastData("Success", "Image Deleted"));
     return redirect(request.url, {
       headers: { "Set-Cookie": await commitSession(session) },
@@ -70,7 +78,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
-  const newFile = data.file && data.file !== "undefined";
+
   const stone = await selectId<{ url: string }>(
     db,
     "select url from stones WHERE id = ?",
@@ -84,10 +92,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     );
   } catch (error) {
     console.error("Error connecting to the database:", errors);
-  }
-
-  if (stone?.url && newFile) {
-    deleteFile(stone.url);
   }
 
   const session = await getSession(request.headers.get("Cookie"));
@@ -119,7 +123,6 @@ function AddImage() {
   const navigation = useNavigation();
   const form = useCustomForm<TInstalledProjectsSchema>(InstalledProjectsSchema);
 
-  // Счётчик, который будем менять, чтобы "пересоздать" input
   const [inputKey, setInputKey] = useState(0);
 
   useEffect(() => {

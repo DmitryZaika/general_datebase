@@ -162,8 +162,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 };
 
 function StoneInformation({ data }: { data: any }) {
-  const navigate = useNavigate();
-  const isSubmitting = navigate.state === "submitting";
+  const navigate = useNavigation();
+  const isSubmitting = navigate.state !== "idle";
   const { name, type, url, is_display, height, width, amount } = data;
   const defaultValues = {
     name,
