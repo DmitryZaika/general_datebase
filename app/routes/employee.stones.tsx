@@ -47,6 +47,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       SELECT id, name, type, url, is_display, height, width, amount
       FROM stones
       WHERE company_id = ? AND is_display = 1
+      ORDER BY name ASC, (amount = 0), amount ASC
     `,
     [user.company_id]
   );
@@ -100,9 +101,7 @@ export default function Stones() {
                       {stoneList[type].sort(amountSort).map((stone) => (
                         <div
                           key={stone.id}
-                          className={`relative group w-full ${
-                            (stone.amount ?? 0) === 0 ? "opacity-50" : ""
-                          }`}
+                          className="relative group w-full"
                           onAuxClick={(e) => {
                             if (e.button === 1 && stone.url) {
                               e.preventDefault();
@@ -119,6 +118,13 @@ export default function Stones() {
                             }}
                             title={stone.name}
                           >
+                            {stone.amount === 0 && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45">
+                                  Out of Stock
+                                </div>
+                              </div>
+                            )}
                             <ChildrenImagesDialog
                               id={stone.id}
                               src={stone.url}
