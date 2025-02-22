@@ -120,7 +120,7 @@ export default function Stones() {
                           >
                             {stone.amount === 0 && (
                               <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45">
+                                <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
                                   Out of Stock
                                 </div>
                               </div>
