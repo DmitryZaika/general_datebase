@@ -1,5 +1,3 @@
-// admin.stones.tsx
-
 import {
   Accordion,
   AccordionItem,
@@ -48,7 +46,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     `SELECT id, name, type, url, is_display, height, width, amount
        FROM stones
-      WHERE company_id = ?`,
+      WHERE company_id = ?
+      ORDER BY is_display DESC, amount DESC`,
     [user.company_id]
   );
 
@@ -103,29 +102,22 @@ export default function AdminStones() {
                       </AccordionTrigger>
                       <AccordionContent>
                         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
-                          {stoneList[type]
-                            .sort((a, b) => {
-                              const amountA = a.amount ?? 0;
-                              const amountB = b.amount ?? 0;
-                              if (amountA === 0 && amountB !== 0) return 1;
-                              if (amountA !== 0 && amountB === 0) return -1;
-                              return a.name.localeCompare(b.name);
-                            })
-                            .map((stone) => {
-                              return (
+                          {stoneList[type].map((stone) => {
+                            return (
+                              <div
+                                key={stone.id}
+                                className="relative group w-full"
+                                onAuxClick={(e) => {
+                                  if (e.button === 1 && stone.url) {
+                                    e.preventDefault();
+                                    window.open(stone.url, "_blank");
+                                  }
+                                }}
+                              >
                                 <div
-                                  key={stone.id}
-                                  className={`relative group w-full ${
-                                    (stone.amount ?? 0) === 0
-                                      ? "opacity-50"
-                                      : ""
+                                  className={`${
+                                    !stone.is_display ? "opacity-30" : ""
                                   }`}
-                                  onAuxClick={(e) => {
-                                    if (e.button === 1 && stone.url) {
-                                      e.preventDefault();
-                                      window.open(stone.url, "_blank");
-                                    }
-                                  }}
                                 >
                                   <Image
                                     id={stone.id}
@@ -135,52 +127,54 @@ export default function AdminStones() {
                                     isOpen={currentId === stone.id}
                                     setImage={setCurrentId}
                                   />
-                                  <div className="absolute bottom-0 left-0 w-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-800 bg-opacity-70 text-white text-xs rounded">
-                                    <p>
-                                      <strong>Amount:</strong>{" "}
-                                      {stone.amount ?? "—"}
-                                    </p>
-                                    <p>
-                                      <strong>Size:</strong>{" "}
-                                      {stone.width ?? "—"} x{" "}
-                                      {stone.height ?? "—"}
-                                    </p>
-                                  </div>
-
-                                  <div className="absolute inset-0 flex justify-between items-start p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                    <Link
-                                      to={`edit/${stone.id}`}
-                                      className="text-white z-10 bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
-                                      title="Edit Stone"
-                                      aria-label={`Edit ${stone.name}`}
-                                    >
-                                      <FaPencilAlt />
-                                    </Link>
-
-                                    <Link
-                                      to={`delete/${stone.id}`}
-                                      className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
-                                      title="Delete Stone"
-                                      aria-label={`Delete ${stone.name}`}
-                                    >
-                                      <FaTimes />
-                                    </Link>
-                                  </div>
-
-                                  {!stone.is_display && (
-                                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-1 py-0.5 whitespace-nowrap">
-                                      Not Displayed
-                                    </div>
-                                  )}
-
-                                  <div className="mt-2 text-center">
-                                    <h3 className="text-lg font-semibold">
-                                      {stone.name}
-                                    </h3>
-                                  </div>
                                 </div>
-                              );
-                            })}
+                                <div className="absolute bottom-0 left-0 w-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-800 bg-opacity-70 text-white text-xs rounded">
+                                  <p>
+                                    <strong>Amount:</strong>{" "}
+                                    {stone.amount ?? "—"}
+                                  </p>
+                                  <p>
+                                    <strong>Size:</strong> {stone.width ?? "—"}{" "}
+                                    x {stone.height ?? "—"}
+                                  </p>
+                                </div>
+
+                                <div className="absolute inset-0 flex justify-between items-start p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                  <Link
+                                    to={`edit/${stone.id}`}
+                                    className="text-white z-10 bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
+                                    title="Edit Stone"
+                                    aria-label={`Edit ${stone.name}`}
+                                  >
+                                    <FaPencilAlt />
+                                  </Link>
+
+                                  <Link
+                                    to={`delete/${stone.id}`}
+                                    className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
+                                    title="Delete Stone"
+                                    aria-label={`Delete ${stone.name}`}
+                                  >
+                                    <FaTimes />
+                                  </Link>
+                                </div>
+
+                                {stone.amount === 0 && (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45">
+                                      Out of Stock
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="mt-2 text-center">
+                                  <h3 className="text-lg font-semibold">
+                                    {stone.name}
+                                  </h3>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </AccordionContent>
                     </AccordionItem>
