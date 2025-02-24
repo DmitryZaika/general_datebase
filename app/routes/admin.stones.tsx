@@ -74,7 +74,6 @@ export default function AdminStones() {
     (value: number | undefined) => (value ? [value] : [])
   );
 
-  // Группируем камни по типу
   const stoneList = stones.reduce((acc: { [key: string]: Stone[] }, stone) => {
     if (!acc[stone.type]) {
       acc[stone.type] = [];
@@ -104,11 +103,6 @@ export default function AdminStones() {
                         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
                           {stoneList[type]
                             .sort((a, b) => {
-                              // Формируем оценки для сортировки:
-                              // Группа 0: в наличии и отображается (amount !== 0, is_display true)
-                              // Группа 1: отсутствует, но отображается (amount === 0, is_display true)
-                              // Группа 2: в наличии, но !is_display (amount !== 0, is_display false)
-                              // Группа 3: отсутствует и !is_display (amount === 0, is_display false)
                               const scoreA =
                                 (a.amount === 0 ? 1 : 0) +
                                 (a.is_display ? 0 : 2);
@@ -174,7 +168,7 @@ export default function AdminStones() {
                                     </Link>
                                   </div>
                                   {stone.amount === 0 && (
-                                    <div className="absolute bottom-22 right-2 flex items-center justify-center ">
+                                    <div className="absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
                                       <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
                                         Out of Stock
                                       </div>
