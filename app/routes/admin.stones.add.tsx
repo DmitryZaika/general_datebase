@@ -4,7 +4,12 @@ import {
   LoaderFunctionArgs,
   redirect,
 } from "@remix-run/node";
-import { useNavigate, useNavigation, Outlet } from "@remix-run/react";
+import {
+  useNavigate,
+  useNavigation,
+  Outlet,
+  useLoaderData,
+} from "@remix-run/react";
 import { FormField } from "../components/ui/form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
@@ -23,10 +28,14 @@ import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
-import { getAdminUser } from "~/utils/session.server";
+import { getAdminUser, getEmployeeUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { selectId, selectMany } from "~/utils/queryHelpers";
+import { useState } from "react";
+import { Button } from "~/components/ui/button";
+import { X } from "lucide-react";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -39,6 +48,7 @@ const stoneSchema = z.object({
   height: z.coerce.number().default(0),
   width: z.coerce.number().default(0),
   amount: z.coerce.number().default(0),
+  supplier: z.string().optional(),
 });
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -60,13 +70,14 @@ export async function action({ request }: ActionFunctionArgs) {
   let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.stones (name, type, url, company_id, is_display, width, height, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO main.stones (name, type, url, company_id, is_display, supplier, width, height, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
         data.type,
         data.file,
         user.company_id,
         data.is_display,
+        data.supplier,
         data.width,
         data.height,
         data.amount,
@@ -95,7 +106,12 @@ export async function action({ request }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
-    return { user };
+    const suppliers = await selectMany<{ supplier_name: string }>(
+      db,
+      "SELECT supplier_name FROM suppliers WHERE company_id = ?",
+      [user.company_id]
+    );
+    return { supplier: suppliers.map((item) => item.supplier_name) };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -104,6 +120,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function StonesAdd() {
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state === "submitting";
+  const { supplier } = useLoaderData<typeof loader>();
 
   const form = useCustomForm(stoneSchema, {
     defaultValues: {
@@ -117,9 +134,25 @@ export default function StonesAdd() {
     }
   };
 
+  const [inputFields, setInputFields] = useState<
+    {
+      slab: string;
+      sold: boolean;
+    }[]
+  >([]);
+
+  const addSlab = () => {
+    setInputFields([...inputFields, { slab: "", sold: false }]);
+  };
+
+  const handleDelete = (index: number) => {
+    const newFields = inputFields.filter((_, i) => i !== index);
+    setInputFields(newFields);
+  };
+
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] overflow-y-auto max-h-[95vh]">
         <DialogHeader>
           <DialogTitle>Add Stone</DialogTitle>
         </DialogHeader>
@@ -197,15 +230,43 @@ export default function StonesAdd() {
           </div>
           <FormField
             control={form.control}
-            name="amount"
+            name="supplier"
             render={({ field }) => (
-              <InputItem
-                name={"Amount"}
-                placeholder={"Amount of the stone"}
+              <SelectInput
+                options={supplier.map((item) => ({
+                  key: item.toLowerCase(),
+                  value: item,
+                }))}
+                name={"Supplier"}
+                placeholder={"Supplier of the stone"}
                 field={field}
               />
             )}
           />
+          {inputFields.map((field, index) => (
+            <div key={index} className="flex gap-2">
+              <FormField
+                control={form.control}
+                name={`Bundle${index}`}
+                render={({ field }) => (
+                  <InputItem
+                    formClassName="mb-0"
+                    className="mb-2"
+                    placeholder={`Slab number ${index + 1}`}
+                    field={field}
+                  />
+                )}
+              />
+              <Button type="button" onClick={() => handleDelete(index)}>
+                <X />
+              </Button>
+            </div>
+          ))}
+
+          <Button type="button" onClick={addSlab}>
+            Add Slab
+          </Button>
+
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
           </DialogFooter>
