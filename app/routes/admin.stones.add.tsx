@@ -49,9 +49,10 @@ const stoneSchema = z.object({
   width: z.coerce.number().default(0),
   amount: z.coerce.number().default(0),
   supplier: z.string().optional(),
+  bundle: z.string().optional(),
 });
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await getAdminUser(request);
   } catch (error) {
@@ -85,15 +86,33 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
+    const stoneId = parseInt(params.stone ?? "0", 10);
+    if (!stoneId) {
+      return new Response(
+        JSON.stringify({ error: "Invalid or missing stone ID" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
 
-    const session = await getSession(request.headers.get("Cookie"));
-    session.flash(
-      "message",
-      toastData("Failure", "Database Error Occured", "destructive")
-    );
-    return new Response(JSON.stringify({ error: "Database Error Occured" }), {
-      headers: { "Set-Cookie": await commitSession(session) },
-    });
+    try {
+      await db.execute(
+        `INSERT INTO main.slab_inventory (bundle, stone_id) VALUES (?, ?);`,
+        [data.bundle, stoneId]
+      );
+    } catch (error) {
+      console.error("Error connecting to the database: ", error);
+      const session = await getSession(request.headers.get("Cookie"));
+      session.flash(
+        "message",
+        toastData("Failure", "Database Error Occured", "destructive")
+      );
+      return new Response(JSON.stringify({ error: "Database Error Occured" }), {
+        headers: { "Set-Cookie": await commitSession(session) },
+      });
+    }
   }
 
   const session = await getSession(request.headers.get("Cookie"));
@@ -247,7 +266,7 @@ export default function StonesAdd() {
             <div key={index} className="flex gap-2">
               <FormField
                 control={form.control}
-                name={`Bundle${index}`}
+                name={`bundle[${index}].slab`}
                 render={({ field }) => (
                   <InputItem
                     formClassName="mb-0"
@@ -257,6 +276,7 @@ export default function StonesAdd() {
                   />
                 )}
               />
+
               <Button type="button" onClick={() => handleDelete(index)}>
                 <X />
               </Button>
