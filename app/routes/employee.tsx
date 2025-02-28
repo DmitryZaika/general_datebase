@@ -1,9 +1,9 @@
-import type { LoaderFunction, MetaFunction } from "@remix-run/node";
-import { useLocation, useNavigate, Outlet } from "@remix-run/react";
+import type { LoaderFunction, MetaFunction } from "react-router";
+import { useLocation, useNavigate, Outlet } from "react-router";
 import { PageLayout } from "~/components/PageLayout";
 // import { TransitionGroup, CSSTransition } from "react-transition-group";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { redirect } from "@remix-run/node";
+import { redirect } from "react-router";
 import { getEmployeeUser } from "~/utils/session.server";
 
 export const meta: MetaFunction = () => {

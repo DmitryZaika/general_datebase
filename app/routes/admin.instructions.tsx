@@ -1,5 +1,5 @@
-import { LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { Link, Outlet, useLoaderData } from "@remix-run/react";
+import { LoaderFunctionArgs, redirect } from "react-router";
+import { Link, Outlet, useLoaderData } from "react-router";
 import { PageLayout } from "~/components/PageLayout";
 import { Button } from "~/components/ui/button";
 import {
