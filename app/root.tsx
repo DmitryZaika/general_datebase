@@ -1,6 +1,5 @@
-// app/root.tsx (for example)
+import { data } from "@remix-run/node";
 import {
-  json,
   Links,
   Meta,
   Outlet,
@@ -45,7 +44,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = (await getUserBySessionId(activeSession)) || null;
   }
 
-  return json(
+  return data(
     { message, token, user },
 
     {

@@ -24,5 +24,5 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     "SELECT id, url FROM installed_stones WHERE stone_id = ?",
     [stoneId]
   );
-  return { images };
+  return Response.json({ images });
 }

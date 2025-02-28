@@ -23,14 +23,14 @@ export async function action({ request }: ActionFunctionArgs) {
     zodResolver(todoListSchema)
   );
   if (errors) {
-    return { errors, defaultValues };
+    return Response.json({ errors, defaultValues });
   }
 
   await db.execute(
     `INSERT INTO main.todolist (rich_text, user_id) VALUES (?, ?);`,
     [data.rich_text, user.id]
   );
-  return { success: true };
+  return Response.json({ success: true });
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -46,5 +46,5 @@ export async function loader({ request }: LoaderFunctionArgs) {
     "SELECT id, rich_text, is_done FROM todolist WHERE user_id = ?",
     [user.id]
   );
-  return { todos };
+  return Response.json({ todos });
 }
