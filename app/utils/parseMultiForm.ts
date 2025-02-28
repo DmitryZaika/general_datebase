@@ -23,19 +23,14 @@ export async function parseMutliForm<T>(
   const resolver = zodResolver(finalSchema);
 
   async function uploadHandler(fileUpload: FileUpload) {
-    console.log(fileUpload);
     const response = await s3UploadHandler(fileUpload, folder);
-    console.log(response);
     return response;
   }
 
-  console.log(request.body);
   const formData = await parseFormData(request, uploadHandler);
-  console.log(formData);
 
   csrf.validate(formData, request.headers);
 
   const { data, errors } = await validateFormData(formData, resolver);
-  console.log({ data, errors });
   return { data: data as z.infer<typeof finalSchema>, errors };
 }
