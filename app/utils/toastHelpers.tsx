@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { commitSession, getSession } from "~/sessions";
-import { redirect } from "@remix-run/node";
+import { redirect } from "react-router";
 
 type Variants = "default" | "destructive" | "success";
 

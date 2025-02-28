@@ -1,5 +1,5 @@
 // app/routes/todoList.ts
-import { ActionFunctionArgs } from "@remix-run/node";
+import { ActionFunctionArgs } from "react-router";
 import { db } from "~/db.server";
 import { getValidatedFormData } from "remix-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -54,7 +54,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 
   const todoId = parseInt(params.todo, 10);
   if (!todoId) {
-    return { name: undefined };
+    return Response.json({ name: undefined });
   }
 
   if (request.method === "POST") {
@@ -67,24 +67,24 @@ export async function action({ params, request }: ActionFunctionArgs) {
       zodResolver(todoListSchema)
     );
     if (errors) {
-      return { errors, defaultValues };
+      return Response.json({ errors, defaultValues });
     }
 
     await editAction(data.rich_text, todoId, user.id);
-    return { success: true };
+    return Response.json({ success: true });
   }
 
   if (request.method === "DELETE") {
     await deleteAction(todoId, user.id);
-    return { success: true };
+    return Response.json({ success: true });
   }
   if (request.method === "PATCH") {
     const formData = await request.formData();
     const isDone = formData.get("isDone") === "true";
     await updateDoneAction(todoId, isDone, user.id);
-    return { success: true };
+    return Response.json({ success: true });
   }
   6;
 
-  return { success: false };
+  return Response.json({ success: false });
 }
