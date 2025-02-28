@@ -1,5 +1,5 @@
-import { LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { LoaderFunctionArgs, redirect } from "react-router";
+import { useLoaderData } from "react-router";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";

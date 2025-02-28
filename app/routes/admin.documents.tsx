@@ -7,10 +7,10 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData, Outlet, Link } from "@remix-run/react";
+import { useLoaderData, Outlet, Link } from "react-router";
 import { Button } from "~/components/ui/button";
 import { getAdminUser } from "~/utils/session.server";
 

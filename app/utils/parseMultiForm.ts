@@ -2,12 +2,7 @@ import { validateFormData } from "remix-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FieldErrors, FieldValues } from "react-hook-form";
 import { z } from "zod";
-import {
-  unstable_parseMultipartFormData,
-  UploadHandler,
-  unstable_createMemoryUploadHandler,
-  unstable_composeUploadHandlers,
-} from "@remix-run/node";
+import { type FileUpload, parseFormData } from "@mjackson/form-data-parser";
 import { s3UploadHandler } from "~/utils/s3.server";
 import { csrf } from "~/utils/csrf.server";
 
@@ -27,17 +22,20 @@ export async function parseMutliForm<T>(
   const finalSchema = schema.merge(fileSchema);
   const resolver = zodResolver(finalSchema);
 
-  const uploadHandler: UploadHandler = unstable_composeUploadHandlers(
-    (value) => s3UploadHandler(value, folder),
-    unstable_createMemoryUploadHandler()
-  );
-  const formData = await unstable_parseMultipartFormData(
-    request,
-    uploadHandler
-  );
+  async function uploadHandler(fileUpload: FileUpload) {
+    console.log(fileUpload);
+    const response = await s3UploadHandler(fileUpload, folder);
+    console.log(response);
+    return response;
+  }
+
+  console.log(request.body);
+  const formData = await parseFormData(request, uploadHandler);
+  console.log(formData);
 
   csrf.validate(formData, request.headers);
 
   const { data, errors } = await validateFormData(formData, resolver);
+  console.log({ data, errors });
   return { data: data as z.infer<typeof finalSchema>, errors };
 }
