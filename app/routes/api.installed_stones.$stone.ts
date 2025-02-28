@@ -1,4 +1,4 @@
-import { LoaderFunctionArgs } from "@remix-run/node";
+import { LoaderFunctionArgs } from "react-router";
 import { db } from "~/db.server";
 import { getSession } from "~/sessions";
 import { selectMany } from "~/utils/queryHelpers";

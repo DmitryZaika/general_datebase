@@ -1,6 +1,8 @@
 node_modules
+.react-router
 
 /.cache
 /build
 .env
 public/images
+build.log
