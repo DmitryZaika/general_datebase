@@ -1,6 +1,8 @@
 import { Button } from "../ui/button";
 import { Spinner } from "../atoms/Spinner";
 
+import type { JSX } from "react";
+
 export function LoadingButton({
   loading,
   children,

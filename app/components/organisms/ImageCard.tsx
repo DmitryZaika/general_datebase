@@ -1,5 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from "~/components/ui/card";
 
+import type { JSX } from "react";
+
 export function ImageCard({
   children,
   fieldList,
