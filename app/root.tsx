@@ -1,13 +1,6 @@
-import { data } from "@remix-run/node";
-import {
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-  useLoaderData,
-} from "@remix-run/react";
-import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
+import { data } from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "react-router";
+import type { LinksFunction, LoaderFunctionArgs } from "react-router";
 import { Header } from "./components/Header";
 import { Toaster } from "./components/ui/toaster";
 import "./tailwind.css";

@@ -1,5 +1,5 @@
-import { LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { LoaderFunctionArgs, redirect } from "react-router";
+import { useLoaderData } from "react-router";
 import {
   Accordion,
   AccordionItem,

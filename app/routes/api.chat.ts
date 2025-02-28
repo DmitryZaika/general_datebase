@@ -1,4 +1,4 @@
-import { LoaderFunctionArgs } from "@remix-run/node";
+import { LoaderFunctionArgs } from "react-router";
 import { eventStream } from "remix-utils/sse/server";
 import { getSession } from "../sessions";
 import OpenAI from "openai";

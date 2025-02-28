@@ -1,6 +1,6 @@
 import { PassThrough } from "stream";
-import type { UploadHandlerPart } from "@remix-run/node";
-import { writeAsyncIterableToWritable } from "@remix-run/node";
+import { type FileUpload } from "@mjackson/form-data-parser";
+import { writeAsyncIterableToWritable } from "@react-router/node";
 import { Upload } from "@aws-sdk/lib-storage";
 import {
   PutObjectCommandInput,
@@ -27,7 +27,6 @@ const getClient = () => {
       accessKeyId: STORAGE_ACCESS_KEY,
       secretAccessKey: STORAGE_SECRET,
     },
-    // logger: console,
     region: STORAGE_REGION,
   });
 };
@@ -89,7 +88,10 @@ const uploadStream = ({
   };
 };
 
-export async function uploadStreamToS3(data: any, filename: string) {
+export async function uploadStreamToS3(
+  data: AsyncIterable<Uint8Array>,
+  filename: string
+) {
   const mimeType = mime.lookup(filename) || "application/octet-stream";
   const stream = uploadStream({
     Key: `dynamic-images/${filename}`,
@@ -101,16 +103,19 @@ export async function uploadStreamToS3(data: any, filename: string) {
 }
 
 export const s3UploadHandler = async (
-  { name, filename, data }: UploadHandlerPart,
+  fileUpload: FileUpload,
   folder: string
 ): Promise<File | string | null | undefined> => {
-  if (name !== "file" || filename === undefined) {
-    return undefined;
-  }
-  const extensionRegex = /(?:\.([^.]+))?$/;
-  const extension = extensionRegex.exec(filename);
-  const finalname = `${folder}/${uuidv4()}.${extension?.[1]}`;
+  console.log(fileUpload);
+  if (fileUpload.fieldName === "file") {
+    const extensionRegex = /(?:\.([^.]+))?$/;
+    const extension = extensionRegex.exec(fileUpload.name);
+    const finalname = `${folder}/${uuidv4()}.${extension?.[1]}`;
 
-  const uploadedFileLocation = await uploadStreamToS3(data, finalname);
-  return uploadedFileLocation;
+    const uploadedFileLocation = await uploadStreamToS3(
+      await fileUpload.arrayBuffer(),
+      finalname
+    );
+    return uploadedFileLocation;
+  }
 };

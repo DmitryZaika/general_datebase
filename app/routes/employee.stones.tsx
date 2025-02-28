@@ -5,10 +5,10 @@ import {
   AccordionContent,
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData } from "react-router";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
 import { useArrowToggle } from "~/hooks/useArrowToggle";

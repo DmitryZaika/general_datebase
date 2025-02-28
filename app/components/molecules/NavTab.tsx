@@ -1,4 +1,4 @@
-import { NavLink } from "@remix-run/react";
+import { NavLink } from "react-router";
 import { TabsTrigger } from "../ui/tabs";
 
 export function NavTab({ name }: { name: string }) {
