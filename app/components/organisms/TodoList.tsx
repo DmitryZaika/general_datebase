@@ -213,7 +213,10 @@ export function TodoList() {
                 )
                 .map((todo) => {
                   return (
-                    <div className="flex items-center" key={todo.id}>
+                    <div
+                      className="flex items-center px-3 py-2 border-b border-gray-200 hover:bg-gray-100 transition-colors"
+                      key={todo.id}
+                    >
                       <FinishForm todo={todo} refresh={getTodos} />
                       <EditForm todo={todo} refresh={getTodos} />
                       <DeleteForm todo={todo} refresh={getTodos} />

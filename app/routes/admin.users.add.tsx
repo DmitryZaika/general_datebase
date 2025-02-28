@@ -1,10 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  ActionFunctionArgs,
-  LoaderFunctionArgs,
-  redirect,
-} from "@remix-run/node";
-import { Form, useLoaderData, useNavigate } from "@remix-run/react";
+import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { Form, useLoaderData, useNavigate } from "react-router";
 import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";

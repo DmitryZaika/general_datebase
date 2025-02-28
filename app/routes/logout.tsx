@@ -1,4 +1,4 @@
-import { LoaderFunction, redirect } from "@remix-run/node";
+import { LoaderFunction, redirect } from "react-router";
 import { db } from "~/db.server";
 import { getSession, destroySession } from "~/sessions";
 
