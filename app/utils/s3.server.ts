@@ -88,6 +88,26 @@ const uploadStream = ({
   };
 };
 
+function readableStreamToAsyncIterable(stream: ReadableStream<Uint8Array>) {
+  const reader = stream.getReader();
+
+  return {
+    async *[Symbol.asyncIterator]() {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+          yield value;
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    },
+  };
+}
+
 export async function uploadStreamToS3(
   data: AsyncIterable<Uint8Array>,
   filename: string
@@ -106,14 +126,15 @@ export const s3UploadHandler = async (
   fileUpload: FileUpload,
   folder: string
 ): Promise<File | string | null | undefined> => {
-  console.log(fileUpload);
   if (fileUpload.fieldName === "file") {
     const extensionRegex = /(?:\.([^.]+))?$/;
     const extension = extensionRegex.exec(fileUpload.name);
     const finalname = `${folder}/${uuidv4()}.${extension?.[1]}`;
 
+    const asyncIterable = readableStreamToAsyncIterable(fileUpload.stream());
+
     const uploadedFileLocation = await uploadStreamToS3(
-      await fileUpload.arrayBuffer(),
+      asyncIterable,
       finalname
     );
     return uploadedFileLocation;
