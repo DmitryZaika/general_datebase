@@ -11,7 +11,7 @@ interface BurgerLinkProps {
   children: JSX.Element;
   className?: string;
 }
-import React, { useState } from "react";
+import React, { useState, type JSX } from "react";
 import { Button } from "~/components/ui/button";
 import { Menu, X } from "lucide-react";
 import clsx from "clsx";
