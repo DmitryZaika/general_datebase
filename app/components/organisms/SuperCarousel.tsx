@@ -8,7 +8,12 @@ import {
   CarouselPrevious,
   type CarouselApi,
 } from "~/components/ui/carousel";
-import { Dialog, DialogContent } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "~/components/ui/dialog";
 import { useArrowCarousel } from "~/hooks/useArrowToggle";
 
 interface ImageProps {
@@ -39,7 +44,6 @@ function ChildrenImagesDialog({
   };
 
   useEffect(() => {
-    console.log("HERE");
     if (isOpen) {
       getImages();
       setSelectedImage(src);
@@ -115,8 +119,8 @@ export function SuperCarousel({
       api.scrollTo(index, true);
     }
     api.on("settle", (index) => {
-      console.log(currentId, index);
-      // setCurrentId(images[index].id);
+      const slidesInView = api.slidesInView();
+      setCurrentId(images[slidesInView[0]].id);
     });
   }, [api]);
   return (
@@ -128,6 +132,8 @@ export function SuperCarousel({
         closeClassName="z-50 "
         className=" flex flex-col justify-center items-center gap-3 bg-transparent"
       >
+        <DialogTitle className="sr-only">Image Gallery</DialogTitle>
+        <DialogDescription className="sr-only">Image Gallery</DialogDescription>
         <Carousel
           className="2xl:max-w-[60vw]  max-w-screen  "
           setApi={setApi}
