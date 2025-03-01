@@ -44,7 +44,6 @@ function ChildrenImagesDialog({
   };
 
   useEffect(() => {
-    console.log("HERE");
     if (isOpen) {
       getImages();
       setSelectedImage(src);
@@ -120,11 +119,8 @@ export function SuperCarousel({
       api.scrollTo(index, true);
     }
     api.on("settle", (index) => {
-      const slidesInView = api.slidesInView(); // <-- Pass true to the slidesInView method
-      console.log("Val", slidesInView);
-      console.log(currentId);
-      console.log("SCROLL", index);
-      // setCurrentId(images[index].id);
+      const slidesInView = api.slidesInView();
+      setCurrentId(images[slidesInView[0]].id);
     });
   }, [api]);
   return (
