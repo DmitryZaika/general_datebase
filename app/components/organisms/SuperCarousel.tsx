@@ -72,7 +72,7 @@ function ChildrenImagesDialog({
       </div>
 
       <div
-        className="flex justify-center overflow-x-auto max-w-full  overflow-y-hidden md:overflow-hidden w-screen gap-2"
+        className="flex justify-center overflow-x-auto max-w-full overflow-y-hidden md:overflow-hidden w-screen pb-4 gap-2"
         onMouseLeave={handleMouseLeaveContainer}
       >
         {data?.images.map((image) => (
@@ -115,7 +115,7 @@ export function SuperCarousel({
       api.scrollTo(index, true);
     }
     api.on("settle", (index) => {
-      console.log("SCROLL", index);
+      console.log(currentId, index);
       // setCurrentId(images[index].id);
     });
   }, [api]);
@@ -125,11 +125,11 @@ export function SuperCarousel({
       onOpenChange={(open) => !open && setCurrentId(undefined)}
     >
       <DialogContent
-        closeClassName="z-50"
-        className=" flex flex-col justify-between items-center bg-transparent h-screen w-screen p-4"
+        closeClassName="z-50 "
+        className=" flex flex-col justify-center items-center gap-3 bg-transparent"
       >
         <Carousel
-          className=" max-w-screen max-h-screen "
+          className="2xl:max-w-[60vw]  max-w-screen  "
           setApi={setApi}
           opts={{
             dragFree: false,
