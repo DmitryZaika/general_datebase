@@ -128,7 +128,13 @@ export function SuperCarousel({
         closeClassName="z-50"
         className=" flex flex-col justify-between items-center bg-transparent h-screen w-screen p-4"
       >
-        <Carousel className=" max-w-screen max-h-screen " setApi={setApi}>
+        <Carousel
+          className=" max-w-screen max-h-screen "
+          setApi={setApi}
+          opts={{
+            dragFree: false,
+          }}
+        >
           <CarouselContent>
             {images.map(({ id, url }) => (
               <CarouselItem key={id}>
