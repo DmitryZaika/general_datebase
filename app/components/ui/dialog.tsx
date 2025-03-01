@@ -75,7 +75,7 @@ const DialogContent = React.forwardRef<
         {!hideClose && (
           <DialogPrimitive.Close
             className={clsx(
-              `absolute cursor-pointer top-5 right-5 w-7 h-7 flex items-center justify-center rounded-full text-white bg-black opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none`,
+              `absolute cursor-pointer  top-5 right-5 w-7 h-7 flex items-center justify-center rounded-full text-white bg-black opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none`,
               closeClassName
             )}
           >
