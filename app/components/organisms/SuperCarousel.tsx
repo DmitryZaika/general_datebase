@@ -8,7 +8,12 @@ import {
   CarouselPrevious,
   type CarouselApi,
 } from "~/components/ui/carousel";
-import { Dialog, DialogContent } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "~/components/ui/dialog";
 import { useArrowCarousel } from "~/hooks/useArrowToggle";
 
 interface ImageProps {
@@ -115,6 +120,9 @@ export function SuperCarousel({
       api.scrollTo(index, true);
     }
     api.on("settle", (index) => {
+      const slidesInView = api.slidesInView(); // <-- Pass true to the slidesInView method
+      console.log("Val", slidesInView);
+      console.log(currentId);
       console.log("SCROLL", index);
       // setCurrentId(images[index].id);
     });
@@ -128,6 +136,8 @@ export function SuperCarousel({
         closeClassName="z-50"
         className=" flex flex-col justify-between items-center bg-transparent h-screen w-screen p-4"
       >
+        <DialogTitle className="sr-only">Image Gallery</DialogTitle>
+        <DialogDescription className="sr-only">Image Gallery</DialogDescription>
         <Carousel
           className=" max-w-screen max-h-screen "
           setApi={setApi}
