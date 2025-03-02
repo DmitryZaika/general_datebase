@@ -4,6 +4,7 @@ import { Cross2Icon } from "@radix-ui/react-icons";
 
 import { cn } from "~/lib/utils"; // Ensure this path is correct
 import { cva, type VariantProps } from "class-variance-authority";
+import clsx from "clsx";
 
 const Dialog = DialogPrimitive.Root;
 
@@ -50,27 +51,44 @@ export interface DialogContentProps
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  DialogContentProps & { hideClose?: boolean }
->(({ className, children, position, hideClose = false, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
+  DialogContentProps & { hideClose?: boolean; closeClassName?: string }
+>(
+  (
+    {
+      className,
+      closeClassName,
+      children,
+      position,
+      hideClose = false,
+      ...props
+    },
+    ref
+  ) => (
+    <DialogPortal>
+      <DialogOverlay />
 
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(dialogVariants({ position, className }))}
-      {...props}
-    >
-      {!hideClose && (
-        <DialogPrimitive.Close className="absolute cursor-pointer top-5 right-5 w-7 h-7 flex items-center justify-center rounded-full text-white bg-black opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none">
-          <Cross2Icon className="w-5 h-5 " />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      )}
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(dialogVariants({ position, className }))}
+        {...props}
+      >
+        {!hideClose && (
+          <DialogPrimitive.Close
+            className={clsx(
+              `absolute cursor-pointer  top-5 right-5 w-7 h-7 flex items-center justify-center rounded-full text-white bg-black opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none`,
+              closeClassName
+            )}
+          >
+            <Cross2Icon className="w-5 h-5 " />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        )}
 
-      {children}
-    </DialogPrimitive.Content>
-  </DialogPortal>
-));
+        {children}
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  )
+);
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogContentImage = React.forwardRef<
