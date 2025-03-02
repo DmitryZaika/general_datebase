@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { type CarouselApi } from "~/components/ui/carousel";
 
 interface UseArrowToggleReturn<T> {
   currentId: T | undefined;
@@ -47,4 +48,23 @@ export function useArrowToggle<T>(
   }, [currentId, ids]);
 
   return { currentId, setCurrentId };
+}
+
+export function useArrowCarousel(api: CarouselApi) {
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "ArrowLeft") {
+      api?.scrollPrev();
+    }
+
+    if (event.key === "ArrowRight") {
+      api?.scrollNext();
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [api]);
 }

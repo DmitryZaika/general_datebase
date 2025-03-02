@@ -5,15 +5,15 @@ import {
   AccordionContent,
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData } from "react-router";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
-import { useArrowToggle } from "~/hooks/useArrowToggle";
 import { ImageCard } from "~/components/organisms/ImageCard";
-import { ChildrenImagesDialog } from "~/components/organisms/ChildrenImagesDialog";
+import { SuperCarousel } from "~/components/organisms/SuperCarousel";
+import { useState } from "react";
 
 interface Stone {
   id: number;
@@ -55,26 +55,51 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { stones };
 };
 
-function amountSort(a: Stone, b: Stone) {
-  if ((a.amount ?? 0) === 0 && (b.amount ?? 0) !== 0) return 1;
-  if ((a.amount ?? 0) !== 0 && (b.amount ?? 0) === 0) return -1;
-  return a.name.localeCompare(b.name);
-}
-
-function stoneIds(stones: Stone[], stoneId: number): number[] {
-  const stoneType = stones.find((item) => item.id === stoneId)?.type;
-  if (!stoneType) return [];
-  return stones
-    .filter((item) => item.type === stoneType)
-    .sort(amountSort)
-    .map((item) => item.id);
+function InteractiveCard({
+  stone,
+  setCurrentId,
+}: {
+  stone: Stone;
+  setCurrentId: (value: number) => void;
+}) {
+  return (
+    <div
+      key={stone.id}
+      className={`relative group w-full ${
+        (stone.amount ?? 0) === 0 ? "opacity-50" : ""
+      }`}
+      onAuxClick={(e) => {
+        if (e.button === 1 && stone.url) {
+          e.preventDefault();
+          window.open(stone.url, "_blank");
+        }
+      }}
+    >
+      <ImageCard
+        fieldList={{
+          Amount: `${stone.amount || "—"}`,
+          Size: `${stone.width || "—"} x  ${stone.height || "—"}`,
+        }}
+        title={stone.name}
+      >
+        <img
+          src={stone.url || "/path/to/placeholder.png"}
+          alt={stone.name || "Image"}
+          className="object-cover w-full h-40 border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300"
+          loading="lazy"
+          onClick={() => setCurrentId(stone.id)}
+        />
+      </ImageCard>
+      {stone.name && (
+        <p className="text-center font-bold font-sans">{stone.name}</p>
+      )}
+    </div>
+  );
 }
 
 export default function Stones() {
   const { stones } = useLoaderData<typeof loader>();
-  const { currentId, setCurrentId } = useArrowToggle(
-    (value: number | undefined) => (value ? stoneIds(stones, value) : [])
-  );
+  const [currentId, setCurrentId] = useState<number | undefined>(undefined);
 
   const stoneList = stones.reduce((acc: { [key: string]: Stone[] }, stone) => {
     if (!acc[stone.type]) {
@@ -98,42 +123,17 @@ export default function Stones() {
                   </AccordionTrigger>
                   <AccordionContent>
                     <ModuleList>
-                      {stoneList[type].sort(amountSort).map((stone) => (
-                        <div
+                      <SuperCarousel
+                        currentId={currentId}
+                        setCurrentId={setCurrentId}
+                        images={stoneList[type]}
+                      />
+                      {stoneList[type].map((stone) => (
+                        <InteractiveCard
                           key={stone.id}
-                          className="relative group w-full"
-                          onAuxClick={(e) => {
-                            if (e.button === 1 && stone.url) {
-                              e.preventDefault();
-                              window.open(stone.url, "_blank");
-                            }
-                          }}
-                        >
-                          <ImageCard
-                            fieldList={{
-                              Amount: `${stone.amount || "—"}`,
-                              Size: `${stone.width || "—"} x  ${
-                                stone.height || "—"
-                              }`,
-                            }}
-                            title={stone.name}
-                          >
-                            {stone.amount === 0 && (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
-                                  Out of Stock
-                                </div>
-                              </div>
-                            )}
-                            <ChildrenImagesDialog
-                              id={stone.id}
-                              src={stone.url}
-                              alt={stone.name}
-                              setImage={setCurrentId}
-                              isOpen={currentId === stone.id}
-                            />
-                          </ImageCard>
-                        </div>
+                          stone={stone}
+                          setCurrentId={setCurrentId}
+                        />
                       ))}
                     </ModuleList>
                   </AccordionContent>

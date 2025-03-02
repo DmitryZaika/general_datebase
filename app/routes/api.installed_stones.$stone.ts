@@ -1,4 +1,4 @@
-import { LoaderFunctionArgs } from "@remix-run/node";
+import { LoaderFunctionArgs } from "react-router";
 import { db } from "~/db.server";
 import { getSession } from "~/sessions";
 import { selectMany } from "~/utils/queryHelpers";
@@ -24,5 +24,5 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     "SELECT id, url FROM installed_stones WHERE stone_id = ?",
     [stoneId]
   );
-  return { images };
+  return Response.json({ images });
 }

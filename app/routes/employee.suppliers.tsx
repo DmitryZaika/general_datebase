@@ -12,8 +12,8 @@ import {
   TableHead,
   TableCell,
 } from "~/components/ui/table";
-import { Link, useLoaderData } from "@remix-run/react";
-import { LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { Link, useLoaderData } from "react-router";
+import { LoaderFunctionArgs, redirect } from "react-router";
 import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
 import { getEmployeeUser } from "~/utils/session.server";
