@@ -76,7 +76,7 @@ function ChildrenImagesDialog({
       </div>
 
       <div
-        className="flex justify-center overflow-x-auto max-w-full h-[60px] overflow-y-hidden md:overflow-hidden w-screen pb-10 gap-2"
+        className="flex justify-center  overflow-x-auto max-w-full h-[60px] overflow-y-hidden md:overflow-hidden w-screen pb-50 sm:pb-20 flex-wrap sm:flex-nowrap gap-2"
         onMouseLeave={handleMouseLeaveContainer}
       >
         {data?.images.map((image) => (
@@ -104,29 +104,40 @@ export function SuperCarousel({
   currentId,
   setCurrentId,
   images,
+  stoneType,
+  activeType,
 }: {
   images: { id: number; url: string | null }[];
   currentId?: number;
-  setCurrentId: (value: number | undefined) => void;
+  setCurrentId: (value: number | undefined, type?: string) => void;
+  stoneType: string;
+  activeType?: string;
 }) {
   const [api, setApi] = useState<CarouselApi>();
   const _ = useArrowCarousel(api);
 
   useEffect(() => {
     if (!api) return;
-    if (currentId !== undefined) {
+    if (currentId !== undefined && stoneType === activeType) {
       const index = images.findIndex(({ id }) => id === currentId);
-      api.scrollTo(index, true);
+      if (index !== -1) {
+        api.scrollTo(index, true);
+      }
     }
     api.on("settle", (index) => {
       const slidesInView = api.slidesInView();
-      setCurrentId(images[slidesInView[0]].id);
-      console.log(currentId, "idd");
+      if (slidesInView.length > 0) {
+        setCurrentId(images[slidesInView[0]].id, stoneType);
+      }
     });
-  }, [api]);
+  }, [api, currentId, images, setCurrentId, stoneType, activeType]);
+
+  // Only show this carousel if it matches the active type
+  const isCarouselActive = activeType === stoneType;
+
   return (
     <Dialog
-      open={currentId !== undefined}
+      open={currentId !== undefined && isCarouselActive}
       onOpenChange={(open) => !open && setCurrentId(undefined)}
     >
       <DialogContent

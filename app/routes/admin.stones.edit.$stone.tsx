@@ -1,5 +1,10 @@
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { useNavigate, useLoaderData, useNavigation, Outlet } from "react-router";
+import {
+  useNavigate,
+  useLoaderData,
+  useNavigation,
+  Outlet,
+} from "react-router";
 import { FormField } from "../components/ui/form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
@@ -314,7 +319,7 @@ export default function StonesEdit() {
           }}
         >
           <TabsList>
-            <TabsTrigger value="information">Stone Information</TabsTrigger>
+            <TabsTrigger value="information">General</TabsTrigger>
             <TabsTrigger value="images">Images</TabsTrigger>
           </TabsList>
           <TabsContent value="information">
