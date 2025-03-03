@@ -43,7 +43,6 @@ const stoneSchema = z.object({
   ]),
   height: z.coerce.number().default(0),
   width: z.coerce.number().default(0),
-  amount: z.coerce.number().default(0),
   supplier: z.string().optional(),
   bundle: z.string().optional(),
 });
@@ -67,7 +66,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.stones (name, type, url, company_id, is_display, supplier, width, height, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO main.stones (name, type, url, company_id, is_display, supplier, width, height) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
         data.type,
@@ -77,7 +76,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.supplier,
         data.width,
         data.height,
-        data.amount,
       ]
     );
   } catch (error) {
