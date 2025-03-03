@@ -166,7 +166,7 @@ function StoneInformation({
   const defaultValues = {
     name,
     type,
-    file: "",
+    url: "",
     is_display,
     supplier,
     height,

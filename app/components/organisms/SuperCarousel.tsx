@@ -132,7 +132,6 @@ export function SuperCarousel({
     });
   }, [api, currentId, images, setCurrentId, stoneType, activeType]);
 
-  // Only show this carousel if it matches the active type
   const isCarouselActive = activeType === stoneType;
 
   return (
