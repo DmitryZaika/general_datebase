@@ -147,22 +147,6 @@ export default function StonesAdd() {
     }
   };
 
-  const [inputFields, setInputFields] = useState<
-    {
-      slab: string;
-      sold: boolean;
-    }[]
-  >([]);
-
-  const addSlab = () => {
-    setInputFields([...inputFields, { slab: "", sold: false }]);
-  };
-
-  const handleDelete = (index: number) => {
-    const newFields = inputFields.filter((_, i) => i !== index);
-    setInputFields(newFields);
-  };
-
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px] overflow-y-auto max-h-[95vh]">
@@ -256,30 +240,6 @@ export default function StonesAdd() {
               />
             )}
           />
-          {inputFields.map((field, index) => (
-            <div key={index} className="flex gap-2">
-              <FormField
-                control={form.control}
-                name={`bundle[${index}].slab`}
-                render={({ field }) => (
-                  <InputItem
-                    formClassName="mb-0"
-                    className="mb-2"
-                    placeholder={`Slab number ${index + 1}`}
-                    field={field}
-                  />
-                )}
-              />
-
-              <Button type="button" onClick={() => handleDelete(index)}>
-                <X />
-              </Button>
-            </div>
-          ))}
-
-          <Button type="button" onClick={addSlab}>
-            Add Slab
-          </Button>
 
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
