@@ -95,15 +95,12 @@ function InteractiveCard({
           onClick={() => setCurrentId(stone.id, stoneType)}
         />
       </ImageCard>
-      {stone.amount === 0 && (
+      {displayedAmount === "—" && (
         <div className="absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
           <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
             Out of Stock
           </div>
         </div>
-      )}
-      {stone.name && (
-        <p className="text-center font-bold font-sans mt-1">{stone.name}</p>
       )}
     </div>
   );
