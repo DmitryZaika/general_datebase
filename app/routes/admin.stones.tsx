@@ -12,13 +12,20 @@ import { useLoaderData, Link, Outlet } from "react-router";
 import { Button } from "~/components/ui/button";
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { getAdminUser } from "~/utils/session.server";
-import type { Stone } from "~/routes/admin.stones"; // or define the interface inline
+
+interface Stone {
+  id: number;
+  name: string;
+  type: string;
+  url: string | null;
+  is_display: boolean | number;
+  height: number | null;
+  width: number | null;
+  amount: number | null;
+}
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
 
-/**
- * Sort types (granite, quartz, etc.) in a custom order.
- */
 function customSort(a: string, b: string) {
   return (
     customOrder.indexOf(a.toLowerCase()) - customOrder.indexOf(b.toLowerCase())
@@ -50,7 +57,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminStones() {
   const { stones } = useLoaderData<typeof loader>();
 
-  // Group stones by type
   const stoneList = stones.reduce((acc: Record<string, Stone[]>, stone) => {
     if (!acc[stone.type]) {
       acc[stone.type] = [];
