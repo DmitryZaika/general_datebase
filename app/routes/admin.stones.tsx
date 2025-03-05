@@ -85,7 +85,6 @@ export default function AdminStones() {
                       <AccordionContent>
                         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
                           {stoneList[type]
-                            // Sort so that out-of-stock and non-displayed items go last
                             .sort((a, b) => {
                               const scoreA =
                                 (a.amount === 0 ? 1 : 0) +
@@ -125,7 +124,7 @@ export default function AdminStones() {
                                         className="object-cover w-full h-40 rounded select-none"
                                         loading="lazy"
                                       />
-                                      {stone.amount === 0 && (
+                                      {displayedAmount === "—" && (
                                         <div className="absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
                                           <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
                                             Out of Stock
