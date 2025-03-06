@@ -29,9 +29,6 @@ import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { selectId, selectMany } from "~/utils/queryHelpers";
-import { useState } from "react";
-import { Button } from "~/components/ui/button";
-import { X } from "lucide-react";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),

@@ -36,9 +36,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 const sinkSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum([
-    "stainless 18 gage",
-    "stainless 16 gage",
-    "composit",
+    "stainless 18 gauge",
+    "stainless 16 gauge",
+    "granite composite",
     "ceramic",
   ]),
   is_display: z.union([
@@ -201,9 +201,9 @@ function SinkInformation({
               placeholder="Sink Type"
               field={field}
               options={[
-                "Stainless 18 gage",
-                "Stainless 16 gage",
-                "Composit",
+                "Stainless 18 gauge",
+                "Stainless 16 gauge",
+                "Granite Composite",
                 "Ceramic",
               ]}
             />

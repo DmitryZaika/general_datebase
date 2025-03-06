@@ -33,9 +33,9 @@ import { useState } from "react";
 const sinkSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum([
-    "stainless 18 gage",
-    "stainless 16 gage",
-    "composit",
+    "stainless 18 gauge",
+    "stainless 16 gauge",
+    "granite composite",
     "ceramic",
   ]),
   is_display: z.union([
@@ -144,11 +144,6 @@ export default function SinksAdd() {
     setInputFields([...inputFields, { slab: "", sold: false }]);
   };
 
-  const handleDelete = (index: number) => {
-    const newFields = inputFields.filter((_, i) => i !== index);
-    setInputFields(newFields);
-  };
-
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px] overflow-y-auto max-h-[95vh]">
@@ -178,9 +173,9 @@ export default function SinksAdd() {
                   placeholder="Type of the Sink"
                   name="Type"
                   options={[
-                    "Stainless 18 gage",
-                    "Stainless 16 gage",
-                    "Composit",
+                    "Stainless 18 gauge",
+                    "Stainless 16 gauge",
+                    "Composite",
                     "Ceramic",
                   ].map((item) => ({ key: item.toLowerCase(), value: item }))}
                 />
