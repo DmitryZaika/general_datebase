@@ -26,9 +26,9 @@ interface Sink {
 }
 
 const customOrder = [
-  "stainless 18 gage",
-  "stainless 16 gage",
-  "granite composit",
+  "stainless 18 gauge",
+  "stainless 16 gauge",
+  "granite composite",
   "ceramic",
 ];
 

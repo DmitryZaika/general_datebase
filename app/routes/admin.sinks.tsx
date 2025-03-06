@@ -26,6 +26,36 @@ interface Sink {
   height: number | null;
 }
 
+const customOrder = [
+  "stainless 18 gauge",
+  "stainless 16 gauge",
+  "granite composite",
+  "ceramic",
+];
+
+function customSort(a: string, b: string) {
+  const aIndex = customOrder.findIndex(
+    (item) => item.toLowerCase() === a.toLowerCase()
+  );
+  const bIndex = customOrder.findIndex(
+    (item) => item.toLowerCase() === b.toLowerCase()
+  );
+
+  if (aIndex !== -1 && bIndex !== -1) {
+    return aIndex - bIndex;
+  }
+  if (aIndex !== -1 && bIndex === -1) {
+    return -1;
+  }
+  if (aIndex === -1 && bIndex !== -1) {
+    return 1;
+  }
+
+  // Если ни один из них не входит в customOrder,
+  // сортируем по алфавиту
+  return a.localeCompare(b);
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getAdminUser(request);
@@ -59,6 +89,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminSinks() {
   const { sinks } = useLoaderData<typeof loader>();
 
+  // Группируем по типу (type)
   const sinkList = sinks.reduce<Record<string, Sink[]>>((acc, sink) => {
     if (!acc[sink.type]) {
       acc[sink.type] = [];
@@ -67,7 +98,8 @@ export default function AdminSinks() {
     return acc;
   }, {});
 
-  const sortedTypes = Object.keys(sinkList).sort();
+  // Сортируем ключи (типы) с помощью customSort
+  const sortedTypes = Object.keys(sinkList).sort(customSort);
 
   return (
     <>
@@ -89,6 +121,7 @@ export default function AdminSinks() {
                     <AccordionContent>
                       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
                         {sinkList[type]
+
                           .sort((a, b) => {
                             const scoreA =
                               (a.amount === 0 ? 1 : 0) + (a.is_display ? 0 : 2);
@@ -143,7 +176,7 @@ export default function AdminSinks() {
                                   </p>
                                 </div>
 
-                                <div className="absolute inset-0 flex justify-between opacity-50 items-start p-2">
+                                <div className="absolute inset-0 flex justify-between items-start p-2 opacity-50">
                                   <Link
                                     to={`edit/${sink.id}`}
                                     className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"

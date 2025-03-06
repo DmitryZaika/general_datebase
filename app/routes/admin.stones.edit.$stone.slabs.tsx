@@ -1,182 +1,150 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import {
-  Link,
+  LoaderFunctionArgs,
+  ActionFunctionArgs,
+  redirect,
+  Form,
   useLoaderData,
   useNavigation,
-  Form as RemixForm,
 } from "react-router";
-import { useEffect, useState } from "react";
-import { FaTimes } from "react-icons/fa";
 import { z } from "zod";
-import { FileInput } from "~/components/molecules/FileInput";
-import { MultiPartForm } from "~/components/molecules/MultiPartForm";
-import { Button } from "~/components/ui/button";
-import { FormField } from "~/components/ui/form";
-import { db } from "~/db.server";
-import { commitSession, getSession } from "~/sessions";
-import { csrf } from "~/utils/csrf.server";
-import { parseMutliForm } from "~/utils/parseMultiForm";
-import { selectId, selectMany } from "~/utils/queryHelpers";
-import { deleteFile } from "~/utils/s3.server";
 import { getAdminUser } from "~/utils/session.server";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
-import { useCustomForm } from "~/utils/useCustomForm";
+import { commitSession, getSession } from "~/sessions";
+import { selectMany, selectId } from "~/utils/queryHelpers";
+import { db } from "~/db.server";
+import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
+import { Button } from "~/components/ui/button";
+import { FaTimes } from "react-icons/fa";
+import { useEffect, useRef, useState } from "react";
 
-export const InstalledProjectsSchema = z.object({});
-type TInstalledProjectsSchema = z.infer<typeof InstalledProjectsSchema>;
+const slabSchema = z.object({ bundle: z.string().min(1) });
+
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect("/login?error=" + encodeURIComponent(String(error)));
+  }
+  if (!params.stone) {
+    return forceRedirectError(request.headers, "No stone id provided");
+  }
+  const stoneId = parseInt(params.stone, 10);
+  const slabs = await selectMany<{ id: number; bundle: string }>(
+    db,
+    "SELECT id, bundle FROM slab_inventory WHERE stone_id = ?",
+    [stoneId]
+  );
+  return { slabs };
+}
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await getAdminUser(request);
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect("/login?error=" + encodeURIComponent(String(error)));
   }
   try {
     await csrf.validate(request);
-  } catch (error) {
+  } catch {
     return { error: "Invalid CSRF token" };
   }
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
-  const stoneId = parseInt(params.stone);
-
+  const stoneId = parseInt(params.stone, 10);
   if (request.method === "DELETE") {
     const form = await request.formData();
     const id = form.get("id");
     if (!id) {
-      return forceRedirectError(request.headers, "No id provided");
+      return forceRedirectError(request.headers, "No slab id provided");
     }
-    const sid = parseInt(id.toString());
-    const result = await selectId<{ url: string | null }>(
+    const slabId = parseInt(id.toString(), 10);
+    const record = await selectId<{ bundle: string | null }>(
       db,
       "SELECT bundle FROM slab_inventory WHERE id = ?",
-      sid
+      slabId
     );
-    await db.execute(`DELETE FROM main.slab_inventory WHERE id = ?`, [sid]);
-    const session = await getSession(request.headers.get("Cookie"));
-    if (result?.url) {
-      deleteFile(result.url);
+    if (!record) {
+      return forceRedirectError(request.headers, "Slab not found");
     }
-    session.flash("message", toastData("Success", "Image Deleted"));
+    await db.execute("DELETE FROM slab_inventory WHERE id = ?", [slabId]);
+    const session = await getSession(request.headers.get("Cookie"));
+    session.flash("message", toastData("Success", "Slab Deleted"));
     return redirect(request.url, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
   }
-
-  const { errors, data } = await parseMutliForm(
-    request,
-    InstalledProjectsSchema,
-    "stones"
-  );
-  if (errors || !data) {
-    return { errors };
+  const form = await request.formData();
+  const bundle = form.get("bundle");
+  if (!bundle) {
+    return { errors: { bundle: "Required" } };
   }
-
-  const stone = await selectId<{ url: string }>(
-    db,
-    "select url from stones WHERE id = ?",
-    stoneId
-  );
-
-  try {
-    await db.execute(
-      `INSERT INTO slab_inventory (bundle, stone_id) VALUES (?, ?)`,
-      [data.bundle, stoneId]
-    );
-  } catch (error) {
-    console.error("Error connecting to the database:", errors);
+  const parsed = slabSchema.safeParse({ bundle: bundle.toString() });
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors };
   }
-
+  await db.execute(
+    "INSERT INTO slab_inventory (bundle, stone_id, is_sold) VALUES (?, ?, 0)",
+    [bundle.toString(), stoneId]
+  );
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Image Added"));
+  session.flash("message", toastData("Success", "Slab Added"));
   return redirect(request.url, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
 
-export const loader = async ({ params, request }: LoaderFunctionArgs) => {
-  try {
-    await getAdminUser(request);
-  } catch (error) {
-    return redirect(`/login?error=${error}`);
-  }
-  if (!params.stone) {
-    return forceRedirectError(request.headers, "No stone id provided");
-  }
-  const stoneId = parseInt(params.stone);
-  const stones = await selectMany<{ id: number; url: string }>(
-    db,
-    "select id, url from slab_inventory WHERE stone_id = ?",
-    [stoneId]
-  );
-  return { stones };
-};
-
-function AddImage() {
+export function AddSlab() {
   const navigation = useNavigation();
-  const form = useCustomForm<TInstalledProjectsSchema>(InstalledProjectsSchema);
-
-  const [inputKey, setInputKey] = useState(0);
+  const [bundle, setBundle] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Если сабмит завершён, очищаем инпут и фокусируем его
     if (navigation.state === "idle") {
-      form.reset();
-      setInputKey((k) => k + 1);
+      setBundle("");
+      inputRef.current?.focus();
     }
-  }, [navigation.state, form]);
+  }, [navigation.state]);
 
   return (
-    <MultiPartForm form={form}>
-      <div className="flex items-center space-x-4">
-        <FormField
-          control={form.control}
-          name="file"
-          render={({ field }) => (
-            <FormField
-              control={form.control}
-              key={inputKey}
-              inputName="images"
-              id="image"
-              type="image"
-              onChange={field.onChange}
-            />
-          )}
-        />
-        <Button type="submit" variant="blue">
-          Add image
-        </Button>
-      </div>
-    </MultiPartForm>
+    <Form method="post" className="mb-5">
+      <AuthenticityTokenInput />
+      <input
+        className="border-2 p-1.5"
+        ref={inputRef}
+        type="text"
+        name="bundle"
+        value={bundle}
+        onChange={(e) => setBundle(e.target.value)}
+        autoFocus
+      />
+      <Button type="submit">Add Slab</Button>
+    </Form>
   );
 }
 
-export default function SelectImages() {
-  const { stones } = useLoaderData<typeof loader>();
+export default function EditStoneSlabs() {
+  const { slabs } = useLoaderData<typeof loader>();
   return (
     <>
-      <AddImage />
-      <div className="grid grid-cols-2  md:grid-cols-3 gap-4 mt-4">
-        {stones.map((stone) => (
-          <div key={stone.id} className="relative group">
-            <img src={stone.url} alt="" className="w-full h-32 object-cover" />
-            <div className="absolute top-2 right-2 flex justify-between items-start transition-opacity duration-300">
-              <RemixForm
-                method="delete"
-                title="Delete Stone"
-                aria-label="Delete Image"
-              >
-                <input type="hidden" name="id" value={stone.id} />
+      <AddSlab />
+      <div className="flex flex-col gap-2">
+        {slabs.map((slab, index) => (
+          <div key={slab.id} className="flex justify-between items-center">
+            <p className="whitespace-nowrap mr-2">Slab {index + 1}</p>
+            <div className="border-r-2 p-2 border w-full border-gray-300">
+              <p className="w-full">{slab.bundle}</p>
+            </div>
+            <div>
+              <Form method="delete">
                 <AuthenticityTokenInput />
-                <Button
-                  type="submit"
-                  className="size-4 p-4 text-white bg-gray-800 bg-opacity-60 rounded-full transition"
-                >
+                <input type="hidden" name="id" value={slab.id} />
+                <Button type="submit">
                   <FaTimes />
                 </Button>
-              </RemixForm>
+              </Form>
             </div>
           </div>
         ))}

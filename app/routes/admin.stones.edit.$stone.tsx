@@ -173,18 +173,7 @@ function StoneInformation({
     width,
   };
   const form = useCustomOptionalForm(stoneSchema, defaultValues);
-  const [inputFields, setInputFields] = useState<
-    {
-      slab: string;
-      sold: boolean;
-    }[]
-  >([]);
-  const addSlab = () => {
-    setInputFields((prev) => [...prev, { slab: "", sold: false }]);
-  };
-  const handleDelete = (index: number) => {
-    setInputFields((prev) => prev.filter((_, i) => i !== index));
-  };
+
   return (
     <MultiPartForm form={form}>
       <FormField
@@ -256,28 +245,7 @@ function StoneInformation({
           )}
         />
       </div>
-      {inputFields.map((f, index) => (
-        <div key={index} className="flex gap-2 items-center">
-          <FormField
-            control={form.control}
-            name={`Bundle${index}`}
-            render={({ field }) => (
-              <InputItem
-                formClassName="mb-0"
-                className="mb-2"
-                placeholder={`Slab number ${index + 1}`}
-                field={field}
-              />
-            )}
-          />
-          <Button type="button" onClick={() => handleDelete(index)}>
-            <X />
-          </Button>
-        </div>
-      ))}
-      <Button type="button" onClick={addSlab}>
-        Add Slab
-      </Button>
+
       <DialogFooter className="mt-4">
         <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
       </DialogFooter>
@@ -308,7 +276,7 @@ export default function StonesEdit() {
   };
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px] overflow-auto max-h-[95vh]">
+      <DialogContent className="sm:max-w-[425px] overflow-auto flex flex-col justify-baseline min-h-[95vh]  max-h-[95vh]">
         <DialogHeader>
           <DialogTitle>Edit Stone</DialogTitle>
         </DialogHeader>
@@ -316,11 +284,15 @@ export default function StonesEdit() {
           defaultValue="information"
           onValueChange={(value) => {
             if (value === "images") navigate("images");
+            else if (value === "slabs") {
+              navigate("slabs");
+            }
           }}
         >
           <TabsList>
             <TabsTrigger value="information">General</TabsTrigger>
             <TabsTrigger value="images">Images</TabsTrigger>
+            <TabsTrigger value="slabs">Slabs</TabsTrigger>
           </TabsList>
           <TabsContent value="information">
             <StoneInformation
@@ -330,6 +302,9 @@ export default function StonesEdit() {
             />
           </TabsContent>
           <TabsContent value="images">
+            <Outlet />
+          </TabsContent>
+          <TabsContent value="slabs">
             <Outlet />
           </TabsContent>
         </Tabs>
