@@ -37,6 +37,7 @@ const sinkSchema = z.object({
     "stainless 16 gauge",
     "granite composite",
     "ceramic",
+    "farm house",
   ]),
   is_display: z.union([
     z.boolean(),
@@ -177,6 +178,7 @@ export default function SinksAdd() {
                     "Stainless 16 gauge",
                     "Composite",
                     "Ceramic",
+                    "Farm House",
                   ].map((item) => ({ key: item.toLowerCase(), value: item }))}
                 />
               )}
