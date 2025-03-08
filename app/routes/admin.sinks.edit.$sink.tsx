@@ -40,6 +40,7 @@ const sinkSchema = z.object({
     "stainless 16 gauge",
     "granite composite",
     "ceramic",
+    "farm house",
   ]),
   is_display: z.union([
     z.boolean(),
@@ -205,6 +206,7 @@ function SinkInformation({
                 "Stainless 16 gauge",
                 "Granite Composite",
                 "Ceramic",
+                "Farm House",
               ]}
             />
           )}

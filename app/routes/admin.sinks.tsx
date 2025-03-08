@@ -31,6 +31,7 @@ const customOrder = [
   "stainless 16 gauge",
   "granite composite",
   "ceramic",
+  "farm house",
 ];
 
 function customSort(a: string, b: string) {
