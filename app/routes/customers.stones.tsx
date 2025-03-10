@@ -35,22 +35,15 @@ function customSortType(a: string, b: string) {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  try {
-    await getEmployeeUser(request);
-  } catch (error) {
-    return redirect(`/login?error=${error}`);
-  }
-  const user = await getEmployeeUser(request);
-
   const stones = await selectMany<Stone>(
     db,
     `
-      SELECT id, name, type, url, is_display, height, width, amount
-      FROM stones
-      WHERE company_id = ? AND is_display = 1
-      ORDER BY name ASC
-    `,
-    [user.company_id]
+        SELECT id, name, type, url, is_display, height, width, amount
+        FROM stones
+        WHERE company_id = ? AND is_display = 1
+        ORDER BY name ASC
+      `,
+    [1]
   );
 
   return { stones };
