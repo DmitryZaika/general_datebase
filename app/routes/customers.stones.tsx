@@ -10,7 +10,6 @@ import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
 import ModuleList from "~/components/ModuleList";
-import { getEmployeeUser } from "~/utils/session.server";
 import { ImageCard } from "~/components/organisms/ImageCard";
 import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState } from "react";
@@ -41,6 +40,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         SELECT id, name, type, url, is_display, height, width, amount
         FROM stones
         WHERE company_id = ? AND is_display = 1
+        AND COALESCE(amount, 0) > 0
         ORDER BY name ASC
       `,
     [1]
@@ -143,6 +143,7 @@ export default function Stones() {
                         activeType={activeType}
                       />
                       {stoneList[type]
+
                         .sort((a, b) => {
                           const aAmount = a.amount ?? 0;
                           const bAmount = b.amount ?? 0;
