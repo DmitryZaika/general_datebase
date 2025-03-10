@@ -7,7 +7,6 @@ import { selectMany } from "../utils/queryHelpers";
 import { InstructionSlim } from "~/types";
 import { db } from "~/db.server";
 import { DONE_KEY } from "~/utils/constants";
-import { c } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_SECRET_KEY,
