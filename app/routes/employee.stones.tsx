@@ -27,7 +27,8 @@ interface Stone {
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
-function customSort(a: string, b: string) {
+
+function customSortType(a: string, b: string) {
   return (
     customOrder.indexOf(a.toLowerCase()) - customOrder.indexOf(b.toLowerCase())
   );
@@ -47,7 +48,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       SELECT id, name, type, url, is_display, height, width, amount
       FROM stones
       WHERE company_id = ? AND is_display = 1
-      ORDER BY name ASC, (amount = 0), amount ASC
+      ORDER BY name ASC
     `,
     [user.company_id]
   );
@@ -58,16 +59,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 function InteractiveCard({
   stone,
   setCurrentId,
+  stoneType,
 }: {
   stone: Stone;
-  setCurrentId: (value: number) => void;
+  setCurrentId: (value: number, type: string) => void;
+  stoneType: string;
 }) {
+  const displayedAmount = stone.amount && stone.amount > 0 ? stone.amount : "—";
+  const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
+  const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
+
   return (
     <div
       key={stone.id}
-      className={`relative group w-full ${
-        (stone.amount ?? 0) === 0 ? "opacity-50" : ""
-      }`}
+      className="relative group w-full"
       onAuxClick={(e) => {
         if (e.button === 1 && stone.url) {
           e.preventDefault();
@@ -77,21 +82,25 @@ function InteractiveCard({
     >
       <ImageCard
         fieldList={{
-          Amount: `${stone.amount || "—"}`,
-          Size: `${stone.width || "—"} x  ${stone.height || "—"}`,
+          Amount: `${displayedAmount}`,
+          Size: `${displayedWidth} x ${displayedHeight}`,
         }}
         title={stone.name}
       >
         <img
-          src={stone.url || "/path/to/placeholder.png"}
-          alt={stone.name || "Image"}
-          className="object-cover w-full h-40 border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300"
+          src={stone.url || "/placeholder.png"}
+          alt={stone.name || "Stone Image"}
+          className="object-cover w-full h-40 border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none"
           loading="lazy"
-          onClick={() => setCurrentId(stone.id)}
+          onClick={() => setCurrentId(stone.id, stoneType)}
         />
       </ImageCard>
-      {stone.name && (
-        <p className="text-center font-bold font-sans">{stone.name}</p>
+      {displayedAmount === "—" && (
+        <div className="absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
+          <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
+            Out of Stock
+          </div>
+        </div>
       )}
     </div>
   );
@@ -100,6 +109,16 @@ function InteractiveCard({
 export default function Stones() {
   const { stones } = useLoaderData<typeof loader>();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
+  const [activeType, setActiveType] = useState<string | undefined>(undefined);
+
+  const handleSetCurrentId = (id: number | undefined, type?: string) => {
+    setCurrentId(id);
+    if (type) {
+      setActiveType(type);
+    } else if (id === undefined) {
+      setActiveType(undefined);
+    }
+  };
 
   const stoneList = stones.reduce((acc: { [key: string]: Stone[] }, stone) => {
     if (!acc[stone.type]) {
@@ -115,7 +134,7 @@ export default function Stones() {
         <AccordionContent>
           <Accordion type="multiple">
             {Object.keys(stoneList)
-              .sort(customSort)
+              .sort(customSortType)
               .map((type) => (
                 <AccordionItem key={type} value={type}>
                   <AccordionTrigger>
@@ -125,16 +144,27 @@ export default function Stones() {
                     <ModuleList>
                       <SuperCarousel
                         currentId={currentId}
-                        setCurrentId={setCurrentId}
+                        setCurrentId={handleSetCurrentId}
                         images={stoneList[type]}
+                        stoneType={type}
+                        activeType={activeType}
                       />
-                      {stoneList[type].map((stone) => (
-                        <InteractiveCard
-                          key={stone.id}
-                          stone={stone}
-                          setCurrentId={setCurrentId}
-                        />
-                      ))}
+                      {stoneList[type]
+                        .sort((a, b) => {
+                          const aAmount = a.amount ?? 0;
+                          const bAmount = b.amount ?? 0;
+                          if (aAmount === 0 && bAmount !== 0) return 1;
+                          if (aAmount !== 0 && bAmount === 0) return -1;
+                          return a.name.localeCompare(b.name);
+                        })
+                        .map((stone) => (
+                          <InteractiveCard
+                            key={stone.id}
+                            stone={stone}
+                            setCurrentId={handleSetCurrentId}
+                            stoneType={type}
+                          />
+                        ))}
                     </ModuleList>
                   </AccordionContent>
                 </AccordionItem>
