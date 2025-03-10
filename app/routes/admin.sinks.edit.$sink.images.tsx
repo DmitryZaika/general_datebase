@@ -38,10 +38,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     return { error: "Invalid CSRF token" };
   }
-  if (!params.stone) {
-    return forceRedirectError(request.headers, "No stone id provided");
+  if (!params.sink) {
+    return forceRedirectError(request.headers, "No sink id provided");
   }
-  const stoneId = parseInt(params.stone);
+  const sinkId = parseInt(params.sink);
 
   if (request.method === "DELETE") {
     const form = await request.formData();
@@ -52,10 +52,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const sid = parseInt(id.toString());
     const result = await selectId<{ url: string | null }>(
       db,
-      "SELECT url FROM installed_stones WHERE id = ?",
+      "SELECT url FROM installed_sinks WHERE id = ?",
       sid
     );
-    await db.execute(`DELETE FROM main.installed_stones WHERE id = ?`, [sid]);
+    await db.execute(`DELETE FROM main.installed_sinks WHERE id = ?`, [sid]);
     const session = await getSession(request.headers.get("Cookie"));
     if (result?.url) {
       deleteFile(result.url);
@@ -69,22 +69,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { errors, data } = await parseMutliForm(
     request,
     InstalledProjectsSchema,
-    "stones"
+    "sinks"
   );
   if (errors || !data) {
     return { errors };
   }
 
-  const stone = await selectId<{ url: string }>(
+  const sink = await selectId<{ url: string }>(
     db,
-    "select url from stones WHERE id = ?",
-    stoneId
+    "select url from sinks WHERE id = ?",
+    sinkId
   );
 
   try {
     await db.execute(
-      `INSERT INTO installed_stones (url, stone_id) VALUES (?, ?)`,
-      [data.file, stoneId]
+      `INSERT INTO installed_sinks (url, sink_id) VALUES (?, ?)`,
+      [data.file, sinkId]
     );
   } catch (error) {
     console.error("Error connecting to the database:", errors);
@@ -103,16 +103,16 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  if (!params.stone) {
-    return forceRedirectError(request.headers, "No stone id provided");
+  if (!params.sink) {
+    return forceRedirectError(request.headers, "No sink id provided");
   }
-  const stoneId = parseInt(params.stone);
-  const stones = await selectMany<{ id: number; url: string }>(
+  const sinkId = parseInt(params.sink);
+  const sinks = await selectMany<{ id: number; url: string }>(
     db,
-    "select id, url from installed_stones WHERE stone_id = ?",
-    [stoneId]
+    "select id, url from installed_sinks WHERE sink_id = ?",
+    [sinkId]
   );
-  return { stones };
+  return { sinks };
 };
 
 function AddImage() {
@@ -153,21 +153,21 @@ function AddImage() {
 }
 
 export default function SelectImages() {
-  const { stones } = useLoaderData<typeof loader>();
+  const { sinks } = useLoaderData<typeof loader>();
   return (
     <>
       <AddImage />
       <div className="grid grid-cols-2  md:grid-cols-3 gap-4 mt-4">
-        {stones.map((stone) => (
-          <div key={stone.id} className="relative group">
-            <img src={stone.url} alt="" className="w-full h-32 object-cover" />
+        {sinks.map((sink) => (
+          <div key={sink.id} className="relative group">
+            <img src={sink.url} alt="" className="w-full h-32 object-cover" />
             <div className="absolute top-2 right-2 flex justify-between items-start transition-opacity duration-300">
               <RemixForm
                 method="delete"
-                title="Delete Stone"
+                title="Delete Sink"
                 aria-label="Delete Image"
               >
-                <input type="hidden" name="id" value={stone.id} />
+                <input type="hidden" name="id" value={sink.id} />
                 <AuthenticityTokenInput />
                 <Button
                   type="submit"

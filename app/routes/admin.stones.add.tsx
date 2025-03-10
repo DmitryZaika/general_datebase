@@ -1,6 +1,11 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { useNavigate, useNavigation, Outlet } from "react-router";
+import {
+  useNavigate,
+  useNavigation,
+  Outlet,
+  useLoaderData,
+} from "react-router";
 import { FormField } from "../components/ui/form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
@@ -19,10 +24,11 @@ import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
-import { getAdminUser } from "~/utils/session.server";
+import { getAdminUser, getEmployeeUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { selectId, selectMany } from "~/utils/queryHelpers";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -34,10 +40,11 @@ const stoneSchema = z.object({
   ]),
   height: z.coerce.number().default(0),
   width: z.coerce.number().default(0),
-  amount: z.coerce.number().default(0),
+  supplier: z.string().optional(),
+  bundle: z.string().optional(),
 });
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await getAdminUser(request);
   } catch (error) {
@@ -56,29 +63,47 @@ export async function action({ request }: ActionFunctionArgs) {
   let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.stones (name, type, url, company_id, is_display, width, height, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO main.stones (name, type, url, company_id, is_display, supplier, width, height) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
         data.type,
         data.file,
         user.company_id,
         data.is_display,
+        data.supplier,
         data.width,
         data.height,
-        data.amount,
       ]
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
+    const stoneId = parseInt(params.stone ?? "0", 10);
+    if (!stoneId) {
+      return new Response(
+        JSON.stringify({ error: "Invalid or missing stone ID" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
 
-    const session = await getSession(request.headers.get("Cookie"));
-    session.flash(
-      "message",
-      toastData("Failure", "Database Error Occured", "destructive")
-    );
-    return new Response(JSON.stringify({ error: "Database Error Occured" }), {
-      headers: { "Set-Cookie": await commitSession(session) },
-    });
+    try {
+      await db.execute(
+        `INSERT INTO main.slab_inventory (bundle, stone_id) VALUES (?, ?);`,
+        [data.bundle, stoneId]
+      );
+    } catch (error) {
+      console.error("Error connecting to the database: ", error);
+      const session = await getSession(request.headers.get("Cookie"));
+      session.flash(
+        "message",
+        toastData("Failure", "Database Error Occured", "destructive")
+      );
+      return new Response(JSON.stringify({ error: "Database Error Occured" }), {
+        headers: { "Set-Cookie": await commitSession(session) },
+      });
+    }
   }
 
   const session = await getSession(request.headers.get("Cookie"));
@@ -91,7 +116,12 @@ export async function action({ request }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
-    return { user };
+    const suppliers = await selectMany<{ supplier_name: string }>(
+      db,
+      "SELECT supplier_name FROM suppliers WHERE company_id = ?",
+      [user.company_id]
+    );
+    return { supplier: suppliers.map((item) => item.supplier_name) };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -100,6 +130,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function StonesAdd() {
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state === "submitting";
+  const { supplier } = useLoaderData<typeof loader>();
 
   const form = useCustomForm(stoneSchema, {
     defaultValues: {
@@ -115,7 +146,7 @@ export default function StonesAdd() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] overflow-y-auto max-h-[95vh]">
         <DialogHeader>
           <DialogTitle>Add Stone</DialogTitle>
         </DialogHeader>
@@ -193,15 +224,20 @@ export default function StonesAdd() {
           </div>
           <FormField
             control={form.control}
-            name="amount"
+            name="supplier"
             render={({ field }) => (
-              <InputItem
-                name={"Amount"}
-                placeholder={"Amount of the stone"}
+              <SelectInput
+                options={supplier.map((item) => ({
+                  key: item.toLowerCase(),
+                  value: item,
+                }))}
+                name={"Supplier"}
+                placeholder={"Supplier of the stone"}
                 field={field}
               />
             )}
           />
+
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
           </DialogFooter>
