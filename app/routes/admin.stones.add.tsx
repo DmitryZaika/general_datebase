@@ -38,6 +38,13 @@ const stoneSchema = z.object({
     z.number().transform((val) => val === 1),
     z.enum(["true", "false"]).transform((val) => val === "true"),
   ]),
+  on_sale: z
+    .union([
+      z.boolean(),
+      z.number().transform((val) => val === 1),
+      z.enum(["true", "false"]).transform((val) => val === "true"),
+    ])
+    .default(false),
   height: z.coerce.number().default(0),
   width: z.coerce.number().default(0),
   supplier: z.string().optional(),
@@ -63,13 +70,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
   let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.stones (name, type, url, company_id, is_display, supplier, width, height) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO main.stones
+       (name, type, url, company_id, is_display, on_sale, supplier, width, height)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
         data.type,
         data.file,
         user.company_id,
         data.is_display,
+        data.on_sale,
         data.supplier,
         data.width,
         data.height,
@@ -197,6 +207,12 @@ export default function StonesAdd() {
             control={form.control}
             name="is_display"
             render={({ field }) => <SwitchItem field={field} name="Display" />}
+          />
+          <FormField
+            defaultValue={false}
+            control={form.control}
+            name="on_sale"
+            render={({ field }) => <SwitchItem field={field} name="On Sale" />}
           />
           <div className="flex gap-2">
             <FormField

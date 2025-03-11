@@ -25,7 +25,6 @@ import { useCustomForm } from "~/utils/useCustomForm";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { deleteFile } from "~/utils/s3.server";
 import { Dialog, DialogContent, DialogClose } from "~/components/ui/dialog";
-import { X } from "lucide-react";
 
 const slabSchema = z.object({
   bundle: z.string().min(1),
