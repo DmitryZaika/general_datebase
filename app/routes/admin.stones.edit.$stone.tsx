@@ -32,9 +32,6 @@ import { csrf } from "~/utils/csrf.server";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { useState } from "react";
-import { Button } from "~/components/ui/button";
-import { X } from "lucide-react";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -47,6 +44,11 @@ const stoneSchema = z.object({
   height: z.coerce.number().optional(),
   width: z.coerce.number().optional(),
   supplier: z.string().optional(),
+  on_sale: z.union([
+    z.boolean(),
+    z.number().transform((val) => val === 1),
+    z.enum(["true", "false"]).transform((val) => val === "true"),
+  ]),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -74,7 +76,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (newFile) {
       await db.execute(
         `UPDATE stones
-         SET name = ?, type = ?, url = ?, is_display = ?, supplier = ?, height = ?, width = ?
+         SET name = ?, type = ?, url = ?, is_display = ?, supplier = ?, height = ?, width = ?, on_sale = ?
          WHERE id = ?`,
         [
           data.name,
@@ -84,13 +86,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.supplier,
           data.height,
           data.width,
+          data.on_sale,
           stoneId,
         ]
       );
     } else {
       await db.execute(
         `UPDATE stones
-         SET name = ?, type = ?, is_display = ?, supplier = ?, height = ?, width = ?
+         SET name = ?, type = ?, is_display = ?, supplier = ?, height = ?, width = ?, on_sale = ?
          WHERE id = ?`,
         [
           data.name,
@@ -99,6 +102,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.supplier,
           data.height,
           data.width,
+          data.on_sale,
           stoneId,
         ]
       );
@@ -132,9 +136,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     supplier: string;
     height: string;
     width: string;
+    on_sale: boolean;
   }>(
     db,
-    "SELECT name, type, url, is_display, supplier, height, width FROM stones WHERE id = ?",
+    "SELECT name, type, url, is_display, supplier, height, width, on_sale FROM stones WHERE id = ?",
     stoneId
   );
   if (!stone) {
@@ -162,7 +167,8 @@ function StoneInformation({
 }) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
-  const { name, type, url, is_display, supplier, height, width } = stoneData;
+  const { name, type, url, is_display, supplier, height, width, on_sale } =
+    stoneData;
   const defaultValues = {
     name,
     type,
@@ -171,6 +177,7 @@ function StoneInformation({
     supplier,
     height,
     width,
+    on_sale,
   };
   const form = useCustomOptionalForm(stoneSchema, defaultValues);
 
@@ -209,12 +216,19 @@ function StoneInformation({
           )}
         />
       </div>
-      <div className="flex justify-between gap-2">
-        <FormField
-          control={form.control}
-          name="is_display"
-          render={({ field }) => <SwitchItem field={field} name="Display" />}
-        />
+      <div className="flex justify-between items-baseline gap-2">
+        <div className="">
+          <FormField
+            control={form.control}
+            name="is_display"
+            render={({ field }) => <SwitchItem field={field} name="Display" />}
+          />
+          <FormField
+            control={form.control}
+            name="on_sale"
+            render={({ field }) => <SwitchItem field={field} name="On Sale" />}
+          />
+        </div>
         <FormField
           control={form.control}
           name="supplier"
@@ -228,6 +242,7 @@ function StoneInformation({
           )}
         />
       </div>
+
       {url ? <img src={url} alt={name} className="w-48 mt-4 mx-auto" /> : null}
       <div className="flex gap-2">
         <FormField
@@ -263,6 +278,7 @@ export default function StonesEdit() {
       supplier: string;
       height: string;
       width: string;
+      on_sale: boolean;
     };
     supplierNames: string[];
   }>();

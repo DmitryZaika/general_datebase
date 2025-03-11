@@ -25,6 +25,7 @@ interface Stone {
   width: number | null;
   amount: number | null;
   created_date: string;
+  on_sale: boolean;
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
@@ -46,8 +47,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const stones = await selectMany<Stone>(
     db,
     `
-      SELECT id, name, type, url, is_display, height, width, amount, created_date
-      FROM stones
+    SELECT id, name, type, url, is_display, height, width, amount, created_date, on_sale
+FROM stones
       WHERE company_id = ? AND is_display = 1
       ORDER BY name ASC
     `,
@@ -75,10 +76,12 @@ function InteractiveCard({
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const isNew = createdDate > oneWeekAgo;
 
+  const isOnSale = !!stone.on_sale;
+
   return (
     <div
       key={stone.id}
-      className="relative group w-full"
+      className="relative group w-full overflow-hidden"
       onAuxClick={(e) => {
         if (e.button === 1 && stone.url) {
           e.preventDefault();
@@ -86,6 +89,16 @@ function InteractiveCard({
         }
       }}
     >
+      {isOnSale && (
+        <div className="absolute top-[17px] left-[-40px] w-[140px] transform -rotate-45 z-10">
+          <div className="text-center py-1 text-white font-bold text-sm bg-red-600 shadow-md">
+            <span className="block relative z-10">ON SALE</span>
+            <div className="absolute left-0 top-full border-l-[10px] border-l-transparent border-t-[10px] border-t-red-800"></div>
+            <div className="absolute right-0 top-full border-r-[10px] border-r-transparent border-t-[10px] border-t-red-800"></div>
+          </div>
+        </div>
+      )}
+
       <ImageCard
         fieldList={{
           Amount: `${displayedAmount}`,
@@ -101,13 +114,15 @@ function InteractiveCard({
           onClick={() => setCurrentId(stone.id, stoneType)}
         />
       </ImageCard>
+
       {displayedAmount === "—" && (
-        <div className="absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
+        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
           <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
             Out of Stock
           </div>
         </div>
       )}
+
       {isNew && (
         <div className="absolute top-0 right-0 bg-green-500 text-white px-2 py-1 rounded-bl text-sm font-bold">
           New Color
