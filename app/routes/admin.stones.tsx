@@ -111,7 +111,6 @@ export default function AdminStones() {
 
                               return (
                                 <div key={stone.id} className="relative w-full">
-                                  {/* Dim the card if it's hidden (is_display=0) */}
                                   <div
                                     className={`border-2 border-blue-500 rounded p-2 ${
                                       !stone.is_display ? "opacity-30" : ""
@@ -143,7 +142,6 @@ export default function AdminStones() {
                                     </p>
                                   </div>
 
-                                  {/* Edit & Delete icons always visible */}
                                   <div className="absolute inset-0 flex justify-between items-start p-2 opacity-50 transition-opacity duration-300">
                                     <Link
                                       to={`edit/${stone.id}`}
