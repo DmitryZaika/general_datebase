@@ -24,6 +24,7 @@ interface Stone {
   height: number | null;
   width: number | null;
   amount: number | null;
+  created_date: string;
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
@@ -45,7 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const stones = await selectMany<Stone>(
     db,
     `
-      SELECT id, name, type, url, is_display, height, width, amount
+      SELECT id, name, type, url, is_display, height, width, amount, created_date
       FROM stones
       WHERE company_id = ? AND is_display = 1
       ORDER BY name ASC
@@ -68,6 +69,11 @@ function InteractiveCard({
   const displayedAmount = stone.amount && stone.amount > 0 ? stone.amount : "—";
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
   const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
+
+  const createdDate = new Date(stone.created_date);
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const isNew = createdDate > oneWeekAgo;
 
   return (
     <div
@@ -100,6 +106,11 @@ function InteractiveCard({
           <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
             Out of Stock
           </div>
+        </div>
+      )}
+      {isNew && (
+        <div className="absolute top-0 right-0 bg-green-500 text-white px-2 py-1 rounded-bl text-sm font-bold">
+          New Color
         </div>
       )}
     </div>
