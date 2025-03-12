@@ -7,7 +7,6 @@ import {
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
 import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
-//                          ^^^^^^ Важно: импортируем Outlet
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
@@ -25,7 +24,8 @@ interface Stone {
   is_display: boolean | number;
   height: number | null;
   width: number | null;
-  amount: number | null;
+  amount: number;
+  available: number;
   created_date: string;
   on_sale: boolean;
 }
@@ -39,26 +39,31 @@ function customSortType(a: string, b: string) {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  // Проверяем юзера
   try {
     await getEmployeeUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-
   const user = await getEmployeeUser(request);
 
-  // Получаем список камней
   const stones = await selectMany<Stone>(
     db,
     `
     SELECT 
-      id, name, type, url, 
-      is_display, height, width, 
-      amount, created_date, on_sale
-    FROM stones
-    WHERE company_id = ? AND is_display = 1
-    ORDER BY name ASC
+      s.id, 
+      s.name, 
+      s.type, 
+      s.url, 
+      s.is_display, 
+      s.height, 
+      s.width, 
+      (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id) AS amount,
+       (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id AND is_sold = 0) AS available,
+      s.created_date, 
+      s.on_sale
+    FROM stones s
+    WHERE s.company_id = ? AND s.is_display = 1
+    ORDER BY s.name ASC
     `,
     [user.company_id]
   );
@@ -66,7 +71,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { stones };
 };
 
-// Карточка для одного камня
 function InteractiveCard({
   stone,
   setCurrentId,
@@ -76,14 +80,14 @@ function InteractiveCard({
   setCurrentId: (value: number, type: string) => void;
   stoneType: string;
 }) {
-  const displayedAmount = stone.amount && stone.amount > 0 ? stone.amount : "—";
+  // Используем вычисленное значение amount
+  const displayedAmount = stone.amount > 0 ? stone.amount : "—";
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
   const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
   const createdDate = new Date(stone.created_date);
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const isNew = createdDate > oneWeekAgo;
-
   const isOnSale = !!stone.on_sale;
 
   return (
@@ -91,7 +95,6 @@ function InteractiveCard({
       key={stone.id}
       className="relative group w-full overflow-hidden"
       onAuxClick={(e) => {
-        // Middle-click открывает URL в новой вкладке
         if (e.button === 1 && stone.url) {
           e.preventDefault();
           window.open(stone.url, "_blank");
@@ -112,6 +115,7 @@ function InteractiveCard({
         stoneId={stone.id}
         fieldList={{
           Amount: `${displayedAmount}`,
+          Avaliable: `${stone.available}`,
           Size: `${displayedWidth} x ${displayedHeight}`,
         }}
         title={stone.name}
@@ -210,11 +214,6 @@ export default function Stones() {
           </AccordionContent>
         </AccordionItem>
       </Accordion>
-
-      {/*
-        ВАЖНО: Outlet позволяет вложенному маршруту (slabs.$stone.tsx)
-        отобразить содержимое (диалог) поверх этой страницы
-      */}
       <Outlet />
     </>
   );
