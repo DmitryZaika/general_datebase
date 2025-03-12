@@ -1,3 +1,4 @@
+// app/routes/employee.stones.tsx
 import {
   Accordion,
   AccordionItem,
@@ -5,10 +6,10 @@ import {
   AccordionContent,
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect } from "react-router";
+import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData, Link, Outlet } from "react-router";
+import { useLoaderData, Link } from "react-router";
 import { Button } from "~/components/ui/button";
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { getAdminUser } from "~/utils/session.server";
@@ -21,7 +22,7 @@ interface Stone {
   is_display: boolean | number;
   height: number | null;
   width: number | null;
-  amount: number | null;
+  amount: number; // вычисляемое поле – количество слэбов
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
@@ -40,13 +41,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const user = await getAdminUser(request);
 
+  // Здесь для каждого камня вычисляется количество слэбов,
+  // используя подзапрос в SELECT.
   const stones = await selectMany<Stone>(
     db,
     `
-      SELECT id, name, type, url, is_display, height, width, amount
-      FROM stones
-      WHERE company_id = ?
-      ORDER BY name ASC
+      SELECT 
+        s.id, 
+        s.name, 
+        s.type, 
+        s.url, 
+        s.is_display, 
+        s.height, 
+        s.width, 
+        (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id) AS amount
+      FROM stones s
+      WHERE s.company_id = ?
+      ORDER BY s.name ASC
     `,
     [user.company_id]
   );
@@ -86,20 +97,15 @@ export default function AdminStones() {
                         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
                           {stoneList[type]
                             .sort((a, b) => {
-                              const scoreA =
-                                (a.amount === 0 ? 1 : 0) +
-                                (a.is_display ? 0 : 2);
-                              const scoreB =
-                                (b.amount === 0 ? 1 : 0) +
-                                (b.is_display ? 0 : 2);
-                              if (scoreA !== scoreB) return scoreA - scoreB;
+                              const aAmount = a.amount;
+                              const bAmount = b.amount;
+                              if (aAmount === 0 && bAmount !== 0) return 1;
+                              if (aAmount !== 0 && bAmount === 0) return -1;
                               return a.name.localeCompare(b.name);
                             })
                             .map((stone) => {
                               const displayedAmount =
-                                stone.amount && stone.amount > 0
-                                  ? stone.amount
-                                  : "—";
+                                stone.amount > 0 ? stone.amount : "—";
                               const displayedWidth =
                                 stone.width && stone.width > 0
                                   ? stone.width

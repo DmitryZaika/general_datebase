@@ -21,7 +21,7 @@ interface Slab {
   id: number;
   bundle: string;
   url: string | null;
-  sold: boolean | number;
+  is_sold: boolean | number;
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -43,7 +43,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     "SELECT id, bundle, url, is_sold FROM slab_inventory WHERE stone_id = ?",
     [stoneId]
   );
-  console.log(slabs);
   return { slabs, stone };
 }
 
@@ -58,16 +57,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!slabId) {
     return forceRedirectError(request.headers, "No slabId provided");
   }
-  const slab = await selectId<{ sold: number }>(
+  const slab = await selectId<{ is_sold: number }>(
     db,
-    "SELECT sold FROM slab_inventory WHERE id = ?",
+    "SELECT is_sold FROM slab_inventory WHERE id = ?",
     parseInt(slabId.toString(), 10)
   );
   if (!slab) {
     return forceRedirectError(request.headers, "No slab found for given ID");
   }
-  const newValue = slab.sold === 1 ? 0 : 1;
-  await db.execute("UPDATE slab_inventory SET sold = ? WHERE id = ?", [
+  const newValue = slab.is_sold === 1 ? 0 : 1;
+  await db.execute("UPDATE slab_inventory SET is_sold = ? WHERE id = ?", [
     newValue,
     slabId,
   ]);
@@ -91,40 +90,40 @@ export default function SlabsModal() {
         if (!open) history.back();
       }}
     >
-      <DialogContent className="h-auto bg-white p-3 rounded-md">
-        <h2 className="text-xl font-bold mb-4">Slabs for {stone.name}</h2>
-        <div className="flex flex-col gap-2">
+      <DialogContent className="p-5 bg-white rounded-md shadow-lg text-gray-800">
+        <h2 className="text-2xl font-bold mb-6 text-center">
+          Slabs for {stone.name}
+        </h2>
+        <div className="flex flex-col gap-4">
           {slabs.length === 0 ? (
             <p className="text-center text-gray-500">No Slabs available</p>
           ) : (
             slabs.map((slab) => {
-              const isSold = !!slab.sold;
+              const isSold = !!slab.is_sold;
               return (
                 <div
                   key={slab.id}
-                  className="border p-2 rounded flex items-center gap-2"
+                  className={`flex items-center  gap-4 p-3 rounded-lg border border-gray-200 ${
+                    isSold ? "bg-red-200" : "bg-white"
+                  }`}
                 >
                   <img
                     src={slab.url ?? "/placeholder.png"}
                     alt="Slab"
-                    className="w-20 h-20 object-cover cursor-pointer"
+                    className="w-15 h-15 object-cover cursor-pointer rounded"
                     onClick={() => setSelectedImage(slab.url)}
                   />
                   <span
-                    className={`font-bold ${
-                      isSold ? "text-red-600" : "text-black"
+                    className={`font-semibold ${
+                      isSold ? "text-red-900" : "text-gray-800"
                     }`}
                   >
                     {slab.bundle}
                   </span>
-                  <Form method="post">
+                  <Form method="post" className="ml-auto">
                     <AuthenticityTokenInput />
                     <input type="hidden" name="slabId" value={slab.id} />
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      className="ml-auto w-full"
-                    >
+                    <Button type="submit" className="px-4 py-2">
                       {isSold ? "Unsell" : "Sell"}
                     </Button>
                   </Form>
@@ -135,7 +134,7 @@ export default function SlabsModal() {
         </div>
         {selectedImage && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
             onClick={() => setSelectedImage(null)}
           >
             <img
