@@ -80,7 +80,6 @@ function InteractiveCard({
   setCurrentId: (value: number, type: string) => void;
   stoneType: string;
 }) {
-  // Используем вычисленное значение amount
   const displayedAmount = stone.amount > 0 ? stone.amount : "—";
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
   const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
@@ -114,8 +113,8 @@ function InteractiveCard({
       <ImageCard
         stoneId={stone.id}
         fieldList={{
-          Amount: `${displayedAmount}`,
           Avaliable: `${stone.available}`,
+          Amount: `${displayedAmount}`,
           Size: `${displayedWidth} x ${displayedHeight}`,
         }}
         title={stone.name}
@@ -129,7 +128,7 @@ function InteractiveCard({
         />
       </ImageCard>
 
-      {displayedAmount === "—" && (
+      {stone.available === 0 && (
         <div className="absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
           <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
             Out of Stock
@@ -192,10 +191,16 @@ export default function Stones() {
                         />
                         {stoneList[type]
                           .sort((a, b) => {
+                            const aAvailable = a.available ?? 0;
+                            const bAvailable = b.available ?? 0;
+                            if (aAvailable > 0 && bAvailable === 0) return -1;
+                            if (aAvailable === 0 && bAvailable > 0) return 1;
+
                             const aAmount = a.amount ?? 0;
                             const bAmount = b.amount ?? 0;
-                            if (aAmount === 0 && bAmount !== 0) return 1;
-                            if (aAmount !== 0 && bAmount === 0) return -1;
+                            if (aAmount > bAmount) return -1;
+                            if (aAmount < bAmount) return 1;
+
                             return a.name.localeCompare(b.name);
                           })
                           .map((stone) => (

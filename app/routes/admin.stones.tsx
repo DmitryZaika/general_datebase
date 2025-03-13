@@ -1,4 +1,6 @@
-// app/routes/employee.stones.tsx
+//// filepath: c:\Users\sarah\general_datebase\app\routes\admin.stones.tsx
+import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
+import { useLoaderData, Link } from "react-router";
 import {
   Accordion,
   AccordionItem,
@@ -6,12 +8,10 @@ import {
   AccordionContent,
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
+import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData, Link } from "react-router";
 import { Button } from "~/components/ui/button";
-import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { getAdminUser } from "~/utils/session.server";
 
 interface Stone {
@@ -22,39 +22,46 @@ interface Stone {
   is_display: boolean | number;
   height: number | null;
   width: number | null;
-  amount: number; // вычисляемое поле – количество слэбов
+  amount: number;
+  available: number;
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
 
-function customSort(a: string, b: string) {
+function customSortType(a: string, b: string) {
   return (
     customOrder.indexOf(a.toLowerCase()) - customOrder.indexOf(b.toLowerCase())
   );
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  try {
-    await getAdminUser(request);
-  } catch (error) {
-    return redirect(`/login?error=${encodeURIComponent(String(error))}`);
-  }
-  const user = await getAdminUser(request);
+function getStonePriority(stone: Stone) {
+  const hasStock = stone.available > 0;
+  const isDisplayed = !!stone.is_display;
 
-  // Здесь для каждого камня вычисляется количество слэбов,
-  // используя подзапрос в SELECT.
+  if (isDisplayed && hasStock) return 0;
+  if (isDisplayed && !hasStock) return 1;
+  if (!isDisplayed && hasStock) return 2;
+  return 3;
+}
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const user = await getAdminUser(request).catch(() =>
+    redirect("/login?error=Unauthorized")
+  );
+
   const stones = await selectMany<Stone>(
     db,
     `
       SELECT 
-        s.id, 
-        s.name, 
-        s.type, 
-        s.url, 
-        s.is_display, 
-        s.height, 
-        s.width, 
-        (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id) AS amount
+        s.id,
+        s.name,
+        s.type,
+        s.url,
+        s.is_display,
+        s.height,
+        s.width,
+        (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id) AS amount,
+        (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id AND is_sold = 0) AS available
       FROM stones s
       WHERE s.company_id = ?
       ORDER BY s.name ASC
@@ -68,6 +75,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminStones() {
   const { stones } = useLoaderData<typeof loader>();
 
+  // Group stones by type
   const stoneList = stones.reduce((acc: Record<string, Stone[]>, stone) => {
     if (!acc[stone.type]) {
       acc[stone.type] = [];
@@ -81,13 +89,14 @@ export default function AdminStones() {
       <Link to="add">
         <Button>Add Stone</Button>
       </Link>
+
       <div className="pt-24 sm:pt-0">
         <Accordion type="single" defaultValue="stones" className="w-full">
           <AccordionItem value="stones">
             <AccordionContent>
               <Accordion type="multiple">
                 {Object.keys(stoneList)
-                  .sort(customSort)
+                  .sort(customSortType)
                   .map((type) => (
                     <AccordionItem key={type} value={type}>
                       <AccordionTrigger>
@@ -97,15 +106,18 @@ export default function AdminStones() {
                         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
                           {stoneList[type]
                             .sort((a, b) => {
-                              const aAmount = a.amount;
-                              const bAmount = b.amount;
-                              if (aAmount === 0 && bAmount !== 0) return 1;
-                              if (aAmount !== 0 && bAmount === 0) return -1;
+                              const priorityA = getStonePriority(a);
+                              const priorityB = getStonePriority(b);
+                              if (priorityA !== priorityB) {
+                                return priorityA - priorityB;
+                              }
+                              // Tie-break: sort by name
                               return a.name.localeCompare(b.name);
                             })
                             .map((stone) => {
                               const displayedAmount =
                                 stone.amount > 0 ? stone.amount : "—";
+                              const displayedAvailable = stone.available;
                               const displayedWidth =
                                 stone.width && stone.width > 0
                                   ? stone.width
@@ -142,6 +154,9 @@ export default function AdminStones() {
                                     </p>
                                     <p className="text-center text-sm">
                                       Amount: {displayedAmount}
+                                    </p>
+                                    <p className="text-center text-sm">
+                                      Available: {displayedAvailable}
                                     </p>
                                     <p className="text-center text-sm">
                                       Size: {displayedWidth} x {displayedHeight}

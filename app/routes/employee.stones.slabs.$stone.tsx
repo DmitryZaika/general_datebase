@@ -1,4 +1,3 @@
-//// filepath: c:\Users\sarah\general_datebase\app\routes\employee.stones.slabs.$stone.tsx
 import {
   LoaderFunctionArgs,
   ActionFunctionArgs,
@@ -14,7 +13,7 @@ import { db } from "~/db.server";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent } from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogClose } from "~/components/ui/dialog";
 import { useState } from "react";
 
 interface Slab {
@@ -83,6 +82,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export default function SlabsModal() {
   const { slabs, stone } = useLoaderData<typeof loader>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
   return (
     <Dialog
       open
@@ -91,9 +91,10 @@ export default function SlabsModal() {
       }}
     >
       <DialogContent className="p-5 bg-white rounded-md shadow-lg text-gray-800">
-        <h2 className="text-2xl font-bold mb-6 text-center">
+        <h2 className="text-2xl font-bold mb-6 text-center pl-5 pr-5">
           Slabs for {stone.name}
         </h2>
+
         <div className="flex flex-col gap-4">
           {slabs.length === 0 ? (
             <p className="text-center text-gray-500">No Slabs available</p>
@@ -103,7 +104,7 @@ export default function SlabsModal() {
               return (
                 <div
                   key={slab.id}
-                  className={`flex items-center  gap-4 p-3 rounded-lg border border-gray-200 ${
+                  className={`transition-colors duration-300 flex items-center gap-4 p-3 rounded-lg border border-gray-200 ${
                     isSold ? "bg-red-200" : "bg-white"
                   }`}
                 >
@@ -111,7 +112,11 @@ export default function SlabsModal() {
                     src={slab.url ?? "/placeholder.png"}
                     alt="Slab"
                     className="w-15 h-15 object-cover cursor-pointer rounded"
-                    onClick={() => setSelectedImage(slab.url)}
+                    onClick={() => {
+                      if (slab.url) {
+                        setSelectedImage(slab.url);
+                      }
+                    }}
                   />
                   <span
                     className={`font-semibold ${
@@ -132,19 +137,30 @@ export default function SlabsModal() {
             })
           )}
         </div>
-        {selectedImage && (
-          <div
-            className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
-            onClick={() => setSelectedImage(null)}
-          >
-            <img
-              src={selectedImage}
-              alt="Slab Zoom"
-              className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        )}
+
+        <Dialog
+          open={!!selectedImage}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedImage(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-4xl w-full h-auto flex items-center justify-center bg-black bg-opacity-90 p-1">
+            <DialogClose className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+              <span className="sr-only">Close</span>
+            </DialogClose>
+
+            {selectedImage && (
+              <img
+                src={selectedImage}
+                alt="Full size"
+                className="max-w-full max-h-[80vh] object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );
