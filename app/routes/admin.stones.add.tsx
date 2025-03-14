@@ -27,7 +27,6 @@ import { useCustomForm } from "~/utils/useCustomForm";
 import { getAdminUser, getEmployeeUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { selectId, selectMany } from "~/utils/queryHelpers";
 
 const stoneSchema = z.object({
