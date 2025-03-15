@@ -5,18 +5,7 @@ import {
   useNavigation,
   Outlet,
 } from "react-router";
-import { FormField } from "../components/ui/form";
 import { z } from "zod";
-import { InputItem } from "~/components/molecules/InputItem";
-
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
-
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { selectId, selectMany } from "~/utils/queryHelpers";
@@ -31,24 +20,39 @@ import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { FormField } from "../components/ui/form";
+import { InputItem } from "~/components/molecules/InputItem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 
 const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  is_display: z.union([
-    z.boolean(),
-    z.number().transform((val) => val === 1),
-    z.enum(["true", "false"]).transform((val) => val === "true"),
-  ]),
+  is_display: z
+    .union([
+      z.boolean(),
+      z.number().transform((val) => val === 1),
+      z.enum(["true", "false"]).transform((val) => val === "true"),
+    ])
+    .optional(),
   height: z.coerce.number().optional(),
   width: z.coerce.number().optional(),
   supplier: z.string().optional(),
-  on_sale: z.union([
-    z.boolean(),
-    z.number().transform((val) => val === 1),
-    z.enum(["true", "false"]).transform((val) => val === "true"),
-  ]),
+  on_sale: z
+    .union([
+      z.boolean(),
+      z.number().transform((val) => val === 1),
+      z.enum(["true", "false"]).transform((val) => val === "true"),
+    ])
+    .optional(),
+  cost_per_sqft: z.coerce.number().optional(),
+  retail_price: z.coerce.number().optional(),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -76,7 +80,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (newFile) {
       await db.execute(
         `UPDATE stones
-         SET name = ?, type = ?, url = ?, is_display = ?, supplier = ?, height = ?, width = ?, on_sale = ?
+         SET name = ?, type = ?, url = ?, is_display = ?, supplier = ?, height = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
          WHERE id = ?`,
         [
           data.name,
@@ -87,13 +91,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.height,
           data.width,
           data.on_sale,
+          data.cost_per_sqft,
+          data.retail_price,
           stoneId,
         ]
       );
     } else {
       await db.execute(
         `UPDATE stones
-         SET name = ?, type = ?, is_display = ?, supplier = ?, height = ?, width = ?, on_sale = ?
+         SET name = ?, type = ?, is_display = ?, supplier = ?, height = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
          WHERE id = ?`,
         [
           data.name,
@@ -103,6 +109,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.height,
           data.width,
           data.on_sale,
+          data.cost_per_sqft,
+          data.retail_price,
           stoneId,
         ]
       );
@@ -137,9 +145,11 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     height: string;
     width: string;
     on_sale: boolean;
+    cost_per_sqft: number;
+    retail_price: number;
   }>(
     db,
-    "SELECT name, type, url, is_display, supplier, height, width, on_sale FROM stones WHERE id = ?",
+    "SELECT name, type, url, is_display, supplier, height, width, on_sale, cost_per_sqft, retail_price FROM stones WHERE id = ?",
     stoneId
   );
   if (!stone) {
@@ -161,14 +171,35 @@ function StoneInformation({
   supplierNames,
   refresh,
 }: {
-  stoneData: ReturnType<typeof loader>["stone"];
+  stoneData: {
+    name: string;
+    type: string;
+    url: string;
+    is_display: boolean;
+    supplier: string;
+    height: string;
+    width: string;
+    on_sale: boolean;
+    cost_per_sqft: number;
+    retail_price: number;
+  };
   supplierNames: string[];
   refresh: () => void;
 }) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
-  const { name, type, url, is_display, supplier, height, width, on_sale } =
-    stoneData;
+  const {
+    name,
+    type,
+    url,
+    is_display,
+    supplier,
+    height,
+    width,
+    on_sale,
+    cost_per_sqft,
+    retail_price,
+  } = stoneData;
   const defaultValues = {
     name,
     type,
@@ -178,9 +209,10 @@ function StoneInformation({
     height,
     width,
     on_sale,
+    cost_per_sqft,
+    retail_price,
   };
   const form = useCustomOptionalForm(stoneSchema, defaultValues);
-
   return (
     <MultiPartForm form={form}>
       <FormField
@@ -217,7 +249,7 @@ function StoneInformation({
         />
       </div>
       <div className="flex justify-between items-baseline gap-2">
-        <div className="">
+        <div>
           <FormField
             control={form.control}
             name="is_display"
@@ -242,7 +274,6 @@ function StoneInformation({
           )}
         />
       </div>
-
       {url ? <img src={url} alt={name} className="w-48 mt-4 mx-auto" /> : null}
       <div className="flex gap-2">
         <FormField
@@ -260,13 +291,37 @@ function StoneInformation({
           )}
         />
       </div>
-
+      <div className="flex gap-2">
+        <FormField
+          control={form.control}
+          name="cost_per_sqft"
+          render={({ field }) => (
+            <InputItem
+              name="Cost Per Sqft"
+              placeholder="Cost Per Sqft"
+              field={field}
+            />
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="retail_price"
+          render={({ field }) => (
+            <InputItem
+              name="Retail Price"
+              placeholder="Retail Price"
+              field={field}
+            />
+          )}
+        />
+      </div>
       <DialogFooter className="mt-4">
         <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
       </DialogFooter>
     </MultiPartForm>
   );
 }
+
 export default function StonesEdit() {
   const navigate = useNavigate();
   const { stone, supplierNames } = useLoaderData<{
@@ -279,6 +334,8 @@ export default function StonesEdit() {
       height: string;
       width: string;
       on_sale: boolean;
+      cost_per_sqft: number;
+      retail_price: number;
     };
     supplierNames: string[];
   }>();
@@ -292,7 +349,7 @@ export default function StonesEdit() {
   };
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px] overflow-auto flex flex-col justify-baseline min-h-[95vh]  max-h-[95vh]">
+      <DialogContent className="sm:max-w-[425px] overflow-auto flex flex-col justify-baseline min-h-[95vh] max-h-[95vh]">
         <DialogHeader>
           <DialogTitle>Edit Stone</DialogTitle>
         </DialogHeader>
@@ -300,9 +357,7 @@ export default function StonesEdit() {
           defaultValue="information"
           onValueChange={(value) => {
             if (value === "images") navigate("images");
-            else if (value === "slabs") {
-              navigate("slabs");
-            }
+            else if (value === "slabs") navigate("slabs");
           }}
         >
           <TabsList>
