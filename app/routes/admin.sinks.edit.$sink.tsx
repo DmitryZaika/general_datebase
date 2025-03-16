@@ -32,26 +32,7 @@ import { csrf } from "~/utils/csrf.server";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-
-const sinkSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  type: z.enum([
-    "stainless 18 gauge",
-    "stainless 16 gauge",
-    "granite composite",
-    "ceramic",
-    "farm house",
-  ]),
-  is_display: z.union([
-    z.boolean(),
-    z.number().transform((val) => val === 1),
-    z.enum(["true", "false"]).transform((val) => val === "true"),
-  ]),
-  height: z.coerce.number().optional(),
-  width: z.coerce.number().optional(),
-  supplier: z.string().optional(),
-  amount: z.coerce.number().optional(),
-});
+import { sinkSchema } from "~/schemas/sinks";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const user = await getAdminUser(request).catch((err) => {
@@ -78,14 +59,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (newFile) {
       await db.execute(
         `UPDATE sinks
-         SET name = ?, type = ?, url = ?, is_display = ?, supplier = ?,  height = ?, width = ?, amount = ?
+         SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?,  height = ?, width = ?, amount = ?
          WHERE id = ?`,
         [
           data.name,
           data.type,
           data.file,
           data.is_display,
-          data.supplier,
+          data.supplier_id,
           data.height,
           data.width,
           data.amount,
@@ -95,13 +76,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     } else {
       await db.execute(
         `UPDATE sinks
-         SET name = ?, type = ?, is_display = ?, supplier = ?, height = ?, width = ?, amount = ?
+         SET name = ?, type = ?, is_display = ?, supplier_id = ?, height = ?, width = ?, amount = ?
          WHERE id = ?`,
         [
           data.name,
           data.type,
           data.is_display,
-          data.supplier,
+          data.supplier_id,
           data.height,
           data.width,
           data.amount,
@@ -135,48 +116,52 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     type: string;
     url: string;
     is_display: boolean;
-    supplier: string;
+    supplier_id: string;
     height: string;
     width: string;
     amount: number | null;
   }>(
     db,
-    "SELECT name, type, url, is_display, supplier, height, width, amount FROM sinks WHERE id = ?",
+    "SELECT name, type, url, is_display, supplier_id, height, width, amount FROM sinks WHERE id = ?",
     sinkId
   );
   if (!sink) {
     return forceRedirectError(request.headers, "No sink found");
   }
-  const suppliers = await selectMany<{ supplier_name: string }>(
-    db,
-    "SELECT supplier_name FROM suppliers WHERE company_id = ?",
-    [user.company_id]
-  );
+  const suppliers = await selectMany<{
+    id: number;
+    supplier_name: string;
+  }>(db, "SELECT id, supplier_name FROM suppliers WHERE company_id = ?", [
+    user.company_id,
+  ]);
   return {
     sink,
-    supplierNames: suppliers.map((item) => item.supplier_name),
+    suppliers,
   };
 };
 
 function SinkInformation({
   sinkData,
-  supplierNames,
+  suppliers,
   refresh,
 }: {
   sinkData: ReturnType<typeof loader>["sink"];
-  supplierNames: string[];
+  suppliers: {
+    id: number;
+    supplier_name: string;
+  }[];
   refresh: () => void;
 }) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
-  const { name, type, url, is_display, supplier, height, width, amount } =
+  const { name, type, url, is_display, supplier_id, height, width, amount } =
     sinkData;
   const defaultValues = {
     name,
     type,
     url: "",
     is_display,
-    supplier,
+    supplier_id,
     height,
     width,
     amount,
@@ -232,13 +217,16 @@ function SinkInformation({
         />
         <FormField
           control={form.control}
-          name="supplier"
+          name="supplier_id"
           render={({ field }) => (
             <SelectInput
               name="Supplier"
               placeholder="Supplier"
               field={field}
-              options={supplierNames}
+              options={suppliers.map((item) => ({
+                key: item.id.toString(),
+                value: item.supplier_name,
+              }))}
             />
           )}
         />
@@ -276,19 +264,7 @@ function SinkInformation({
 }
 export default function SinksEdit() {
   const navigate = useNavigate();
-  const { sink, supplierNames } = useLoaderData<{
-    sink: {
-      name: string;
-      type: string;
-      url: string;
-      is_display: boolean;
-      supplier: string;
-      height: string;
-      width: string;
-      amount: number | null;
-    };
-    supplierNames: string[];
-  }>();
+  const { sink, suppliers } = useLoaderData();
   const handleChange = (open: boolean) => {
     if (!open) {
       navigate("..");
@@ -316,7 +292,7 @@ export default function SinksEdit() {
           <TabsContent value="information">
             <SinkInformation
               sinkData={sink}
-              supplierNames={supplierNames}
+              suppliers={suppliers}
               refresh={refresh}
             />
           </TabsContent>
