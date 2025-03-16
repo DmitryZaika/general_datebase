@@ -23,7 +23,7 @@ import { toastData } from "~/utils/toastHelpers";
 import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
-import { useCustomForm } from "~/utils/useCustomForm";
+import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
@@ -124,7 +124,7 @@ export default function StonesAdd() {
   const isSubmitting = useNavigation().state === "submitting";
   const { suppliers } = useLoaderData<typeof loader>();
 
-  const form = useCustomForm(stoneSchema, {
+  const form = useCustomOptionalForm(stoneSchema, {
     defaultValues: {
       is_display: true,
     },
