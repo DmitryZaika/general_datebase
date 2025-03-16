@@ -94,10 +94,10 @@
   },
   "optionalDependencies": {
     "@esbuild/linux-x64": "0.25.0",
-    "lightningcss-linux-x64-gnu": "^1.29.1",
     "@rollup/rollup-darwin-arm64": "^4.34.8",
     "@tailwindcss/oxide-darwin-arm64": "4.0.9",
-    "lightningcss-darwin-arm64": "^1.29.1"
+    "lightningcss-darwin-arm64": "^1.29.1",
+    "lightningcss-linux-x64-gnu": "^1.29.1"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -1,0 +1,2 @@
+ALTER TABLE slab_inventory
+ADD COLUMN url VARCHAR(255);

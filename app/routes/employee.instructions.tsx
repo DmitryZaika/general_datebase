@@ -48,12 +48,12 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
         <AccordionContent>
           {!isEmptyText && (
             <div
-              className="prose max-w-none w-full instructions ml-5"
+              className="prose max-w-[calc(100vw-200px)] w-full instructions ml-5 "
               dangerouslySetInnerHTML={{ __html: instruction.text }}
             />
           )}
           {instruction.children.length > 0 && (
-            <Accordion type="multiple" className="ml-5">
+            <Accordion type="multiple" className="ml-5 ">
               {instruction.children.map((childInstruction) => (
                 <InstructionItem
                   key={childInstruction.id}
@@ -70,7 +70,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
       <div className="py-4">
         {!isEmptyText && (
           <div
-            className="prose overflow-auto break-words w-full ml-5"
+            className="prose overflow-auto break-words w-full ml-5 "
             dangerouslySetInnerHTML={{ __html: instruction.text }}
           />
         )}
