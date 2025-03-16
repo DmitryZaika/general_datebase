@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export interface Todo {
   id: number;
   rich_text: string;

@@ -30,30 +30,7 @@ import {
 import { FormField } from "../components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-
-const stoneSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  is_display: z
-    .union([
-      z.boolean(),
-      z.number().transform((val) => val === 1),
-      z.enum(["true", "false"]).transform((val) => val === "true"),
-    ])
-    .optional(),
-  height: z.coerce.number().optional(),
-  width: z.coerce.number().optional(),
-  supplier: z.string().optional(),
-  on_sale: z
-    .union([
-      z.boolean(),
-      z.number().transform((val) => val === 1),
-      z.enum(["true", "false"]).transform((val) => val === "true"),
-    ])
-    .optional(),
-  cost_per_sqft: z.coerce.number().optional(),
-  retail_price: z.coerce.number().optional(),
-});
+import { stoneSchema } from "~/schemas/stones";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const user = await getAdminUser(request).catch((err) => {
@@ -80,14 +57,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (newFile) {
       await db.execute(
         `UPDATE stones
-         SET name = ?, type = ?, url = ?, is_display = ?, supplier = ?, height = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
+         SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, height = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
          WHERE id = ?`,
         [
           data.name,
           data.type,
           data.file,
           data.is_display,
-          data.supplier,
+          data.supplier_id,
           data.height,
           data.width,
           data.on_sale,
@@ -99,13 +76,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     } else {
       await db.execute(
         `UPDATE stones
-         SET name = ?, type = ?, is_display = ?, supplier = ?, height = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
+         SET name = ?, type = ?, is_display = ?, supplier_id = ?, height = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
          WHERE id = ?`,
         [
           data.name,
           data.type,
           data.is_display,
-          data.supplier,
+          data.supplier_id,
           data.height,
           data.width,
           data.on_sale,
@@ -141,7 +118,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     type: string;
     url: string;
     is_display: boolean;
-    supplier: string;
+    supplier_id: string;
     height: string;
     width: string;
     on_sale: boolean;
@@ -149,26 +126,27 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     retail_price: number;
   }>(
     db,
-    "SELECT name, type, url, is_display, supplier, height, width, on_sale, cost_per_sqft, retail_price FROM stones WHERE id = ?",
+    "SELECT name, type, url, is_display, supplier_id, height, width, on_sale, cost_per_sqft, retail_price FROM stones WHERE id = ?",
     stoneId
   );
   if (!stone) {
     return forceRedirectError(request.headers, "No stone found");
   }
-  const suppliers = await selectMany<{ supplier_name: string }>(
-    db,
-    "SELECT supplier_name FROM suppliers WHERE company_id = ?",
-    [user.company_id]
-  );
+  const suppliers = await selectMany<{
+    id: number | null;
+    supplier_name: string;
+  }>(db, "SELECT id, supplier_name FROM suppliers WHERE company_id = ?", [
+    user.company_id,
+  ]);
   return {
     stone,
-    supplierNames: suppliers.map((item) => item.supplier_name),
+    suppliers,
   };
 };
 
 function StoneInformation({
   stoneData,
-  supplierNames,
+  suppliers,
   refresh,
 }: {
   stoneData: {
@@ -176,14 +154,17 @@ function StoneInformation({
     type: string;
     url: string;
     is_display: boolean;
-    supplier: string;
+    supplier_id: string;
     height: string;
     width: string;
     on_sale: boolean;
     cost_per_sqft: number;
     retail_price: number;
   };
-  supplierNames: string[];
+  suppliers: {
+    id: number;
+    supplier_name: string;
+  }[];
   refresh: () => void;
 }) {
   const navigation = useNavigation();
@@ -193,7 +174,7 @@ function StoneInformation({
     type,
     url,
     is_display,
-    supplier,
+    supplier_id,
     height,
     width,
     on_sale,
@@ -205,7 +186,7 @@ function StoneInformation({
     type,
     url: "",
     is_display,
-    supplier,
+    supplier_id,
     height,
     width,
     on_sale,
@@ -263,13 +244,16 @@ function StoneInformation({
         </div>
         <FormField
           control={form.control}
-          name="supplier"
+          name="supplier_id"
           render={({ field }) => (
             <SelectInput
               name="Supplier"
               placeholder="Supplier"
               field={field}
-              options={supplierNames}
+              options={suppliers.map((item) => ({
+                key: item.id.toString(),
+                value: item.supplier_name,
+              }))}
             />
           )}
         />
@@ -324,20 +308,23 @@ function StoneInformation({
 
 export default function StonesEdit() {
   const navigate = useNavigate();
-  const { stone, supplierNames } = useLoaderData<{
+  const { stone, suppliers } = useLoaderData<{
     stone: {
       name: string;
       type: string;
       url: string;
       is_display: boolean;
-      supplier: string;
+      supplier_id: string;
       height: string;
       width: string;
       on_sale: boolean;
       cost_per_sqft: number;
       retail_price: number;
     };
-    supplierNames: string[];
+    suppliers: {
+      id: number;
+      supplier_name: string;
+    }[];
   }>();
   const handleChange = (open: boolean) => {
     if (!open) {
@@ -368,7 +355,7 @@ export default function StonesEdit() {
           <TabsContent value="information">
             <StoneInformation
               stoneData={stone}
-              supplierNames={supplierNames}
+              suppliers={suppliers}
               refresh={refresh}
             />
           </TabsContent>

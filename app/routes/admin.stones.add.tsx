@@ -24,33 +24,11 @@ import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { useCustomForm } from "~/utils/useCustomForm";
-import { getAdminUser, getEmployeeUser } from "~/utils/session.server";
+import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
-import { selectId, selectMany } from "~/utils/queryHelpers";
-
-const stoneSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  is_display: z.union([
-    z.boolean(),
-    z.number().transform((val) => val === 1),
-    z.enum(["true", "false"]).transform((val) => val === "true"),
-  ]),
-  on_sale: z
-    .union([
-      z.boolean(),
-      z.number().transform((val) => val === 1),
-      z.enum(["true", "false"]).transform((val) => val === "true"),
-    ])
-    .default(false),
-  height: z.coerce.number().default(0),
-  width: z.coerce.number().default(0),
-  supplier: z.string().optional(),
-  bundle: z.string().optional(),
-  cost_per_sqft: z.coerce.number().default(0),
-  retail_price: z.coerce.number().default(0),
-});
+import { selectMany } from "~/utils/queryHelpers";
+import { stoneSchema } from "~/schemas/stones";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
@@ -72,7 +50,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await db.execute(
       `INSERT INTO main.stones
-       (name, type, url, company_id, is_display, on_sale, supplier, width, height, cost_per_sqft, retail_price)
+       (name, type, url, company_id, is_display, on_sale, supplier_id, width, height, cost_per_sqft, retail_price)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
@@ -81,7 +59,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         user.company_id,
         data.is_display,
         data.on_sale,
-        data.supplier,
+        data.supplier_id,
         data.width,
         data.height,
         data.cost_per_sqft,
@@ -129,12 +107,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
-    const suppliers = await selectMany<{ supplier_name: string }>(
-      db,
-      "SELECT supplier_name FROM suppliers WHERE company_id = ?",
-      [user.company_id]
-    );
-    return { supplier: suppliers.map((item) => item.supplier_name) };
+    const suppliers = await selectMany<{
+      id: number;
+      supplier_name: string;
+    }>(db, "SELECT id,  supplier_name FROM suppliers WHERE company_id = ?", [
+      user.company_id,
+    ]);
+    return { suppliers };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -143,7 +122,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function StonesAdd() {
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state === "submitting";
-  const { supplier } = useLoaderData<typeof loader>();
+  const { suppliers } = useLoaderData<typeof loader>();
 
   const form = useCustomForm(stoneSchema, {
     defaultValues: {
@@ -229,12 +208,12 @@ export default function StonesAdd() {
             </div>
             <FormField
               control={form.control}
-              name="supplier"
+              name="supplier_id"
               render={({ field }) => (
                 <SelectInput
-                  options={supplier.map((item) => ({
-                    key: item.toLowerCase(),
-                    value: item,
+                  options={suppliers.map((item) => ({
+                    key: item.id.toString(),
+                    value: item.supplier_name,
                   }))}
                   name={"Supplier"}
                   placeholder={"Supplier of the stone"}
