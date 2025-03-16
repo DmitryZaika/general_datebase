@@ -21,14 +21,13 @@ import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
 import { FileInput } from "~/components/molecules/FileInput";
-import { useCustomForm } from "~/utils/useCustomForm";
+import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { deleteFile } from "~/utils/s3.server";
 import { Dialog, DialogContent, DialogClose } from "~/components/ui/dialog";
 
 const slabSchema = z.object({
   bundle: z.string().min(1),
-  file: z.any().optional(),
 });
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -117,7 +116,7 @@ export function AddSlab() {
   const navigation = useNavigation();
   const [resetKey, setResetKey] = useState(0);
   const [bundle, setBundle] = useState("");
-  const form = useCustomForm(slabSchema, {});
+  const form = useCustomOptionalForm(slabSchema, {});
 
   useEffect(() => {
     if (navigation.state === "idle") {
@@ -129,6 +128,8 @@ export function AddSlab() {
       setResetKey((prev) => prev + 1);
     }
   }, [navigation.state, form]);
+
+  console.log(form.formState.errors);
 
   return (
     <MultiPartForm form={form} className="mb-5">
