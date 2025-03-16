@@ -83,7 +83,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await db.execute(
       "INSERT INTO slab_inventory (bundle, stone_id, url) VALUES (?, ?, ?)",
-      [data.bundle, stoneId, data.file]
+      [data.bundle, stoneId, data.file ?? ""]
     );
   } catch (error) {
     console.error("Error connecting to the database:", error);
@@ -181,11 +181,22 @@ export default function EditStoneSlabs() {
             className="flex gap-1 justify-between items-center"
           >
             <img
-              src={slab.url}
+              src={
+                slab.url && slab.url !== "null"
+                  ? slab.url
+                  : "https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg"
+              }
               alt="Slab"
               className="size-9 cursor-pointer"
-              onClick={() => setSelectedImage(slab.url)}
+              onClick={() =>
+                setSelectedImage(
+                  slab.url && slab.url !== "null"
+                    ? slab.url
+                    : "https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg"
+                )
+              }
             />
+
             <div className="p-1.5 border w-full border-gray-300">
               <p className="w-full">{slab.bundle}</p>
             </div>
