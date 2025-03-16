@@ -1,4 +1,3 @@
-import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Carousel,
@@ -23,6 +22,7 @@ interface ImageProps {
   className?: string;
   isOpen: boolean;
   id: number;
+  type: string;
   setImage: (value: undefined | number) => void;
 }
 
@@ -32,6 +32,7 @@ function ChildrenImagesDialog({
   alt,
   isOpen,
   id,
+  type,
   setImage,
 }: ImageProps) {
   const [data, setData] = useState<
@@ -52,7 +53,7 @@ function ChildrenImagesDialog({
   }, [isOpen, src, id]);
 
   const getImages = () => {
-    fetch(`/api/installed_stones/${id}`)
+    fetch(`/api/installed_${type}/${id}`)
       .then(async (res) => await res.json())
       .then(setData);
   };
@@ -125,21 +126,23 @@ export function SuperCarousel({
   currentId,
   setCurrentId,
   images,
-  stoneType,
+  category,
   activeType,
+  type,
 }: {
   images: { id: number; url: string | null }[];
   currentId?: number;
   setCurrentId: (value: number | undefined, type?: string) => void;
-  stoneType: string;
+  category: string;
   activeType?: string;
+  type: string;
 }) {
   const [api, setApi] = useState<CarouselApi>();
   const _ = useArrowCarousel(api);
 
   useEffect(() => {
     if (!api) return;
-    if (currentId !== undefined && stoneType === activeType) {
+    if (currentId !== undefined && category === activeType) {
       const index = images.findIndex(({ id }) => id === currentId);
       if (index !== -1) {
         api.scrollTo(index, true);
@@ -148,12 +151,12 @@ export function SuperCarousel({
     api.on("settle", (index) => {
       const slidesInView = api.slidesInView();
       if (slidesInView.length > 0) {
-        setCurrentId(images[slidesInView[0]].id, stoneType);
+        setCurrentId(images[slidesInView[0]].id, category);
       }
     });
-  }, [api, currentId, images, setCurrentId, stoneType, activeType]);
+  }, [api, currentId, images, setCurrentId, category, activeType]);
 
-  const isCarouselActive = activeType === stoneType;
+  const isCarouselActive = activeType === category;
 
   return (
     <Dialog
@@ -177,6 +180,7 @@ export function SuperCarousel({
             {images.map(({ id, url }) => (
               <CarouselItem key={id}>
                 <ChildrenImagesDialog
+                  type={type}
                   src={url}
                   id={id}
                   isOpen={currentId === id}

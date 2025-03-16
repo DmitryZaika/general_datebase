@@ -14,9 +14,11 @@ function createFromData(data: object) {
 export function MultiPartForm<TFieldValues extends FieldValues = FieldValues>({
   children,
   form,
+  className,
 }: {
   children: React.ReactNode;
   form: UseFormReturn<TFieldValues>;
+  className?: string;
 }) {
   const submit = useSubmit();
   const token = useAuthenticityToken();
@@ -24,6 +26,7 @@ export function MultiPartForm<TFieldValues extends FieldValues = FieldValues>({
   return (
     <FormProvider {...form}>
       <Form
+        className={className}
         id="customerForm"
         method="post"
         onSubmit={form.handleSubmit((data) => {

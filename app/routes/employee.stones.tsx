@@ -1,3 +1,4 @@
+// app/routes/employee.stones.tsx
 import {
   Accordion,
   AccordionItem,
@@ -5,7 +6,7 @@ import {
   AccordionContent,
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect } from "react-router";
+import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
@@ -23,8 +24,10 @@ interface Stone {
   is_display: boolean | number;
   height: number | null;
   width: number | null;
-  amount: number | null;
+  amount: number;
+  available: number;
   created_date: string;
+  on_sale: boolean;
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
@@ -46,10 +49,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const stones = await selectMany<Stone>(
     db,
     `
-      SELECT id, name, type, url, is_display, height, width, amount, created_date
-      FROM stones
-      WHERE company_id = ? AND is_display = 1
-      ORDER BY name ASC
+    SELECT 
+      s.id, 
+      s.name, 
+      s.type, 
+      s.url, 
+      s.is_display, 
+      s.height, 
+      s.width, 
+      (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id) AS amount,
+       (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id AND is_sold = 0) AS available,
+      s.created_date, 
+      s.on_sale
+    FROM stones s
+    WHERE s.company_id = ? AND s.is_display = 1
+    ORDER BY s.name ASC
     `,
     [user.company_id]
   );
@@ -66,19 +80,19 @@ function InteractiveCard({
   setCurrentId: (value: number, type: string) => void;
   stoneType: string;
 }) {
-  const displayedAmount = stone.amount && stone.amount > 0 ? stone.amount : "—";
+  const displayedAmount = stone.amount > 0 ? stone.amount : "—";
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
   const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
-
   const createdDate = new Date(stone.created_date);
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const isNew = createdDate > oneWeekAgo;
+  const isOnSale = !!stone.on_sale;
 
   return (
     <div
       key={stone.id}
-      className="relative group w-full"
+      className="relative group w-full overflow-hidden"
       onAuxClick={(e) => {
         if (e.button === 1 && stone.url) {
           e.preventDefault();
@@ -86,8 +100,21 @@ function InteractiveCard({
         }
       }}
     >
+      {isOnSale && (
+        <div className="absolute top-[17px] left-[-40px] w-[140px] transform -rotate-45 z-10">
+          <div className="text-center py-1 text-white font-bold text-sm bg-red-600 shadow-md">
+            <span className="block relative z-10">ON SALE</span>
+            <div className="absolute left-0 top-full border-l-[10px] border-l-transparent border-t-[10px] border-t-red-800" />
+            <div className="absolute right-0 top-full border-r-[10px] border-r-transparent border-t-[10px] border-t-red-800" />
+          </div>
+        </div>
+      )}
+
       <ImageCard
+        type="slabs"
+        itemId={stone.id}
         fieldList={{
+          Avaliable: `${stone.available}`,
           Amount: `${displayedAmount}`,
           Size: `${displayedWidth} x ${displayedHeight}`,
         }}
@@ -101,8 +128,9 @@ function InteractiveCard({
           onClick={() => setCurrentId(stone.id, stoneType)}
         />
       </ImageCard>
-      {displayedAmount === "—" && (
-        <div className="absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
+
+      {stone.available === 0 && (
+        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
           <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
             Out of Stock
           </div>
@@ -140,49 +168,59 @@ export default function Stones() {
   }, {});
 
   return (
-    <Accordion type="single" defaultValue="stones" className="pt-24 sm:pt-0">
-      <AccordionItem value="stones">
-        <AccordionContent>
-          <Accordion type="multiple">
-            {Object.keys(stoneList)
-              .sort(customSortType)
-              .map((type) => (
-                <AccordionItem key={type} value={type}>
-                  <AccordionTrigger>
-                    {capitalizeFirstLetter(type)}
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <ModuleList>
-                      <SuperCarousel
-                        currentId={currentId}
-                        setCurrentId={handleSetCurrentId}
-                        images={stoneList[type]}
-                        stoneType={type}
-                        activeType={activeType}
-                      />
-                      {stoneList[type]
-                        .sort((a, b) => {
-                          const aAmount = a.amount ?? 0;
-                          const bAmount = b.amount ?? 0;
-                          if (aAmount === 0 && bAmount !== 0) return 1;
-                          if (aAmount !== 0 && bAmount === 0) return -1;
-                          return a.name.localeCompare(b.name);
-                        })
-                        .map((stone) => (
-                          <InteractiveCard
-                            key={stone.id}
-                            stone={stone}
-                            setCurrentId={handleSetCurrentId}
-                            stoneType={type}
-                          />
-                        ))}
-                    </ModuleList>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-          </Accordion>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+    <>
+      <Accordion type="single" defaultValue="stones" className="pt-24 sm:pt-0">
+        <AccordionItem value="stones">
+          <AccordionContent>
+            <Accordion type="multiple">
+              {Object.keys(stoneList)
+                .sort(customSortType)
+                .map((type) => (
+                  <AccordionItem key={type} value={type}>
+                    <AccordionTrigger>
+                      {capitalizeFirstLetter(type)}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <ModuleList>
+                        <SuperCarousel
+                          type="stones"
+                          currentId={currentId}
+                          setCurrentId={handleSetCurrentId}
+                          images={stoneList[type]}
+                          category={type}
+                          activeType={activeType}
+                        />
+                        {stoneList[type]
+                          .sort((a, b) => {
+                            const aAvailable = a.available ?? 0;
+                            const bAvailable = b.available ?? 0;
+                            if (aAvailable > 0 && bAvailable === 0) return -1;
+                            if (aAvailable === 0 && bAvailable > 0) return 1;
+
+                            const aAmount = a.amount ?? 0;
+                            const bAmount = b.amount ?? 0;
+                            if (aAmount > bAmount) return -1;
+                            if (aAmount < bAmount) return 1;
+
+                            return a.name.localeCompare(b.name);
+                          })
+                          .map((stone) => (
+                            <InteractiveCard
+                              key={stone.id}
+                              stone={stone}
+                              setCurrentId={handleSetCurrentId}
+                              stoneType={type}
+                            />
+                          ))}
+                      </ModuleList>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+            </Accordion>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+      <Outlet />
+    </>
   );
 }
