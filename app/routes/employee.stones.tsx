@@ -111,7 +111,8 @@ function InteractiveCard({
       )}
 
       <ImageCard
-        stoneId={stone.id}
+        type="slabs"
+        itemId={stone.id}
         fieldList={{
           Avaliable: `${stone.available}`,
           Amount: `${displayedAmount}`,
@@ -183,10 +184,11 @@ export default function Stones() {
                     <AccordionContent>
                       <ModuleList>
                         <SuperCarousel
+                          type="stones"
                           currentId={currentId}
                           setCurrentId={handleSetCurrentId}
                           images={stoneList[type]}
-                          stoneType={type}
+                          category={type}
                           activeType={activeType}
                         />
                         {stoneList[type]
