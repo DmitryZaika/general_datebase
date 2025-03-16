@@ -24,7 +24,7 @@ import { getAdminUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 
 const supplierschema = z.object({
-  website: z.union([z.string().url().optional(), z.literal("")]),
+  website: z.union([z.string().url().optional(), z.literal("")]).optional(),
   supplier_name: z.string().min(1),
   manager: z.string().optional(),
   phone: z.union([z.coerce.string().min(10), z.literal("")]).optional(),
