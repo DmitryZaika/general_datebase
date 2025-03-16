@@ -8,22 +8,24 @@ export function ImageCard({
   children,
   fieldList,
   title,
-  stoneId,
+  itemId,
+  type,
 }: {
   children: JSX.Element;
   fieldList?: Record<string, number | null | string>;
   title: string;
-  stoneId?: number;
+  itemId?: number;
+  type: string;
 }) {
   return (
-    <Card className="w-full max-w-sm hover:cursor-pointer">
+    <Card className="w-full max-w-sm ">
       <div className="relative">{children}</div>
 
       <CardHeader className="grid gap-1 p-[2px]">
         <CardTitle className="text-md text-center">{title}</CardTitle>
       </CardHeader>
       <CardContent className="py-0 px-1 text-xs">
-        <Link to={`slabs/${stoneId}`}>
+        <Link to={`${type}/${itemId}`}>
           {fieldList &&
             Object.entries(fieldList).map(([key, value]) => (
               <p key={key}>

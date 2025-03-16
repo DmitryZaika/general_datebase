@@ -4,7 +4,7 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "~/components/ui/accordion";
-import { LoaderFunctionArgs, redirect } from "react-router";
+import { LoaderFunctionArgs, Outlet, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
@@ -45,6 +45,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+
   const user = await getEmployeeUser(request);
 
   const sinks = await selectMany<Sink>(
@@ -86,6 +87,8 @@ function InteractiveCard({
       }}
     >
       <ImageCard
+        type="sinks"
+        itemId={sink.id}
         fieldList={{
           Amount: `${displayedAmount}`,
           Size: `${displayedWidth} x ${displayedHeight}`,
@@ -134,49 +137,53 @@ export default function Sinks() {
   }, {});
 
   return (
-    <Accordion type="single" defaultValue="sinks" className="pt-24 sm:pt-0">
-      <AccordionItem value="sinks">
-        <AccordionContent>
-          <Accordion type="multiple">
-            {Object.keys(sinkList)
-              .sort(customSortType)
-              .map((type) => (
-                <AccordionItem key={type} value={type}>
-                  <AccordionTrigger>
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <ModuleList>
-                      <SuperCarousel
-                        currentId={currentId}
-                        setCurrentId={handleSetCurrentId}
-                        images={sinkList[type]}
-                        stoneType={type}
-                        activeType={activeType}
-                      />
-                      {sinkList[type]
-                        .sort((a, b) => {
-                          const aAmount = a.amount ?? 0;
-                          const bAmount = b.amount ?? 0;
-                          if (aAmount === 0 && bAmount !== 0) return 1;
-                          if (aAmount !== 0 && bAmount === 0) return -1;
-                          return a.name.localeCompare(b.name);
-                        })
-                        .map((sink) => (
-                          <InteractiveCard
-                            key={sink.id}
-                            sink={sink}
-                            setCurrentId={handleSetCurrentId}
-                            sinkType={type}
-                          />
-                        ))}
-                    </ModuleList>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-          </Accordion>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+    <>
+      <Accordion type="single" defaultValue="sinks" className="pt-24 sm:pt-0">
+        <AccordionItem value="sinks">
+          <AccordionContent>
+            <Accordion type="multiple">
+              {Object.keys(sinkList)
+                .sort(customSortType)
+                .map((type) => (
+                  <AccordionItem key={type} value={type}>
+                    <AccordionTrigger>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <ModuleList>
+                        <SuperCarousel
+                          type="sinks"
+                          currentId={currentId}
+                          setCurrentId={handleSetCurrentId}
+                          images={sinkList[type]}
+                          category={type}
+                          activeType={activeType}
+                        />
+                        {sinkList[type]
+                          .sort((a, b) => {
+                            const aAmount = a.amount ?? 0;
+                            const bAmount = b.amount ?? 0;
+                            if (aAmount === 0 && bAmount !== 0) return 1;
+                            if (aAmount !== 0 && bAmount === 0) return -1;
+                            return a.name.localeCompare(b.name);
+                          })
+                          .map((sink) => (
+                            <InteractiveCard
+                              key={sink.id}
+                              sink={sink}
+                              setCurrentId={handleSetCurrentId}
+                              sinkType={type}
+                            />
+                          ))}
+                      </ModuleList>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+            </Accordion>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+      <Outlet />
+    </>
   );
 }
