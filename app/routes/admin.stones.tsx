@@ -45,10 +45,7 @@ function getStonePriority(stone: Stone) {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const user = await getAdminUser(request).catch(() =>
-    redirect("/login?error=Unauthorized")
-  );
-
+  const user = await getAdminUser(request);
   const stones = await selectMany<Stone>(
     db,
     `
@@ -111,7 +108,6 @@ export default function AdminStones() {
                               if (priorityA !== priorityB) {
                                 return priorityA - priorityB;
                               }
-                              // Tie-break: sort by name
                               return a.name.localeCompare(b.name);
                             })
                             .map((stone) => {

@@ -181,20 +181,10 @@ export default function EditStoneSlabs() {
             className="flex gap-1 justify-between items-center"
           >
             <img
-              src={
-                slab.url && slab.url !== "null"
-                  ? slab.url
-                  : "https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg"
-              }
+              src={slab.url}
               alt="Slab"
               className="size-9 cursor-pointer"
-              onClick={() =>
-                setSelectedImage(
-                  slab.url && slab.url !== "null"
-                    ? slab.url
-                    : "https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg"
-                )
-              }
+              onClick={() => setSelectedImage(slab.url)}
             />
 
             <div className="p-1.5 border w-full border-gray-300">

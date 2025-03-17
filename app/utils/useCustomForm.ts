@@ -7,10 +7,7 @@ const fileSchema = z.object({
 });
 
 const optionalFileSchema = z.object({
-  file: z.preprocess(
-    (val) => (val instanceof File ? val : null),
-    z.instanceof(File).nullable()
-  ),
+  file: z.instanceof(File),
 });
 
 export function useCustomForm<TFieldValues extends FieldValues = FieldValues>(
