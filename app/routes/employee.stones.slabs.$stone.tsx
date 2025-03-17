@@ -47,7 +47,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export async function action({ request, params }: ActionFunctionArgs) {
   await getEmployeeUser(request);
-  await csrf.validate(request);
+  // await csrf.validate(request);
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
   }

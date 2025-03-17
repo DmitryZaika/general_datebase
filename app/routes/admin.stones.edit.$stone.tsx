@@ -106,9 +106,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
-  const user = await getAdminUser(request).catch((err) => {
-    return redirect(`/login?error=${err}`);
-  });
+  const user = await getAdminUser(request);
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
