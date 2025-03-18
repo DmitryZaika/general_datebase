@@ -6,7 +6,7 @@ export const sinkSchema = z.object({
   type: z.enum([
     "stainless 18 gauge",
     "stainless 16 gauge",
-    "granite composite",
+    "composite",
     "ceramic",
     "farm house",
   ]),

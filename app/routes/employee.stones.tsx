@@ -116,7 +116,7 @@ function InteractiveCard({
         fieldList={{
           Avaliable: `${stone.available}`,
           Amount: `${displayedAmount}`,
-          Size: `${displayedWidth} x ${displayedHeight}`,
+          Size: `${displayedHeight} x ${displayedWidth}`,
         }}
         title={stone.name}
       >
