@@ -41,7 +41,7 @@ export default function Images() {
   const { currentId, setCurrentId } = useArrowToggle(ids);
 
   return (
-    <Accordion type="single" defaultValue="images" className="pt-24 sm:pt-0">
+    <Accordion type="single" defaultValue="images" className="">
       <AccordionItem value="images">
         <AccordionContent>
           <Accordion type="multiple">

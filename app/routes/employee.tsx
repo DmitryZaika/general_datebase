@@ -57,7 +57,7 @@ export default function Employee() {
         onValueChange={handleTabChange}
         orientation="vertical"
       >
-        <TabsList className="flex flex-col pt-20 sm:pt-0 pb-5 sm:flex-row sm:justify-start">
+        <TabsList className="flex flex-col pt-20 sm:pt-0 pb-28 sm:pb-9 sm:flex-row sm:justify-start">
           <TabsTrigger value="stones" className={getTabClassName("stones")}>
             Stones
           </TabsTrigger>

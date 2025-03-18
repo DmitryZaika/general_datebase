@@ -138,7 +138,7 @@ export default function Sinks() {
 
   return (
     <>
-      <Accordion type="single" defaultValue="sinks" className="pt-24 sm:pt-0">
+      <Accordion type="single" defaultValue="sinks" className="">
         <AccordionItem value="sinks">
           <AccordionContent>
             <Accordion type="multiple">
