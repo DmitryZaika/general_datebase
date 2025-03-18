@@ -181,7 +181,8 @@ export default function Stones() {
 
   return (
     <>
-      <div className="flex gap-2 overflow-x-auto">
+      <div className="flex gap-2 overflow-x-auto items-center">
+        Suppliers:
         {suppliersUsed.map((supp) => (
           <Button
             variant="link"
@@ -201,7 +202,7 @@ export default function Stones() {
           Reset
         </Button>
       </div>
-      <Accordion type="single" defaultValue="stones" className="pt-24 sm:pt-0">
+      <Accordion type="single" defaultValue="stones" className="border-t-2">
         <AccordionItem value="stones">
           <AccordionContent>
             <Accordion type="multiple">
