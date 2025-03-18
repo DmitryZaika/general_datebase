@@ -21,6 +21,8 @@ interface Slab {
   bundle: string;
   url: string | null;
   is_sold: boolean | number;
+  width: number;
+  height: number;
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -29,9 +31,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
   const stoneId = parseInt(params.stone, 10);
-  const stone = await selectId<{ name: string }>(
+  const stone = await selectId<{ id: number; name: string; url: string }>(
     db,
-    "SELECT name FROM stones WHERE id = ?",
+    "SELECT id, name, url FROM stones WHERE id = ?",
     stoneId
   );
   if (!stone) {
@@ -39,7 +41,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const slabs = await selectMany<Slab>(
     db,
-    "SELECT id, bundle, url, is_sold FROM slab_inventory WHERE stone_id = ?",
+    "SELECT id, bundle, url, is_sold, width, height FROM slab_inventory WHERE stone_id = ?",
     [stoneId]
   );
   return { slabs, stone };
@@ -109,7 +111,11 @@ export default function SlabsModal() {
                   }`}
                 >
                   <img
-                    src={slab.url ?? "/placeholder.png"}
+                    src={
+                      slab.url === "undefined" || slab.url === null
+                        ? stone.url
+                        : slab.url
+                    }
                     alt="Slab"
                     className="w-15 h-15 object-cover cursor-pointer rounded"
                     onClick={() => {
@@ -118,13 +124,19 @@ export default function SlabsModal() {
                       }
                     }}
                   />
-                  <span
-                    className={`font-semibold ${
-                      isSold ? "text-red-900" : "text-gray-800"
-                    }`}
-                  >
-                    {slab.bundle}
-                  </span>
+                  <div className="flex flex-col">
+                    <span
+                      className={`font-semibold ${
+                        isSold ? "text-red-900" : "text-gray-800"
+                      }`}
+                    >
+                      {slab.bundle}
+                    </span>
+                    <span className="text-gray-500">
+                      {slab.width} x {slab.height}
+                    </span>
+                  </div>
+
                   <Form method="post" className="ml-auto">
                     <AuthenticityTokenInput />
                     <input type="hidden" name="slabId" value={slab.id} />
@@ -153,7 +165,7 @@ export default function SlabsModal() {
 
             {selectedImage && (
               <img
-                src={selectedImage}
+                src={selectedImage === "undefined" ? stone.url : selectedImage}
                 alt="Full size"
                 className="max-w-full max-h-[80vh] object-contain"
                 onClick={(e) => e.stopPropagation()}
