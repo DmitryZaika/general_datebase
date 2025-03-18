@@ -155,7 +155,7 @@ export default function AdminStones() {
                                       Available: {displayedAvailable}
                                     </p>
                                     <p className="text-center text-sm">
-                                      Size: {displayedWidth} x {displayedHeight}
+                                      Size: {displayedHeight} x {displayedWidth}
                                     </p>
                                   </div>
 
