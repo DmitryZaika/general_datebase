@@ -1,4 +1,4 @@
-// app/routes/employee.stones.tsx
+//// filepath: c:\Users\sarah\general_datebase\app\routes\employee.stones.tsx
 import {
   Accordion,
   AccordionItem,
@@ -15,6 +15,7 @@ import { getEmployeeUser } from "~/utils/session.server";
 import { ImageCard } from "~/components/organisms/ImageCard";
 import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState } from "react";
+import { Button } from "~/components/ui/button";
 
 interface Stone {
   id: number;
@@ -28,6 +29,8 @@ interface Stone {
   available: number;
   created_date: string;
   on_sale: boolean;
+  supplier_id: string | null;
+  supplier_name: string;
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
@@ -45,7 +48,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   const user = await getEmployeeUser(request);
-
   const stones = await selectMany<Stone>(
     db,
     `
@@ -56,18 +58,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       s.url, 
       s.is_display, 
       s.height, 
-      s.width, 
+      s.width,
+      s.supplier_id,
+      COALESCE(sup.supplier_name, '') AS supplier_name,
       (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id) AS amount,
-       (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id AND is_sold = 0) AS available,
+      (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id AND is_sold = 0) AS available,
       s.created_date, 
       s.on_sale
     FROM stones s
+    LEFT JOIN suppliers sup ON s.supplier_id = sup.id
     WHERE s.company_id = ? AND s.is_display = 1
     ORDER BY s.name ASC
     `,
     [user.company_id]
   );
-
   return { stones };
 };
 
@@ -109,7 +113,6 @@ function InteractiveCard({
           </div>
         </div>
       )}
-
       <ImageCard
         type="slabs"
         itemId={stone.id}
@@ -128,7 +131,6 @@ function InteractiveCard({
           onClick={() => setCurrentId(stone.id, stoneType)}
         />
       </ImageCard>
-
       {stone.available === 0 && (
         <div className="absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
           <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
@@ -149,7 +151,6 @@ export default function Stones() {
   const { stones } = useLoaderData<typeof loader>();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [activeType, setActiveType] = useState<string | undefined>(undefined);
-
   const handleSetCurrentId = (id: number | undefined, type?: string) => {
     setCurrentId(id);
     if (type) {
@@ -158,17 +159,48 @@ export default function Stones() {
       setActiveType(undefined);
     }
   };
-
-  const stoneList = stones.reduce((acc: { [key: string]: Stone[] }, stone) => {
-    if (!acc[stone.type]) {
-      acc[stone.type] = [];
-    }
-    acc[stone.type].push(stone);
-    return acc;
-  }, {});
+  const [selectedSupplier, setSelectedSupplier] = useState<string | undefined>(
+    undefined
+  );
+  const suppliersUsed = Array.from(
+    new Set(stones.map((st) => st.supplier_name).filter(Boolean))
+  );
+  const filteredStones = selectedSupplier
+    ? stones.filter((st) => st.supplier_name === selectedSupplier)
+    : stones;
+  const stoneList = filteredStones.reduce(
+    (acc: { [key: string]: Stone[] }, stone) => {
+      if (!acc[stone.type]) {
+        acc[stone.type] = [];
+      }
+      acc[stone.type].push(stone);
+      return acc;
+    },
+    {}
+  );
 
   return (
     <>
+      <div className="flex gap-2 overflow-x-auto">
+        {suppliersUsed.map((supp) => (
+          <Button
+            variant="link"
+            key={supp}
+            aria-current={selectedSupplier === supp ? "page" : undefined}
+            className={`px-3 py-1 border-none `}
+            onClick={() => setSelectedSupplier(supp)}
+          >
+            {supp}
+          </Button>
+        ))}
+        <Button
+          variant="secondary"
+          className="px-3 py-1 border hover:bg-red-500 hover:text-white"
+          onClick={() => setSelectedSupplier(undefined)}
+        >
+          Reset
+        </Button>
+      </div>
       <Accordion type="single" defaultValue="stones" className="pt-24 sm:pt-0">
         <AccordionItem value="stones">
           <AccordionContent>
@@ -196,12 +228,10 @@ export default function Stones() {
                             const bAvailable = b.available ?? 0;
                             if (aAvailable > 0 && bAvailable === 0) return -1;
                             if (aAvailable === 0 && bAvailable > 0) return 1;
-
                             const aAmount = a.amount ?? 0;
                             const bAmount = b.amount ?? 0;
                             if (aAmount > bAmount) return -1;
                             if (aAmount < bAmount) return 1;
-
                             return a.name.localeCompare(b.name);
                           })
                           .map((stone) => (
