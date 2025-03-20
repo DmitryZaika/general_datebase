@@ -11,11 +11,10 @@ import { MoreHorizontal } from "lucide-react";
 import { Link } from "react-router";
 
 interface IProps {
-  editLink?: string;
-  deleteLink?: string;
+  actions: Record<string, string>
 }
 
-export const ActionDropdown = ({ editLink, deleteLink }: IProps) => {
+export const ActionDropdown = ({actions}: IProps) => {
   return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -26,8 +25,10 @@ export const ActionDropdown = ({ editLink, deleteLink }: IProps) => {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            {editLink && <DropdownMenuItem asChild><Link to={editLink}>Edit</Link></DropdownMenuItem>}
-            {deleteLink && <DropdownMenuItem asChild><Link to={deleteLink}>Delete</Link></DropdownMenuItem>}
+            {Object.entries(actions).map(([action, link]) => (
+
+            <DropdownMenuItem asChild><Link to={link}>{action}</Link></DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
   )

@@ -1,3 +1,4 @@
+import { ColumnDef } from "@tanstack/react-table"
 import {
   Table,
   TableBody,
@@ -13,6 +14,8 @@ import { db } from "~/db.server";
 import { useLoaderData, Outlet, Link } from "react-router";
 import { Button } from "~/components/ui/button";
 import { getAdminUser } from "~/utils/session.server";
+import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
+import { DataTable } from "~/components/ui/data-table";
 
 interface Document {
   id: number;
@@ -35,6 +38,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { documents };
 };
 
+const documentColumns: ColumnDef<Document>[] = [
+  {
+    accessorKey: "name",
+    header: "Document Name",
+  },
+  {
+
+    id: "actions",
+    cell: ({ row }) => {
+      return (
+        <ActionDropdown actions={{edit:`edit/${row.original.id}`, delete: `delete/${row.original.id}` }}/>
+      )
+    }
+  },
+]
+
 export default function Documents() {
   const { documents } = useLoaderData<typeof loader>();
 
@@ -43,39 +62,7 @@ export default function Documents() {
       <Link to={`add`} relative="path">
         <Button>Add Document</Button>
       </Link>
-      <Table>
-        <TableCaption>A list of available documents.</TableCaption>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-xl w-[200px]">Document Name</TableHead>
-            <TableHead className="text-xl text-right">Edit Document</TableHead>
-            <TableHead className="text-xl text-right">
-              Delete Document
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {documents
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((document) => (
-              <TableRow key={document.id}>
-                <TableCell className="font-medium w-[200px]">
-                  {document.name}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Link to={`edit/${document.id}`} className="text-xl">
-                    Edit
-                  </Link>
-                </TableCell>
-                <TableCell className="w-[200px] text-right">
-                  <Link to={`delete/${document.id}`} className="text-xl">
-                    Delete
-                  </Link>
-                </TableCell>
-              </TableRow>
-            ))}
-        </TableBody>
-      </Table>
+      <DataTable columns={documentColumns} data={documents}/>
       <Outlet />
     </div>
   );
