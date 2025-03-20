@@ -1,3 +1,6 @@
+import { ColumnDef } from "@tanstack/react-table"
+import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
+import { DataTable } from "~/components/ui/data-table";
 import { LoaderFunctionArgs, redirect } from "react-router";
 import { Link, Outlet, useLoaderData } from "react-router";
 import { PageLayout } from "~/components/PageLayout";
@@ -14,7 +17,7 @@ import {
 import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
 import { getSuperUser } from "~/utils/session.server";
-interface Users {
+interface User {
   id: number;
   name: string;
   email: string;
@@ -28,13 +31,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   const user = await getSuperUser(request);
-  const users = await selectMany<Users>(
+  const users = await selectMany<User>(
     db,
     " select id, name, email, phone_number from main.users WHERE is_deleted = 0"
   );
 
   return { users };
 };
+
+const adminColumns: ColumnDef<User>[] =[
+  {
+    accessorKey: "name",
+    header: "Name",
+  },
+  {
+    accessorKey: "email",
+    header: "Email",
+  },
+  {
+    accessorKey: "phone_number",
+    header: "Phone Number",
+  },
+    {
+    id: "actions",
+    cell: ({ row }) => {
+      return (
+        <ActionDropdown actions={{edit:`edit/${row.original.id}`, delete: `delete/${row.original.id}` }}/>
+      )
+    }
+    }
+]
 
 export default function Adminusers() {
   const { users } = useLoaderData<typeof loader>();
@@ -44,39 +70,7 @@ export default function Adminusers() {
       <Link to={`add`} relative="path">
         <Button>Add User</Button>
       </Link>
-      <Table>
-        <TableCaption>A list of users</TableCaption>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-xl w-[200px]">Name</TableHead>{" "}
-            <TableHead className="text-xl">Email</TableHead>
-            <TableHead className="text-xl"> Phone number</TableHead>
-            <TableHead className="text-xl text-right pr-4">
-              Edit User
-            </TableHead>{" "}
-            <TableHead className="text-right text-xl">Delete User</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell>{user.name}</TableCell>
-              <TableCell>{user.email}</TableCell>
-              <TableCell>{user.phone_number}</TableCell>
-              <TableCell className="text-right pr-4">
-                <Link to={`edit/${user.id}`} className="text-xl">
-                  Edit
-                </Link>
-              </TableCell>
-              <TableCell className="text-right w-[200px]">
-                <Link to={`delete/${user.id}`} className="text-xl">
-                  Delete
-                </Link>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <DataTable columns={adminColumns} data={users}/>
       <Outlet />
     </PageLayout>
   );
