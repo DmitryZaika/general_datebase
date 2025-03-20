@@ -65,7 +65,7 @@ const columns: ColumnDef<Supplier>[] =[
     id: "actions",
     cell: ({ row }) => {
       return (
-        <ActionDropdown editLink={`edit/${row.original.id}`} deleteLink={`delete/${row.original.id}`}/>
+        <ActionDropdown actions={{edit:`edit/${row.original.id}`, delete: `delete/${row.original.id}` }}/>
       )
     }
   }
