@@ -3,7 +3,8 @@ import { useLocation, useNavigate, Outlet } from "react-router";
 import { Checkbox } from "~/components/ui/checkbox"
 import { FormLabel } from "~/components/ui/form"
 import { STONE_TYPES } from "~/utils/constants";
-import { useSearchParams } from "@remix-run/react";
+import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
+import { stoneFilterSchema, StoneFilter } from "~/schemas/stones";
 
 import {
   Sidebar,
@@ -51,10 +52,16 @@ const items = [
   },
 ]
 
-function CheckOption({ value }: {value: string}) {
+interface ICheckOptionProps {
+  value: StoneFilter["type"][number]
+  selected: StoneFilter["type"]
+  toggleValue: (val: StoneFilter["type"][number]) => void
+}
+
+function CheckOption({ value, selected, toggleValue }: ICheckOptionProps) {
   return (
     <div className="items-top flex space-x-2">
-      <Checkbox id="terms1" />
+      <Checkbox id="terms1" checked={selected.includes(value)} onCheckedChange={() => toggleValue(value)}/>
       <div className="grid gap-1.5 leading-none">
         <label
           htmlFor="terms1"
@@ -69,13 +76,29 @@ function CheckOption({ value }: {value: string}) {
 }
 
 function SubStonesItem() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const stoneTypes = searchParams.get("stoneTypes")?.split(",") || [];
+  const [searchParams, setSearchParams] = useSafeSearchParams(stoneFilterSchema);
+    // Функция, которая добавляет/убирает элемент в массиве `type`
+  const toggleStoneType = (typeToToggle: StoneFilter["type"][number]) => {
+    let { type } = searchParams;
+    type = type ?? [];
+    let newTypes;
+
+    if (type.includes(typeToToggle)) {
+      // Если уже выбран, убираем из массива
+      newTypes = type.filter((t) => t !== typeToToggle);
+    } else {
+      // Иначе добавляем
+      newTypes = [...type, typeToToggle];
+    }
+
+    // Обновляем параметры (Partial<T>): меняем только ключ `type`
+    setSearchParams({ type: newTypes });
+  };
   return (
     <SidebarMenuSub>
       <SidebarGroupLabel>Stone</SidebarGroupLabel>
       {STONE_TYPES.map((item) => (
-        <CheckOption value={item} key={item}/>
+        <CheckOption value={item} key={item} selected={searchParams.type} toggleValue={toggleStoneType}/>
       ))}
     </SidebarMenuSub>
   )

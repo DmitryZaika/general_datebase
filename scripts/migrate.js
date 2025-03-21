@@ -6,7 +6,7 @@ import fs from "fs";
 import dotenv from "dotenv";
 import os from "os";
 
-const __dirname = fileURLToPath(new URL(".", import.meta.url)).replace(
+const __dirname = fileURLToPath(new URL("..", import.meta.url)).replace(
   /\/$/,
   ""
 );

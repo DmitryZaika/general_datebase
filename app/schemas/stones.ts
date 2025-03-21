@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { NullableId, StringBoolean } from "./general";
+import { NullableId, StringBoolean, StringBoolV2 } from "./general";
+import { STONE_TYPES } from "~/utils/constants";
 
 export const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
+  type: z.enum(STONE_TYPES),
   is_display: StringBoolean,
   on_sale: StringBoolean,
 
@@ -14,3 +15,12 @@ export const stoneSchema = z.object({
   cost_per_sqft: z.coerce.number().default(0),
   retail_price: z.coerce.number().default(0),
 });
+
+
+export const stoneFilterSchema = z.object({
+  type: z.array(z.enum(STONE_TYPES)).default([]),
+  show_sold_out: z.preprocess(value => value === "true", z.boolean()),
+  supplier: z.number().gte(0).default(0),
+})
+
+export type StoneFilter = z.infer<typeof stoneFilterSchema>;
