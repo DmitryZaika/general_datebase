@@ -1,4 +1,5 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { STONE_TYPES } from "~/utils/constants";
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import {
   useNavigate,
@@ -163,13 +164,7 @@ export default function StonesAdd() {
                   field={field}
                   placeholder="Type of the Stone"
                   name="Type"
-                  options={[
-                    "Granite",
-                    "Quartz",
-                    "Marble",
-                    "Dolomite",
-                    "Quartzite",
-                  ].map((item) => ({ key: item.toLowerCase(), value: item }))}
+                  options={STONE_TYPES.map((item) => ({ key: item.toLowerCase(), value: item }))}
                 />
               )}
             />
