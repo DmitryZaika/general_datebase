@@ -1,4 +1,3 @@
-//// filepath: c:\Users\sarah\general_datebase\app\routes\employee.stones.tsx
 import {
   Accordion,
   AccordionItem,
