@@ -1,4 +1,5 @@
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { STONE_TYPES } from "~/utils/constants";
 import {
   useNavigate,
   useLoaderData,
@@ -210,7 +211,7 @@ function StoneInformation({
               name="Type"
               placeholder="Stone Type"
               field={field}
-              options={["Granite", "Quartz", "Marble", "Dolomite", "Quartzite"]}
+              options={STONE_TYPES}
             />
           )}
         />
