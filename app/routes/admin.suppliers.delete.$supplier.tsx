@@ -66,7 +66,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const supplier = await selectId<{ supplier_name: string }>(
     db,
     "select supplier_name from suppliers WHERE id = ?",
-    supplierId
+    supplierId,
   );
 
   if (!supplier) {

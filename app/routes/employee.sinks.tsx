@@ -56,7 +56,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       WHERE company_id = ? AND is_display = 1
       ORDER BY name ASC
     `,
-    [user.company_id]
+    [user.company_id],
   );
 
   return { sinks };

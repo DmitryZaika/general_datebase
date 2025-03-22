@@ -56,7 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
-    resolver
+    resolver,
   );
   if (errors) {
     return { errors, receivedValues };
@@ -73,7 +73,7 @@ export async function action({ request }: ActionFunctionArgs) {
         data.email ?? null,
         data.notes ?? null,
         (await user).company_id,
-      ]
+      ],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);

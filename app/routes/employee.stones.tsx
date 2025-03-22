@@ -1,14 +1,5 @@
-//// filepath: c:\Users\sarah\general_datebase\app\routes\employee.stones.tsx
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
 import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
-import { selectMany } from "~/utils/queryHelpers";
-import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
@@ -16,22 +7,11 @@ import { ImageCard } from "~/components/organisms/ImageCard";
 import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
+import { StoneFilter, stoneFilterSchema } from "~/schemas/stones";
+import { STONE_TYPES } from "~/utils/constants";
+import { cleanParams } from "~/hooks/use-safe-search-params";
+import { Stone, stoneQueryBuilder } from "~/utils/queries";
 
-interface Stone {
-  id: number;
-  name: string;
-  type: string;
-  url: string | null;
-  is_display: boolean | number;
-  height: number | null;
-  width: number | null;
-  amount: number;
-  available: number;
-  created_date: string;
-  on_sale: boolean;
-  supplier_id: string | null;
-  supplier_name: string;
-}
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
 
@@ -41,6 +21,19 @@ function customSortType(a: string, b: string) {
   );
 }
 
+function customSort2(a: Stone, b: Stone) {
+  const aAvailable = a.available ?? 0;
+  const bAvailable = b.available ?? 0;
+  if (aAvailable > 0 && bAvailable === 0) return -1;
+  if (aAvailable === 0 && bAvailable > 0) return 1;
+  const aAmount = a.amount ?? 0;
+  const bAmount = b.amount ?? 0;
+  if (aAmount > bAmount) return -1;
+  if (aAmount < bAmount) return 1;
+  return a.name.localeCompare(b.name);
+}
+
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getEmployeeUser(request);
@@ -48,30 +41,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   const user = await getEmployeeUser(request);
-  const stones = await selectMany<Stone>(
-    db,
-    `
-    SELECT 
-      s.id, 
-      s.name, 
-      s.type, 
-      s.url, 
-      s.is_display, 
-      s.height, 
-      s.width,
-      s.supplier_id,
-      COALESCE(sup.supplier_name, '') AS supplier_name,
-      (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id) AS amount,
-      (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id AND is_sold = 0) AS available,
-      s.created_date, 
-      s.on_sale
-    FROM stones s
-    LEFT JOIN suppliers sup ON s.supplier_id = sup.id
-    WHERE s.company_id = ? AND s.is_display = 1
-    ORDER BY s.name ASC
-    `,
-    [user.company_id]
-  );
+  const [, searchParams] = request.url.split("?");
+  const queryParams = new URLSearchParams(searchParams);
+  const filters = stoneFilterSchema.parse(cleanParams(queryParams));
+  const stones = await stoneQueryBuilder(filters, user.company_id);
   return { stones };
 };
 
@@ -81,7 +54,7 @@ function InteractiveCard({
   stoneType,
 }: {
   stone: Stone;
-  setCurrentId: (value: number, type: string) => void;
+  setCurrentId: (value: number) => void;
   stoneType: string;
 }) {
   const displayedAmount = stone.amount > 0 ? stone.amount : "—";
@@ -128,7 +101,7 @@ function InteractiveCard({
           alt={stone.name || "Stone Image"}
           className="object-cover w-full h-40 border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none"
           loading="lazy"
-          onClick={() => setCurrentId(stone.id, stoneType)}
+          onClick={() => setCurrentId(stone.id)}
         />
       </ImageCard>
       {stone.available === 0 && (
@@ -151,106 +124,26 @@ export default function Stones() {
   const { stones } = useLoaderData<typeof loader>();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [activeType, setActiveType] = useState<string | undefined>(undefined);
-  const handleSetCurrentId = (id: number | undefined, type?: string) => {
-    setCurrentId(id);
-    if (type) {
-      setActiveType(type);
-    } else if (id === undefined) {
-      setActiveType(undefined);
-    }
-  };
-  const [selectedSupplier, setSelectedSupplier] = useState<string | undefined>(
-    undefined
-  );
-  const suppliersUsed = Array.from(
-    new Set(stones.map((st) => st.supplier_name).filter(Boolean))
-  );
-  const filteredStones = selectedSupplier
-    ? stones.filter((st) => st.supplier_name === selectedSupplier)
-    : stones;
-  const stoneList = filteredStones.reduce(
-    (acc: { [key: string]: Stone[] }, stone) => {
-      if (!acc[stone.type]) {
-        acc[stone.type] = [];
-      }
-      acc[stone.type].push(stone);
-      return acc;
-    },
-    {}
-  );
 
   return (
     <>
-      <div className="flex gap-2 overflow-x-auto items-center">
-        Suppliers:
-        {suppliersUsed.map((supp) => (
-          <Button
-            variant="link"
-            key={supp}
-            aria-current={selectedSupplier === supp ? "page" : undefined}
-            className={`px-3 py-1 border-none `}
-            onClick={() => setSelectedSupplier(supp)}
-          >
-            {supp}
-          </Button>
+      <ModuleList>
+        <SuperCarousel
+          type="stones"
+          currentId={currentId}
+          setCurrentId={setCurrentId}
+          images={stones}
+          activeType={activeType}
+        />
+        {stones.map((stone) => (
+          <InteractiveCard
+            key={stone.id}
+            stone={stone}
+            setCurrentId={setCurrentId}
+            stoneType={stone.type}
+          />
         ))}
-        <Button
-          variant="secondary"
-          className="px-3 py-1 border hover:bg-red-500 hover:text-white"
-          onClick={() => setSelectedSupplier(undefined)}
-        >
-          Reset
-        </Button>
-      </div>
-      <Accordion type="single" defaultValue="stones" className="border-t-2">
-        <AccordionItem value="stones">
-          <AccordionContent>
-            <Accordion type="multiple">
-              {Object.keys(stoneList)
-                .sort(customSortType)
-                .map((type) => (
-                  <AccordionItem key={type} value={type}>
-                    <AccordionTrigger>
-                      {capitalizeFirstLetter(type)}
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <ModuleList>
-                        <SuperCarousel
-                          type="stones"
-                          currentId={currentId}
-                          setCurrentId={handleSetCurrentId}
-                          images={stoneList[type]}
-                          category={type}
-                          activeType={activeType}
-                        />
-                        {stoneList[type]
-                          .sort((a, b) => {
-                            const aAvailable = a.available ?? 0;
-                            const bAvailable = b.available ?? 0;
-                            if (aAvailable > 0 && bAvailable === 0) return -1;
-                            if (aAvailable === 0 && bAvailable > 0) return 1;
-                            const aAmount = a.amount ?? 0;
-                            const bAmount = b.amount ?? 0;
-                            if (aAmount > bAmount) return -1;
-                            if (aAmount < bAmount) return 1;
-                            return a.name.localeCompare(b.name);
-                          })
-                          .map((stone) => (
-                            <InteractiveCard
-                              key={stone.id}
-                              stone={stone}
-                              setCurrentId={handleSetCurrentId}
-                              stoneType={type}
-                            />
-                          ))}
-                      </ModuleList>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-            </Accordion>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+      </ModuleList>
       <Outlet />
     </>
   );

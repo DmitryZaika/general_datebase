@@ -13,7 +13,12 @@ import { db } from "~/db.server";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent, DialogClose } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogClose,
+  DialogTitle,
+} from "~/components/ui/dialog";
 import { useState } from "react";
 
 interface Slab {
@@ -34,7 +39,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const stone = await selectId<{ id: number; name: string; url: string }>(
     db,
     "SELECT id, name, url FROM stones WHERE id = ?",
-    stoneId
+    stoneId,
   );
   if (!stone) {
     return forceRedirectError(request.headers, "No stone found for given ID");
@@ -42,7 +47,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const slabs = await selectMany<Slab>(
     db,
     "SELECT id, bundle, url, is_sold, width, height FROM slab_inventory WHERE stone_id = ?",
-    [stoneId]
+    [stoneId],
   );
   return { slabs, stone };
 }
@@ -61,7 +66,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const slab = await selectId<{ is_sold: number }>(
     db,
     "SELECT is_sold FROM slab_inventory WHERE id = ?",
-    parseInt(slabId.toString(), 10)
+    parseInt(slabId.toString(), 10),
   );
   if (!slab) {
     return forceRedirectError(request.headers, "No slab found for given ID");
@@ -74,7 +79,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const session = await getSession(request.headers.get("Cookie"));
   session.flash(
     "message",
-    toastData("Success", `Slab ${newValue ? "Sold" : "Unsold"}`)
+    toastData("Success", `Slab ${newValue ? "Sold" : "Unsold"}`),
   );
   return redirect(request.url, {
     headers: { "Set-Cookie": await commitSession(session) },
@@ -93,9 +98,7 @@ export default function SlabsModal() {
       }}
     >
       <DialogContent className="p-5 bg-white rounded-md shadow-lg text-gray-800">
-        <h2 className="text-2xl font-bold mb-6 text-center pl-5 pr-5">
-          Slabs for {stone.name}
-        </h2>
+        <DialogTitle>Slabs for {stone.name}</DialogTitle>
 
         <div className="flex flex-col gap-4">
           {slabs.length === 0 ? (

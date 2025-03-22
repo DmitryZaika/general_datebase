@@ -14,7 +14,7 @@ export interface ToastMessage {
 export function toastData(
   title: string,
   description: string,
-  variant: Variants = "success"
+  variant: Variants = "success",
 ): ToastMessage {
   return {
     nonce: uuidv4(),
@@ -26,7 +26,7 @@ export function toastData(
 
 export async function forceRedirectError(
   headers: Headers,
-  description: string
+  description: string,
 ) {
   const session = await getSession(headers.get("Cookie"));
   session.flash("message", toastData("Error", description, "destructive"));

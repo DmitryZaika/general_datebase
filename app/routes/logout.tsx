@@ -12,7 +12,7 @@ export const loader: LoaderFunction = async ({ request }) => {
   if (sessionId) {
     const result = await db.execute(
       `UPDATE main.sessions SET is_deleted = 1 WHERE id = ?`,
-      [sessionId]
+      [sessionId],
     );
   }
 

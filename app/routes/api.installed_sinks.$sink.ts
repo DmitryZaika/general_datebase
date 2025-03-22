@@ -22,7 +22,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const images = await selectMany<{ id: number; url: string }>(
     db,
     "SELECT id, url FROM installed_sinks WHERE sink_id = ?",
-    [sinkId]
+    [sinkId],
   );
   return Response.json({ images });
 }

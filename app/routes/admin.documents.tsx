@@ -1,4 +1,4 @@
-import { ColumnDef } from "@tanstack/react-table"
+import { ColumnDef } from "@tanstack/react-table";
 import {
   Table,
   TableBody,
@@ -33,7 +33,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const documents = await selectMany<Document>(
     db,
     "SELECT id, name FROM documents WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return { documents };
 };
@@ -44,15 +44,19 @@ const documentColumns: ColumnDef<Document>[] = [
     header: "Document Name",
   },
   {
-
     id: "actions",
     cell: ({ row }) => {
       return (
-        <ActionDropdown actions={{edit:`edit/${row.original.id}`, delete: `delete/${row.original.id}` }}/>
-      )
-    }
+        <ActionDropdown
+          actions={{
+            edit: `edit/${row.original.id}`,
+            delete: `delete/${row.original.id}`,
+          }}
+        />
+      );
+    },
   },
-]
+];
 
 export default function Documents() {
   const { documents } = useLoaderData<typeof loader>();
@@ -62,7 +66,7 @@ export default function Documents() {
       <Link to={`add`} relative="path">
         <Button>Add Document</Button>
       </Link>
-      <DataTable columns={documentColumns} data={documents}/>
+      <DataTable columns={documentColumns} data={documents} />
       <Outlet />
     </div>
   );
