@@ -1,9 +1,3 @@
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
 import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
@@ -15,21 +9,22 @@ import { ImageCard } from "~/components/organisms/ImageCard";
 import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
+import { StoneFilter, stoneFilterSchema } from "~/schemas/stones";
+import { STONE_TYPES } from "~/utils/constants";
+import { cleanParams } from "~/hooks/use-safe-search-params";
 
 interface Stone {
   id: number;
   name: string;
   type: string;
   url: string | null;
-  is_display: boolean | number;
+  is_display: number;
   height: number | null;
   width: number | null;
   amount: number;
   available: number;
   created_date: string;
   on_sale: boolean;
-  supplier_id: string | null;
-  supplier_name: string;
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
@@ -40,6 +35,70 @@ function customSortType(a: string, b: string) {
   );
 }
 
+function customSort2(a: Stone, b: Stone) {
+  const aAvailable = a.available ?? 0;
+  const bAvailable = b.available ?? 0;
+  if (aAvailable > 0 && bAvailable === 0) return -1;
+  if (aAvailable === 0 && bAvailable > 0) return 1;
+  const aAmount = a.amount ?? 0;
+  const bAmount = b.amount ?? 0;
+  if (aAmount > bAmount) return -1;
+  if (aAmount < bAmount) return 1;
+  return a.name.localeCompare(b.name);
+}
+
+const stoneQueryBuilder = async (
+  filters: StoneFilter,
+  companyId: number,
+): Promise<Stone[]> => {
+  if (filters.type.length === 0) {
+    return [];
+  }
+  const params: (string | number)[] = [companyId];
+  let query = `
+  SELECT 
+    s.id, 
+    s.name, 
+    s.type, 
+    s.url, 
+    s.is_display, 
+    s.height, 
+    s.width,
+    s.created_date, 
+    s.on_sale,
+    COUNT(si.stone_id) AS amount,
+    SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS available
+  FROM main.stones s
+  LEFT JOIN main.slab_inventory AS si ON si.stone_id = s.id
+  WHERE s.company_id = ? AND s.is_display = 1
+  `;
+  if (filters.type.length < STONE_TYPES.length) {
+    query += ` AND s.type IN (${filters.type.map(() => "?").join(", ")})`;
+    params.push(...filters.type);
+  }
+  if (filters.supplier > 0) {
+    query += " AND s.supplier_id = ?";
+    params.push(filters.supplier);
+  }
+  query += `
+    GROUP BY
+      s.id,
+      s.name,
+      s.type,
+      s.url,
+      s.is_display,
+      s.height,
+      s.width,
+      s.created_date,
+      s.on_sale
+    `;
+  if (!filters.show_sold_out) {
+    query += `\nHAVING available > 0`;
+  }
+  query += `\nORDER BY s.name ASC`;
+  return await selectMany<Stone>(db, query, params);
+};
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getEmployeeUser(request);
@@ -47,30 +106,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   const user = await getEmployeeUser(request);
-  const stones = await selectMany<Stone>(
-    db,
-    `
-    SELECT 
-      s.id, 
-      s.name, 
-      s.type, 
-      s.url, 
-      s.is_display, 
-      s.height, 
-      s.width,
-      s.supplier_id,
-      COALESCE(sup.supplier_name, '') AS supplier_name,
-      (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id) AS amount,
-      (SELECT COUNT(*) FROM slab_inventory WHERE stone_id = s.id AND is_sold = 0) AS available,
-      s.created_date, 
-      s.on_sale
-    FROM stones s
-    LEFT JOIN suppliers sup ON s.supplier_id = sup.id
-    WHERE s.company_id = ? AND s.is_display = 1
-    ORDER BY s.name ASC
-    `,
-    [user.company_id]
-  );
+  const [, searchParams] = request.url.split("?");
+  const queryParams = new URLSearchParams(searchParams);
+  const filters = stoneFilterSchema.parse(cleanParams(queryParams));
+  const stones = await stoneQueryBuilder(filters, user.company_id);
   return { stones };
 };
 
@@ -159,97 +198,31 @@ export default function Stones() {
     }
   };
   const [selectedSupplier, setSelectedSupplier] = useState<string | undefined>(
-    undefined
-  );
-  const suppliersUsed = Array.from(
-    new Set(stones.map((st) => st.supplier_name).filter(Boolean))
-  );
-  const filteredStones = selectedSupplier
-    ? stones.filter((st) => st.supplier_name === selectedSupplier)
-    : stones;
-  const stoneList = filteredStones.reduce(
-    (acc: { [key: string]: Stone[] }, stone) => {
-      if (!acc[stone.type]) {
-        acc[stone.type] = [];
-      }
-      acc[stone.type].push(stone);
-      return acc;
-    },
-    {}
+    undefined,
   );
 
   return (
     <>
-      <div className="flex gap-2 overflow-x-auto items-center">
-        Suppliers:
-        {suppliersUsed.map((supp) => (
-          <Button
-            variant="link"
-            key={supp}
-            aria-current={selectedSupplier === supp ? "page" : undefined}
-            className={`px-3 py-1 border-none `}
-            onClick={() => setSelectedSupplier(supp)}
-          >
-            {supp}
-          </Button>
+      <ModuleList>
+        {/*
+        <SuperCarousel
+          type="stones"
+          currentId={currentId}
+          setCurrentId={handleSetCurrentId}
+          images={stoneList[type]}
+          category={type}
+          activeType={activeType}
+        />
+          */}
+        {stones.map((stone) => (
+          <InteractiveCard
+            key={stone.id}
+            stone={stone}
+            setCurrentId={handleSetCurrentId}
+            stoneType={stone.type}
+          />
         ))}
-        <Button
-          variant="secondary"
-          className="px-3 py-1 border hover:bg-red-500 hover:text-white"
-          onClick={() => setSelectedSupplier(undefined)}
-        >
-          Reset
-        </Button>
-      </div>
-      <Accordion type="single" defaultValue="stones" className="border-t-2">
-        <AccordionItem value="stones">
-          <AccordionContent>
-            <Accordion type="multiple">
-              {Object.keys(stoneList)
-                .sort(customSortType)
-                .map((type) => (
-                  <AccordionItem key={type} value={type}>
-                    <AccordionTrigger>
-                      {capitalizeFirstLetter(type)}
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <ModuleList>
-                        <SuperCarousel
-                          type="stones"
-                          currentId={currentId}
-                          setCurrentId={handleSetCurrentId}
-                          images={stoneList[type]}
-                          category={type}
-                          activeType={activeType}
-                        />
-                        {stoneList[type]
-                          .sort((a, b) => {
-                            const aAvailable = a.available ?? 0;
-                            const bAvailable = b.available ?? 0;
-                            if (aAvailable > 0 && bAvailable === 0) return -1;
-                            if (aAvailable === 0 && bAvailable > 0) return 1;
-                            const aAmount = a.amount ?? 0;
-                            const bAmount = b.amount ?? 0;
-                            if (aAmount > bAmount) return -1;
-                            if (aAmount < bAmount) return 1;
-                            return a.name.localeCompare(b.name);
-                          })
-                          .map((stone) => (
-                            <InteractiveCard
-                              key={stone.id}
-                              stone={stone}
-                              setCurrentId={handleSetCurrentId}
-                              stoneType={type}
-                            />
-                          ))}
-                      </ModuleList>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-            </Accordion>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+      </ModuleList>
       <Outlet />
     </>
   );

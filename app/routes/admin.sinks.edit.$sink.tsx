@@ -53,7 +53,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const sink = await selectId<{ url: string }>(
     db,
     "SELECT url FROM sinks WHERE id = ?",
-    sinkId
+    sinkId,
   );
   try {
     if (newFile) {
@@ -71,7 +71,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.width,
           data.amount,
           sinkId,
-        ]
+        ],
       );
     } else {
       await db.execute(
@@ -87,7 +87,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.width,
           data.amount,
           sinkId,
-        ]
+        ],
       );
     }
   } catch (error) {
@@ -123,7 +123,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   }>(
     db,
     "SELECT name, type, url, is_display, supplier_id, height, width, amount FROM sinks WHERE id = ?",
-    sinkId
+    sinkId,
   );
   if (!sink) {
     return forceRedirectError(request.headers, "No sink found");

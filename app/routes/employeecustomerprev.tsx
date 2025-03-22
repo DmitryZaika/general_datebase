@@ -44,7 +44,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await db.execute(
       `INSERT INTO main.customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
-      [data.name, data.email, data.phoneNumber, data.address]
+      [data.name, data.email, data.phoneNumber, data.address],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);

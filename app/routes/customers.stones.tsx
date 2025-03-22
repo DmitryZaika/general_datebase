@@ -43,7 +43,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         AND COALESCE(amount, 0) > 0
         ORDER BY name ASC
       `,
-    [1]
+    [1],
   );
 
   return { stones };

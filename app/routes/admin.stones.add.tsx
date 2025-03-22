@@ -65,7 +65,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.height,
         data.cost_per_sqft,
         data.retail_price,
-      ]
+      ],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -76,21 +76,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
     try {
       await db.execute(
         `INSERT INTO main.slab_inventory (bundle, stone_id) VALUES (?, ?);`,
-        [data.bundle, stoneId]
+        [data.bundle, stoneId],
       );
     } catch (error) {
       console.error("Error connecting to the database: ", error);
       const session = await getSession(request.headers.get("Cookie"));
       session.flash(
         "message",
-        toastData("Failure", "Database Error Occured", "destructive")
+        toastData("Failure", "Database Error Occured", "destructive"),
       );
       return new Response(JSON.stringify({ error: "Database Error Occured" }), {
         headers: { "Set-Cookie": await commitSession(session) },
@@ -164,7 +164,10 @@ export default function StonesAdd() {
                   field={field}
                   placeholder="Type of the Stone"
                   name="Type"
-                  options={STONE_TYPES.map((item) => ({ key: item.toLowerCase(), value: item }))}
+                  options={STONE_TYPES.map((item) => ({
+                    key: item.toLowerCase(),
+                    value: item,
+                  }))}
                 />
               )}
             />

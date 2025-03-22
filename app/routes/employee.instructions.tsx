@@ -103,7 +103,7 @@ function cleanData(instructions: Instruction[]): InstructionNode[] {
   const rootNodes: InstructionNode[] = [];
   const insertNodeInOrder = (
     nodes: InstructionNode[],
-    node: InstructionNode
+    node: InstructionNode,
   ) => {
     if (node.after_id === null) {
       nodes.unshift(node);
@@ -140,7 +140,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const instructions = await selectMany<Instruction>(
     db,
     "SELECT id, title, parent_id, after_id, rich_text FROM instructions WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return { instructions };
 };

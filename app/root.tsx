@@ -1,5 +1,12 @@
 import { data } from "react-router";
-import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "react-router";
+import {
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  useLoaderData,
+} from "react-router";
 import type { LinksFunction, LoaderFunctionArgs } from "react-router";
 import { Header } from "./components/Header";
 import { Toaster } from "./components/ui/toaster";
@@ -45,7 +52,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         ["Set-Cookie", cookieHeader || ""],
         ["Set-Cookie", await commitSession(session)],
       ],
-    }
+    },
   );
 }
 

@@ -1,4 +1,4 @@
-import { SidebarProvider, SidebarTrigger } from "~/components/ui/sidebar"
+import { SidebarProvider, SidebarTrigger } from "~/components/ui/sidebar";
 import type { LoaderFunction, MetaFunction } from "react-router";
 import { Outlet } from "react-router";
 import { PageLayout } from "~/components/PageLayout";
@@ -34,9 +34,9 @@ export default function Employee() {
     <SidebarProvider>
       <EmployeeSidebar />
       <PageLayout title="Granite Depot DataBase">
-        { isMobile &&  <SidebarTrigger />}
+        {isMobile && <SidebarTrigger />}
         <Outlet />
       </PageLayout>
     </SidebarProvider>
-  )
+  );
 }

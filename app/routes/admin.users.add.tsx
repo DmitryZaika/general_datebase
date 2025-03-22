@@ -59,7 +59,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
-    resolver
+    resolver,
   );
   if (errors) {
     return { errors, receivedValues };
@@ -76,7 +76,7 @@ export async function action({ request }: ActionFunctionArgs) {
         password,
         data.company_id,
         data.is_admin,
-      ]
+      ],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -96,7 +96,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const companies = await selectMany<Company>(
     db,
-    "select id, name from company"
+    "select id, name from company",
   );
   return { companies };
 };

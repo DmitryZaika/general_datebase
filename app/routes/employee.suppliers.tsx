@@ -9,7 +9,7 @@ import { LoaderFunctionArgs, redirect } from "react-router";
 import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
 import { getEmployeeUser } from "~/utils/session.server";
-import { ColumnDef } from "@tanstack/react-table"
+import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "~/components/ui/data-table";
 
 interface Supplier {
@@ -31,7 +31,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const suppliers = await selectMany<Supplier>(
     db,
     "select id,website, supplier_name,  manager, phone, email, notes from suppliers WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return { suppliers };
 };
@@ -40,7 +40,15 @@ const columns: ColumnDef<Supplier>[] = [
   {
     accessorKey: "supplier_name",
     header: "Supplier Name",
-    cell: ({ row }) => <Link to={row.original.website} classname="text-blue-600 hover:underline" target="_blank">{row.original.supplier_name}</Link>,
+    cell: ({ row }) => (
+      <Link
+        to={row.original.website}
+        classname="text-blue-600 hover:underline"
+        target="_blank"
+      >
+        {row.original.supplier_name}
+      </Link>
+    ),
   },
   {
     accessorKey: "manager",
@@ -57,12 +65,10 @@ const columns: ColumnDef<Supplier>[] = [
   {
     accessorKey: "notes",
     header: "Notes",
-  }
-]
+  },
+];
 
 export default function Suppliers() {
   const { suppliers } = useLoaderData<typeof loader>();
-  return (
-    <DataTable columns={columns} data={suppliers} />
-  );
+  return <DataTable columns={columns} data={suppliers} />;
 }

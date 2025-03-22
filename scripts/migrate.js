@@ -8,7 +8,7 @@ import os from "os";
 
 const __dirname = fileURLToPath(new URL("..", import.meta.url)).replace(
   /\/$/,
-  ""
+  "",
 );
 
 dotenv.config();
@@ -16,7 +16,7 @@ const { DB_DATABASE, DB_USER, DB_PASSWORD, DB_HOST } = process.env;
 
 if (!DB_DATABASE || !DB_USER || !DB_PASSWORD || !DB_HOST) {
   throw new Error(
-    "Не указаны все переменные окружения для подключения к базе данных"
+    "Не указаны все переменные окружения для подключения к базе данных",
   );
 }
 const sequelize = new Sequelize(DB_DATABASE, DB_USER, DB_PASSWORD, {
