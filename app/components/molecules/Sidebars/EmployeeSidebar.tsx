@@ -83,7 +83,6 @@ function SubStonesItem() {
 
   const toggleShowSoldOut = (val: string) => {
     const show_sold_out = searchParams.show_sold_out ?? true;
-    console.log(show_sold_out);
     setSearchParams({ show_sold_out: !show_sold_out });
   };
   const allTypesSelected = searchParams.type.length === STONE_TYPES.length;

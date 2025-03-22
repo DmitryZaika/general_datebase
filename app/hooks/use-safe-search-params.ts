@@ -43,15 +43,8 @@ export function useSafeSearchParams<T>(
    * 4) Функция для обновления query-параметров
    */
   const updateSearchParams = (newValues: Partial<T>) => {
-    // Берём текущие данные + новые
     const merged = { ...currentValues, ...newValues };
-
-    // Прогоняем через Zod ещё раз, чтобы убедиться, что всё валидно
-    console.log("merged", merged);
     const nextParsed = schema.parse(merged);
-    console.log("nextParsed", nextParsed);
-
-    // Сериализуем все поля в JSON и записываем в URLSearchParams
     const sp = objectToURLSearchParams(nextParsed as Record<string, unknown>);
     setSearchParams(sp);
   };
