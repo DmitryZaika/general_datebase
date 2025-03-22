@@ -35,7 +35,7 @@ interface ISidebarItem {
   component?: () => React.ReactNode;
 }
 
-const getItems = (base: "employee" | "admin" | "customer") => {
+const getItems = (base: string) => {
   const finalList: ISidebarItem[] = [
     {
       title: "Stones",
