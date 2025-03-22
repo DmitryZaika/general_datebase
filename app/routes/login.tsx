@@ -1,4 +1,4 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { ActionFunctionArgs, LoaderFunctionArgs, redirect, Link } from "react-router";
 import { z } from "zod";
 import {
   Form,
@@ -82,7 +82,9 @@ export default function Login() {
   const isSubmitting = navigation.state !== "idle";
 
   return (
-    <div className="flex justify-center p-20">
+    <div className="flex flex-col items-center justify-center p-20">
+
+      <Link to="/customer/1/stones" className="pb-4 text-blue-500 underline cursor-pointer">For Customers</Link>
       <FormProvider {...form}>
         <Form
           className="w-full max-w-sm bg-white p-6 shadow-md rounded"

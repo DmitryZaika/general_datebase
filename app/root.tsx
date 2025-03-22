@@ -105,7 +105,7 @@ export default function App() {
       <body>
         <SidebarProvider open={!!basePath}>
           <EmployeeSidebar />
-          <main className="h-full w-full">
+          <main className="h-screen bg-gray-100 w-full">
             <AuthenticityTokenProvider token={token}>
               <Header
                 isEmployee={user?.is_employee ?? false}
