@@ -21,6 +21,7 @@ interface Stone {
   url: string | null;
   is_display: boolean | number;
   height: number | null;
+  available: number;
   width: number | null;
   amount: number | null;
 }
@@ -42,6 +43,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         WHERE company_id = ? AND is_display = 1
         AND COALESCE(amount, 0) > 0
         ORDER BY name ASC
+          
       `,
     [1],
   );
@@ -74,9 +76,12 @@ function InteractiveCard({
       }}
     >
       <ImageCard
+        type="slabs"
+        itemId={stone.id}
         fieldList={{
+          Avaliable: `${stone.available}`,
           Amount: `${displayedAmount}`,
-          Size: `${displayedWidth} x ${displayedHeight}`,
+          Size: `${displayedHeight} x ${displayedWidth}`,
         }}
         title={stone.name}
       >
@@ -136,10 +141,11 @@ export default function Stones() {
                   <AccordionContent>
                     <ModuleList>
                       <SuperCarousel
+                        type="stones"
                         currentId={currentId}
                         setCurrentId={handleSetCurrentId}
                         images={stoneList[type]}
-                        stoneType={type}
+                        category={type}
                         activeType={activeType}
                       />
                       {stoneList[type]
