@@ -20,7 +20,7 @@ export function HeaderDesktop({
   return (
     <header
       className={clsx(
-        "relative flex-row items-center   gap-0 justify-between  m-3 ",
+        "relative flex-row items-center   gap-0 justify-between  p-3 ",
         className,
       )}
     >

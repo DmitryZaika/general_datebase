@@ -13,7 +13,7 @@ export function Header({
     return <HeaderCustomers />;
   }
   return (
-    <>
+    <div className="bg-white">
       {" "}
       <HeaderDesktop
         className="hidden md:flex"
@@ -27,6 +27,6 @@ export function Header({
         isAdmin={isAdmin}
         isSuperUser={isSuperUser}
       />
-    </>
+    </div>
   );
 }
