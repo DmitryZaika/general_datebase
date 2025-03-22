@@ -9,12 +9,11 @@ export function Header({
   isAdmin,
   isSuperUser,
 }: HeaderProps) {
-  console.log(isEmployee, isAdmin, isSuperUser);
   if (!isEmployee && !isAdmin && !isSuperUser) {
     return <HeaderCustomers />;
   }
   return (
-    <>
+    <div className="bg-white">
       {" "}
       <HeaderDesktop
         className="hidden md:flex"
@@ -28,6 +27,6 @@ export function Header({
         isAdmin={isAdmin}
         isSuperUser={isSuperUser}
       />
-    </>
+    </div>
   );
 }

@@ -55,7 +55,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
-    resolver
+    resolver,
   );
   if (errors) {
     return { errors, receivedValues };
@@ -71,7 +71,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       data.email,
       data.notes,
       supplierId,
-    ]
+    ],
   );
 
   const session = await getSession(request.headers.get("Cookie"));
@@ -109,7 +109,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const supplier = await selectId<Supplier>(
     db,
     "select website, supplier_name, manager, phone, email, notes from suppliers WHERE id = ?",
-    supplierId
+    supplierId,
   );
 
   if (!supplier) {

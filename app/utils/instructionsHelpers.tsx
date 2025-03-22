@@ -10,7 +10,7 @@ export interface InstructionsReturn {
 }
 
 export function parentOptions(
-  instructions: InstructionsBasic[]
+  instructions: InstructionsBasic[],
 ): InstructionsReturn[] {
   let values = instructions.map((instruction) => ({
     key: instruction.id,
@@ -22,7 +22,7 @@ export function parentOptions(
 
 export function afterOptions(
   parent_id: number | undefined,
-  instructions: InstructionsBasic[]
+  instructions: InstructionsBasic[],
 ): InstructionsReturn[] {
   let values = instructions
     .filter((item) => item.parent_id === (parent_id || null))

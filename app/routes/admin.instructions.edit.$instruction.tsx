@@ -56,7 +56,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
-    resolver
+    resolver,
   );
   if (errors) {
     return { errors, receivedValues };
@@ -71,7 +71,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.after_id || null,
         data.rich_text,
         instructionId,
-      ]
+      ],
     );
   } catch (error) {
     console.error("Error updating the database: ", error);
@@ -111,7 +111,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const instruction = await selectId<Instruction>(
     db,
     "SELECT title, parent_id, after_id, rich_text FROM instructions WHERE id = ?",
-    instructionId
+    instructionId,
   );
 
   const instructions = await selectMany<{

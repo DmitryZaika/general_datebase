@@ -29,7 +29,7 @@ const slabSchema = z.object({
       id: z.number(),
       slab: z.string().min(1, "Slab is required"),
       is_sold: z.boolean().optional(),
-    })
+    }),
   ),
 });
 

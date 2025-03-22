@@ -57,7 +57,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const record = await selectId<{ url: string | null }>(
       db,
       "SELECT url FROM slab_inventory WHERE id = ?",
-      slabId
+      slabId,
     );
     await db.execute("DELETE FROM slab_inventory WHERE id = ?", [slabId]);
     const session = await getSession(request.headers.get("Cookie"));
@@ -77,14 +77,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const [stoneRecord] = await selectMany<{ width: number; height: number }>(
       db,
       "SELECT width, height FROM stones WHERE stone_id = ? LIMIT 1",
-      [stoneId]
+      [stoneId],
     );
     data.height = stoneRecord?.height ?? 0;
     data.width = stoneRecord?.width ?? 0;
   }
   await db.execute(
     "INSERT INTO slab_inventory (bundle, stone_id, url, width, height) VALUES (?, ?, ?, ?, ?)",
-    [data.bundle, stoneId, data.file ?? "", data.width, data.height]
+    [data.bundle, stoneId, data.file ?? "", data.width, data.height],
   );
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Image Added"));
@@ -108,7 +108,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }>(
     db,
     "SELECT id, bundle, url, width, height FROM slab_inventory WHERE stone_id = ?",
-    [stoneId]
+    [stoneId],
   );
   const [stone] = await selectMany<{
     id: number;
@@ -118,7 +118,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }>(db, "SELECT id, width, height, url FROM stones WHERE id = ? LIMIT 1", [
     stoneId,
   ]);
-  console.log(stone);
   return { slabs, stone };
 }
 

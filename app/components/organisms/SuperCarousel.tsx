@@ -126,14 +126,12 @@ export function SuperCarousel({
   currentId,
   setCurrentId,
   images,
-  category,
   activeType,
   type,
 }: {
   images: { id: number; url: string | null }[];
   currentId?: number;
-  setCurrentId: (value: number | undefined, type?: string) => void;
-  category: string;
+  setCurrentId: (value: number | undefined) => void;
   activeType?: string;
   type: string;
 }) {
@@ -142,7 +140,7 @@ export function SuperCarousel({
 
   useEffect(() => {
     if (!api) return;
-    if (currentId !== undefined && category === activeType) {
+    if (currentId !== undefined) {
       const index = images.findIndex(({ id }) => id === currentId);
       if (index !== -1) {
         api.scrollTo(index, true);
@@ -151,16 +149,14 @@ export function SuperCarousel({
     api.on("settle", (index) => {
       const slidesInView = api.slidesInView();
       if (slidesInView.length > 0) {
-        setCurrentId(images[slidesInView[0]].id, category);
+        setCurrentId(images[slidesInView[0]].id);
       }
     });
-  }, [api, currentId, images, setCurrentId, category, activeType]);
-
-  const isCarouselActive = activeType === category;
+  }, [api, currentId, images, setCurrentId, activeType]);
 
   return (
     <Dialog
-      open={currentId !== undefined && isCarouselActive}
+      open={currentId !== undefined}
       onOpenChange={(open) => !open && setCurrentId(undefined)}
     >
       <DialogContent
