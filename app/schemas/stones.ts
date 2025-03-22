@@ -16,11 +16,13 @@ export const stoneSchema = z.object({
   retail_price: z.coerce.number().default(0),
 });
 
-
 export const stoneFilterSchema = z.object({
-  type: z.array(z.enum(STONE_TYPES)).default([]),
-  show_sold_out: z.preprocess(value => value === "true", z.boolean()),
+  type: z.array(z.enum(STONE_TYPES)).default(["granite"]),
+  show_sold_out: z.preprocess((value) => {
+    if (typeof value === "boolean") return value;
+    return value !== "false";
+  }, z.boolean()),
   supplier: z.number().gte(0).default(0),
-})
+});
 
 export type StoneFilter = z.infer<typeof stoneFilterSchema>;

@@ -63,7 +63,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       WHERE s.company_id = ?
       ORDER BY s.name ASC
     `,
-    [user.company_id]
+    [user.company_id],
   );
 
   return { stones };

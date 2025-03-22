@@ -20,9 +20,9 @@ export const StringBoolean = z.union([
 
 export const StringBoolV2 = z.preprocess((val) => {
   if (val === undefined) {
-    return undefined
+    return undefined;
   }
   if (val === "true") {
-    return true
+    return true;
   }
 }, z.boolean().optional());

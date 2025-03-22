@@ -59,7 +59,7 @@ export function BurgerMenu({
           {
             "translate-x-0": open,
             "translate-x-full": !open,
-          }
+          },
         )}
       >
         <div className="p-4">

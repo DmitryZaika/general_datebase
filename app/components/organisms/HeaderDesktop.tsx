@@ -20,7 +20,7 @@ export function HeaderDesktop({
     <header
       className={clsx(
         "relative flex-row items-center   gap-0 justify-between  m-3 ",
-        className
+        className,
       )}
     >
       <div className="logo">

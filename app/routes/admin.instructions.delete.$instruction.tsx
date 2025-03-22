@@ -34,7 +34,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   try {
     const result = await db.execute(
       `DELETE FROM main.instructions WHERE id = ?`,
-      [instructionId]
+      [instructionId],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -60,7 +60,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const instruction = await selectId<{ title: string }>(
     db,
     "select title from instructions WHERE id = ?",
-    instructionId
+    instructionId,
   );
   return {
     title: instruction?.title,

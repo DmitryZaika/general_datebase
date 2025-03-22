@@ -1,4 +1,4 @@
-import { ColumnDef } from "@tanstack/react-table"
+import { ColumnDef } from "@tanstack/react-table";
 import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
 import { DataTable } from "~/components/ui/data-table";
 import { LoaderFunctionArgs, redirect } from "react-router";
@@ -33,13 +33,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getSuperUser(request);
   const users = await selectMany<User>(
     db,
-    " select id, name, email, phone_number from main.users WHERE is_deleted = 0"
+    " select id, name, email, phone_number from main.users WHERE is_deleted = 0",
   );
 
   return { users };
 };
 
-const adminColumns: ColumnDef<User>[] =[
+const adminColumns: ColumnDef<User>[] = [
   {
     accessorKey: "name",
     header: "Name",
@@ -52,15 +52,20 @@ const adminColumns: ColumnDef<User>[] =[
     accessorKey: "phone_number",
     header: "Phone Number",
   },
-    {
+  {
     id: "actions",
     cell: ({ row }) => {
       return (
-        <ActionDropdown actions={{edit:`edit/${row.original.id}`, delete: `delete/${row.original.id}` }}/>
-      )
-    }
-    }
-]
+        <ActionDropdown
+          actions={{
+            edit: `edit/${row.original.id}`,
+            delete: `delete/${row.original.id}`,
+          }}
+        />
+      );
+    },
+  },
+];
 
 export default function Adminusers() {
   const { users } = useLoaderData<typeof loader>();
@@ -70,7 +75,7 @@ export default function Adminusers() {
       <Link to={`add`} relative="path">
         <Button>Add User</Button>
       </Link>
-      <DataTable columns={adminColumns} data={users}/>
+      <DataTable columns={adminColumns} data={users} />
       <Outlet />
     </PageLayout>
   );

@@ -30,7 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const images = await selectMany<Image>(
     db,
     "SELECT id, name, url FROM images WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return { images };
 };

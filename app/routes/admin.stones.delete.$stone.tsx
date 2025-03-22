@@ -38,7 +38,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   const stone = await selectId<{ url: string }>(
     db,
     "select url from stones WHERE id = ?",
-    stoneId
+    stoneId,
   );
   if (stone?.url) {
     deleteFile(stone.url);
@@ -70,7 +70,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const stone = await selectId<{ name: string }>(
     db,
     "select name from stones WHERE id = ?",
-    stoneId
+    stoneId,
   );
   return {
     name: stone?.name,

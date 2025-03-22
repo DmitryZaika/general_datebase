@@ -36,10 +36,10 @@ const customOrder = [
 
 function customSort(a: string, b: string) {
   const aIndex = customOrder.findIndex(
-    (item) => item.toLowerCase() === a.toLowerCase()
+    (item) => item.toLowerCase() === a.toLowerCase(),
   );
   const bIndex = customOrder.findIndex(
-    (item) => item.toLowerCase() === b.toLowerCase()
+    (item) => item.toLowerCase() === b.toLowerCase(),
   );
 
   if (aIndex !== -1 && bIndex !== -1) {
@@ -81,7 +81,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       WHERE company_id = ?
       ORDER BY name ASC
     `,
-    [user.company_id]
+    [user.company_id],
   );
 
   return { sinks };
