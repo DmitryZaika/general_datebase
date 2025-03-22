@@ -13,7 +13,12 @@ import { db } from "~/db.server";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { Button } from "~/components/ui/button";
-import { Dialog, DialogContent, DialogClose } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogClose,
+  DialogTitle,
+} from "~/components/ui/dialog";
 import { useState } from "react";
 
 interface Slab {
@@ -93,9 +98,7 @@ export default function SlabsModal() {
       }}
     >
       <DialogContent className="p-5 bg-white rounded-md shadow-lg text-gray-800">
-        <h2 className="text-2xl font-bold mb-6 text-center pl-5 pr-5">
-          Slabs for {stone.name}
-        </h2>
+        <DialogTitle>Slabs for {stone.name}</DialogTitle>
 
         <div className="flex flex-col gap-4">
           {slabs.length === 0 ? (

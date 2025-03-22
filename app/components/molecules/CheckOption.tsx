@@ -17,7 +17,7 @@ export function CheckOption<T>({
         checked={selected}
         onCheckedChange={() => toggleValue(value)}
       />
-      <div className="grid gap-1.5 leading-none">
+      <div className="grid gap-1.5 leading-none capitalize">
         <label
           htmlFor="terms1"
           className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"

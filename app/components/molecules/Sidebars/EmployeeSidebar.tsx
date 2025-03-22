@@ -1,10 +1,18 @@
-import { Calendar, Home, Inbox, Search, Settings } from "lucide-react";
+import {
+  LucideProps,
+  Calendar,
+  Home,
+  Inbox,
+  Search,
+  Settings,
+} from "lucide-react";
 import { useLocation, useNavigate, Outlet } from "react-router";
 import { FormLabel } from "~/components/ui/form";
 import { STONE_TYPES } from "~/utils/constants";
 import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
 import { stoneFilterSchema, StoneFilter } from "~/schemas/stones";
 import { CheckOption } from "~/components/molecules/CheckOption";
+import { getBase } from "~/utils/urlHelpers";
 
 import {
   Sidebar,
@@ -18,39 +26,74 @@ import {
   SidebarMenuSub,
 } from "~/components/ui/sidebar";
 
-const items = [
-  {
-    title: "Stones",
-    url: "/employee/stones",
-    icon: Home,
-    component: SubStonesItem,
-  },
-  {
-    title: "Sinks",
-    url: "/employee/sinks",
-    icon: Inbox,
-  },
-  {
-    title: "Suppliers",
-    url: "/employee/suppliers",
-    icon: Calendar,
-  },
-  {
-    title: "Supports",
-    url: "/employee/supports",
-    icon: Search,
-  },
-  {
-    title: "Documents",
-    url: "/employee/documents",
-    icon: Settings,
-  },
-  {
-    title: "Images",
-    url: "/employee/images",
-    icon: Settings,
-  },
-];
+interface ISidebarItem {
+  title: string;
+  url: string;
+  icon: React.ForwardRefExoticComponent<
+    Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>
+  >;
+  component?: () => React.ReactNode;
+}
+
+const getItems = (base: "employee" | "admin" | "customer") => {
+  const finalList: ISidebarItem[] = [
+    {
+      title: "Stones",
+      url: `/${base}/stones`,
+      icon: Home,
+      component: SubStonesItem,
+    },
+  ];
+  if (["admin", "employee"].includes(base)) {
+    finalList.push(
+      {
+        title: "Sinks",
+        url: `/${base}/sinks`,
+        icon: Inbox,
+      },
+      {
+        title: "Suppliers",
+        url: `/${base}/suppliers`,
+        icon: Calendar,
+      },
+      {
+        title: "Supports",
+        url: `/${base}/supports`,
+        icon: Search,
+      },
+      {
+        title: "Documents",
+        url: `/${base}/documents`,
+        icon: Settings,
+      },
+      {
+        title: "Images",
+        url: `/${base}/images`,
+        icon: Settings,
+      },
+      {
+        title: "Instructions",
+        url: `/${base}/instructions`,
+        icon: Settings,
+      },
+    );
+  }
+  if (base === "employee") {
+    finalList.push({
+      title: "Special Order",
+      url: `/employee/special-order`,
+      icon: Settings,
+    });
+  }
+  if (base === "admin") {
+    finalList.push({
+      title: "User Panel",
+      url: `/admin/users`,
+      icon: Settings,
+    });
+  }
+  return finalList;
+};
 
 function SubStonesItem() {
   const [searchParams, setSearchParams] =
@@ -106,6 +149,7 @@ function SubStonesItem() {
         />
       ))}
       <SidebarGroupLabel>Supplier</SidebarGroupLabel>
+      <span className="ml-4">Coming Soon</span>
 
       <SidebarGroupLabel>Other</SidebarGroupLabel>
       <CheckOption
@@ -119,11 +163,13 @@ function SubStonesItem() {
 
 export function EmployeeSidebar() {
   const location = useLocation();
+  const base = getBase(location.pathname);
+  const items = getItems(base as "employee" | "admin" | "customer");
   return (
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Application</SidebarGroupLabel>
+          <SidebarGroupLabel>Granite Depot</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => {
