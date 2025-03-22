@@ -1,5 +1,3 @@
-// src/components/Header.tsx
-
 import HeaderCustomers from "./organisms/HeaderCustomers";
 import { HeaderDesktop } from "./organisms/HeaderDesktop";
 import { HeaderMobile } from "./organisms/HeaderMobile";
