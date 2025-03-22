@@ -1,5 +1,12 @@
 import { data } from "react-router";
-import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "react-router";
+import {
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  useLoaderData,
+} from "react-router";
 import type { LinksFunction, LoaderFunctionArgs } from "react-router";
 import { Header } from "./components/Header";
 import { Toaster } from "./components/ui/toaster";
@@ -73,13 +80,12 @@ export default function App() {
       </head>
       <body>
         <AuthenticityTokenProvider token={token}>
-          {user && (
-            <Header
-              user={user}
-              isAdmin={user.is_admin}
-              isSuperUser={user.is_superuser}
-            />
-          )}
+          <Header
+            isEmployee={user?.is_employee ?? false}
+            user={user}
+            isAdmin={user?.is_admin ?? false}
+            isSuperUser={user?.is_superuser ?? false}
+          />
           <Outlet />
         </AuthenticityTokenProvider>
 

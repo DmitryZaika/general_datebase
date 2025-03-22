@@ -7,15 +7,17 @@ import { HeaderProps } from "~/types";
 interface HeaderDesktopProps extends HeaderProps {
   className: string;
 }
-
 export function HeaderDesktop({
   user,
   isAdmin,
   isSuperUser,
   className,
+  isEmployee,
 }: HeaderDesktopProps) {
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
+  console.log(isEmployee, isAdmin, isSuperUser);
+
   return (
     <header
       className={clsx(
