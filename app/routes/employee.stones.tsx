@@ -1,6 +1,5 @@
 import { capitalizeFirstLetter } from "~/utils/words";
 import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
-import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
@@ -12,6 +11,7 @@ import { StoneFilter, stoneFilterSchema } from "~/schemas/stones";
 import { STONE_TYPES } from "~/utils/constants";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { Stone, stoneQueryBuilder } from "~/utils/queries";
+
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
 
@@ -32,6 +32,7 @@ function customSort2(a: Stone, b: Stone) {
   if (aAmount < bAmount) return 1;
   return a.name.localeCompare(b.name);
 }
+
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {

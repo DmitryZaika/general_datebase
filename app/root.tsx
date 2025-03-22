@@ -107,17 +107,15 @@ export default function App() {
           <EmployeeSidebar />
           <main className="h-full w-full">
             <AuthenticityTokenProvider token={token}>
-              {user && (
-                <Header
-                  user={user}
-                  isAdmin={user.is_admin}
-                  isSuperUser={user.is_superuser}
-                />
-              )}
+              <Header
+                isEmployee={user?.is_employee ?? false}
+                user={user}
+                isAdmin={user?.is_admin ?? false}
+                isSuperUser={user?.is_superuser ?? false}
+              />
               {isMobile && <SidebarTrigger />}
               <Outlet />
             </AuthenticityTokenProvider>
-
             <Toaster />
             <ScrollRestoration />
             <Scripts />

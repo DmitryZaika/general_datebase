@@ -22,4 +22,5 @@ export interface HeaderProps {
   user: object | null;
   isAdmin: boolean;
   isSuperUser: boolean;
+  isEmployee?: boolean;
 }
