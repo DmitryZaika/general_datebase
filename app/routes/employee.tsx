@@ -31,12 +31,9 @@ export const loader: LoaderFunction = async ({ request }) => {
 export default function Employee() {
   const isMobile = useIsMobile();
   return (
-    <SidebarProvider>
-      <EmployeeSidebar />
       <PageLayout title="Granite Depot DataBase">
         {isMobile && <SidebarTrigger />}
         <Outlet />
       </PageLayout>
-    </SidebarProvider>
   );
 }
