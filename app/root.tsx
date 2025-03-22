@@ -1,6 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "~/components/ui/sidebar";
 import { useIsMobile } from "~/hooks/use-mobile";
-import { data } from "react-router";
+import { data, useLocation } from "react-router";
 import {
   Links,
   Meta,
@@ -24,6 +24,7 @@ import { getUserBySessionId } from "./utils/session.server";
 import { selectMany } from "./utils/queryHelpers";
 import { db } from "~/db.server";
 import { EmployeeSidebar } from "~/components/molecules/Sidebars/EmployeeSidebar";
+import { getBase } from "~/utils/urlHelpers";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -40,7 +41,7 @@ export const links: LinksFunction = () => [
 
 interface ISupplier {
   id: number;
-  name: string;
+  supplier_name: string;
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -56,7 +57,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   let suppliers: ISupplier[] = [];
   if (user) {
-    suppliers = await selectMany<ISupplier>(db, "select id, name from suppliers where company_id = ?", [user.company_id])
+    suppliers = await selectMany<ISupplier>(
+      db,
+      "select id, supplier_name from suppliers where company_id = ?",
+      [user.company_id],
+    );
   }
 
   return data(
@@ -73,6 +78,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function App() {
   const { message, token, user } = useLoaderData<typeof loader>();
+  const { pathname } = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -86,6 +92,8 @@ export default function App() {
     }
   }, [message?.nonce]);
 
+  const basePath = getBase(pathname);
+
   return (
     <html lang="en">
       <head>
@@ -95,28 +103,28 @@ export default function App() {
         <Links />
       </head>
       <body>
-        <SidebarProvider open={window.location.pathname.startsWith("/employee")}>
-      <EmployeeSidebar />
-        <main className="h-full">
-        {isMobile && <SidebarTrigger />}
-        <AuthenticityTokenProvider token={token}>
-          {user && (
-            <Header
-              user={user}
-              isAdmin={user.is_admin}
-              isSuperUser={user.is_superuser}
-            />
-          )}
-          <Outlet />
-        </AuthenticityTokenProvider>
+        <SidebarProvider open={!!basePath}>
+          <EmployeeSidebar />
+          <main className="h-full w-full">
+            <AuthenticityTokenProvider token={token}>
+              {user && (
+                <Header
+                  user={user}
+                  isAdmin={user.is_admin}
+                  isSuperUser={user.is_superuser}
+                />
+              )}
+              {isMobile && <SidebarTrigger />}
+              <Outlet />
+            </AuthenticityTokenProvider>
 
-        <Toaster />
-        <ScrollRestoration />
-        <Scripts />
+            <Toaster />
+            <ScrollRestoration />
+            <Scripts />
 
-        {user && <Chat />}
-        </main>
-    </SidebarProvider>
+            {user && <Chat />}
+          </main>
+        </SidebarProvider>
       </body>
     </html>
   );

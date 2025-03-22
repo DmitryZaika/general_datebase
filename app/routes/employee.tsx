@@ -1,12 +1,9 @@
-import { SidebarProvider, SidebarTrigger } from "~/components/ui/sidebar";
 import type { LoaderFunction, MetaFunction } from "react-router";
 import { Outlet } from "react-router";
 import { PageLayout } from "~/components/PageLayout";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { redirect } from "react-router";
 import { getEmployeeUser } from "~/utils/session.server";
-import { EmployeeSidebar } from "~/components/molecules/Sidebars/EmployeeSidebar";
-import { useIsMobile } from "~/hooks/use-mobile";
 
 export const meta: MetaFunction = () => {
   return [
@@ -29,11 +26,9 @@ export const loader: LoaderFunction = async ({ request }) => {
 };
 
 export default function Employee() {
-  const isMobile = useIsMobile();
   return (
-      <PageLayout title="Granite Depot DataBase">
-        {isMobile && <SidebarTrigger />}
-        <Outlet />
-      </PageLayout>
+    <PageLayout title="Granite Depot DataBase">
+      <Outlet />
+    </PageLayout>
   );
 }

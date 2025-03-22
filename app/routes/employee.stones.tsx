@@ -1,6 +1,5 @@
 import { capitalizeFirstLetter } from "~/utils/words";
 import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
-import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
 import ModuleList from "~/components/ModuleList";
@@ -12,20 +11,7 @@ import { Button } from "~/components/ui/button";
 import { StoneFilter, stoneFilterSchema } from "~/schemas/stones";
 import { STONE_TYPES } from "~/utils/constants";
 import { cleanParams } from "~/hooks/use-safe-search-params";
-
-interface Stone {
-  id: number;
-  name: string;
-  type: string;
-  url: string | null;
-  is_display: number;
-  height: number | null;
-  width: number | null;
-  amount: number;
-  available: number;
-  created_date: string;
-  on_sale: boolean;
-}
+import { Stone, stoneQueryBuilder } from "~/utils/queries";
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
 
@@ -47,58 +33,6 @@ function customSort2(a: Stone, b: Stone) {
   return a.name.localeCompare(b.name);
 }
 
-const stoneQueryBuilder = async (
-  filters: StoneFilter,
-  companyId: number,
-): Promise<Stone[]> => {
-  if (filters.type.length === 0) {
-    return [];
-  }
-  const params: (string | number)[] = [companyId];
-  let query = `
-  SELECT 
-    s.id, 
-    s.name, 
-    s.type, 
-    s.url, 
-    s.is_display, 
-    s.height, 
-    s.width,
-    s.created_date, 
-    s.on_sale,
-    COUNT(si.stone_id) AS amount,
-    SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS available
-  FROM main.stones s
-  LEFT JOIN main.slab_inventory AS si ON si.stone_id = s.id
-  WHERE s.company_id = ? AND s.is_display = 1
-  `;
-  if (filters.type.length < STONE_TYPES.length) {
-    query += ` AND s.type IN (${filters.type.map(() => "?").join(", ")})`;
-    params.push(...filters.type);
-  }
-  if (filters.supplier > 0) {
-    query += " AND s.supplier_id = ?";
-    params.push(filters.supplier);
-  }
-  query += `
-    GROUP BY
-      s.id,
-      s.name,
-      s.type,
-      s.url,
-      s.is_display,
-      s.height,
-      s.width,
-      s.created_date,
-      s.on_sale
-    `;
-  if (!filters.show_sold_out) {
-    query += `\nHAVING available > 0`;
-  }
-  query += `\nORDER BY s.name ASC`;
-  return await selectMany<Stone>(db, query, params);
-};
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getEmployeeUser(request);
@@ -119,7 +53,7 @@ function InteractiveCard({
   stoneType,
 }: {
   stone: Stone;
-  setCurrentId: (value: number, type: string) => void;
+  setCurrentId: (value: number) => void;
   stoneType: string;
 }) {
   const displayedAmount = stone.amount > 0 ? stone.amount : "—";
@@ -166,7 +100,7 @@ function InteractiveCard({
           alt={stone.name || "Stone Image"}
           className="object-cover w-full h-40 border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none"
           loading="lazy"
-          onClick={() => setCurrentId(stone.id, stoneType)}
+          onClick={() => setCurrentId(stone.id)}
         />
       </ImageCard>
       {stone.available === 0 && (
@@ -189,36 +123,22 @@ export default function Stones() {
   const { stones } = useLoaderData<typeof loader>();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [activeType, setActiveType] = useState<string | undefined>(undefined);
-  const handleSetCurrentId = (id: number | undefined, type?: string) => {
-    setCurrentId(id);
-    if (type) {
-      setActiveType(type);
-    } else if (id === undefined) {
-      setActiveType(undefined);
-    }
-  };
-  const [selectedSupplier, setSelectedSupplier] = useState<string | undefined>(
-    undefined,
-  );
 
   return (
     <>
       <ModuleList>
-        {/*
         <SuperCarousel
           type="stones"
           currentId={currentId}
-          setCurrentId={handleSetCurrentId}
-          images={stoneList[type]}
-          category={type}
+          setCurrentId={setCurrentId}
+          images={stones}
           activeType={activeType}
         />
-          */}
         {stones.map((stone) => (
           <InteractiveCard
             key={stone.id}
             stone={stone}
-            setCurrentId={handleSetCurrentId}
+            setCurrentId={setCurrentId}
             stoneType={stone.type}
           />
         ))}
