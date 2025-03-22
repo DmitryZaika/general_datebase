@@ -1,3 +1,5 @@
+import { SidebarProvider, SidebarTrigger } from "~/components/ui/sidebar";
+import { useIsMobile } from "~/hooks/use-mobile";
 import { data } from "react-router";
 import {
   Links,
@@ -19,6 +21,9 @@ import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
 import { Chat } from "./components/organisms/Chat";
 import { getUserBySessionId } from "./utils/session.server";
+import { selectMany } from "./utils/queryHelpers";
+import { db } from "~/db.server";
+import { EmployeeSidebar } from "~/components/molecules/Sidebars/EmployeeSidebar";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -33,6 +38,11 @@ export const links: LinksFunction = () => [
   },
 ];
 
+interface ISupplier {
+  id: number;
+  name: string;
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const [token, cookieHeader] = await csrf.commitToken();
   const session = await getSession(request.headers.get("Cookie"));
@@ -42,6 +52,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let user = null;
   if (activeSession) {
     user = (await getUserBySessionId(activeSession)) || null;
+  }
+
+  let suppliers: ISupplier[] = [];
+  if (user) {
+    suppliers = await selectMany<ISupplier>(db, "select id, name from suppliers where company_id = ?", [user.company_id])
   }
 
   return data(
@@ -59,6 +74,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export default function App() {
   const { message, token, user } = useLoaderData<typeof loader>();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (message !== null && message !== undefined) {
@@ -79,6 +95,10 @@ export default function App() {
         <Links />
       </head>
       <body>
+        <SidebarProvider open={window.location.pathname.startsWith("/employee")}>
+      <EmployeeSidebar />
+        <main className="h-full">
+        {isMobile && <SidebarTrigger />}
         <AuthenticityTokenProvider token={token}>
           {user && (
             <Header
@@ -95,6 +115,8 @@ export default function App() {
         <Scripts />
 
         {user && <Chat />}
+        </main>
+    </SidebarProvider>
       </body>
     </html>
   );

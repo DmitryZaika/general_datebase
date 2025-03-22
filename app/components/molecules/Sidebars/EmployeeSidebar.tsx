@@ -136,7 +136,7 @@ export function EmployeeSidebar() {
                         <span>{item.title}</span>
                       </a>
                     </SidebarMenuButton>
-                    {item.component && <item.component />}
+                    {item.component && isActive && <item.component />}
                   </SidebarMenuItem>
                 );
               })}
