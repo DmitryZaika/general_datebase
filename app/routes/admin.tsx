@@ -26,9 +26,5 @@ export const loader: LoaderFunction = async ({ request }) => {
 };
 
 export default function Admin() {
-  return (
-    <PageLayout title="Granite Depot DataBase">
-      <Outlet />
-    </PageLayout>
-  );
+  return <Outlet />;
 }
