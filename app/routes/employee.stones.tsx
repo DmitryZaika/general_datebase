@@ -23,11 +23,18 @@ function customSort2(a: Stone, b: Stone) {
   const bAvailable = b.available ?? 0;
   if (aAvailable > 0 && bAvailable === 0) return -1;
   if (aAvailable === 0 && bAvailable > 0) return 1;
+  if (aAvailable > 0 && bAvailable > 0) {
+    return a.name.localeCompare(b.name);
+  }
+  if (aAvailable === 0 && bAvailable === 0) {
+    return a.name.localeCompare(b.name);
+  }
   const aAmount = a.amount ?? 0;
   const bAmount = b.amount ?? 0;
   if (aAmount > bAmount) return -1;
   if (aAmount < bAmount) return 1;
-  return a.name.localeCompare(b.name);
+
+  return 0;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
