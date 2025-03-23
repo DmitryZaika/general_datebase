@@ -17,7 +17,7 @@ interface ValidatedData<T> {
 export async function parseMutliForm<T>(
   request: Request,
   schema: T,
-  folder: string
+  folder: string,
 ): Promise<ValidatedData<typeof schema & typeof fileSchema>> {
   const finalSchema = schema.merge(fileSchema);
   const resolver = zodResolver(finalSchema);

@@ -29,7 +29,7 @@ export function TypeSelect<TFieldValues extends FieldValues = FieldValues>({
   const cleanOptions: Option[] = options.map((option) =>
     typeof option === "string"
       ? { key: option.toLowerCase(), value: option }
-      : { key: option.key.toLowerCase(), value: option.value }
+      : { key: option.key.toLowerCase(), value: option.value },
   );
 
   return (

@@ -47,7 +47,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { errors, data } = await parseMutliForm(
     request,
     supportSchema,
-    "supports"
+    "supports",
   );
   if (errors || !data) {
     return { errors };
@@ -58,14 +58,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const support = await selectId<{ url: string }>(
     db,
     "select url from supports WHERE id = ?",
-    supportId
+    supportId,
   );
 
   try {
     if (newFile) {
       await db.execute(
         `UPDATE main.supports SET name = ?, url = ? WHERE id = ?`,
-        [data.name, data.file, supportId]
+        [data.name, data.file, supportId],
       );
     } else {
       await db.execute(`UPDATE main.supports SET name = ? WHERE id = ?`, [
@@ -100,7 +100,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const support = await selectId<{ name: string; url: string }>(
     db,
     "select name, url from supports WHERE id = ?",
-    supportId
+    supportId,
   );
   return {
     name: support?.name,
@@ -115,7 +115,7 @@ export default function SupportsEdit() {
 
   const form = useCustomOptionalForm(
     supportSchema,
-    supportSchema.parse({ name, url })
+    supportSchema.parse({ name, url }),
   );
   const handleChange = (open: boolean) => {
     if (open === false) {

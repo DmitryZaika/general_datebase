@@ -13,6 +13,9 @@ import ModuleList from "~/components/ModuleList";
 import { ImageCard } from "~/components/organisms/ImageCard";
 import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState } from "react";
+import { stoneQueryBuilder } from "~/utils/queries";
+import { StoneFilter, stoneFilterSchema } from "~/schemas/stones";
+import { cleanParams } from "~/hooks/use-safe-search-params";
 
 interface Stone {
   id: number;
@@ -21,6 +24,7 @@ interface Stone {
   url: string | null;
   is_display: boolean | number;
   height: number | null;
+  available: number;
   width: number | null;
   amount: number | null;
 }
@@ -33,18 +37,19 @@ function customSortType(a: string, b: string) {
   );
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const stones = await selectMany<Stone>(
-    db,
-    `
-        SELECT id, name, type, url, is_display, height, width, amount
-        FROM stones
-        WHERE company_id = ? AND is_display = 1
-        AND COALESCE(amount, 0) > 0
-        ORDER BY name ASC
-      `,
-    [1]
-  );
+function sortStones(a: Stone, b: Stone) {
+  const aAmount = a.amount ?? 0;
+  const bAmount = b.amount ?? 0;
+  if (aAmount === 0 && bAmount !== 0) return 1;
+  if (aAmount !== 0 && bAmount === 0) return -1;
+  return a.name.localeCompare(b.name);
+}
+
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const [, searchParams] = request.url.split("?");
+  const queryParams = new URLSearchParams(searchParams);
+  const filters = stoneFilterSchema.parse(cleanParams(queryParams));
+  const stones = await stoneQueryBuilder(filters, params.company);
 
   return { stones };
 };
@@ -74,9 +79,12 @@ function InteractiveCard({
       }}
     >
       <ImageCard
+        type="slabs"
+        itemId={stone.id}
         fieldList={{
+          Avaliable: `${stone.available}`,
           Amount: `${displayedAmount}`,
-          Size: `${displayedWidth} x ${displayedHeight}`,
+          Size: `${displayedHeight} x ${displayedWidth}`,
         }}
         title={stone.name}
       >
@@ -122,50 +130,24 @@ export default function Stones() {
   }, {});
 
   return (
-    <Accordion type="single" defaultValue="stones" className="pt-24 sm:pt-0">
-      <AccordionItem value="stones">
-        <AccordionContent>
-          <Accordion type="multiple">
-            {Object.keys(stoneList)
-              .sort(customSortType)
-              .map((type) => (
-                <AccordionItem key={type} value={type}>
-                  <AccordionTrigger>
-                    {capitalizeFirstLetter(type)}
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <ModuleList>
-                      <SuperCarousel
-                        currentId={currentId}
-                        setCurrentId={handleSetCurrentId}
-                        images={stoneList[type]}
-                        stoneType={type}
-                        activeType={activeType}
-                      />
-                      {stoneList[type]
-
-                        .sort((a, b) => {
-                          const aAmount = a.amount ?? 0;
-                          const bAmount = b.amount ?? 0;
-                          if (aAmount === 0 && bAmount !== 0) return 1;
-                          if (aAmount !== 0 && bAmount === 0) return -1;
-                          return a.name.localeCompare(b.name);
-                        })
-                        .map((stone) => (
-                          <InteractiveCard
-                            key={stone.id}
-                            stone={stone}
-                            setCurrentId={handleSetCurrentId}
-                            stoneType={type}
-                          />
-                        ))}
-                    </ModuleList>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-          </Accordion>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+    <ModuleList>
+      <SuperCarousel
+        type="stones"
+        currentId={currentId}
+        setCurrentId={handleSetCurrentId}
+        images={stones}
+        activeType={activeType}
+      />
+      {stones
+        .sort(sortStones)
+        .map((stone) => (
+          <InteractiveCard
+            key={stone.id}
+            stone={stone}
+            setCurrentId={handleSetCurrentId}
+            stoneType={stone.type}
+          />
+        ))}
+    </ModuleList>
   );
 }

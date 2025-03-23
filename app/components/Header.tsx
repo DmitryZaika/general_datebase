@@ -1,12 +1,19 @@
-// src/components/Header.tsx
-
+import HeaderCustomers from "./organisms/HeaderCustomers";
 import { HeaderDesktop } from "./organisms/HeaderDesktop";
 import { HeaderMobile } from "./organisms/HeaderMobile";
 import { HeaderProps } from "~/types";
 
-export function Header({ user, isAdmin, isSuperUser }: HeaderProps) {
+export function Header({
+  user,
+  isEmployee,
+  isAdmin,
+  isSuperUser,
+}: HeaderProps) {
+  if (!isEmployee && !isAdmin && !isSuperUser) {
+    return <HeaderCustomers />;
+  }
   return (
-    <>
+    <div className="bg-white">
       {" "}
       <HeaderDesktop
         className="hidden md:flex"
@@ -20,6 +27,6 @@ export function Header({ user, isAdmin, isSuperUser }: HeaderProps) {
         isAdmin={isAdmin}
         isSuperUser={isSuperUser}
       />
-    </>
+    </div>
   );
 }

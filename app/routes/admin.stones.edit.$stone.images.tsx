@@ -1,6 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Link, useLoaderData, useNavigation, Form as RemixForm } from "react-router";
+import {
+  Link,
+  useLoaderData,
+  useNavigation,
+  Form as RemixForm,
+} from "react-router";
 import { useEffect, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { z } from "zod";
@@ -48,7 +53,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const result = await selectId<{ url: string | null }>(
       db,
       "SELECT url FROM installed_stones WHERE id = ?",
-      sid
+      sid,
     );
     await db.execute(`DELETE FROM main.installed_stones WHERE id = ?`, [sid]);
     const session = await getSession(request.headers.get("Cookie"));
@@ -64,7 +69,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { errors, data } = await parseMutliForm(
     request,
     InstalledProjectsSchema,
-    "stones"
+    "stones",
   );
   if (errors || !data) {
     return { errors };
@@ -73,13 +78,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const stone = await selectId<{ url: string }>(
     db,
     "select url from stones WHERE id = ?",
-    stoneId
+    stoneId,
   );
 
   try {
     await db.execute(
       `INSERT INTO installed_stones (url, stone_id) VALUES (?, ?)`,
-      [data.file, stoneId]
+      [data.file, stoneId],
     );
   } catch (error) {
     console.error("Error connecting to the database:", errors);
@@ -105,7 +110,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const stones = await selectMany<{ id: number; url: string }>(
     db,
     "select id, url from installed_stones WHERE stone_id = ?",
-    [stoneId]
+    [stoneId],
   );
   return { stones };
 };

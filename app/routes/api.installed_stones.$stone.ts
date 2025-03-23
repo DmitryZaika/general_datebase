@@ -22,7 +22,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const images = await selectMany<{ id: number; url: string }>(
     db,
     "SELECT id, url FROM installed_stones WHERE stone_id = ?",
-    [stoneId]
+    [stoneId],
   );
   return Response.json({ images });
 }

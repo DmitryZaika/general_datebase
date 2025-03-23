@@ -11,28 +11,28 @@ import { forceRedirectError } from "~/utils/toastHelpers";
 const editAction = async (
   rich_text: string,
   todoId: number,
-  userId: number
+  userId: number,
 ): Promise<void> => {
   await db.execute(
     `UPDATE main.todolist 
      SET rich_text = ?  
      WHERE id = ?
      AND user_id = ?;`,
-    [rich_text, todoId, userId]
+    [rich_text, todoId, userId],
   );
 };
 
 const updateDoneAction = async (
   todoId: number,
   isDone: boolean,
-  userId: number
+  userId: number,
 ): Promise<void> => {
   await db.execute(
     `UPDATE main.todolist
      SET is_done = ?
      WHERE id = ?
      AND user_id = ?;`,
-    [isDone, todoId, userId]
+    [isDone, todoId, userId],
   );
 };
 
@@ -41,7 +41,7 @@ const deleteAction = async (todoId: number, userId: number): Promise<void> => {
     `DELETE FROM main.todolist 
      WHERE id = ?
      AND user_id = ?;`,
-    [todoId, userId]
+    [todoId, userId],
   );
 };
 
@@ -64,7 +64,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
       receivedValues: defaultValues,
     } = await getValidatedFormData<TTodoListSchema>(
       request,
-      zodResolver(todoListSchema)
+      zodResolver(todoListSchema),
     );
     if (errors) {
       return Response.json({ errors, defaultValues });

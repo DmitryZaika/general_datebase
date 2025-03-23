@@ -1,3 +1,4 @@
+import { ColumnDef } from "@tanstack/react-table";
 import {
   Table,
   TableBody,
@@ -15,6 +16,8 @@ import { useLoaderData, Outlet, Link } from "react-router";
 import { Button } from "~/components/ui/button";
 import { getEmployeeUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
+import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
+import { DataTable } from "~/components/ui/data-table";
 
 interface Customer {
   id: number;
@@ -32,12 +35,44 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const customers = await selectMany<Customer>(
     db,
-    "select id name, email, phone_number, address from customers"
+    "select id name, email, phone_number, address from customers",
   );
   return {
     customers,
   };
 };
+
+const customerColumns: ColumnDef<Customer>[] = [
+  {
+    accessorKey: "name",
+    header: "Name of customer",
+  },
+  {
+    accessorKey: "phone",
+    header: "Phone Number",
+  },
+  {
+    accessorKey: "email",
+    header: "Email",
+  },
+  {
+    accessorKey: "address",
+    header: "Address",
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => {
+      return (
+        <ActionDropdown
+          actions={{
+            edit: `edit/${row.original.id}`,
+            delete: `delete/${row.original.id}`,
+          }}
+        />
+      );
+    },
+  },
+];
 
 export default function AdminCustomers() {
   const { customers } = useLoaderData<typeof loader>();
@@ -47,46 +82,7 @@ export default function AdminCustomers() {
       <Link to={`add`} relative="path">
         <Button>Add new customer</Button>
       </Link>
-      <Table>
-        <TableCaption>A list of your recent customers.</TableCaption>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-xl w-[200px]">
-              Name of customer
-            </TableHead>{" "}
-            <TableHead className="text-xl">Phone Number</TableHead>
-            <TableHead className="text-xl pr-4">Email</TableHead>{" "}
-            <TableHead className="text-xl">Address</TableHead>
-            <TableHead className="text-right text-xl">Edit Customer</TableHead>
-            <TableHead className="text-right text-xl">
-              Delete customer
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {customers.map((customer) => (
-            <TableRow key={customer.id}>
-              <TableCell className=" font-medium w-[200px]">
-                {customer.name}
-              </TableCell>{" "}
-              <TableCell>{customer.phone}</TableCell>
-              <TableCell>{customer.email}</TableCell>
-              <TableCell>{customer.address}</TableCell>
-              <TableCell className="text-right pr-4">
-                <Link to={`edit/${customer.id}`} className="text-xl">
-                  Edit
-                </Link>
-              </TableCell>
-              <TableCell className="text-right w-[200px]">
-                <Link to={`delete/${customer.id}`} className="text-xl">
-                  Delete
-                </Link>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-        <TableFooter></TableFooter>
-      </Table>
+      <DataTable columns={customerColumns} data={customers} />
       <Outlet />
     </PageLayout>
   );

@@ -8,7 +8,7 @@ interface HeaderMobileProps extends HeaderProps {
 interface BurgerLinkProps {
   setOpen: (value: boolean) => void;
   to: string;
-  children: JSX.Element;
+  children: JSX.Element | string;
   className?: string;
 }
 import React, { useState, type JSX } from "react";
@@ -59,7 +59,7 @@ export function BurgerMenu({
           {
             "translate-x-0": open,
             "translate-x-full": !open,
-          }
+          },
         )}
       >
         <div className="p-4">
@@ -100,27 +100,6 @@ export function BurgerMenu({
               ) : null}
             </div>
 
-            <BurgerLink
-              to={isAdminPage ? "/admin/stones" : "/employee/stones"}
-              setOpen={setOpen}
-            >
-              Database
-            </BurgerLink>
-
-            <BurgerLink
-              to={
-                isAdminPage ? "/admin/instructions" : "/employee/instructions"
-              }
-              setOpen={setOpen}
-            >
-              Instruction
-            </BurgerLink>
-
-            {!isAdminPage && (
-              <BurgerLink to="/employee/special-order" setOpen={setOpen}>
-                Special Order
-              </BurgerLink>
-            )}
             {user !== null && (
               <BurgerLink to="/logout" className="pt-10" setOpen={setOpen}>
                 <Button> Logout</Button>

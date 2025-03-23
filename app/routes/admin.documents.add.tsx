@@ -41,7 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const { errors, data } = await parseMutliForm(
     request,
     documentSchema,
-    "documents"
+    "documents",
   );
   if (errors || !data) {
     return { errors };
@@ -50,7 +50,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await db.execute(
       `INSERT INTO main.documents (name, url, company_id) VALUES (?,  ?, ?);`,
-      [data.name, data.file, user.company_id]
+      [data.name, data.file, user.company_id],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
