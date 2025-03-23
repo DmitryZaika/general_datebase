@@ -6,9 +6,7 @@ import { getEmployeeUser } from "~/utils/session.server";
 import { ImageCard } from "~/components/organisms/ImageCard";
 import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState } from "react";
-import { Button } from "~/components/ui/button";
-import { StoneFilter, stoneFilterSchema } from "~/schemas/stones";
-import { STONE_TYPES } from "~/utils/constants";
+import { stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { Stone, stoneQueryBuilder } from "~/utils/queries";
 
@@ -49,7 +47,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 function InteractiveCard({
   stone,
   setCurrentId,
-  stoneType,
 }: {
   stone: Stone;
   setCurrentId: (value: number) => void;
@@ -88,9 +85,9 @@ function InteractiveCard({
         type="slabs"
         itemId={stone.id}
         fieldList={{
-          Avaliable: `${stone.available}`,
-          Amount: `${displayedAmount}`,
+          Avaliable: `${stone.available} / ${displayedAmount}`,
           Size: `${displayedHeight} x ${displayedWidth}`,
+          Price: `$${stone.retail_price}`,
         }}
         title={stone.name}
       >

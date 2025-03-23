@@ -16,12 +16,13 @@ export function HeaderDesktop({
 }: HeaderDesktopProps) {
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
+  const isCustomerPage = location.pathname.startsWith("/customer");
 
   return (
     <header
       className={clsx(
         "relative flex-row items-center   gap-0 justify-between  p-3 ",
-        className,
+        className
       )}
     >
       <div className="logo">
@@ -48,6 +49,10 @@ export function HeaderDesktop({
             </Link>
           )
         ) : null}
+        <Link to={isCustomerPage ? `/employee/stones` : `/customer/1/stones`}>
+          {" "}
+          <Button>{isCustomerPage ? "Employee" : "Customer"}</Button>
+        </Link>
       </div>
       <nav className="text-center flex-1">
         <ul className="flex-col md:flex-row flex flex-wrap justify-center ali md:justify-center gap-4">
