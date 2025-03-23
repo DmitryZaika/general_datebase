@@ -34,7 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { stoneSchema } from "~/schemas/stones";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const user = await getAdminUser(request).catch((err) => {
+  await getAdminUser(request).catch((err) => {
     return redirect(`/login?error=${err}`);
   });
   await csrf.validate(request).catch(() => {
@@ -111,8 +111,6 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
-  console.log(params.stone);
-  console.log(typeof params.stone);
   const stoneId = parseInt(params.stone, 10);
   const stone = await selectId<{
     name: string;
