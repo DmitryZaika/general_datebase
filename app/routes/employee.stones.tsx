@@ -12,7 +12,6 @@ import { STONE_TYPES } from "~/utils/constants";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { Stone, stoneQueryBuilder } from "~/utils/queries";
 
-
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
 
 function customSortType(a: string, b: string) {
@@ -32,7 +31,6 @@ function customSort2(a: Stone, b: Stone) {
   if (aAmount < bAmount) return 1;
   return a.name.localeCompare(b.name);
 }
-
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
