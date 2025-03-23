@@ -118,7 +118,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }>(db, "SELECT id, width, height, url FROM stones WHERE id = ? LIMIT 1", [
     stoneId,
   ]);
-  console.log(stone);
   return { slabs, stone };
 }
 

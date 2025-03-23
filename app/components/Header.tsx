@@ -9,7 +9,6 @@ export function Header({
   isAdmin,
   isSuperUser,
 }: HeaderProps) {
-  console.log(isEmployee, isAdmin, isSuperUser);
   if (!isEmployee && !isAdmin && !isSuperUser) {
     return <HeaderCustomers />;
   }
