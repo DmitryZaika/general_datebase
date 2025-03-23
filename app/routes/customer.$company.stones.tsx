@@ -138,16 +138,14 @@ export default function Stones() {
         images={stones}
         activeType={activeType}
       />
-      {stones
-        .sort(sortStones)
-        .map((stone) => (
-          <InteractiveCard
-            key={stone.id}
-            stone={stone}
-            setCurrentId={handleSetCurrentId}
-            stoneType={stone.type}
-          />
-        ))}
+      {stones.sort(sortStones).map((stone) => (
+        <InteractiveCard
+          key={stone.id}
+          stone={stone}
+          setCurrentId={handleSetCurrentId}
+          stoneType={stone.type}
+        />
+      ))}
     </ModuleList>
   );
 }
