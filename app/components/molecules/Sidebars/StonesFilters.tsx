@@ -82,7 +82,7 @@ export function StonesFilters({ suppliers }: IProps) {
           </SidebarGroupLabel>
           {suppliers.map((supplier) => (
             <LinkSpan
-              onClick={() => setSearchParams({ supplier: supplier.id })}
+              onClick={() => setSearchParams({ supplier: supplier.id })} key={supplier.id}
             >
               {supplier.supplier_name}
             </LinkSpan>
