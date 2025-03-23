@@ -12,12 +12,14 @@ import { SidebarGroupLabel, SidebarMenuSub } from "~/components/ui/sidebar";
 
 interface IProps {
   suppliers: ISupplier[] | undefined;
+  base: string;
 }
 
-export function StonesFilters({ suppliers }: IProps) {
+export function StonesFilters({ suppliers, base }: IProps) {
   const [searchParams, setSearchParams] =
     useSafeSearchParams(stoneFilterSchema);
   const cleanType = searchParams.type || ["granite"];
+  const showSoldOutToggle = ["admin", "employee"].includes(base)
   // Функция, которая добавляет/убирает элемент в массиве `type`
   const toggleStoneType = (typeToToggle: StoneFilter["type"][number]) => {
     let { type } = searchParams;
@@ -90,12 +92,16 @@ export function StonesFilters({ suppliers }: IProps) {
         </>
       )}
 
-      <SidebarGroupLabel>Other</SidebarGroupLabel>
-      <CheckOption
-        value="Show sold out"
-        selected={searchParams.show_sold_out}
-        toggleValue={toggleShowSoldOut}
-      />
+      { showSoldOutToggle && (
+        <>
+          <SidebarGroupLabel>Other</SidebarGroupLabel>
+          <CheckOption
+            value="Show sold out"
+            selected={searchParams.show_sold_out}
+            toggleValue={toggleShowSoldOut}
+          />
+        </>
+      )}
     </SidebarMenuSub>
   );
 }

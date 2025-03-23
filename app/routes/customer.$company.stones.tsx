@@ -5,7 +5,7 @@ import {
   AccordionContent,
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect } from "react-router";
+import { LoaderFunctionArgs, Outlet, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
@@ -49,6 +49,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const [, searchParams] = request.url.split("?");
   const queryParams = new URLSearchParams(searchParams);
   const filters = stoneFilterSchema.parse(cleanParams(queryParams));
+  filters.show_sold_out = false;
   const stones = await stoneQueryBuilder(filters, params.company);
 
   return { stones };
@@ -82,8 +83,6 @@ function InteractiveCard({
         type="slabs"
         itemId={stone.id}
         fieldList={{
-          Avaliable: `${stone.available}`,
-          Amount: `${displayedAmount}`,
           Size: `${displayedHeight} x ${displayedWidth}`,
         }}
         title={stone.name}
@@ -130,22 +129,25 @@ export default function Stones() {
   }, {});
 
   return (
-    <ModuleList>
-      <SuperCarousel
-        type="stones"
-        currentId={currentId}
-        setCurrentId={handleSetCurrentId}
-        images={stones}
-        activeType={activeType}
-      />
-      {stones.sort(sortStones).map((stone) => (
-        <InteractiveCard
-          key={stone.id}
-          stone={stone}
+    <>
+      <ModuleList>
+        <SuperCarousel
+          type="stones"
+          currentId={currentId}
           setCurrentId={handleSetCurrentId}
-          stoneType={stone.type}
+          images={stones}
+          activeType={activeType}
         />
-      ))}
-    </ModuleList>
+        {stones.sort(sortStones).map((stone) => (
+          <InteractiveCard
+            key={stone.id}
+            stone={stone}
+            setCurrentId={handleSetCurrentId}
+            stoneType={stone.type}
+          />
+        ))}
+      </ModuleList>
+      <Outlet />
+    </>
   );
 }

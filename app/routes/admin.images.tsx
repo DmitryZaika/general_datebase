@@ -28,7 +28,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const images = await selectMany<ImageItem>(
     db,
     "SELECT id, name, url FROM images WHERE company_id = ?",
-    [user.company_id],
+    [user.company_id]
   );
   return { images };
 };
@@ -37,7 +37,7 @@ export default function AdminImages() {
   const { images } = useLoaderData<typeof loader>();
 
   const { currentId, setCurrentId } = useArrowToggle(
-    (value: number | undefined) => (value ? [value] : []),
+    (value: number | undefined) => (value ? [value] : [])
   );
 
   return (
@@ -46,7 +46,7 @@ export default function AdminImages() {
         <Button>Add Image</Button>
       </Link>
       <div className="pt-24 sm:pt-0">
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
           {images
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((image) => (

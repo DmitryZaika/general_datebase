@@ -32,7 +32,7 @@ interface Stone {
 
 function customSortType(
   a: (typeof STONE_TYPES)[number],
-  b: (typeof STONE_TYPES)[number],
+  b: (typeof STONE_TYPES)[number]
 ) {
   return STONE_TYPES.indexOf(a) - STONE_TYPES.indexOf(b);
 }
@@ -76,7 +76,7 @@ export default function AdminStones() {
       </Link>
 
       <div className="pt-24 sm:pt-0">
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
           {stones
             .sort((a, b) => {
               const priorityA = getStonePriority(a);
