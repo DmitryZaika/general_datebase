@@ -16,6 +16,7 @@ export interface Stone {
   created_date: string;
   on_sale: boolean;
   retail_price: number;
+  cost_per_sqft: number;
 }
 
 export const stoneQueryBuilder = async (
@@ -39,6 +40,7 @@ export const stoneQueryBuilder = async (
     s.created_date, 
     s.on_sale,
     s.retail_price,
+    s.cost_per_sqft,
     COUNT(si.stone_id) AS amount,
     CAST(SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM main.stones s
