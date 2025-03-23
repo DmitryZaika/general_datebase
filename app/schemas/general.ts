@@ -17,3 +17,12 @@ export const StringBoolean = z.union([
   z.number().transform((val) => val === 1),
   z.enum(["true", "false"]).transform((val) => val === "true"),
 ]);
+
+export const StringBoolV2 = z.preprocess((val) => {
+  if (val === undefined) {
+    return undefined;
+  }
+  if (val === "true") {
+    return true;
+  }
+}, z.boolean().optional());

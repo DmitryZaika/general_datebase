@@ -57,7 +57,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const document = await selectId<{ name: string }>(
     db,
     "select name from documents WHERE id = ?",
-    documentId
+    documentId,
   );
   return {
     name: document?.name,

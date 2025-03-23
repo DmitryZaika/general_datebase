@@ -1,6 +1,6 @@
-import { ArrowUpDown } from "lucide-react"
-import { Column } from "@tanstack/react-table"
-import { Button } from "~/components/ui/button"
+import { ArrowUpDown } from "lucide-react";
+import { Column } from "@tanstack/react-table";
+import { Button } from "~/components/ui/button";
 
 interface IProps<T> {
   column: Column<T, unknown>;
@@ -8,11 +8,11 @@ interface IProps<T> {
 }
 
 export const SortableHeader = <T,>({ column, title }: IProps<T>) => (
-          <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          {title}
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-)
+  <Button
+    variant="ghost"
+    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+  >
+    {title}
+    <ArrowUpDown className="ml-2 h-4 w-4" />
+  </Button>
+);

@@ -4,7 +4,7 @@ import { RowDataPacket } from "mysql2";
 export async function selectMany<T>(
   db: mysql.Pool,
   query: string,
-  params: any[] = []
+  params: any[] = [],
 ): Promise<T[]> {
   try {
     const [rows] = await db.query<T[] & RowDataPacket[]>(query, params);
@@ -18,7 +18,7 @@ export async function selectMany<T>(
 export async function selectId<T>(
   db: mysql.Pool,
   query: string,
-  id: number
+  id: number,
 ): Promise<T | undefined> {
   try {
     const [rows] = await db.query<T[] & RowDataPacket[]>(query, [id]);

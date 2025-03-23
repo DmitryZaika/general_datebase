@@ -23,7 +23,7 @@ interface Document {
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
+  import.meta.url,
 ).toString();
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -36,7 +36,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const documents = await selectMany<Document>(
     db,
     "SELECT id, name, url FROM documents WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return { documents };
 };

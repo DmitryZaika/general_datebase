@@ -28,7 +28,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const images = await selectMany<ImageItem>(
     db,
     "SELECT id, name, url FROM images WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return { images };
 };
@@ -37,7 +37,7 @@ export default function AdminImages() {
   const { images } = useLoaderData<typeof loader>();
 
   const { currentId, setCurrentId } = useArrowToggle(
-    (value: number | undefined) => (value ? [value] : [])
+    (value: number | undefined) => (value ? [value] : []),
   );
 
   return (

@@ -44,10 +44,10 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     return { error: "Invalid CSRF token" };
   }
-  
+
   const { errors, data } = await getValidatedFormData<FormData>(
     request,
-    resolver
+    resolver,
   );
   if (errors) {
     return { errors };
@@ -56,7 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await db.execute(
       `INSERT INTO main.customers (name, email, phone, address ) VALUES (?,?,?,?)`,
-      [data.name, data.email, data.phone, data.address]
+      [data.name, data.email, data.phone, data.address],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);

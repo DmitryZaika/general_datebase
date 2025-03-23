@@ -20,8 +20,8 @@ export function HeaderDesktop({
   return (
     <header
       className={clsx(
-        "relative flex-row items-center   gap-0 justify-between  m-3 ",
-        className
+        "relative flex-row items-center   gap-0 justify-between  p-3 ",
+        className,
       )}
     >
       <div className="logo">
@@ -48,50 +48,9 @@ export function HeaderDesktop({
             </Link>
           )
         ) : null}
-        {isSuperUser ? (
-          isAdminPage ? (
-            <Link to="/admin/users">
-              <Button>User Panel</Button>
-            </Link>
-          ) : null
-        ) : null}
       </div>
       <nav className="text-center flex-1">
         <ul className="flex-col md:flex-row flex flex-wrap justify-center ali md:justify-center gap-4">
-          <li>
-            <Button asChild variant="link">
-              <Link
-                to={isAdminPage ? "/admin/stones" : "/employee/stones"}
-                className="text-xl md:text-xl"
-              >
-                Database
-              </Link>
-            </Button>
-          </li>
-          <li>
-            <Button asChild variant="link">
-              <Link
-                to={
-                  isAdminPage ? "/admin/instructions" : "/employee/instructions"
-                }
-                className="text-xl md:text-xl"
-              >
-                Instructions
-              </Link>
-            </Button>
-          </li>
-          {!isAdminPage && (
-            <li>
-              <Button asChild variant="link">
-                <Link
-                  to="/employee/special-order"
-                  className="text-xl md:text-xl"
-                >
-                  Special Order
-                </Link>
-              </Button>
-            </li>
-          )}
           {/* {isAdminPage && (
               <li>
                 <Button asChild variant="link">

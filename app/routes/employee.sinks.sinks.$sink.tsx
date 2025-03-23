@@ -33,7 +33,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const sink = await selectId<Sink>(
     db,
     "SELECT id, name, type, amount, url FROM sinks WHERE id = ?",
-    sinkId
+    sinkId,
   );
   if (!sink) {
     return forceRedirectError(request.headers, "No sink found for given ID");
@@ -58,7 +58,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const sink = await selectId<{ amount: number }>(
     db,
     "SELECT amount FROM sinks WHERE id = ?",
-    sinkId
+    sinkId,
   );
   if (!sink) {
     return forceRedirectError(request.headers, "No sink found for given ID");
@@ -66,7 +66,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   await db.execute(
     "UPDATE sinks SET amount = GREATEST(amount - 1, 0) WHERE id = ?",
-    [sinkId]
+    [sinkId],
   );
 
   const session = await getSession(request.headers.get("Cookie"));

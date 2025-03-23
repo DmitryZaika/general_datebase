@@ -54,7 +54,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const userId = parseInt(params.user);
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
-    resolver
+    resolver,
   );
   if (errors) {
     return { errors, receivedValues };
@@ -77,7 +77,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       data.company_id,
       data.is_admin,
       userId,
-    ]
+    ],
   );
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "User updated"));
@@ -116,14 +116,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await selectId<User>(
     db,
     "SELECT id, name, email, phone_number, company_id, is_admin FROM users WHERE id = ?",
-    userId
+    userId,
   );
   if (!user) {
     return forceRedirectError(request.headers, "Invalid user id");
   }
   const companies = await selectMany<Company>(
     db,
-    "SELECT id, name FROM company"
+    "SELECT id, name FROM company",
   );
   return {
     user,
