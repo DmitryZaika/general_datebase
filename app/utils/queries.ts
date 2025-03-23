@@ -37,7 +37,7 @@ export const stoneQueryBuilder = async (
     s.created_date, 
     s.on_sale,
     COUNT(si.stone_id) AS amount,
-    SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS available
+    CAST(SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM main.stones s
   LEFT JOIN main.slab_inventory AS si ON si.stone_id = s.id
   WHERE s.company_id = ? AND s.is_display = 1
