@@ -70,13 +70,14 @@ function convertData(data) {
 async function saveData(data) {
   for (const item of data) {
     await db.execute(
-      `UPDATE main.stones SET retail_price = ?, cost_per_sqft = ?, height = ?, width = ?, supplier_id = ?`,
+      `UPDATE main.stones SET retail_price = ?, cost_per_sqft = ?, height = ?, width = ?, supplier_id = ? WHERE id = ?`,
       [
         item.retail_price,
         item.cost_per_sqft,
         item.height,
         item.width,
         item.supplier_id,
+        item.id,
       ]
     );
   }
@@ -84,5 +85,5 @@ async function saveData(data) {
 
 const data = getCsvData();
 const cleanData = convertData(data);
-const updateData = saveData(cleanData);
+const updateData = await saveData(cleanData);
 console.log(updateData);

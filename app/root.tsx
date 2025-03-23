@@ -55,8 +55,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (user) {
     suppliers = await selectMany<ISupplier>(
       db,
-      "select id, supplier_name from suppliers where company_id = ?",
-      [user.company_id],
+      `SELECT s.id, s.supplier_name 
+       FROM suppliers s
+       INNER JOIN stones st ON s.id = st.supplier_id
+       WHERE s.company_id = ?
+       GROUP BY s.id, s.supplier_name`,
+      [user.company_id]
     );
   }
 
@@ -68,7 +72,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         ["Set-Cookie", cookieHeader || ""],
         ["Set-Cookie", await commitSession(session)],
       ],
-    },
+    }
   );
 }
 
