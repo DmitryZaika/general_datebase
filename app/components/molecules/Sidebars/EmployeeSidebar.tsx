@@ -43,7 +43,7 @@ const getItems = (base: string, suppliers: ISupplier[] | undefined) => {
       title: "Stones",
       url: `/${base}/stones`,
       icon: Home,
-      component: () => <StonesFilters suppliers={suppliers} />,
+      component: () => <StonesFilters suppliers={suppliers} base={base}/>,
     },
   ];
   if (["admin", "employee"].includes(base)) {

@@ -49,6 +49,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const [, searchParams] = request.url.split("?");
   const queryParams = new URLSearchParams(searchParams);
   const filters = stoneFilterSchema.parse(cleanParams(queryParams));
+  filters.show_sold_out = false;
   const stones = await stoneQueryBuilder(filters, params.company);
 
   return { stones };
@@ -82,8 +83,6 @@ function InteractiveCard({
         type="slabs"
         itemId={stone.id}
         fieldList={{
-          Avaliable: `${stone.available}`,
-          Amount: `${displayedAmount}`,
           Size: `${displayedHeight} x ${displayedWidth}`,
         }}
         title={stone.name}

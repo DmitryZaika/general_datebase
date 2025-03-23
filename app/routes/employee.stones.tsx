@@ -88,8 +88,7 @@ function InteractiveCard({
         type="slabs"
         itemId={stone.id}
         fieldList={{
-          Avaliable: `${stone.available}`,
-          Amount: `${displayedAmount}`,
+          Avaliable: `${stone.available} / ${displayedAmount}`,
           Size: `${displayedHeight} x ${displayedWidth}`,
         }}
         title={stone.name}
