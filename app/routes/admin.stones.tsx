@@ -52,7 +52,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const [, searchParams] = request.url.split("?");
   const queryParams = new URLSearchParams(searchParams);
   const filters = stoneFilterSchema.parse(cleanParams(queryParams));
-  const stones = await stoneQueryBuilder(filters, user.company_id);
+  const stones = await stoneQueryBuilder(filters, user.company_id, true);
 
   return { stones };
 };

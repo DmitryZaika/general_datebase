@@ -52,7 +52,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const stone = await selectId<{ url: string }>(
     db,
     "SELECT url FROM stones WHERE id = ?",
-    stoneId,
+    stoneId
   );
   try {
     if (newFile) {
@@ -72,7 +72,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.cost_per_sqft,
           data.retail_price,
           stoneId,
-        ],
+        ]
       );
     } else {
       await db.execute(
@@ -90,7 +90,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.cost_per_sqft,
           data.retail_price,
           stoneId,
-        ],
+        ]
       );
     }
   } catch (error) {
@@ -111,6 +111,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
+  console.log(params.stone);
+  console.log(typeof params.stone);
   const stoneId = parseInt(params.stone, 10);
   const stone = await selectId<{
     name: string;
@@ -126,7 +128,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   }>(
     db,
     "SELECT name, type, url, is_display, supplier_id, height, width, on_sale, cost_per_sqft, retail_price FROM stones WHERE id = ?",
-    stoneId,
+    stoneId
   );
   if (!stone) {
     return forceRedirectError(request.headers, "No stone found");
