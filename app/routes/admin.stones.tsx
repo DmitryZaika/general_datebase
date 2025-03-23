@@ -9,12 +9,11 @@ import {
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
-import { selectMany } from "~/utils/queryHelpers";
-import { db } from "~/db.server";
+
 import { Button } from "~/components/ui/button";
 import { getAdminUser } from "~/utils/session.server";
 import { stoneQueryBuilder } from "~/utils/queries";
-import { StoneFilter, stoneFilterSchema } from "~/schemas/stones";
+import { stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { STONE_TYPES } from "~/utils/constants";
 
@@ -60,7 +59,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminStones() {
   const { stones } = useLoaderData<typeof loader>();
 
-  // Group stones by type
   const stoneList = stones.reduce((acc: Record<string, Stone[]>, stone) => {
     if (!acc[stone.type]) {
       acc[stone.type] = [];
@@ -118,13 +116,16 @@ export default function AdminStones() {
                     </div>
                     <p className="text-center font-bold mt-2">{stone.name}</p>
                     <p className="text-center text-sm">
-                      Amount: {displayedAmount}
-                    </p>
-                    <p className="text-center text-sm">
-                      Available: {displayedAvailable}
+                      Available: {displayedAvailable} / {displayedAmount}
                     </p>
                     <p className="text-center text-sm">
                       Size: {displayedHeight} x {displayedWidth}
+                    </p>
+                    <p className="text-center text-sm">
+                      Price: ${stone.retail_price}
+                    </p>
+                    <p className="text-center text-sm">
+                      Cost per sqft: ${stone.cost_per_sqft}
                     </p>
                   </div>
 
