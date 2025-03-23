@@ -31,7 +31,6 @@ interface Slab {
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  await getEmployeeUser(request);
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
@@ -53,8 +52,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  await getEmployeeUser(request);
-  // await csrf.validate(request);
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
@@ -139,14 +136,6 @@ export default function SlabsModal() {
                       {slab.width} x {slab.height}
                     </span>
                   </div>
-
-                  <Form method="post" className="ml-auto">
-                    <AuthenticityTokenInput />
-                    <input type="hidden" name="slabId" value={slab.id} />
-                    <Button type="submit" className="px-4 py-2">
-                      {isSold ? "Unsell" : "Sell"}
-                    </Button>
-                  </Form>
                 </div>
               );
             })
