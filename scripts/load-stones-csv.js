@@ -1,99 +1,88 @@
 import fs from "fs";
-import csv from "csv-parser";
+import path from "path";
+import { fileURLToPath } from "url";
 import mysql from "mysql2/promise";
-import dotenv from "dotenv";
 
-dotenv.config();
+const access = {
+  user: process.env.DB_USER,
+  database: process.env.DB_DATABASE,
+  password: process.env.DB_PASSWORD,
+  host: process.env.DB_HOST,
+};
 
-const { DB_HOST, DB_USER, DB_PASSWORD, DB_DATABASE } = process.env;
-if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_DATABASE) {
-  throw new Error("Missing DB environment variables!");
-}
+export const db = mysql.createPool(access);
 
-const db = mysql.createPool({
-  host: DB_HOST,
-  user: DB_USER,
-  password: DB_PASSWORD,
-  database: DB_DATABASE,
-});
+const __dirname = fileURLToPath(new URL(".", import.meta.url)).replace(
+  /\/$/,
+  ""
+);
 
-export async function selectMany(db, query, params = []) {
-  try {
-    const [rows] = await db.query(query, params);
-    return rows;
-  } catch {
-    return [];
-  }
-}
+const getCsvData = () => {
+  const filePath = path.join(__dirname, "data.csv");
 
-export async function selectId(db, query, id) {
-  try {
-    const [rows] = await db.query(query, [id]);
-    if (!rows.length) return undefined;
-    return rows[0];
-  } catch {
-    return undefined;
-  }
-}
+  // 2. Read the CSV file
+  const csvContent = fs.readFileSync(filePath, "utf8");
 
-export async function updateRow(db, query, params) {
-  try {
-    const [result] = await db.query(query, params);
-    return result.affectedRows;
-  } catch {
-    return 0;
-  }
-}
+  // 3. Split into lines
+  const lines = csvContent.trim().split(/\r?\n/);
 
-async function updateRecordsFromCsv(csvPath) {
-  const rows = [];
-  return new Promise((resolve, reject) => {
-    fs.createReadStream(csvPath)
-      .pipe(csv())
-      .on("data", (row) => {
-        rows.push(row);
-      })
-      .on("end", async () => {
-        for (const r of rows) {
-          const { id } = r;
-          if (!id) continue;
-          const retail_price = r.retail_price
-            ? r.retail_price.replace(/\$/g, "")
-            : null;
-          const cost_per_sqft = r.cost_per_sqft
-            ? r.cost_per_sqft.replace(/\$/g, "")
-            : null;
-          const height = r.height ? Number(r.height) : null;
-          const width = r.width ? Number(r.width) : null;
-          const supplier_id = r.supplier_id ? Number(r.supplier_id) : null;
-          const q = `
-            UPDATE my_table
-            SET retail_price = ?, cost_per_sqft = ?, height = ?, width = ?, supplier_id = ?
-            WHERE id = ?
-          `;
-          await updateRow(db, q, [
-            retail_price,
-            cost_per_sqft,
-            height,
-            width,
-            supplier_id,
-            id,
-          ]);
-        }
-        resolve();
-      })
-      .on("error", (err) => {
-        reject(err);
-      });
+  // 4. The first line should be the header row
+  const headers = lines[0].split(",");
+
+  // 5. Parse each subsequent line into an object
+  return lines.slice(1).map((line) => {
+    // Split the current line by commas
+    const values = line.split(",");
+
+    // Combine header names with their corresponding values
+    return headers.reduce((obj, header, index) => {
+      // If there's no value (like with id=94 retail_price), it becomes ""
+      obj[header] = values[index] || "";
+      return obj;
+    }, {});
   });
+};
+
+function convertData(data) {
+  // вспомогательная функция для преобразования строк в целые числа (int)
+  function toInt(str) {
+    if (!str) return 0; // если пусто, возвращаем 0
+    // убираем '$' и приводим к целому
+    return parseInt(str.replace("$", ""), 10) || 0;
+  }
+
+  // вспомогательная функция для преобразования строк в число с плавающей точкой (float)
+  function toFloat(str) {
+    if (!str) return 0;
+    return parseFloat(str) || 0;
+  }
+
+  return data.map((item) => ({
+    id: toInt(item.id),
+    retail_price: toInt(item.retail_price),
+    cost_per_sqft: toInt(item.cost_per_sqft),
+    height: toFloat(item.height),
+    width: toFloat(item.width),
+    supplier_id: toInt(item.supplier_id),
+  }));
 }
 
-(async function main() {
-  try {
-    await db.query("SELECT 1");
-    await updateRecordsFromCsv("path/to/your-csv.csv");
-    await db.end();
-  } catch (e) {
-    process.exit(1);
+async function saveData(data) {
+  for (const item of data) {
+    await db.execute(
+      `UPDATE main.stones SET retail_price = ?, cost_per_sqft = ?, height = ?, width = ?, supplier_id = ?`,
+      [
+        item.retail_price,
+        item.cost_per_sqft,
+        item.height,
+        item.width,
+        item.supplier_id,
+      ]
+    );
   }
-})();
+}
+
+const data = getCsvData();
+const cleanData = convertData(data);
+const updateData = saveData(cleanData);
+console.log(updateData);
