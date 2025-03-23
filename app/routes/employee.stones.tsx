@@ -133,7 +133,7 @@ export default function Stones() {
           images={stones}
           activeType={activeType}
         />
-        {stones.map((stone) => (
+        {stones.sort(customSort2).map((stone) => (
           <InteractiveCard
             key={stone.id}
             stone={stone}
