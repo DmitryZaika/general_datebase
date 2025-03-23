@@ -25,6 +25,7 @@ import { selectMany } from "./utils/queryHelpers";
 import { db } from "~/db.server";
 import { EmployeeSidebar } from "~/components/molecules/Sidebars/EmployeeSidebar";
 import { getBase } from "~/utils/urlHelpers";
+import { ISupplier } from "~/schemas/suppliers";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -39,11 +40,6 @@ export const links: LinksFunction = () => [
   },
 ];
 
-interface ISupplier {
-  id: number;
-  supplier_name: string;
-}
-
 export async function loader({ request }: LoaderFunctionArgs) {
   const [token, cookieHeader] = await csrf.commitToken();
   const session = await getSession(request.headers.get("Cookie"));
@@ -55,7 +51,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = (await getUserBySessionId(activeSession)) || null;
   }
 
-  let suppliers: ISupplier[] = [];
+  let suppliers: ISupplier[] | undefined = undefined;
   if (user) {
     suppliers = await selectMany<ISupplier>(
       db,
@@ -65,7 +61,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   return data(
-    { message, token, user },
+    { message, token, user, suppliers },
 
     {
       headers: [
@@ -77,7 +73,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function App() {
-  const { message, token, user } = useLoaderData<typeof loader>();
+  const { message, token, user, suppliers } = useLoaderData<typeof loader>();
   const { pathname } = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -104,7 +100,7 @@ export default function App() {
       </head>
       <body>
         <SidebarProvider open={!!basePath}>
-          <EmployeeSidebar />
+          <EmployeeSidebar suppliers={suppliers} />
           <main className="h-screen bg-gray-100 w-full">
             <AuthenticityTokenProvider token={token}>
               <Header
