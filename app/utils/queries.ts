@@ -15,11 +15,12 @@ export interface Stone {
   available: number;
   created_date: string;
   on_sale: boolean;
+  retail_price: number;
 }
 
 export const stoneQueryBuilder = async (
   filters: StoneFilter,
-  companyId: number,
+  companyId: number
 ): Promise<Stone[]> => {
   if (filters.type.length === 0) {
     return [];
@@ -36,6 +37,7 @@ export const stoneQueryBuilder = async (
     s.width,
     s.created_date, 
     s.on_sale,
+    s.retail_price,
     COUNT(si.stone_id) AS amount,
     SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS available
   FROM main.stones s

@@ -10,12 +10,16 @@ export function ImageCard({
   title,
   itemId,
   type,
+  price,
+  supplier,
 }: {
   children: JSX.Element;
   fieldList?: Record<string, number | null | string>;
   title: string;
   itemId?: number;
   type: string;
+  price?: number;
+  supplier?: string;
 }) {
   return (
     <Card className="w-full max-w-sm ">
@@ -28,9 +32,13 @@ export function ImageCard({
         <Link to={`${type}/${itemId}`}>
           {fieldList &&
             Object.entries(fieldList).map(([key, value]) => (
-              <p key={key}>
-                {key}: {value}
-              </p>
+              <>
+                <p key={key}>
+                  {key}: {value}
+                </p>
+                <p>{price}</p>
+                <p>{supplier}</p>
+              </>
             ))}
         </Link>
       </CardContent>

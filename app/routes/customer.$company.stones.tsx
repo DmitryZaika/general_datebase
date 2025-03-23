@@ -5,7 +5,7 @@ import {
   AccordionContent,
 } from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect } from "react-router";
+import { LoaderFunctionArgs, Outlet, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
@@ -130,17 +130,16 @@ export default function Stones() {
   }, {});
 
   return (
-    <ModuleList>
-      <SuperCarousel
-        type="stones"
-        currentId={currentId}
-        setCurrentId={handleSetCurrentId}
-        images={stones}
-        activeType={activeType}
-      />
-      {stones
-        .sort(sortStones)
-        .map((stone) => (
+    <>
+      <ModuleList>
+        <SuperCarousel
+          type="stones"
+          currentId={currentId}
+          setCurrentId={handleSetCurrentId}
+          images={stones}
+          activeType={activeType}
+        />
+        {stones.sort(sortStones).map((stone) => (
           <InteractiveCard
             key={stone.id}
             stone={stone}
@@ -148,6 +147,8 @@ export default function Stones() {
             stoneType={stone.type}
           />
         ))}
-    </ModuleList>
+      </ModuleList>
+      <Outlet />
+    </>
   );
 }
