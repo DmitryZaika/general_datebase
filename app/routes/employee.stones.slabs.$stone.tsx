@@ -97,7 +97,7 @@ export default function SlabsModal() {
         if (!open) history.back();
       }}
     >
-      <DialogContent className="p-5 bg-white rounded-md shadow-lg text-gray-800">
+      <DialogContent className="p-5 bg-white rounded-md shadow-lg text-gray-800  overflow-y-auto max-h-[95vh]">
         <DialogTitle>Slabs for {stone.name}</DialogTitle>
 
         <div className="flex flex-col gap-4">

@@ -36,10 +36,10 @@ const customOrder = [
 
 function customSort(a: string, b: string) {
   const aIndex = customOrder.findIndex(
-    (item) => item.toLowerCase() === a.toLowerCase(),
+    (item) => item.toLowerCase() === a.toLowerCase()
   );
   const bIndex = customOrder.findIndex(
-    (item) => item.toLowerCase() === b.toLowerCase(),
+    (item) => item.toLowerCase() === b.toLowerCase()
   );
 
   if (aIndex !== -1 && bIndex !== -1) {
@@ -81,7 +81,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       WHERE company_id = ?
       ORDER BY name ASC
     `,
-    [user.company_id],
+    [user.company_id]
   );
 
   return { sinks };
@@ -120,7 +120,7 @@ export default function AdminSinks() {
                     </AccordionTrigger>
 
                     <AccordionContent>
-                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
                         {sinkList[type]
 
                           .sort((a, b) => {
