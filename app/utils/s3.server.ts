@@ -34,7 +34,7 @@ const getClient = () => {
 export const deleteFile = async (url: string) => {
   const finalKey = url.replace(
     `https://${STORAGE_BUCKET}.s3.${STORAGE_REGION}.amazonaws.com/`,
-    ""
+    "",
   );
   const client = getClient();
   try {
@@ -42,11 +42,11 @@ export const deleteFile = async (url: string) => {
       new DeleteObjectCommand({
         Bucket: STORAGE_BUCKET,
         Key: finalKey,
-      })
+      }),
     );
     await waitUntilObjectNotExists(
       { client, maxWaitTime: 30 },
-      { Bucket: STORAGE_BUCKET!, Key: finalKey }
+      { Bucket: STORAGE_BUCKET!, Key: finalKey },
     );
   } catch (caught) {
     if (
@@ -54,11 +54,11 @@ export const deleteFile = async (url: string) => {
       caught.name === "NoSuchBucket"
     ) {
       console.error(
-        `Error from S3 while deleting object from ${STORAGE_BUCKET}. The bucket doesn't exist.`
+        `Error from S3 while deleting object from ${STORAGE_BUCKET}. The bucket doesn't exist.`,
       );
     } else if (caught instanceof S3ServiceException) {
       console.error(
-        `Error from S3 while deleting object from ${STORAGE_BUCKET}.  ${caught.name}: ${caught.message}`
+        `Error from S3 while deleting object from ${STORAGE_BUCKET}.  ${caught.name}: ${caught.message}`,
       );
     } else {
       throw caught;
@@ -110,7 +110,7 @@ function readableStreamToAsyncIterable(stream: ReadableStream<Uint8Array>) {
 
 export async function uploadStreamToS3(
   data: AsyncIterable<Uint8Array>,
-  filename: string
+  filename: string,
 ) {
   const mimeType = mime.lookup(filename) || "application/octet-stream";
   const stream = uploadStream({
@@ -124,7 +124,7 @@ export async function uploadStreamToS3(
 
 export const s3UploadHandler = async (
   fileUpload: FileUpload,
-  folder: string
+  folder: string,
 ): Promise<File | string | null | undefined> => {
   if (fileUpload.fieldName === "file") {
     const extensionRegex = /(?:\.([^.]+))?$/;
@@ -135,7 +135,7 @@ export const s3UploadHandler = async (
 
     const uploadedFileLocation = await uploadStreamToS3(
       asyncIterable,
-      finalname
+      finalname,
     );
     return uploadedFileLocation;
   }

@@ -1,3 +1,4 @@
+import { ColumnDef } from "@tanstack/react-table";
 import { LoaderFunctionArgs, redirect } from "react-router";
 import { Link, Outlet, useLoaderData } from "react-router";
 import { PageLayout } from "~/components/PageLayout";
@@ -14,6 +15,9 @@ import {
 import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
 import { getAdminUser } from "~/utils/session.server";
+import { DataTable } from "~/components/ui/data-table";
+import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
+
 interface Instructions {
   id: number;
   title: string;
@@ -32,10 +36,38 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const instructions = await selectMany<Instructions>(
     db,
     "select id, title, parent_id, after_id, rich_text from instructions WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return { instructions };
 };
+
+const instructionsColumn: ColumnDef<Instructions>[] = [
+  {
+    accessorKey: "title",
+    header: "Title",
+  },
+  {
+    accessorKey: "parent_id",
+    header: "Parent Id",
+  },
+  {
+    accessorKey: "after_id",
+    header: "Order",
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => {
+      return (
+        <ActionDropdown
+          actions={{
+            edit: `edit/${row.original.id}`,
+            delete: `delete/${row.original.id}`,
+          }}
+        />
+      );
+    },
+  },
+];
 
 export default function AdminInstructions() {
   const { instructions } = useLoaderData<typeof loader>();
@@ -44,43 +76,7 @@ export default function AdminInstructions() {
       <Link to={`add`} relative="path">
         <Button>Add Instruction</Button>
       </Link>
-      <Table>
-        <TableCaption>A list of Instructions</TableCaption>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-xl w-[200px]">Title</TableHead>{" "}
-            <TableHead className="text-xl">Parent Id</TableHead>
-            <TableHead className="text-xl">Order</TableHead>
-            <TableHead className="text-xl text-right pr-4">
-              Edit Instruction
-            </TableHead>{" "}
-            <TableHead className="text-right text-xl">
-              Delete Instruction
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {instructions.map((instruction) => (
-            <TableRow key={instruction.id}>
-              <TableCell className=" font-medium w-[200px]">
-                {instruction.title}
-              </TableCell>{" "}
-              <TableCell>{instruction.parent_id}</TableCell>
-              <TableCell>{instruction.after_id}</TableCell>
-              <TableCell className="text-right pr-4">
-                <Link to={`edit/${instruction.id}`} className="text-xl">
-                  Edit
-                </Link>
-              </TableCell>
-              <TableCell className="text-right w-[200px]">
-                <Link to={`delete/${instruction.id}`} className="text-xl">
-                  Delete
-                </Link>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <DataTable columns={instructionsColumn} data={instructions} />
       <Outlet />
     </PageLayout>
   );

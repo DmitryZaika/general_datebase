@@ -12,7 +12,7 @@ const optionalFileSchema = z.object({
 
 export function useCustomForm<TFieldValues extends FieldValues = FieldValues>(
   schema: TFieldValues,
-  defaultValues?: object
+  defaultValues?: object,
 ): UseFormReturn<z.infer<TFieldValues & typeof fileSchema>> {
   const finalSchema = schema.merge(fileSchema);
   type finalData = z.infer<typeof finalSchema>;
@@ -24,10 +24,10 @@ export function useCustomForm<TFieldValues extends FieldValues = FieldValues>(
 }
 
 export function useCustomOptionalForm<
-  TFieldValues extends FieldValues = FieldValues
+  TFieldValues extends FieldValues = FieldValues,
 >(
   schema: TFieldValues,
-  defaultValues?: object
+  defaultValues?: object,
 ): UseFormReturn<z.infer<TFieldValues & typeof optionalFileSchema>> {
   const finalSchema = schema.merge(optionalFileSchema);
   type finalData = z.infer<typeof finalSchema>;

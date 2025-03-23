@@ -8,6 +8,7 @@ type FileInput = {
   id: string;
   label?: string;
   type: "image" | "pdf";
+  className?: string;
   onChange: (event: File | undefined) => void;
 };
 
@@ -36,7 +37,13 @@ function getQuality(size: number): number {
   }
 }
 
-export function FileInput({ onChange, id, label = "Image", type }: FileInput) {
+export function FileInput({
+  onChange,
+  id,
+  label = "Image",
+  type,
+  className,
+}: FileInput) {
   function compressImage(file: File) {
     new Compressor(file, {
       quality: getQuality(file.size),
@@ -68,6 +75,7 @@ export function FileInput({ onChange, id, label = "Image", type }: FileInput) {
       <FormLabel>{label}</FormLabel>
       <FormControl>
         <Input
+          className={className}
           onChange={(event) => handleChange(event.target.files?.[0])}
           type="file"
           accept={acceptsMap[type]}

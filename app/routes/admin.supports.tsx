@@ -28,7 +28,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const supports = await selectMany<Support>(
     db,
     "SELECT id, name, url FROM supports WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
 
   return { supports };
@@ -38,7 +38,7 @@ export default function AdminSupports() {
   const { supports } = useLoaderData<typeof loader>();
 
   const { currentId, setCurrentId } = useArrowToggle(
-    (value: number | undefined) => (value ? [value] : [])
+    (value: number | undefined) => (value ? [value] : []),
   );
 
   return (

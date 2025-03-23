@@ -1,30 +1,17 @@
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "~/components/ui/accordion";
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect } from "react-router";
-import { selectMany } from "~/utils/queryHelpers";
-import { db } from "~/db.server";
+import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
 import { useLoaderData } from "react-router";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
 import { ImageCard } from "~/components/organisms/ImageCard";
 import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState } from "react";
+import { Button } from "~/components/ui/button";
+import { StoneFilter, stoneFilterSchema } from "~/schemas/stones";
+import { STONE_TYPES } from "~/utils/constants";
+import { cleanParams } from "~/hooks/use-safe-search-params";
+import { Stone, stoneQueryBuilder } from "~/utils/queries";
 
-interface Stone {
-  id: number;
-  name: string;
-  type: string;
-  url: string | null;
-  is_display: boolean | number;
-  height: number | null;
-  width: number | null;
-  amount: number | null;
-}
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
 
@@ -34,6 +21,19 @@ function customSortType(a: string, b: string) {
   );
 }
 
+function customSort2(a: Stone, b: Stone) {
+  const aAvailable = a.available ?? 0;
+  const bAvailable = b.available ?? 0;
+  if (aAvailable > 0 && bAvailable === 0) return -1;
+  if (aAvailable === 0 && bAvailable > 0) return 1;
+  const aAmount = a.amount ?? 0;
+  const bAmount = b.amount ?? 0;
+  if (aAmount > bAmount) return -1;
+  if (aAmount < bAmount) return 1;
+  return a.name.localeCompare(b.name);
+}
+
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getEmployeeUser(request);
@@ -41,18 +41,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
   const user = await getEmployeeUser(request);
-
-  const stones = await selectMany<Stone>(
-    db,
-    `
-      SELECT id, name, type, url, is_display, height, width, amount
-      FROM stones
-      WHERE company_id = ? AND is_display = 1
-      ORDER BY name ASC
-    `,
-    [user.company_id]
-  );
-
+  const [, searchParams] = request.url.split("?");
+  const queryParams = new URLSearchParams(searchParams);
+  const filters = stoneFilterSchema.parse(cleanParams(queryParams));
+  const stones = await stoneQueryBuilder(filters, user.company_id);
   return { stones };
 };
 
@@ -62,17 +54,22 @@ function InteractiveCard({
   stoneType,
 }: {
   stone: Stone;
-  setCurrentId: (value: number, type: string) => void;
+  setCurrentId: (value: number) => void;
   stoneType: string;
 }) {
-  const displayedAmount = stone.amount && stone.amount > 0 ? stone.amount : "—";
+  const displayedAmount = stone.amount > 0 ? stone.amount : "—";
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
   const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
+  const createdDate = new Date(stone.created_date);
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const isNew = createdDate > oneWeekAgo;
+  const isOnSale = !!stone.on_sale;
 
   return (
     <div
       key={stone.id}
-      className="relative group w-full"
+      className="relative group w-full overflow-hidden"
       onAuxClick={(e) => {
         if (e.button === 1 && stone.url) {
           e.preventDefault();
@@ -80,10 +77,22 @@ function InteractiveCard({
         }
       }}
     >
+      {isOnSale && (
+        <div className="absolute top-[17px] left-[-40px] w-[140px] transform -rotate-45 z-10">
+          <div className="text-center py-1 text-white font-bold text-sm bg-red-600 shadow-md">
+            <span className="block relative z-10">ON SALE</span>
+            <div className="absolute left-0 top-full border-l-[10px] border-l-transparent border-t-[10px] border-t-red-800" />
+            <div className="absolute right-0 top-full border-r-[10px] border-r-transparent border-t-[10px] border-t-red-800" />
+          </div>
+        </div>
+      )}
       <ImageCard
+        type="slabs"
+        itemId={stone.id}
         fieldList={{
+          Avaliable: `${stone.available}`,
           Amount: `${displayedAmount}`,
-          Size: `${displayedWidth} x ${displayedHeight}`,
+          Size: `${displayedHeight} x ${displayedWidth}`,
         }}
         title={stone.name}
       >
@@ -92,14 +101,19 @@ function InteractiveCard({
           alt={stone.name || "Stone Image"}
           className="object-cover w-full h-40 border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none"
           loading="lazy"
-          onClick={() => setCurrentId(stone.id, stoneType)}
+          onClick={() => setCurrentId(stone.id)}
         />
       </ImageCard>
-      {displayedAmount === "—" && (
-        <div className="absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
+      {stone.available === 0 && (
+        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
           <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
             Out of Stock
           </div>
+        </div>
+      )}
+      {isNew && (
+        <div className="absolute top-0 right-0 bg-green-500 text-white px-2 py-1 rounded-bl text-sm font-bold">
+          New Color
         </div>
       )}
     </div>
@@ -111,67 +125,26 @@ export default function Stones() {
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [activeType, setActiveType] = useState<string | undefined>(undefined);
 
-  const handleSetCurrentId = (id: number | undefined, type?: string) => {
-    setCurrentId(id);
-    if (type) {
-      setActiveType(type);
-    } else if (id === undefined) {
-      setActiveType(undefined);
-    }
-  };
-
-  const stoneList = stones.reduce((acc: { [key: string]: Stone[] }, stone) => {
-    if (!acc[stone.type]) {
-      acc[stone.type] = [];
-    }
-    acc[stone.type].push(stone);
-    return acc;
-  }, {});
-
   return (
-    <Accordion type="single" defaultValue="stones" className="pt-24 sm:pt-0">
-      <AccordionItem value="stones">
-        <AccordionContent>
-          <Accordion type="multiple">
-            {Object.keys(stoneList)
-              .sort(customSortType)
-              .map((type) => (
-                <AccordionItem key={type} value={type}>
-                  <AccordionTrigger>
-                    {capitalizeFirstLetter(type)}
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <ModuleList>
-                      <SuperCarousel
-                        currentId={currentId}
-                        setCurrentId={handleSetCurrentId}
-                        images={stoneList[type]}
-                        stoneType={type}
-                        activeType={activeType}
-                      />
-                      {stoneList[type]
-                        .sort((a, b) => {
-                          const aAmount = a.amount ?? 0;
-                          const bAmount = b.amount ?? 0;
-                          if (aAmount === 0 && bAmount !== 0) return 1;
-                          if (aAmount !== 0 && bAmount === 0) return -1;
-                          return a.name.localeCompare(b.name);
-                        })
-                        .map((stone) => (
-                          <InteractiveCard
-                            key={stone.id}
-                            stone={stone}
-                            setCurrentId={handleSetCurrentId}
-                            stoneType={type}
-                          />
-                        ))}
-                    </ModuleList>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-          </Accordion>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+    <>
+      <ModuleList>
+        <SuperCarousel
+          type="stones"
+          currentId={currentId}
+          setCurrentId={setCurrentId}
+          images={stones}
+          activeType={activeType}
+        />
+        {stones.map((stone) => (
+          <InteractiveCard
+            key={stone.id}
+            stone={stone}
+            setCurrentId={setCurrentId}
+            stoneType={stone.type}
+          />
+        ))}
+      </ModuleList>
+      <Outlet />
+    </>
   );
 }

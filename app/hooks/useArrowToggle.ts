@@ -7,7 +7,7 @@ interface UseArrowToggleReturn<T> {
 }
 
 export function useArrowToggle<T>(
-  ids: T[] | ((value: T | undefined) => T[])
+  ids: T[] | ((value: T | undefined) => T[]),
 ): UseArrowToggleReturn<T> {
   const [currentId, setCurrentId] = useState<T | undefined>(undefined);
 

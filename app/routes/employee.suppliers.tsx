@@ -4,19 +4,13 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "~/components/ui/accordion";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "~/components/ui/table";
 import { Link, useLoaderData } from "react-router";
 import { LoaderFunctionArgs, redirect } from "react-router";
 import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
 import { getEmployeeUser } from "~/utils/session.server";
+import { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "~/components/ui/data-table";
 
 interface Supplier {
   id: number;
@@ -37,53 +31,44 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const suppliers = await selectMany<Supplier>(
     db,
     "select id,website, supplier_name,  manager, phone, email, notes from suppliers WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return { suppliers };
 };
 
+const columns: ColumnDef<Supplier>[] = [
+  {
+    accessorKey: "supplier_name",
+    header: "Supplier Name",
+    cell: ({ row }) => (
+      <Link
+        to={row.original.website}
+        classname="text-blue-600 hover:underline"
+        target="_blank"
+      >
+        {row.original.supplier_name}
+      </Link>
+    ),
+  },
+  {
+    accessorKey: "manager",
+    header: "Manager",
+  },
+  {
+    accessorKey: "phone",
+    header: "Phone Number",
+  },
+  {
+    accessorKey: "email",
+    header: "Email",
+  },
+  {
+    accessorKey: "notes",
+    header: "Notes",
+  },
+];
+
 export default function Suppliers() {
   const { suppliers } = useLoaderData<typeof loader>();
-  return (
-    <Accordion type="single" defaultValue="suppliers" className="pt-24 sm:pt-0">
-      <AccordionItem value="suppliers">
-        <AccordionTrigger>Suppliers</AccordionTrigger>
-        <AccordionContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Manager</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {suppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
-                    <TableCell>
-                      <a
-                        href={supplier.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        {supplier.supplier_name}
-                      </a>
-                    </TableCell>
-                    <TableCell>{supplier.manager || "-"}</TableCell>
-                    <TableCell>{supplier.phone || "-"}</TableCell>
-                    <TableCell>{supplier.email || "-"}</TableCell>
-                    <TableCell>{supplier.notes || "-"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
-  );
+  return <DataTable columns={columns} data={suppliers} />;
 }
