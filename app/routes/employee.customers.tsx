@@ -1,4 +1,4 @@
-import { ColumnDef } from "@tanstack/react-table"
+import { ColumnDef } from "@tanstack/react-table";
 import {
   Table,
   TableBody,
@@ -35,7 +35,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const customers = await selectMany<Customer>(
     db,
-    "select id name, email, phone_number, address from customers"
+    "select id name, email, phone_number, address from customers",
   );
   return {
     customers,
@@ -43,31 +43,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 const customerColumns: ColumnDef<Customer>[] = [
-    {
-      accessorKey: "name",
-      header: "Name of customer",
-    },
-    {
-      accessorKey: "phone",
-      header: "Phone Number",
-    },
-    {
-      accessorKey: "email",
-      header: "Email",
-    },
-    {
-      accessorKey: "address",
-      header: "Address",
-    },
-    {
+  {
+    accessorKey: "name",
+    header: "Name of customer",
+  },
+  {
+    accessorKey: "phone",
+    header: "Phone Number",
+  },
+  {
+    accessorKey: "email",
+    header: "Email",
+  },
+  {
+    accessorKey: "address",
+    header: "Address",
+  },
+  {
     id: "actions",
     cell: ({ row }) => {
       return (
-        <ActionDropdown actions={{edit:`edit/${row.original.id}`, delete: `delete/${row.original.id}` }}/>
-      )
-    }
-  }
-  ]
+        <ActionDropdown
+          actions={{
+            edit: `edit/${row.original.id}`,
+            delete: `delete/${row.original.id}`,
+          }}
+        />
+      );
+    },
+  },
+];
 
 export default function AdminCustomers() {
   const { customers } = useLoaderData<typeof loader>();
@@ -77,7 +82,7 @@ export default function AdminCustomers() {
       <Link to={`add`} relative="path">
         <Button>Add new customer</Button>
       </Link>
-      <DataTable columns={customerColumns} data={customers}/>
+      <DataTable columns={customerColumns} data={customers} />
       <Outlet />
     </PageLayout>
   );

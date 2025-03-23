@@ -63,7 +63,7 @@ function EditForm({ refresh, todo }: EditFormProps) {
   });
   const { fullSubmit, fetcher } = useFullFetcher(
     form,
-    `/api/todoList/${todo.id}`
+    `/api/todoList/${todo.id}`,
   );
   const [isEditing, setEditing] = useState<boolean>(false);
 
@@ -123,7 +123,7 @@ function DeleteForm({ refresh, todo }: EditFormProps) {
   const { fullSubmit, fetcher } = useFullFetcher(
     form,
     `/api/todoList/${todo.id}`,
-    "DELETE"
+    "DELETE",
   );
   useEffect(() => {
     if (fetcher.state === "idle") {
@@ -209,7 +209,7 @@ export function TodoList() {
             <div className="overflow-y-auto md:max-h-full">
               {data?.todos
                 ?.sort((a, b) =>
-                  a.is_done === b.is_done ? 0 : a.is_done ? 1 : -1
+                  a.is_done === b.is_done ? 0 : a.is_done ? 1 : -1,
                 )
                 .map((todo) => {
                   return (

@@ -1,4 +1,4 @@
-import { ColumnDef } from "@tanstack/react-table"
+import { ColumnDef } from "@tanstack/react-table";
 import { LoaderFunctionArgs, redirect } from "react-router";
 import { Link, Outlet, useLoaderData } from "react-router";
 import { PageLayout } from "~/components/PageLayout";
@@ -36,7 +36,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const instructions = await selectMany<Instructions>(
     db,
     "select id, title, parent_id, after_id, rich_text from instructions WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return { instructions };
 };
@@ -58,11 +58,16 @@ const instructionsColumn: ColumnDef<Instructions>[] = [
     id: "actions",
     cell: ({ row }) => {
       return (
-        <ActionDropdown actions={{edit:`edit/${row.original.id}`, delete: `delete/${row.original.id}` }}/>
+        <ActionDropdown
+          actions={{
+            edit: `edit/${row.original.id}`,
+            delete: `delete/${row.original.id}`,
+          }}
+        />
       );
     },
-  }
-]
+  },
+];
 
 export default function AdminInstructions() {
   const { instructions } = useLoaderData<typeof loader>();

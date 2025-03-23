@@ -19,12 +19,12 @@ interface Message {
 
 async function getContext(
   user_id: number,
-  query: string
+  query: string,
 ): Promise<{ messages: Message[]; id: number }> {
   const history = await selectMany<{ history: Message[]; id: number }>(
     db,
     "SELECT id, history from chat_history WHERE user_id = ?",
-    [user_id]
+    [user_id],
   );
   const currentConvo = history[0].history;
   currentConvo.push({ role: "user", content: query });
@@ -34,17 +34,17 @@ async function getContext(
 async function newContext(
   user_id: number,
   company_id: number,
-  query: string
+  query: string,
 ): Promise<{ history: Message[]; id: number | undefined }> {
   const instructions = await selectMany<InstructionSlim>(
     db,
     "SELECT id, title, rich_text from instructions WHERE company_id = ?",
-    [company_id]
+    [company_id],
   );
   const chatHistory = await selectMany<{ id: number }>(
     db,
     "SELECT id from chat_history WHERE user_id = ?",
-    [user_id]
+    [user_id],
   );
   let chatHistoryId = undefined;
   if (chatHistory.length > 0) {
@@ -68,12 +68,12 @@ async function newContext(
 async function insertContext(
   user_id: number,
   messages: Message[],
-  answer: string
+  answer: string,
 ) {
   messages.push({ role: "assistant", content: answer });
   await db.execute(
     `INSERT INTO main.chat_history (history, user_id) VALUES (?, ?);`,
-    [JSON.stringify(messages), user_id]
+    [JSON.stringify(messages), user_id],
   );
 }
 
@@ -81,12 +81,12 @@ async function updateContext(
   userId: number,
   chatHistoryId: number,
   messages: Message[],
-  answer: string
+  answer: string,
 ) {
   messages.push({ role: "assistant", content: answer });
   await db.execute(
     `UPDATE main.chat_history SET history = ? WHERE id = ? AND user_id = ?;`,
-    [JSON.stringify(messages), chatHistoryId, userId]
+    [JSON.stringify(messages), chatHistoryId, userId],
   );
 }
 

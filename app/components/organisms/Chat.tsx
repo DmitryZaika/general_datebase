@@ -81,7 +81,7 @@ export const Chat = () => {
     addMessage({ role: "user", content: query || "" });
 
     const sse = new EventSource(
-      `/api/chat?query=${query}&isNew=${messages.length === 0}`
+      `/api/chat?query=${query}&isNew=${messages.length === 0}`,
     );
 
     sse.addEventListener("message", (event) => {

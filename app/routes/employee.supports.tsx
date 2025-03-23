@@ -30,7 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const supports = await selectMany<Support>(
     db,
     "select id, name, url from supports WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return { supports };
 };

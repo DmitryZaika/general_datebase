@@ -70,7 +70,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const user = await selectId<{ name: string }>(
     db,
     "SELECT name FROM main.users WHERE id = ?",
-    userId
+    userId,
   );
 
   return {

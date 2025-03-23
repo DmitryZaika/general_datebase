@@ -41,12 +41,12 @@ export async function register(
   password: string,
   company_id: number,
   isEmployee: number = 1,
-  isAdmin: number = 0
+  isAdmin: number = 0,
 ) {
   const passwordHash = await bcrypt.hash(password, 10);
   await db.execute(
     `INSERT INTO main.users (email, password, company_id, isEmployee, isAdmin) VALUES (?, ?, ?, ?, ?)`,
-    [email, passwordHash, company_id, isEmployee, isAdmin]
+    [email, passwordHash, company_id, isEmployee, isAdmin],
   );
   return true;
 }
@@ -54,11 +54,11 @@ export async function register(
 export async function login(
   email: string,
   password: string,
-  expiration: number
+  expiration: number,
 ): Promise<string | undefined> {
   const [rows] = await db.query<LoginUser[] & RowDataPacket[]>(
     "SELECT id, password FROM users WHERE email = ? AND is_deleted = 0",
-    [email]
+    [email],
   );
   if (rows.length < 1) {
     return undefined;
@@ -70,7 +70,7 @@ export async function login(
   const id = uuidv4();
   await db.execute(
     `INSERT INTO main.sessions (id, user_id, expiration_date) VALUES (?, ?, ?)`,
-    [id, user.id, getExpirationDate(expiration)]
+    [id, user.id, getExpirationDate(expiration)],
   );
 
   return id;
@@ -85,7 +85,7 @@ async function getUser(sessionId: string): Promise<SessionUser | undefined> {
        AND sessions.is_deleted = 0
        AND users.is_deleted = 0`,
 
-    [sessionId]
+    [sessionId],
   );
   if (rows.length < 1) {
     return undefined;
@@ -95,7 +95,7 @@ async function getUser(sessionId: string): Promise<SessionUser | undefined> {
 
 async function handlePermissions(
   request: Request,
-  validUser: (value: SessionUser) => boolean
+  validUser: (value: SessionUser) => boolean,
 ): Promise<SessionUser> {
   const cookie = request.headers.get("Cookie");
   const session = await getSession(cookie);
@@ -116,14 +116,14 @@ async function handlePermissions(
 export async function getAdminUser(request: Request): Promise<SessionUser> {
   return await handlePermissions(
     request,
-    (user) => user.is_admin || user.is_superuser
+    (user) => user.is_admin || user.is_superuser,
   );
 }
 
 export async function getEmployeeUser(request: Request): Promise<SessionUser> {
   return await handlePermissions(
     request,
-    (user) => user.is_employee || user.is_admin || user.is_superuser
+    (user) => user.is_employee || user.is_admin || user.is_superuser,
   );
 }
 
@@ -132,7 +132,7 @@ export async function getSuperUser(request: Request): Promise<SessionUser> {
 }
 
 export async function getUserBySessionId(
-  sessionId: string
+  sessionId: string,
 ): Promise<SessionUser | undefined> {
   return await getUser(sessionId);
 }

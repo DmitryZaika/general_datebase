@@ -60,7 +60,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.width,
         data.height,
         data.amount,
-      ]
+      ],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -71,7 +71,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
   }

@@ -62,7 +62,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const image = await selectId<{ name: string }>(
     db,
     "select name from images WHERE id = ?",
-    imageId
+    imageId,
   );
   return {
     name: image?.name || "this image",
