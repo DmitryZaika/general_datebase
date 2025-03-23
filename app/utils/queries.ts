@@ -20,7 +20,8 @@ export interface Stone {
 
 export const stoneQueryBuilder = async (
   filters: StoneFilter,
-  companyId: number
+  companyId: number,
+  show_hidden: boolean = false
 ): Promise<Stone[]> => {
   if (filters.type.length === 0) {
     return [];
@@ -42,8 +43,11 @@ export const stoneQueryBuilder = async (
     CAST(SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM main.stones s
   LEFT JOIN main.slab_inventory AS si ON si.stone_id = s.id
-  WHERE s.company_id = ? AND s.is_display = 1
+  WHERE s.company_id = ?
   `;
+  if (!show_hidden) {
+    query += " AND s.is_display = 1";
+  }
   if (filters.type.length < STONE_TYPES.length) {
     query += ` AND s.type IN (${filters.type.map(() => "?").join(", ")})`;
     params.push(...filters.type);
