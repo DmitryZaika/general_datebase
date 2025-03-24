@@ -300,7 +300,7 @@ export function TodoList() {
           <div className="px-2 flex flex-col">
             <AddForm refresh={getTodos} />
 
-            <div className="overflow-y-auto md:max-h-full">
+            <div className="overflow-hidden md:max-h-full">
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
@@ -310,22 +310,13 @@ export function TodoList() {
                   items={data?.todos?.map(todo => todo.id) || []}
                   strategy={verticalListSortingStrategy}
                 >
-                  {data?.todos
-                    ?.sort((a, b) => {
-                      // Сначала сортируем по позиции
-                      if (a.position !== b.position) {
-                        return a.position - b.position;
-                      }
-                      // Затем по статусу выполнения
-                      return a.is_done === b.is_done ? 0 : a.is_done ? 1 : -1;
-                    })
-                    .map((todo) => (
-                      <SortableTodoItem
-                        key={todo.id}
-                        todo={todo}
-                        refresh={getTodos}
-                      />
-                    ))}
+                  {data?.todos?.map((todo) => (
+                    <SortableTodoItem
+                      key={todo.id}
+                      todo={todo}
+                      refresh={getTodos}
+                    />
+                  ))}
                 </SortableContext>
               </DndContext>
             </div>
