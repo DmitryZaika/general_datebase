@@ -1,6 +1,6 @@
 //// filepath: c:\Users\sarah\general_datebase\app\routes\admin.stones.tsx
 import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
-import { useLoaderData, Link } from "react-router";
+import { useLoaderData, Link, useSearchParams } from "react-router";
 import {
   Accordion,
   AccordionItem,
@@ -58,6 +58,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AdminStones() {
   const { stones } = useLoaderData<typeof loader>();
+  const [searchParams] = useSearchParams();
 
   const stoneList = stones.reduce((acc: Record<string, Stone[]>, stone) => {
     if (!acc[stone.type]) {
@@ -66,6 +67,11 @@ export default function AdminStones() {
     acc[stone.type].push(stone);
     return acc;
   }, {});
+
+  const getEditUrl = (stoneId: number) => {
+    const currentParams = new URLSearchParams(searchParams);
+    return `edit/${stoneId}?${currentParams.toString()}`;
+  };
 
   return (
     <>
@@ -131,7 +137,7 @@ export default function AdminStones() {
 
                   <div className="absolute inset-0 flex justify-between items-start p-2 opacity-50 transition-opacity duration-300">
                     <Link
-                      to={`edit/${stone.id}`}
+                      to={getEditUrl(stone.id)}
                       className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2"
                       title="Edit Stone"
                       aria-label={`Edit ${stone.name}`}
