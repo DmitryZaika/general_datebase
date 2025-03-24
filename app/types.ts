@@ -4,6 +4,7 @@ export interface Todo {
   id: number;
   rich_text: string;
   is_done: number;
+  position: number;
 }
 
 export interface InstructionSlim {
