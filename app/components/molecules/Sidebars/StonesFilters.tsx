@@ -58,6 +58,7 @@ export function StonesFilters({ suppliers, base }: IProps) {
         <LinkSpan
           className="ml-2"
           onClick={toggleSelectAllTypes}
+          variant="blue"
         >
           {allTypesSelected ? "Clear" : "Select all"}
         </LinkSpan>
@@ -77,6 +78,7 @@ export function StonesFilters({ suppliers, base }: IProps) {
               <LinkSpan
                 className="ml-2"
                 onClick={() => setSearchParams({ supplier: 0 })}
+                variant="blue"
               >
                 Select all
               </LinkSpan>
@@ -84,7 +86,14 @@ export function StonesFilters({ suppliers, base }: IProps) {
           </SidebarGroupLabel>
           {suppliers.map((supplier) => (
             <LinkSpan
-              onClick={() => setSearchParams({ supplier: supplier.id })} key={supplier.id}
+              onClick={() => {
+                setSearchParams({ 
+                  supplier: supplier.id,
+                  type: [...STONE_TYPES]
+                });
+              }} 
+              key={supplier.id}
+              isSelected={searchParams.supplier === supplier.id}
             >
               {supplier.supplier_name}
             </LinkSpan>

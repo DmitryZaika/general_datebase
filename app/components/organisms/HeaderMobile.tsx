@@ -35,6 +35,7 @@ export function BurgerMenu({
 }: Omit<HeaderMobileProps, "className">) {
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
+  const isCustomerPage = location.pathname.startsWith("/customer");
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -59,7 +60,7 @@ export function BurgerMenu({
           {
             "translate-x-0": open,
             "translate-x-full": !open,
-          },
+          }
         )}
       >
         <div className="p-4">
@@ -86,11 +87,17 @@ export function BurgerMenu({
                     <Button>Employee</Button>
                   </BurgerLink>
                 ) : (
-                  <BurgerLink to="/admin" className="pb-10" setOpen={setOpen}>
+                  <BurgerLink to="/admin" className="pb-2" setOpen={setOpen}>
                     <Button> Admin</Button>
                   </BurgerLink>
                 )
               ) : null}
+              <Link
+                to={isCustomerPage ? `/employee/stones` : `/customer/1/stones`}
+              >
+                {" "}
+                <Button>{isCustomerPage ? "Employee" : "Customer"}</Button>
+              </Link>
               {isSuperUser ? (
                 isAdminPage ? (
                   <BurgerLink to="/admin/users" setOpen={setOpen}>
@@ -101,7 +108,7 @@ export function BurgerMenu({
             </div>
 
             {user !== null && (
-              <BurgerLink to="/logout" className="pt-10" setOpen={setOpen}>
+              <BurgerLink to="/logout" className="pt-2" setOpen={setOpen}>
                 <Button> Logout</Button>
               </BurgerLink>
             )}
