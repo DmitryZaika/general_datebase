@@ -12,7 +12,7 @@ export const LinkSpan = ({ children, className, isSelected, variant = 'default',
       "cursor-pointer transition-colors duration-300",
       variant === 'default' && [
         "text-zinc-900 dark:text-zinc-50",
-        "hover:text-blue-500",
+        "hover:text-blue-500 underline",
         isSelected && "text-blue-500 hover:text-blue-500"
       ],
       variant === 'blue' && "text-blue-500 hover:text-blue-600",
