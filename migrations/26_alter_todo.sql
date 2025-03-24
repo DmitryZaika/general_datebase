@@ -1,0 +1,1 @@
+ALTER TABLE todolist ADD COLUMN position INTEGER;
