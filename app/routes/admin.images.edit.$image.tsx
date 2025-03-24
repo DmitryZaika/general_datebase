@@ -107,7 +107,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 export default function ImagesEdit() {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
+  const isSubmitting = useNavigation().state !== "idle";
   const { name, url } = useLoaderData<typeof loader>();
 
   const form = useCustomOptionalForm(
