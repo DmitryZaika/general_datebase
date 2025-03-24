@@ -100,7 +100,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function SinksAdd() {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
+  const isSubmitting = useNavigation().state !== "idle";
   const { suppliers } = useLoaderData<typeof loader>();
 
   const form = useCustomForm(sinkSchema, {

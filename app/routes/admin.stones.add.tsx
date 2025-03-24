@@ -122,7 +122,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function StonesAdd() {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
+  const isSubmitting = useNavigation().state !== "idle";
   const { suppliers } = useLoaderData<typeof loader>();
 
   const form = useCustomOptionalForm(stoneSchema, {
