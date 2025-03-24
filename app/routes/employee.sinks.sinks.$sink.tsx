@@ -51,6 +51,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const formData = await request.formData();
   const sinkId = Number(formData.get("sinkId"));
+  const action = formData.get("action");
+
   if (!sinkId) {
     return forceRedirectError(request.headers, "No sinkId provided");
   }
@@ -64,13 +66,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return forceRedirectError(request.headers, "No sink found for given ID");
   }
 
-  await db.execute(
-    "UPDATE sinks SET amount = GREATEST(amount - 1, 0) WHERE id = ?",
-    [sinkId],
-  );
+  if (action === "sell") {
+    await db.execute(
+      "UPDATE sinks SET amount = GREATEST(amount - 1, 0) WHERE id = ?",
+      [sinkId],
+    );
+  } else if (action === "increment") {
+    await db.execute(
+      "UPDATE sinks SET amount = amount + 1 WHERE id = ?",
+      [sinkId],
+    );
+  }
 
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Sink sold"));
+  const message = action === "sell" ? "Sink sold" : "Sink added";
+  session.flash("message", toastData("Success", message));
 
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
@@ -110,14 +120,26 @@ export default function SinksModal() {
               {sink.name}
             </span>
             <span className="font-semibold text-gray-800">{sink.amount}</span>
-            <Form method="post" ref={formRef} className="ml-4">
+            <Form method="post" ref={formRef} className="ml-4 flex gap-2">
               <AuthenticityTokenInput />
               <input type="hidden" name="sinkId" value={sink.id} />
+              <input type="hidden" name="action" value="sell" />
               <Button
                 type="submit"
                 className="px-4 py-2 transition-colors duration-300"
               >
                 Sell
+              </Button>
+            </Form>
+            <Form method="post" className="ml-2">
+              <AuthenticityTokenInput />
+              <input type="hidden" name="sinkId" value={sink.id} />
+              <input type="hidden" name="action" value="increment" />
+              <Button
+                type="submit"
+                className="px-4 py-2 transition-colors duration-300"
+              >
+                +1
               </Button>
             </Form>
           </div>

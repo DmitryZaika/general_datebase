@@ -109,7 +109,7 @@ export default function AdminSinks() {
       </Link>
 
       <div className="pt-24 sm:pt-0">
-        <Accordion type="single" defaultValue="sinks" className="w-full">
+        <Accordion type="single" defaultValue="sinks" className="w-full pl-5">
           <AccordionItem value="sinks">
             <AccordionContent>
               <Accordion type="multiple">

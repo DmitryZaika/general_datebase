@@ -1,3 +1,4 @@
+
 import {
   LoaderFunctionArgs,
   ActionFunctionArgs,
@@ -11,7 +12,6 @@ import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { commitSession, getSession } from "~/sessions";
 import { selectMany, selectId } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { Button } from "~/components/ui/button";
 import {
@@ -177,7 +177,7 @@ export default function SlabsModal() {
                   />
                   
                   <span
-                    className={`font-semibold ${
+                    className={`font-semibold whitespace-nowrap ${
                       isSold ? "text-red-900" : "text-gray-800"
                     }`}
                   >
