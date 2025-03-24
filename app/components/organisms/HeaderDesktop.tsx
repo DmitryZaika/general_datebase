@@ -25,7 +25,6 @@ export function HeaderDesktop({
   const [isRoleSwitching, setIsRoleSwitching] = useState(false);
   const [isCustomerSwitching, setIsCustomerSwitching] = useState(false);
   
-  // Сброс состояния загрузки при завершении навигации
   useEffect(() => {
     if (navigation.state === "idle") {
       if (isRoleSwitching) setIsRoleSwitching(false);
@@ -33,45 +32,36 @@ export function HeaderDesktop({
     }
   }, [navigation.state]);
 
-  // Создаем функцию для определения противоположного URL
   const getMirroredUrl = () => {
     const path = location.pathname;
     const segments = path.split('/').filter(Boolean);
     
     if (segments.length < 1) return isAdminPage ? "/employee" : "/admin";
     
-    const currentRole = segments[0]; // "admin" или "employee"
+    const currentRole = segments[0]; 
     const targetRole = currentRole === "admin" ? "employee" : "admin";
     
-    // Если нет второго сегмента, просто возвращаем базовый URL
     if (segments.length < 2) return `/${targetRole}`;
     
-    // Получаем текущий раздел (stones, instructions и т.д.)
     const currentSection = segments[1];
     
-    // Набор разделов, для которых нужно обеспечить прямое соответствие
     const supportedSections = ["stones", "instructions", "sinks", "suppliers", "supports", "documents", "images"];
     
-    // Если текущий раздел поддерживается, создаем зеркальный URL
     if (supportedSections.includes(currentSection)) {
       return `/${targetRole}/${currentSection}`;
     }
     
-    // Для всех других разделов просто переходим на базовый URL
     return `/${targetRole}`;
   };
   
-  // Обработчик клика для имитации загрузки
   const handleRoleSwitchClick = () => {
     setIsRoleSwitching(true);
   };
 
-  // Обработчик клика для имитации загрузки при переключении на Customer
   const handleCustomerSwitchClick = () => {
     setIsCustomerSwitching(true);
   };
-
-  // Получаем URL для кнопки Customer
+  
   const getCustomerUrl = () => {
     return isCustomerPage ? `/employee/stones` : `/customer/1/stones`;
   };
