@@ -10,17 +10,20 @@ export function CheckOption<T>({
   selected,
   toggleValue,
 }: ICheckOptionProps<T>) {
+  const id = `checkbox-${value as string}`;
+  
   return (
-    <div className="items-top flex space-x-2">
+    <div className="items-to flex space-x-2">
       <Checkbox
-        id="terms1"
+        className="cursor-pointer"
+        id={id}
         checked={selected}
         onCheckedChange={() => toggleValue(value)}
       />
       <div className="grid gap-1.5 leading-none capitalize">
         <label
-          htmlFor="terms1"
-          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          htmlFor={id}
+          className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
         >
           {value as string}
         </label>
