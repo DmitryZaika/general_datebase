@@ -242,8 +242,36 @@ export function TodoList() {
   const getTodos = (callback: undefined | (() => void) = undefined) => {
     fetch("/api/todoList")
       .then(async (res) => await res.json())
-      .then(setData)
-      .then(() => callback && callback());
+      .then((newData) => {
+        // Sort todos to put completed ones at the end
+        const sortedTodos = [...newData.todos].sort((a, b) => {
+          if (a.is_done && !b.is_done) return 1;
+          if (!a.is_done && b.is_done) return -1;
+          return a.position - b.position;
+        });
+        
+        // Only update positions if the sort actually changed anything
+        if (JSON.stringify(sortedTodos) !== JSON.stringify(newData.todos)) {
+          const formData = new FormData();
+          formData.append("positions", JSON.stringify(
+            sortedTodos.map((todo, index) => ({
+              id: todo.id,
+              position: index
+            }))
+          ));
+          
+          fetch("/api/todoList/reorder", {
+            method: "POST",
+            body: formData,
+          }).then(() => {
+            setData({ todos: sortedTodos });
+            if (callback) callback();
+          });
+        } else {
+          setData({ todos: sortedTodos });
+          if (callback) callback();
+        }
+      });
   };
 
   useEffect(() => {

@@ -192,7 +192,7 @@ export default function SlabsModal() {
                         <input type="hidden" name="slabId" value={slab.id} />
                         <Input
                           type="number"
-                          name="width"
+                          name="height"
                           defaultValue={slab.height}
                           className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           inputMode="numeric"
@@ -200,7 +200,7 @@ export default function SlabsModal() {
                         <span>x</span>
                         <Input
                           type="number"
-                          name="height"
+                          name="width"
                           defaultValue={slab.width}
                           className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           inputMode="numeric"
