@@ -245,24 +245,7 @@ export default function EditStoneSlabs() {
           </div>
         ))}
       </div>
-      <Dialog
-        open={!!selectedImage}
-        onOpenChange={(open) => !open && setSelectedImage(null)}
-      >
-        <DialogContent className="max-w-4xl w-full h-auto flex items-center justify-center bg-black bg-opacity-90 p-1">
-          <DialogClose className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-            <span className="sr-only">Close</span>
-          </DialogClose>
-          {selectedImage && (
-            <img
-              src={selectedImage === "undefined" ? stone.url : selectedImage}
-              alt="Full size"
-              className="max-w-full max-h-[80vh] object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+    
     </>
   );
 }
