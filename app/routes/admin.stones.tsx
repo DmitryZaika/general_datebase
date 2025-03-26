@@ -16,6 +16,7 @@ import { stoneQueryBuilder } from "~/utils/queries";
 import { stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { STONE_TYPES } from "~/utils/constants";
+import ModuleList from "~/components/ModuleList";
 
 interface Stone {
   id: number;
@@ -80,7 +81,7 @@ export default function AdminStones() {
       </Link>
 
       <div className="pt-24 sm:pt-0">
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
+        <ModuleList>
           {stones
             .sort((a, b) => {
               const priorityA = getStonePriority(a);
@@ -99,7 +100,7 @@ export default function AdminStones() {
                 stone.height && stone.height > 0 ? stone.height : "—";
 
               return (
-                <div key={stone.id} className="relative w-full">
+                <div key={stone.id} className="relative w-full module-item">
                   <div
                     className={`border-2 border-blue-500 rounded p-2 ${
                       !stone.is_display ? "opacity-30" : ""
@@ -156,7 +157,7 @@ export default function AdminStones() {
                 </div>
               );
             })}
-        </div>
+        </ModuleList>
         <Outlet />
       </div>
     </>
