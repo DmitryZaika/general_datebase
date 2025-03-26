@@ -119,25 +119,21 @@ export default function Stones() {
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [activeType, setActiveType] = useState<string | undefined>(undefined);
 
-  // Обработчик для клика по карточке камня
   const handleCardClick = (id: number, type: string) => {
     setCurrentId(id);
     setActiveType(type);
   };
 
-  // Обработчик для карусели - принимает number | undefined
   const handleCarouselChange = (id: number | undefined) => {
     setCurrentId(id);
     
     if (id !== undefined) {
-      // Если ID определен, найдем тип камня и обновим активный тип
       const stone = stones.find(s => s.id === id);
       if (stone) {
         setActiveType(stone.type);
       }
     } else {
-      // Если ID не определен, сбросим активный тип
-      setActiveType(undefined);
+        setActiveType(undefined);
     }
   };
 
