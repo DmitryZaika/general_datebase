@@ -27,6 +27,7 @@ interface Stone {
   available: number;
   width: number | null;
   amount: number | null;
+  on_sale: boolean | number;
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
@@ -65,6 +66,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
   const displayedAmount = stone.amount && stone.amount > 0 ? stone.amount : "—";
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
   const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
+  const isOnSale = !!stone.on_sale;
 
   return (
     <div
@@ -76,6 +78,15 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
         }
       }}
     >
+        {isOnSale && (
+        <div className="absolute top-[17px] left-[-40px] w-[140px] transform -rotate-45 z-10">
+          <div className="text-center py-1 text-white font-bold text-sm bg-red-600 shadow-md">
+            <span className="block relative z-10">ON SALE</span>
+            <div className="absolute left-0 top-full border-l-[10px] border-l-transparent border-t-[10px] border-t-red-800" />
+            <div className="absolute right-0 top-full border-r-[10px] border-r-transparent border-t-[10px] border-t-red-800" />
+          </div>
+        </div>
+      )}
       <ImageCard
         type="slabs"
         itemId={stone.id}
