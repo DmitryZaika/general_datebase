@@ -1,4 +1,4 @@
-import { useLocation, useNavigate, Outlet } from "react-router";
+import { useLocation, useNavigate, useNavigation, Outlet } from "react-router";
 import { FormLabel } from "~/components/ui/form";
 import { STONE_TYPES } from "~/utils/constants";
 import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
@@ -7,7 +7,7 @@ import { CheckOption } from "~/components/molecules/CheckOption";
 import { getBase } from "~/utils/urlHelpers";
 import { ISupplier } from "~/schemas/suppliers";
 import { LinkSpan } from "~/components/atoms/LinkSpan";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Stone } from "~/utils/queries";
 
 import { SidebarGroupLabel, SidebarMenuSub } from "~/components/ui/sidebar";
@@ -21,39 +21,23 @@ interface IProps {
 export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
   const [searchParams, setSearchParams] =
     useSafeSearchParams(stoneFilterSchema);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showLoadingUI, setShowLoadingUI] = useState(false);
-  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const navigation = useNavigation();
+  const isSubmitting = useMemo(() => navigation.state !== "idle", [navigation.state]);
+  const navigate = useNavigate();
+  const location = useLocation();
   
-  const cleanType = searchParams.type || ["granite"];
-  const showSoldOutToggle = ["admin", "employee"].includes(base);
+  const cleanType = useMemo(() => searchParams.type || ["granite"], [searchParams.type]);
+  const showSoldOutToggle = useMemo(() => ["admin", "employee"].includes(base), [base]);
   
-  useEffect(() => {
-    if (isLoading) {
-      loadingTimerRef.current = setTimeout(() => {
-        setShowLoadingUI(true);
-      }, 500);
-    } else {
-      setShowLoadingUI(false);
-      if (loadingTimerRef.current) {
-        clearTimeout(loadingTimerRef.current);
-        loadingTimerRef.current = null;
-      }
-    }
-    
-    return () => {
-      if (loadingTimerRef.current) {
-        clearTimeout(loadingTimerRef.current);
-      }
-    };
-  }, [isLoading]);
+  const allTypesSelected = useMemo(() => 
+    searchParams?.type?.length === STONE_TYPES.length, 
+    [searchParams.type]
+  );
 
-  const toggleStoneType = (typeToToggle: StoneFilter["type"][number]) => {
-    if (isLoading) return;
+  const toggleStoneType = useCallback((typeToToggle: StoneFilter["type"][number]) => {
+    if (isSubmitting) return;
     
-    setIsLoading(true);
-    let { type } = searchParams;
-    type = type ?? [];
+    const type = searchParams.type ?? [];
     let newTypes;
 
     if (type.includes(typeToToggle)) {
@@ -62,44 +46,31 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
       newTypes = [...type, typeToToggle];
     }
 
-    setSearchParams({ type: newTypes });
-    
-    setTimeout(() => setIsLoading(false), 300);
-  };
+    setSearchParams({ ...searchParams, type: newTypes });
+  }, [isSubmitting, searchParams, setSearchParams]);
 
-  const toggleSelectAllTypes = () => {
-    if (isLoading) return;
+  const toggleSelectAllTypes = useCallback(() => {
+    if (isSubmitting) return;
     
-    setIsLoading(true);
-    if (searchParams?.type?.length === STONE_TYPES.length) {
-      setSearchParams({ type: ["granite"] });
-    } else {
-      setSearchParams({ type: [...STONE_TYPES] });
-    }
-    setTimeout(() => setIsLoading(false), 300);
-  };
+    const newType = searchParams?.type?.length === STONE_TYPES.length ? [] : [...STONE_TYPES];
+    setSearchParams({ ...searchParams, type: newType });
+  }, [isSubmitting, searchParams, setSearchParams]);
 
-  const toggleShowSoldOut = (val: string) => {
-    if (isLoading) return;
+  const toggleShowSoldOut = useCallback((val: string) => {
+    if (isSubmitting) return;
     
-    setIsLoading(true);
     const show_sold_out = searchParams.show_sold_out ?? true;
-    setSearchParams({ show_sold_out: !show_sold_out });
-    setTimeout(() => setIsLoading(false), 300);
-  };
+    setSearchParams({ ...searchParams, show_sold_out: !show_sold_out });
+  }, [isSubmitting, searchParams, setSearchParams]);
   
-  const toggleSupplier = (supplierId: number) => {
-    if (isLoading) return;
+  const toggleSupplier = useCallback((supplierId: number) => {
+    if (isSubmitting) return;
     
-    setIsLoading(true);
     setSearchParams({ 
       supplier: supplierId,
       type: [...STONE_TYPES]
     });
-    setTimeout(() => setIsLoading(false), 300);
-  };
-  
-  const allTypesSelected = searchParams?.type?.length === STONE_TYPES.length;
+  }, [isSubmitting, setSearchParams]);
   
   return (
     <SidebarMenuSub>
@@ -109,7 +80,7 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
           className="ml-2"
           onClick={toggleSelectAllTypes}
           variant="blue"
-          disabled={showLoadingUI}
+          disabled={isSubmitting}
         >
           {allTypesSelected ? "Clear" : "Select all"}
         </LinkSpan>
@@ -121,7 +92,7 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
           key={item}
           selected={searchParams.type ? searchParams.type.includes(item) : false}
           toggleValue={toggleStoneType}
-          isLoading={showLoadingUI}
+          isLoading={isSubmitting}
         />
       ))}
       
@@ -133,7 +104,7 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
                 className="ml-2"
                 onClick={() => toggleSupplier(0)}
                 variant="blue"
-                disabled={showLoadingUI}
+                disabled={isSubmitting}
               >
                 Select all
               </LinkSpan>
@@ -143,14 +114,14 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
           {suppliers.map((supplier) => (
             <div
               key={supplier.id}
-              onClick={() => !isLoading && toggleSupplier(supplier.id)}
+              onClick={() => !isSubmitting && toggleSupplier(supplier.id)}
               className={`p-1 cursor-pointer hover:bg-gray-100 transition-colors ${
                 searchParams.supplier === supplier.id ? "bg-gray-100" : ""
-              } ${showLoadingUI ? "opacity-60" : ""}`}
+              } ${isSubmitting ? "opacity-60" : ""}`}
             >
               <LinkSpan
                 isSelected={searchParams.supplier === supplier.id}
-                disabled={showLoadingUI}
+                disabled={isSubmitting}
               >
                 {supplier.supplier_name}
               </LinkSpan>
@@ -166,7 +137,7 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
             value="Show sold out"
             selected={!!searchParams.show_sold_out}
             toggleValue={toggleShowSoldOut}
-            isLoading={showLoadingUI}
+            isLoading={isSubmitting}
           />
         </>
       )}
