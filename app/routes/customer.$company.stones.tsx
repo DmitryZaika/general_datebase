@@ -70,7 +70,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
 
   return (
     <div
-      className="relative group w-full module-item"
+      className="relative group w-full module-item overflow-hidden"
       onAuxClick={(e) => {
         if (e.button === 1 && stone.url) {
           e.preventDefault();
