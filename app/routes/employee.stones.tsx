@@ -71,7 +71,7 @@ function InteractiveCard({
   return (
     <div
       key={stone.id}
-      className="relative group w-full overflow-hidden"
+      className="relative group w-full module-item"
       onAuxClick={(e) => {
         if (e.button === 1 && stone.url) {
           e.preventDefault();
@@ -130,13 +130,15 @@ export default function Stones() {
   return (
     <>
       <ModuleList>
-        <SuperCarousel
-          type="stones"
-          currentId={currentId}
-          setCurrentId={setCurrentId}
-          images={stones}
-          activeType={activeType}
-        />
+        <div className="w-full col-span-full mb-4">
+          <SuperCarousel
+            type="stones"
+            currentId={currentId}
+            setCurrentId={setCurrentId}
+            images={stones}
+            activeType={activeType}
+          />
+        </div>
         {stones.sort(customSort2).map((stone) => (
           <InteractiveCard
             key={stone.id}
