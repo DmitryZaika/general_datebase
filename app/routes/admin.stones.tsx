@@ -1,6 +1,6 @@
 //// filepath: c:\Users\sarah\general_datebase\app\routes\admin.stones.tsx
 import { LoaderFunctionArgs, Outlet } from "react-router";
-import { useLoaderData, Link, useSearchParams } from "react-router";
+import { useLoaderData, Link, useSearchParams, useNavigation } from "react-router";
 
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 
@@ -11,6 +11,8 @@ import { stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { STONE_TYPES } from "~/utils/constants";
 import ModuleList from "~/components/ModuleList";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { useEffect, useState } from "react";
 
 interface Stone {
   id: number;
@@ -54,6 +56,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminStones() {
   const { stones } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
+  const navigation = useNavigation();
+  const [isRoleSwitching, setIsRoleSwitching] = useState(false);
+  const [isAddingStone, setIsAddingStone] = useState(false);
+
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      if (isRoleSwitching) setIsRoleSwitching(false);
+      if (isAddingStone) setIsAddingStone(false);
+    }
+  }, [navigation.state]);
+
+  const handleAddStoneClick = () => {
+    setIsAddingStone(true);
+  };
 
   const stoneList = stones.reduce((acc: Record<string, Stone[]>, stone) => {
     if (!acc[stone.type]) {
@@ -70,8 +86,8 @@ export default function AdminStones() {
 
   return (
     <>
-      <Link to="add">
-        <Button>Add Stone</Button>
+      <Link to="add" onClick={handleAddStoneClick}>
+        <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
       </Link>
 
       <div className="pt-24 sm:pt-0">

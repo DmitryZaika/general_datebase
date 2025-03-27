@@ -10,10 +10,12 @@ import { capitalizeFirstLetter } from "~/utils/words";
 import { LoaderFunctionArgs, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData, Link, Outlet } from "react-router";
+import { useLoaderData, Link, Outlet, useNavigation } from "react-router";
 import { Button } from "~/components/ui/button";
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { getAdminUser } from "~/utils/session.server";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { useEffect, useState } from "react";
 
 interface Sink {
   id: number;
@@ -89,6 +91,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AdminSinks() {
   const { sinks } = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
+  const [isAddingSink, setIsAddingSink] = useState(false);
+
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      if (isAddingSink) setIsAddingSink(false);
+    }
+  }, [navigation.state]);
+
+  const handleAddSinkClick = () => {
+    setIsAddingSink(true);
+  };
 
   const sinkList = sinks.reduce<Record<string, Sink[]>>((acc, sink) => {
     if (!acc[sink.type]) {
@@ -102,8 +116,8 @@ export default function AdminSinks() {
 
   return (
     <>
-      <Link to="add">
-        <Button>Add Sink</Button>
+      <Link to="add" onClick={handleAddSinkClick}>
+        <LoadingButton loading={isAddingSink}>Add Sink</LoadingButton>
       </Link>
 
       <div className="pt-24 sm:pt-0">
