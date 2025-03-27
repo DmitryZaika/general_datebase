@@ -23,7 +23,7 @@ interface Stone {
   type: string;
   url: string | null;
   is_display: boolean | number;
-  height: number | null;
+  length: number | null;
   available: number;
   width: number | null;
   amount: number | null;
@@ -51,7 +51,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const queryParams = new URLSearchParams(searchParams);
   const filters = stoneFilterSchema.parse(cleanParams(queryParams));
   filters.show_sold_out = false;
-  const stones = await stoneQueryBuilder(filters, params.company);
+  const stones = await stoneQueryBuilder(filters, Number(params.company));
 
   return { stones };
 };
@@ -65,7 +65,7 @@ interface InteractiveCardProps {
 function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProps) {
   const displayedAmount = stone.amount && stone.amount > 0 ? stone.amount : "—";
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
-  const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
+  const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
   const isOnSale = !!stone.on_sale;
 
   return (
@@ -91,7 +91,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
         type="slabs"
         itemId={stone.id}
         fieldList={{
-          Size: `${displayedHeight} x ${displayedWidth}`,
+          Size: `${displayedLength} x ${displayedWidth}`,
         }}
         title={stone.name}
       >
