@@ -74,7 +74,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function DocumentsAdd() {
   const navigate = useNavigate();
   // const actionData = useActionData<typeof action>();
-  const isSubmitting = useNavigation().state === "submitting";
+  const isSubmitting = useNavigation().state !== "idle";
   const form = useCustomForm(documentSchema);
 
   const handleChange = (open: boolean) => {

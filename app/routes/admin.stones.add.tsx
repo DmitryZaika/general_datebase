@@ -51,7 +51,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await db.execute(
       `INSERT INTO main.stones
-       (name, type, url, company_id, is_display, on_sale, supplier_id, width, height, cost_per_sqft, retail_price)
+       (name, type, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
@@ -62,7 +62,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.on_sale,
         data.supplier_id,
         data.width,
-        data.height,
+        data.length,
         data.cost_per_sqft,
         data.retail_price,
       ],
@@ -122,7 +122,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function StonesAdd() {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
+  const isSubmitting = useNavigation().state !== "idle";
   const { suppliers } = useLoaderData<typeof loader>();
 
   const form = useCustomOptionalForm(stoneSchema, {
@@ -224,11 +224,11 @@ export default function StonesAdd() {
           <div className="flex gap-2">
             <FormField
               control={form.control}
-              name="height"
+              name="length"
               render={({ field }) => (
                 <InputItem
-                  name={"Height"}
-                  placeholder={"Height of the stone"}
+                  name={"Length"}
+                  placeholder={"Length of the stone"}
                   field={field}
                 />
               )}

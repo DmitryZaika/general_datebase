@@ -60,7 +60,7 @@ export function SlabList() {
     const newFields = inputFields.filter((_, i) => i !== index);
     setInputFields(newFields);
     const navigate = useNavigate();
-    const isSubmitting = useNavigation().state === "submitting";
+    const isSubmitting = useNavigation().state !== "idle";
   };
 
   const handleChange = (open: boolean) => {

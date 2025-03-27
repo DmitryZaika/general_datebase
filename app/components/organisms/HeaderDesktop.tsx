@@ -1,12 +1,15 @@
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate, useNavigation } from "react-router";
 import { Button } from "~/components/ui/button";
 import { TodoList } from "../organisms/TodoList";
 import clsx from "clsx";
 import { HeaderProps } from "~/types";
+import { LoadingButton } from "../molecules/LoadingButton";
+import { useEffect, useState } from "react";
 
 interface HeaderDesktopProps extends HeaderProps {
   className: string;
 }
+
 export function HeaderDesktop({
   user,
   isAdmin,
@@ -15,8 +18,53 @@ export function HeaderDesktop({
   isEmployee,
 }: HeaderDesktopProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const navigation = useNavigation();
   const isAdminPage = location.pathname.startsWith("/admin");
   const isCustomerPage = location.pathname.startsWith("/customer");
+  const [isRoleSwitching, setIsRoleSwitching] = useState(false);
+  const [isCustomerSwitching, setIsCustomerSwitching] = useState(false);
+  
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      if (isRoleSwitching) setIsRoleSwitching(false);
+      if (isCustomerSwitching) setIsCustomerSwitching(false);
+    }
+  }, [navigation.state]);
+
+  const getMirroredUrl = () => {
+    const path = location.pathname;
+    const segments = path.split('/').filter(Boolean);
+    
+    if (segments.length < 1) return isAdminPage ? "/employee" : "/admin";
+    
+    const currentRole = segments[0]; 
+    const targetRole = currentRole === "admin" ? "employee" : "admin";
+    
+    if (segments.length < 2) return `/${targetRole}`;
+    
+    const currentSection = segments[1];
+    
+    const supportedSections = ["stones", "instructions", "sinks", "suppliers", "supports", "documents", "images"];
+    
+    if (supportedSections.includes(currentSection)) {
+      return `/${targetRole}/${currentSection}`;
+    }
+    
+    return `/${targetRole}`;
+  };
+  
+  const handleRoleSwitchClick = () => {
+    setIsRoleSwitching(true);
+  };
+
+  const handleCustomerSwitchClick = () => {
+    setIsCustomerSwitching(true);
+  };
+  
+  const getCustomerUrl = () => {
+    return isCustomerPage ? `/employee/stones` : `/customer/1/stones`;
+  };
 
   return (
     <header
@@ -39,19 +87,20 @@ export function HeaderDesktop({
         {isAdmin || isSuperUser ? (
           isAdminPage ? (
             <div className=" flex gap-4">
-              <Link to="/employee">
-                <Button>Employee</Button>
+              <Link to={getMirroredUrl()} onClick={handleRoleSwitchClick}>
+                <LoadingButton loading={isRoleSwitching}>Employee</LoadingButton>
               </Link>
             </div>
           ) : (
-            <Link to="/admin">
-              <Button>Admin</Button>
+            <Link to={getMirroredUrl()} onClick={handleRoleSwitchClick}>
+              <LoadingButton loading={isRoleSwitching}>Admin</LoadingButton>
             </Link>
           )
         ) : null}
-        <Link to={isCustomerPage ? `/employee/stones` : `/customer/1/stones`}>
-          {" "}
-          <Button>{isCustomerPage ? "Employee" : "Customer"}</Button>
+        <Link to={getCustomerUrl()} onClick={handleCustomerSwitchClick}>
+          <LoadingButton loading={isCustomerSwitching}>
+            {isCustomerPage ? "Employee" : "Customer"}
+          </LoadingButton>
         </Link>
       </div>
       <nav className="text-center flex-1">

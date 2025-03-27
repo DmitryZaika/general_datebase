@@ -23,10 +23,11 @@ interface Stone {
   type: string;
   url: string | null;
   is_display: boolean | number;
-  height: number | null;
+  length: number | null;
   available: number;
   width: number | null;
   amount: number | null;
+  on_sale: boolean | number;
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
@@ -50,28 +51,26 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const queryParams = new URLSearchParams(searchParams);
   const filters = stoneFilterSchema.parse(cleanParams(queryParams));
   filters.show_sold_out = false;
-  const stones = await stoneQueryBuilder(filters, params.company);
+  const stones = await stoneQueryBuilder(filters, Number(params.company));
 
   return { stones };
 };
 
-function InteractiveCard({
-  stone,
-  setCurrentId,
-  stoneType,
-}: {
+interface InteractiveCardProps {
   stone: Stone;
-  setCurrentId: (value: number, type: string) => void;
+  setCurrentId: (id: number, type: string) => void;
   stoneType: string;
-}) {
+}
+
+function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProps) {
   const displayedAmount = stone.amount && stone.amount > 0 ? stone.amount : "—";
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
-  const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
+  const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
+  const isOnSale = !!stone.on_sale;
 
   return (
     <div
-      key={stone.id}
-      className="relative group w-full"
+      className="relative group w-full module-item overflow-hidden"
       onAuxClick={(e) => {
         if (e.button === 1 && stone.url) {
           e.preventDefault();
@@ -79,11 +78,20 @@ function InteractiveCard({
         }
       }}
     >
+        {isOnSale && (
+        <div className="absolute top-[17px] left-[-40px] w-[140px] transform -rotate-45 z-10">
+          <div className="text-center py-1 text-white font-bold text-sm bg-red-600 shadow-md">
+            <span className="block relative z-10">ON SALE</span>
+            <div className="absolute left-0 top-full border-l-[10px] border-l-transparent border-t-[10px] border-t-red-800" />
+            <div className="absolute right-0 top-full border-r-[10px] border-r-transparent border-t-[10px] border-t-red-800" />
+          </div>
+        </div>
+      )}
       <ImageCard
         type="slabs"
         itemId={stone.id}
         fieldList={{
-          Size: `${displayedHeight} x ${displayedWidth}`,
+          Size: `${displayedLength} x ${displayedWidth}`,
         }}
         title={stone.name}
       >
@@ -111,38 +119,41 @@ export default function Stones() {
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [activeType, setActiveType] = useState<string | undefined>(undefined);
 
-  const handleSetCurrentId = (id: number | undefined, type?: string) => {
+  const handleCardClick = (id: number, type: string) => {
     setCurrentId(id);
-    if (type) {
-      setActiveType(type);
-    } else if (id === undefined) {
-      setActiveType(undefined);
-    }
+    setActiveType(type);
   };
 
-  const stoneList = stones.reduce((acc: { [key: string]: Stone[] }, stone) => {
-    if (!acc[stone.type]) {
-      acc[stone.type] = [];
+  const handleCarouselChange = (id: number | undefined) => {
+    setCurrentId(id);
+    
+    if (id !== undefined) {
+      const stone = stones.find(s => s.id === id);
+      if (stone) {
+        setActiveType(stone.type);
+      }
+    } else {
+        setActiveType(undefined);
     }
-    acc[stone.type].push(stone);
-    return acc;
-  }, {});
+  };
 
   return (
     <>
       <ModuleList>
-        <SuperCarousel
-          type="stones"
-          currentId={currentId}
-          setCurrentId={handleSetCurrentId}
-          images={stones}
-          activeType={activeType}
-        />
+        <div className="w-full col-span-full">
+          <SuperCarousel
+            type="stones"
+            currentId={currentId}
+            setCurrentId={handleCarouselChange}
+            images={stones}
+            activeType={activeType}
+          />
+        </div>
         {stones.sort(sortStones).map((stone) => (
           <InteractiveCard
             key={stone.id}
             stone={stone}
-            setCurrentId={handleSetCurrentId}
+            setCurrentId={handleCardClick}
             stoneType={stone.type}
           />
         ))}

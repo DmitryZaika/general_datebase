@@ -9,13 +9,14 @@ export interface Stone {
   type: string;
   url: string | null;
   is_display: number;
-  height: number | null;
+  length: number | null;
   width: number | null;
   amount: number;
   available: number;
   created_date: string;
   on_sale: boolean;
   retail_price: number;
+  cost_per_sqft: number;
 }
 
 export const stoneQueryBuilder = async (
@@ -34,11 +35,12 @@ export const stoneQueryBuilder = async (
     s.type, 
     s.url, 
     s.is_display, 
-    s.height, 
+    s.length, 
     s.width,
     s.created_date, 
     s.on_sale,
     s.retail_price,
+    s.cost_per_sqft,
     COUNT(si.stone_id) AS amount,
     CAST(SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM main.stones s
@@ -63,7 +65,7 @@ export const stoneQueryBuilder = async (
       s.type,
       s.url,
       s.is_display,
-      s.height,
+      s.length,
       s.width,
       s.created_date,
       s.on_sale

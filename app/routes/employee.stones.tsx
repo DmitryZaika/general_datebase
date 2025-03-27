@@ -1,5 +1,5 @@
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
+import { LoaderFunctionArgs, redirect, Outlet, useLocation } from "react-router";
 import { useLoaderData } from "react-router";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
@@ -23,11 +23,18 @@ function customSort2(a: Stone, b: Stone) {
   const bAvailable = b.available ?? 0;
   if (aAvailable > 0 && bAvailable === 0) return -1;
   if (aAvailable === 0 && bAvailable > 0) return 1;
+  if (aAvailable > 0 && bAvailable > 0) {
+    return a.name.localeCompare(b.name);
+  }
+  if (aAvailable === 0 && bAvailable === 0) {
+    return a.name.localeCompare(b.name);
+  }
   const aAmount = a.amount ?? 0;
   const bAmount = b.amount ?? 0;
   if (aAmount > bAmount) return -1;
   if (aAmount < bAmount) return 1;
-  return a.name.localeCompare(b.name);
+
+  return 0;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -54,17 +61,18 @@ function InteractiveCard({
 }) {
   const displayedAmount = stone.amount > 0 ? stone.amount : "—";
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
-  const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
+  const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
   const createdDate = new Date(stone.created_date);
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const isNew = createdDate > oneWeekAgo;
   const isOnSale = !!stone.on_sale;
+  const location = useLocation();
 
   return (
     <div
       key={stone.id}
-      className="relative group w-full overflow-hidden"
+        className="relative group w-full module-item overflow-hidden"
       onAuxClick={(e) => {
         if (e.button === 1 && stone.url) {
           e.preventDefault();
@@ -86,8 +94,8 @@ function InteractiveCard({
         itemId={stone.id}
         fieldList={{
           Avaliable: `${stone.available} / ${displayedAmount}`,
-          Size: `${displayedHeight} x ${displayedWidth}`,
-          Price: `$${stone.retail_price}`,
+          Size: `${displayedLength} x ${displayedWidth}`,
+          Price: stone.retail_price === 0 ? `Price by slab $${stone.cost_per_sqft}` : `$${stone.retail_price}`,
         }}
         title={stone.name}
       >
@@ -123,13 +131,15 @@ export default function Stones() {
   return (
     <>
       <ModuleList>
-        <SuperCarousel
-          type="stones"
-          currentId={currentId}
-          setCurrentId={setCurrentId}
-          images={stones}
-          activeType={activeType}
-        />
+        <div className="w-full col-span-full">
+          <SuperCarousel
+            type="stones"
+            currentId={currentId}
+            setCurrentId={setCurrentId}
+            images={stones}
+            activeType={activeType}
+          />
+        </div>
         {stones.sort(customSort2).map((stone) => (
           <InteractiveCard
             key={stone.id}
