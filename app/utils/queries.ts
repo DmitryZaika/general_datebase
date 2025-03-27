@@ -9,7 +9,7 @@ export interface Stone {
   type: string;
   url: string | null;
   is_display: number;
-  height: number | null;
+  length: number | null;
   width: number | null;
   amount: number;
   available: number;
@@ -35,7 +35,7 @@ export const stoneQueryBuilder = async (
     s.type, 
     s.url, 
     s.is_display, 
-    s.height, 
+    s.length, 
     s.width,
     s.created_date, 
     s.on_sale,
@@ -65,7 +65,7 @@ export const stoneQueryBuilder = async (
       s.type,
       s.url,
       s.is_display,
-      s.height,
+      s.length,
       s.width,
       s.created_date,
       s.on_sale

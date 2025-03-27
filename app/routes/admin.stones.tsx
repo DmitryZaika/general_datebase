@@ -1,13 +1,7 @@
 //// filepath: c:\Users\sarah\general_datebase\app\routes\admin.stones.tsx
-import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
+import { LoaderFunctionArgs, Outlet } from "react-router";
 import { useLoaderData, Link, useSearchParams } from "react-router";
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "~/components/ui/accordion";
-import { capitalizeFirstLetter } from "~/utils/words";
+
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 
 import { Button } from "~/components/ui/button";
@@ -24,7 +18,7 @@ interface Stone {
   type: string;
   url: string | null;
   is_display: boolean | number;
-  height: number | null;
+  length: number | null;
   width: number | null;
   amount: number;
   available: number;
@@ -96,8 +90,8 @@ export default function AdminStones() {
               const displayedAvailable = stone.available;
               const displayedWidth =
                 stone.width && stone.width > 0 ? stone.width : "—";
-              const displayedHeight =
-                stone.height && stone.height > 0 ? stone.height : "—";
+              const displayedLength =
+                stone.length && stone.length > 0 ? stone.length : "—";
 
               return (
                 <div key={stone.id} className="relative w-full module-item">
@@ -126,7 +120,7 @@ export default function AdminStones() {
                       Available: {displayedAvailable} / {displayedAmount}
                     </p>
                     <p className="text-center text-sm">
-                      Size: {displayedHeight} x {displayedWidth}
+                      Size: {displayedLength} x {displayedWidth}
                     </p>
                     <p className="text-center text-sm">
                       Price: ${stone.retail_price}

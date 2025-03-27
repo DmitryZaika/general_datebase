@@ -1,5 +1,5 @@
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
+import { LoaderFunctionArgs, redirect, Outlet, useLocation } from "react-router";
 import { useLoaderData } from "react-router";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
@@ -61,12 +61,13 @@ function InteractiveCard({
 }) {
   const displayedAmount = stone.amount > 0 ? stone.amount : "—";
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
-  const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
+  const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
   const createdDate = new Date(stone.created_date);
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const isNew = createdDate > oneWeekAgo;
   const isOnSale = !!stone.on_sale;
+  const location = useLocation();
 
   return (
     <div
@@ -93,7 +94,7 @@ function InteractiveCard({
         itemId={stone.id}
         fieldList={{
           Avaliable: `${stone.available} / ${displayedAmount}`,
-          Size: `${displayedHeight} x ${displayedWidth}`,
+          Size: `${displayedLength} x ${displayedWidth}`,
           Price: stone.retail_price === 0 ? `Price by slab $${stone.cost_per_sqft}` : `$${stone.retail_price}`,
         }}
         title={stone.name}

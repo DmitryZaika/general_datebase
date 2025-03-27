@@ -21,9 +21,9 @@ interface Sink {
   type: string;
   url: string | null;
   is_display: boolean | number;
-  amount: number | null;
+  length: number | null;
   width: number | null;
-  height: number | null;
+  amount: number | null;
 }
 
 const customOrder = [
@@ -74,9 +74,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         type,
         url,
         is_display,
-        amount,
+        length,
         width,
-        height
+        amount
       FROM sinks
       WHERE company_id = ?
       ORDER BY name ASC
@@ -90,7 +90,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminSinks() {
   const { sinks } = useLoaderData<typeof loader>();
 
-  // Группируем по типу (type)
   const sinkList = sinks.reduce<Record<string, Sink[]>>((acc, sink) => {
     if (!acc[sink.type]) {
       acc[sink.type] = [];
@@ -99,7 +98,6 @@ export default function AdminSinks() {
     return acc;
   }, {});
 
-  // Сортируем ключи (типы) с помощью customSort
   const sortedTypes = Object.keys(sinkList).sort(customSort);
 
   return (
@@ -138,9 +136,9 @@ export default function AdminSinks() {
                                 : "—";
                             const displayedWidth =
                               sink.width && sink.width > 0 ? sink.width : "—";
-                            const displayedHeight =
-                              sink.height && sink.height > 0
-                                ? sink.height
+                            const displayedLength =
+                              sink.length && sink.length > 0
+                                ? sink.length
                                 : "—";
 
                             return (
@@ -173,7 +171,7 @@ export default function AdminSinks() {
                                     Amount: {displayedAmount}
                                   </p>
                                   <p className="text-center text-sm">
-                                    Size: {displayedWidth} x {displayedHeight}
+                                    Size: {displayedWidth} x {displayedLength}
                                   </p>
                                 </div>
 
