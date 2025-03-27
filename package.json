@@ -52,6 +52,7 @@
     "lucide-react": "^0.469.0",
     "mysql2": "^3.11.5",
     "openai": "^4.85.3",
+    "posthog-js": "^1.234.1",
     "quill": "^2.0.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",
