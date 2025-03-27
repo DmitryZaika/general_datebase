@@ -28,7 +28,7 @@ import { Dialog, DialogContent, DialogClose } from "~/components/ui/dialog";
 
 const slabSchema = z.object({
   bundle: z.string().min(1),
-  height: z.coerce.number().default(0),
+  length: z.coerce.number().default(0),
   width: z.coerce.number().default(0),
 });
 
@@ -73,18 +73,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
-  if (data.height === 0 && data.width === 0) {
-    const [stoneRecord] = await selectMany<{ width: number; height: number }>(
+  if (data.length === 0 && data.width === 0) {
+    const [stoneRecord] = await selectMany<{ width: number; length: number }>(
       db,
-      "SELECT width, height FROM stones WHERE stone_id = ? LIMIT 1",
+      "SELECT width, length FROM stones WHERE stone_id = ? LIMIT 1",
       [stoneId],
     );
-    data.height = stoneRecord?.height ?? 0;
+    data.length = stoneRecord?.length ?? 0;
     data.width = stoneRecord?.width ?? 0;
   }
   await db.execute(
-    "INSERT INTO slab_inventory (bundle, stone_id, url, width, height) VALUES (?, ?, ?, ?, ?)",
-    [data.bundle, stoneId, data.file ?? "", data.width, data.height],
+    "INSERT INTO slab_inventory (bundle, stone_id, url, width, length) VALUES (?, ?, ?, ?, ?)",
+    [data.bundle, stoneId, data.file ?? "", data.width, data.length],
   );
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Image Added"));
@@ -104,18 +104,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     bundle: string;
     url: string;
     width: number;
-    height: number;
+    length: number;
   }>(
     db,
-    "SELECT id, bundle, url, width, height FROM slab_inventory WHERE stone_id = ?",
+    "SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ?",
     [stoneId],
   );
   const [stone] = await selectMany<{
     id: number;
     width: number;
-    height: number;
+    length: number;
     url: string;
-  }>(db, "SELECT id, width, height, url FROM stones WHERE id = ? LIMIT 1", [
+  }>(db, "SELECT id, width, length, url FROM stones WHERE id = ? LIMIT 1", [
     stoneId,
   ]);
   return { slabs, stone };
@@ -130,7 +130,7 @@ export function AddSlab() {
     defaultValues: {
       bundle: "",
       file: stone.url || undefined,
-      height: "",
+      length: "",
       width: "",
     },
   });
@@ -139,7 +139,7 @@ export function AddSlab() {
       form.reset({
         bundle: "",
         file: undefined,
-        height: stone?.height ?? "",
+        length: stone?.length ?? "",
         width: stone?.width ?? "",
       });
       setResetKey((prev) => prev + 1);
@@ -179,12 +179,12 @@ export function AddSlab() {
       <div className="flex gap-2">
         <FormField
           control={form.control}
-          name="height"
+          name="length"
           render={({ field }) => (
             <InputItem
-              name="Height"
+              name="Length"
               className="-mb-3"
-              placeholder={stone?.height?.toString() || "Height"}
+              placeholder={stone?.length?.toString() || "Length"}
               field={field}
             />
           )}
@@ -230,7 +230,7 @@ export default function EditStoneSlabs() {
             <div className="p-1.5 border w-full  border-gray-300">
               <p className="w-full">Slab number: {slab.bundle}</p>
               <p>
-                Size {slab.height} x {slab.width}
+                Size {slab.length} x {slab.width}
               </p>
             </div>
             <div>
@@ -245,24 +245,7 @@ export default function EditStoneSlabs() {
           </div>
         ))}
       </div>
-      <Dialog
-        open={!!selectedImage}
-        onOpenChange={(open) => !open && setSelectedImage(null)}
-      >
-        <DialogContent className="max-w-4xl w-full h-auto flex items-center justify-center bg-black bg-opacity-90 p-1">
-          <DialogClose className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-            <span className="sr-only">Close</span>
-          </DialogClose>
-          {selectedImage && (
-            <img
-              src={selectedImage === "undefined" ? stone.url : selectedImage}
-              alt="Full size"
-              className="max-w-full max-h-[80vh] object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+    
     </>
   );
 }

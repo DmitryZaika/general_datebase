@@ -34,7 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { stoneSchema } from "~/schemas/stones";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const user = await getAdminUser(request).catch((err) => {
+  await getAdminUser(request).catch((err) => {
     return redirect(`/login?error=${err}`);
   });
   await csrf.validate(request).catch(() => {
@@ -58,7 +58,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (newFile) {
       await db.execute(
         `UPDATE stones
-         SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, height = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
+         SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
          WHERE id = ?`,
         [
           data.name,
@@ -66,7 +66,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.file,
           data.is_display,
           data.supplier_id,
-          data.height,
+          data.length,
           data.width,
           data.on_sale,
           data.cost_per_sqft,
@@ -77,14 +77,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     } else {
       await db.execute(
         `UPDATE stones
-         SET name = ?, type = ?, is_display = ?, supplier_id = ?, height = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
+         SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
          WHERE id = ?`,
         [
           data.name,
           data.type,
           data.is_display,
           data.supplier_id,
-          data.height,
+          data.length,
           data.width,
           data.on_sale,
           data.cost_per_sqft,
@@ -111,8 +111,6 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
-  console.log(params.stone);
-  console.log(typeof params.stone);
   const stoneId = parseInt(params.stone, 10);
   const stone = await selectId<{
     name: string;
@@ -120,14 +118,14 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     url: string;
     is_display: boolean;
     supplier_id: string;
-    height: string;
+    length: string;
     width: string;
     on_sale: boolean;
     cost_per_sqft: number;
     retail_price: number;
   }>(
     db,
-    "SELECT name, type, url, is_display, supplier_id, height, width, on_sale, cost_per_sqft, retail_price FROM stones WHERE id = ?",
+    "SELECT name, type, url, is_display, supplier_id, length, width, on_sale, cost_per_sqft, retail_price FROM stones WHERE id = ?",
     stoneId
   );
   if (!stone) {
@@ -156,7 +154,7 @@ function StoneInformation({
     url: string;
     is_display: boolean;
     supplier_id: string;
-    height: string;
+    length: string;
     width: string;
     on_sale: boolean;
     cost_per_sqft: number;
@@ -176,7 +174,7 @@ function StoneInformation({
     url,
     is_display,
     supplier_id,
-    height,
+    length,
     width,
     on_sale,
     cost_per_sqft,
@@ -188,7 +186,7 @@ function StoneInformation({
     url: "",
     is_display,
     supplier_id,
-    height,
+    length,
     width,
     on_sale,
     cost_per_sqft,
@@ -263,9 +261,9 @@ function StoneInformation({
       <div className="flex gap-2">
         <FormField
           control={form.control}
-          name="height"
+          name="length"
           render={({ field }) => (
-            <InputItem name="Height" placeholder="Stone height" field={field} />
+            <InputItem name="Length" placeholder="Stone length" field={field} />
           )}
         />
         <FormField
@@ -316,7 +314,7 @@ export default function StonesEdit() {
       url: string;
       is_display: boolean;
       supplier_id: string;
-      height: string;
+      length: string;
       width: string;
       on_sale: boolean;
       cost_per_sqft: number;

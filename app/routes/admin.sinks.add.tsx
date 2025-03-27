@@ -49,7 +49,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.sinks (name, type, url, company_id, is_display, supplier_id, width, height, amount) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO main.sinks (name, type, url, company_id, is_display, supplier_id, width, length, amount) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
         data.type,
@@ -58,7 +58,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.is_display,
         data.supplier_id,
         data.width,
-        data.height,
+        data.length,
         data.amount,
       ],
     );
@@ -100,7 +100,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function SinksAdd() {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
+  const isSubmitting = useNavigation().state !== "idle";
   const { suppliers } = useLoaderData<typeof loader>();
 
   const form = useCustomForm(sinkSchema, {
@@ -196,22 +196,22 @@ export default function SinksAdd() {
           <div className="flex gap-2">
             <FormField
               control={form.control}
-              name="height"
+              name="width"
               render={({ field }) => (
                 <InputItem
-                  name={"Height"}
-                  placeholder={"Height of the sink"}
+                  name={"Width"}
+                  placeholder={"Width of the sink"}
                   field={field}
                 />
               )}
             />
             <FormField
               control={form.control}
-              name="width"
+              name="length"
               render={({ field }) => (
                 <InputItem
-                  name={"Width"}
-                  placeholder={"Width of the sink"}
+                  name={"Length"}
+                  placeholder={"Length of the sink"}
                   field={field}
                 />
               )}

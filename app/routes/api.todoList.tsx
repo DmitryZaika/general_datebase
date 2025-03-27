@@ -39,7 +39,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const todos = await selectMany<Todo>(
     db,
-    "SELECT id, rich_text, is_done FROM todolist WHERE user_id = ?",
+    "SELECT id, rich_text, is_done, position FROM todolist WHERE user_id = ? ORDER BY position ASC",
     [user.id],
   );
   return Response.json({ todos });

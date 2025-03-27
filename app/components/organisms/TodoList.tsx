@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { clsx } from "clsx";
-import { PencilIcon, TrashIcon, CheckIcon } from "lucide-react";
+import { PencilIcon, TrashIcon, CheckIcon, GripVerticalIcon } from "lucide-react";
 import type { Todo } from "~/types";
 import { Form, FormProvider, useForm } from "react-hook-form";
 import { useFullFetcher } from "~/hooks/useFullFetcher";
@@ -13,6 +13,23 @@ import { LoadingButton } from "../molecules/LoadingButton";
 import { Checkbox } from "~/components/ui/checkbox";
 import { DialogFullHeader } from "../molecules/DialogFullHeader";
 import { Dialog, DialogContent, DialogTrigger } from "~/components/ui/dialog";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface EditFormProps {
   todo: Todo;
@@ -170,19 +187,121 @@ function FinishForm({ refresh, todo }: EditFormProps) {
   );
 }
 
+interface SortableTodoItemProps {
+  todo: Todo;
+  refresh: () => void;
+}
+
+function SortableTodoItem({ todo, refresh }: SortableTodoItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: todo.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={clsx(
+        "flex items-center px-3 py-2 border-b border-gray-200 hover:bg-gray-100 transition-colors",
+        isDragging && "opacity-50"
+      )}
+    >
+      <button
+        className="touch-none p-1 opacity-40 hover:opacity-100"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVerticalIcon className="h-4 w-4" />
+      </button>
+      <FinishForm todo={todo} refresh={refresh} />
+      <EditForm todo={todo} refresh={refresh} />
+      <DeleteForm todo={todo} refresh={refresh} />
+    </div>
+  );
+}
+
 export function TodoList() {
   const [data, setData] = useState<{ todos: Todo[] } | undefined>();
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const getTodos = (callback: undefined | (() => void) = undefined) => {
     fetch("/api/todoList")
       .then(async (res) => await res.json())
-      .then(setData)
-      .then(() => callback && callback());
+      .then((newData) => {
+        const sortedTodos = [...newData.todos].sort((a, b) => {
+          if (a.is_done && !b.is_done) return 1;
+          if (!a.is_done && b.is_done) return -1;
+          return a.position - b.position;
+        });
+        
+        if (JSON.stringify(sortedTodos) !== JSON.stringify(newData.todos)) {
+          const formData = new FormData();
+          formData.append("positions", JSON.stringify(
+            sortedTodos.map((todo, index) => ({
+              id: todo.id,
+              position: index
+            }))
+          ));
+          
+          fetch("/api/todoList/reorder", {
+            method: "POST",
+            body: formData,
+          }).then(() => {
+            setData({ todos: sortedTodos });
+            if (callback) callback();
+          });
+        } else {
+          setData({ todos: sortedTodos });
+          if (callback) callback();
+        }
+      });
   };
 
   useEffect(() => {
     getTodos();
   }, []);
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over || active.id === over.id || !data) {
+      return;
+    }
+
+    const oldIndex = data.todos.findIndex((todo) => todo.id === active.id);
+    const newIndex = data.todos.findIndex((todo) => todo.id === over.id);
+    
+    const newTodos = arrayMove(data.todos, oldIndex, newIndex);
+    setData({ todos: newTodos });
+
+    const formData = new FormData();
+    formData.append("positions", JSON.stringify(
+      newTodos.map((todo, index) => ({
+        id: todo.id,
+        position: index
+      }))
+    ));
+
+    await fetch("/api/todoList/reorder", {
+      method: "POST",
+      body: formData,
+    });
+  };
 
   return (
     <Dialog modal={false}>
@@ -203,26 +322,28 @@ export function TodoList() {
         <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto">
           <DialogFullHeader>Todo List</DialogFullHeader>
 
-          <div className="px-2  flex flex-col">
+          <div className="px-2 flex flex-col">
             <AddForm refresh={getTodos} />
 
-            <div className="overflow-y-auto md:max-h-full">
-              {data?.todos
-                ?.sort((a, b) =>
-                  a.is_done === b.is_done ? 0 : a.is_done ? 1 : -1,
-                )
-                .map((todo) => {
-                  return (
-                    <div
-                      className="flex items-center px-3 py-2 border-b border-gray-200 hover:bg-gray-100 transition-colors"
+            <div className="overflow-hidden md:max-h-full">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={data?.todos?.map(todo => todo.id) || []}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {data?.todos?.map((todo) => (
+                    <SortableTodoItem
                       key={todo.id}
-                    >
-                      <FinishForm todo={todo} refresh={getTodos} />
-                      <EditForm todo={todo} refresh={getTodos} />
-                      <DeleteForm todo={todo} refresh={getTodos} />
-                    </div>
-                  );
-                })}
+                      todo={todo}
+                      refresh={getTodos}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             </div>
           </div>
         </div>

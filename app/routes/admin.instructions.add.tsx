@@ -134,7 +134,7 @@ function cleanId(value: string | undefined): number | undefined {
 
 export default function InstructionsAdd() {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
+  const isSubmitting = useNavigation().state !== "idle";
   const token = useAuthenticityToken();
   const { instructions } = useLoaderData<typeof loader>();
 
