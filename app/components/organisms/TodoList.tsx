@@ -243,14 +243,12 @@ export function TodoList() {
     fetch("/api/todoList")
       .then(async (res) => await res.json())
       .then((newData) => {
-        // Sort todos to put completed ones at the end
         const sortedTodos = [...newData.todos].sort((a, b) => {
           if (a.is_done && !b.is_done) return 1;
           if (!a.is_done && b.is_done) return -1;
           return a.position - b.position;
         });
         
-        // Only update positions if the sort actually changed anything
         if (JSON.stringify(sortedTodos) !== JSON.stringify(newData.todos)) {
           const formData = new FormData();
           formData.append("positions", JSON.stringify(
@@ -291,7 +289,6 @@ export function TodoList() {
     const newTodos = arrayMove(data.todos, oldIndex, newIndex);
     setData({ todos: newTodos });
 
-    // Обновляем позиции в базе данных
     const formData = new FormData();
     formData.append("positions", JSON.stringify(
       newTodos.map((todo, index) => ({
