@@ -1,4 +1,3 @@
-
 import {
   LoaderFunctionArgs,
   ActionFunctionArgs,
@@ -29,7 +28,7 @@ interface Slab {
   url: string | null;
   is_sold: boolean | number;
   width: number;
-  height: number;
+  length: number;
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -48,7 +47,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const slabs = await selectMany<Slab>(
     db,
-    "SELECT id, bundle, url, is_sold, width, height FROM slab_inventory WHERE stone_id = ?",
+    "SELECT id, bundle, url, is_sold, width, length FROM slab_inventory WHERE stone_id = ?",
     [stoneId]
   );
   return { slabs, stone };
@@ -65,16 +64,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (intent === "updateSize") {
     const slabId = formData.get("slabId");
     const width = formData.get("width");
-    const height = formData.get("height");
+    const length = formData.get("length");
     
-    if (!slabId || !width || !height) {
+    if (!slabId || !width || !length) {
       return forceRedirectError(request.headers, "Missing required fields");
     }
 
     try {
       await db.execute(
-        "UPDATE slab_inventory SET width = ?, height = ? WHERE id = ?",
-        [parseInt(width.toString()), parseInt(height.toString()), parseInt(slabId.toString())]
+        "UPDATE slab_inventory SET width = ?, length = ? WHERE id = ?",
+        [parseInt(width.toString()), parseInt(length.toString()), parseInt(slabId.toString())]
       );
 
       const session = await getSession(request.headers.get("Cookie"));
@@ -192,8 +191,8 @@ export default function SlabsModal() {
                         <input type="hidden" name="slabId" value={slab.id} />
                         <Input
                           type="number"
-                          name="height"
-                          defaultValue={slab.height}
+                          name="length"
+                          defaultValue={slab.length}
                           className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           inputMode="numeric"
                         />
@@ -213,7 +212,7 @@ export default function SlabsModal() {
                         onClick={() => handleEditClick(slab.id)}
                         className="text-gray-500 hover:text-gray-700 cursor-pointer"
                       >
-                        {slab.height} x {slab.width}
+                        {slab.length} x {slab.width}
                       </button>
                     )}
                   </div>

@@ -23,10 +23,11 @@ interface Stone {
   type: string;
   url: string | null;
   is_display: boolean | number;
-  height: number | null;
+  length: number | null;
   available: number;
   width: number | null;
   amount: number | null;
+  on_sale: boolean | number;
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
@@ -50,7 +51,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const queryParams = new URLSearchParams(searchParams);
   const filters = stoneFilterSchema.parse(cleanParams(queryParams));
   filters.show_sold_out = false;
-  const stones = await stoneQueryBuilder(filters, params.company);
+  const stones = await stoneQueryBuilder(filters, Number(params.company));
 
   return { stones };
 };
@@ -64,11 +65,12 @@ interface InteractiveCardProps {
 function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProps) {
   const displayedAmount = stone.amount && stone.amount > 0 ? stone.amount : "—";
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
-  const displayedHeight = stone.height && stone.height > 0 ? stone.height : "—";
+  const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
+  const isOnSale = !!stone.on_sale;
 
   return (
     <div
-      className="relative group w-full module-item"
+      className="relative group w-full module-item overflow-hidden"
       onAuxClick={(e) => {
         if (e.button === 1 && stone.url) {
           e.preventDefault();
@@ -76,11 +78,20 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
         }
       }}
     >
+        {isOnSale && (
+        <div className="absolute top-[17px] left-[-40px] w-[140px] transform -rotate-45 z-10">
+          <div className="text-center py-1 text-white font-bold text-sm bg-red-600 shadow-md">
+            <span className="block relative z-10">ON SALE</span>
+            <div className="absolute left-0 top-full border-l-[10px] border-l-transparent border-t-[10px] border-t-red-800" />
+            <div className="absolute right-0 top-full border-r-[10px] border-r-transparent border-t-[10px] border-t-red-800" />
+          </div>
+        </div>
+      )}
       <ImageCard
         type="slabs"
         itemId={stone.id}
         fieldList={{
-          Size: `${displayedHeight} x ${displayedWidth}`,
+          Size: `${displayedLength} x ${displayedWidth}`,
         }}
         title={stone.name}
       >
@@ -108,32 +119,28 @@ export default function Stones() {
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [activeType, setActiveType] = useState<string | undefined>(undefined);
 
-  // Обработчик для клика по карточке камня
   const handleCardClick = (id: number, type: string) => {
     setCurrentId(id);
     setActiveType(type);
   };
 
-  // Обработчик для карусели - принимает number | undefined
   const handleCarouselChange = (id: number | undefined) => {
     setCurrentId(id);
     
     if (id !== undefined) {
-      // Если ID определен, найдем тип камня и обновим активный тип
       const stone = stones.find(s => s.id === id);
       if (stone) {
         setActiveType(stone.type);
       }
     } else {
-      // Если ID не определен, сбросим активный тип
-      setActiveType(undefined);
+        setActiveType(undefined);
     }
   };
 
   return (
     <>
       <ModuleList>
-        <div className="w-full col-span-full mb-4">
+        <div className="w-full col-span-full">
           <SuperCarousel
             type="stones"
             currentId={currentId}
