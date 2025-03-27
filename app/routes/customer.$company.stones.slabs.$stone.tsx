@@ -27,7 +27,7 @@ interface Slab {
   url: string | null;
   is_sold: boolean | number;
   width: number;
-  height: number;
+  length: number;
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -45,7 +45,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const slabs = await selectMany<Slab>(
     db,
-    "SELECT id, bundle, url, is_sold, width, height FROM slab_inventory WHERE stone_id = ?",
+    "SELECT id, bundle, url, is_sold, width, length FROM slab_inventory WHERE stone_id = ?",
     [stoneId]
   );
   return { slabs, stone };
@@ -133,7 +133,7 @@ export default function SlabsModal() {
                       {slab.bundle}
                     </span>
                     <span className="text-gray-500">
-                      {slab.width} x {slab.height}
+                      {slab.width} x {slab.length}
                     </span>
                   </div>
                 </div>

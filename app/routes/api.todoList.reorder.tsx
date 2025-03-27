@@ -19,7 +19,6 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     const positions = JSON.parse(positionsData.toString());
     
-    // Обновляем позиции всех задач в транзакции
     await db.beginTransaction();
     
     try {

@@ -11,7 +11,7 @@ export const sinkSchema = z.object({
     "farm house",
   ]),
   is_display: StringBoolean,
-  height: z.coerce.number().default(0),
+  length: z.coerce.number().default(0),
   width: z.coerce.number().default(0),
   supplier_id: NullableId,
   amount: z.coerce.number().default(0),

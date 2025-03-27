@@ -8,7 +8,7 @@ export const stoneSchema = z.object({
   is_display: StringBoolean,
   on_sale: StringBoolean,
 
-  height: z.coerce.number().default(0),
+  length: z.coerce.number().default(0),
   width: z.coerce.number().default(0),
   supplier_id: NullableId,
   bundle: z.string().optional(),

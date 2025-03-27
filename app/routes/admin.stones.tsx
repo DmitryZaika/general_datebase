@@ -1,13 +1,7 @@
 //// filepath: c:\Users\sarah\general_datebase\app\routes\admin.stones.tsx
-import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
-import { useLoaderData, Link, useSearchParams } from "react-router";
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "~/components/ui/accordion";
-import { capitalizeFirstLetter } from "~/utils/words";
+import { LoaderFunctionArgs, Outlet } from "react-router";
+import { useLoaderData, Link, useSearchParams, useNavigation } from "react-router";
+
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 
 import { Button } from "~/components/ui/button";
@@ -17,6 +11,8 @@ import { stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { STONE_TYPES } from "~/utils/constants";
 import ModuleList from "~/components/ModuleList";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { useEffect, useState } from "react";
 
 interface Stone {
   id: number;
@@ -24,7 +20,7 @@ interface Stone {
   type: string;
   url: string | null;
   is_display: boolean | number;
-  height: number | null;
+  length: number | null;
   width: number | null;
   amount: number;
   available: number;
@@ -60,6 +56,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminStones() {
   const { stones } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
+  const navigation = useNavigation();
+  const [isRoleSwitching, setIsRoleSwitching] = useState(false);
+  const [isAddingStone, setIsAddingStone] = useState(false);
+
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      if (isRoleSwitching) setIsRoleSwitching(false);
+      if (isAddingStone) setIsAddingStone(false);
+    }
+  }, [navigation.state]);
+
+  const handleAddStoneClick = () => {
+    setIsAddingStone(true);
+  };
 
   const stoneList = stones.reduce((acc: Record<string, Stone[]>, stone) => {
     if (!acc[stone.type]) {
@@ -76,8 +86,8 @@ export default function AdminStones() {
 
   return (
     <>
-      <Link to="add">
-        <Button>Add Stone</Button>
+      <Link to="add" onClick={handleAddStoneClick}>
+        <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
       </Link>
 
       <div className="pt-24 sm:pt-0">
@@ -96,8 +106,8 @@ export default function AdminStones() {
               const displayedAvailable = stone.available;
               const displayedWidth =
                 stone.width && stone.width > 0 ? stone.width : "—";
-              const displayedHeight =
-                stone.height && stone.height > 0 ? stone.height : "—";
+              const displayedLength =
+                stone.length && stone.length > 0 ? stone.length : "—";
 
               return (
                 <div key={stone.id} className="relative w-full module-item">
@@ -126,7 +136,7 @@ export default function AdminStones() {
                       Available: {displayedAvailable} / {displayedAmount}
                     </p>
                     <p className="text-center text-sm">
-                      Size: {displayedHeight} x {displayedWidth}
+                      Size: {displayedLength} x {displayedWidth}
                     </p>
                     <p className="text-center text-sm">
                       Price: ${stone.retail_price}
