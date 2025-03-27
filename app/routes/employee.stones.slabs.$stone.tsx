@@ -5,8 +5,9 @@ import {
   useLoaderData,
   Form,
   useNavigation,
+  useNavigate,
 } from "react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getEmployeeUser } from "~/utils/session.server";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { commitSession, getSession } from "~/sessions";
@@ -18,14 +19,21 @@ import {
   Dialog,
   DialogContent,
   DialogClose,
+  DialogFooter,
   DialogTitle,
+  DialogHeader,
 } from "~/components/ui/dialog";
-import { useState, useEffect } from "react";
 import { Input } from "~/components/ui/input";
+import { FormProvider, useFieldArray, useForm } from "react-hook-form";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { FormField } from "~/components/ui/form";
+import { InputItem } from "~/components/molecules/InputItem";
+import { SelectInput } from "~/components/molecules/SelectItem";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
 
 interface Slab {
   id: number;
-  bundle: string;
+  bundle: string; 
   url: string | null;
   is_sold: boolean | number;
   width: number;
@@ -104,10 +112,45 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
   }
 
-  const slabId = formData.get("slabId");
-  if (!slabId) {
-    return forceRedirectError(request.headers, "No slabId provided");
+  if (intent === "toggleSold") {
+    const slabId = formData.get("slabId");
+    if (!slabId) {
+      return forceRedirectError(request.headers, "No slabId provided");
+    }
+    const slab = await selectId<{ is_sold: number }>(
+      db,
+      "SELECT is_sold FROM slab_inventory WHERE id = ?",
+      parseInt(slabId.toString(), 10)
+    );
+    if (!slab) {
+      return forceRedirectError(request.headers, "No slab found for given ID");
+    }
+    const newValue = slab.is_sold === 1 ? 0 : 1;
+    await db.execute("UPDATE slab_inventory SET is_sold = ? WHERE id = ?", [
+      newValue,
+      slabId,
+    ]);
+    const session = await getSession(request.headers.get("Cookie"));
+    session.flash(
+      "message",
+      toastData("Success", `Slab ${newValue ? "Sold" : "Unsold"}`)
+    );
+    return redirect(request.url, {
+      headers: { "Set-Cookie": await commitSession(session) },
+    });
   }
+
+  if (intent === "completeSell") {
+    // Здесь будет логика для завершения продажи слеба
+    // с использованием SellSlab формы
+    // ...
+    const session = await getSession(request.headers.get("Cookie"));
+    session.flash("message", toastData("Success", "Slab sold successfully"));
+    return redirect(request.url, {
+      headers: { "Set-Cookie": await commitSession(session) },
+    });
+  }
+
   return forceRedirectError(request.headers, "Unknown action");
 }
 
@@ -154,6 +197,18 @@ export function SellSlab({
   const handleChange = (nextOpen: boolean) => {
     onOpenChange(nextOpen);
   };
+  
+  const sinkOptions = sinks.map((s) => ({
+    key: s.name,
+    value: s.name,
+  }));
+  
+  const slabOptions = filteredSlabs.map((s) => ({
+    key: String(s.id),
+    value: String(s.id),
+    label: s.bundle,
+  }));
+  
   return (
     <Dialog open={open} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -203,10 +258,7 @@ export function SellSlab({
                           label=""
                           field={field}
                           placeholder="Choose sink"
-                          options={sinks.map((s) => ({
-                            label: s.name,
-                            value: s.name,
-                          }))}
+                          options={sinkOptions}
                         />
                       )}
                     />
@@ -241,10 +293,7 @@ export function SellSlab({
                           label=""
                           field={field}
                           placeholder="Choose Slab"
-                          options={filteredSlabs.map((s) => ({
-                            label: s.bundle,
-                            value: String(s.id),
-                          }))}
+                          options={slabOptions}
                         />
                       )}
                     />
@@ -290,17 +339,25 @@ export default function SlabsModal() {
   const { slabs, stone } = useLoaderData<typeof loader>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [editingSlab, setEditingSlab] = useState<number | null>(null);
+  const [sellDialogOpen, setSellDialogOpen] = useState(false);
+  const [sellSlabId, setSellSlabId] = useState<number | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigation = useNavigation();
 
   useEffect(() => {
-    if (navigation.state === "idle" && editingSlab !== null) {
-      setEditingSlab(null);
+    if (navigation.state === "idle") {
+      if (editingSlab !== null) setEditingSlab(null);
+      if (isSubmitting) setIsSubmitting(false);
     }
   }, [navigation.state]);
 
   const handleEditClick = (slabId: number) => {
-    console.log('Setting editing slab:', slabId);
     setEditingSlab(slabId);
+  };
+
+  const handleSellClick = (slabId: number) => {
+    setSellSlabId(slabId);
+    setSellDialogOpen(true);
   };
 
   return (
@@ -386,12 +443,19 @@ export default function SlabsModal() {
                   </div>
 
                   {!isEditing && (
-                    <Form method="post" className="ml-auto">
+                    <Form method="post" className="ml-auto" onSubmit={() => setIsSubmitting(true)}>
                       <AuthenticityTokenInput />
+                      <input type="hidden" name="intent" value="toggleSold" />
                       <input type="hidden" name="slabId" value={slab.id} />
-                      <Button type="submit" className="px-4 py-2">
-                        {isSold ? "Unsell" : "Sell"}
-                      </Button>
+                      {isSold ? (
+                        <LoadingButton loading={isSubmitting} className="px-4 py-2">
+                          Unsell
+                        </LoadingButton>
+                      ) : (
+                        <Button type="button" className="px-4 py-2" onClick={() => handleSellClick(slab.id)}>
+                          Sell
+                        </Button>
+                      )}
                     </Form>
                   )}
                 </div>
