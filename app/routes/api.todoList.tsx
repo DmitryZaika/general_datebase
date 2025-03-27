@@ -16,7 +16,7 @@ export async function action({ request }: ActionFunctionArgs) {
     receivedValues: defaultValues,
   } = await getValidatedFormData<TTodoListSchema>(
     request,
-    zodResolver(todoListSchema)
+    zodResolver(todoListSchema),
   );
   if (errors) {
     return Response.json({ errors, defaultValues });
@@ -24,7 +24,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   await db.execute(
     `INSERT INTO main.todolist (rich_text, user_id) VALUES (?, ?);`,
-    [data.rich_text, user.id]
+    [data.rich_text, user.id],
   );
   return Response.json({ success: true });
 }
@@ -39,8 +39,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const todos = await selectMany<Todo>(
     db,
-    "SELECT id, rich_text, is_done FROM todolist WHERE user_id = ?",
-    [user.id]
+    "SELECT id, rich_text, is_done, position FROM todolist WHERE user_id = ? ORDER BY position ASC",
+    [user.id],
   );
   return Response.json({ todos });
 }

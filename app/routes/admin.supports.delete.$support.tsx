@@ -59,7 +59,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const support = await selectId<{ name: string }>(
     db,
     "select name from supports WHERE id = ?",
-    supportId
+    supportId,
   );
   return {
     name: support?.name,

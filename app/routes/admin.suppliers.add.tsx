@@ -1,5 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import {
+  ActionFunctionArgs,
+  LoaderFunctionArgs,
+  redirect,
+  useNavigation,
+} from "react-router";
 import { Form, useNavigate } from "react-router";
 import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
@@ -22,6 +27,7 @@ import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
 import { getAdminUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
 
 const supplierschema = z.object({
   website: z.union([z.string().url().optional(), z.literal("")]).optional(),
@@ -50,7 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
-    resolver
+    resolver,
   );
   if (errors) {
     return { errors, receivedValues };
@@ -67,7 +73,7 @@ export async function action({ request }: ActionFunctionArgs) {
         data.email ?? null,
         data.notes ?? null,
         (await user).company_id,
-      ]
+      ],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -90,6 +96,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function SuppliersAdd() {
   const navigate = useNavigate();
+  const isSubmitting = useNavigation().state === "idle";
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
@@ -177,7 +184,7 @@ export default function SuppliersAdd() {
               )}
             />
             <DialogFooter>
-              <Button type="submit">Save changes</Button>
+              <LoadingButton loading={!isSubmitting}>Add Stone</LoadingButton>
             </DialogFooter>
           </Form>
         </FormProvider>

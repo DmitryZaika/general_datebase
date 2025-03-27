@@ -47,7 +47,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { errors, data } = await parseMutliForm(
     request,
     documentSchema,
-    "documents"
+    "documents",
   );
 
   if (errors || !data) {
@@ -58,14 +58,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const document = await selectId<{ url: string }>(
     db,
     "select url from documents WHERE id = ?",
-    documentId
+    documentId,
   );
 
   try {
     if (newFile) {
       await db.execute(
         `UPDATE main.documents SET name = ?, url = ? WHERE id = ?`,
-        [data.name, data.file, documentId]
+        [data.name, data.file, documentId],
       );
     } else {
       await db.execute(`UPDATE main.documents SET name = ? WHERE id = ?`, [
@@ -101,7 +101,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const document = await selectId<{ name: string; url: string }>(
     db,
     "select name, url from documents WHERE id = ?",
-    documentId
+    documentId,
   );
   return {
     name: document?.name,
@@ -111,12 +111,12 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 export default function DocumentsEdit() {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
+  const isSubmitting = useNavigation().state !== "idle";
   const { name, url } = useLoaderData<typeof loader>();
 
   const form = useCustomOptionalForm(
     documentSchema,
-    documentSchema.parse({ name, url })
+    documentSchema.parse({ name, url }),
   );
   const handleChange = (open: boolean) => {
     if (open === false) {

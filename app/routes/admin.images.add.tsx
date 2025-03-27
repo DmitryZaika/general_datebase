@@ -46,7 +46,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await db.execute(
       `INSERT INTO main.images (name, url, company_id) VALUES (?,  ?, ?);`,
-      [data.name, data.file, user.company_id]
+      [data.name, data.file, user.company_id],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -71,7 +71,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function ImagesAdd() {
   const navigate = useNavigate();
   // const actionData = useActionData<typeof action>();
-  const isSubmitting = useNavigation().state === "submitting";
+  const isSubmitting = useNavigation().state !== "idle";
 
   const form = useCustomForm(imageSchema);
 

@@ -53,7 +53,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const result = await selectId<{ url: string | null }>(
       db,
       "SELECT url FROM installed_sinks WHERE id = ?",
-      sid
+      sid,
     );
     await db.execute(`DELETE FROM main.installed_sinks WHERE id = ?`, [sid]);
     const session = await getSession(request.headers.get("Cookie"));
@@ -69,7 +69,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { errors, data } = await parseMutliForm(
     request,
     InstalledProjectsSchema,
-    "sinks"
+    "sinks",
   );
   if (errors || !data) {
     return { errors };
@@ -78,13 +78,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const sink = await selectId<{ url: string }>(
     db,
     "select url from sinks WHERE id = ?",
-    sinkId
+    sinkId,
   );
 
   try {
     await db.execute(
       `INSERT INTO installed_sinks (url, sink_id) VALUES (?, ?)`,
-      [data.file, sinkId]
+      [data.file, sinkId],
     );
   } catch (error) {
     console.error("Error connecting to the database:", errors);
@@ -110,7 +110,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const sinks = await selectMany<{ id: number; url: string }>(
     db,
     "select id, url from installed_sinks WHERE sink_id = ?",
-    [sinkId]
+    [sinkId],
   );
   return { sinks };
 };

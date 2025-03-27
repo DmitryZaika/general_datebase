@@ -57,7 +57,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const sink = await selectId<{ name: string }>(
     db,
     "select name from sinks WHERE id = ?",
-    sinkId
+    sinkId,
   );
   return {
     name: sink?.name,

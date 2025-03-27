@@ -1,19 +1,15 @@
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "~/components/ui/table";
 import { LoaderFunctionArgs, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData, Outlet, Link } from "react-router";
+import { useLoaderData, Outlet, Link, useNavigation } from "react-router";
 import { Button } from "~/components/ui/button";
 import { getAdminUser } from "~/utils/session.server";
+import { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "~/components/ui/data-table";
+import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
+import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { useEffect, useState } from "react";
 
 interface Supplier {
   id: number;
@@ -35,61 +31,76 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const suppliers = await selectMany<Supplier>(
     db,
     "SELECT id, website, supplier_name, manager, phone, email, notes from suppliers WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return {
     suppliers,
   };
 };
 
+const columns: ColumnDef<Supplier>[] = [
+  {
+    accessorKey: "website",
+    header: ({ column }) => <SortableHeader column={column} title="Website" />,
+  },
+  {
+    accessorKey: "supplier_name",
+    header: ({ column }) => (
+      <SortableHeader column={column} title="Supplier Name" />
+    ),
+  },
+  {
+    accessorKey: "manager",
+    header: ({ column }) => <SortableHeader column={column} title="Manager" />,
+  },
+  {
+    accessorKey: "phone",
+    header: "Phone Number",
+  },
+  {
+    accessorKey: "email",
+    header: "Email",
+  },
+  {
+    accessorKey: "notes",
+    header: "Notes",
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => {
+      return (
+        <ActionDropdown
+          actions={{
+            edit: `edit/${row.original.id}`,
+            delete: `delete/${row.original.id}`,
+          }}
+        />
+      );
+    },
+  },
+];
+
 export default function Suppliers() {
   const { suppliers } = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
+  const [isAddingSupplier, setIsAddingSupplier] = useState(false);
+
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      if (isAddingSupplier) setIsAddingSupplier(false);
+    }
+  }, [navigation.state]);
+
+  const handleAddSupplierClick = () => {
+    setIsAddingSupplier(true);
+  };
 
   return (
     <div className="pt-24 sm:pt-0">
-      <Link to={`add`} relative="path">
-        <Button>Add Supplier</Button>
+      <Link to={`add`} relative="path" onClick={handleAddSupplierClick}>
+        <LoadingButton loading={isAddingSupplier}>Add Supplier</LoadingButton>
       </Link>
-      <Table>
-        <TableCaption>A list of suppliers.</TableCaption>
-        <TableHeader>
-          <TableRow className="text-xl">
-            <TableHead className="w-[100px]">WebSite</TableHead>
-            <TableHead>Supplier Name</TableHead>
-            <TableHead>Manager</TableHead>
-            <TableHead>Phone Number</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Notes</TableHead>
-            <TableHead className="text-right text-xl">Edit Supplier</TableHead>
-            <TableHead className="text-right">Delete Supplier</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {suppliers.map((supplier) => (
-            <TableRow key={supplier.id}>
-              <TableCell className="font-medium">{supplier.website}</TableCell>
-              <TableCell className="font-medium">
-                {supplier.supplier_name}
-              </TableCell>
-              <TableCell className="font-medium">{supplier.manager}</TableCell>
-              <TableCell className="font-medium">{supplier.phone}</TableCell>
-              <TableCell className="font-medium">{supplier.email}</TableCell>
-              <TableCell className="font-medium">{supplier.notes}</TableCell>
-              <TableCell>
-                <Link to={`edit/${supplier.id}`} className="text-xl text-right">
-                  Edit
-                </Link>
-              </TableCell>
-
-              <TableCell className="text-right">
-                <Link to={`delete/${supplier.id}`} className="text-xl">
-                  Delete
-                </Link>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <DataTable columns={columns} data={suppliers} />
       <Outlet />
     </div>
   );

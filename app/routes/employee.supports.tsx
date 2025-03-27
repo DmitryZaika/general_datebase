@@ -30,7 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const supports = await selectMany<Support>(
     db,
     "select id, name, url from supports WHERE company_id = ?",
-    [user.company_id]
+    [user.company_id],
   );
   return { supports };
 };
@@ -40,7 +40,7 @@ export default function Supports() {
   const ids = supports.map((item) => item.id);
   const { currentId, setCurrentId } = useArrowToggle(ids);
   return (
-    <Accordion type="single" defaultValue="supports" className="pt-24 sm:pt-0">
+    <Accordion type="single" defaultValue="supports">
       <AccordionItem value="supports">
         <AccordionContent>
           <Accordion type="multiple">

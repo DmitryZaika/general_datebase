@@ -10,10 +10,12 @@ import { capitalizeFirstLetter } from "~/utils/words";
 import { LoaderFunctionArgs, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData, Link, Outlet } from "react-router";
+import { useLoaderData, Link, Outlet, useNavigation } from "react-router";
 import { Button } from "~/components/ui/button";
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { getAdminUser } from "~/utils/session.server";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { useEffect, useState } from "react";
 
 interface Sink {
   id: number;
@@ -21,9 +23,9 @@ interface Sink {
   type: string;
   url: string | null;
   is_display: boolean | number;
-  amount: number | null;
+  length: number | null;
   width: number | null;
-  height: number | null;
+  amount: number | null;
 }
 
 const customOrder = [
@@ -74,9 +76,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         type,
         url,
         is_display,
-        amount,
+        length,
         width,
-        height
+        amount
       FROM sinks
       WHERE company_id = ?
       ORDER BY name ASC
@@ -89,8 +91,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AdminSinks() {
   const { sinks } = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
+  const [isAddingSink, setIsAddingSink] = useState(false);
 
-  // Группируем по типу (type)
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      if (isAddingSink) setIsAddingSink(false);
+    }
+  }, [navigation.state]);
+
+  const handleAddSinkClick = () => {
+    setIsAddingSink(true);
+  };
+
   const sinkList = sinks.reduce<Record<string, Sink[]>>((acc, sink) => {
     if (!acc[sink.type]) {
       acc[sink.type] = [];
@@ -99,17 +112,16 @@ export default function AdminSinks() {
     return acc;
   }, {});
 
-  // Сортируем ключи (типы) с помощью customSort
   const sortedTypes = Object.keys(sinkList).sort(customSort);
 
   return (
     <>
-      <Link to="add">
-        <Button>Add Sink</Button>
+      <Link to="add" onClick={handleAddSinkClick}>
+        <LoadingButton loading={isAddingSink}>Add Sink</LoadingButton>
       </Link>
 
       <div className="pt-24 sm:pt-0">
-        <Accordion type="single" defaultValue="sinks" className="w-full">
+        <Accordion type="single" defaultValue="sinks" className="w-full pl-5">
           <AccordionItem value="sinks">
             <AccordionContent>
               <Accordion type="multiple">
@@ -120,7 +132,7 @@ export default function AdminSinks() {
                     </AccordionTrigger>
 
                     <AccordionContent>
-                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
                         {sinkList[type]
 
                           .sort((a, b) => {
@@ -138,9 +150,9 @@ export default function AdminSinks() {
                                 : "—";
                             const displayedWidth =
                               sink.width && sink.width > 0 ? sink.width : "—";
-                            const displayedHeight =
-                              sink.height && sink.height > 0
-                                ? sink.height
+                            const displayedLength =
+                              sink.length && sink.length > 0
+                                ? sink.length
                                 : "—";
 
                             return (
@@ -173,7 +185,7 @@ export default function AdminSinks() {
                                     Amount: {displayedAmount}
                                   </p>
                                   <p className="text-center text-sm">
-                                    Size: {displayedWidth} x {displayedHeight}
+                                    Size: {displayedWidth} x {displayedLength}
                                   </p>
                                 </div>
 

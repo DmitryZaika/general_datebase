@@ -55,14 +55,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const image = await selectId<{ url: string }>(
     db,
     "select url from images WHERE id = ?",
-    imageId
+    imageId,
   );
 
   try {
     if (newFile) {
       await db.execute(
         `UPDATE main.images SET name = ?, url = ? WHERE id = ?`,
-        [data.name, data.file, imageId]
+        [data.name, data.file, imageId],
       );
     } else {
       await db.execute(`UPDATE main.images SET name = ? WHERE id = ?`, [
@@ -97,7 +97,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const image = await selectId<{ name: string; url: string }>(
     db,
     "select name, url from images WHERE id = ?",
-    imageId
+    imageId,
   );
   return {
     name: image?.name,
@@ -107,12 +107,12 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 export default function ImagesEdit() {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
+  const isSubmitting = useNavigation().state !== "idle";
   const { name, url } = useLoaderData<typeof loader>();
 
   const form = useCustomOptionalForm(
     imageSchema,
-    imageSchema.parse({ name, url })
+    imageSchema.parse({ name, url }),
   );
   const handleChange = (open: boolean) => {
     if (open === false) {

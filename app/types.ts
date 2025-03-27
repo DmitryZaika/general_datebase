@@ -1,7 +1,10 @@
+import { z } from "zod";
+
 export interface Todo {
   id: number;
   rich_text: string;
   is_done: number;
+  position: number;
 }
 
 export interface InstructionSlim {
@@ -20,4 +23,5 @@ export interface HeaderProps {
   user: object | null;
   isAdmin: boolean;
   isSuperUser: boolean;
+  isEmployee?: boolean;
 }

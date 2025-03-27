@@ -4,12 +4,14 @@ import React from "react";
 import { LoaderFunctionArgs, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData, Link, Outlet } from "react-router";
+import { useLoaderData, Link, Outlet, useNavigation } from "react-router";
 import { Button } from "~/components/ui/button";
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { Image } from "~/components/molecules/Image";
 import { getAdminUser } from "~/utils/session.server";
 import { useArrowToggle } from "~/hooks/useArrowToggle";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { useEffect, useState } from "react";
 
 interface Support {
   id: number;
@@ -36,6 +38,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AdminSupports() {
   const { supports } = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
+  const [isAddingSupport, setIsAddingSupport] = useState(false);
+
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      if (isAddingSupport) setIsAddingSupport(false);
+    }
+  }, [navigation.state]);
+
+  const handleAddSupportClick = () => {
+    setIsAddingSupport(true);
+  };
 
   const { currentId, setCurrentId } = useArrowToggle(
     (value: number | undefined) => (value ? [value] : [])
@@ -43,11 +57,11 @@ export default function AdminSupports() {
 
   return (
     <>
-      <Link to={`add`} className="mb-6 inline-block">
-        <Button>Add Support</Button>
+      <Link to={`add`} className="mb-6 inline-block" onClick={handleAddSupportClick}>
+        <LoadingButton loading={isAddingSupport}>Add Support</LoadingButton>
       </Link>
       <div className="pt-24 sm:pt-0">
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
           {supports
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((support) => (

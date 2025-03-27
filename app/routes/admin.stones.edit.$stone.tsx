@@ -1,22 +1,12 @@
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { STONE_TYPES } from "~/utils/constants";
 import {
   useNavigate,
   useLoaderData,
   useNavigation,
   Outlet,
 } from "react-router";
-import { FormField } from "../components/ui/form";
 import { z } from "zod";
-import { InputItem } from "~/components/molecules/InputItem";
-
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
-
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { selectId, selectMany } from "~/utils/queryHelpers";
@@ -31,28 +21,20 @@ import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { FormField } from "../components/ui/form";
+import { InputItem } from "~/components/molecules/InputItem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-
-const stoneSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  is_display: z.union([
-    z.boolean(),
-    z.number().transform((val) => val === 1),
-    z.enum(["true", "false"]).transform((val) => val === "true"),
-  ]),
-  height: z.coerce.number().optional(),
-  width: z.coerce.number().optional(),
-  supplier: z.string().optional(),
-  on_sale: z.union([
-    z.boolean(),
-    z.number().transform((val) => val === 1),
-    z.enum(["true", "false"]).transform((val) => val === "true"),
-  ]),
-});
+import { stoneSchema } from "~/schemas/stones";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const user = await getAdminUser(request).catch((err) => {
+  await getAdminUser(request).catch((err) => {
     return redirect(`/login?error=${err}`);
   });
   await csrf.validate(request).catch(() => {
@@ -76,33 +58,37 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (newFile) {
       await db.execute(
         `UPDATE stones
-         SET name = ?, type = ?, url = ?, is_display = ?, supplier = ?, height = ?, width = ?, on_sale = ?
+         SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
          WHERE id = ?`,
         [
           data.name,
           data.type,
           data.file,
           data.is_display,
-          data.supplier,
-          data.height,
+          data.supplier_id,
+          data.length,
           data.width,
           data.on_sale,
+          data.cost_per_sqft,
+          data.retail_price,
           stoneId,
         ]
       );
     } else {
       await db.execute(
         `UPDATE stones
-         SET name = ?, type = ?, is_display = ?, supplier = ?, height = ?, width = ?, on_sale = ?
+         SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
          WHERE id = ?`,
         [
           data.name,
           data.type,
           data.is_display,
-          data.supplier,
-          data.height,
+          data.supplier_id,
+          data.length,
           data.width,
           data.on_sale,
+          data.cost_per_sqft,
+          data.retail_price,
           stoneId,
         ]
       );
@@ -121,9 +107,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
-  const user = await getAdminUser(request).catch((err) => {
-    return redirect(`/login?error=${err}`);
-  });
+  const user = await getAdminUser(request);
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
@@ -133,54 +117,82 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     type: string;
     url: string;
     is_display: boolean;
-    supplier: string;
-    height: string;
+    supplier_id: string;
+    length: string;
     width: string;
     on_sale: boolean;
+    cost_per_sqft: number;
+    retail_price: number;
   }>(
     db,
-    "SELECT name, type, url, is_display, supplier, height, width, on_sale FROM stones WHERE id = ?",
+    "SELECT name, type, url, is_display, supplier_id, length, width, on_sale, cost_per_sqft, retail_price FROM stones WHERE id = ?",
     stoneId
   );
   if (!stone) {
     return forceRedirectError(request.headers, "No stone found");
   }
-  const suppliers = await selectMany<{ supplier_name: string }>(
-    db,
-    "SELECT supplier_name FROM suppliers WHERE company_id = ?",
-    [user.company_id]
-  );
+  const suppliers = await selectMany<{
+    id: number | null;
+    supplier_name: string;
+  }>(db, "SELECT id, supplier_name FROM suppliers WHERE company_id = ?", [
+    user.company_id,
+  ]);
   return {
     stone,
-    supplierNames: suppliers.map((item) => item.supplier_name),
+    suppliers,
   };
 };
 
 function StoneInformation({
   stoneData,
-  supplierNames,
+  suppliers,
   refresh,
 }: {
-  stoneData: ReturnType<typeof loader>["stone"];
-  supplierNames: string[];
+  stoneData: {
+    name: string;
+    type: string;
+    url: string;
+    is_display: boolean;
+    supplier_id: string;
+    length: string;
+    width: string;
+    on_sale: boolean;
+    cost_per_sqft: number;
+    retail_price: number;
+  };
+  suppliers: {
+    id: number;
+    supplier_name: string;
+  }[];
   refresh: () => void;
 }) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
-  const { name, type, url, is_display, supplier, height, width, on_sale } =
-    stoneData;
+  const {
+    name,
+    type,
+    url,
+    is_display,
+    supplier_id,
+    length,
+    width,
+    on_sale,
+    cost_per_sqft,
+    retail_price,
+  } = stoneData;
   const defaultValues = {
     name,
     type,
     url: "",
     is_display,
-    supplier,
-    height,
+    supplier_id,
+    length,
     width,
     on_sale,
+    cost_per_sqft,
+    retail_price,
   };
   const form = useCustomOptionalForm(stoneSchema, defaultValues);
-
   return (
     <MultiPartForm form={form}>
       <FormField
@@ -199,7 +211,7 @@ function StoneInformation({
               name="Type"
               placeholder="Stone Type"
               field={field}
-              options={["Granite", "Quartz", "Marble", "Dolomite", "Quartzite"]}
+              options={STONE_TYPES}
             />
           )}
         />
@@ -217,7 +229,7 @@ function StoneInformation({
         />
       </div>
       <div className="flex justify-between items-baseline gap-2">
-        <div className="">
+        <div>
           <FormField
             control={form.control}
             name="is_display"
@@ -231,25 +243,27 @@ function StoneInformation({
         </div>
         <FormField
           control={form.control}
-          name="supplier"
+          name="supplier_id"
           render={({ field }) => (
             <SelectInput
               name="Supplier"
               placeholder="Supplier"
               field={field}
-              options={supplierNames}
+              options={suppliers.map((item) => ({
+                key: item.id.toString(),
+                value: item.supplier_name,
+              }))}
             />
           )}
         />
       </div>
-
       {url ? <img src={url} alt={name} className="w-48 mt-4 mx-auto" /> : null}
       <div className="flex gap-2">
         <FormField
           control={form.control}
-          name="height"
+          name="length"
           render={({ field }) => (
-            <InputItem name="Height" placeholder="Stone height" field={field} />
+            <InputItem name="Length" placeholder="Stone length" field={field} />
           )}
         />
         <FormField
@@ -260,27 +274,56 @@ function StoneInformation({
           )}
         />
       </div>
-
+      <div className="flex gap-2">
+        <FormField
+          control={form.control}
+          name="cost_per_sqft"
+          render={({ field }) => (
+            <InputItem
+              name="Cost Per Sqft"
+              placeholder="Cost Per Sqft"
+              field={field}
+            />
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="retail_price"
+          render={({ field }) => (
+            <InputItem
+              name="Retail Price"
+              placeholder="Retail Price"
+              field={field}
+            />
+          )}
+        />
+      </div>
       <DialogFooter className="mt-4">
         <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
       </DialogFooter>
     </MultiPartForm>
   );
 }
+
 export default function StonesEdit() {
   const navigate = useNavigate();
-  const { stone, supplierNames } = useLoaderData<{
+  const { stone, suppliers } = useLoaderData<{
     stone: {
       name: string;
       type: string;
       url: string;
       is_display: boolean;
-      supplier: string;
-      height: string;
+      supplier_id: string;
+      length: string;
       width: string;
       on_sale: boolean;
+      cost_per_sqft: number;
+      retail_price: number;
     };
-    supplierNames: string[];
+    suppliers: {
+      id: number;
+      supplier_name: string;
+    }[];
   }>();
   const handleChange = (open: boolean) => {
     if (!open) {
@@ -292,7 +335,7 @@ export default function StonesEdit() {
   };
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px] overflow-auto flex flex-col justify-baseline min-h-[95vh]  max-h-[95vh]">
+      <DialogContent className="sm:max-w-[425px] overflow-auto flex flex-col justify-baseline min-h-[95vh] max-h-[95vh]">
         <DialogHeader>
           <DialogTitle>Edit Stone</DialogTitle>
         </DialogHeader>
@@ -300,9 +343,7 @@ export default function StonesEdit() {
           defaultValue="information"
           onValueChange={(value) => {
             if (value === "images") navigate("images");
-            else if (value === "slabs") {
-              navigate("slabs");
-            }
+            else if (value === "slabs") navigate("slabs");
           }}
         >
           <TabsList>
@@ -313,7 +354,7 @@ export default function StonesEdit() {
           <TabsContent value="information">
             <StoneInformation
               stoneData={stone}
-              supplierNames={supplierNames}
+              suppliers={suppliers}
               refresh={refresh}
             />
           </TabsContent>

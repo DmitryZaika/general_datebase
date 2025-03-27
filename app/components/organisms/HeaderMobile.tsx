@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigation } from "react-router";
 import { TodoList } from "../organisms/TodoList";
 import { HeaderProps } from "~/types";
 
@@ -8,24 +8,58 @@ interface HeaderMobileProps extends HeaderProps {
 interface BurgerLinkProps {
   setOpen: (value: boolean) => void;
   to: string;
-  children: JSX.Element;
+  children: JSX.Element | string;
   className?: string;
+  onClick?: () => void;
 }
-import React, { useState, type JSX } from "react";
+import React, { useState, useEffect, type JSX } from "react";
 import { Button } from "~/components/ui/button";
 import { Menu, X } from "lucide-react";
+import { LoadingButton } from "../molecules/LoadingButton";
 import clsx from "clsx";
 
-function BurgerLink({ setOpen, to, children, className }: BurgerLinkProps) {
+function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkProps) {
+  const handleClick = () => {
+    setOpen(false);
+    if (onClick) onClick();
+  };
+
   return (
     <Link
       className={clsx("uppercase text-lg font-bold", className)}
       to={to}
-      onClick={() => setOpen(false)}
+      onClick={handleClick}
     >
       {children}
     </Link>
   );
+}
+
+// Функция для определения противоположного URL
+function getMirroredUrl(path: string) {
+  const segments = path.split('/').filter(Boolean);
+  
+  if (segments.length < 1) return "/employee";
+  
+  const currentRole = segments[0]; // "admin" или "employee"
+  const targetRole = currentRole === "admin" ? "employee" : "admin";
+  
+  // Если нет второго сегмента, просто возвращаем базовый URL
+  if (segments.length < 2) return `/${targetRole}`;
+  
+  // Получаем текущий раздел (stones, instructions и т.д.)
+  const currentSection = segments[1];
+  
+  // Набор разделов, для которых нужно обеспечить прямое соответствие
+  const supportedSections = ["stones", "instructions", "sinks", "suppliers", "supports", "documents", "images"];
+  
+  // Если текущий раздел поддерживается, создаем зеркальный URL
+  if (supportedSections.includes(currentSection)) {
+    return `/${targetRole}/${currentSection}`;
+  }
+  
+  // Для всех других разделов просто переходим на базовый URL
+  return `/${targetRole}`;
 }
 
 export function BurgerMenu({
@@ -34,8 +68,38 @@ export function BurgerMenu({
   isSuperUser,
 }: Omit<HeaderMobileProps, "className">) {
   const location = useLocation();
+  const navigation = useNavigation();
   const isAdminPage = location.pathname.startsWith("/admin");
+  const isCustomerPage = location.pathname.startsWith("/customer");
   const [open, setOpen] = useState(false);
+  const [isRoleSwitching, setIsRoleSwitching] = useState(false);
+  const [isCustomerSwitching, setIsCustomerSwitching] = useState(false);
+  
+  // Сброс состояния загрузки при завершении навигации
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      if (isRoleSwitching) setIsRoleSwitching(false);
+      if (isCustomerSwitching) setIsCustomerSwitching(false);
+    }
+  }, [navigation.state]);
+  
+  // Получаем целевой URL для переключения между admin и employee
+  const targetPath = getMirroredUrl(location.pathname);
+  
+  // Получаем URL для кнопки Customer
+  const getCustomerUrl = () => {
+    return isCustomerPage ? `/employee/stones` : `/customer/1/stones`;
+  };
+  
+  // Обработчики для имитации загрузки
+  const handleRoleSwitchClick = () => {
+    setIsRoleSwitching(true);
+  };
+  
+  const handleCustomerSwitchClick = () => {
+    setIsCustomerSwitching(true);
+  };
+
   return (
     <>
       <Button
@@ -75,22 +139,36 @@ export function BurgerMenu({
           <nav className="flex flex-col space-y-2 pt-1">
             <a href="/" className="uppercase text-lg font-bold"></a>
             <div className="flex gap-1">
-              {" "}
               {isAdmin || isSuperUser ? (
                 isAdminPage ? (
                   <BurgerLink
-                    to="/employee"
+                    to={targetPath}
                     className="pb-10"
                     setOpen={setOpen}
+                    onClick={handleRoleSwitchClick}
                   >
-                    <Button>Employee</Button>
+                    <LoadingButton loading={isRoleSwitching}>Employee</LoadingButton>
                   </BurgerLink>
                 ) : (
-                  <BurgerLink to="/admin" className="pb-10" setOpen={setOpen}>
-                    <Button> Admin</Button>
+                  <BurgerLink 
+                    to={targetPath} 
+                    className="pb-2" 
+                    setOpen={setOpen}
+                    onClick={handleRoleSwitchClick}
+                  >
+                    <LoadingButton loading={isRoleSwitching}>Admin</LoadingButton>
                   </BurgerLink>
                 )
               ) : null}
+              <BurgerLink
+                to={getCustomerUrl()}
+                setOpen={setOpen}
+                onClick={handleCustomerSwitchClick}
+              >
+                <LoadingButton loading={isCustomerSwitching}>
+                  {isCustomerPage ? "Employee" : "Customer"}
+                </LoadingButton>
+              </BurgerLink>
               {isSuperUser ? (
                 isAdminPage ? (
                   <BurgerLink to="/admin/users" setOpen={setOpen}>
@@ -100,30 +178,9 @@ export function BurgerMenu({
               ) : null}
             </div>
 
-            <BurgerLink
-              to={isAdminPage ? "/admin/stones" : "/employee/stones"}
-              setOpen={setOpen}
-            >
-              Database
-            </BurgerLink>
-
-            <BurgerLink
-              to={
-                isAdminPage ? "/admin/instructions" : "/employee/instructions"
-              }
-              setOpen={setOpen}
-            >
-              Instruction
-            </BurgerLink>
-
-            {!isAdminPage && (
-              <BurgerLink to="/employee/special-order" setOpen={setOpen}>
-                Special Order
-              </BurgerLink>
-            )}
             {user !== null && (
-              <BurgerLink to="/logout" className="pt-10" setOpen={setOpen}>
-                <Button> Logout</Button>
+              <BurgerLink to="/logout" className="pt-2" setOpen={setOpen}>
+                <Button>Logout</Button>
               </BurgerLink>
             )}
           </nav>

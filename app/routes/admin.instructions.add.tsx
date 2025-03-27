@@ -56,7 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const { errors, data } = await getValidatedFormData<FormData>(
     request,
-    resolver
+    resolver,
   );
   if (errors) {
     return { errors };
@@ -70,7 +70,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const [result] = await db.execute<ResultSetHeader>(
       `INSERT INTO main.instructions (title, parent_id, after_id, rich_text, company_id)
        VALUES (?, ?, ?, ?, ?)`,
-      [data.title, parentId, afterId, data.rich_text, user.company_id]
+      [data.title, parentId, afterId, data.rich_text, user.company_id],
     );
     insertId = result.insertId;
   } catch (error) {
@@ -117,7 +117,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const instructions = await selectMany<InstructionsBasic>(
     db,
-    "SELECT id, parent_id, title FROM instructions"
+    "SELECT id, parent_id, title FROM instructions",
   );
   if (!instructions) {
     return { instructions: [] };
@@ -134,7 +134,7 @@ function cleanId(value: string | undefined): number | undefined {
 
 export default function InstructionsAdd() {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
+  const isSubmitting = useNavigation().state !== "idle";
   const token = useAuthenticityToken();
   const { instructions } = useLoaderData<typeof loader>();
 

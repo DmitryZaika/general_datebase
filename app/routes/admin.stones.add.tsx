@@ -1,4 +1,5 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { STONE_TYPES } from "~/utils/constants";
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import {
   useNavigate,
@@ -23,32 +24,12 @@ import { toastData } from "~/utils/toastHelpers";
 import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
-import { useCustomForm } from "~/utils/useCustomForm";
-import { getAdminUser, getEmployeeUser } from "~/utils/session.server";
+import { useCustomOptionalForm } from "~/utils/useCustomForm";
+import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
-import { selectId, selectMany } from "~/utils/queryHelpers";
-
-const stoneSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  type: z.enum(["granite", "quartz", "marble", "dolomite", "quartzite"]),
-  is_display: z.union([
-    z.boolean(),
-    z.number().transform((val) => val === 1),
-    z.enum(["true", "false"]).transform((val) => val === "true"),
-  ]),
-  on_sale: z
-    .union([
-      z.boolean(),
-      z.number().transform((val) => val === 1),
-      z.enum(["true", "false"]).transform((val) => val === "true"),
-    ])
-    .default(false),
-  height: z.coerce.number().default(0),
-  width: z.coerce.number().default(0),
-  supplier: z.string().optional(),
-  bundle: z.string().optional(),
-});
+import { selectMany } from "~/utils/queryHelpers";
+import { stoneSchema } from "~/schemas/stones";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
@@ -70,8 +51,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await db.execute(
       `INSERT INTO main.stones
-       (name, type, url, company_id, is_display, on_sale, supplier, width, height)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+       (name, type, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
         data.type,
@@ -79,10 +60,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
         user.company_id,
         data.is_display,
         data.on_sale,
-        data.supplier,
+        data.supplier_id,
         data.width,
-        data.height,
-      ]
+        data.length,
+        data.cost_per_sqft,
+        data.retail_price,
+      ],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -93,21 +76,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
     try {
       await db.execute(
         `INSERT INTO main.slab_inventory (bundle, stone_id) VALUES (?, ?);`,
-        [data.bundle, stoneId]
+        [data.bundle, stoneId],
       );
     } catch (error) {
       console.error("Error connecting to the database: ", error);
       const session = await getSession(request.headers.get("Cookie"));
       session.flash(
         "message",
-        toastData("Failure", "Database Error Occured", "destructive")
+        toastData("Failure", "Database Error Occured", "destructive"),
       );
       return new Response(JSON.stringify({ error: "Database Error Occured" }), {
         headers: { "Set-Cookie": await commitSession(session) },
@@ -125,12 +108,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
-    const suppliers = await selectMany<{ supplier_name: string }>(
-      db,
-      "SELECT supplier_name FROM suppliers WHERE company_id = ?",
-      [user.company_id]
-    );
-    return { supplier: suppliers.map((item) => item.supplier_name) };
+    const suppliers = await selectMany<{
+      id: number;
+      supplier_name: string;
+    }>(db, "SELECT id,  supplier_name FROM suppliers WHERE company_id = ?", [
+      user.company_id,
+    ]);
+    return { suppliers };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -138,10 +122,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function StonesAdd() {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
-  const { supplier } = useLoaderData<typeof loader>();
+  const isSubmitting = useNavigation().state !== "idle";
+  const { suppliers } = useLoaderData<typeof loader>();
 
-  const form = useCustomForm(stoneSchema, {
+  const form = useCustomOptionalForm(stoneSchema, {
     defaultValues: {
       is_display: true,
     },
@@ -171,56 +155,80 @@ export default function StonesAdd() {
               />
             )}
           />
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <SelectInput
-                field={field}
-                placeholder="Type of the Stone"
-                name="Type"
-                options={[
-                  "Granite",
-                  "Quartz",
-                  "Marble",
-                  "Dolomite",
-                  "Quartzite",
-                ].map((item) => ({ key: item.toLowerCase(), value: item }))}
-              />
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="file"
-            render={({ field }) => (
-              <FileInput
-                inputName="stones"
-                type="image"
-                id="image"
-                onChange={field.onChange}
-              />
-            )}
-          />
-          <FormField
-            defaultValue={true}
-            control={form.control}
-            name="is_display"
-            render={({ field }) => <SwitchItem field={field} name="Display" />}
-          />
-          <FormField
-            defaultValue={false}
-            control={form.control}
-            name="on_sale"
-            render={({ field }) => <SwitchItem field={field} name="On Sale" />}
-          />
           <div className="flex gap-2">
             <FormField
               control={form.control}
-              name="height"
+              name="type"
+              render={({ field }) => (
+                <SelectInput
+                  field={field}
+                  placeholder="Type of the Stone"
+                  name="Type"
+                  options={STONE_TYPES.map((item) => ({
+                    key: item.toLowerCase(),
+                    value: item,
+                  }))}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="file"
+              render={({ field }) => (
+                <FileInput
+                  inputName="stones"
+                  type="image"
+                  id="image"
+                  onChange={field.onChange}
+                />
+              )}
+            />
+          </div>
+
+          <div className="flex justify-between gap-2">
+            <div className="">
+              <FormField
+                defaultValue={true}
+                control={form.control}
+                name="is_display"
+                render={({ field }) => (
+                  <SwitchItem field={field} name="Display" />
+                )}
+              />
+              <FormField
+                defaultValue={false}
+                control={form.control}
+                name="on_sale"
+                render={({ field }) => (
+                  <SwitchItem field={field} name="On Sale" />
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="supplier_id"
+              render={({ field }) => (
+                <SelectInput
+                  options={suppliers.map((item) => ({
+                    key: item.id.toString(),
+                    value: item.supplier_name,
+                  }))}
+                  name={"Supplier"}
+                  placeholder={"Supplier of the stone"}
+                  field={field}
+                />
+              )}
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <FormField
+              control={form.control}
+              name="length"
               render={({ field }) => (
                 <InputItem
-                  name={"Height"}
-                  placeholder={"Height of the stone"}
+                  name={"Length"}
+                  placeholder={"Length of the stone"}
                   field={field}
                 />
               )}
@@ -237,21 +245,31 @@ export default function StonesAdd() {
               )}
             />
           </div>
-          <FormField
-            control={form.control}
-            name="supplier"
-            render={({ field }) => (
-              <SelectInput
-                options={supplier.map((item) => ({
-                  key: item.toLowerCase(),
-                  value: item,
-                }))}
-                name={"Supplier"}
-                placeholder={"Supplier of the stone"}
-                field={field}
-              />
-            )}
-          />
+
+          <div className="flex gap-2">
+            <FormField
+              control={form.control}
+              name="cost_per_sqft"
+              render={({ field }) => (
+                <InputItem
+                  name={"Cost Per Sqft"}
+                  placeholder={"Cost Per Sqft"}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="retail_price"
+              render={({ field }) => (
+                <InputItem
+                  name={"Retail Price"}
+                  placeholder={"Retail Price"}
+                  field={field}
+                />
+              )}
+            />
+          </div>
 
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>

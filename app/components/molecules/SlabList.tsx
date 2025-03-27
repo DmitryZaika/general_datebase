@@ -29,7 +29,7 @@ const slabSchema = z.object({
       id: z.number(),
       slab: z.string().min(1, "Slab is required"),
       is_sold: z.boolean().optional(),
-    })
+    }),
   ),
 });
 
@@ -60,7 +60,7 @@ export function SlabList() {
     const newFields = inputFields.filter((_, i) => i !== index);
     setInputFields(newFields);
     const navigate = useNavigate();
-    const isSubmitting = useNavigation().state === "submitting";
+    const isSubmitting = useNavigation().state !== "idle";
   };
 
   const handleChange = (open: boolean) => {

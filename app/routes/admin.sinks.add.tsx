@@ -28,27 +28,7 @@ import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { selectMany } from "~/utils/queryHelpers";
-import { useState } from "react";
-
-const sinkSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  type: z.enum([
-    "stainless 18 gauge",
-    "stainless 16 gauge",
-    "granite composite",
-    "ceramic",
-    "farm house",
-  ]),
-  is_display: z.union([
-    z.boolean(),
-    z.number().transform((val) => val === 1),
-    z.enum(["true", "false"]).transform((val) => val === "true"),
-  ]),
-  height: z.coerce.number().default(0),
-  width: z.coerce.number().default(0),
-  supplier: z.string().optional(),
-  amount: z.coerce.number().optional(),
-});
+import { sinkSchema } from "~/schemas/sinks";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
@@ -69,18 +49,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
   let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.sinks (name, type, url, company_id, is_display, supplier, width, height, amount) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO main.sinks (name, type, url, company_id, is_display, supplier_id, width, length, amount) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
         data.type,
         data.file,
         user.company_id,
         data.is_display,
-        data.supplier,
+        data.supplier_id,
         data.width,
-        data.height,
+        data.length,
         data.amount,
-      ]
+      ],
     );
   } catch (error) {
     console.error("Error connecting to the database: ", error);
@@ -91,7 +71,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
   }
@@ -106,12 +86,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request);
-    const suppliers = await selectMany<{ supplier_name: string }>(
-      db,
-      "SELECT supplier_name FROM suppliers WHERE company_id = ?",
-      [user.company_id]
-    );
-    return { supplier: suppliers.map((item) => item.supplier_name) };
+    const suppliers = await selectMany<{
+      id: number;
+      supplier_name: string;
+    }>(db, "SELECT id, supplier_name FROM suppliers WHERE company_id = ?", [
+      user.company_id,
+    ]);
+    return { suppliers };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -119,8 +100,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function SinksAdd() {
   const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
-  const { supplier } = useLoaderData<typeof loader>();
+  const isSubmitting = useNavigation().state !== "idle";
+  const { suppliers } = useLoaderData<typeof loader>();
 
   const form = useCustomForm(sinkSchema, {
     defaultValues: {
@@ -132,17 +113,6 @@ export default function SinksAdd() {
     if (open === false) {
       navigate("..");
     }
-  };
-
-  const [inputFields, setInputFields] = useState<
-    {
-      slab: string;
-      sold: boolean;
-    }[]
-  >([]);
-
-  const addSlab = () => {
-    setInputFields([...inputFields, { slab: "", sold: false }]);
   };
 
   return (
@@ -208,12 +178,12 @@ export default function SinksAdd() {
             />
             <FormField
               control={form.control}
-              name="supplier"
+              name="supplier_id"
               render={({ field }) => (
                 <SelectInput
-                  options={supplier.map((item) => ({
-                    key: item.toLowerCase(),
-                    value: item,
+                  options={suppliers.map((item) => ({
+                    key: item.id.toString(),
+                    value: item.supplier_name,
                   }))}
                   name={"Supplier"}
                   placeholder={"Supplier of the sink"}
@@ -226,22 +196,22 @@ export default function SinksAdd() {
           <div className="flex gap-2">
             <FormField
               control={form.control}
-              name="height"
+              name="width"
               render={({ field }) => (
                 <InputItem
-                  name={"Height"}
-                  placeholder={"Height of the sink"}
+                  name={"Width"}
+                  placeholder={"Width of the sink"}
                   field={field}
                 />
               )}
             />
             <FormField
               control={form.control}
-              name="width"
+              name="length"
               render={({ field }) => (
                 <InputItem
-                  name={"Width"}
-                  placeholder={"Width of the sink"}
+                  name={"Length"}
+                  placeholder={"Length of the sink"}
                   field={field}
                 />
               )}
