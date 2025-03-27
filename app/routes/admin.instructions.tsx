@@ -1,6 +1,6 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { LoaderFunctionArgs, redirect } from "react-router";
-import { Link, Outlet, useLoaderData } from "react-router";
+import { Link, Outlet, useLoaderData, useNavigation } from "react-router";
 import { PageLayout } from "~/components/PageLayout";
 import { Button } from "~/components/ui/button";
 import {
@@ -17,6 +17,8 @@ import { selectMany } from "~/utils/queryHelpers";
 import { getAdminUser } from "~/utils/session.server";
 import { DataTable } from "~/components/ui/data-table";
 import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { useEffect, useState } from "react";
 
 interface Instructions {
   id: number;
@@ -71,10 +73,23 @@ const instructionsColumn: ColumnDef<Instructions>[] = [
 
 export default function AdminInstructions() {
   const { instructions } = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
+  const [isAddingInstruction, setIsAddingInstruction] = useState(false);
+
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      if (isAddingInstruction) setIsAddingInstruction(false);
+    }
+  }, [navigation.state]);
+
+  const handleAddInstructionClick = () => {
+    setIsAddingInstruction(true);
+  };
+
   return (
     <PageLayout title="Instructions">
-      <Link to={`add`} relative="path">
-        <Button>Add Instruction</Button>
+      <Link to={`add`} relative="path" onClick={handleAddInstructionClick}>
+        <LoadingButton loading={isAddingInstruction}>Add Instruction</LoadingButton>
       </Link>
       <DataTable columns={instructionsColumn} data={instructions} />
       <Outlet />

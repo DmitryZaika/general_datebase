@@ -1,13 +1,15 @@
 import { LoaderFunctionArgs, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData, Outlet, Link } from "react-router";
+import { useLoaderData, Outlet, Link, useNavigation } from "react-router";
 import { Button } from "~/components/ui/button";
 import { getAdminUser } from "~/utils/session.server";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "~/components/ui/data-table";
 import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { useEffect, useState } from "react";
 
 interface Supplier {
   id: number;
@@ -80,11 +82,23 @@ const columns: ColumnDef<Supplier>[] = [
 
 export default function Suppliers() {
   const { suppliers } = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
+  const [isAddingSupplier, setIsAddingSupplier] = useState(false);
+
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      if (isAddingSupplier) setIsAddingSupplier(false);
+    }
+  }, [navigation.state]);
+
+  const handleAddSupplierClick = () => {
+    setIsAddingSupplier(true);
+  };
 
   return (
     <div className="pt-24 sm:pt-0">
-      <Link to={`add`} relative="path">
-        <Button>Add Supplier</Button>
+      <Link to={`add`} relative="path" onClick={handleAddSupplierClick}>
+        <LoadingButton loading={isAddingSupplier}>Add Supplier</LoadingButton>
       </Link>
       <DataTable columns={columns} data={suppliers} />
       <Outlet />

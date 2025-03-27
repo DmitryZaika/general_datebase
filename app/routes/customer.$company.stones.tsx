@@ -140,7 +140,7 @@ export default function Stones() {
   return (
     <>
       <ModuleList>
-        <div className="w-full col-span-full mb-4">
+        <div className="w-full col-span-full">
           <SuperCarousel
             type="stones"
             currentId={currentId}

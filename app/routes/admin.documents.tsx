@@ -11,11 +11,13 @@ import {
 import { LoaderFunctionArgs, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { useLoaderData, Outlet, Link } from "react-router";
+import { useLoaderData, Outlet, Link, useNavigation } from "react-router";
 import { Button } from "~/components/ui/button";
 import { getAdminUser } from "~/utils/session.server";
 import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
 import { DataTable } from "~/components/ui/data-table";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { useEffect, useState } from "react";
 
 interface Document {
   id: number;
@@ -60,11 +62,23 @@ const documentColumns: ColumnDef<Document>[] = [
 
 export default function Documents() {
   const { documents } = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
+  const [isAddingDocument, setIsAddingDocument] = useState(false);
+
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      if (isAddingDocument) setIsAddingDocument(false);
+    }
+  }, [navigation.state]);
+
+  const handleAddDocumentClick = () => {
+    setIsAddingDocument(true);
+  };
 
   return (
     <div className="pt-24 sm:pt-0">
-      <Link to={`add`} relative="path">
-        <Button>Add Document</Button>
+      <Link to={`add`} relative="path" onClick={handleAddDocumentClick}>
+        <LoadingButton loading={isAddingDocument}>Add Document</LoadingButton>
       </Link>
       <DataTable columns={documentColumns} data={documents} />
       <Outlet />
