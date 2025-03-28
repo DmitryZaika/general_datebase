@@ -133,7 +133,7 @@ export default function SlabsModal() {
                       {slab.bundle}
                     </span>
                     <span className="text-gray-500">
-                      {slab.width} x {slab.length}
+                      {slab.length} x {slab.width}
                     </span>
                   </div>
                 </div>
