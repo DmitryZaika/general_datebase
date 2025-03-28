@@ -1,4 +1,4 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { ActionFunctionArgs, LoaderFunctionArgs, redirect, useLocation } from "react-router";
 import { STONE_TYPES } from "~/utils/constants";
 import {
   useNavigate,
@@ -307,6 +307,7 @@ function StoneInformation({
 
 export default function StonesEdit() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { stone, suppliers } = useLoaderData<{
     stone: {
       name: string;
@@ -333,6 +334,14 @@ export default function StonesEdit() {
   const refresh = () => {
     navigate(".", { replace: true });
   };
+
+  const getActiveTab = () => {
+    const ending = location.pathname.split("/").pop();
+    if (ending === "images") return "images";
+    if (ending === "slabs") return "slabs";
+    return "information";
+  }
+
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px] overflow-auto flex flex-col justify-baseline min-h-[95vh] max-h-[95vh]">
@@ -340,10 +349,11 @@ export default function StonesEdit() {
           <DialogTitle>Edit Stone</DialogTitle>
         </DialogHeader>
         <Tabs
-          defaultValue="information"
+          value={getActiveTab()}
           onValueChange={(value) => {
             if (value === "images") navigate("images");
             else if (value === "slabs") navigate("slabs");
+            else navigate(".");
           }}
         >
           <TabsList>
