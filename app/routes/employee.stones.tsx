@@ -138,7 +138,7 @@ export default function Stones() {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center">
         <div className="flex-grow">
           {/* Место для фильтров */}
         </div>
