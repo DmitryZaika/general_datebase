@@ -40,6 +40,25 @@ export const links: LinksFunction = () => [
   },
 ];
 
+export function Posthog() {
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      import("posthog-js")
+        .then(({ default: posthog }) => {
+          if (!posthog.__loaded) {
+            posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
+              api_host: "https://us.i.posthog.com",
+              person_profiles: "always",
+            });
+          }
+        })
+        .catch(console.error);
+    }
+  }, []);
+
+  return null;
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const [token, cookieHeader] = await csrf.commitToken();
   const session = await getSession(request.headers.get("Cookie"));
@@ -119,6 +138,7 @@ export default function App() {
             <Toaster />
             <ScrollRestoration />
             <Scripts />
+            <Posthog />
 
             {user && <Chat />}
           </main>
