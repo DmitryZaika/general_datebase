@@ -153,7 +153,7 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
   };
   
   return (
-    <div ref={searchRef} className="relative w-80">
+    <div ref={searchRef} className="relative w-80 mt-2">
       <div className="relative">
         <Input
           type="text"
