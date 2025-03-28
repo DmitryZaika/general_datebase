@@ -157,7 +157,7 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
       <div className="relative">
         <Input
           type="text"
-          placeholder="Поиск камней..."
+          placeholder="Stone Search"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onFocus={() => setIsInputFocused(true)}
