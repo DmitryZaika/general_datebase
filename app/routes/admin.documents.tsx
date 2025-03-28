@@ -76,7 +76,7 @@ export default function Documents() {
   };
 
   return (
-    <div className="pt-24 sm:pt-0">
+    <div >
       <Link to={`add`} relative="path" onClick={handleAddDocumentClick}>
         <LoadingButton loading={isAddingDocument}>Add Document</LoadingButton>
       </Link>

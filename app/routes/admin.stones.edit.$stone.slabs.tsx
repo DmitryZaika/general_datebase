@@ -212,6 +212,8 @@ export function AddSlab() {
 export default function EditStoneSlabs() {
   const { slabs, stone } = useLoaderData<typeof loader>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+   const navigation = useNavigation();
+    const isSubmitting = navigation.state === "submitting";
   return (
     <>
       <AddSlab />
@@ -237,7 +239,7 @@ export default function EditStoneSlabs() {
               <Form method="delete">
                 <AuthenticityTokenInput />
                 <input type="hidden" name="id" value={slab.id} />
-                <Button type="submit">
+                <Button type="submit" disabled={isSubmitting}>
                   <FaTimes />
                 </Button>
               </Form>
