@@ -21,7 +21,7 @@ export default function ModuleList({ children, className }: ModuleListProps) {
     <div
       className={`
       grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7
-      gap-2 p-2 select-none
+      gap-2 px-2 select-none
       ${className || ''}
     `}
     >

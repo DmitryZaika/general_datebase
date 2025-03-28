@@ -16,6 +16,7 @@ import { useState } from "react";
 import { stoneQueryBuilder } from "~/utils/queries";
 import { StoneFilter, stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
+import { StoneSearch } from "~/components/molecules/StoneSearch";
 
 interface Stone {
   id: number;
@@ -70,6 +71,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
 
   return (
     <div
+      id={`stone-${stone.id}`}
       className="relative group w-full module-item overflow-hidden"
       onAuxClick={(e) => {
         if (e.button === 1 && stone.url) {
@@ -139,6 +141,10 @@ export default function Stones() {
 
   return (
     <>
+      <div className="flex justify-end">
+        <StoneSearch stones={stones} onSelectStone={(id) => handleCardClick(id, stones.find(s => s.id === id)?.type || '')} userRole="customer" />
+      </div>
+      
       <ModuleList>
         <div className="w-full col-span-full">
           <SuperCarousel
