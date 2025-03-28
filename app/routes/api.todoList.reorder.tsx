@@ -19,8 +19,6 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     const positions = JSON.parse(positionsData.toString());
     
-    await db.beginTransaction();
-    
     try {
       for (const { id, position } of positions) {
         await db.execute(
@@ -29,10 +27,8 @@ export async function action({ request }: ActionFunctionArgs) {
         );
       }
       
-      await db.commit();
       return Response.json({ success: true });
     } catch (error) {
-      await db.rollback();
       throw error;
     }
   } catch (error) {
