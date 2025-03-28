@@ -60,7 +60,7 @@ export default function AdminSupports() {
       <Link to={`add`} className="mb-6 inline-block" onClick={handleAddSupportClick}>
         <LoadingButton loading={isAddingSupport}>Add Support</LoadingButton>
       </Link>
-      <div className="pt-24 sm:pt-0">
+      <div >
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
           {supports
             .sort((a, b) => a.name.localeCompare(b.name))

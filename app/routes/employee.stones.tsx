@@ -9,6 +9,7 @@ import { useState } from "react";
 import { stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { Stone, stoneQueryBuilder } from "~/utils/queries";
+import { StoneSearch } from "~/components/molecules/StoneSearch";
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
 
@@ -69,10 +70,15 @@ function InteractiveCard({
   const isOnSale = !!stone.on_sale;
   const location = useLocation();
 
+  const handleClick = () => {
+    setCurrentId(stone.id);
+  };
+
   return (
     <div
+      id={`stone-${stone.id}`}
       key={stone.id}
-        className="relative group w-full module-item overflow-hidden"
+      className="relative group w-full module-item overflow-hidden"
       onAuxClick={(e) => {
         if (e.button === 1 && stone.url) {
           e.preventDefault();
@@ -108,8 +114,10 @@ function InteractiveCard({
         />
       </ImageCard>
       {stone.available === 0 && (
-        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
-          <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
+        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center cursor-pointer whitespace-nowrap"
+        onClick={() => setCurrentId(stone.id)}>
+          <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none "
+          >
             Out of Stock
           </div>
         </div>
@@ -130,6 +138,10 @@ export default function Stones() {
 
   return (
     <>
+      <div className="flex justify-end">
+        <StoneSearch stones={stones} onSelectStone={setCurrentId} userRole="employee" />
+      </div>
+      
       <ModuleList>
         <div className="w-full col-span-full">
           <SuperCarousel

@@ -120,7 +120,7 @@ export default function AdminSinks() {
         <LoadingButton loading={isAddingSink}>Add Sink</LoadingButton>
       </Link>
 
-      <div className="pt-24 sm:pt-0">
+      <div >
         <Accordion type="single" defaultValue="sinks" className="w-full pl-5">
           <AccordionItem value="sinks">
             <AccordionContent>
