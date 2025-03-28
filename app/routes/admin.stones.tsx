@@ -13,6 +13,7 @@ import { STONE_TYPES } from "~/utils/constants";
 import ModuleList from "~/components/ModuleList";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { useEffect, useState } from "react";
+import { StoneSearch } from "~/components/molecules/StoneSearch";
 
 interface Stone {
   id: number;
@@ -57,18 +58,23 @@ export default function AdminStones() {
   const { stones } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   const navigation = useNavigation();
-  const [isRoleSwitching, setIsRoleSwitching] = useState(false);
   const [isAddingStone, setIsAddingStone] = useState(false);
+  const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
 
   useEffect(() => {
     if (navigation.state === "idle") {
-      if (isRoleSwitching) setIsRoleSwitching(false);
       if (isAddingStone) setIsAddingStone(false);
     }
   }, [navigation.state]);
 
   const handleAddStoneClick = () => {
     setIsAddingStone(true);
+  };
+
+  const handleSelectStone = (stoneId: number) => {
+    setSelectedStoneId(stoneId);
+    // При выборе камня в поиске, прокручиваем страницу к нему
+    // Компонент StoneSearch уже обрабатывает скролл и подсветку
   };
 
   const stoneList = stones.reduce((acc: Record<string, Stone[]>, stone) => {
@@ -86,11 +92,14 @@ export default function AdminStones() {
 
   return (
     <>
-      <Link to="add" onClick={handleAddStoneClick}>
-        <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
-      </Link>
+      <div className="flex justify-between items-center mb-4">
+        <Link to="add" onClick={handleAddStoneClick}>
+          <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
+        </Link>
+        <StoneSearch stones={stones} onSelectStone={handleSelectStone} userRole="admin" />
+      </div>
 
-      <div className="pt-24 sm:pt-0">
+      <div>
         <ModuleList>
           {stones
             .sort((a, b) => {
@@ -110,7 +119,7 @@ export default function AdminStones() {
                 stone.length && stone.length > 0 ? stone.length : "—";
 
               return (
-                <div key={stone.id} className="relative w-full module-item">
+                <div id={`stone-${stone.id}`} key={stone.id} className="relative w-full module-item">
                   <div
                     className={`border-2 border-blue-500 rounded p-2 ${
                       !stone.is_display ? "opacity-30" : ""

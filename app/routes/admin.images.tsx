@@ -59,7 +59,7 @@ export default function AdminImages() {
       <Link to={`add`} relative="path" className="mb-6 inline-block" onClick={handleAddImageClick}>
         <LoadingButton loading={isAddingImage}>Add Image</LoadingButton>
       </Link>
-      <div className="pt-24 sm:pt-0">
+      <div >
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
           {images
             .sort((a, b) => a.name.localeCompare(b.name))

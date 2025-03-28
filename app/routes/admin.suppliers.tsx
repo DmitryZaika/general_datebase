@@ -96,7 +96,7 @@ export default function Suppliers() {
   };
 
   return (
-    <div className="pt-24 sm:pt-0">
+    <div >
       <Link to={`add`} relative="path" onClick={handleAddSupplierClick}>
         <LoadingButton loading={isAddingSupplier}>Add Supplier</LoadingButton>
       </Link>
