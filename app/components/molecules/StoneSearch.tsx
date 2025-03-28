@@ -36,16 +36,18 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   
-  // Добавляем стили подсветки один раз при монтировании
+  // Добавляем стили подсветки один раз при монтировании (только для admin)
   useEffect(() => {
-    const styleElement = document.createElement('style');
-    styleElement.textContent = highlightStyles;
-    document.head.appendChild(styleElement);
-    
-    return () => {
-      document.head.removeChild(styleElement);
-    };
-  }, []);
+    if (userRole === "admin") {
+      const styleElement = document.createElement('style');
+      styleElement.textContent = highlightStyles;
+      document.head.appendChild(styleElement);
+      
+      return () => {
+        document.head.removeChild(styleElement);
+      };
+    }
+  }, [userRole]);
   
   // Закрываем результаты поиска при клике вне компонента
   useEffect(() => {
@@ -113,25 +115,24 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
   
   // Обработчик клика по результату поиска
   const handleResultClick = (stoneId: number) => {
-    // Различное поведение в зависимости от роли
-    if (userRole === "customer" || userRole === "employee") {
-      // Для customer и employee - открытие камня в карусели
-      onSelectStone(stoneId);
-    }
+    // Для всех ролей - просто вызываем функцию выбора камня
+    onSelectStone(stoneId);
     
     setIsInputFocused(false);
     setSearchTerm("");
     
-    // Находим элемент на странице и прокручиваем к нему
-    const stoneElement = document.getElementById(`stone-${stoneId}`);
-    if (stoneElement) {
-      stoneElement.scrollIntoView({ behavior: "smooth", block: "center" });
-      
-      // Добавляем и удаляем класс для подсветки элемента на 2 секунды
-      stoneElement.classList.add("stone-highlight");
-      setTimeout(() => {
-        stoneElement.classList.remove("stone-highlight");
-      }, 2000);
+    // Прокрутка и подсветка только для admin (кроме случая с редактированием)
+    if (userRole === "admin") {
+      const stoneElement = document.getElementById(`stone-${stoneId}`);
+      if (stoneElement) {
+        stoneElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        
+        // Подсветка элемента
+        stoneElement.classList.add("stone-highlight");
+        setTimeout(() => {
+          stoneElement.classList.remove("stone-highlight");
+        }, 2000);
+      }
     }
   };
   
@@ -152,7 +153,7 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
   };
   
   return (
-    <div ref={searchRef} className="relative w-80 mt-2">
+    <div ref={searchRef} className="relative w-80">
       <div className="relative">
         <Input
           type="text"
