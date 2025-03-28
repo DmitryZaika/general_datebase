@@ -92,11 +92,16 @@ export default function AdminStones() {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
-        <Link to="add" onClick={handleAddStoneClick}>
-          <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
-        </Link>
-        <StoneSearch stones={stones} onSelectStone={handleSelectStone} userRole="admin" />
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center space-x-4 flex-grow">
+          <Link to="add" onClick={handleAddStoneClick}>
+            <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
+          </Link>
+          {/* Место для фильтров */}
+        </div>
+        <div className="ml-4">
+          <StoneSearch stones={stones} onSelectStone={handleSelectStone} userRole="admin" />
+        </div>
       </div>
 
       <div>

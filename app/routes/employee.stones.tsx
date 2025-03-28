@@ -138,8 +138,13 @@ export default function Stones() {
 
   return (
     <>
-      <div className="flex justify-end">
-        <StoneSearch stones={stones} onSelectStone={setCurrentId} userRole="employee" />
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex-grow">
+          {/* Место для фильтров */}
+        </div>
+        <div className="ml-4">
+          <StoneSearch stones={stones} onSelectStone={setCurrentId} userRole="employee" />
+        </div>
       </div>
       
       <ModuleList>
