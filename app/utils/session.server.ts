@@ -8,6 +8,7 @@ import { getSession } from "~/sessions";
 interface LoginUser {
   id: number;
   password: string;
+  email: string;
 }
 
 export interface User {
@@ -28,6 +29,11 @@ interface SessionUser {
   is_admin: boolean;
   is_superuser: boolean;
   company_id: number;
+}
+
+interface LoginResponse {
+  sessionId: string;
+  email: string;
 }
 
 function getExpirationDate(expiration: number): string {
@@ -55,9 +61,9 @@ export async function login(
   email: string,
   password: string,
   expiration: number,
-): Promise<string | undefined> {
+): Promise<LoginResponse | undefined> {
   const [rows] = await db.query<LoginUser[] & RowDataPacket[]>(
-    "SELECT id, password FROM users WHERE email = ? AND is_deleted = 0",
+    "SELECT id, password, email FROM users WHERE email = ? AND is_deleted = 0",
     [email],
   );
   if (rows.length < 1) {
@@ -73,7 +79,7 @@ export async function login(
     [id, user.id, getExpirationDate(expiration)],
   );
 
-  return id;
+  return { sessionId: id, email: user.email };
 }
 
 async function getUser(sessionId: string): Promise<SessionUser | undefined> {

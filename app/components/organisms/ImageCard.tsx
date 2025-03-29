@@ -33,13 +33,13 @@ export function ImageCard({
         <Link to={`${type}/${itemId}${location.search}`}>
           {fieldList &&
             Object.entries(fieldList).map(([key, value]) => (
-              <>
+              <div key={key}>
                 <p key={key}>
                   {key}: {value}
                 </p>
                 <p>{price}</p>
                 <p>{supplier}</p>
-              </>
+              </div>
             ))}
         </Link>
       </CardContent>
