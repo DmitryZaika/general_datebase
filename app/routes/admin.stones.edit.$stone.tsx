@@ -33,115 +33,9 @@ import { InputItem } from "~/components/molecules/InputItem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { stoneSchema } from "~/schemas/stones";
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  await getAdminUser(request).catch((err) => {
-    return redirect(`/login?error=${err}`);
-  });
-  await csrf.validate(request).catch(() => {
-    return { error: "Invalid CSRF token" };
-  });
-  if (!params.stone) {
-    return forceRedirectError(request.headers, "No stone id provided");
-  }
-  const stoneId = parseInt(params.stone, 10);
-  const { errors, data } = await parseMutliForm(request, stoneSchema, "stones");
-  if (errors || !data) {
-    return { errors };
-  }
-  const newFile = data.file && data.file !== "undefined";
-  const stone = await selectId<{ url: string }>(
-    db,
-    "SELECT url FROM stones WHERE id = ?",
-    stoneId
-  );
-  try {
-    if (newFile) {
-      await db.execute(
-        `UPDATE stones
-         SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
-         WHERE id = ?`,
-        [
-          data.name,
-          data.type,
-          data.file,
-          data.is_display,
-          data.supplier_id,
-          data.length,
-          data.width,
-          data.on_sale,
-          data.cost_per_sqft,
-          data.retail_price,
-          stoneId,
-        ]
-      );
-    } else {
-      await db.execute(
-        `UPDATE stones
-         SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
-         WHERE id = ?`,
-        [
-          data.name,
-          data.type,
-          data.is_display,
-          data.supplier_id,
-          data.length,
-          data.width,
-          data.on_sale,
-          data.cost_per_sqft,
-          data.retail_price,
-          stoneId,
-        ]
-      );
-    }
-  } catch (error) {
-    console.error("Error updating stone: ", error);
-  }
-  if (stone?.url && newFile) {
-    await deleteFile(stone.url);
-  }
-  const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Stone Edited"));
-  return redirect("..", {
-    headers: { "Set-Cookie": await commitSession(session) },
-  });
-}
 
-export const loader = async ({ params, request }: LoaderFunctionArgs) => {
-  const user = await getAdminUser(request);
-  if (!params.stone) {
-    return forceRedirectError(request.headers, "No stone id provided");
-  }
-  const stoneId = parseInt(params.stone, 10);
-  const stone = await selectId<{
-    name: string;
-    type: string;
-    url: string;
-    is_display: boolean;
-    supplier_id: string;
-    length: string;
-    width: string;
-    on_sale: boolean;
-    cost_per_sqft: number;
-    retail_price: number;
-  }>(
-    db,
-    "SELECT name, type, url, is_display, supplier_id, length, width, on_sale, cost_per_sqft, retail_price FROM stones WHERE id = ?",
-    stoneId
-  );
-  if (!stone) {
-    return forceRedirectError(request.headers, "No stone found");
-  }
-  const suppliers = await selectMany<{
-    id: number | null;
-    supplier_name: string;
-  }>(db, "SELECT id, supplier_name FROM suppliers WHERE company_id = ?", [
-    user.company_id,
-  ]);
-  return {
-    stone,
-    suppliers,
-  };
-};
+
+
 
 function StoneInformation({
   stoneData,
@@ -308,39 +202,12 @@ function StoneInformation({
 export default function StonesEdit() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { stone, suppliers } = useLoaderData<{
-    stone: {
-      name: string;
-      type: string;
-      url: string;
-      is_display: boolean;
-      supplier_id: string;
-      length: string;
-      width: string;
-      on_sale: boolean;
-      cost_per_sqft: number;
-      retail_price: number;
-    };
-    suppliers: {
-      id: number;
-      supplier_name: string;
-    }[];
-  }>();
+ 
   const handleChange = (open: boolean) => {
     if (!open) {
       navigate("..");
     }
   };
-  const refresh = () => {
-    navigate(".", { replace: true });
-  };
-
-  const getActiveTab = () => {
-    const ending = location.pathname.split("/").pop();
-    if (ending === "images") return "images";
-    if (ending === "slabs") return "slabs";
-    return "information";
-  }
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -349,31 +216,16 @@ export default function StonesEdit() {
           <DialogTitle>Edit Stone</DialogTitle>
         </DialogHeader>
         <Tabs
-          value={getActiveTab()}
-          onValueChange={(value) => {
-            if (value === "images") navigate("images");
-            else if (value === "slabs") navigate("slabs");
-            else navigate(".");
-          }}
+          value={location.pathname.split("/").pop()}
+          onValueChange={(value) => navigate(value)}
+
         >
-          <TabsList>
-            <TabsTrigger value="information">General</TabsTrigger>
+        <TabsList>
+            <TabsTrigger  value="information">General</TabsTrigger>
             <TabsTrigger value="images">Images</TabsTrigger>
             <TabsTrigger value="slabs">Slabs</TabsTrigger>
           </TabsList>
-          <TabsContent value="information">
-            <StoneInformation
-              stoneData={stone}
-              suppliers={suppliers}
-              refresh={refresh}
-            />
-          </TabsContent>
-          <TabsContent value="images">
             <Outlet />
-          </TabsContent>
-          <TabsContent value="slabs">
-            <Outlet />
-          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>

@@ -73,8 +73,7 @@ export default function AdminStones() {
 
   const handleSelectStone = (stoneId: number) => {
     setSelectedStoneId(stoneId);
-    // При выборе камня в поиске, прокручиваем страницу к нему
-    // Компонент StoneSearch уже обрабатывает скролл и подсветку
+  
   };
 
   const stoneList = stones.reduce((acc: Record<string, Stone[]>, stone) => {
@@ -87,7 +86,7 @@ export default function AdminStones() {
 
   const getEditUrl = (stoneId: number) => {
     const currentParams = new URLSearchParams(searchParams);
-    return `edit/${stoneId}?${currentParams.toString()}`;
+    return `edit/${stoneId}/information?${currentParams.toString()}`;
   };
 
   return (
@@ -97,7 +96,6 @@ export default function AdminStones() {
           <Link to="add" onClick={handleAddStoneClick}>
             <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
           </Link>
-          {/* Место для фильтров */}
         </div>
         <div className="ml-4">
           <StoneSearch stones={stones} onSelectStone={handleSelectStone} userRole="admin" />
