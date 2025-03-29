@@ -24,6 +24,7 @@ import { InputItem } from "~/components/molecules/InputItem";
 import { PasswordInput } from "~/components/molecules/PasswordInput";
 import { DialogFooter } from "~/components/ui/dialog";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { posthog } from 'posthog-js'
 
 const userSchema = z.object({
   email: z.string().email(),
@@ -63,12 +64,13 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, defaultValues } as ActionData;
   }
 
-  const sessionId = await login(data.email, data.password, 60 * 60 * 24 * 7);
-  if (!sessionId) {
+  const loginObject = await login(data.email, data.password, 60 * 60 * 24 * 7);
+  if (!loginObject) {
     return { error: "Unable to login", defaultValues } as ActionData;
   }
+  posthog.identify(loginObject.email);
   const session = await getSession(request.headers.get("Cookie"));
-  session.set("sessionId", sessionId);
+  session.set("sessionId", loginObject.sessionId);
   session.flash("message", toastData("Success", "Logged in"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
