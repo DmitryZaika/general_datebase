@@ -31,11 +31,6 @@ interface SessionUser {
   company_id: number;
 }
 
-interface LoginResponse {
-  sessionId: string;
-  email: string;
-}
-
 function getExpirationDate(expiration: number): string {
   const now = new Date();
   const expirationDate = new Date(now.getTime() + expiration * 1000);
@@ -61,7 +56,7 @@ export async function login(
   email: string,
   password: string,
   expiration: number,
-): Promise<LoginResponse | undefined> {
+): Promise<string | undefined> {
   const [rows] = await db.query<LoginUser[] & RowDataPacket[]>(
     "SELECT id, password, email FROM users WHERE email = ? AND is_deleted = 0",
     [email],
@@ -79,7 +74,7 @@ export async function login(
     [id, user.id, getExpirationDate(expiration)],
   );
 
-  return { sessionId: id, email: user.email };
+  return id;
 }
 
 async function getUser(sessionId: string): Promise<SessionUser | undefined> {
