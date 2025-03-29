@@ -36,7 +36,6 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   
-  // Добавляем стили подсветки один раз при монтировании (только для admin)
   useEffect(() => {
     if (userRole === "admin") {
       const styleElement = document.createElement('style');
@@ -49,7 +48,6 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
     }
   }, [userRole]);
   
-  // Закрываем результаты поиска при клике вне компонента
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -63,7 +61,6 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
     };
   }, []);
   
-  // Обновляем результаты поиска при изменении текста в поле ввода
   useEffect(() => {
     if (searchTerm.trim() === "") {
       setSearchResults([]);
@@ -72,35 +69,29 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
     
     const term = searchTerm.toLowerCase();
     
-    // Находим все совпадения
-    const matchingStones = stones.filter(stone => 
+      const matchingStones = stones.filter(stone => 
       stone.name.toLowerCase().includes(term)
     );
     
-    // Сортируем результаты по релевантности
     const sortedResults = matchingStones.sort((a, b) => {
       const aName = a.name.toLowerCase();
       const bName = b.name.toLowerCase();
       
-      // Если точное совпадение с началом имени (наивысший приоритет)
       const aStartsWithTerm = aName.startsWith(term);
       const bStartsWithTerm = bName.startsWith(term);
       if (aStartsWithTerm && !bStartsWithTerm) return -1;
       if (!aStartsWithTerm && bStartsWithTerm) return 1;
       
-      // Если совпадение с целым словом (второй приоритет)
       const aHasExactWord = aName.split(' ').some(word => word === term);
       const bHasExactWord = bName.split(' ').some(word => word === term);
       if (aHasExactWord && !bHasExactWord) return -1;
       if (!aHasExactWord && bHasExactWord) return 1;
       
-      // Если совпадение с началом слова (третий приоритет)
       const aHasWordStartingWithTerm = aName.split(' ').some(word => word.startsWith(term));
       const bHasWordStartingWithTerm = bName.split(' ').some(word => word.startsWith(term));
       if (aHasWordStartingWithTerm && !bHasWordStartingWithTerm) return -1;
       if (!aHasWordStartingWithTerm && bHasWordStartingWithTerm) return 1;
       
-      // Ближе к началу имени (четвертый приоритет)
       const aTermIndex = aName.indexOf(term);
       const bTermIndex = bName.indexOf(term);
       if (aTermIndex !== bTermIndex) return aTermIndex - bTermIndex;
