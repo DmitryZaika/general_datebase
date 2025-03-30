@@ -4,11 +4,11 @@ import { FaSearch, FaChevronRight, FaEdit, FaImage } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
+import { SuperCarousel } from "../organisms/SuperCarousel";
 
 type UserRole = "employee" | "admin" | "customer";
 
 interface StoneSearchProps {
-  onSelectStone: (stoneId: number) => void;
   userRole: UserRole;
 }
 
@@ -26,21 +26,21 @@ const highlightStyles = `
   }
 `;
 
-const getStones = async (name: string): Promise<{id: number, name: string}[]> => {
+const getStones = async (name: string): Promise<{id: number, name: string, url: string, retail_price: number}[]> => {
   const response = await fetch(`/api/stones/search?name=${encodeURIComponent(name)}`)
   const data = await response.json()
   return data?.stones || []
 };
 
 
-export function StoneSearch({ onSelectStone, userRole }: StoneSearchProps) {
+export function StoneSearch({ userRole }: StoneSearchProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isInputFocused, setIsInputFocused] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
-
-  const { data, isLoading} = useQuery({ queryKey: ['stones', 'search', searchTerm], queryFn: () => getStones(searchTerm) })
+  const [currentId, setCurrentId] = useState<number | undefined>(undefined);
+  const { data, isLoading} = useQuery({ queryKey: ['stones', 'search', searchTerm], queryFn: () => getStones(searchTerm), enabled: !!searchTerm })
   
   useEffect(() => {
     if (userRole === "admin") {
@@ -69,12 +69,11 @@ export function StoneSearch({ onSelectStone, userRole }: StoneSearchProps) {
     };
   }, []);
   
-  
+ 
   const handleResultClick = (stoneId: number) => {
-    onSelectStone(stoneId);
-    setIsInputFocused(false);
-    setSearchTerm("");
-    
+    setCurrentId(stoneId);
+  
+    /*
     if (userRole === "admin") {
       const stoneElement = document.getElementById(`stone-${stoneId}`);
       if (stoneElement) {
@@ -86,6 +85,7 @@ export function StoneSearch({ onSelectStone, userRole }: StoneSearchProps) {
         }, 2000);
       }
     }
+    */
   };
   
   const handleSlabsClick = (stoneId: number, e: React.MouseEvent) => {
@@ -122,11 +122,12 @@ export function StoneSearch({ onSelectStone, userRole }: StoneSearchProps) {
               onClick={() => handleResultClick(stone.id)}
               className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center"
             >
-              <div className="flex-1">
+              <div className="flex-1 flex-row ">
                 <div className="font-medium text-gray-800">{stone.name}</div>
-                {/* <div className="text-sm text-gray-500">{stone.type}</div> */}
+               
+                <div className="text-sm text-gray-500">{userRole !== "customer" ? `Price: $${stone.retail_price}` : ""}</div>
               </div>
-              
+
                   {userRole === "employee" && (
                 <div className="flex items-center space-x-2">
                   <Button 
@@ -166,6 +167,13 @@ export function StoneSearch({ onSelectStone, userRole }: StoneSearchProps) {
           ))}
         </div>
       )}
+        <SuperCarousel
+            type="stones"
+            currentId={currentId}
+            setCurrentId={setCurrentId}
+            images={data || []}
+
+          />
     </div>
   );
 } 

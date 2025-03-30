@@ -131,7 +131,6 @@ export default function SlabsModal() {
   }, [navigation.state]);
 
   const handleEditClick = (slabId: number) => {
-    console.log('Setting editing slab:', slabId);
     setEditingSlab(slabId);
   };
 
