@@ -158,7 +158,7 @@ export default function AdminSinks() {
                             return (
                               <div key={sink.id} className="relative w-full">
                                 <div
-                                  className={`border-2 border-blue-500 rounded p-2 ${
+                                  className={`border-2 border-blue-500 rounded ${
                                     !sink.is_display ? "opacity-30" : ""
                                   }`}
                                 >
