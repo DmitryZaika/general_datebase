@@ -127,6 +127,7 @@ export default function SinksAdd() {
             name="name"
             render={({ field }) => (
               <InputItem
+                inputAutoFocus={true}
                 name={"Name"}
                 placeholder={"Name of the sink"}
                 field={field}
