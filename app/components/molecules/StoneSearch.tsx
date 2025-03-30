@@ -120,7 +120,7 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
             <div
               key={stone.id}
               onClick={() => handleResultClick(stone.id)}
-              className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center"
+              className="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center"
             >
               <div className="flex-1 flex-row ">
                 <div className="font-medium text-gray-800">{stone.name}</div>
@@ -130,21 +130,14 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
 
                   {userRole === "employee" && (
                 <div className="flex items-center space-x-2">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={(e) => handleResultClick(stone.id)}
-                    className="h-8 w-8 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
-                  >
-                    <FaImage className="h-4 w-4" />
-                  </Button>
+                
                   <Button 
                     variant="ghost" 
                     size="icon" 
                     onClick={(e) => handleSlabsClick(stone.id, e)}
-                    className="h-8 w-8 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                    className="h-12 w-12 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
                   >
-                    <FaChevronRight className="h-4 w-4" />
+                    Slabs
                   </Button>
                 </div>
               )}
@@ -154,9 +147,9 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
                   variant="ghost" 
                   size="icon" 
                   onClick={(e) => handleEditClick(stone.id, e)}
-                  className="h-8 w-8 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                  className="h-12 w-12 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
                 >
-                  <FaEdit className="h-4 w-4" />
+                  <FaEdit  style={{ minWidth: '20px', minHeight: '20px' }} />
                 </Button>
               )}
               
