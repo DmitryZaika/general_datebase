@@ -5,6 +5,7 @@ import {
   Form,
   useLoaderData,
   useNavigation,
+  data
 } from "react-router";
 import { z } from "zod";
 import { getAdminUser } from "~/utils/session.server";
@@ -24,7 +25,6 @@ import { FileInput } from "~/components/molecules/FileInput";
 import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { deleteFile } from "~/utils/s3.server";
-import { Dialog, DialogContent, DialogClose } from "~/components/ui/dialog";
 
 const slabSchema = z.object({
   bundle: z.string().min(1),
@@ -65,30 +65,30 @@ export async function action({ request, params }: ActionFunctionArgs) {
       deleteFile(record.url);
     }
     session.flash("message", toastData("Success", "Image Deleted"));
-    return redirect(request.url, {
+    return data({ success: true }, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
   }
-  const { errors, data } = await parseMutliForm(request, slabSchema, "stones");
-  if (errors || !data) {
+  const { errors, data: formData } = await parseMutliForm(request, slabSchema, "stones");
+  if (errors || !formData) {
     return { errors };
   }
-  if (data.length === 0 && data.width === 0) {
+  if (formData.length === 0 && formData.width === 0) {
     const [stoneRecord] = await selectMany<{ width: number; length: number }>(
       db,
       "SELECT width, length FROM stones WHERE stone_id = ? LIMIT 1",
       [stoneId],
     );
-    data.length = stoneRecord?.length ?? 0;
-    data.width = stoneRecord?.width ?? 0;
+    formData.length = stoneRecord?.length ?? 0;
+    formData.width = stoneRecord?.width ?? 0;
   }
   await db.execute(
     "INSERT INTO slab_inventory (bundle, stone_id, url, width, length) VALUES (?, ?, ?, ?, ?)",
-    [data.bundle, stoneId, data.file ?? "", data.width, data.length],
+    [formData.bundle, stoneId, formData.file ?? "", formData.width, formData.length],
   );
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Image Added"));
-  return redirect(request.url, {
+  return data({ success: true }, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
