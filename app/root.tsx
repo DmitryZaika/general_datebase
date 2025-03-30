@@ -30,6 +30,7 @@ import {
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query'
+import { posthog } from 'posthog-js'
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -114,6 +115,12 @@ export default function App() {
         description: message.description,
         variant: message.variant,
       });
+      // This is a hacky way to only send the indentifier when the user logs in
+      if (message.description === "Logged in" && user) {
+        if (typeof window !== "undefined") {
+          posthog.identify(user.email);
+        }
+      }
     }
   }, [message?.nonce]);
 
