@@ -1,20 +1,17 @@
 import { useState, useRef, useEffect } from "react";
-import { Stone } from "~/utils/queries";
 import { Input } from "~/components/ui/input";
 import { FaSearch, FaChevronRight, FaEdit, FaImage } from "react-icons/fa";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { SuperCarousel } from "../organisms/SuperCarousel";
 
-// Виды действий для разных ролей
 type UserRole = "employee" | "admin" | "customer";
 
 interface StoneSearchProps {
-  stones: Stone[];
-  onSelectStone: (stoneId: number) => void;
   userRole: UserRole;
 }
 
-// Стили подсветки (встроенные, чтобы не зависеть от внешних CSS файлов)
 const highlightStyles = `
   @keyframes pulse-highlight {
     0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
@@ -29,12 +26,21 @@ const highlightStyles = `
   }
 `;
 
-export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProps) {
+const getStones = async (name: string): Promise<{id: number, name: string, url: string, retail_price: number}[]> => {
+  const response = await fetch(`/api/stones/search?name=${encodeURIComponent(name)}`)
+  const data = await response.json()
+  return data?.stones || []
+};
+
+
+export function StoneSearch({ userRole }: StoneSearchProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isInputFocused, setIsInputFocused] = useState(false);
-  const [searchResults, setSearchResults] = useState<Stone[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [currentId, setCurrentId] = useState<number | undefined>(undefined);
+  const { data, isLoading} = useQuery({ queryKey: ['stones', 'search', searchTerm], queryFn: () => getStones(searchTerm), enabled: !!searchTerm })
   
   useEffect(() => {
     if (userRole === "admin") {
@@ -48,6 +54,8 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
     }
   }, [userRole]);
   
+  console.log({ data})
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -61,86 +69,33 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
     };
   }, []);
   
-  useEffect(() => {
-    if (searchTerm.trim() === "") {
-      setSearchResults([]);
-      return;
-    }
-    
-    const term = searchTerm.toLowerCase();
-    
-      const matchingStones = stones.filter(stone => 
-      stone.name.toLowerCase().includes(term)
-    );
-    
-    const sortedResults = matchingStones.sort((a, b) => {
-      const aName = a.name.toLowerCase();
-      const bName = b.name.toLowerCase();
-      
-      const aStartsWithTerm = aName.startsWith(term);
-      const bStartsWithTerm = bName.startsWith(term);
-      if (aStartsWithTerm && !bStartsWithTerm) return -1;
-      if (!aStartsWithTerm && bStartsWithTerm) return 1;
-      
-      const aHasExactWord = aName.split(' ').some(word => word === term);
-      const bHasExactWord = bName.split(' ').some(word => word === term);
-      if (aHasExactWord && !bHasExactWord) return -1;
-      if (!aHasExactWord && bHasExactWord) return 1;
-      
-      const aHasWordStartingWithTerm = aName.split(' ').some(word => word.startsWith(term));
-      const bHasWordStartingWithTerm = bName.split(' ').some(word => word.startsWith(term));
-      if (aHasWordStartingWithTerm && !bHasWordStartingWithTerm) return -1;
-      if (!aHasWordStartingWithTerm && bHasWordStartingWithTerm) return 1;
-      
-      const aTermIndex = aName.indexOf(term);
-      const bTermIndex = bName.indexOf(term);
-      if (aTermIndex !== bTermIndex) return aTermIndex - bTermIndex;
-      
-      // В качестве последнего критерия - сортировка по алфавиту
-      return aName.localeCompare(bName);
-    });
-    
-    // Ограничиваем до 5 результатов
-    setSearchResults(sortedResults.slice(0, 5));
-  }, [searchTerm, stones]);
-  
-  // Обработчик клика по результату поиска
+ 
   const handleResultClick = (stoneId: number) => {
-    // Для всех ролей - просто вызываем функцию выбора камня
-    onSelectStone(stoneId);
-    
-    setIsInputFocused(false);
-    setSearchTerm("");
-    
-    // Прокрутка и подсветка только для admin (кроме случая с редактированием)
+    setCurrentId(stoneId);
+  
+    /*
     if (userRole === "admin") {
       const stoneElement = document.getElementById(`stone-${stoneId}`);
       if (stoneElement) {
         stoneElement.scrollIntoView({ behavior: "smooth", block: "center" });
         
-        // Подсветка элемента
         stoneElement.classList.add("stone-highlight");
         setTimeout(() => {
           stoneElement.classList.remove("stone-highlight");
         }, 2000);
       }
     }
+    */
   };
   
-  // Обработчик клика по кнопке slabs (для employee)
   const handleSlabsClick = (stoneId: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // Предотвращаем всплытие, чтобы не сработал handleResultClick
-    navigate(`/employee/stones/slabs/${stoneId}`);
-    setIsInputFocused(false);
-    setSearchTerm("");
+    e.stopPropagation();
+    navigate(`/employee/stones/slabs/${stoneId}${location.search}`);
   };
   
-  // Обработчик клика по кнопке edit (для admin)
   const handleEditClick = (stoneId: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // Предотвращаем всплытие, чтобы не сработал handleResultClick
-    navigate(`/admin/stones/edit/${stoneId}`);
-    setIsInputFocused(false);
-    setSearchTerm("");
+    e.stopPropagation();
+    navigate(`/admin/stones/edit/${stoneId}/information${location.search}`);
   };
   
   return (
@@ -159,21 +114,21 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
         </div>
       </div>
       
-      {isInputFocused && searchResults.length > 0 && (
+      {isInputFocused && (
         <div className="absolute z-50 w-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto">
-          {searchResults.map(stone => (
+          {data?.map(stone => (
             <div
               key={stone.id}
               onClick={() => handleResultClick(stone.id)}
               className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center"
             >
-              <div className="flex-1">
+              <div className="flex-1 flex-row ">
                 <div className="font-medium text-gray-800">{stone.name}</div>
-                <div className="text-sm text-gray-500">{stone.type}</div>
+               
+                <div className="text-sm text-gray-500">{userRole !== "customer" ? `Price: $${stone.retail_price}` : ""}</div>
               </div>
-              
-              {/* Различные действия в зависимости от роли */}
-              {userRole === "employee" && (
+
+                  {userRole === "employee" && (
                 <div className="flex items-center space-x-2">
                   <Button 
                     variant="ghost" 
@@ -212,6 +167,13 @@ export function StoneSearch({ stones, onSelectStone, userRole }: StoneSearchProp
           ))}
         </div>
       )}
+        <SuperCarousel
+            type="stones"
+            currentId={currentId}
+            setCurrentId={setCurrentId}
+            images={data || []}
+
+          />
     </div>
   );
 } 

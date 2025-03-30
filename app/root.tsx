@@ -26,6 +26,10 @@ import { db } from "~/db.server";
 import { EmployeeSidebar } from "~/components/molecules/Sidebars/EmployeeSidebar";
 import { getBase } from "~/utils/urlHelpers";
 import { ISupplier } from "~/schemas/suppliers";
+import {
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query'
 import { posthog } from 'posthog-js'
 
 export const links: LinksFunction = () => [
@@ -96,6 +100,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   );
 }
 
+const queryClient = new QueryClient();
+
 export default function App() {
   const { message, token, user, suppliers } = useLoaderData<typeof loader>();
   const { pathname } = useLocation();
@@ -129,6 +135,7 @@ export default function App() {
         <Links />
       </head>
       <body>
+      <QueryClientProvider client={queryClient}>
         <SidebarProvider open={!!basePath}>
           <EmployeeSidebar suppliers={suppliers} />
           <main className="h-screen bg-gray-100 w-full">
@@ -150,6 +157,7 @@ export default function App() {
             {user && <Chat />}
           </main>
         </SidebarProvider>
+        </QueryClientProvider>
       </body>
     </html>
   );

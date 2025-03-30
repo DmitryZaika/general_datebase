@@ -11,13 +11,6 @@ import { cleanParams } from "~/hooks/use-safe-search-params";
 import { Stone, stoneQueryBuilder } from "~/utils/queries";
 import { StoneSearch } from "~/components/molecules/StoneSearch";
 
-const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
-
-function customSortType(a: string, b: string) {
-  return (
-    customOrder.indexOf(a.toLowerCase()) - customOrder.indexOf(b.toLowerCase())
-  );
-}
 
 function customSort2(a: Stone, b: Stone) {
   const aAvailable = a.available ?? 0;
@@ -68,11 +61,8 @@ function InteractiveCard({
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const isNew = createdDate > oneWeekAgo;
   const isOnSale = !!stone.on_sale;
-  const location = useLocation();
 
-  const handleClick = () => {
-    setCurrentId(stone.id);
-  };
+
 
   return (
     <div
@@ -134,12 +124,11 @@ function InteractiveCard({
 export default function Stones() {
   const { stones } = useLoaderData<typeof loader>();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
-  const [activeType, setActiveType] = useState<string | undefined>(undefined);
 
   return (
     <>
       <div className="flex justify-end">
-        <StoneSearch stones={stones} onSelectStone={setCurrentId} userRole="employee" />
+        <StoneSearch userRole="employee" />
       </div>
       
       <ModuleList>
@@ -149,7 +138,6 @@ export default function Stones() {
             currentId={currentId}
             setCurrentId={setCurrentId}
             images={stones}
-            activeType={activeType}
           />
         </div>
         {stones.sort(customSort2).map((stone) => (

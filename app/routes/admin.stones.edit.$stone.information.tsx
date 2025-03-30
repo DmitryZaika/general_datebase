@@ -97,7 +97,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     const session = await getSession(request.headers.get("Cookie"));
     session.flash("message", toastData("Success", "Stone Edited"));
-    return redirect("..", {
+    return redirect("../..", {
       headers: { "Set-Cookie": await commitSession(session) },
     });
   }
@@ -187,7 +187,10 @@ export default function Information() {
                 name="Type"
                 placeholder="Stone Type"
                 field={field}
-                options={STONE_TYPES}
+                options={STONE_TYPES.map((type) => ({
+                  key: type,
+                  value: type,
+                }))}
               />
             )}
           />

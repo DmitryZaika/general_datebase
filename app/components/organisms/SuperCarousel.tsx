@@ -126,13 +126,11 @@ export function SuperCarousel({
   currentId,
   setCurrentId,
   images,
-  activeType,
   type,
 }: {
   images: { id: number; url: string | null }[];
   currentId?: number;
-  setCurrentId: (value: number | undefined) => void;
-  activeType?: string;
+  setCurrentId?: (value: number | undefined) => void;
   type: string;
 }) {
   const [api, setApi] = useState<CarouselApi>();
@@ -149,15 +147,15 @@ export function SuperCarousel({
     api.on("settle", (index) => {
       const slidesInView = api.slidesInView();
       if (slidesInView.length > 0) {
-        setCurrentId(images[slidesInView[0]].id);
+        setCurrentId?.(images[slidesInView[0]].id);
       }
     });
-  }, [api, currentId, images, setCurrentId, activeType]);
+  }, [api, currentId, images, setCurrentId]);
 
   return (
     <Dialog
       open={currentId !== undefined}
-      onOpenChange={(open) => !open && setCurrentId(undefined)}
+      onOpenChange={(open) => !open && setCurrentId?.(undefined)}
     >
       <DialogContent
         closeClassName="z-50 top-40 sm:top-10 md:top-25 lg:top-10 right-0 sm:-right-15 md:-right-25 lg:-right-35"
