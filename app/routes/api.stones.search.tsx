@@ -41,11 +41,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
     db,
     `SELECT id, name, url, retail_price
     FROM stones
-     WHERE UPPER(name) LIKE UPPER(?)
-     ORDER BY name ASC
-     LIMIT 5
-     `,
-    [`%${searchTerm}%`]
+    WHERE UPPER(name) LIKE UPPER(?)
+    ORDER BY 
+      CASE 
+        WHEN UPPER(name) LIKE UPPER(?) THEN 0  
+        WHEN UPPER(name) LIKE UPPER(?) THEN 1  
+        ELSE 2                                  
+      END,
+      name ASC
+    LIMIT 5`,
+    [
+      `%${searchTerm}%`, 
+      `${searchTerm}%`,   
+      `% ${searchTerm} %`
+    ]
   );
   
   return Response.json({ stones });
