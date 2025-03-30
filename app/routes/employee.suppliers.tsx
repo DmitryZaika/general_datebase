@@ -42,8 +42,8 @@ const columns: ColumnDef<Supplier>[] = [
     header: "Supplier Name",
     cell: ({ row }) => (
       <Link
-        to={row.original.website}
-        classname="text-blue-600 hover:underline"
+        to={row.original.website || ""}
+        className="text-blue-600 hover:underline"
         target="_blank"
       >
         {row.original.supplier_name}
