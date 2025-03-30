@@ -26,8 +26,9 @@ const highlightStyles = `
   }
 `;
 
-const getStones = async (name: string): Promise<{id: number, name: string, url: string, retail_price: number}[]> => {
-  const response = await fetch(`/api/stones/search?name=${encodeURIComponent(name)}`)
+const getStones = async (name: string, userRole: UserRole): Promise<{id: number, name: string, url: string, retail_price: number, available: number}[]> => {
+  const showSoldOut = userRole === "admin" || userRole === "employee";
+  const response = await fetch(`/api/stones/search?name=${encodeURIComponent(name)}&show_sold_out=${showSoldOut}`)
   const data = await response.json()
   return data?.stones || []
 };
@@ -40,7 +41,11 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
-  const { data, isLoading} = useQuery({ queryKey: ['stones', 'search', searchTerm], queryFn: () => getStones(searchTerm), enabled: !!searchTerm })
+  const { data, isLoading} = useQuery({ 
+    queryKey: ['stones', 'search', searchTerm, userRole], 
+    queryFn: () => getStones(searchTerm, userRole), 
+    enabled: !!searchTerm 
+  })
   
   useEffect(() => {
     if (userRole === "admin") {
@@ -123,7 +128,14 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
               className="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center"
             >
               <div className="flex-1 flex-row ">
-                <div className="font-medium text-gray-800">{stone.name}</div>
+                <div className="font-medium text-gray-800">
+                  {stone.name}
+                  {stone.available === 0 && (
+                    <span className="ml-2 text-xs font-bold text-red-500">
+                      Out of Stock
+                    </span>
+                  )}
+                </div>
                
                 <div className="text-sm text-gray-500">{userRole !== "customer" ? `Price: $${stone.retail_price}` : ""}</div>
               </div>

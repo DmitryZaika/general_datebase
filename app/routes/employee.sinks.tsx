@@ -51,7 +51,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const sinks = await selectMany<Sink>(
     db,
     `
-      SELECT id, name, type, url, is_display, height, width, amount
+      SELECT id, name, type, url, is_display, length, width, amount
       FROM sinks
       WHERE company_id = ? AND is_display = 1
       ORDER BY name ASC
@@ -135,7 +135,7 @@ export default function Sinks() {
     acc[sink.type].push(sink);
     return acc;
   }, {});
-
+console.log(sinkList);
   return (
     <>
       <Accordion type="single" defaultValue="sinks" className="pl-5">
@@ -156,8 +156,7 @@ export default function Sinks() {
                           currentId={currentId}
                           setCurrentId={handleSetCurrentId}
                           images={sinkList[type]}
-                          category={type}
-                          activeType={activeType}
+                        
                         />
                         {sinkList[type]
                           .sort((a, b) => {
