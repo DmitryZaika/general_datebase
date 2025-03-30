@@ -37,9 +37,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (!searchTerm) {
     return Response.json({ stones: [] });
   }
-  const stones = await selectMany<{ id: number; name: string }>(
+  const stones = await selectMany<{ id: number; name: string, url: string, retail_price: number }>(
     db,
-    `SELECT id, name
+    `SELECT id, name, url, retail_price
     FROM stones
      WHERE UPPER(name) LIKE UPPER(?)
      LIMIT 5`,

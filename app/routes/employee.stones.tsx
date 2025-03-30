@@ -62,9 +62,7 @@ function InteractiveCard({
   const isNew = createdDate > oneWeekAgo;
   const isOnSale = !!stone.on_sale;
 
-  const handleClick = () => {
-    setCurrentId(stone.id);
-  };
+
 
   return (
     <div
@@ -126,12 +124,11 @@ function InteractiveCard({
 export default function Stones() {
   const { stones } = useLoaderData<typeof loader>();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
-  const [activeType, setActiveType] = useState<string | undefined>(undefined);
 
   return (
     <>
       <div className="flex justify-end">
-        <StoneSearch onSelectStone={setCurrentId} userRole="employee" />
+        <StoneSearch userRole="employee" />
       </div>
       
       <ModuleList>
@@ -141,7 +138,6 @@ export default function Stones() {
             currentId={currentId}
             setCurrentId={setCurrentId}
             images={stones}
-            activeType={activeType}
           />
         </div>
         {stones.sort(customSort2).map((stone) => (
