@@ -98,7 +98,7 @@ export default function AdminStones() {
           </Link>
         </div>
         <div className="ml-4">
-          <StoneSearch onSelectStone={handleSelectStone} userRole="admin" />
+          <StoneSearch  userRole="admin" />
         </div>
       </div>
 
@@ -124,7 +124,7 @@ export default function AdminStones() {
               return (
                 <div id={`stone-${stone.id}`} key={stone.id} className="relative w-full module-item">
                   <div
-                    className={`border-2 border-blue-500 rounded p-2 ${
+                    className={`border-2 border-blue-500 rounded ${
                       !stone.is_display ? "opacity-30" : ""
                     }`}
                   >
