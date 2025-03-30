@@ -4,8 +4,8 @@ import { TodoList } from "../organisms/TodoList";
 import clsx from "clsx";
 import { HeaderProps } from "~/types";
 import { LoadingButton } from "../molecules/LoadingButton";
-import { useEffect, useState } from "react";
-
+import { getMirroredUrl, getCustomerUrl  } from "~/utils/headerNav";
+import { LinkButton } from "../molecules/LinkButton";
 interface HeaderDesktopProps extends HeaderProps {
   className: string;
 }
@@ -18,53 +18,8 @@ export function HeaderDesktop({
   isEmployee,
 }: HeaderDesktopProps) {
   const location = useLocation();
-  const navigate = useNavigate();
-  const navigation = useNavigation();
   const isAdminPage = location.pathname.startsWith("/admin");
   const isCustomerPage = location.pathname.startsWith("/customer");
-  const [isRoleSwitching, setIsRoleSwitching] = useState(false);
-  const [isCustomerSwitching, setIsCustomerSwitching] = useState(false);
-  
-  useEffect(() => {
-    if (navigation.state === "idle") {
-      if (isRoleSwitching) setIsRoleSwitching(false);
-      if (isCustomerSwitching) setIsCustomerSwitching(false);
-    }
-  }, [navigation.state]);
-
-  const getMirroredUrl = () => {
-    const path = location.pathname;
-    const segments = path.split('/').filter(Boolean);
-    
-    if (segments.length < 1) return isAdminPage ? "/employee" : "/admin";
-    
-    const currentRole = segments[0]; 
-    const targetRole = currentRole === "admin" ? "employee" : "admin";
-    
-    if (segments.length < 2) return `/${targetRole}`;
-    
-    const currentSection = segments[1];
-    
-    const supportedSections = ["stones", "instructions", "sinks", "suppliers", "supports", "documents", "images"];
-    
-    if (supportedSections.includes(currentSection)) {
-      return `/${targetRole}/${currentSection}`;
-    }
-    
-    return `/${targetRole}`;
-  };
-  
-  const handleRoleSwitchClick = () => {
-    setIsRoleSwitching(true);
-  };
-
-  const handleCustomerSwitchClick = () => {
-    setIsCustomerSwitching(true);
-  };
-  
-  const getCustomerUrl = () => {
-    return isCustomerPage ? `/employee/stones` : `/customer/1/stones`;
-  };
 
   return (
     <header
@@ -87,45 +42,25 @@ export function HeaderDesktop({
         {isAdmin || isSuperUser ? (
           isAdminPage ? (
             <div className=" flex gap-4">
-              <Link to={getMirroredUrl()} onClick={handleRoleSwitchClick}>
-                <LoadingButton loading={isRoleSwitching}>Employee</LoadingButton>
+              <Link to={getMirroredUrl(isAdminPage, location)} >
+                <LinkButton>Employee</LinkButton>
               </Link>
             </div>
           ) : (
-            <Link to={getMirroredUrl()} onClick={handleRoleSwitchClick}>
-              <LoadingButton loading={isRoleSwitching}>Admin</LoadingButton>
+            <Link to={getMirroredUrl(isAdminPage, location)}>
+              <LinkButton>Admin</LinkButton>
             </Link>
           )
         ) : null}
-        <Link to={getCustomerUrl()} onClick={handleCustomerSwitchClick}>
-          <LoadingButton loading={isCustomerSwitching}>
+        <Link to={getCustomerUrl(isCustomerPage, location)}>
+            <LinkButton >
             {isCustomerPage ? "Employee" : "Customer"}
-          </LoadingButton>
+          </LinkButton>
         </Link>
       </div>
       <nav className="text-center flex-1">
         <ul className="flex-col md:flex-row flex flex-wrap justify-center ali md:justify-center gap-4">
-          {/* {isAdminPage && (
-              <li>
-                <Button asChild variant="link">
-                  <Link
-                    to="/admin/ai-instructions"
-                    className="text-lg md:text-xl"
-                  >
-                    AI Instructions
-                  </Link>
-                </Button>
-              </li>
-            )} */}
-          {/* {!isAdminPage && (
-              <li>
-                <Button asChild variant="link">
-                  <Link to="/employee/customers" className="text-lg md:text-xl">
-                    Customer
-                  </Link>
-                </Button>
-              </li>
-            )} */}
+       
         </ul>
       </nav>
 
