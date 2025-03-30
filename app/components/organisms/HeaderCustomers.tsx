@@ -5,6 +5,7 @@ export default function HeaderCustomers() {
   const location = useLocation();
   const isLogin = location.pathname.includes("login");
 
+  
   return (
     <>
       <header className="flex justify-center p-4">

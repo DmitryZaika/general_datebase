@@ -17,12 +17,13 @@ import { Button } from "~/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { LoadingButton } from "../molecules/LoadingButton";
 import clsx from "clsx";
-
+import { LinkButton } from "../molecules/LinkButton"; 
 function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkProps) {
   const handleClick = () => {
     setOpen(false);
     if (onClick) onClick();
   };
+
 
   return (
     <Link
@@ -35,30 +36,24 @@ function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkPro
   );
 }
 
-// Функция для определения противоположного URL
-function getMirroredUrl(path: string) {
+function getMirroredUrl(path: string, search: string) {
   const segments = path.split('/').filter(Boolean);
   
   if (segments.length < 1) return "/employee";
   
-  const currentRole = segments[0]; // "admin" или "employee"
+  const currentRole = segments[0]; 
   const targetRole = currentRole === "admin" ? "employee" : "admin";
   
-  // Если нет второго сегмента, просто возвращаем базовый URL
   if (segments.length < 2) return `/${targetRole}`;
   
-  // Получаем текущий раздел (stones, instructions и т.д.)
   const currentSection = segments[1];
   
-  // Набор разделов, для которых нужно обеспечить прямое соответствие
   const supportedSections = ["stones", "instructions", "sinks", "suppliers", "supports", "documents", "images"];
+  const cleanSearch = currentSection === "stones" ? search : "";
+    if (supportedSections.includes(currentSection)) {
+      return `/${targetRole}/${currentSection}${cleanSearch}`;
+    }
   
-  // Если текущий раздел поддерживается, создаем зеркальный URL
-  if (supportedSections.includes(currentSection)) {
-    return `/${targetRole}/${currentSection}`;
-  }
-  
-  // Для всех других разделов просто переходим на базовый URL
   return `/${targetRole}`;
 }
 
@@ -75,7 +70,7 @@ export function BurgerMenu({
   const [isRoleSwitching, setIsRoleSwitching] = useState(false);
   const [isCustomerSwitching, setIsCustomerSwitching] = useState(false);
   
-  // Сброс состояния загрузки при завершении навигации
+
   useEffect(() => {
     if (navigation.state === "idle") {
       if (isRoleSwitching) setIsRoleSwitching(false);
@@ -83,15 +78,15 @@ export function BurgerMenu({
     }
   }, [navigation.state]);
   
-  // Получаем целевой URL для переключения между admin и employee
-  const targetPath = getMirroredUrl(location.pathname);
+ 
+  const targetPath = getMirroredUrl(location.pathname, location.search);
   
-  // Получаем URL для кнопки Customer
+ 
   const getCustomerUrl = () => {
     return isCustomerPage ? `/employee/stones` : `/customer/1/stones`;
   };
   
-  // Обработчики для имитации загрузки
+
   const handleRoleSwitchClick = () => {
     setIsRoleSwitching(true);
   };
@@ -147,7 +142,7 @@ export function BurgerMenu({
                     setOpen={setOpen}
                     onClick={handleRoleSwitchClick}
                   >
-                    <LoadingButton loading={isRoleSwitching}>Employee</LoadingButton>
+                    <LinkButton >Employee</LinkButton>
                   </BurgerLink>
                 ) : (
                   <BurgerLink 
@@ -156,7 +151,7 @@ export function BurgerMenu({
                     setOpen={setOpen}
                     onClick={handleRoleSwitchClick}
                   >
-                    <LoadingButton loading={isRoleSwitching}>Admin</LoadingButton>
+                    <LinkButton>Admin</LinkButton>
                   </BurgerLink>
                 )
               ) : null}
@@ -165,9 +160,9 @@ export function BurgerMenu({
                 setOpen={setOpen}
                 onClick={handleCustomerSwitchClick}
               >
-                <LoadingButton loading={isCustomerSwitching}>
+                <LinkButton>
                   {isCustomerPage ? "Employee" : "Customer"}
-                </LoadingButton>
+                </LinkButton>
               </BurgerLink>
               {isSuperUser ? (
                 isAdminPage ? (
@@ -196,8 +191,6 @@ export function HeaderMobile({
   isSuperUser,
   className,
 }: HeaderMobileProps) {
-  const location = useLocation();
-  const isAdminPage = location.pathname.startsWith("/admin");
   return (
     <header className={clsx("flex justify-between", className)}>
       <div className="logo">

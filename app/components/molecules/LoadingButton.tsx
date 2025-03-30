@@ -1,17 +1,18 @@
 import { Button } from "../ui/button";
 import { Spinner } from "../atoms/Spinner";
+import { ButtonHTMLAttributes } from "react";
 
-import type { JSX } from "react";
+interface LoadingButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  loading: boolean;
+}
 
 export function LoadingButton({
   loading,
   children,
-}: {
-  loading: boolean;
-  children: JSX.Element | string;
-}) {
+  ...props
+}: LoadingButtonProps) {
   return (
-    <Button type="submit">
+      <Button {...props} type="submit">
       {loading ? <Spinner size={20} /> : <>{children}</>}
     </Button>
   );

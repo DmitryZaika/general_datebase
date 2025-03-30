@@ -98,7 +98,7 @@ export default function AdminStones() {
           </Link>
         </div>
         <div className="ml-4">
-          <StoneSearch stones={stones} onSelectStone={handleSelectStone} userRole="admin" />
+          <StoneSearch onSelectStone={handleSelectStone} userRole="admin" />
         </div>
       </div>
 
@@ -163,7 +163,7 @@ export default function AdminStones() {
                       to={getEditUrl(stone.id)}
                       className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2"
                       title="Edit Stone"
-                      aria-label={`Edit ${stone.name}`}
+                      aria-label={`Edit ${stone.name}/information`}
                     >
                       <FaPencilAlt />
                     </Link>
