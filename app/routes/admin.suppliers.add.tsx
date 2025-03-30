@@ -130,6 +130,7 @@ export default function SuppliersAdd() {
               name="website"
               render={({ field }) => (
                 <InputItem
+                inputAutoFocus={true}
                   name={"Website"}
                   placeholder={"Website"}
                   field={field}
