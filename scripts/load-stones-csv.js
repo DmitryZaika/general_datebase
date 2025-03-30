@@ -61,7 +61,7 @@ function convertData(data) {
     id: toInt(item.id),
     retail_price: toInt(item.retail_price),
     cost_per_sqft: toInt(item.cost_per_sqft),
-    height: toFloat(item.height),
+    length: toFloat(item.length),
     width: toFloat(item.width),
     supplier_id: toInt(item.supplier_id),
   }));
@@ -70,11 +70,11 @@ function convertData(data) {
 async function saveData(data) {
   for (const item of data) {
     await db.execute(
-      `UPDATE main.stones SET retail_price = ?, cost_per_sqft = ?, height = ?, width = ?, supplier_id = ? WHERE id = ?`,
+      `UPDATE main.stones SET retail_price = ?, cost_per_sqft = ?, length = ?, width = ?, supplier_id = ? WHERE id = ?`,
       [
         item.retail_price,
         item.cost_per_sqft,
-        item.height,
+        item.length,
         item.width,
         item.supplier_id,
         item.id,
