@@ -42,7 +42,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     `SELECT id, name, url, retail_price
     FROM stones
      WHERE UPPER(name) LIKE UPPER(?)
-     LIMIT 5`,
+     ORDER BY name ASC
+     LIMIT 5
+     `,
     [`%${searchTerm}%`]
   );
   
