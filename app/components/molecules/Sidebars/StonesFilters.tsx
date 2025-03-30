@@ -9,6 +9,7 @@ import { ISupplier } from "~/schemas/suppliers";
 import { LinkSpan } from "~/components/atoms/LinkSpan";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Stone } from "~/utils/queries";
+import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 
 import { SidebarGroupLabel, SidebarMenuSub } from "~/components/ui/sidebar";
 
@@ -25,6 +26,19 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
   const isSubmitting = useMemo(() => navigation.state !== "idle", [navigation.state]);
   const navigate = useNavigate();
   const location = useLocation();
+  const [suppliersExpanded, setSuppliersExpanded] = useState(false);
+  
+
+  useEffect(() => {
+    localStorage.setItem('suppliersExpanded', JSON.stringify(suppliersExpanded));
+  }, [suppliersExpanded]);
+  
+
+  useEffect(() => {
+    if (searchParams.supplier !== 0) {
+      setSuppliersExpanded(true);
+    }
+  }, [searchParams.supplier]);
   
   const cleanType = useMemo(() => searchParams.type || ["granite"], [searchParams.type]);
   const showSoldOutToggle = useMemo(() => ["admin", "employee"].includes(base), [base]);
@@ -72,6 +86,10 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
     });
   }, [isSubmitting, setSearchParams]);
   
+  const toggleSuppliersExpanded = useCallback(() => {
+    setSuppliersExpanded(prev => !prev);
+  }, []);
+  
   return (
     <SidebarMenuSub>
       <SidebarGroupLabel>
@@ -98,11 +116,22 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
       
       {Array.isArray(suppliers) && (
         <>
-          <SidebarGroupLabel>Supplier {" "}
+          <SidebarGroupLabel 
+            onClick={toggleSuppliersExpanded} 
+            className="flex items-center cursor-pointer"
+          >
+            <span>Suppliers</span>{" "}
+            {suppliersExpanded ? 
+              <FaChevronUp className="ml-1 text-gray-500" size={12} /> : 
+              <FaChevronDown className="ml-1 text-gray-500" size={12} />
+            }
             { searchParams.supplier !== 0 && (
               <LinkSpan
                 className="ml-2"
-                onClick={() => toggleSupplier(0)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSupplier(0);
+                }}
                 variant="blue"
                 disabled={isSubmitting}
               >
@@ -111,10 +140,10 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
             ) }
           </SidebarGroupLabel>
           
-          {suppliers.map((supplier) => (
+          {suppliersExpanded && suppliers.map((supplier) => (
             <div
               key={supplier.id}
-              onClick={() => !isSubmitting && toggleSupplier(supplier.id)}
+              onClick={() =>  toggleSupplier(supplier.id)}
               className={`p-1 cursor-pointer hover:bg-gray-100 transition-colors ${
                 searchParams.supplier === supplier.id ? "bg-gray-100" : ""
               } ${isSubmitting ? "opacity-60" : ""}`}
@@ -132,7 +161,7 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
 
       { showSoldOutToggle && (
         <>
-          <SidebarGroupLabel>Other</SidebarGroupLabel>
+       
           <CheckOption
             value="Show sold out"
             selected={!!searchParams.show_sold_out}
