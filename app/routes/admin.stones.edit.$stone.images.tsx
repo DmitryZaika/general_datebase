@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { ActionFunctionArgs, data, LoaderFunctionArgs, redirect } from "react-router";
 import {
   Link,
   useLoaderData,
@@ -23,7 +23,7 @@ import { getAdminUser } from "~/utils/session.server";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { useCustomForm } from "~/utils/useCustomForm";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
-
+import { LoadingButton } from "~/components/molecules/LoadingButton";
 export const InstalledProjectsSchema = z.object({});
 type TInstalledProjectsSchema = z.infer<typeof InstalledProjectsSchema>;
 
@@ -61,30 +61,24 @@ export async function action({ request, params }: ActionFunctionArgs) {
       deleteFile(result.url);
     }
     session.flash("message", toastData("Success", "Image Deleted"));
-    return redirect(request.url, {
+    return data({ success: true }, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
   }
 
-  const { errors, data } = await parseMutliForm(
+  const { errors, data: formData } = await parseMutliForm(
     request,
     InstalledProjectsSchema,
     "stones",
   );
-  if (errors || !data) {
+  if (errors || !formData) {
     return { errors };
   }
-
-  const stone = await selectId<{ url: string }>(
-    db,
-    "select url from stones WHERE id = ?",
-    stoneId,
-  );
 
   try {
     await db.execute(
       `INSERT INTO installed_stones (url, stone_id) VALUES (?, ?)`,
-      [data.file, stoneId],
+      [formData.file, stoneId],
     );
   } catch (error) {
     console.error("Error connecting to the database:", errors);
@@ -92,7 +86,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Image Added"));
-  return redirect(request.url, {
+  return data({ success: true }, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
@@ -117,6 +111,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 function AddImage() {
   const navigation = useNavigation();
+  const isSubmitting = useNavigation().state === "submitting";
   const form = useCustomForm<TInstalledProjectsSchema>(InstalledProjectsSchema);
 
   const [inputKey, setInputKey] = useState(0);
@@ -144,9 +139,8 @@ function AddImage() {
             />
           )}
         />
-        <Button type="submit" variant="blue">
-          Add image
-        </Button>
+        <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
+        
       </div>
     </MultiPartForm>
   );
