@@ -127,9 +127,9 @@ export default function Stones() {
 
   return (
     <>
-      <div className="flex justify-end">
+      <div className="flex justify-center sm:justify-end">
         <StoneSearch userRole="employee" />
-      </div>
+      </div>  
       
       <ModuleList>
         <div className="w-full col-span-full">
