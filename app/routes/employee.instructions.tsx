@@ -48,9 +48,9 @@ const InstructionItem: React.FC<InstructionItemProps> = ({ instruction }) => {
         <AccordionContent>
           {!isEmptyText && (
             <div
-              className="prose max-w-[calc(100vw-500px)] w-full instructions ml-15 "
+              className="prose  max-w-[calc(100vw-70px)] sm:max-w-[calc(100vw-500px)] w-full instructions ml-5 sm:ml-15 "
               dangerouslySetInnerHTML={{ __html: instruction.text }}
-            />
+            />    
           )}
           {instruction.children.length > 0 && (
             <Accordion type="multiple" className="ml-5 ">
