@@ -5,6 +5,7 @@ import {
   useLoaderData,
   Form,
   useNavigation,
+  data,
 } from "react-router";
 import { getEmployeeUser } from "~/utils/session.server";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
@@ -78,14 +79,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       const session = await getSession(request.headers.get("Cookie"));
       session.flash("message", toastData("Success", "Slab size updated"));
-      return redirect(request.url, {
+      return data({success: true}, {
         headers: { "Set-Cookie": await commitSession(session) },
       });
     } catch (error) {
       console.error("Error updating slab size:", error);
       const session = await getSession(request.headers.get("Cookie"));
       session.flash("message", toastData("Error", "Failed to update slab size"));
-      return redirect(request.url, {
+      return data({success: true}, {
         headers: { "Set-Cookie": await commitSession(session) },
       });
     }
@@ -113,7 +114,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     "message",
     toastData("Success", `Slab ${newValue ? "Sold" : "Unsold"}`)
   );
-  return redirect(request.url, {
+    return data({success: true}, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
