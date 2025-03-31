@@ -10,6 +10,7 @@ type UserRole = "employee" | "admin" | "customer";
 
 interface StoneSearchProps {
   userRole: UserRole;
+  className?: string;
 }
 
 const highlightStyles = `
@@ -32,7 +33,8 @@ const getStones = async (name: string, userRole: UserRole): Promise<{
   url: string, 
   retail_price: number, 
   cost_per_sqft: number, 
-  available: number
+  available: number,
+ 
 }[]> => {
   const showSoldOut = userRole === "admin" || userRole === "employee";
   const response = await fetch(`/api/stones/search?name=${encodeURIComponent(name)}&show_sold_out=${showSoldOut}`)
@@ -41,7 +43,7 @@ const getStones = async (name: string, userRole: UserRole): Promise<{
 };
 
 
-export function StoneSearch({ userRole }: StoneSearchProps) {
+export function StoneSearch({ userRole, className  }: StoneSearchProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isInputFocused, setIsInputFocused] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -66,7 +68,7 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
     }
   }, [userRole]);
   
-  console.log({ data})
+
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -116,7 +118,7 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
   };
   
   return (
-    <div ref={searchRef} className="relative w-80 mt-2">
+    <div ref={searchRef} className={`relative w-80 mt-2 ${className}`}>
       <div className="relative">
         <Input
           type="text"
