@@ -141,7 +141,7 @@ export default function Stones() {
 
   return (
     <>
-      <div className="flex justify-end">
+      <div className="flex justify-center sm:justify-end">
         <StoneSearch stones={stones} onSelectStone={(id) => handleCardClick(id, stones.find(s => s.id === id)?.type || '')} userRole="customer" />
       </div>
       
