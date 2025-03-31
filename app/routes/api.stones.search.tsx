@@ -40,13 +40,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return Response.json({ stones: [] });
   }
   
-  let query = `SELECT s.id, s.name, s.url, s.retail_price,
+  let query = `SELECT s.id, s.name, s.url, s.retail_price, s.cost_per_sqft,
             CAST(SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS UNSIGNED) AS available
     FROM main.stones s
     LEFT JOIN main.slab_inventory AS si ON si.stone_id = s.id
     WHERE UPPER(s.name) LIKE UPPER(?)
     AND s.is_display = 1
-    GROUP BY s.id, s.name, s.url, s.retail_price`;
+    GROUP BY s.id, s.name, s.url, s.retail_price, s.cost_per_sqft`;
     
   if (!showSoldOut) {
     query += `\nHAVING available > 0`;
@@ -61,7 +61,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
       s.name ASC
     LIMIT 5`;
     
-  const stones = await selectMany<{ id: number; name: string, url: string, retail_price: number, available: number }>(
+  const stones = await selectMany<{ 
+    id: number; 
+    name: string, 
+    url: string, 
+    retail_price: number, 
+    cost_per_sqft: number, 
+    available: number 
+  }>(
     db,
     query,
     [

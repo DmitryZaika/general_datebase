@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "~/components/ui/input";
-import { FaSearch, FaChevronRight, FaEdit, FaImage } from "react-icons/fa";
+import { FaSearch, FaChevronRight, FaEdit, FaImage, FaTrash } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -26,7 +26,14 @@ const highlightStyles = `
   }
 `;
 
-const getStones = async (name: string, userRole: UserRole): Promise<{id: number, name: string, url: string, retail_price: number, available: number}[]> => {
+const getStones = async (name: string, userRole: UserRole): Promise<{
+  id: number, 
+  name: string, 
+  url: string, 
+  retail_price: number, 
+  cost_per_sqft: number, 
+  available: number
+}[]> => {
   const showSoldOut = userRole === "admin" || userRole === "employee";
   const response = await fetch(`/api/stones/search?name=${encodeURIComponent(name)}&show_sold_out=${showSoldOut}`)
   const data = await response.json()
@@ -102,6 +109,11 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
     e.stopPropagation();
     navigate(`/admin/stones/edit/${stoneId}/information${location.search}`);
   };
+
+  const handleDeleteClick = (stoneId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/admin/stones/delete/${stoneId}${location.search}`);
+  };
   
   return (
     <div ref={searchRef} className="relative w-80 mt-2">
@@ -137,7 +149,19 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
                   )}
                 </div>
                
-                <div className="text-sm text-gray-500">{userRole !== "customer" ? `Price: $${stone.retail_price}` : ""}</div>
+              <div className="text-sm text-gray-500">
+                {userRole === "admin" ? (
+                  stone.retail_price === 0 
+                    ? `Price per slab $${stone.cost_per_sqft}` 
+                    : `Price: $${stone.retail_price} / $${stone.cost_per_sqft}`
+                ) : userRole === "employee" ? (
+                  stone.retail_price === 0 
+                    ? `Price per slab $${stone.cost_per_sqft}` 
+                    : `Price: $${stone.retail_price}`
+                ) : (
+                  ""
+                )}
+              </div>
               </div>
 
                   {userRole === "employee" && (
@@ -155,6 +179,7 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
               )}
               
               {userRole === "admin" && (
+                <>
                 <Button 
                   variant="ghost" 
                   size="icon" 
@@ -163,6 +188,15 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
                 >
                   <FaEdit  style={{ minWidth: '20px', minHeight: '20px' }} />
                 </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={(e) => handleDeleteClick(stone.id, e)}
+                  className="h-12 w-12 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                >
+                    <FaTrash  style={{ minWidth: '16px', minHeight: '16px' }} />
+                  </Button>
+                </>
               )}
               
               {userRole === "customer" && (
