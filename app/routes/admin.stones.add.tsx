@@ -149,6 +149,7 @@ export default function StonesAdd() {
             name="name"
             render={({ field }) => (
               <InputItem
+                inputAutoFocus={true}
                 name={"Name"}
                 placeholder={"Name of the stone"}
                 field={field}
