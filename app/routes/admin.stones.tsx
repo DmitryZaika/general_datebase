@@ -91,9 +91,9 @@ export default function AdminStones() {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-2">
-        <div className="flex items-center space-x-4 flex-grow">
-          <Link to="add" onClick={handleAddStoneClick}>
+      <div className="flex justify-between flex-wrap items-center items-end mb-2">
+        <div className="flex items-center">
+          <Link to="add" onClick={handleAddStoneClick} className="mr-auto">
             <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
           </Link>
         </div>
