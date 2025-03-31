@@ -59,7 +59,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (newFile) {
       await db.execute(
         `UPDATE sinks
-         SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?,  height = ?, width = ?, amount = ?
+          SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, amount = ?
          WHERE id = ?`,
         [
           data.name,
@@ -67,7 +67,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.file,
           data.is_display,
           data.supplier_id,
-          data.height,
+          data.length,
           data.width,
           data.amount,
           sinkId,
@@ -76,14 +76,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     } else {
       await db.execute(
         `UPDATE sinks
-         SET name = ?, type = ?, is_display = ?, supplier_id = ?, height = ?, width = ?, amount = ?
+         SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, amount = ?
          WHERE id = ?`,
         [
           data.name,
           data.type,
           data.is_display,
           data.supplier_id,
-          data.height,
+          data.length,
           data.width,
           data.amount,
           sinkId,
@@ -117,12 +117,12 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     url: string;
     is_display: boolean;
     supplier_id: string;
-    height: string;
+    length: string;
     width: string;
     amount: number | null;
   }>(
     db,
-    "SELECT name, type, url, is_display, supplier_id, height, width, amount FROM sinks WHERE id = ?",
+    "SELECT name, type, url, is_display, supplier_id, length, width, amount FROM sinks WHERE id = ?",
     sinkId,
   );
   if (!sink) {
@@ -154,7 +154,7 @@ function SinkInformation({
 }) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
-  const { name, type, url, is_display, supplier_id, height, width, amount } =
+  const { name, type, url, is_display, supplier_id, length, width, amount } =
     sinkData;
   const defaultValues = {
     name,
@@ -162,7 +162,7 @@ function SinkInformation({
     url: "",
     is_display,
     supplier_id,
-    height,
+    length,
     width,
     amount,
   };
@@ -235,9 +235,9 @@ function SinkInformation({
       <div className="flex gap-2">
         <FormField
           control={form.control}
-          name="height"
+          name="length"
           render={({ field }) => (
-            <InputItem name="Height" placeholder="Sink height" field={field} />
+            <InputItem name="Length" placeholder="Sink length" field={field} />
           )}
         />
         <FormField

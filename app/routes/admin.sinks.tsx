@@ -185,7 +185,7 @@ export default function AdminSinks() {
                                     Amount: {displayedAmount}
                                   </p>
                                   <p className="text-center text-sm">
-                                    Size: {displayedWidth} x {displayedLength}
+                                    Size:{displayedLength} x {displayedWidth}
                                   </p>
                                 </div>
 

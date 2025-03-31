@@ -34,22 +34,43 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const [, searchParams] = request.url.split("?");
   const cleanParams = new URLSearchParams(searchParams);
   const searchTerm = cleanParams.get("name");
+  const showSoldOut = cleanParams.get("show_sold_out") === "true";
+  
   if (!searchTerm) {
     return Response.json({ stones: [] });
   }
-  const stones = await selectMany<{ id: number; name: string, url: string, retail_price: number }>(
-    db,
-    `SELECT id, name, url, retail_price
-    FROM stones
-    WHERE UPPER(name) LIKE UPPER(?)
-    ORDER BY 
+  
+  let query = `SELECT s.id, s.name, s.url, s.retail_price, s.cost_per_sqft,
+            CAST(SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS UNSIGNED) AS available
+    FROM main.stones s
+    LEFT JOIN main.slab_inventory AS si ON si.stone_id = s.id
+    WHERE UPPER(s.name) LIKE UPPER(?)
+    AND s.is_display = 1
+    GROUP BY s.id, s.name, s.url, s.retail_price, s.cost_per_sqft`;
+    
+  if (!showSoldOut) {
+    query += `\nHAVING available > 0`;
+  }
+  
+  query += `\nORDER BY 
       CASE 
-        WHEN UPPER(name) LIKE UPPER(?) THEN 0  
-        WHEN UPPER(name) LIKE UPPER(?) THEN 1  
+        WHEN UPPER(s.name) LIKE UPPER(?) THEN 0  
+        WHEN UPPER(s.name) LIKE UPPER(?) THEN 1  
         ELSE 2                                  
       END,
-      name ASC
-    LIMIT 5`,
+      s.name ASC
+    LIMIT 5`;
+    
+  const stones = await selectMany<{ 
+    id: number; 
+    name: string, 
+    url: string, 
+    retail_price: number, 
+    cost_per_sqft: number, 
+    available: number 
+  }>(
+    db,
+    query,
     [
       `%${searchTerm}%`, 
       `${searchTerm}%`,   

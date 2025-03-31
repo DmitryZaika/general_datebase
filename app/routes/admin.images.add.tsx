@@ -94,6 +94,7 @@ export default function ImagesAdd() {
             name="name"
             render={({ field }) => (
               <InputItem
+                inputAutoFocus={true}
                 name={"Name"}
                 placeholder={"Name of the image"}
                 field={field}

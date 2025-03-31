@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "~/components/ui/input";
-import { FaSearch, FaChevronRight, FaEdit, FaImage } from "react-icons/fa";
+import { FaSearch, FaChevronRight, FaEdit, FaImage, FaTrash } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -26,8 +26,16 @@ const highlightStyles = `
   }
 `;
 
-const getStones = async (name: string): Promise<{id: number, name: string, url: string, retail_price: number}[]> => {
-  const response = await fetch(`/api/stones/search?name=${encodeURIComponent(name)}`)
+const getStones = async (name: string, userRole: UserRole): Promise<{
+  id: number, 
+  name: string, 
+  url: string, 
+  retail_price: number, 
+  cost_per_sqft: number, 
+  available: number
+}[]> => {
+  const showSoldOut = userRole === "admin" || userRole === "employee";
+  const response = await fetch(`/api/stones/search?name=${encodeURIComponent(name)}&show_sold_out=${showSoldOut}`)
   const data = await response.json()
   return data?.stones || []
 };
@@ -40,7 +48,11 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
-  const { data, isLoading} = useQuery({ queryKey: ['stones', 'search', searchTerm], queryFn: () => getStones(searchTerm), enabled: !!searchTerm })
+  const { data, isLoading} = useQuery({ 
+    queryKey: ['stones', 'search', searchTerm, userRole], 
+    queryFn: () => getStones(searchTerm, userRole), 
+    enabled: !!searchTerm 
+  })
   
   useEffect(() => {
     if (userRole === "admin") {
@@ -97,6 +109,11 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
     e.stopPropagation();
     navigate(`/admin/stones/edit/${stoneId}/information${location.search}`);
   };
+
+  const handleDeleteClick = (stoneId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/admin/stones/delete/${stoneId}${location.search}`);
+  };
   
   return (
     <div ref={searchRef} className="relative w-80 mt-2">
@@ -123,9 +140,28 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
               className="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center"
             >
               <div className="flex-1 flex-row ">
-                <div className="font-medium text-gray-800">{stone.name}</div>
+                <div className="font-medium text-gray-800">
+                  {stone.name}
+                  {stone.available === 0 && (
+                    <span className="ml-2 text-xs font-bold text-red-500">
+                      Out of Stock
+                    </span>
+                  )}
+                </div>
                
-                <div className="text-sm text-gray-500">{userRole !== "customer" ? `Price: $${stone.retail_price}` : ""}</div>
+              <div className="text-sm text-gray-500">
+                {userRole === "admin" ? (
+                  stone.retail_price === 0 
+                    ? `Price per slab $${stone.cost_per_sqft}` 
+                    : `Price: $${stone.retail_price} / $${stone.cost_per_sqft}`
+                ) : userRole === "employee" ? (
+                  stone.retail_price === 0 
+                    ? `Price per slab $${stone.cost_per_sqft}` 
+                    : `Price: $${stone.retail_price}`
+                ) : (
+                  ""
+                )}
+              </div>
               </div>
 
                   {userRole === "employee" && (
@@ -135,7 +171,7 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
                     variant="ghost" 
                     size="icon" 
                     onClick={(e) => handleSlabsClick(stone.id, e)}
-                    className="h-12 w-12 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                    className="h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
                   >
                     Slabs
                   </Button>
@@ -143,14 +179,24 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
               )}
               
               {userRole === "admin" && (
+                <>
                 <Button 
                   variant="ghost" 
                   size="icon" 
                   onClick={(e) => handleEditClick(stone.id, e)}
-                  className="h-12 w-12 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                  className="h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
                 >
                   <FaEdit  style={{ minWidth: '20px', minHeight: '20px' }} />
                 </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={(e) => handleDeleteClick(stone.id, e)}
+                  className="h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                >
+                    <FaTrash  style={{ minWidth: '16px', minHeight: '16px' }} />
+                  </Button>
+                </>
               )}
               
               {userRole === "customer" && (
