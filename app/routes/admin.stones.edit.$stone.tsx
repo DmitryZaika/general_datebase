@@ -42,9 +42,9 @@ export default function StonesEdit() {
 
         >
         <TabsList>
-            <TabsTrigger  value="information">General</TabsTrigger>
-            <TabsTrigger value="images">Images</TabsTrigger>
-            <TabsTrigger value="slabs">Slabs</TabsTrigger>
+            <TabsTrigger value={`information${location.search}`}>General</TabsTrigger>
+            <TabsTrigger value={`images${location.search}`}>Images</TabsTrigger>
+            <TabsTrigger value={`slabs${location.search}`}>Slabs</TabsTrigger>
           </TabsList>
             <Outlet />
         </Tabs>

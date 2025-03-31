@@ -125,7 +125,7 @@ export const Chat = () => {
         }}
       >
         <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto">
-          <DialogFullHeader>Chat</DialogFullHeader>
+          <DialogFullHeader><span className="text-lg font-bold">Chat</span></DialogFullHeader>
           <ChatMessages
             messages={[
               ...messages,
