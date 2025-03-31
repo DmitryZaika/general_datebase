@@ -155,7 +155,7 @@ export default function SlabsModal() {
               return (
                 <div
                   key={slab.id}
-                  className={`transition-colors duration-300 flex items-center gap-4 px-1 py-3 sm:px-5 rounded-lg border border-gray-200 ${
+                  className={`transition-colors duration-300 flex items-center gap-4 p-2 sm:px-5 rounded-lg border border-gray-200 ${
                     isSold ? "bg-red-200" : "bg-white"
                   }`}
                 >
