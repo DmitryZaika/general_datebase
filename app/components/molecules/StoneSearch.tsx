@@ -171,7 +171,7 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
                     variant="ghost" 
                     size="icon" 
                     onClick={(e) => handleSlabsClick(stone.id, e)}
-                    className="h-12 w-12 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                    className="h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
                   >
                     Slabs
                   </Button>
@@ -184,7 +184,7 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
                   variant="ghost" 
                   size="icon" 
                   onClick={(e) => handleEditClick(stone.id, e)}
-                  className="h-12 w-12 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                  className="h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
                 >
                   <FaEdit  style={{ minWidth: '20px', minHeight: '20px' }} />
                 </Button>
@@ -192,7 +192,7 @@ export function StoneSearch({ userRole }: StoneSearchProps) {
                   variant="ghost" 
                   size="icon" 
                   onClick={(e) => handleDeleteClick(stone.id, e)}
-                  className="h-12 w-12 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                  className="h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
                 >
                     <FaTrash  style={{ minWidth: '16px', minHeight: '16px' }} />
                   </Button>
