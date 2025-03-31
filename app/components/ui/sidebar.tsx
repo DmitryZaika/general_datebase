@@ -266,7 +266,7 @@ function SidebarTrigger({
       }}
       {...props}
     >
-    <p className="ml-15 -mb-4 mt-2 text-white text-xl p-1 px-2 bg-black border-2 border-white rounded-xl"  >Filters</p>
+    <p className="absolute right-5 -mb-4 mt-2 text-white text-xl p-1 px-2 bg-black border-2 border-white rounded-xl"  >Filters</p>
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );
