@@ -138,7 +138,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <SidebarProvider open={!!basePath}>
           <EmployeeSidebar suppliers={suppliers} />
-          <main className="h-screen bg-gray-100 w-full">
+          <main className="h-screen overflow-y-auto bg-gray-100 w-full">
             <AuthenticityTokenProvider token={token}>
               <Header
                 isEmployee={user?.is_employee ?? false}
