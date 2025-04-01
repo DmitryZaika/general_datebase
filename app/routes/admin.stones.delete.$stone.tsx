@@ -1,5 +1,5 @@
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Form, useLoaderData, useNavigate } from "react-router";
+import { Form, useLoaderData, useNavigate, useLocation   } from "react-router";
 import { selectId } from "~/utils/queryHelpers";
 import { Button } from "~/components/ui/button";
 import { deleteFile } from "~/utils/s3.server";
@@ -49,9 +49,14 @@ export async function action({ params, request }: ActionFunctionArgs) {
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
+
+  const url = new URL(request.url);
+  const searchParams = url.searchParams.toString();
+  const searchString = searchParams ? `?${searchParams}` : '';
+  
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Stone Deleted"));
-  return redirect("..", {
+  return redirect(`..${searchString}`, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
@@ -79,11 +84,12 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 export default function StonesAdd() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { name } = useLoaderData<typeof loader>();
 
   const handleChange = (open: boolean) => {
     if (open === false) {
-      navigate("..");
+      navigate(`..${location.search}`);
     }
   };
   return (

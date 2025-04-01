@@ -6,6 +6,7 @@ import {
   useNavigation,
   Outlet,
   useLoaderData,
+  useLocation,
 } from "react-router";
 import { FormField } from "../components/ui/form";
 import { z } from "zod";
@@ -97,10 +98,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
       });
     }
   }
-
+  
+  const url = new URL(request.url);
+  const searchParams = url.searchParams.toString();
+  const searchString = searchParams ? `?${searchParams}` : '';
+  
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Stone added"));
-  return redirect("..", {
+  return redirect(`..${searchString}`, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
@@ -122,6 +127,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function StonesAdd() {
   const navigate = useNavigate();
+  const location = useLocation();
   const isSubmitting = useNavigation().state !== "idle";
   const { suppliers } = useLoaderData<typeof loader>();
 
@@ -133,7 +139,7 @@ export default function StonesAdd() {
 
   const handleChange = (open: boolean) => {
     if (open === false) {
-      navigate("..");
+      navigate(`..${location.search}`);
     }
   };
 
