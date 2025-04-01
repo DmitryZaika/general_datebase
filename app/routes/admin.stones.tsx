@@ -1,6 +1,6 @@
 //// filepath: c:\Users\sarah\general_datebase\app\routes\admin.stones.tsx
 import { LoaderFunctionArgs, Outlet } from "react-router";
-import { useLoaderData, Link, useSearchParams, useNavigation } from "react-router";
+import { useLoaderData, Link, useSearchParams, useNavigation, useLocation } from "react-router";
 
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 
@@ -60,6 +60,7 @@ export default function AdminStones() {
   const navigation = useNavigation();
   const [isAddingStone, setIsAddingStone] = useState(false);
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
+  const location = useLocation();
 
   useEffect(() => {
     if (navigation.state === "idle") {
@@ -73,7 +74,7 @@ export default function AdminStones() {
 
   const handleSelectStone = (stoneId: number) => {
     setSelectedStoneId(stoneId);
-  
+ 
   };
 
   const stoneList = stones.reduce((acc: Record<string, Stone[]>, stone) => {
@@ -93,7 +94,7 @@ export default function AdminStones() {
     <>
       <div className="flex justify-between flex-wrap items-center items-end mb-2">
         <div className="flex items-center">
-          <Link to="add" onClick={handleAddStoneClick} className="mr-auto">
+          <Link to={`add${location.search}`} onClick={handleAddStoneClick} className="mr-auto">
             <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
           </Link>
         </div>
@@ -168,7 +169,7 @@ export default function AdminStones() {
                       <FaPencilAlt />
                     </Link>
                     <Link
-                      to={`delete/${stone.id}`}
+                      to={`delete/${stone.id}${location.search}`}
                       className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2"
                       title="Delete Stone"
                       aria-label={`Delete ${stone.name}`}

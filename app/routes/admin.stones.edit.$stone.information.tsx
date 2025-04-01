@@ -95,9 +95,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (stone?.url && newFile) {
       await deleteFile(stone.url);
     }
+    const url = new URL(request.url);
+    const searchParams = url.searchParams.toString();
+    const searchString = searchParams ? `?${searchParams}` : '';
+
     const session = await getSession(request.headers.get("Cookie"));
     session.flash("message", toastData("Success", "Stone Edited"));
-    return redirect("../..", {
+    return redirect(`../..${searchString}`, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
   }
