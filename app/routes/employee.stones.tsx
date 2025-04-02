@@ -137,7 +137,7 @@ export default function Stones() {
        
         </div>
         <div className="flex-1 flex justify-center md:justify-end md:ml-auto">
-            <StoneSearch userRole="admin" />
+            <StoneSearch userRole="employee" />
         </div>
       </div>
       
