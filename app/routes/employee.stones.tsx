@@ -131,16 +131,20 @@ export default function Stones() {
 
   return (
     <>
-      <div className="mb-4">
+     <div className="flex justify-between flex-wrap items-center items-end mb-2">
+        <div className="flex items-center gap-4">
         <StonesSort 
           stones={stones} 
-          onSortedStones={setSortedStones} 
+          onSortedStones={setSortedStones}
           priorityFn={priorityFunction}
         >
-          <div className="ml-auto">
-            <StoneSearch userRole="employee" />
-          </div>
+         
         </StonesSort>
+       
+        </div>
+        <div className="flex-1 flex justify-center">
+            <StoneSearch userRole="admin" />
+        </div>
       </div>
       
       <ModuleList>

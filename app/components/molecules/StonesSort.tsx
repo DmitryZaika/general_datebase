@@ -68,7 +68,7 @@ export function StonesSort<T extends Stone>({
   };
 
   return (
-    <div className="flex justify-between items-center w-full">
+    <div className=" px-1 flex justify-between items-center w-full">
       <div className={`flex items-center gap-4 ${className}`}>
         <p className="text-lg font-medium">Sort by:</p>
         <Select value={sortOption} onValueChange={handleSortChange}>

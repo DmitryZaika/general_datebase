@@ -110,7 +110,7 @@ export default function AdminStones() {
             <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
           </Link>
         </div>
-        <div className="ml-auto">
+        <div className="flex-1 flex justify-center">
             <StoneSearch userRole="admin" />
           </div>
       
