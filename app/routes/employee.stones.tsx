@@ -5,31 +5,12 @@ import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
 import { ImageCard } from "~/components/organisms/ImageCard";
 import { SuperCarousel } from "~/components/organisms/SuperCarousel";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { Stone, stoneQueryBuilder } from "~/utils/queries";
 import { StoneSearch } from "~/components/molecules/StoneSearch";
-
-
-function customSort2(a: Stone, b: Stone) {
-  const aAvailable = a.available ?? 0;
-  const bAvailable = b.available ?? 0;
-  if (aAvailable > 0 && bAvailable === 0) return -1;
-  if (aAvailable === 0 && bAvailable > 0) return 1;
-  if (aAvailable > 0 && bAvailable > 0) {
-    return a.name.localeCompare(b.name);
-  }
-  if (aAvailable === 0 && bAvailable === 0) {
-    return a.name.localeCompare(b.name);
-  }
-  const aAmount = a.amount ?? 0;
-  const bAmount = b.amount ?? 0;
-  if (aAmount > bAmount) return -1;
-  if (aAmount < bAmount) return 1;
-
-  return 0;
-}
+import { StonesSort } from "~/components/molecules/StonesSort";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
@@ -61,8 +42,6 @@ function InteractiveCard({
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const isNew = createdDate > oneWeekAgo;
   const isOnSale = !!stone.on_sale;
-
-
 
   return (
     <div
@@ -124,12 +103,38 @@ function InteractiveCard({
 export default function Stones() {
   const { stones } = useLoaderData<typeof loader>();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
+  const [sortedStones, setSortedStones] = useState<Stone[]>(stones);
+
+  // Инициализируем отсортированные камни при загрузке данных
+  useEffect(() => {
+    setSortedStones(stones);
+  }, [stones]);
+
+  // Функция приоритета для сортировки камней
+  const priorityFunction = (a: Stone, b: Stone) => {
+    const aAvailable = a.available ?? 0;
+    const bAvailable = b.available ?? 0;
+    
+    // Приоритизируем доступные камни
+    if (aAvailable > 0 && bAvailable === 0) return -1;
+    if (aAvailable === 0 && bAvailable > 0) return 1;
+    
+    return 0;
+  };
 
   return (
     <>
-      <div className="flex justify-center sm:justify-end">
-        <StoneSearch userRole="employee" />
-      </div>  
+      <div className="mb-4">
+        <StonesSort 
+          stones={stones} 
+          onSortedStones={setSortedStones} 
+          priorityFn={priorityFunction}
+        >
+          <div className="ml-auto">
+            <StoneSearch userRole="employee" />
+          </div>
+        </StonesSort>
+      </div>
       
       <ModuleList>
         <div className="w-full col-span-full">
@@ -137,10 +142,10 @@ export default function Stones() {
             type="stones"
             currentId={currentId}
             setCurrentId={setCurrentId}
-            images={stones}
+            images={sortedStones}
           />
         </div>
-        {stones.sort(customSort2).map((stone) => (
+        {sortedStones.map((stone) => (
           <InteractiveCard
             key={stone.id}
             stone={stone}
