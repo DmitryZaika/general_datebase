@@ -65,7 +65,18 @@ export default function AdminStones() {
   const location = useLocation();
 
   useEffect(() => {
-    setSortedStones(stones);
+    // Разделяем камни на три группы по приоритету
+    const inStock = stones.filter(stone => Number(stone.available) > 0 && Boolean(stone.is_display));
+    const outOfStock = stones.filter(stone => Number(stone.available) <= 0 && Boolean(stone.is_display));
+    const notDisplayed = stones.filter(stone => !Boolean(stone.is_display));
+    
+    // Сортируем каждую группу по имени (A-Z)
+    const sortedInStock = [...inStock].sort((a, b) => a.name.localeCompare(b.name));
+    const sortedOutOfStock = [...outOfStock].sort((a, b) => a.name.localeCompare(b.name));
+    const sortedNotDisplayed = [...notDisplayed].sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Объединяем все три группы в порядке приоритета
+    setSortedStones([...sortedInStock, ...sortedOutOfStock, ...sortedNotDisplayed]);
   }, [stones]);
 
   useEffect(() => {
@@ -79,9 +90,7 @@ export default function AdminStones() {
   };
 
   const priorityFunction = (a: Stone, b: Stone) => {
-    const priorityA = getStonePriority(a);
-    const priorityB = getStonePriority(b);
-    return priorityA - priorityB;
+    return 0;
   };
 
   const getEditUrl = (stoneId: number) => {
