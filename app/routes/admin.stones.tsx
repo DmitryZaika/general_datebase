@@ -4,7 +4,6 @@ import { useLoaderData, Link, useSearchParams, useNavigation, useLocation } from
 
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 
-import { Button } from "~/components/ui/button";
 import { getAdminUser } from "~/utils/session.server";
 import { stoneQueryBuilder } from "~/utils/queries";
 import { stoneFilterSchema } from "~/schemas/stones";
@@ -14,6 +13,7 @@ import ModuleList from "~/components/ModuleList";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { useEffect, useState } from "react";
 import { StoneSearch } from "~/components/molecules/StoneSearch";
+import { StonesSort } from "~/components/molecules/StonesSort";
 
 interface Stone {
   id: number;
@@ -25,6 +25,8 @@ interface Stone {
   width: number | null;
   amount: number;
   available: number;
+  retail_price: number;
+  cost_per_sqft: number;
 }
 
 function customSortType(
@@ -59,8 +61,12 @@ export default function AdminStones() {
   const [searchParams] = useSearchParams();
   const navigation = useNavigation();
   const [isAddingStone, setIsAddingStone] = useState(false);
-  const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
+  const [sortedStones, setSortedStones] = useState<Stone[]>(stones);
   const location = useLocation();
+
+  useEffect(() => {
+    setSortedStones(stones);
+  }, [stones]);
 
   useEffect(() => {
     if (navigation.state === "idle") {
@@ -72,18 +78,11 @@ export default function AdminStones() {
     setIsAddingStone(true);
   };
 
-  const handleSelectStone = (stoneId: number) => {
-    setSelectedStoneId(stoneId);
- 
+  const priorityFunction = (a: Stone, b: Stone) => {
+    const priorityA = getStonePriority(a);
+    const priorityB = getStonePriority(b);
+    return priorityA - priorityB;
   };
-
-  const stoneList = stones.reduce((acc: Record<string, Stone[]>, stone) => {
-    if (!acc[stone.type]) {
-      acc[stone.type] = [];
-    }
-    acc[stone.type].push(stone);
-    return acc;
-  }, {});
 
   const getEditUrl = (stoneId: number) => {
     const currentParams = new URLSearchParams(searchParams);
@@ -93,93 +92,92 @@ export default function AdminStones() {
   return (
     <>
       <div className="flex justify-between flex-wrap items-center items-end mb-2">
-        <div className="flex items-center">
+        <div className="flex items-center gap-4">
+        <StonesSort 
+          stones={stones} 
+          onSortedStones={setSortedStones}
+          priorityFn={priorityFunction}
+        >
+         
+        </StonesSort>
           <Link to={`add${location.search}`} onClick={handleAddStoneClick} className="mr-auto">
             <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
           </Link>
         </div>
-        <div className="ml-4">
-          <StoneSearch  userRole="admin" />
-        </div>
+        <div className="ml-auto">
+            <StoneSearch userRole="admin" />
+          </div>
+      
       </div>
 
       <div>
         <ModuleList>
-          {stones
-            .sort((a, b) => {
-              const priorityA = getStonePriority(a);
-              const priorityB = getStonePriority(b);
-              if (priorityA !== priorityB) {
-                return priorityA - priorityB;
-              }
-              return a.name.localeCompare(b.name);
-            })
-            .map((stone) => {
-              const displayedAmount = stone.amount > 0 ? stone.amount : "—";
-              const displayedAvailable = stone.available;
-              const displayedWidth =
-                stone.width && stone.width > 0 ? stone.width : "—";
-              const displayedLength =
-                stone.length && stone.length > 0 ? stone.length : "—";
+          {sortedStones.map((stone) => {
+            const displayedAmount = stone.amount > 0 ? stone.amount : "—";
+            const displayedAvailable = stone.available;
+            const displayedWidth =
+              stone.width && stone.width > 0 ? stone.width : "—";
+            const displayedLength =
+              stone.length && stone.length > 0 ? stone.length : "—";
 
-              return (
-                <div id={`stone-${stone.id}`} key={stone.id} className="relative w-full module-item">
-                  <div
-                    className={`border-2 border-blue-500 rounded ${
-                      !stone.is_display ? "opacity-30" : ""
-                    }`}
-                  >
-                    <div className="relative">
-                      <img
-                        src={stone.url || "/placeholder.png"}
-                        alt={stone.name || "Stone Image"}
-                        className="object-cover w-full h-40 rounded select-none"
-                        loading="lazy"
-                      />
-                      {displayedAmount === "—" && (
-                        <div className="absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
-                          <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
-                            Out of Stock
-                          </div>
+            return (
+              <div id={`stone-${stone.id}`} key={stone.id} className="relative w-full module-item">
+                <div
+                  className={`border-2 border-blue-500 rounded ${
+                    !stone.is_display ? "opacity-30" : ""
+                  }`}
+                >
+                  <div className="relative">
+                    <img
+                      src={stone.url || "/placeholder.png"}
+                      alt={stone.name || "Stone Image"}
+                      className="object-cover w-full h-40 rounded select-none"
+                      loading="lazy"
+                    />
+                    {displayedAmount === "—" && (
+                      <div className="absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
+                        <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
+                          Out of Stock
                         </div>
-                      )}
-                    </div>
-                    <p className="text-center font-bold mt-2">{stone.name}</p>
-                    <p className="text-center text-sm">
-                      Available: {displayedAvailable} / {displayedAmount}
-                    </p>
-                    <p className="text-center text-sm">
-                      Size: {displayedLength} x {displayedWidth}
-                    </p>
-                    <p className="text-center text-sm">
-                      Price: ${stone.retail_price}
-                    </p>
-                    <p className="text-center text-sm">
-                      Cost per sqft: ${stone.cost_per_sqft}
-                    </p>
+                      </div>
+                    )}
                   </div>
-
-                  <div className="absolute inset-0 flex justify-between items-start p-2 opacity-50 transition-opacity duration-300">
-                    <Link
-                      to={getEditUrl(stone.id)}
-                      className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2"
-                      title="Edit Stone"
-                      aria-label={`Edit ${stone.name}/information`}
-                    >
-                      <FaPencilAlt />
-                    </Link>
-                    <Link
-                      to={`delete/${stone.id}${location.search}`}
-                      className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2"
-                      title="Delete Stone"
-                      aria-label={`Delete ${stone.name}`}
-                    >
-                      <FaTimes />
-                    </Link>
-                  </div>
+                  <p className="text-center font-bold mt-2">{stone.name}</p>
+                  <p className="text-center text-sm">
+                    Available: {displayedAvailable} / {displayedAmount}
+                  </p>
+                  <p className="text-center text-sm">
+                    Size: {displayedLength} x {displayedWidth}
+                  </p>
+                  <p className="text-center text-sm">
+                    Price: ${stone.retail_price}
+                  </p>
+                  <p className="text-center text-sm">
+                    Cost per sqft: ${stone.cost_per_sqft}
+                  </p>
                 </div>
-              );
-            })}
+
+                <div className="absolute inset-0 flex justify-between items-start p-2 opacity-50 transition-opacity duration-300">
+                  <Link
+                    to={getEditUrl(stone.id)}
+                    className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2"
+                    title="Edit Stone"
+                    aria-label={`Edit ${stone.name}/information`}
+                  >
+                    <FaPencilAlt />
+                  </Link>
+                  <Link
+                    to={`delete/${stone.id}${location.search}`}
+                    className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2"
+                    title="Delete Stone"
+                    aria-label={`Delete ${stone.name}`}
+                  >
+                    <FaTimes />
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
         </ModuleList>
         <Outlet />
       </div>
