@@ -105,27 +105,21 @@ export default function Stones() {
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones);
 
-  // Инициализируем отсортированные камни при загрузке данных
   useEffect(() => {
-    // Разделяем камни на три группы по приоритету
     const inStock = stones.filter(stone => Number(stone.available) > 0 && Boolean(stone.is_display));
     const outOfStock = stones.filter(stone => Number(stone.available) <= 0 && Boolean(stone.is_display));
     const notDisplayed = stones.filter(stone => !Boolean(stone.is_display));
     
-    // Сортируем каждую группу по имени (A-Z)
     const sortedInStock = [...inStock].sort((a, b) => a.name.localeCompare(b.name));
     const sortedOutOfStock = [...outOfStock].sort((a, b) => a.name.localeCompare(b.name));
     const sortedNotDisplayed = [...notDisplayed].sort((a, b) => a.name.localeCompare(b.name));
     
-    // Объединяем все три группы в порядке приоритета
     setSortedStones([...sortedInStock, ...sortedOutOfStock, ...sortedNotDisplayed]);
   }, [stones]);
 
-  // Функция приоритета вызывается после применения основного приоритета в StonesSort,
-  // который уже размещает out of stock и not displayed камни в конце.
+ 
   const priorityFunction = (a: Stone, b: Stone) => {
-    // Возвращаем 0, чтобы позволить основной сортировке в StonesSort работать
-    // Это гарантирует, что камни out of stock будут внизу списка
+
     return 0;
   };
 
@@ -142,7 +136,7 @@ export default function Stones() {
         </StonesSort>
        
         </div>
-        <div className="flex-1 flex justify-center">
+        <div className="flex-1 flex justify-center md:justify-end md:ml-auto">
             <StoneSearch userRole="admin" />
         </div>
       </div>

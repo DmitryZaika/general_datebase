@@ -97,7 +97,7 @@ export default function AdminStones() {
 
   return (
     <>
-      <div className="flex justify-between flex-wrap items-center items-end mb-2">
+      <div className="flex justify-between justify-end flex-wrap items-center items-end mb-2">
         <div className="flex items-center gap-4">
         <StonesSort 
           stones={stones} 
@@ -110,7 +110,7 @@ export default function AdminStones() {
             <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
           </Link>
         </div>
-        <div className="flex-1 flex justify-center">
+        <div className="flex-1 flex justify-center md:justify-end ">
             <StoneSearch userRole="admin" />
           </div>
       
