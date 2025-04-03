@@ -142,7 +142,7 @@ export default function Stones() {
   return (
     <>
       <div className="flex justify-center sm:justify-end">
-        <StoneSearch stones={stones} onSelectStone={(id) => handleCardClick(id, stones.find(s => s.id === id)?.type || '')} userRole="customer" />
+        <StoneSearch  userRole="customer" />
       </div>
       
       <ModuleList>
@@ -152,7 +152,7 @@ export default function Stones() {
             currentId={currentId}
             setCurrentId={handleCarouselChange}
             images={stones}
-            activeType={activeType}
+          
           />
         </div>
         {stones.sort(sortStones).map((stone) => (
