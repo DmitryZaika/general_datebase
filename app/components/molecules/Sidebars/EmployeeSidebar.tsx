@@ -14,6 +14,7 @@ import { stoneFilterSchema, StoneFilter } from "~/schemas/stones";
 import { CheckOption } from "~/components/molecules/CheckOption";
 import { getBase } from "~/utils/urlHelpers";
 import { StonesFilters } from "./StonesFilters";
+import { SinksFilters } from "./SinksFilters";
 import { ISupplier } from "~/schemas/suppliers";
 
 import {
@@ -37,7 +38,7 @@ interface ISidebarItem {
   component?: ({}) => React.ReactNode;
 }
 
-const getItems = (base: string, suppliers: ISupplier[] | undefined) => {
+const getItems = (base: string, suppliers: ISupplier[] | undefined, sinkSuppliers?: ISupplier[] | undefined) => {
   const finalList: ISidebarItem[] = [
     {
       title: "Stones",
@@ -52,6 +53,7 @@ const getItems = (base: string, suppliers: ISupplier[] | undefined) => {
         title: "Sinks",
         url: `/${base}/sinks`,
         icon: Inbox,
+        component: () => <SinksFilters base={base} suppliers={sinkSuppliers}/>,
       },
       {
         title: "Suppliers",
@@ -99,12 +101,13 @@ const getItems = (base: string, suppliers: ISupplier[] | undefined) => {
 
 interface IProps {
   suppliers: ISupplier[] | undefined;
+  sinkSuppliers?: ISupplier[] | undefined;
 }
 
-export function EmployeeSidebar({ suppliers }: IProps) {
+export function EmployeeSidebar({ suppliers, sinkSuppliers }: IProps) {
   const location = useLocation();
   const base = getBase(location.pathname);
-  const items = getItems(base as "employee" | "admin" | "customer", suppliers);
+  const items = getItems(base as "employee" | "admin" | "customer", suppliers, sinkSuppliers);
   return (
     <Sidebar>
       <SidebarContent>
