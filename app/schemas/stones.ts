@@ -7,7 +7,6 @@ export const stoneSchema = z.object({
   type: z.enum(STONE_TYPES),
   is_display: StringBoolean,
   on_sale: StringBoolean,
-
   length: z.coerce.number().default(0),
   width: z.coerce.number().default(0),
   supplier_id: NullableId,
@@ -20,8 +19,8 @@ export const stoneFilterSchema = z.object({
   type: z.array(z.enum(STONE_TYPES)).default([...STONE_TYPES]),
   show_sold_out: z.preprocess((value) => {
     if (typeof value === "boolean") return value;
-    return value !== "false";
-  }, z.boolean()),
+    return value === "true";
+  }, z.boolean()).default(false),
   supplier: z.number().gte(0).default(0),
 });
 

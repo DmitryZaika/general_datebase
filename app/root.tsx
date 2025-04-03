@@ -75,9 +75,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = (await getUserBySessionId(activeSession)) || null;
   }
 
-  let suppliers: ISupplier[] | undefined = undefined;
+  let stoneSuppliers: ISupplier[] | undefined = undefined;
+  let sinkSuppliers: ISupplier[] | undefined = undefined;
+  
   if (user) {
-    suppliers = await selectMany<ISupplier>(
+    stoneSuppliers = await selectMany<ISupplier>(
       db,
       `SELECT s.id, s.supplier_name 
        FROM suppliers s
@@ -86,10 +88,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
        GROUP BY s.id, s.supplier_name`,
       [user.company_id]
     );
+    
+    sinkSuppliers = await selectMany<ISupplier>(
+      db,
+      `SELECT s.id, s.supplier_name 
+       FROM suppliers s
+       INNER JOIN sinks sk ON s.id = sk.supplier_id
+       WHERE s.company_id = ?
+       GROUP BY s.id, s.supplier_name`,
+      [user.company_id]
+    );
   }
 
   return data(
-    { message, token, user, suppliers },
+    { message, token, user, stoneSuppliers, sinkSuppliers },
 
     {
       headers: [
@@ -103,7 +115,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 const queryClient = new QueryClient();
 
 export default function App() {
-  const { message, token, user, suppliers } = useLoaderData<typeof loader>();
+  const { message, token, user, stoneSuppliers, sinkSuppliers } = useLoaderData<typeof loader>();
   const { pathname } = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -136,7 +148,7 @@ export default function App() {
       <body>
       <QueryClientProvider client={queryClient}>
         <SidebarProvider open={!!basePath}>
-          <EmployeeSidebar suppliers={suppliers} />
+          <EmployeeSidebar suppliers={stoneSuppliers} sinkSuppliers={sinkSuppliers} />
           <main className="h-screen overflow-y-auto bg-gray-100 w-full">
             <AuthenticityTokenProvider token={token}>
               <Header

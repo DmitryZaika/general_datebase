@@ -1,54 +1,44 @@
-import { useLocation, useNavigate, useNavigation, Outlet } from "react-router";
-import { FormLabel } from "~/components/ui/form";
-import { STONE_TYPES } from "~/utils/constants";
+import { useNavigation } from "react-router";
+import { SINK_TYPES } from "~/utils/constants";
 import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
-import { stoneFilterSchema, StoneFilter } from "~/schemas/stones";
+import { sinkFilterSchema, SinkFilter } from "~/schemas/sinks";
 import { CheckOption } from "~/components/molecules/CheckOption";
-import { getBase } from "~/utils/urlHelpers";
-import { ISupplier } from "~/schemas/suppliers";
 import { LinkSpan } from "~/components/atoms/LinkSpan";
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Stone } from "~/utils/queries";
+import { useMemo, useCallback, useState, useEffect } from "react";
+import { ISupplier } from "~/schemas/suppliers";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 
 import { SidebarGroupLabel, SidebarMenuSub } from "~/components/ui/sidebar";
 
 interface IProps {
-  suppliers: ISupplier[] | undefined;
   base: string;
-  stones?: Stone[];
+  suppliers?: ISupplier[];
 }
 
-export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
-  const [searchParams, setSearchParams] =
-    useSafeSearchParams(stoneFilterSchema);
+export function SinksFilters({ base, suppliers }: IProps) {
+  const [searchParams, setSearchParams] = useSafeSearchParams(sinkFilterSchema);
   const navigation = useNavigation();
   const isSubmitting = useMemo(() => navigation.state !== "idle", [navigation.state]);
-  const navigate = useNavigate();
-  const location = useLocation();
   const [suppliersExpanded, setSuppliersExpanded] = useState(false);
   
-
+  const showSoldOutToggle = useMemo(() => ["admin", "employee"].includes(base), [base]);
+  
   useEffect(() => {
     localStorage.setItem('suppliersExpanded', JSON.stringify(suppliersExpanded));
   }, [suppliersExpanded]);
   
-
   useEffect(() => {
     if (searchParams.supplier !== 0) {
       setSuppliersExpanded(true);
     }
   }, [searchParams.supplier]);
   
-  const cleanType = useMemo(() => searchParams.type || ["granite"], [searchParams.type]);
-  const showSoldOutToggle = useMemo(() => ["admin", "employee"].includes(base), [base]);
-  
   const allTypesSelected = useMemo(() => 
-    searchParams?.type?.length === STONE_TYPES.length, 
+    searchParams?.type?.length === SINK_TYPES.length, 
     [searchParams.type]
   );
 
-  const toggleStoneType = useCallback((typeToToggle: StoneFilter["type"][number]) => {
+  const toggleSinkType = useCallback((typeToToggle: SinkFilter["type"][number]) => {
     if (isSubmitting) return;
     
     const type = searchParams.type ?? [];
@@ -66,14 +56,14 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
   const toggleSelectAllTypes = useCallback(() => {
     if (isSubmitting) return;
     
-    const newType = searchParams?.type?.length === STONE_TYPES.length ? [] : [...STONE_TYPES];
+    const newType = searchParams?.type?.length === SINK_TYPES.length ? [] : [...SINK_TYPES];
     setSearchParams({ ...searchParams, type: newType });
   }, [isSubmitting, searchParams, setSearchParams]);
 
   const toggleShowSoldOut = useCallback((val: string) => {
     if (isSubmitting) return;
     
-    const show_sold_out = searchParams.show_sold_out ?? true;
+    const show_sold_out = searchParams.show_sold_out ?? false;
     setSearchParams({ ...searchParams, show_sold_out: !show_sold_out });
   }, [isSubmitting, searchParams, setSearchParams]);
   
@@ -81,10 +71,10 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
     if (isSubmitting) return;
     
     setSearchParams({ 
-      supplier: supplierId,
-      type: [...STONE_TYPES]
+      ...searchParams,
+      supplier: supplierId
     });
-  }, [isSubmitting, setSearchParams]);
+  }, [isSubmitting, searchParams, setSearchParams]);
   
   const toggleSuppliersExpanded = useCallback(() => {
     setSuppliersExpanded(prev => !prev);
@@ -93,7 +83,7 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
   return (
     <SidebarMenuSub>
       <SidebarGroupLabel>
-        Types{" "}
+        Sink Types{" "}
         <LinkSpan
           className="ml-2"
           onClick={toggleSelectAllTypes}
@@ -104,17 +94,17 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
         </LinkSpan>
       </SidebarGroupLabel>
       
-      {STONE_TYPES.map((item) => (
+      {SINK_TYPES.map((item) => (
         <CheckOption
           value={item}
           key={item}
           selected={searchParams.type ? searchParams.type.includes(item) : false}
-          toggleValue={toggleStoneType}
+          toggleValue={toggleSinkType}
           isLoading={isSubmitting}
         />
       ))}
       
-      {Array.isArray(suppliers) && (
+      {Array.isArray(suppliers) && suppliers.length > 0 && (
         <>
           <SidebarGroupLabel 
             onClick={toggleSuppliersExpanded} 
@@ -143,13 +133,13 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
           {suppliersExpanded && suppliers.map((supplier) => (
             <div
               key={supplier.id}
-              onClick={() =>  toggleSupplier(supplier.id)}
+              onClick={() => toggleSupplier(Number(supplier.id))}
               className={`p-1 cursor-pointer hover:bg-gray-100 transition-colors ${
-                searchParams.supplier === supplier.id ? "bg-gray-100" : ""
+                searchParams.supplier === Number(supplier.id) ? "bg-gray-100" : ""
               } ${isSubmitting ? "opacity-60" : ""}`}
             >
               <LinkSpan
-                isSelected={searchParams.supplier === supplier.id}
+                isSelected={searchParams.supplier === Number(supplier.id)}
                 disabled={isSubmitting}
               >
                 {supplier.supplier_name}
@@ -158,10 +148,9 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
           ))}
         </>
       )}
-
+      
       { showSoldOutToggle && (
         <>
-       
           <CheckOption
             value="Show sold out"
             selected={!!searchParams.show_sold_out}
@@ -173,4 +162,4 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
       )}
     </SidebarMenuSub>
   );
-}
+} 
