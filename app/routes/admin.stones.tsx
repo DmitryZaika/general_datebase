@@ -65,17 +65,14 @@ export default function AdminStones() {
   const location = useLocation();
 
   useEffect(() => {
-    // Разделяем камни на три группы по приоритету
     const inStock = stones.filter(stone => Number(stone.available) > 0 && Boolean(stone.is_display));
     const outOfStock = stones.filter(stone => Number(stone.available) <= 0 && Boolean(stone.is_display));
     const notDisplayed = stones.filter(stone => !Boolean(stone.is_display));
     
-    // Сортируем каждую группу по имени (A-Z)
     const sortedInStock = [...inStock].sort((a, b) => a.name.localeCompare(b.name));
     const sortedOutOfStock = [...outOfStock].sort((a, b) => a.name.localeCompare(b.name));
     const sortedNotDisplayed = [...notDisplayed].sort((a, b) => a.name.localeCompare(b.name));
     
-    // Объединяем все три группы в порядке приоритета
     setSortedStones([...sortedInStock, ...sortedOutOfStock, ...sortedNotDisplayed]);
   }, [stones]);
 
@@ -100,7 +97,7 @@ export default function AdminStones() {
 
   return (
     <>
-      <div className="flex justify-between flex-wrap items-center items-end mb-2">
+      <div className="flex justify-between justify-end flex-wrap items-center items-end mb-2">
         <div className="flex items-center gap-4">
         <StonesSort 
           stones={stones} 
@@ -113,7 +110,7 @@ export default function AdminStones() {
             <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
           </Link>
         </div>
-        <div className="ml-auto">
+        <div className="flex-1 flex justify-center md:justify-end ">
             <StoneSearch userRole="admin" />
           </div>
       

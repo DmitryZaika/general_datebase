@@ -320,7 +320,7 @@ export function TodoList() {
         }}
       >
         <div className="h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto">
-          <DialogFullHeader>Todo List</DialogFullHeader>
+          <DialogFullHeader><span className="text-lg font-bold">Todo List</span></DialogFullHeader>
 
           <div className="px-2 flex flex-col">
             <AddForm refresh={getTodos} />
