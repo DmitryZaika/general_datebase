@@ -172,7 +172,6 @@ export function AddSlab() {
               type="image"
               id="image"
               onChange={field.onChange}
-              showCameraOptions={true}
             />
           )}
         />

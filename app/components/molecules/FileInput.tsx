@@ -2,7 +2,7 @@ import Compressor from "compressorjs";
 
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { Input } from "~/components/ui/input";
-import { useRef } from "react";
+import { useState } from "react";
 import { Button } from "~/components/ui/button";
 
 type FileInput = {
@@ -12,7 +12,6 @@ type FileInput = {
   type: "image" | "pdf";
   className?: string;
   onChange: (event: File | undefined) => void;
-  showCameraOptions?: boolean;
 };
 
 const acceptsMap = {
@@ -46,11 +45,7 @@ export function FileInput({
   label = "Image",
   type,
   className,
-  showCameraOptions = false,
 }: FileInput) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  
   function compressImage(file: File) {
     new Compressor(file, {
       quality: getQuality(file.size),
@@ -81,59 +76,13 @@ export function FileInput({
     <FormItem>
       <FormLabel>{label}</FormLabel>
       <FormControl>
-        <div className="space-y-2">
-          {/* Стандартный input - показывается всегда на ПК и на мобильных если не нужны кнопки камеры */}
-          <Input
-            className={`${className} ${showCameraOptions ? 'hidden sm:block' : ''}`}
-            onChange={(event) => handleChange(event.target.files?.[0])}
-            type="file"
-            accept={acceptsMap[type]}
-            id={id}
-          />
-          
-          {/* Скрытые input поля и кнопки для мобильных - только когда showCameraOptions=true */}
-          {type === "image" && showCameraOptions && (
-            <>
-              <Input
-                className="hidden"
-                ref={fileInputRef}
-                onChange={(event) => handleChange(event.target.files?.[0])}
-                type="file"
-                accept={acceptsMap.image}
-              />
-              
-              <Input
-                className="hidden"
-                ref={cameraInputRef}
-                onChange={(event) => handleChange(event.target.files?.[0])}
-                type="file"
-                accept="image/*"
-                capture="environment"
-              />
-              
-              {/* Видимые кнопки только на мобильных */}
-              <div className="flex flex-col space-y-2 sm:hidden">
-                <Button 
-                  type="button"
-                  variant="default"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="w-full"
-                >
-                  Take Photo
-                </Button>
-                
-                <Button 
-                  type="button"
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full"
-                >
-                  Choose from Gallery
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
+        <Input
+          className={className}
+          onChange={(event) => handleChange(event.target.files?.[0])}
+          type="file"
+          accept={acceptsMap[type]}
+          id={id}
+        />
       </FormControl>
       <FormMessage />
     </FormItem>
