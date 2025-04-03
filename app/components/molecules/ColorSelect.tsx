@@ -10,10 +10,15 @@ type Option = { key: string; value: string };
 interface ColorSelectProps<TFieldValues extends FieldValues = FieldValues> {
   name: string;
   placeholder?: string;
-  field: ControllerRenderProps<TFieldValues>;
+  field: ControllerRenderProps<TFieldValues> & { value: string[] };
   disabled?: boolean;
   options: Array<string | Option>;
   className?: string;
+}
+
+function areArraysEqual(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  return a.every((val, index) => val === b[index]);
 }
 
 export function ColorSelect<TFieldValues extends FieldValues = FieldValues>({
@@ -25,8 +30,8 @@ export function ColorSelect<TFieldValues extends FieldValues = FieldValues>({
   className,
 }: ColorSelectProps<TFieldValues>) {
   const [open, setOpen] = useState(false);
-  
-  // Нормализуем опции в формат { key, value }
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const normalizedOptions = useMemo(() => {
     return options.map((option) => {
       if (typeof option === "string") {
@@ -37,58 +42,56 @@ export function ColorSelect<TFieldValues extends FieldValues = FieldValues>({
     });
   }, [options]);
 
-  // Для отслеживания изменений без использования эффектов
-  const fieldValueRef = useRef<any>(field.value);
-  
-  // Инициализируем выбранные значения
-  const selectedValues: string[] = 
-    Array.isArray(field.value) ? field.value : [];
-  
-  // Обработчик выбора опции
-  const handleOptionToggle = useCallback((optionKey: string) => {
-    // Для избежания цикла обновлений, проверяем текущее значение
-    const currentValues: string[] = Array.isArray(field.value) ? field.value : [];
-    
-    // Создаем новый массив выбранных значений
-    let newValues;
-    if (currentValues.includes(optionKey)) {
-      newValues = currentValues.filter(key => key !== optionKey);
-    } else {
-      newValues = [...currentValues, optionKey];
-    }
-    
-    // Только если значение изменилось, вызываем onChange
-    if (JSON.stringify(currentValues) !== JSON.stringify(newValues)) {
-      fieldValueRef.current = newValues;
-      field.onChange(newValues);
-    }
-  }, [field]);
+  const selectedValues: string[] = Array.isArray(field.value) 
+    ? field.value 
+    : [];
 
-  // Закрытие при клике вне компонента
-  const containerRef = useRef<HTMLDivElement>(null);
+  const valueRef = useRef(selectedValues);
   
+  useEffect(() => {
+    if (!areArraysEqual(valueRef.current, selectedValues)) {
+      valueRef.current = selectedValues;
+    }
+  }, [selectedValues]);
+
+  const handleOptionToggle = useCallback(
+    (optionKey: string) => {
+      const currentValues = [...valueRef.current];
+      
+      let newValues: string[];
+      if (currentValues.includes(optionKey)) {
+        newValues = currentValues.filter((key) => key !== optionKey);
+      } else {
+        newValues = [...currentValues, optionKey];
+      }
+      
+      if (!areArraysEqual(currentValues, newValues)) {
+        valueRef.current = newValues;
+        field.onChange(newValues);
+      }
+    },
+    [field]
+  );
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
-    
     if (open) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
-    
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [open]);
 
-  // Текст для отображения в кнопке
   const displayText = useMemo(() => {
     if (selectedValues.length === 0) {
       return placeholder || "Select colors";
     } else if (selectedValues.length === 1) {
-      const selectedOption = normalizedOptions.find(opt => opt.key === selectedValues[0]);
+      const selectedOption = normalizedOptions.find((opt) => opt.key === selectedValues[0]);
       return selectedOption ? selectedOption.value : selectedValues[0];
     } else {
       return `${selectedValues.length} colors selected`;
@@ -113,11 +116,8 @@ export function ColorSelect<TFieldValues extends FieldValues = FieldValues>({
             <span className="text-left">{displayText}</span>
             <CaretSortIcon className="h-4 w-4 opacity-50" />
           </button>
-          
           {open && (
-            <div 
-              className="absolute z-50 bottom-full mb-1 max-h-60 w-full overflow-auto rounded-md border border-zinc-200 bg-white p-1 text-zinc-950 shadow-md animate-in fade-in-0 zoom-in-95 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50"
-            >
+            <div className="absolute z-50 bottom-full mb-1 max-h-60 w-full overflow-auto rounded-md border border-zinc-200 bg-white p-1 text-zinc-950 shadow-md animate-in fade-in-0 zoom-in-95 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50">
               {normalizedOptions.map((option) => {
                 const isSelected = selectedValues.includes(option.key);
                 return (
@@ -131,10 +131,7 @@ export function ColorSelect<TFieldValues extends FieldValues = FieldValues>({
                     }}
                   >
                     <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={isSelected}
-                        className="mr-1"
-                      />
+                      <Checkbox checked={isSelected} className="mr-1" />
                       {option.value}
                     </div>
                     {isSelected && (
