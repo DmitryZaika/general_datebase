@@ -7,3 +7,11 @@ export const STONE_TYPES = [
   "dolomite",
   "quartzite",
 ] as const;
+
+export const SINK_TYPES = [
+  "stainless 18 gauge",
+  "stainless 16 gauge",
+  "granite composite",
+  "ceramic",
+  "farm house",
+] as const;

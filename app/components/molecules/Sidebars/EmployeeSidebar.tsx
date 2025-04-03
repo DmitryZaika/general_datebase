@@ -14,6 +14,7 @@ import { stoneFilterSchema, StoneFilter } from "~/schemas/stones";
 import { CheckOption } from "~/components/molecules/CheckOption";
 import { getBase } from "~/utils/urlHelpers";
 import { StonesFilters } from "./StonesFilters";
+import { SinksFilters } from "./SinksFilters";
 import { ISupplier } from "~/schemas/suppliers";
 
 import {
@@ -52,6 +53,7 @@ const getItems = (base: string, suppliers: ISupplier[] | undefined) => {
         title: "Sinks",
         url: `/${base}/sinks`,
         icon: Inbox,
+        component: () => <SinksFilters base={base}/>,
       },
       {
         title: "Suppliers",

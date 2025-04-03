@@ -167,6 +167,7 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
             selected={!!searchParams.show_sold_out}
             toggleValue={toggleShowSoldOut}
             isLoading={isSubmitting}
+            defaultChecked={false}
           />
         </>
       )}
