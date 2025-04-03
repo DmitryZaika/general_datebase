@@ -18,6 +18,8 @@ export const sinkSchema = z.object({
     if (value === null || value === undefined) return 0;
     return value;
   }, z.number().gte(0).default(0)),
+  retail_price: z.coerce.number().default(0),
+  cost: z.coerce.number().default(0),
 });
 
 export const sinkFilterSchema = z.object({
