@@ -172,6 +172,7 @@ export function AddSlab() {
               type="image"
               id="image"
               onChange={field.onChange}
+              showCameraOptions={true}
             />
           )}
         />
@@ -212,8 +213,8 @@ export function AddSlab() {
 export default function EditStoneSlabs() {
   const { slabs, stone } = useLoaderData<typeof loader>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-   const navigation = useNavigation();
-    const isSubmitting = navigation.state === "submitting";
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
   return (
     <>
       <AddSlab />
