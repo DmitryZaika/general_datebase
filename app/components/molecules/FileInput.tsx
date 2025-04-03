@@ -2,10 +2,6 @@ import Compressor from "compressorjs";
 
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { Input } from "~/components/ui/input";
-import { useState } from "react";
-import { Button } from "~/components/ui/button";
-import { Label } from "~/components/ui/label";
-import { cn } from "~/lib/utils";
 
 type FileInput = {
   inputName?: string;
@@ -48,10 +44,6 @@ export function FileInput({
   type,
   className,
 }: FileInput) {
-  const [captureMode, setCaptureMode] = useState<"environment" | "user" | undefined>(
-    type === "image" ? "environment" : undefined
-  );
-
   function compressImage(file: File) {
     new Compressor(file, {
       quality: getQuality(file.size),
@@ -82,50 +74,13 @@ export function FileInput({
     <FormItem>
       <FormLabel>{label}</FormLabel>
       <FormControl>
-        <div className="space-y-3">
-          <Input
-            className={className}
-            onChange={(event) => handleChange(event.target.files?.[0])}
-            type="file"
-            accept={acceptsMap[type]}
-            id={id}
-            capture={captureMode}
-          />
-          {type === "image" && (
-            <div className="flex flex-col gap-2 sm:hidden">
-              <div className="text-sm font-medium">Source:</div>
-              <div className="flex gap-1">
-                <Button
-                  type="button" 
-                  variant="outline"
-                  size="sm"
-                  className={`text-xs border-gray-300 ${captureMode === "environment" ? "bg-blue-100 border-blue-500 text-blue-700" : ""}`}
-                  onClick={() => setCaptureMode("environment")}
-                >
-                  Rear Camera
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className={`text-xs border-gray-300 ${captureMode === "user" ? "bg-blue-100 border-blue-500 text-blue-700" : ""}`}
-                  onClick={() => setCaptureMode("user")}
-                >
-                  Front Camera
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className={`text-xs border-gray-300 ${captureMode === undefined ? "bg-blue-100 border-blue-500 text-blue-700" : ""}`}
-                  onClick={() => setCaptureMode(undefined)}
-                >
-                  Gallery
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+        <Input
+          className={className}
+          onChange={(event) => handleChange(event.target.files?.[0])}
+          type="file"
+          accept={acceptsMap[type]}
+          id={id}
+        />
       </FormControl>
       <FormMessage />
     </FormItem>
