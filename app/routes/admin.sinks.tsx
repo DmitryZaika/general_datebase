@@ -99,11 +99,10 @@ export default function AdminSinks() {
 
   return (
     <>
-      <div className="flex justify-between mb-2">
+      <div className="flex justify-start mb-2">
         <Link to="add" onClick={handleAddSinkClick}>
           <LoadingButton className="mt-2 ml-2 -mb-3" loading={isAddingSink}>Add Sink</LoadingButton>
         </Link>
-      
       </div>
 
       <div>

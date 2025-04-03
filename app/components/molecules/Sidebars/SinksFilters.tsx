@@ -4,20 +4,34 @@ import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
 import { sinkFilterSchema, SinkFilter } from "~/schemas/sinks";
 import { CheckOption } from "~/components/molecules/CheckOption";
 import { LinkSpan } from "~/components/atoms/LinkSpan";
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
+import { ISupplier } from "~/schemas/suppliers";
+import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 
 import { SidebarGroupLabel, SidebarMenuSub } from "~/components/ui/sidebar";
 
 interface IProps {
   base: string;
+  suppliers?: ISupplier[];
 }
 
-export function SinksFilters({ base }: IProps) {
+export function SinksFilters({ base, suppliers }: IProps) {
   const [searchParams, setSearchParams] = useSafeSearchParams(sinkFilterSchema);
   const navigation = useNavigation();
   const isSubmitting = useMemo(() => navigation.state !== "idle", [navigation.state]);
+  const [suppliersExpanded, setSuppliersExpanded] = useState(false);
   
   const showSoldOutToggle = useMemo(() => ["admin", "employee"].includes(base), [base]);
+  
+  useEffect(() => {
+    localStorage.setItem('suppliersExpanded', JSON.stringify(suppliersExpanded));
+  }, [suppliersExpanded]);
+  
+  useEffect(() => {
+    if (searchParams.supplier !== 0) {
+      setSuppliersExpanded(true);
+    }
+  }, [searchParams.supplier]);
   
   const allTypesSelected = useMemo(() => 
     searchParams?.type?.length === SINK_TYPES.length, 
@@ -53,6 +67,19 @@ export function SinksFilters({ base }: IProps) {
     setSearchParams({ ...searchParams, show_sold_out: !show_sold_out });
   }, [isSubmitting, searchParams, setSearchParams]);
   
+  const toggleSupplier = useCallback((supplierId: number) => {
+    if (isSubmitting) return;
+    
+    setSearchParams({ 
+      ...searchParams,
+      supplier: supplierId
+    });
+  }, [isSubmitting, searchParams, setSearchParams]);
+  
+  const toggleSuppliersExpanded = useCallback(() => {
+    setSuppliersExpanded(prev => !prev);
+  }, []);
+  
   return (
     <SidebarMenuSub>
       <SidebarGroupLabel>
@@ -76,6 +103,51 @@ export function SinksFilters({ base }: IProps) {
           isLoading={isSubmitting}
         />
       ))}
+      
+      {Array.isArray(suppliers) && suppliers.length > 0 && (
+        <>
+          <SidebarGroupLabel 
+            onClick={toggleSuppliersExpanded} 
+            className="flex items-center cursor-pointer"
+          >
+            <span>Suppliers</span>{" "}
+            {suppliersExpanded ? 
+              <FaChevronUp className="ml-1 text-gray-500" size={12} /> : 
+              <FaChevronDown className="ml-1 text-gray-500" size={12} />
+            }
+            { searchParams.supplier !== 0 && (
+              <LinkSpan
+                className="ml-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSupplier(0);
+                }}
+                variant="blue"
+                disabled={isSubmitting}
+              >
+                Select all
+              </LinkSpan>
+            ) }
+          </SidebarGroupLabel>
+          
+          {suppliersExpanded && suppliers.map((supplier) => (
+            <div
+              key={supplier.id}
+              onClick={() => toggleSupplier(Number(supplier.id))}
+              className={`p-1 cursor-pointer hover:bg-gray-100 transition-colors ${
+                searchParams.supplier === Number(supplier.id) ? "bg-gray-100" : ""
+              } ${isSubmitting ? "opacity-60" : ""}`}
+            >
+              <LinkSpan
+                isSelected={searchParams.supplier === Number(supplier.id)}
+                disabled={isSubmitting}
+              >
+                {supplier.supplier_name}
+              </LinkSpan>
+            </div>
+          ))}
+        </>
+      )}
       
       { showSoldOutToggle && (
         <>

@@ -7,7 +7,6 @@ export const stoneSchema = z.object({
   type: z.enum(STONE_TYPES),
   is_display: StringBoolean,
   on_sale: StringBoolean,
-
   length: z.coerce.number().default(0),
   width: z.coerce.number().default(0),
   supplier_id: NullableId,

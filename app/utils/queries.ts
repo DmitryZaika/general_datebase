@@ -87,20 +87,29 @@ export interface Sink {
   length: number | null;
   width: number | null;
   amount: number | null;
+  supplier_id: number | null;
 }
 
 export async function sinkQueryBuilder(
   filters: SinkFilter,
-  companyId: number
+  companyId: number | string
 ): Promise<Sink[]> {
-  const { type, show_sold_out } = filters;
+  const { type, show_sold_out, supplier } = filters;
+  const numericCompanyId = typeof companyId === 'string' ? Number(companyId) : companyId;
+  
   let whereClause = "WHERE company_id = ?";
-  let params: (string | number | boolean)[] = [companyId];
+  let params: (string | number | boolean)[] = [numericCompanyId];
 
   // Фильтрация по типу
   if (type && type.length > 0 && type.length < 5) {
     whereClause += " AND type IN (?)";
     params.push(type.join(","));
+  }
+
+  // Фильтрация по поставщику
+  if (supplier > 0) {
+    whereClause += " AND supplier_id = ?";
+    params.push(supplier);
   }
 
   // Показывать ли распроданные
@@ -109,7 +118,7 @@ export async function sinkQueryBuilder(
   }
 
   const query = `
-    SELECT id, name, type, url, is_display, length, width, amount
+    SELECT id, name, type, url, is_display, length, width, amount, supplier_id
     FROM sinks
     ${whereClause}
     ORDER BY name ASC
