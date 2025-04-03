@@ -151,55 +151,72 @@ export async function loader({ request }: LoaderFunctionArgs) {
   console.timeEnd('openai:request');
   console.log('OpenAI connection established');
 
-  return eventStream(request.signal, function setup(send) {
-    console.log('SSE connection established');
-    // Отправляем начальное сообщение для проверки соединения
-    send({ data: 'Connecting to AI...' });
-    
-    (async () => {
-      console.time('openai:streaming');
-      let answer = "";
-      let chunkCount = 0;
-      let firstChunkReceived = false;
-      let requestStartTime = Date.now();
+  return eventStream(
+    request.signal, 
+    function setup(send) {
+      console.log('SSE connection established');
       
-      try {
-        for await (const chunk of response) {
-          chunkCount++;
-          if (chunkCount === 1) {
-            firstChunkReceived = true;
-            console.log('First chunk received after', Date.now() - requestStartTime, 'ms');
-          }
-          
-          const message = chunk.choices[0].delta.content;
-          if (message) {
-            send({ data: message });
-            answer += message;
-          }
-        }
-        console.log('Total chunks received:', chunkCount);
-        console.timeEnd('openai:streaming');
-        
-        send({ data: DONE_KEY });
-        
-        console.time('db:save-context');
-        if (chatHistoryId) {
-          updateContext(user.id, chatHistoryId, messages, answer);
-        } else {
-          insertContext(user.id, messages, answer);
-        }
-        console.timeEnd('db:save-context');
-      } catch (error) {
-        console.error('Error during streaming:', error);
-        send({ data: 'Error: ' + (error instanceof Error ? error.message : 'Unknown error') });
+      // Используем SSE комментарии для заполнения буфера
+      // Комментарии начинаются с ':' и не отображаются клиенту
+      for (let i = 0; i < 30; i++) {
+        send({ event: 'ping', data: '' });
       }
       
-      console.timeEnd('chat:total-request');
-      console.log('Chat request completed:', new Date().toISOString());
-    })();
+      // Информационное сообщение отправляем как комментарий (не будет видно пользователю)
+      send({ event: 'info', data: 'Connecting to AI...' });
+      
+      (async () => {
+        console.time('openai:streaming');
+        let answer = "";
+        let chunkCount = 0;
+        let firstChunkReceived = false;
+        let requestStartTime = Date.now();
+        
+        try {
+          for await (const chunk of response) {
+            chunkCount++;
+            if (chunkCount === 1) {
+              firstChunkReceived = true;
+              console.log('First chunk received after', Date.now() - requestStartTime, 'ms');
+            }
+            
+            const message = chunk.choices[0].delta.content;
+            if (message) {
+              send({ data: message });
+              answer += message;
+            }
+          }
+          console.log('Total chunks received:', chunkCount);
+          console.timeEnd('openai:streaming');
+          
+          send({ data: DONE_KEY });
+          
+          console.time('db:save-context');
+          if (chatHistoryId) {
+            updateContext(user.id, chatHistoryId, messages, answer);
+          } else {
+            insertContext(user.id, messages, answer);
+          }
+          console.timeEnd('db:save-context');
+        } catch (error) {
+          console.error('Error during streaming:', error);
+          send({ data: 'Error: ' + (error instanceof Error ? error.message : 'Unknown error') });
+        }
+        
+        console.timeEnd('chat:total-request');
+        console.log('Chat request completed:', new Date().toISOString());
+      })();
 
-    return function clear() {
-      console.log('SSE connection closed by client');
-    };
-  });
+      return function clear() {
+        console.log('SSE connection closed by client');
+      };
+    },
+    {
+      headers: {
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no"
+      }
+    }
+  );
 }
