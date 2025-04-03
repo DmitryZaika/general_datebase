@@ -145,8 +145,10 @@ export default function App() {
                 isAdmin={user?.is_admin ?? false}
                 isSuperUser={user?.is_superuser ?? false}
               />
-              {isMobile && <SidebarTrigger />}
-              <Outlet />
+              <div className="relative">
+                {isMobile && <SidebarTrigger />}
+                <Outlet />
+              </div>
             </AuthenticityTokenProvider>
             <Toaster />
             <ScrollRestoration />
