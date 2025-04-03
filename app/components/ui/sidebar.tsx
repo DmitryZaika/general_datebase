@@ -254,21 +254,23 @@ function SidebarTrigger({
   const { toggleSidebar } = useSidebar();
 
   return (
-    <Button
-      data-sidebar="trigger"
-      data-slot="sidebar-trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("size-7", className)}
-      onClick={(event) => {
-        onClick?.(event);
-        toggleSidebar();
-      }}
-      {...props}
-    >
-    <p className="absolute right-5 top-10.5 -mb-4 mt-2 text-white text-lg p-1 px-2 bg-black border-2 border-white rounded-xl"  >Filters</p>
-      <span className="sr-only">Toggle Sidebar</span>
-    </Button>
+    <div className="w-full flex justify-end pr-6 pt-2">
+      <Button
+        data-sidebar="trigger"
+        data-slot="sidebar-trigger"
+        variant="ghost"
+        size="icon"
+        className={cn("", className)}
+        onClick={(event) => {
+          onClick?.(event);
+          toggleSidebar();
+        }}
+        {...props}
+      >
+        <p className="text-white text-lg p-1 px-2 bg-black border-2 border-white rounded-xl">Filters</p>
+        <span className="sr-only">Toggle Sidebar</span>
+      </Button>
+    </div>
   );
 }
 
