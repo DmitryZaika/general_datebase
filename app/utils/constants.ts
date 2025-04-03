@@ -7,3 +7,20 @@ export const STONE_TYPES = [
   "dolomite",
   "quartzite",
 ] as const;
+
+export const STONE_COLORS = [
+  "white",
+  "black",
+  "grey",
+  "beige",
+  "brown",
+  "cream",
+  "gold",
+  "silver",
+  "blue",
+  "green",
+  "red",
+  "pink",
+  "ivory",
+  "charcoal",
+] as const;

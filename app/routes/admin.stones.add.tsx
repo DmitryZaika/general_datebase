@@ -1,5 +1,5 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
-import { STONE_TYPES } from "~/utils/constants";
+import { STONE_TYPES, STONE_COLORS } from "~/utils/constants";
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import {
   useNavigate,
@@ -31,6 +31,7 @@ import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { selectMany } from "~/utils/queryHelpers";
 import { stoneSchema } from "~/schemas/stones";
+import { ColorSelect } from "~/components/molecules/ColorSelect";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
@@ -68,6 +69,27 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.retail_price,
       ],
     );
+    
+    // Получаем ID созданного камня
+    const [stoneResult] = await db.execute(
+      `SELECT id FROM main.stones WHERE name = ? AND company_id = ? ORDER BY id DESC LIMIT 1`,
+      [data.name, user.company_id]
+    );
+    const stoneRows = stoneResult as any[];
+    
+    if (stoneRows && stoneRows.length > 0) {
+      const stoneId = stoneRows[0].id;
+      
+      // Добавляем цвета, если они есть
+      if (data.colors && data.colors.length > 0) {
+        for (const color of data.colors) {
+          await db.execute(
+            `INSERT INTO main.stone_colors (name, stone_id) VALUES (?, ?)`,
+            [color, stoneId]
+          );
+        }
+      }
+    }
   } catch (error) {
     console.error("Error connecting to the database: ", error);
     const stoneId = parseInt(params.stone ?? "0", 10);
@@ -277,6 +299,22 @@ export default function StonesAdd() {
               )}
             />
           </div>
+
+          <FormField
+            control={form.control}
+            name="colors"
+            render={({ field }) => (
+              <ColorSelect
+                field={field}
+                placeholder="Select colors"
+                name="Colors"
+                options={STONE_COLORS.map((color) => ({
+                  key: color.toLowerCase(),
+                  value: color
+                }))}
+              />
+            )}
+          />
 
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>

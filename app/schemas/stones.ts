@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { NullableId, StringBoolean, StringBoolV2 } from "./general";
-import { STONE_TYPES } from "~/utils/constants";
+import { STONE_TYPES, STONE_COLORS } from "~/utils/constants";
 
 export const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -14,6 +14,7 @@ export const stoneSchema = z.object({
   bundle: z.string().optional(),
   cost_per_sqft: z.coerce.number().default(0),
   retail_price: z.coerce.number().default(0),
+  colors: z.array(z.string()).default([]),
 });
 
 export const stoneFilterSchema = z.object({
