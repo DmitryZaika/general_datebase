@@ -8,7 +8,6 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 
-// Используем только три опции сортировки: имя по возрастанию и цена в обоих направлениях
 export type SortOption = 'name_asc' | 'price_asc' | 'price_desc';
 
 interface Stone {
@@ -38,13 +37,11 @@ export function StonesSort<T extends Stone>({
 }: StonesSortProps<T>) {
   const [sortOption, setSortOption] = useState<SortOption>('name_asc');
   
-  // Автоматически применяем сортировку по имени при первой загрузке компонента
   useEffect(() => {
     applySortOption('name_asc');
   }, []);
   
   useEffect(() => {
-    // При изменении stones применяем текущую сортировку
     applySortOption(sortOption);
   }, [stones]);
 
@@ -57,18 +54,16 @@ export function StonesSort<T extends Stone>({
   const applySortOption = (option: SortOption) => {
     const sorted = sortStones(stones, option, priorityFn);
     
-    // Дополнительная проверка, чтобы гарантировать правильный порядок камней по категориям
     const inStock = sorted.filter(stone => Number(stone.available) > 0 && Boolean(stone.is_display));
     const outOfStock = sorted.filter(stone => Number(stone.available) <= 0 && Boolean(stone.is_display));
     const notDisplayed = sorted.filter(stone => !Boolean(stone.is_display));
     
-    // Сортируем каждую группу по выбранному критерию (они уже отсортированы через sortStones)
-    // Объединяем все три группы в порядке приоритета
+
     onSortedStones([...inStock, ...outOfStock, ...notDisplayed]);
   };
 
   return (
-    <div className="flex justify-between items-center w-full">
+    <div className=" px-1 flex justify-between items-center w-full">
       <div className={`flex items-center gap-4 ${className}`}>
         <p className="text-lg font-medium">Sort by:</p>
         <Select value={sortOption} onValueChange={handleSortChange}>
@@ -93,16 +88,13 @@ function sortStones<T extends Stone>(
   priorityFn?: (a: T, b: T) => number
 ): T[] {
   return [...stones].sort((a, b) => {
-    // Строгая проверка на доступность (принудительно преобразуем к числу)
     const aAvailable = Number(a.available) || 0;
     const bAvailable = Number(b.available) || 0;
     
-    // САМЫЙ ВЫСОКИЙ ПРИОРИТЕТ: камни out of stock всегда в конце списка
-    // Если только один из камней out of stock, его нужно поместить в конец
-    if (aAvailable > 0 && bAvailable <= 0) return -1; // a в наличии, но b нет -> a вверху, b внизу
-    if (aAvailable <= 0 && bAvailable > 0) return 1;  // a нет в наличии, но b есть -> b вверху, a внизу
+ 
+    if (aAvailable > 0 && bAvailable <= 0) return -1; 
+    if (aAvailable <= 0 && bAvailable > 0) return 1; 
     
-    // Второй приоритет: отображаемые/не отображаемые (только если оба камня имеют одинаковый статус наличия)
     const aDisplayed = Boolean(a.is_display);
     const bDisplayed = Boolean(b.is_display);
     
