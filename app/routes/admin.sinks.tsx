@@ -13,6 +13,7 @@ import { sinkFilterSchema } from "~/schemas/sinks";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { Sink, sinkQueryBuilder } from "~/utils/queries";
 import { SidebarTrigger } from "~/components/ui/sidebar";
+import { SINK_TYPES } from "~/utils/constants";
 
 const customOrder = [
   "stainless 18 gauge",
@@ -71,14 +72,34 @@ export default function AdminSinks() {
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [searchParams] = useSafeSearchParams(sinkFilterSchema);
 
+  // Helper function to get type priority based on SINK_TYPES array order
+  const getTypePriority = (type: string) => {
+    const index = SINK_TYPES.indexOf(type as any);
+    return index === -1 ? SINK_TYPES.length : index;
+  };
+
   useEffect(() => {
+    // First, separate sinks into display categories
     const inStock = sinks.filter(sink => Number(sink.amount) > 0 && Boolean(sink.is_display));
     const outOfStock = sinks.filter(sink => Number(sink.amount) <= 0 && Boolean(sink.is_display));
     const notDisplayed = sinks.filter(sink => !Boolean(sink.is_display));
     
-    const sortedInStock = [...inStock].sort((a, b) => a.name.localeCompare(b.name));
-    const sortedOutOfStock = [...outOfStock].sort((a, b) => a.name.localeCompare(b.name));
-    const sortedNotDisplayed = [...notDisplayed].sort((a, b) => a.name.localeCompare(b.name));
+    // Sort each category first by type according to SINK_TYPES order, then by name
+    const sortBySinkType = (a: Sink, b: Sink) => {
+      const typePriorityA = getTypePriority(a.type);
+      const typePriorityB = getTypePriority(b.type);
+      
+      if (typePriorityA !== typePriorityB) {
+        return typePriorityA - typePriorityB;
+      }
+      
+      // If same type, sort by name
+      return a.name.localeCompare(b.name);
+    };
+    
+    const sortedInStock = [...inStock].sort(sortBySinkType);
+    const sortedOutOfStock = [...outOfStock].sort(sortBySinkType);
+    const sortedNotDisplayed = [...notDisplayed].sort(sortBySinkType);
     
     setSortedSinks([...sortedInStock, ...sortedOutOfStock, ...sortedNotDisplayed]);
   }, [sinks]);
@@ -155,6 +176,12 @@ export default function AdminSinks() {
                   </p>
                   <p className="text-center text-sm">
                     Size: {displayedLength} x {displayedWidth}
+                  </p>
+                  <p className="text-center text-sm">
+                    Price: ${sink.retail_price}
+                  </p>
+                  <p className="text-center text-sm">
+                    Cost: ${sink.cost}
                   </p>
                 </div>
 
