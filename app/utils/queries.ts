@@ -2,6 +2,7 @@ import { StoneFilter } from "~/schemas/stones";
 import { STONE_TYPES } from "~/utils/constants";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
+import { SinkFilter } from "~/schemas/sinks";
 
 export interface Stone {
   id: number;
@@ -76,3 +77,44 @@ export const stoneQueryBuilder = async (
   query += `\nORDER BY s.name ASC`;
   return await selectMany<Stone>(db, query, params);
 };
+
+export interface Sink {
+  id: number;
+  name: string;
+  type: string;
+  url: string | null;
+  is_display: boolean | number;
+  length: number | null;
+  width: number | null;
+  amount: number | null;
+}
+
+export async function sinkQueryBuilder(
+  filters: SinkFilter,
+  companyId: number
+): Promise<Sink[]> {
+  const { type, show_sold_out } = filters;
+  let whereClause = "WHERE company_id = ?";
+  let params: (string | number | boolean)[] = [companyId];
+
+  // Фильтрация по типу
+  if (type && type.length > 0 && type.length < 5) {
+    whereClause += " AND type IN (?)";
+    params.push(type.join(","));
+  }
+
+  // Показывать ли распроданные
+  if (!show_sold_out) {
+    whereClause += " AND (amount IS NOT NULL AND amount > 0)";
+  }
+
+  const query = `
+    SELECT id, name, type, url, is_display, length, width, amount
+    FROM sinks
+    ${whereClause}
+    ORDER BY name ASC
+  `;
+
+  const sinks = await selectMany<Sink>(db, query, params);
+  return sinks;
+}

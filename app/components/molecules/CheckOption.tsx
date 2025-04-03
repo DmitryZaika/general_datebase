@@ -4,12 +4,14 @@ interface ICheckOptionProps<T> {
   selected: boolean;
   toggleValue: (val: T) => void;
   isLoading?: boolean;
+  defaultChecked?: boolean;
 }
 
 export function CheckOption<T>({
   value,
   selected,
   toggleValue,
+  defaultChecked,
   isLoading = false,
 }: ICheckOptionProps<T>) {
   const id = `checkbox-${value as string}`;
@@ -28,6 +30,7 @@ export function CheckOption<T>({
         disabled={isLoading}
         onClick={(e) => e.stopPropagation()}
         onCheckedChange={() => toggleValue(value)}
+        defaultChecked={defaultChecked}
       />
       <div className="grid  p-1.5 leading-none capitalize w-full">
         <label
