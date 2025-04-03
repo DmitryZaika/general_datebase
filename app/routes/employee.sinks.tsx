@@ -68,6 +68,7 @@ function InteractiveCard({
         fieldList={{
           Amount: `${displayedAmount}`,
           Size: `${displayedWidth} x ${displayedLength}`,
+          Price: sink.retail_price === 0 ? `Contact for price` : `$${sink.retail_price}`,
         }}
         title={sink.name}
       >
