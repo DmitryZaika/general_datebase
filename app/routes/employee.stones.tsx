@@ -151,6 +151,7 @@ export default function Stones() {
             currentId={currentId}
             setCurrentId={setCurrentId}
             images={sortedStones}
+            userRole="employee"
           />
         </div>
         {sortedStones.map((stone) => (
