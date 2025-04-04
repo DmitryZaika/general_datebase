@@ -69,7 +69,10 @@ function InteractiveCard({
         itemId={stone.id}
         fieldList={{
           Avaliable: `${stone.available} / ${displayedAmount}`,
+
           Size: `${displayedLength} x ${displayedWidth}`,
+          Type: capitalizeFirstLetter(stone.type),
+          
           Price: stone.retail_price === 0 ? `Price by slab $${stone.cost_per_sqft}` : `$${stone.retail_price}`,
         }}
         title={stone.name}
