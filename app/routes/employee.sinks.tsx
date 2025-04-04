@@ -67,7 +67,7 @@ function InteractiveCard({
         itemId={sink.id}
         fieldList={{
           Amount: `${displayedAmount}`,
-          Size: `${displayedWidth} x ${displayedLength}`,
+          Size: `${displayedLength} x ${displayedWidth}  `,
           Price: sink.retail_price === 0 ? `Contact for price` : `$${sink.retail_price}`,
         }}
         title={sink.name}
@@ -111,7 +111,7 @@ export default function Sinks() {
     const outOfStock = sinks.filter(sink => Number(sink.amount) <= 0 && Boolean(sink.is_display));
     const notDisplayed = sinks.filter(sink => !Boolean(sink.is_display));
     
-    // Sort each category first by type according to SINK_TYPES order, then by name
+      // Sort each category first by type according to SINK_TYPES order, then by name
     const sortBySinkType = (a: Sink, b: Sink) => {
       const typePriorityA = getTypePriority(a.type);
       const typePriorityB = getTypePriority(b.type);
@@ -120,7 +120,6 @@ export default function Sinks() {
         return typePriorityA - typePriorityB;
       }
       
-      // If same type, sort by name
       return a.name.localeCompare(b.name);
     };
     
