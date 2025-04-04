@@ -156,11 +156,9 @@ export default function AdminStones() {
                     Size: {displayedLength} x {displayedWidth}
                   </p>
                   <p className="text-center text-sm">
-                    Price: ${stone.retail_price}
+                    Price: ${stone.retail_price}/${stone.cost_per_sqft}
                   </p>
-                  <p className="text-center text-sm">
-                    Cost per sqft: ${stone.cost_per_sqft}
-                  </p>
+                
                 </div>
 
                 <div className="absolute inset-0 flex justify-between items-start p-2 opacity-50 transition-opacity duration-300">

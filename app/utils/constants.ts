@@ -11,7 +11,7 @@ export const STONE_TYPES = [
 export const SINK_TYPES = [
   "stainless 18 gauge",
   "stainless 16 gauge",
-  "granite composite",
+  "composite",
   "ceramic",
   "farm house",
 ] as const;
