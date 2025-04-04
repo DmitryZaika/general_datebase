@@ -31,6 +31,7 @@ import {
   QueryClientProvider,
 } from '@tanstack/react-query'
 import { posthog } from 'posthog-js'
+import { ScrollToTopButton } from "~/components/ui/ScrollToTopButton";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -146,30 +147,31 @@ export default function App() {
         <Links />
       </head>
       <body>
-      <QueryClientProvider client={queryClient}>
-        <SidebarProvider open={!!basePath}>
-          <EmployeeSidebar suppliers={stoneSuppliers} sinkSuppliers={sinkSuppliers} />
-          <main className="h-screen overflow-y-auto bg-gray-100 w-full">
-            <AuthenticityTokenProvider token={token}>
-              <Header
-                isEmployee={user?.is_employee ?? false}
-                user={user}
-                isAdmin={user?.is_admin ?? false}
-                isSuperUser={user?.is_superuser ?? false}
-              />
-              <div className="relative">
-                {isMobile && <SidebarTrigger />}
-                <Outlet />
-              </div>
-            </AuthenticityTokenProvider>
-            <Toaster />
-            <ScrollRestoration />
-            <Scripts />
-            <Posthog />
+        <QueryClientProvider client={queryClient}>
+          <SidebarProvider open={!!basePath}>
+            <EmployeeSidebar suppliers={stoneSuppliers} sinkSuppliers={sinkSuppliers} />
+            <main className="h-screen overflow-y-auto bg-gray-100 w-full">
+              <AuthenticityTokenProvider token={token}>
+                <Header
+                  isEmployee={user?.is_employee ?? false}
+                  user={user}
+                  isAdmin={user?.is_admin ?? false}
+                  isSuperUser={user?.is_superuser ?? false}
+                />
+                <div className="relative">
+                  {isMobile && <SidebarTrigger />}
+                  <Outlet />
+                </div>
+              </AuthenticityTokenProvider>
+              <Toaster />
+              <ScrollRestoration />
+              <Scripts />
+              <Posthog />
 
-            {user && <Chat />}
-          </main>
-        </SidebarProvider>
+              {user && <Chat />}
+              <ScrollToTopButton />
+            </main>
+          </SidebarProvider>
         </QueryClientProvider>
       </body>
     </html>
