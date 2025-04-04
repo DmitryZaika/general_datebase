@@ -88,6 +88,11 @@ const getItems = (base: string, suppliers: ISupplier[] | undefined, sinkSupplier
       url: `/employee/special-order`,
       icon: Settings,
     });
+    finalList.push({
+      title: "My Account",
+      url: `/employee/user`,
+      icon: Settings,
+    });
   }
   if (base === "admin") {
     finalList.push({
