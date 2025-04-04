@@ -1,5 +1,5 @@
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect, Outlet, useLocation } from "react-router";
+import { LoaderFunctionArgs, redirect, Outlet, useLocation, Link } from "react-router";
 import { useLoaderData } from "react-router";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
@@ -139,7 +139,7 @@ export default function Stones() {
         </StonesSort>
        
         </div>
-        <div className="flex-1 flex justify-center md:justify-end md:ml-auto">
+        <div className="flex-1 flex justify-center md:justify-end md:ml-auto gap-4 items-center">
             <StoneSearch userRole="employee" />
         </div>
       </div>
