@@ -18,7 +18,7 @@ import { SINK_TYPES } from "~/utils/constants";
 const customOrder = [
   "stainless 18 gauge",
   "stainless 16 gauge",
-  "granite composite",
+  "composite",
   "ceramic",
   "farm house",
 ];
@@ -41,8 +41,6 @@ function customSort(a: string, b: string) {
     return 1;
   }
 
-  // Если ни один из них не входит в customOrder,
-  // сортируем по алфавиту
   return a.localeCompare(b);
 }
 
@@ -72,19 +70,16 @@ export default function AdminSinks() {
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [searchParams] = useSafeSearchParams(sinkFilterSchema);
 
-  // Helper function to get type priority based on SINK_TYPES array order
   const getTypePriority = (type: string) => {
     const index = SINK_TYPES.indexOf(type as any);
     return index === -1 ? SINK_TYPES.length : index;
   };
 
   useEffect(() => {
-    // First, separate sinks into display categories
     const inStock = sinks.filter(sink => Number(sink.amount) > 0 && Boolean(sink.is_display));
     const outOfStock = sinks.filter(sink => Number(sink.amount) <= 0 && Boolean(sink.is_display));
     const notDisplayed = sinks.filter(sink => !Boolean(sink.is_display));
     
-    // Sort each category first by type according to SINK_TYPES order, then by name
     const sortBySinkType = (a: Sink, b: Sink) => {
       const typePriorityA = getTypePriority(a.type);
       const typePriorityB = getTypePriority(b.type);
@@ -93,7 +88,6 @@ export default function AdminSinks() {
         return typePriorityA - typePriorityB;
       }
       
-      // If same type, sort by name
       return a.name.localeCompare(b.name);
     };
     
@@ -176,6 +170,9 @@ export default function AdminSinks() {
                   </p>
                   <p className="text-center text-sm">
                     Size: {displayedLength} x {displayedWidth}
+                  </p>
+                  <p className="text-center text-sm">
+                    Price: ${sink.retail_price}/${sink.cost}
                   </p>
                 </div>
 

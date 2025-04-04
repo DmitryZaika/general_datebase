@@ -88,6 +88,9 @@ export interface Sink {
   width: number | null;
   amount: number | null;
   supplier_id: number | null;
+  retail_price: number | null;
+  cost: number | null;
+ 
 }
 
 export async function sinkQueryBuilder(
@@ -100,25 +103,22 @@ export async function sinkQueryBuilder(
   let whereClause = "WHERE company_id = ?";
   let params: (string | number | boolean)[] = [numericCompanyId];
 
-  // Фильтрация по типу
   if (type && type.length > 0 && type.length < 5) {
     whereClause += " AND type IN (?)";
     params.push(type.join(","));
   }
 
-  // Фильтрация по поставщику
   if (supplier > 0) {
     whereClause += " AND supplier_id = ?";
     params.push(supplier);
   }
 
-  // Показывать ли распроданные
   if (!show_sold_out) {
     whereClause += " AND (amount IS NOT NULL AND amount > 0)";
   }
 
   const query = `
-    SELECT id, name, type, url, is_display, length, width, amount, supplier_id
+    SELECT id, name, type, url, is_display, length, width, amount, supplier_id, retail_price, cost
     FROM sinks
     ${whereClause}
     ORDER BY name ASC

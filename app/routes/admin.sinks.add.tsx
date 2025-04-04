@@ -3,11 +3,9 @@ import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import {
   useNavigate,
   useNavigation,
-  Outlet,
   useLoaderData,
 } from "react-router";
 import { FormField } from "../components/ui/form";
-import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
 import {
   Dialog,
@@ -49,7 +47,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.sinks (name, type, url, company_id, is_display, supplier_id, width, length, amount) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO main.sinks (name, type, url, company_id, is_display, supplier_id, width, length, amount, retail_price, cost) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
         data.type,
@@ -59,7 +57,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.supplier_id,
         data.width,
         data.length,
-        data.amount,
+        data.amount,       
+        data.retail_price,
+        data.cost,
       ],
     );
   } catch (error) {
@@ -106,6 +106,7 @@ export default function SinksAdd() {
   const form = useCustomForm(sinkSchema, {
     defaultValues: {
       is_display: true,
+    
     },
   });
 
@@ -231,6 +232,32 @@ export default function SinksAdd() {
                 />
               )}
             />
+          </div>
+          
+          <div className="flex gap-2">
+             <FormField
+              control={form.control}
+              name="retail_price"
+              render={({ field }) => (
+                <InputItem
+                  name={"Retail Price"}
+                  placeholder={"Retail price of the sink"}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="cost"
+              render={({ field }) => (
+                <InputItem
+                  name={"Cost"}
+                  placeholder={"Cost of the sink"}
+                  field={field}
+                />
+              )}
+            />
+         
           </div>
 
           <DialogFooter>
