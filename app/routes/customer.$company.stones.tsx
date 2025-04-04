@@ -94,7 +94,6 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
         itemId={stone.id}
         fieldList={{
           Size: `${displayedLength} x ${displayedWidth}`,
-          Type: capitalizeFirstLetter(stone.type)
         }}
         title={stone.name}
       >

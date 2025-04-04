@@ -1,5 +1,5 @@
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect, Outlet, useLocation, Link } from "react-router";
+import { LoaderFunctionArgs, redirect, Outlet, useLocation } from "react-router";
 import { useLoaderData } from "react-router";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
@@ -29,14 +29,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 function InteractiveCard({
   stone,
   setCurrentId,
-  stoneType,
 }: {
   stone: Stone;
   setCurrentId: (value: number) => void;
   stoneType: string;
 }) {
   const displayedAmount = stone.amount > 0 ? stone.amount : "—";
-  const displayedAvailable = stone.available;
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
   const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
   const createdDate = new Date(stone.created_date);
@@ -70,10 +68,9 @@ function InteractiveCard({
         type="slabs"
         itemId={stone.id}
         fieldList={{
+          Avaliable: `${stone.available} / ${displayedAmount}`,
           Size: `${displayedLength} x ${displayedWidth}`,
-          Type: capitalizeFirstLetter(stone.type),
-          Available: `${displayedAvailable} / ${displayedAmount}`,
-          Price: stone.retail_price === 0 ? `Price by slab $${stone.cost_per_sqft}` : `$${stone.retail_price}`
+          Price: stone.retail_price === 0 ? `Price by slab $${stone.cost_per_sqft}` : `$${stone.retail_price}`,
         }}
         title={stone.name}
       >
@@ -139,7 +136,7 @@ export default function Stones() {
         </StonesSort>
        
         </div>
-        <div className="flex-1 flex justify-center md:justify-end md:ml-auto gap-4 items-center">
+        <div className="flex-1 flex justify-center md:justify-end md:ml-auto">
             <StoneSearch userRole="employee" />
         </div>
       </div>
