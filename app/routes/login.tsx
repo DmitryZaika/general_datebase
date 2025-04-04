@@ -65,7 +65,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const sessionId = await login(data.email, data.password, 60 * 60 * 24 * 7);
   if (!sessionId) {
-    return { error: "Unable to login", defaultValues } as ActionData;
+    return { 
+      error: "Incorrect email or password. Please try again.", 
+      defaultValues: { ...defaultValues, password: "" } 
+    } as ActionData;
   }
   const session = await getSession(request.headers.get("Cookie"));
   session.set("sessionId", sessionId);
@@ -100,7 +103,11 @@ export default function Login() {
           method="post"
           onSubmit={fullSubmit}
         >
-          <p className="text-red-500">{error || actionData?.error || ""}</p>
+          {(error || actionData?.error) && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded">
+              {error || actionData?.error}
+            </div>
+          )}
           <FormField
             control={form.control}
             name="email"

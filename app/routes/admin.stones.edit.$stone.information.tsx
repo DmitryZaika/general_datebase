@@ -240,7 +240,7 @@ export default function Information() {
             )}
           />
         </div>
-        {url ? <img src={url} alt={name} className="w-48 mt-4 mx-auto" /> : null}
+        {url ? <img src={url} alt={name} className="w-48  mx-auto" /> : null}
         <div className="flex gap-2">
           <FormField
             control={form.control}
