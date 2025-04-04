@@ -46,9 +46,24 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   const { errors, data } = await parseMutliForm(request, stoneSchema, "stones");
-  if (errors || !data) {
+  
+  // Return validation errors to the form
+  if (errors) {
+    console.error("Validation errors:", errors);
     return { errors };
   }
+  
+  if (!data) {
+    return { 
+      errors: {
+        _form: {
+          type: "server",
+          message: "Invalid form data"
+        }
+      } 
+    };
+  }
+  
   let user = await getAdminUser(request);
   try {
     await db.execute(
@@ -70,7 +85,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
       ],
     );
     
-    // Получаем ID созданного камня
     const [stoneResult] = await db.execute(
       `SELECT id FROM main.stones WHERE name = ? AND company_id = ? ORDER BY id DESC LIMIT 1`,
       [data.name, user.company_id]
@@ -80,13 +94,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (stoneRows && stoneRows.length > 0) {
       const stoneId = stoneRows[0].id;
       
-      // Добавляем цвета, если они есть
-      if (data.colors && data.colors.length > 0) {
-        for (const color of data.colors) {
-          await db.execute(
-            `INSERT INTO main.stone_colors (name, stone_id) VALUES (?, ?)`,
-            [color, stoneId]
-          );
+      // Правильно обрабатываем массив colors
+      let colorsArray: string[] = [];
+      
+      if (Array.isArray(data.colors)) {
+        colorsArray = data.colors;
+      } else if (data.colors && typeof data.colors === 'string') {
+        colorsArray = [data.colors];
+      }
+      
+      if (colorsArray.length > 0) {
+        const colorInsertStatement = `INSERT INTO main.stone_colors (name, stone_id) VALUES (?, ?)`;
+        
+        for (const color of colorsArray) {
+          if (color) {
+            await db.execute(colorInsertStatement, [color, stoneId]);
+          }
         }
       }
     }

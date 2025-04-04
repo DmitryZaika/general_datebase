@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { FieldValues, ControllerRenderProps } from "react-hook-form";
-import { Checkbox } from "../ui/checkbox";
 import { cn } from "~/lib/utils";
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
 
@@ -44,7 +43,7 @@ export function ColorSelect<TFieldValues extends FieldValues = FieldValues>({
 
   const selectedValues: string[] = Array.isArray(field.value) 
     ? field.value 
-    : [];
+    : field.value ? [field.value] : [];
 
   const valueRef = useRef(selectedValues);
   
@@ -123,22 +122,21 @@ export function ColorSelect<TFieldValues extends FieldValues = FieldValues>({
                 return (
                   <div
                     key={option.key}
-                    className="relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-hidden hover:bg-zinc-100 focus:bg-zinc-100 focus:text-zinc-900 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:hover:bg-zinc-800"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleOptionToggle(option.key);
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Checkbox checked={isSelected} className="mr-1" />
-                      {option.value}
-                    </div>
-                    {isSelected && (
-                      <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
-                        <CheckIcon className="h-4 w-4" />
-                      </span>
+                    className={cn(
+                      "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                      isSelected && "bg-zinc-100 dark:bg-zinc-800"
                     )}
+                    onClick={() => handleOptionToggle(option.key)}
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      <div className={cn(
+                        "flex h-4 w-4 items-center justify-center border border-zinc-900 rounded-sm",
+                        isSelected && "bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900"
+                      )}>
+                        {isSelected && <CheckIcon className="h-3 w-3" />}
+                      </div>
+                      <span className="flex-grow">{option.value}</span>
+                    </div>
                   </div>
                 );
               })}
