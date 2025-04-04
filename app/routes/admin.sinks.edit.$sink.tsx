@@ -4,6 +4,7 @@ import {
   useLoaderData,
   useNavigation,
   Outlet,
+  useRouteError,
 } from "react-router";
 import { FormField } from "../components/ui/form";
 import { z } from "zod";
@@ -59,7 +60,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (newFile) {
       await db.execute(
         `UPDATE sinks
-          SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, amount = ?
+          SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, amount = ?, cost = ?, retail_price = ?
          WHERE id = ?`,
         [
           data.name,
@@ -70,13 +71,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.length,
           data.width,
           data.amount,
+          data.cost,
+          data.retail_price,
           sinkId,
         ],
       );
     } else {
       await db.execute(
         `UPDATE sinks
-         SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, amount = ?
+         SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, amount = ?, cost = ?, retail_price = ?
          WHERE id = ?`,
         [
           data.name,
@@ -86,6 +89,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.length,
           data.width,
           data.amount,
+          data.cost,
+          data.retail_price,
           sinkId,
         ],
       );
@@ -120,9 +125,11 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     length: string;
     width: string;
     amount: number | null;
+    cost: number | null;
+    retail_price: number | null;
   }>(
     db,
-    "SELECT name, type, url, is_display, supplier_id, length, width, amount FROM sinks WHERE id = ?",
+    "SELECT name, type, url, is_display, supplier_id, length, width, amount, cost, retail_price FROM sinks WHERE id = ?",
     sinkId,
   );
   if (!sink) {
@@ -154,7 +161,7 @@ function SinkInformation({
 }) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
-  const { name, type, url, is_display, supplier_id, length, width, amount } =
+  const { name, type, url, is_display, supplier_id, length, width, amount, cost, retail_price } =
     sinkData;
   const defaultValues = {
     name,
@@ -165,6 +172,8 @@ function SinkInformation({
     length,
     width,
     amount,
+    cost,
+    retail_price,
   };
   const form = useCustomOptionalForm(sinkSchema, defaultValues);
 
@@ -255,6 +264,23 @@ function SinkInformation({
           <InputItem name="Amount" placeholder="Sink Amount" field={field} />
         )}
       />
+      <div className="flex gap-2">
+      <FormField
+          control={form.control}
+          name="retail_price"
+          render={({ field }) => (
+            <InputItem name="Retail Price" placeholder="Sink Retail Price" field={field} />
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="cost"
+          render={({ field }) => (
+            <InputItem name="Cost" placeholder="Sink Cost" field={field} />
+          )}
+        />
+    
+      </div>
 
       <DialogFooter className="mt-4">
         <LoadingButton loading={isSubmitting}>Edit Sink</LoadingButton>

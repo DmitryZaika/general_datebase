@@ -72,6 +72,9 @@ export const Chat = () => {
     setInput("");
     event.preventDefault();
 
+    const requestStartTime = Date.now();
+    console.log('Chat request started at:', new Date().toISOString());
+    
     const formData = new FormData(event.target as HTMLFormElement);
     const query = formData.get("query") as string | null;
     if (answer) {
@@ -84,16 +87,25 @@ export const Chat = () => {
       `/api/chat?query=${query}&isNew=${messages.length === 0}`,
     );
 
+    sse.addEventListener("open", () => {
+      console.log('SSE connection opened after:', Date.now() - requestStartTime, 'ms');
+    });
+
     sse.addEventListener("message", (event) => {
       if (event.data === DONE_KEY) {
+        console.log('Chat request completed after:', Date.now() - requestStartTime, 'ms');
         sse.close();
         setIsThinking(false);
       } else {
+        if (!answer) {
+          console.log('First message received after:', Date.now() - requestStartTime, 'ms');
+        }
         setAnswer((prevResults) => prevResults + event.data);
       }
     });
 
     sse.addEventListener("error", (event) => {
+      console.error('SSE error after:', Date.now() - requestStartTime, 'ms');
       sse.close();
     });
   };

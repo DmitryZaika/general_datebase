@@ -24,3 +24,11 @@ export const STONE_COLORS = [
   "ivory",
   "charcoal",
 ] as const;
+
+export const SINK_TYPES = [
+  "stainless 18 gauge",
+  "stainless 16 gauge",
+  "composite",
+  "ceramic",
+  "farm house",
+] as const;
