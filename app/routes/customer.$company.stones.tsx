@@ -154,7 +154,7 @@ export default function Stones() {
             currentId={currentId}
             setCurrentId={handleCarouselChange}
             images={stones}
-          
+            userRole="customer"
           />
         </div>
         {stones.sort(sortStones).map((stone) => (

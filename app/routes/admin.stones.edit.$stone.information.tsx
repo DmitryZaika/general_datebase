@@ -258,6 +258,17 @@ export default function Information() {
           />
         </div>
         <div className="flex gap-2">
+        <FormField
+            control={form.control}
+            name="retail_price"
+            render={({ field }) => (
+              <InputItem
+                name="Retail Price"
+                placeholder="Retail Price"
+                field={field}
+              />
+            )}
+          />
           <FormField
             control={form.control}
             name="cost_per_sqft"
@@ -269,17 +280,7 @@ export default function Information() {
               />
             )}
           />
-          <FormField
-            control={form.control}
-            name="retail_price"
-            render={({ field }) => (
-              <InputItem
-                name="Retail Price"
-                placeholder="Retail Price"
-                field={field}
-              />
-            )}
-          />
+     
         </div>
         <DialogFooter className="mt-4">
           <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
