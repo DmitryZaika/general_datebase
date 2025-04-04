@@ -27,6 +27,7 @@ interface ImageProps {
   setImage: (value: undefined | number) => void;
   image?: any;
   showInfo?: boolean;
+  userRole?: string;
 }
 
 function ChildrenImagesDialog({
@@ -39,6 +40,7 @@ function ChildrenImagesDialog({
   setImage,
   image,
   showInfo = false,
+  userRole,
 }: ImageProps) {
   const [data, setData] = useState<
     { images: { id: number; url: string }[] } | undefined
@@ -71,19 +73,34 @@ function ChildrenImagesDialog({
     setSelectedImage(src);
   };
 
-
   const displayedAvailable = image?.available !== undefined ? image.available : "—";
   const displayedType = image?.type ? capitalizeFirstLetter(image.type) : "—";
+  const displayedWidth = image?.width && image?.width > 0 ? image.width : "—";
+  const displayedLength = image?.length && image?.length > 0 ? image.length : "—";
+  const displayedPrice = image?.retail_price 
+    ? `$${image.retail_price}` 
+    : image?.cost_per_sqft 
+      ? `$${image.cost_per_sqft}/sqft` 
+      : "—";
 
   return (
     <>
       <div className="w-full relative">
         {showInfo && (
-          <div className="absolute top-0 left-[50%]  -translate-x-1/2 z-10 bg-black/70 p-3 rounded shadow-lg text-white border border-gray-700">
+          <div className="absolute top-0 left-[50%] -translate-x-1/2 z-10 bg-black/70 p-3  rounded shadow-lg text-white border border-gray-700">
             <h3 className="text-lg font-bold mb-2 text-center">{image?.name || name}</h3>
-            <div className="grid grid-cols-1 gap-y-1 text-sm">
-              <p><strong>Type:</strong> {displayedType}</p>
-              <p><strong>Available:</strong> {displayedAvailable}</p>
+            <div className="flex flex-col md:flex-row  gap-x-10 text-sm">
+              <div className="flex flex-col  gap-y-1">
+                <p><strong>Type:</strong> {displayedType}</p>
+                <p><strong>Available:</strong> {displayedAvailable}</p>
+              </div>
+              
+              {userRole === "employee" && (
+                <div className="flex flex-col gap-y-1">
+                  <p><strong>Size:</strong> {displayedLength} x {displayedWidth}</p>
+                  <p><strong>Price:</strong> {displayedPrice}</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -201,6 +218,7 @@ export function SuperCarousel({
                   setImage={(value) => setCurrentId?.(value)}
                   image={image}
                   showInfo={(userRole === "customer" || userRole === "employee") && type === "stones"}
+                  userRole={userRole}
                 />
               </CarouselItem>
             ))}
