@@ -87,7 +87,7 @@ function ChildrenImagesDialog({
     <>
       <div className="w-full relative">
         {showInfo && (
-          <div className="absolute top-0 left-[50%] -translate-x-1/2 z-10 bg-black/70 p-3  rounded shadow-lg text-white border border-gray-700">
+          <div className="absolute top-7 sm:top-0 left-[50%] -translate-x-1/2 z-10 bg-black/70 p-3  rounded shadow-lg text-white border border-gray-700">
             <h3 className="text-lg font-bold mb-2 text-center">{image?.name || name}</h3>
             <div className="flex flex-col md:flex-row  gap-x-10 text-sm">
               <div className="flex flex-col  gap-y-1">
