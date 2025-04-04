@@ -29,12 +29,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 function InteractiveCard({
   stone,
   setCurrentId,
+  stoneType,
 }: {
   stone: Stone;
   setCurrentId: (value: number) => void;
   stoneType: string;
 }) {
   const displayedAmount = stone.amount > 0 ? stone.amount : "—";
+  const displayedAvailable = stone.available;
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
   const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
   const createdDate = new Date(stone.created_date);
@@ -68,9 +70,10 @@ function InteractiveCard({
         type="slabs"
         itemId={stone.id}
         fieldList={{
-          Avaliable: `${stone.available} / ${displayedAmount}`,
           Size: `${displayedLength} x ${displayedWidth}`,
-          Price: stone.retail_price === 0 ? `Price by slab $${stone.cost_per_sqft}` : `$${stone.retail_price}`,
+          Type: capitalizeFirstLetter(stone.type),
+          Available: `${displayedAvailable} / ${displayedAmount}`,
+          Price: stone.retail_price === 0 ? `Price by slab $${stone.cost_per_sqft}` : `$${stone.retail_price}`
         }}
         title={stone.name}
       >

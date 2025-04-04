@@ -88,8 +88,6 @@ export interface Sink {
   width: number | null;
   amount: number | null;
   supplier_id: number | null;
-  retail_price: number;
-  cost: number;
 }
 
 export async function sinkQueryBuilder(
@@ -120,7 +118,7 @@ export async function sinkQueryBuilder(
   }
 
   const query = `
-    SELECT id, name, type, url, is_display, length, width, amount, supplier_id, retail_price, cost
+    SELECT id, name, type, url, is_display, length, width, amount, supplier_id
     FROM sinks
     ${whereClause}
     ORDER BY name ASC

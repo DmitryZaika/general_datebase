@@ -177,12 +177,6 @@ export default function AdminSinks() {
                   <p className="text-center text-sm">
                     Size: {displayedLength} x {displayedWidth}
                   </p>
-                  <p className="text-center text-sm">
-                    Price: ${sink.retail_price}
-                  </p>
-                  <p className="text-center text-sm">
-                    Cost: ${sink.cost}
-                  </p>
                 </div>
 
                 <div className="absolute inset-0 flex justify-between items-start p-2 opacity-50">
