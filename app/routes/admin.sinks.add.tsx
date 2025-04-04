@@ -49,7 +49,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   let user = await getAdminUser(request);
   try {
     await db.execute(
-      `INSERT INTO main.sinks (name, type, url, company_id, is_display, supplier_id, width, length, amount, retail_price, cost) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO main.sinks (name, type, url, company_id, is_display, supplier_id, width, length, amount) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
         data.type,
@@ -60,8 +60,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.width,
         data.length,
         data.amount,
-        data.retail_price,
-        data.cost,
       ],
     );
   } catch (error) {
@@ -221,7 +219,7 @@ export default function SinksAdd() {
               )}
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flexs gap-2">
             <FormField
               control={form.control}
               name="amount"
@@ -229,31 +227,6 @@ export default function SinksAdd() {
                 <InputItem
                   name={"Amount"}
                   placeholder={"Amount of the sink"}
-                  field={field}
-                />
-              )}
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <FormField
-              control={form.control}
-              name="retail_price"
-              render={({ field }) => (
-                <InputItem
-                  name={"Retail Price"}
-                  placeholder={"Retail Price"}
-                  field={field}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="cost"
-              render={({ field }) => (
-                <InputItem
-                  name={"Cost"}
-                  placeholder={"Cost"}
                   field={field}
                 />
               )}
