@@ -14,6 +14,7 @@ import {
   DialogDescription,
 } from "~/components/ui/dialog";
 import { useArrowCarousel } from "~/hooks/useArrowToggle";
+import { capitalizeFirstLetter } from "~/utils/words";
 
 interface ImageProps {
   name?: string;
@@ -24,6 +25,8 @@ interface ImageProps {
   id: number;
   type: string;
   setImage: (value: undefined | number) => void;
+  image?: any;
+  showInfo?: boolean;
 }
 
 function ChildrenImagesDialog({
@@ -34,6 +37,8 @@ function ChildrenImagesDialog({
   id,
   type,
   setImage,
+  image,
+  showInfo = false,
 }: ImageProps) {
   const [data, setData] = useState<
     { images: { id: number; url: string }[] } | undefined
@@ -50,7 +55,7 @@ function ChildrenImagesDialog({
       getImages();
       setSelectedImage(src);
     }
-  }, [isOpen, src, id]);
+  }, [isOpen, src, id, type]);
 
   const getImages = () => {
     fetch(`/api/installed_${type}/${id}`)
@@ -66,13 +71,26 @@ function ChildrenImagesDialog({
     setSelectedImage(src);
   };
 
+
+  const displayedAvailable = image?.available !== undefined ? image.available : "—";
+  const displayedType = image?.type ? capitalizeFirstLetter(image.type) : "—";
+
   return (
     <>
-      <div className=" w-full">
+      <div className="w-full relative">
+        {showInfo && (
+          <div className="absolute top-0 left-[50%] opacity-90 -translate-x-1/2 z-10 bg-black/70 p-3 rounded shadow-lg text-white border border-gray-700">
+            <h3 className="text-lg font-bold mb-2 text-center">{image?.name || name}</h3>
+            <div className="grid grid-cols-1 gap-y-1 text-sm">
+              <p><strong>Type:</strong> {displayedType}</p>
+              <p><strong>Available:</strong> {displayedAvailable}</p>
+            </div>
+          </div>
+        )}
         <img
           src={selectedImage || "/path/to/placeholder.png"}
           alt={alt || name || "Image"}
-          className="w-full h-[85vh] md:h-[87vh]  2xl:h-[93vh] object-contain z-0"
+          className="w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] object-contain z-0"
           onClick={(e) => e.stopPropagation()}
         />
       </div>
@@ -81,7 +99,6 @@ function ChildrenImagesDialog({
         <div className="w-screen max-w-full ">
           <Carousel
             className=" flex justify-center items-center w-full  pl-10 pr-10"
-            setApi={setThumbnailApi}
             opts={{
               slidesToScroll: 5,
               align: "start",
@@ -127,11 +144,13 @@ export function SuperCarousel({
   setCurrentId,
   images,
   type,
+  userRole,
 }: {
-  images: { id: number; url: string | null }[];
+  images: { id: number; url: string | null, name?: string, [key: string]: any }[];
   currentId?: number;
   setCurrentId?: (value: number | undefined) => void;
   type: string;
+  userRole?: string;
 }) {
   const [api, setApi] = useState<CarouselApi>();
   const _ = useArrowCarousel(api);
@@ -171,14 +190,17 @@ export function SuperCarousel({
           }}
         >
           <CarouselContent>
-            {images.map(({ id, url }) => (
-              <CarouselItem key={id}>
+            {images.map((image) => (
+              <CarouselItem key={image.id}>
                 <ChildrenImagesDialog
                   type={type}
-                  src={url}
-                  id={id}
-                  isOpen={currentId === id}
-                  setImage={setCurrentId}
+                  src={image.url}
+                  id={image.id}
+                  name={image.name}
+                  isOpen={currentId === image.id}
+                  setImage={(value) => setCurrentId?.(value)}
+                  image={image}
+                  showInfo={(userRole === "customer" || userRole === "employee") && type === "stones"}
                 />
               </CarouselItem>
             ))}
