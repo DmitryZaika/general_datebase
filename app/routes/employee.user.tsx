@@ -23,11 +23,7 @@ const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
   phone_number: z.union([z.coerce.string().min(10), z.literal("")]).optional(),
   email: z.string().email("Invalid email address"),
-  password: z.union([
-    z.coerce.string().min(4, "Password must be at least 4 characters").or(z.literal("")),
-    z.null(),
-    z.undefined()
-  ]).optional(),
+  password: z.union([z.string(), z.null(), z.undefined()]).optional(),
 });
 
 type FormData = z.infer<typeof userSchema>;
@@ -59,10 +55,10 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     
     const updateFields = ['name = ?', 'email = ?', 'phone_number = ?'];
-    const params = [data.name, data.email, data.phone_number || null];
+    const params = [data.name, data.email, data.phone_number];
     
-    // Only hash and update password if provided and not empty
-    if (data.password && typeof data.password === 'string' && data.password.trim() !== '') {
+    // Only hash and update password if provided
+    if (data.password && data.password.trim() !== '') {
       const hashedPassword = await bcrypt.hash(data.password, 10);
       updateFields.push('password = ?');
       params.push(hashedPassword);
