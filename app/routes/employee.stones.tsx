@@ -255,11 +255,11 @@ export default function Stones() {
     <>
      <div className="flex justify-between flex-wrap items-center items-end mb-2">
         <div className="flex items-center gap-4">
-          {/* <StonesSort 
+          <StonesSort 
             stones={stones} 
             onSortedStones={setSortedStones}
             priorityFn={priorityFunction}
-          /> */}
+          />
           
           {/* Кнопка переключения режима просмотра */}
           <Button 
