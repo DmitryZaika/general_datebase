@@ -91,6 +91,12 @@ function StoneTable({ stones, setCurrentId }: { stones: Stone[], setCurrentId: (
       cell: ({ row }) => capitalizeFirstLetter(row.original.type)
     },
     {
+      accessorFn: (row) => {
+        const length = row.length || 0;
+        const width = row.width || 0;
+        // Сортировка по площади (length * width)
+        return length * width;
+      },
       id: "size",
       header: ({ column }) => <SortableHeader column={column} title="Size" />,
       cell: ({ row }) => {
@@ -110,11 +116,13 @@ function StoneTable({ stones, setCurrentId }: { stones: Stone[], setCurrentId: (
       cell: ({ row }) => row.original.amount || "—"
     },
     {
+      accessorFn: (row) => row.retail_price || 0,
       id: "retailPrice",
       header: ({ column }) => <SortableHeader column={column} title="Retail Price" />,
       cell: ({ row }) => row.original.retail_price ? `$${row.original.retail_price}` : "—"
     },
     {
+      accessorFn: (row) => row.cost_per_sqft || 0,
       id: "costPerSqft",
       header: ({ column }) => <SortableHeader column={column} title="Cost per Sqft" />,
       cell: ({ row }) => row.original.cost_per_sqft ? `$${row.original.cost_per_sqft}` : "—"
@@ -255,11 +263,11 @@ export default function Stones() {
     <>
      <div className="flex justify-between flex-wrap items-center items-end mb-2">
         <div className="flex items-center gap-4">
-          {/* <StonesSort 
+          <StonesSort 
             stones={stones} 
             onSortedStones={setSortedStones}
             priorityFn={priorityFunction}
-          /> */}
+          />
           
           {/* Кнопка переключения режима просмотра */}
           <Button 
