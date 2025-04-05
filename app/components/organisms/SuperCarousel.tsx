@@ -77,17 +77,17 @@ function ChildrenImagesDialog({
   const displayedType = image?.type ? capitalizeFirstLetter(image.type) : "—";
   const displayedWidth = image?.width && image?.width > 0 ? image.width : "—";
   const displayedLength = image?.length && image?.length > 0 ? image.length : "—";
-  const displayedPrice = image?.retail_price 
+  const displayedPrice = image?.retail_price && image.retail_price !== 0 
     ? `$${image.retail_price}` 
     : image?.cost_per_sqft 
-      ? `$${image.cost_per_sqft}/sqft` 
+      ? `By slab $${image.cost_per_sqft} sqft` 
       : "—";
 
   return (
     <>
       <div className="w-full relative">
         {showInfo && (
-          <div className="absolute top-7 sm:top-0 left-[50%] -translate-x-1/2 z-10 bg-black/70 p-3  rounded shadow-lg text-white border border-gray-700">
+          <div className="absolute top-7 sm:top-0 left-[50%] -translate-x-1/2 z-10 bg-black/80 p-3  rounded shadow-lg text-white border border-gray-900">
             <h3 className="text-lg font-bold mb-2 text-center">{image?.name || name}</h3>
             <div className="flex flex-col md:flex-row  gap-x-10 text-sm">
               <div className="flex flex-col  gap-y-1">
