@@ -1,15 +1,7 @@
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Form, useLoaderData, useNavigate } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import { selectId } from "~/utils/queryHelpers";
-import { Button } from "~/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
+import { DeleteRow } from "~/components/pages/DeleteRow";
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
@@ -87,25 +79,10 @@ export default function DeleteUser() {
       navigate("..");
     }
   };
+  return (<DeleteRow 
+            handleChange={handleChange}
+            title='Delete user'
+            description={`Are you sure you want to delete ${name}?`}
+          />);
 
-  return (
-    <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Delete user</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete {name || "this user"}?
-          </DialogDescription>
-        </DialogHeader>
-        <Form method="post">
-          <DialogFooter>
-            <AuthenticityTokenInput />
-            <Button autoFocus type="submit">
-              Delete user
-            </Button>
-          </DialogFooter>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
 }
