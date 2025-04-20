@@ -92,12 +92,18 @@ const slabSchema = z.object({
 type SlabFormData = z.infer<typeof slabSchema>;
 const slabsResolver = zodResolver(slabSchema);
 
+const sinkSchema = z.object({
+  sink_type_id: z.coerce.number(),
+  price: z.coerce.number(),
+})
+
+type SinkFormData = z.infer<typeof sinkSchema>;
+const sinksResolver = zodResolver(sinkSchema);
+
+
 const schema = z.object({
   sinks: z.array(
     z.object({
-      id: z.number(),
-      sink_type_id: z.coerce.number(),
-      price: z.coerce.number(),
       is_deleted: z.boolean().default(false),
     })
   ),
@@ -317,7 +323,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (intent == "slab-delete") {
       const slabId = formData.get("id") as string;
       await db.execute(
-        `UPDATE slab_inventory SET sale_id = NULL WHERE id = ?`,
+        `UPDATE slab_inventory SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL WHERE id = ?`,
         [slabId]
       );
     } else if (intent == "slab-update") {
@@ -330,7 +336,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
          WHERE id = ?`,
         [notes, squareFeet, slabId]
       );
-      
+    } else if (intent == "sink-delete") {
+      const sinkId = formData.get("id") as string;
+      await db.execute(
+        `UPDATE sinks SET sale_id = NULL, price = NULL, is_deleted = 0 WHERE id = ?`,
+        [sinkId]
+      );
     }
 
     
@@ -468,7 +479,7 @@ export default function EditSale() {
                         { deleteSlab && (
                           <DeleteRow 
                             handleChange={handleChange}
-                            title='Delete support'
+                            title='Delete slab'
                             description={`Are you sure you want to delete ${name}?`}
                             intent="slab-delete"
                             id={slab.id}
@@ -492,9 +503,6 @@ export default function EditSale() {
             
             <TabsContent value="sinks" className="bg-gray-50 rounded-md p-3 shadow-inner">
               <div className="max-h-[25vh] overflow-y-auto mb-4">
-                {sinks.length === 0 ? (
-                  <p className="text-center text-gray-500 py-4">No sinks in this sale</p>
-                ) : (
                   <div className="space-y-3">
                     {sinks.map((sink, index) => (
                       <div key={sink.id} className={`p-3 rounded-md border shadow-sm ${sink.is_deleted === 1 ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'}`}>
@@ -503,18 +511,15 @@ export default function EditSale() {
                         
                         <div className="flex justify-between items-center mb-2">
                           <span className="font-medium text-sm text-gray-800">{sink.name}</span>
-                          
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              name="sinkIsDeleted"
-                              value="true"
-                              id={`sink-deleted-${sink.id}`}
-                              defaultChecked={false}
-                              className="mr-1.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <label htmlFor={`sink-deleted-${sink.id}`} className="text-xs text-gray-500">Remove</label>
-                          </div>
+                              { deleteSlab && (
+                                <DeleteRow 
+                                  handleChange={handleChange}
+                                  title='Delete sink'
+                                  description={`Are you sure you want to delete ${name}?`}
+                                  intent="sink-delete"
+                                  id={sink.id}
+                                />
+                              )}
                         </div>
                         
                         <div className="grid grid-cols-1 gap-2">
@@ -533,10 +538,8 @@ export default function EditSale() {
                       </div>
                     ))}
                   </div>
-                )}
               </div>
               
-              {/* Добавление новых моек */}
               <div className="mt-4 p-3 border border-blue-100 rounded-md bg-blue-50 shadow-sm">
                 <h4 className="text-sm font-medium mb-2 text-blue-800">Add New Sink</h4>
                 
