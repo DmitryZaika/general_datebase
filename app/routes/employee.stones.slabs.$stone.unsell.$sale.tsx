@@ -1,15 +1,7 @@
 import { ActionFunctionArgs, data, redirect, useLocation,  } from "react-router";
-import { Form,  useNavigate } from "react-router";
-import { Button } from "~/components/ui/button";
+import {  useNavigate } from "react-router";
+import { DeleteRow } from "~/components/pages/DeleteRow";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
 
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
@@ -67,24 +59,9 @@ export default function SupportsAdd() {
       navigate(`..${location.search}`);
     }
   };
-  return (
-    <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Cancel Transaction</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to cancel the transaction?
-          </DialogDescription>
-        </DialogHeader>
-        <Form id="customerForm" method="post">
-          <DialogFooter>
-            <AuthenticityTokenInput />
-            <Button autoFocus type="submit">
-              Cancel Transaction
-            </Button>
-          </DialogFooter>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
+  return (<DeleteRow 
+            handleChange={handleChange}
+            title='Cancel Transaction'
+            description={`Are you sure you want to cancel the transaction?`}
+          />);
 }

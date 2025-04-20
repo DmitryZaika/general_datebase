@@ -5,7 +5,7 @@ import { Input } from "../ui/input";
 interface InputItemProps {
   name?: string;
   placeholder?: string;
-  field: object;
+  field?: object;
   type?: string;
   className?: string;
   formClassName?: string;
