@@ -179,7 +179,6 @@ export default function AdminStones() {
   const [isAddingStone, setIsAddingStone] = useState(false);
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones);
   const location = useLocation();
-  // Новое состояние для режима просмотра
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   useEffect(() => {
@@ -213,7 +212,6 @@ export default function AdminStones() {
     return `edit/${stoneId}/information?${currentParams.toString()}`;
   };
   
-  // Функция переключения режима просмотра
   const toggleViewMode = () => {
     setViewMode(viewMode === "grid" ? "table" : "grid");
   };
@@ -222,14 +220,9 @@ export default function AdminStones() {
     <>
       <div className="flex justify-between flex-wrap items-center items-end mb-2">
         <div className="flex items-center gap-4">
-          {/* <StonesSort 
-            stones={stones} 
-            onSortedStones={setSortedStones}
-            priorityFn={priorityFunction}
-          /> */}
+         
           
-          {/* Кнопка переключения режима просмотра */}
-          <Button 
+            <Button 
             variant="outline"
             onClick={toggleViewMode}
             className="ml-2"

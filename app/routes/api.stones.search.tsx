@@ -41,7 +41,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
   
   let query = `SELECT s.id, s.name, s.url, s.retail_price, s.cost_per_sqft,
-            CAST(SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS UNSIGNED) AS available
+            CAST(SUM(CASE WHEN si.id IS NOT NULL AND si.sale_id IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available
     FROM main.stones s
     LEFT JOIN main.slab_inventory AS si ON si.stone_id = s.id
     WHERE UPPER(s.name) LIKE UPPER(?)

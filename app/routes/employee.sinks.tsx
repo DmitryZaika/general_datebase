@@ -1,9 +1,4 @@
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "~/components/ui/accordion";
+
 import { LoaderFunctionArgs, Outlet, redirect, useLocation } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";

@@ -5,7 +5,11 @@ import {
   useLoaderData,
   Form,
   useNavigation,
+  useNavigate,
   data,
+  Outlet,
+  Link,
+  useLocation,
 } from "react-router";
 import { getEmployeeUser } from "~/utils/session.server";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
@@ -20,16 +24,59 @@ import {
   DialogClose,
   DialogTitle,
 } from "~/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { useState, useEffect } from "react";
 import { Input } from "~/components/ui/input";
+import { X } from "lucide-react";
+import { z } from "zod";
 
 interface Slab {
   id: number;
   bundle: string;
   url: string | null;
-  is_sold: boolean | number;
+  sale_id: number | null;
   width: number;
   length: number;
+  is_cut: number;
+  transaction?: {
+    sale_id: number;
+    sale_date: string;
+    customer_name: string;
+    seller_name: string;
+    notes?: string;
+    square_feet?: number;
+    sink?: string;
+  };
+}
+
+const TransactionSchema = z.object({
+  slab_id: z.number(),
+  sale_id: z.number(),
+  sale_date: z.union([z.string(), z.date()]).transform(val => 
+    typeof val === 'string' ? val : val.toISOString()
+  ),
+  customer_name: z.string(),
+  seller_name: z.string(),
+  notes: z.string().nullable().optional(),
+  square_feet: z.coerce.number().default(0),
+  sink_names: z.string().nullable().optional(),
+});
+
+type Transaction = z.infer<typeof TransactionSchema>;
+
+function formatDate(dateString: string) {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);  
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -38,92 +85,156 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
   const stoneId = parseInt(params.stone, 10);
+  
+  if (isNaN(stoneId)) {
+    return forceRedirectError(request.headers, "Invalid stone ID format");
+  }
+  
+  console.log(stoneId, "Stone ID");
   const stone = await selectId<{ id: number; name: string; url: string }>(
     db,
     "SELECT id, name, url FROM stones WHERE id = ?",
     stoneId
   );
+  console.log(stone, "Stone");
   if (!stone) {
     return forceRedirectError(request.headers, "No stone found for given ID");
   }
   const slabs = await selectMany<Slab>(
     db,
-    "SELECT id, bundle, url, is_sold, width, length FROM slab_inventory WHERE stone_id = ?",
+    "SELECT id, bundle, url, sale_id, width, length, is_cut FROM slab_inventory WHERE stone_id = ? AND (is_cut = 0 OR is_cut IS NULL)",
     [stoneId]
   );
+  
+  const soldSlabIds = slabs.filter(slab => slab.sale_id).map(slab => slab.id);
+  
+  if (soldSlabIds.length > 0) {
+    const placeholders = soldSlabIds.map(() => '?').join(',');
+    
+    
+    const sqlQuery = `
+      SELECT 
+        slab_inventory.id as slab_id,
+        sales.id as sale_id,
+        sales.sale_date,
+        customers.name as customer_name,
+        users.name as seller_name,
+        slab_inventory.notes,
+        slab_inventory.square_feet,
+        (
+          SELECT GROUP_CONCAT(sink_type.name SEPARATOR ', ')
+          FROM sinks
+          JOIN sink_type ON sinks.sink_type_id = sink_type.id
+          WHERE sinks.sale_id = sales.id
+        ) as sink_names
+      FROM 
+        sales
+      JOIN 
+        customers ON sales.customer_id = customers.id
+      JOIN 
+        users ON sales.seller_id = users.id
+      JOIN 
+        slab_inventory ON sales.id = slab_inventory.sale_id
+      WHERE 
+        slab_inventory.id IN (${placeholders})
+      ORDER BY
+        slab_inventory.id DESC
+    `;
+    
+    
+    const rawTransactions = await selectMany<Record<string, any>>(
+      db,
+      sqlQuery,
+      soldSlabIds
+    );
+    
+    const transactionResults = rawTransactions.map(raw => {
+      try {
+        return TransactionSchema.parse(raw);
+      } catch (error) {
+        console.error(`Validation error for transaction:`, error);
+        return null;
+      }
+    }).filter(Boolean) as Transaction[];
+    
+    const transactionsBySlab = transactionResults.reduce((acc, transaction) => {
+      if (!acc[transaction.slab_id]) {
+        acc[transaction.slab_id] = [];
+      }
+      acc[transaction.slab_id].push(transaction);
+      return acc;
+    }, {} as Record<number, Transaction[]>);
+    
+    slabs.forEach(slab => {
+      const slabTransactions = transactionsBySlab[slab.id];
+      
+      if (slabTransactions && slabTransactions.length > 0) {
+        let transaction = slabTransactions[0];
+        
+        slab.transaction = {
+          sale_id: transaction.sale_id,
+          sale_date: transaction.sale_date,
+          customer_name: transaction.customer_name,
+          seller_name: transaction.seller_name,
+          notes: transaction.notes || '',
+          square_feet: transaction.square_feet || 0,
+          sink: transaction.sink_names || '',
+        };
+      } else if (slab.sale_id) {
+        console.warn(`WARNING: Slab ${slab.id} is marked as sold but has no transaction data!`);
+      }
+    });
+  }
   return { slabs, stone };
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  await getEmployeeUser(request);
-  if (!params.stone) {
-    return forceRedirectError(request.headers, "No stone id provided");
-  }
+  const user = await getEmployeeUser(request);
   const formData = await request.formData();
-  const intent = formData.get("intent");
+  const intent = formData.get("intent") as string;
   
   if (intent === "updateSize") {
-    const slabId = formData.get("slabId");
-    const width = formData.get("width");
-    const length = formData.get("length");
+    const slabId = Number(formData.get("slabId"));
+    const length = Number(formData.get("length"));
+    const width = Number(formData.get("width"));
     
-    if (!slabId || !width || !length) {
-      return forceRedirectError(request.headers, "Missing required fields");
-    }
-
-    try {
-      await db.execute(
-        "UPDATE slab_inventory SET width = ?, length = ? WHERE id = ?",
-        [parseInt(width.toString()), parseInt(length.toString()), parseInt(slabId.toString())]
-      );
-
+    if (isNaN(slabId) || isNaN(length) || isNaN(width)) {
       const session = await getSession(request.headers.get("Cookie"));
-      session.flash("message", toastData("Success", "Slab size updated"));
-      return data({success: true}, {
-        headers: { "Set-Cookie": await commitSession(session) },
-      });
-    } catch (error) {
-      console.error("Error updating slab size:", error);
-      const session = await getSession(request.headers.get("Cookie"));
-      session.flash("message", toastData("Error", "Failed to update slab size"));
-      return data({success: true}, {
+      session.flash("message", toastData("Error", "Invalid values provided", "destructive"));
+      return redirect(`/employee/stones/slabs/${params.stone}`, {
         headers: { "Set-Cookie": await commitSession(session) },
       });
     }
+    
+    await db.execute(
+      "UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?",
+      [length, width, slabId]
+    );
+    
+    const session = await getSession(request.headers.get("Cookie"));
+    session.flash("message", toastData("Success", "Slab dimensions updated successfully"));
+    return redirect(`/employee/stones/slabs/${params.stone}`, {
+      headers: { "Set-Cookie": await commitSession(session) },
+    });
   }
-
-  const slabId = formData.get("slabId");
-  if (!slabId) {
-    return forceRedirectError(request.headers, "No slabId provided");
-  }
-  const slab = await selectId<{ is_sold: number }>(
-    db,
-    "SELECT is_sold FROM slab_inventory WHERE id = ?",
-    parseInt(slabId.toString(), 10)
-  );
-  if (!slab) {
-    return forceRedirectError(request.headers, "No slab found for given ID");
-  }
-  const newValue = slab.is_sold === 1 ? 0 : 1;
-  await db.execute("UPDATE slab_inventory SET is_sold = ? WHERE id = ?", [
-    newValue,
-    slabId,
-  ]);
-  const session = await getSession(request.headers.get("Cookie"));
-  session.flash(
-    "message",
-    toastData("Success", `Slab ${newValue ? "Sold" : "Unsold"}`)
-  );
-    return data({success: true}, {
-    headers: { "Set-Cookie": await commitSession(session) },
-  });
+  
+  return null;
 }
+
 
 export default function SlabsModal() {
   const { slabs, stone } = useLoaderData<typeof loader>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [editingSlab, setEditingSlab] = useState<number | null>(null);
   const navigation = useNavigation();
+  const navigate = useNavigate();
+  const location = useLocation();
+ 
+  const handleChange = (open: boolean) => {
+    if (!open) {
+      navigate(`..${location.search}`);
+    }
+  };
 
   useEffect(() => {
     if (navigation.state === "idle" && editingSlab !== null) {
@@ -135,12 +246,11 @@ export default function SlabsModal() {
     setEditingSlab(slabId);
   };
 
+
   return (
     <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) history.back();
-      }}
+      open={true}
+      onOpenChange={handleChange}
     >
       <DialogContent className=" bg-white rounded-md pt-5 px-2 shadow-lg text-gray-800 overflow-y-auto max-h-[95vh]">
         <DialogTitle>Slabs for {stone.name}</DialogTitle>
@@ -150,83 +260,134 @@ export default function SlabsModal() {
             <p className="text-center text-gray-500">No Slabs available</p>
           ) : (
             slabs.map((slab) => {
-              const isSold = !!slab.is_sold;
               const isEditing = editingSlab === slab.id;
 
               return (
-                <div
-                  key={slab.id}
-                  className={`transition-colors duration-300 flex items-center gap-4 p-2 sm:px-5 rounded-lg border border-gray-200 ${
-                    isSold ? "bg-red-200" : "bg-white"
-                  }`}
-                >
-                  <img
-                    src={
-                      slab.url === "undefined" || slab.url === null
-                        ? stone.url
-                        : slab.url
-                    }
-                    alt="Slab"
-                    className="w-7 h-7 sm:w-15 sm:h-15 object-cover cursor-pointer rounded"
-                    onClick={() => {
-                      if (slab.url) {
-                        setSelectedImage(slab.url);
-                      }
-                    }}
-                  />
-                  
-                  <span
-                    className={`font-semibold whitespace-nowrap ${
-                      isSold ? "text-red-900" : "text-gray-800"
-                    }`}
-                  >
-                    {slab.bundle}
-                  </span>
-
-                  <div className="flex items-center gap-2 w-full">
-                    {isEditing ? (
-                      <Form method="post" className="flex items-center gap-2 w-full">
-                        <AuthenticityTokenInput />
-                        <input type="hidden" name="intent" value="updateSize" />
-                        <input type="hidden" name="slabId" value={slab.id} />
-                        <Input
-                          type="number"
-                          name="length"
-                          defaultValue={slab.length}
-                          className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          inputMode="numeric"
-                        />
-                        <span>x</span>
-                        <Input
-                          type="number"
-                          name="width"
-                          defaultValue={slab.width}
-                          className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          inputMode="numeric"
-                        />
-                        <Button type="submit" size="sm" className="ml-auto">Save</Button>
-                      </Form>
-                    ) : (
-                      <button 
-                        type="button"
-                        onClick={() => handleEditClick(slab.id)}
-                        className="text-gray-500 hover:text-gray-700 cursor-pointer"
+                <TooltipProvider key={slab.id}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={`transition-colors duration-300 flex items-center gap-4 p-2 sm:px-5 rounded-lg border border-gray-200 ${
+                          slab.sale_id ? "bg-red-200" : "bg-white"
+                        }`}
                       >
-                        {slab.length} x {slab.width}
-                      </button>
-                    )}
-                  </div>
+                        <img
+                          src={
+                            slab.url === "undefined" || slab.url === null
+                              ? stone.url
+                              : slab.url
+                          }
+                          alt="Slab"
+                          className="w-7 h-7 sm:w-15 sm:h-15 object-cover cursor-pointer rounded"
+                          onClick={() => {
+                            if (slab.url) {
+                              setSelectedImage(slab.url);
+                            }
+                          }}
+                        />
+                        
+                        <span
+                          className={`font-semibold whitespace-nowrap ${
+                            slab.sale_id ? "text-red-900" : "text-gray-800"
+                          }`}
+                        >
+                          {slab.bundle}
+                        </span>
 
-                  {!isEditing && (
-                    <Form method="post" className="ml-auto">
-                      <AuthenticityTokenInput />
-                      <input type="hidden" name="slabId" value={slab.id} />
-                      <Button type="submit" className="px-4 py-2">
-                        {isSold ? "Unsell" : "Sell"}
-                      </Button>
-                    </Form>
-                  )}
-                </div>
+                        <div className="flex items-center gap-2 w-full">
+                          {isEditing ? (
+                            <Form method="post" className="flex items-center gap-2 w-full">
+                              <AuthenticityTokenInput />
+                              <input type="hidden" name="intent" value="updateSize" />
+                              <input type="hidden" name="slabId" value={slab.id} />
+                              <Input
+                                type="number"
+                                name="length"
+                                defaultValue={slab.length}
+                                className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                inputMode="numeric"
+                              />
+                              <span>x</span>
+                              <Input
+                                type="number"
+                                name="width"
+                                defaultValue={slab.width}
+                                className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                inputMode="numeric"
+                              />
+                              <Button type="submit" size="sm" className="ml-auto">Save</Button>
+                            </Form>
+                          ) : (
+                            <button 
+                              type="button"
+                              onClick={() => handleEditClick(slab.id)}
+                              className="text-gray-500 hover:text-gray-700 cursor-pointer"
+                            >
+                              {slab.length} x {slab.width}
+                            </button>
+                          )}
+                        </div>
+
+                        {!isEditing && (
+                          <>
+                            {slab.transaction ? (
+                              <div className="flex gap-2 ml-auto">
+                                <Link to={`edit/${slab.transaction.sale_id}/${location.search}`}>
+                                  <Button type="button">
+                                    Edit
+                                  </Button>
+                                </Link>
+                                  <Link to={`unsell/${slab.transaction.sale_id}/${location.search}`} className="ml-auto">
+                                  <Button type="submit" className="px-4 py-2 bg-red-600 hover:bg-red-700">
+                                    Unsell
+                                  </Button>
+                                  </Link>
+                              </div>
+                            ) : (
+                                <Link to={`sell/${slab.id}/${location.search}`} className="ml-auto">
+                                  <Button className="px-4 py-2">
+                                    Sell
+                                  </Button>
+                                </Link>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    {slab.sale_id && (
+                      <TooltipContent className="bg-gray-900 text-white p-2 rounded shadow-lg max-w-xs">
+                        <div className="flex flex-col gap-1 text-sm">
+                          {slab.transaction ? (
+                            <>
+                              <p><strong>Sold to:</strong> {slab.transaction.customer_name}</p>
+                              <p><strong>Sold by:</strong> {slab.transaction.seller_name}</p>
+                              <p><strong>Sale date:</strong> {formatDate(slab.transaction.sale_date)}</p>
+                              
+                              {/* Always show square_feet if it's more than 0 */}
+                              {(slab.transaction.square_feet ?? 0) > 0 && (
+                                <p><strong>Square Feet:</strong> {slab.transaction.square_feet}</p>
+                              )}
+                              
+                              {slab.transaction.sink ? (
+                                <p><strong>Sink:</strong> {slab.transaction.sink}</p>
+                              ) : null}
+                              
+                              {slab.transaction.notes && (
+                                <p><strong>Notes:</strong> {slab.transaction.notes}</p>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <p><strong>Status:</strong> Sold</p>
+                              <p className="text-red-400">Transaction data not available</p>
+                              <p className="text-xs mt-1">This slab is marked as sold but has no transaction details.</p>
+                            </>
+                          )}
+                        </div>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
               );
             })
           )}
@@ -241,21 +402,27 @@ export default function SlabsModal() {
           }}
         >
           <DialogContent className="max-w-4xl w-full h-auto flex items-center justify-center bg-black bg-opacity-90 p-1">
-            <DialogClose className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+            <DialogClose 
+              className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+              onClick={(e) => {
+                e.preventDefault();
+                setSelectedImage(null);
+              }}
+            >
+              <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
             </DialogClose>
-
             {selectedImage && (
               <img
-                src={selectedImage === "undefined" ? stone.url : selectedImage}
-                alt="Full size"
+                src={selectedImage}
+                alt="Slab large view"
                 className="max-w-full max-h-[80vh] object-contain"
-                onClick={(e) => e.stopPropagation()}
               />
             )}
           </DialogContent>
         </Dialog>
       </DialogContent>
+      <Outlet />
     </Dialog>
   );
 }

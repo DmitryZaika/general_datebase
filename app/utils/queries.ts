@@ -31,50 +31,50 @@ export const stoneQueryBuilder = async (
   const params: (string | number)[] = [companyId];
   let query = `
   SELECT 
-    s.id, 
-    s.name, 
-    s.type, 
-    s.url, 
-    s.is_display, 
-    s.length, 
-    s.width,
-    s.created_date, 
-    s.on_sale,
-    s.retail_price,
-    s.cost_per_sqft,
-    COUNT(si.stone_id) AS amount,
-    CAST(SUM(CASE WHEN si.is_sold = 0 THEN 1 ELSE 0 END) AS UNSIGNED) AS available
-  FROM main.stones s
-  LEFT JOIN main.slab_inventory AS si ON si.stone_id = s.id
-  WHERE s.company_id = ?
+    stones.id, 
+    stones.name, 
+    stones.type, 
+    stones.url, 
+    stones.is_display, 
+    stones.length, 
+    stones.width,
+    stones.created_date, 
+    stones.on_sale,
+    stones.retail_price,
+    stones.cost_per_sqft,
+    COUNT(CASE WHEN slab_inventory.id IS NOT NULL AND (slab_inventory.is_cut = 0 OR slab_inventory.is_cut IS NULL) THEN 1 ELSE NULL END) AS amount,
+    CAST(SUM(CASE WHEN slab_inventory.id IS NOT NULL AND slab_inventory.sale_id IS NULL AND (slab_inventory.is_cut = 0 OR slab_inventory.is_cut IS NULL) THEN 1 ELSE 0 END) AS UNSIGNED) AS available
+  FROM stones
+  LEFT JOIN slab_inventory ON slab_inventory.stone_id = stones.id
+  WHERE stones.company_id = ?
   `;
   if (!show_hidden) {
-    query += " AND s.is_display = 1";
+    query += " AND stones.is_display = 1";
   }
   if (filters.type.length < STONE_TYPES.length) {
-    query += ` AND s.type IN (${filters.type.map(() => "?").join(", ")})`;
+    query += ` AND stones.type IN (${filters.type.map(() => "?").join(", ")})`;
     params.push(...filters.type);
   }
   if (filters.supplier > 0) {
-    query += " AND s.supplier_id = ?";
+    query += " AND stones.supplier_id = ?";
     params.push(filters.supplier);
   }
   query += `
     GROUP BY
-      s.id,
-      s.name,
-      s.type,
-      s.url,
-      s.is_display,
-      s.length,
-      s.width,
-      s.created_date,
-      s.on_sale
+      stones.id,
+      stones.name,
+      stones.type,
+      stones.url,
+      stones.is_display,
+      stones.length,
+      stones.width,
+      stones.created_date,
+      stones.on_sale
     `;
   if (!filters.show_sold_out) {
     query += `\nHAVING available > 0`;
   }
-  query += `\nORDER BY s.name ASC`;
+  query += `\nORDER BY stones.name ASC`;
   return await selectMany<Stone>(db, query, params);
 };
 
@@ -100,30 +100,50 @@ export async function sinkQueryBuilder(
   const { type, show_sold_out, supplier } = filters;
   const numericCompanyId = typeof companyId === 'string' ? Number(companyId) : companyId;
   
-  let whereClause = "WHERE company_id = ?";
+  let whereClause = "WHERE sink_type.company_id = ? AND sink_type.is_deleted = 0";
   let params: (string | number | boolean)[] = [numericCompanyId];
 
   if (type && type.length > 0 && type.length < 5) {
-    whereClause += " AND type IN (?)";
+    whereClause += " AND sink_type.type IN (?)";
     params.push(type.join(","));
   }
 
   if (supplier > 0) {
-    whereClause += " AND supplier_id = ?";
+    whereClause += " AND sink_type.supplier_id = ?";
     params.push(supplier);
   }
 
-  if (!show_sold_out) {
-    whereClause += " AND (amount IS NOT NULL AND amount > 0)";
-  }
-
   const query = `
-    SELECT id, name, type, url, is_display, length, width, amount, supplier_id, retail_price, cost
-    FROM sinks
+    SELECT 
+      sink_type.id, 
+      sink_type.name, 
+      sink_type.type, 
+      sink_type.url, 
+      sink_type.is_display, 
+      sink_type.length, 
+      sink_type.width, 
+      COUNT(sinks.id) AS amount, 
+      sink_type.supplier_id, 
+      sink_type.retail_price, 
+      sink_type.cost
+    FROM sink_type
+    LEFT JOIN sinks ON sinks.sink_type_id = sink_type.id AND sinks.is_deleted = 0
     ${whereClause}
-    ORDER BY name ASC
+    GROUP BY
+      sink_type.id,
+      sink_type.name,
+      sink_type.type,
+      sink_type.url,
+      sink_type.is_display,
+      sink_type.length,
+      sink_type.width,
+      sink_type.supplier_id,
+      sink_type.retail_price,
+      sink_type.cost
+    ORDER BY sink_type.name ASC
   `;
 
   const sinks = await selectMany<Sink>(db, query, params);
-  return sinks;
+  
+  return show_sold_out ? sinks : sinks.filter(sink => (sink.amount || 0) > 0);
 }
