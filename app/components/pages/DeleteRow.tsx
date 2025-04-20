@@ -14,9 +14,11 @@ interface IProps {
   handleChange: (open: boolean) => void;
   title: string;
   description: string;
+  intent?: string;
+  id?: number;
 }
 
-export const DeleteRow = ({ handleChange, title, description }: IProps) => {
+export const DeleteRow = ({ handleChange, title, description, intent, id }: IProps) => {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -30,6 +32,8 @@ export const DeleteRow = ({ handleChange, title, description }: IProps) => {
         <Form id="customerForm" method="post">
           <DialogFooter>
             <AuthenticityTokenInput />
+            { intent && <input type="hidden" name="intent" value={intent} />}
+            { id && <input type="hidden" name="id" value={id} />}
             <Button autoFocus type="submit" variant="destructive">
               Confirm
             </Button>
