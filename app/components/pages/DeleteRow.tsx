@@ -30,7 +30,7 @@ export const DeleteRow = ({ handleChange, title, description }: IProps) => {
         <Form id="customerForm" method="post">
           <DialogFooter>
             <AuthenticityTokenInput />
-            <Button autoFocus type="submit">
+            <Button autoFocus type="submit" variant="destructive">
               Confirm
             </Button>
           </DialogFooter>
