@@ -109,7 +109,6 @@ const schema = z.object({
   ).optional(),
 });
 
-type FormData = z.infer<typeof schema>;
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await getEmployeeUser(request);
@@ -251,6 +250,7 @@ async function handleSlabs(request: Request, formData: globalThis.FormData, sale
     );
   }
 }
+
 
 async function handleSinks(formData: globalThis.FormData,  saleId: number, companyId: number) {
   const sinkIds = formData.getAll("sinkId") as string[];
