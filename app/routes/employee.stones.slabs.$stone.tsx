@@ -192,7 +192,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request);
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
-  
+
+  const url = new URL(request.url);
+  const searchParams = url.searchParams.toString();
+  const searchString = searchParams ? `?${searchParams}` : '';
+
   if (intent === "updateSize") {
     const slabId = Number(formData.get("slabId"));
     const length = Number(formData.get("length"));
@@ -201,7 +205,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (isNaN(slabId) || isNaN(length) || isNaN(width)) {
       const session = await getSession(request.headers.get("Cookie"));
       session.flash("message", toastData("Error", "Invalid values provided", "destructive"));
-      return redirect(`/employee/stones/slabs/${params.stone}`, {
+      return redirect(`/employee/stones/slabs/${params.stone}${searchString}`, {
         headers: { "Set-Cookie": await commitSession(session) },
       });
     }
@@ -213,7 +217,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     
     const session = await getSession(request.headers.get("Cookie"));
     session.flash("message", toastData("Success", "Slab dimensions updated successfully"));
-    return redirect(`/employee/stones/slabs/${params.stone}`, {
+    return redirect(`/employee/stones/slabs/${params.stone}${searchString}`, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
   }

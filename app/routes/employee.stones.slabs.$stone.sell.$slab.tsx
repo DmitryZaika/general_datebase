@@ -81,7 +81,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { error: "Slab ID is missing" };
   }
 
-  
+  const url = new URL(request.url);
+  const searchParams = url.searchParams.toString();
+  const searchString = searchParams ? `?${searchParams}` : '';
+
   try {    
     const [slabDimensions] = await db.execute<RowDataPacket[]>(
       `SELECT length, width FROM slab_inventory WHERE id = ?`,
@@ -117,7 +120,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const sinkTypeId = parseInt(data.sink_type_id as string, 10);
       
       if (!isNaN(sinkTypeId)) {
-        // Находим первую доступную раковину выбранного типа
+        const [sinkTypeResult] = await db.execute<RowDataPacket[]>(
+          `SELECT retail_price FROM sink_type WHERE id = ?`,
+          [sinkTypeId]
+        );
+        
+        let price = 0;
+        if (sinkTypeResult && sinkTypeResult.length > 0) {
+          price = sinkTypeResult[0].retail_price || 0;
+        }
+        
         const [availableSinks] = await db.execute<RowDataPacket[]>(
           `SELECT id FROM sinks 
            WHERE sink_type_id = ? 
@@ -130,10 +142,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
         if (availableSinks && availableSinks.length > 0) {
           const sinkId = availableSinks[0].id;
           
-          // Обновляем эту раковину, привязывая к продаже
           await db.execute(
-            `UPDATE sinks SET sale_id = ?, is_deleted = 1 WHERE id = ?`,
-            [saleId, sinkId]
+            `UPDATE sinks SET sale_id = ?, is_deleted = 1, price = ? WHERE id = ?`,
+            [saleId, price, sinkId]
           );
         }
       }
@@ -153,14 +164,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     console.error("Error during sale process: ", error);
     const session = await getSession(request.headers.get("Cookie"));
     session.flash("message", toastData("Error", "Failed to process sale"));
-    return redirect("..", {
+    return redirect(`..${searchString}`, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
   } 
 
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Sale completed successfully"));
-  return redirect("..", {
+  return redirect(`..${searchString}`, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
@@ -169,7 +180,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getEmployeeUser(request);
     
-    // Получаем только уникальные типы раковин, у которых есть доступные экземпляры
     const sinks = await selectMany<Sink>(
       db,
       `SELECT st.id, st.name, st.type 
@@ -235,7 +245,7 @@ export default function SlabSell() {
   const handleAddToExistingSale = (saleId: number) => {
     if (!params.slab) return;
     
-    navigate(`/employee/stones/slabs/${params.stone}/add-to-sale/${params.slab}/${saleId}`);
+    navigate(`/employee/stones/slabs/${params.stone}/add-to-sale/${params.slab}/${saleId}${location.search}`);
   };
 
   return (

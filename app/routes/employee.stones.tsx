@@ -257,13 +257,7 @@ export default function Stones() {
   return (
     <>
      <div className="flex justify-between flex-wrap items-center items-end mb-2">
-        <div className="flex items-center gap-4">
-          {/* <StonesSort 
-            stones={stones} 
-            onSortedStones={setSortedStones}
-            priorityFn={priorityFunction}
-          /> */}
-          
+        <div className="flex items-center gap-4"> 
           <Button 
             variant="outline"
             onClick={toggleViewMode}

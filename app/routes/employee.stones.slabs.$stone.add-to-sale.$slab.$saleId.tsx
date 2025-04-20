@@ -6,6 +6,7 @@ import {
   useNavigation,
   useParams,
   useLoaderData,
+  useLocation,
 } from "react-router";
 import { Form, useNavigate } from "react-router";
 import { FormProvider, FormField } from "~/components/ui/form";
@@ -50,6 +51,7 @@ interface Sink {
 const schema = z.object({
   notes: z.union([z.string(), z.number()]).transform(val => val ? String(val) : "").optional(),
   sink: z.union([z.string(), z.number()]).optional(),
+  square_feet: z.coerce.number().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -83,6 +85,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { error: "Slab ID or Sale ID is missing" };
   }
 
+  const url = new URL(request.url);
+  const searchParams = url.searchParams.toString();
+  const searchString = searchParams ? `?${searchParams}` : '';
   
   try {
     
@@ -139,21 +144,20 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (slabInSaleCheck && slabInSaleCheck.length > 0) {
       if (slabInSaleCheck[0].is_cut === 1) {
         await db.execute(
-          `UPDATE slab_inventory SET is_cut = 0, notes = ? WHERE id = ?`,
-          [data.notes || null, slabInSaleCheck[0].id]
+          `UPDATE slab_inventory SET is_cut = 0, notes = ?, square_feet = ? WHERE id = ?`,
+          [data.notes || null, data.square_feet || null, slabInSaleCheck[0].id]
         );
       } else {
         throw new Error("This slab is already added to this sale");
       }
     } else {
       await db.execute(
-        `UPDATE slab_inventory SET sale_id = ?, notes = ? WHERE id = ?`,
-        [saleId, data.notes || null, slab]
+        `UPDATE slab_inventory SET sale_id = ?, notes = ?, square_feet = ? WHERE id = ?`,
+        [saleId, data.notes || null, data.square_feet || null, slab]
       );
     }
     
-
-    
+  
 
     
   } catch (error) {
@@ -161,14 +165,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     console.error("Error adding slab to sale: ", error);
     const session = await getSession(request.headers.get("Cookie"));
     session.flash("message", toastData("Error", "Failed to add slab to sale"));
-    return redirect(`/employee/stones/slabs/${params.stone}`, {
+    return redirect(`/employee/stones/slabs/${params.stone}${searchString}`, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
   } 
 
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Slab added to existing sale successfully"));
-  return redirect(`/employee/stones/slabs/${params.stone}`, {
+  return redirect(`/employee/stones/slabs/${params.stone}${searchString}`, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
@@ -268,12 +272,14 @@ export default function AddToSale() {
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state === "submitting";
   const params = useParams();
+  const location = useLocation();
   
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
       notes: "",
       sink: "",
+      square_feet: 0,
     },
   });
   
@@ -281,7 +287,7 @@ export default function AddToSale() {
 
   const handleChange = (open: boolean) => {
     if (open === false) {
-      navigate(`/employee/stones/slabs/${params.stone}`);
+      navigate(`/employee/stones/slabs/${params.stone}${location.search}`);
     }
   };
   
@@ -337,9 +343,17 @@ export default function AddToSale() {
                   />
                 )}
               />
-            
-         
-              
+            <FormField
+              control={form.control}
+              name="square_feet"
+              render={({ field }) => (
+                <InputItem
+                  name={"Square Feet"}
+                  placeholder={"Square Feet"}
+                  field={field}
+                />
+              )}
+              />
               <FormField
                 control={form.control}
                 name="notes"

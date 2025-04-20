@@ -31,11 +31,11 @@ export async function action({ params, request }: ActionFunctionArgs) {
   try {
 
     await db.execute(
-      "UPDATE slab_inventory SET sale_id = NULL, notes = NULL WHERE sale_id = ?",
+      "UPDATE slab_inventory SET sale_id = NULL, notes = NULL, square_feet = NULL WHERE sale_id = ?",
       [params.sale]
     );
     await db.execute(
-      "UPDATE sinks SET sale_id = NULL, is_deleted = 0 WHERE sale_id = ?",
+      "UPDATE sinks SET sale_id = NULL, is_deleted = 0, price = NULL WHERE sale_id = ?",
       [params.sale]
     );
     await db.execute(

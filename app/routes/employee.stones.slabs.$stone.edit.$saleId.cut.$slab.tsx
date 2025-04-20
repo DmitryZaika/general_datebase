@@ -6,6 +6,7 @@ import {
   Form,
   useNavigation,
   useNavigate,
+  useLocation,
 } from "react-router";
 import { getEmployeeUser } from "~/utils/session.server";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
@@ -103,6 +104,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return forceRedirectError(request.headers, "Missing required parameters");
   }
   
+  const url = new URL(request.url);
+  const searchParams = url.searchParams.toString();
+  const searchString = searchParams ? `?${searchParams}` : '';
+
   const slabIdNum = parseInt(slabId, 10);
   const saleIdNum = parseInt(saleId, 10);
   
@@ -125,11 +130,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (isNaN(length) || isNaN(width) || length <= 0 || width <= 0) {
     const session = await getSession(request.headers.get("Cookie"));
     session.flash("message", toastData("Error", "Please provide valid dimensions"));
-    return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleIdNum}/cut/${slabIdNum}`, {
+    return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleIdNum}/cut/${slabIdNum}${searchString}`, {
       headers: { "Set-Cookie": await commitSession(session) }
     });
   }
 
+
+  
   try {    
     const [slabResult] = await db.execute<RowDataPacket[]>(
       `SELECT id, stone_id, bundle, sale_id, notes, url, is_cut FROM slab_inventory WHERE id = ?`,
@@ -197,12 +204,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
     
     if (addAnother) {
       
-      return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleIdNum}/cut/${slabIdNum}`, {
+      return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleIdNum}/cut/${slabIdNum}${searchString}`, {
         headers: { "Set-Cookie": await commitSession(session) }
       });
     } 
       
-      return redirect(`/employee/stones/slabs/${actualStoneId}/edit/${saleIdNum}`, {
+      return redirect(`/employee/stones/slabs/${actualStoneId}/edit/${saleIdNum}${searchString}`, {
         headers: { "Set-Cookie": await commitSession(session) }
       });
     
@@ -223,7 +230,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       actualStoneIdForError = String(slabRecord[0].stone_id);
     }
     
-    return redirect(`/employee/stones/slabs/${actualStoneIdForError}/edit/${saleIdNum}/cut/${slabIdNum}`, {
+    return redirect(`/employee/stones/slabs/${actualStoneIdForError}/edit/${saleIdNum}/cut/${slabIdNum}${searchString}`, {
       headers: { "Set-Cookie": await commitSession(session) }
     });
   } 
@@ -234,6 +241,7 @@ export default function CutSlab() {
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state !== "idle";
   const formRef = useRef<HTMLFormElement>(null);
+  const location = useLocation();
   
  
   
@@ -244,7 +252,7 @@ export default function CutSlab() {
   }, [isSubmitting]);
   
   const handleDialogClose = () => {
-    navigate(`/employee/stones/slabs/${stoneId}/edit/${saleId}`);
+    navigate(`/employee/stones/slabs/${stoneId}/edit/${saleId}${location.search}`);
   };
   
   const isAlreadyCut = slab?.is_cut === 1;
