@@ -13,12 +13,15 @@ import {
   Params
 } from "react-router";
 import { getEmployeeUser } from "~/utils/session.server";
+import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { commitSession, getSession } from "~/sessions";
 import { selectMany, selectId } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { Button } from "~/components/ui/button";
+import { DeleteRow } from "~/components/pages/DeleteRow";
 import {
   Dialog,
   DialogContent,
@@ -41,7 +44,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "~/components/ui/tabs";
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 
 interface SaleDetails {
   id: number;
@@ -81,18 +84,15 @@ interface Customer {
   id: number;
   name: string;
 }
+const slabSchema = z.object({
+  notes: z.string().optional(),
+  square_feet: z.coerce.number().optional(),
+})
+
+type SlabFormData = z.infer<typeof slabSchema>;
+const slabsResolver = zodResolver(slabSchema);
 
 const schema = z.object({
-  customer_id: z.string(),
-  notes: z.string().optional(),
-  slabs: z.array(
-    z.object({
-      id: z.number(),
-      notes: z.string().optional(),
-      square_feet: z.coerce.number().optional(),
-      is_cut: z.boolean().default(false),
-    })
-  ),
   sinks: z.array(
     z.object({
       id: z.number(),
@@ -196,62 +196,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     [user.company_id]
   );
   
-  const customers = await selectMany<Customer>(
-    db,
-    `SELECT id, name FROM customers WHERE company_id = ? ORDER BY name ASC`,
-    [user.company_id]
-  );
-  
   return { 
     sale,
     slabs,
     sinks,
     availableSinks,
-    customers
   };
 }
 
-async function handleGeneral(formData: globalThis.FormData, saleId: number, companyId: number) {
-  const customer_id = formData.get("customer_id") as string;
-  await db.execute(
-    `UPDATE sales SET customer_id = ? WHERE id = ? AND company_id = ?`,
-    [customer_id, saleId, companyId]
-  );
-}
-
-async function handleSlabs(request: Request, formData: globalThis.FormData, saleId: number, companyId: number) {
-  const slabIds = formData.getAll("slabId") as string[];
-  const slabNotes = formData.getAll("slabNotes") as string[];
-  const slabSquareFeet = formData.getAll("slabSquareFeet") as string[];
-  const slabIsCut = formData.getAll("slabIsCut") as string[];
-  const slabId = formData.get("slabId") as string;
-  await db.execute(
-    `UPDATE slab_inventory SET notes = ?, square_feet = ?, is_cut = ? WHERE id = ? AND sale_id = ? AND company_id = ?`,
-    [slabNotes, slabSquareFeet, slabIsCut, slabId, saleId, companyId]
-  );
-  const allSlabsRemoved = slabIsCut.every(status => status === "true");
-  if (allSlabsRemoved && slabIds.length === 0) {
-    const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Error", "At least one slab must remain in the sale", "destructive"));
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { "Set-Cookie": await commitSession(session) },
-    });
-  }
-  
-  for (let i = 0; i < slabIds.length; i++) {
-    const id = parseInt(slabIds[i]);
-    const notes = slabNotes[i] || null;
-    const squareFeet = parseFloat(slabSquareFeet[i]) || null;
-    
-    await db.execute(
-      `UPDATE slab_inventory 
-       SET notes = ?, square_feet = ? 
-       WHERE id = ? AND sale_id = ?`,
-      [notes, squareFeet, id, saleId]
-    );
-  }
-}
-
+/*
 async function handleSinks(formData: globalThis.FormData,  saleId: number, companyId: number) {
   const sinkIds = formData.getAll("sinkId") as string[];
   const sinkTypeIds = formData.getAll("sinkTypeId") as string[];
@@ -328,8 +281,7 @@ for (let i = 0; i < newSinkTypeIds.length; i++) {
   }
 }
 }
-
-
+*/
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request);
@@ -362,12 +314,23 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const intent = formData.get("intent") as string;
   
   try {
-
-    await handleGeneral(formData, saleId, user.company_id);
-    if (intent === "slabs") {
-      await handleSlabs(request, formData, saleId, user.company_id);
-    } else if (intent === "sinks") {
-      await handleSinks(formData, saleId, user.company_id);
+    if (intent == "slab-delete") {
+      const slabId = formData.get("id") as string;
+      await db.execute(
+        `UPDATE slab_inventory SET sale_id = NULL WHERE id = ?`,
+        [slabId]
+      );
+    } else if (intent == "slab-update") {
+      const slabId = formData.get("id") as string;
+      const notes = formData.get("notes") as string;
+      const squareFeet = parseFloat(formData.get("square_feet") as string) || null;
+      await db.execute(
+        `UPDATE slab_inventory 
+         SET notes = ?, square_feet = ? 
+         WHERE id = ?`,
+        [notes, squareFeet, slabId]
+      );
+      
     }
 
     
@@ -390,8 +353,47 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } 
 }
 
+function SlabEdit({ slab }: { slab: SaleSlab }) {
+  const token = useAuthenticityToken();
+  const form = useForm<SlabFormData>({
+    resolver: slabsResolver,
+    defaultValues: {
+      notes: slab.notes || "",
+      square_feet: slab.square_feet || 0,
+    },
+  });
+
+  const fullSubmit = useFullSubmit(form);
+  return (
+    <FormProvider {...form}>
+      <Form id="customerForm" method="post" className="flex items-center gap-2">
+        <input type="hidden" name="id" value={slab.id} />
+        <input type="hidden" name="intent" value="slab-update" />
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <InputItem name="notes" field={field} />
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="square_feet"
+          render={({ field }) => (
+            <InputItem name="number" field={field} />
+          )}
+        />
+        <LoadingButton type="submit" loading={form.formState.isSubmitting}>
+          Save
+        </LoadingButton>
+      </Form>
+    </FormProvider>
+  )
+}
+
 export default function EditSale() {
-  const { sale, slabs, sinks, availableSinks, customers } = useLoaderData<typeof loader>();
+  const { sale, slabs, sinks, availableSinks } = useLoaderData<typeof loader>();
+  const [deleteSlab, setDeleteSlab] = useState(false);
   const navigate = useNavigate();
   const submitClickedRef = useRef(false);
   const location = useLocation();
@@ -417,27 +419,12 @@ export default function EditSale() {
             Edit Sale #{sale.id}
           </DialogTitle>
         </DialogHeader>
-        
-        <fetcher.Form 
-          method="post" 
-          className="space-y-4"
-        >
-
-          
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-              <select
-                name="customer_id"
-                defaultValue={sale.customer_id}
-                className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-              >
-                {customers.map(customer => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
+              <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
+                {sale.customer_name}
+              </div>
             </div>
             
             <div className="col-span-2 sm:col-span-1">
@@ -474,58 +461,28 @@ export default function EditSale() {
                     <div key={slab.id} className={`p-3 rounded-md border shadow-sm ${slab.is_cut === 1 ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'}`}>
                       <input type="hidden" name="slabId" value={slab.id} />
                       
-                      <div className="flex justify-between items-center mb-2">
+                      <div className="flex justify-between">
                         <span className="font-medium text-sm text-gray-800">{slab.stone_name} - {slab.bundle}</span>
                         
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            name="slabIsCut"
-                            value="true"
-                            id={`slab-cut-${slab.id}`}
-                            defaultChecked={false}
-                            disabled={hasSingleSlab}
-                            className={`mr-1.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${hasSingleSlab ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        <Button variant="destructive" disabled={hasSingleSlab} onClick={() => setDeleteSlab(true)}>Delete</Button>
+                        { deleteSlab && (
+                          <DeleteRow 
+                            handleChange={handleChange}
+                            title='Delete support'
+                            description={`Are you sure you want to delete ${name}?`}
+                            intent="slab-delete"
+                            id={slab.id}
                           />
-                          <label 
-                            htmlFor={`slab-cut-${slab.id}`} 
-                            className={`text-xs ${hasSingleSlab ? 'text-gray-400 cursor-not-allowed' : 'text-gray-500'}`}
-                            title={hasSingleSlab ? "Cannot remove the only slab in the sale" : ""}
-                          >
-                            {hasSingleSlab ? "Cannot Remove" : "Remove"}
-                          </label>
-                        </div>
+                        )}
                       </div>
                       
-                      <div className="flex items-end gap-2">
-                        <div className="w-full">
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
-                          <input
-                            type="text"
-                            name="slabNotes"
-                            defaultValue={slab.notes || ""}
-                            className="w-full text-sm border border-gray-300 rounded-md px-3 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                        </div>
-                        
-                        <div className="col-span-1">
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Sq Feet</label>
-                          <input
-                            type="number"
-                            name="slabSquareFeet"
-                            defaultValue={slab.square_feet || ""}
-                            step="1"
-                            min="0"
-                            className="w-full text-sm border border-gray-300 rounded-md px-3 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                        </div>
-                        <div >
+                      <div className="flex items-center">
+                        <SlabEdit slab={slab}/>
                         <Link to={`cut/${slab.id}/${location.search}`}>
-                          <Button className="h-[30px]" variant="blue">
+                          <Button className="ml-2" variant="blue">
                             Cut Slab
                           </Button>
                         </Link>
-                        </div>
                       </div>
                     </div>
                   ))}
@@ -625,20 +582,6 @@ export default function EditSale() {
               </div>
             </TabsContent>
           </Tabs>
-          
-          <DialogFooter className="pt-3 border-t border-gray-200">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => handleChange(false)}
-              disabled={isSubmittingFetched || submitClickedRef.current}
-              className="text-sm font-medium px-4 py-2"
-            >
-              Cancel
-            </Button>
-            <LoadingButton loading={isSubmittingFetched}>Save Changes</LoadingButton>
-          </DialogFooter>
-        </fetcher.Form>
         <Outlet />
       </DialogContent>
     </Dialog>
