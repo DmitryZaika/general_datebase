@@ -76,7 +76,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (formData.length === 0 && formData.width === 0) {
     const [stoneRecord] = await selectMany<{ width: number; length: number }>(
       db,
-      "SELECT width, length FROM stones WHERE stone_id = ? LIMIT 1",
+      "SELECT width, length FROM stones WHERE id = ? LIMIT 1",
       [stoneId],
     );
     formData.length = stoneRecord?.length ?? 0;
@@ -107,7 +107,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     length: number;
   }>(
     db,
-    "SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ?",
+    "SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ? AND is_cut = 0",
     [stoneId],
   );
   const [stone] = await selectMany<{

@@ -32,7 +32,8 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   const sinkId = params.sink;
   try {
-    await db.execute(`DELETE FROM main.sinks WHERE id = ?`, [sinkId]);
+    await db.execute(`UPDATE sink_type SET is_deleted = 1 WHERE id = ?`, [sinkId]);
+    await db.execute(`UPDATE sinks SET is_deleted = 1 WHERE sink_type_id = ?`, [sinkId]);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
@@ -56,7 +57,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   const sink = await selectId<{ name: string }>(
     db,
-    "select name from sinks WHERE id = ?",
+    "select name from sink_type WHERE id = ?",
     sinkId,
   );
   return {

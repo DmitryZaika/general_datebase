@@ -1,0 +1,1 @@
+ALTER TABLE slab_inventory ADD COLUMN square_feet DECIMAL(10,2);

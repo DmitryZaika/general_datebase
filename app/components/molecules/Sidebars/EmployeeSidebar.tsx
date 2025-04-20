@@ -5,6 +5,7 @@ import {
   Inbox,
   Search,
   Settings,
+  DollarSign,
 } from "lucide-react";
 import { useLocation, useNavigate, Outlet } from "react-router";
 import { FormLabel } from "~/components/ui/form";
@@ -95,11 +96,18 @@ const getItems = (base: string, suppliers: ISupplier[] | undefined, sinkSupplier
     });
   }
   if (base === "admin") {
-    finalList.push({
-      title: "User Panel",
-      url: `/admin/users`,
-      icon: Settings,
-    });
+    finalList.push(
+      {
+        title: "Transactions",
+        url: `/admin/transactions`,
+        icon: DollarSign,
+      },
+      {
+        title: "User Panel",
+        url: `/admin/users`,
+        icon: Settings,
+      }
+    );
   }
   return finalList;
 };
