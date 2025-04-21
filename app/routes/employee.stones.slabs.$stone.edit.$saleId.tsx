@@ -10,7 +10,8 @@ import {
   useFetcher,
   Outlet,
   useLocation,
-  Params
+  Params,
+  data
 } from "react-router";
 import { getEmployeeUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
@@ -44,7 +45,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "~/components/ui/tabs";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 
 interface SaleDetails {
   id: number;
@@ -100,7 +101,6 @@ const sinkSchema = z.object({
 type SinkFormData = z.infer<typeof sinkSchema>;
 const sinksResolver = zodResolver(sinkSchema);
 
-
 const schema = z.object({
   sinks: z.array(
     z.object({
@@ -115,6 +115,21 @@ const schema = z.object({
   ).optional(),
 });
 
+const sinkAddSchema = z.object({
+  sink_type_id: z.string().min(1, "Please select a sink"),
+  price: z.coerce.number().optional(),
+});
+
+type SinkAddFormData = z.infer<typeof sinkAddSchema>;
+const sinkAddResolver = zodResolver(sinkAddSchema);
+
+const saleInfoSchema = z.object({
+  customer_name: z.string().min(1, "Customer name is required"),
+  seller_id: z.coerce.number().min(1, "Seller is required"),
+});
+
+type SaleInfoFormData = z.infer<typeof saleInfoSchema>;
+const saleInfoResolver = zodResolver(saleInfoSchema);
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await getEmployeeUser(request);
@@ -201,11 +216,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     [user.company_id]
   );
   
+  const sellers = await selectMany<{id: number, name: string}>(
+    db,
+    `SELECT id, name FROM users WHERE company_id = ? ORDER BY name ASC`,
+    [user.company_id]
+  );
+  
   return { 
     sale,
     slabs,
     sinks,
     availableSinks,
+    sellers,
   };
 }
 
@@ -310,7 +332,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   
   try {
-    } catch (error) {
+  } catch (error) {
     console.error("CSRF validation error:", error);
     return { error: "Invalid CSRF token" };
   }
@@ -318,8 +340,70 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
   
+  
   try {
-    if (intent == "slab-delete") {
+    if (intent === "sale-unsell") {
+   
+      
+      await db.execute(
+        `UPDATE slab_inventory 
+         SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL 
+         WHERE sale_id = ?`,
+        [saleId]
+      );
+      
+      await db.execute(
+        `UPDATE sinks 
+         SET sale_id = NULL, price = NULL, is_deleted = 0 
+         WHERE sale_id = ?`,
+        [saleId]
+      );
+      
+      await db.execute(
+        `UPDATE sales SET status = 'cancelled' WHERE id = ?`,
+        [saleId]
+      );
+      
+      const session = await getSession(request.headers.get("Cookie"));
+      session.flash("message", toastData("Success", "All items returned to stock successfully"));
+      
+      return redirect(`/employee/stones/slabs/${stoneId}`, {
+        headers: { "Set-Cookie": await commitSession(session) },
+      });
+    }
+    else if (intent === "sale-info-update") {
+      const customer_name = formData.get("customer_name") as string;
+      const seller_id = parseInt(formData.get("seller_id") as string);
+    
+      
+      if (!customer_name || isNaN(seller_id)) {
+        console.error(`[ERROR] Invalid sale info data: customer_name=${customer_name}, seller_id=${seller_id}`);
+        throw new Error("Invalid sale info update data");
+      }
+      
+      try {
+        await db.execute(
+          `UPDATE customers SET name = ? WHERE id = (
+            SELECT customer_id FROM sales WHERE id = ?
+          )`,
+          [customer_name, saleId]
+        );
+        
+        await db.execute(
+          `UPDATE sales SET seller_id = ? WHERE id = ?`,
+          [seller_id, saleId]
+        );
+        
+        const session = await getSession(request.headers.get("Cookie"));
+        session.flash("message", toastData("Success", "Sale information updated successfully"));
+        
+        return data({ success: true }, {
+          headers: { "Set-Cookie": await commitSession(session) },
+        });
+      } catch (dbError) {
+        
+      }
+    } else if (intent == "slab-delete") {
       const slabId = formData.get("id") as string;
       await db.execute(
         `UPDATE slab_inventory SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL WHERE id = ?`,
@@ -341,13 +425,52 @@ export async function action({ request, params }: ActionFunctionArgs) {
         `UPDATE sinks SET sale_id = NULL, price = NULL, is_deleted = 0 WHERE id = ?`,
         [sinkId]
       );
+    } else if (intent == "sink-update") {
+      const sinkId = formData.get("id") as string;
+      const price = parseFloat(formData.get("price") as string) || null;
+      await db.execute(
+        `UPDATE sinks SET price = ? WHERE id = ?`,
+        [price, sinkId]
+      );
+    } else if (intent == "sink-add") {
+      const sinkTypeId = formData.get("newSinkTypeId") as string;
+      let price = parseFloat(formData.get("newSinkPrice") as string) || null;
+      if (price === null || price === 0 || price === undefined) {
+        const sinkTypeDetails = await selectMany<{retail_price: number}>(
+          db,
+          `SELECT retail_price FROM sink_type WHERE id = ?`,
+          [parseInt(sinkTypeId)]
+        );
+        
+        if (sinkTypeDetails.length > 0) {
+          price = sinkTypeDetails[0].retail_price;
+        }
+      }
+      
+      const availableSinks = await selectMany<{id: number}>(
+        db,
+        `SELECT id FROM sinks WHERE sink_type_id = ? AND sale_id IS NULL AND is_deleted = 0 LIMIT 1`,
+        [parseInt(sinkTypeId)]
+      );
+      const sinkId = availableSinks[0].id;
+      
+      await db.execute(
+        `UPDATE sinks SET sale_id = ?, price = ?, is_deleted = 1 WHERE id = ?`,
+        [saleId, price, sinkId]
+      );
     }
-
-    
     const session = await getSession(request.headers.get("Cookie"));
+    
+    if (intent === "slab-delete" || intent === "sink-delete") {
+      session.flash("message", toastData("Success", "Item removed from sale"));
+      return redirect(`/employee/stones/slabs/${params.stone}/edit/${saleId}`, {
+        headers: { "Set-Cookie": await commitSession(session) },
+      });
+    }
+    
     session.flash("message", toastData("Success", "Sale updated successfully"));
     
-    return redirect(`/employee/stones/slabs/${params.stone}`, {
+    return data({ success: true }, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
     
@@ -355,16 +478,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
     console.error("Error updating sale:", error);
     
     const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Error", "Failed to update sale"));
+    session.flash("message", toastData("Error", "Failed to update sale", "destructive"));
     
-      return redirect(`/employee/stones/slabs/${params.stone}/edit/${saleId}`, {
+    return data({ success: false }, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
   } 
 }
 
 function SlabEdit({ slab }: { slab: SaleSlab }) {
-  const token = useAuthenticityToken();
   const form = useForm<SlabFormData>({
     resolver: slabsResolver,
     defaultValues: {
@@ -372,8 +494,6 @@ function SlabEdit({ slab }: { slab: SaleSlab }) {
       square_feet: slab.square_feet || 0,
     },
   });
-
-  const fullSubmit = useFullSubmit(form);
   return (
     <FormProvider {...form}>
       <Form id="customerForm" method="post" className="flex items-center gap-2">
@@ -383,14 +503,14 @@ function SlabEdit({ slab }: { slab: SaleSlab }) {
           control={form.control}
           name="notes"
           render={({ field }) => (
-            <InputItem name="notes" field={field} />
+            <InputItem name="Notes" field={field} />
           )}
         />
         <FormField
           control={form.control}
           name="square_feet"
           render={({ field }) => (
-            <InputItem name="number" field={field} />
+            <InputItem name="Square Feet" field={field} />
           )}
         />
         <LoadingButton type="submit" loading={form.formState.isSubmitting}>
@@ -401,17 +521,238 @@ function SlabEdit({ slab }: { slab: SaleSlab }) {
   )
 }
 
+function SinkEdit({ sink }: { sink: SaleSink }) {
+  const form = useForm<SinkFormData>({
+    resolver: sinksResolver,
+    defaultValues: {
+      sink_type_id: sink.sink_type_id,
+      price: sink.price,
+    },
+  });
+  return (
+    <FormProvider {...form}>
+      <Form method="post" className="flex items-center gap-2 -mb-6">
+        <input type="hidden" name="id" value={sink.id} />
+        <input type="hidden" name="intent" value="sink-update" />
+        <FormField
+          control={form.control}
+          name="price"
+          render={({ field }) => (
+            <InputItem name="Price" className="w-full" field={field} />
+          )}
+        />
+        <LoadingButton type="submit" className="ml-auto" loading={form.formState.isSubmitting}>
+          Save
+        </LoadingButton>
+      </Form>
+    </FormProvider>
+  )
+}
+
+function SinkAdd({ availableSinks }: { availableSinks: Sink[] }) {
+  const form = useForm<SinkAddFormData>({
+    resolver: sinkAddResolver,
+    defaultValues: {
+      sink_type_id: "",
+      price: undefined,
+    },
+  });
+  
+  return (
+    <FormProvider {...form}>
+      <Form method="post">
+        <input type="hidden" name="intent" value="sink-add" />
+        <div className="grid grid-cols-6 gap-2">
+          <div className="col-span-3">
+            <FormField
+              control={form.control}
+              name="sink_type_id"
+              render={({ field }) => (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Sink</label>
+                  <select
+                    {...field}
+                    name="newSinkTypeId"
+                    className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">Select a sink</option>
+                    {availableSinks.map(sink => (
+                      <option key={sink.id} value={sink.id} data-price={sink.retail_price}>
+                        {sink.name} - ${sink.retail_price}
+                      </option>
+                    ))}
+                  </select>
+                  {form.formState.errors.sink_type_id && (
+                    <p className="text-xs text-red-500 mt-1">{form.formState.errors.sink_type_id.message}</p>
+                  )}
+                </div>
+              )}
+            />
+          </div>
+          
+          <div className="col-span-2">
+            <FormField
+              control={form.control}
+              name="price"
+              render={({ field }) => (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
+                  <input
+                    {...field}
+                    type="number"
+                    name="newSinkPrice"
+                    placeholder="Auto"
+                    step="1"
+                    min="0"
+                    className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+            />
+          </div>
+          <div className="mt-5">
+          <LoadingButton type="submit" loading={form.formState.isSubmitting}>
+            Add Sink
+          </LoadingButton>
+        </div>
+        </div>
+      
+      </Form>
+    </FormProvider>
+  );
+}
+
+function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: number, name: string}[] }) {
+  const [showUnsellConfirm, setShowUnsellConfirm] = useState(false);
+  
+  return (
+    <div className="mb-6">
+      <Form method="post">
+        <input type="hidden" name="intent" value="sale-info-update" />
+        
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+            <input 
+              type="text" 
+              name="customer_name" 
+              defaultValue={sale.customer_name}
+              className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
+            <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
+              {new Date(sale.sale_date).toLocaleDateString()}
+            </div>
+          </div>
+          
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Seller</label>
+            <select 
+              name="seller_id" 
+              defaultValue={sale.seller_id.toString()}
+              className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {sellers.map(seller => (
+                <option key={seller.id} value={seller.id}>
+                  {seller.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="col-span-2 sm:col-span-1 flex items-end gap-2">
+            <LoadingButton
+              type="submit"
+              className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md shadow-sm transition-colors flex-1" 
+              loading={false}
+            >
+              Save Changes
+            </LoadingButton>
+            
+            <Button
+              type="button"
+              variant="destructive"
+              className="py-2 px-4"
+              onClick={() => setShowUnsellConfirm(true)}
+            >
+              Unsell
+            </Button>
+          </div>
+        </div>
+      </Form>
+      
+      {/* Диалог подтверждения для Unsell */}
+      <Dialog open={showUnsellConfirm} onOpenChange={setShowUnsellConfirm}>
+        <DialogContent className="bg-white rounded-lg p-6 shadow-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-gray-900">
+              Confirm Return to Stock
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="my-4">
+            <p className="text-sm text-gray-600">
+              Are you sure you want to return all items from this sale back to stock? 
+              This will reset all slabs and sinks that were part of this sale.
+            </p>
+          </div>
+          
+          <DialogFooter className="flex justify-end gap-2 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowUnsellConfirm(false)}
+            >
+              Cancel
+            </Button>
+            
+            <Form method="post">
+              <input type="hidden" name="intent" value="sale-unsell" />
+              <Button 
+                type="submit"
+                variant="destructive"
+              >
+                Confirm Unsell
+              </Button>
+            </Form>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function EditSale() {
-  const { sale, slabs, sinks, availableSinks } = useLoaderData<typeof loader>();
-  const [deleteSlab, setDeleteSlab] = useState(false);
+  const { sale, slabs, sinks, availableSinks, sellers } = useLoaderData<typeof loader>();
+  const [deleteSlabId, setDeleteSlabId] = useState<number | null>(null);
+  const [deleteSinkId, setDeleteSinkId] = useState<number | null>(null);
   const navigate = useNavigate();
-  const submitClickedRef = useRef(false);
   const location = useLocation();
-  const handleChange = (open: boolean) => {
+  
+  const navigation = useNavigation();
+  
+  useEffect(() => {
+    if (navigation.state === "loading" || navigation.state === "idle") {
+      setDeleteSlabId(null);
+      setDeleteSinkId(null);
+    }
+  }, [navigation.state]);
+  
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      setDeleteSlabId(null);
+      setDeleteSinkId(null);
+    }
+  };
+  
+  const handleDialogChange = (open: boolean) => {
     if (open === false) {
       navigate(`..${location.search}`);
     }
   };
+  
   const hasSingleSlab = slabs.length === 1;
   
   const formattedDate = new Date(sale.sale_date).toLocaleDateString();
@@ -421,7 +762,7 @@ export default function EditSale() {
   return (
     <Dialog
       open={true}
-      onOpenChange={handleChange}
+      onOpenChange={handleDialogChange}
     >
       <DialogContent className="bg-white rounded-lg pt-4 px-4 shadow-lg text-gray-800 overflow-y-auto max-h-[85vh] max-w-2xl">
         <DialogHeader className="mb-3 pb-2 border-b border-gray-200">
@@ -429,161 +770,96 @@ export default function EditSale() {
             Edit Sale #{sale.id}
           </DialogTitle>
         </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
-              <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
-                {sale.customer_name}
-              </div>
-            </div>
-            
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
-              <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
-                {formattedDate}
-              </div>
-            </div>
-            
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Seller</label>
-              <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
-                {sale.seller_name}
-              </div>
-            </div>
-          </div>
+        
+        <SaleInfoEdit sale={sale} sellers={sellers} />
+        
+        <Tabs defaultValue="slabs" className="w-full">
+          <TabsList className="w-full grid grid-cols-2 mb-3">
+            <TabsTrigger value="slabs" className="data-[state=active]:bg-blue-100">
+              Slabs ({slabs.length})
+            </TabsTrigger>
+            <TabsTrigger value="sinks" className="data-[state=active]:bg-blue-100">
+              Sinks ({sinks.length})
+            </TabsTrigger>
+          </TabsList>
           
-          <Tabs defaultValue="slabs" className="w-full">
-            <TabsList className="w-full grid grid-cols-2 mb-3">
-              <TabsTrigger value="slabs" className="data-[state=active]:bg-blue-100">
-                Slabs ({slabs.length})
-              </TabsTrigger>
-              <TabsTrigger value="sinks" className="data-[state=active]:bg-blue-100">
-                Sinks ({sinks.length})
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="slabs" className="max-h-[40vh] overflow-y-auto rounded-md bg-gray-50 p-3 shadow-inner">
-              {slabs.length === 0 ? (
-                <p className="text-center text-gray-500 py-4">No slabs in this sale</p>
-              ) : (
-                <div className="space-y-3">
-                  {slabs.map((slab, index) => (
-                    <div key={slab.id} className={`p-3 rounded-md border shadow-sm ${slab.is_cut === 1 ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'}`}>
-                      <input type="hidden" name="slabId" value={slab.id} />
+          <TabsContent value="slabs" className="max-h-[40vh] overflow-y-auto rounded-md bg-gray-50 p-3 shadow-inner">
+            {slabs.length === 0 ? (
+              <p className="text-center text-gray-500 py-4">No slabs in this sale</p>
+            ) : (
+              <div className="space-y-3">
+                {slabs.map((slab, index) => (
+                  <div key={slab.id} className={`p-3 rounded-md border shadow-sm ${slab.is_cut === 1 ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'}`}>
+                    <input type="hidden" name="slabId" value={slab.id} />
+                    
+                    <div className="flex justify-between">
+                      <span className="font-medium text-sm text-gray-800">{slab.stone_name} - {slab.bundle}</span>
                       
-                      <div className="flex justify-between">
-                        <span className="font-medium text-sm text-gray-800">{slab.stone_name} - {slab.bundle}</span>
-                        
-                        <Button variant="destructive" disabled={hasSingleSlab} onClick={() => setDeleteSlab(true)}>Delete</Button>
-                        { deleteSlab && (
-                          <DeleteRow 
-                            handleChange={handleChange}
-                            title='Delete slab'
-                            description={`Are you sure you want to delete ${name}?`}
-                            intent="slab-delete"
-                            id={slab.id}
+                      <Button variant="destructive" disabled={hasSingleSlab} onClick={() => setDeleteSlabId(slab.id)}>Delete</Button>
+                      {deleteSlabId === slab.id && (
+                        <DeleteRow 
+                          handleChange={handleDialogClose}
+                          title='Delete slab'
+                          description={`Are you sure you want to delete ${slab.stone_name} - ${slab.bundle}?`}
+                          intent="slab-delete"
+                          id={slab.id}
+                        />
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <SlabEdit slab={slab}/>
+                      <Link to={`cut/${slab.id}/${location.search}`}>
+                        <Button className="ml-2" variant="blue">
+                          Cut Slab
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="sinks" className="bg-gray-50 rounded-md p-3 shadow-inner">
+            <div className="max-h-[25vh] overflow-y-auto mb-4">
+                <div className="space-y-3">
+                  {sinks.map((sink, index) => (
+                    <div key={sink.id} className={`p-3 rounded-md border shadow-sm ${sink.is_deleted === 1 ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'}`}>
+                      <input type="hidden" name="sinkId" value={sink.id} />
+                      <input type="hidden" name="sinkTypeId" value={sink.sink_type_id} />
+                      
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium text-sm text-gray-800">{sink.name}</span>
+                        <Button variant="destructive" onClick={() => setDeleteSinkId(sink.id)}>Delete</Button>
+                        {deleteSinkId === sink.id && (
+                          <DeleteRow
+                            handleChange={handleDialogClose}
+                            title='Delete sink'
+                            description={`Are you sure you want to delete ${sink.name}?`}
+                            intent="sink-delete"
+                            id={sink.id}
                           />
                         )}
                       </div>
                       
-                      <div className="flex items-center">
-                        <SlabEdit slab={slab}/>
-                        <Link to={`cut/${slab.id}/${location.search}`}>
-                          <Button className="ml-2" variant="blue">
-                            Cut Slab
-                          </Button>
-                        </Link>
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="col-span-1">
+                          <SinkEdit sink={sink}/>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
-              )}
-            </TabsContent>
+            </div>
             
-            <TabsContent value="sinks" className="bg-gray-50 rounded-md p-3 shadow-inner">
-              <div className="max-h-[25vh] overflow-y-auto mb-4">
-                  <div className="space-y-3">
-                    {sinks.map((sink, index) => (
-                      <div key={sink.id} className={`p-3 rounded-md border shadow-sm ${sink.is_deleted === 1 ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'}`}>
-                        <input type="hidden" name="sinkId" value={sink.id} />
-                        <input type="hidden" name="sinkTypeId" value={sink.sink_type_id} />
-                        
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-medium text-sm text-gray-800">{sink.name}</span>
-                              { deleteSlab && (
-                                <DeleteRow 
-                                  handleChange={handleChange}
-                                  title='Delete sink'
-                                  description={`Are you sure you want to delete ${name}?`}
-                                  intent="sink-delete"
-                                  id={sink.id}
-                                />
-                              )}
-                        </div>
-                        
-                        <div className="grid grid-cols-1 gap-2">
-                          <div className="col-span-1">
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
-                            <input
-                              type="number"
-                              name="sinkPrice"
-                              defaultValue={sink.price}
-                              step="1"
-                              min="0"
-                              className="w-full text-sm border border-gray-300 rounded-md px-3 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-              </div>
+            <div className="mt-4 p-3 border border-blue-100 rounded-md bg-blue-50 shadow-sm">
+              <h4 className="text-sm font-medium mb-2 text-blue-800">Add New Sink</h4>
               
-              <div className="mt-4 p-3 border border-blue-100 rounded-md bg-blue-50 shadow-sm">
-                <h4 className="text-sm font-medium mb-2 text-blue-800">Add New Sink</h4>
-                
-                <div className="grid grid-cols-6 gap-2">
-                  <div className="col-span-3">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Sink</label>
-                    <select
-                      name="newSinkTypeId"
-                      className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Select a sink</option>
-                      {availableSinks.map(sink => (
-                        <option key={sink.id} value={sink.id} data-price={sink.retail_price}>
-                          {sink.name} - ${sink.retail_price}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="col-span-1">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Qty</label>
-                    <input
-                      type="number"
-                      name="newSinkQuantity"
-                      defaultValue="1"
-                      min="1"
-                      className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
-                    <input
-                      type="number"
-                      name="newSinkPrice"
-                      placeholder="Auto"
-                      step="1"
-                      min="0"
-                      className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+              <SinkAdd availableSinks={availableSinks}/>
+            </div>
+          </TabsContent>
+        </Tabs>
         <Outlet />
       </DialogContent>
     </Dialog>

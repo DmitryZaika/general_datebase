@@ -102,7 +102,6 @@ async function updateContext(
 
 export async function loader({ request }: LoaderFunctionArgs) {
   console.time('chat:total-request');
-  console.log('Chat request started:', new Date().toISOString());
   
   const session = await getSession(request.headers.get("Cookie"));
   const activeSession = session.data.sessionId || null;
@@ -111,7 +110,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let isNew = url.get("isNew") === "true";
 
   if (!activeSession) {
-    console.log('Unauthorized: No active session');
     return new Response("Unauthorized", { status: 401 });
   }
   
@@ -120,7 +118,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   console.timeEnd('auth:get-user');
   
   if (!user) {
-    console.log('Unauthorized: User not found');
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -138,7 +135,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     chatHistoryId = result.id;
   }
   console.timeEnd('context:prepare');
-  console.log('Context prepared, message count:', messages.length);
 
   console.time('openai:request');
   let response = await openai.chat.completions.create({
@@ -149,12 +145,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     stream: true,
   });
   console.timeEnd('openai:request');
-  console.log('OpenAI connection established');
 
   return eventStream(
     request.signal, 
     function setup(send) {
-      console.log('SSE connection established');
       
       // Используем SSE комментарии для заполнения буфера
       // Комментарии начинаются с ':' и не отображаются клиенту
@@ -177,7 +171,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
             chunkCount++;
             if (chunkCount === 1) {
               firstChunkReceived = true;
-              console.log('First chunk received after', Date.now() - requestStartTime, 'ms');
             }
             
             const message = chunk.choices[0].delta.content;
@@ -186,7 +179,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
               answer += message;
             }
           }
-          console.log('Total chunks received:', chunkCount);
           console.timeEnd('openai:streaming');
           
           send({ data: DONE_KEY });
@@ -204,11 +196,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
         }
         
         console.timeEnd('chat:total-request');
-        console.log('Chat request completed:', new Date().toISOString());
       })();
 
       return function clear() {
-        console.log('SSE connection closed by client');
       };
     },
     {

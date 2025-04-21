@@ -288,14 +288,12 @@ export default function SlabSell() {
                   control={form.control}
                   name="sink_type_id"
                   render={({ field }) => {
-                    console.log("SelectInput field value:", field.value);
                     return (
                       <SelectInput
                         field={field}
                         placeholder="Select a Sink"
                         name="Sink"
                         options={sinks.map((sink) => {
-                          console.log("Sink option:", { id: sink.id, name: sink.name });
                           return {
                             key: String(sink.id),
                             value: sink.name,

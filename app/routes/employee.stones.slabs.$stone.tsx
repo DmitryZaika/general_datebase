@@ -90,13 +90,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return forceRedirectError(request.headers, "Invalid stone ID format");
   }
   
-  console.log(stoneId, "Stone ID");
   const stone = await selectId<{ id: number; name: string; url: string }>(
     db,
     "SELECT id, name, url FROM stones WHERE id = ?",
     stoneId
   );
-  console.log(stone, "Stone");
   if (!stone) {
     return forceRedirectError(request.headers, "No stone found for given ID");
   }
@@ -272,7 +270,7 @@ export default function SlabsModal() {
                     <TooltipTrigger asChild>
                       <div
                         className={`transition-colors duration-300 flex items-center gap-4 p-2 sm:px-5 rounded-lg border border-gray-200 ${
-                          slab.sale_id ? "bg-red-200" : "bg-white"
+                          slab.sale_id ? "bg-red-300" : "bg-white"
                         }`}
                       >
                         <img
@@ -341,11 +339,11 @@ export default function SlabsModal() {
                                     Edit
                                   </Button>
                                 </Link>
-                                  <Link to={`unsell/${slab.transaction.sale_id}/${location.search}`} className="ml-auto">
+                                  {/* <Link to={`unsell/${slab.transaction.sale_id}/${location.search}`} className="ml-auto">
                                   <Button type="submit" className="px-4 py-2 bg-red-600 hover:bg-red-700">
                                     Unsell
                                   </Button>
-                                  </Link>
+                                  </Link> */}
                               </div>
                             ) : (
                                 <Link to={`sell/${slab.id}/${location.search}`} className="ml-auto">
