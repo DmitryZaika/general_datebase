@@ -7,6 +7,8 @@ import { getAdminUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
 import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
+import { Button } from "~/components/ui/button";
+import { Link } from "react-router";
 
 interface Transaction {
   id: number;
@@ -59,7 +61,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        s.id`
   );
   
-  console.log("Sink details from separate query:", sinkDetails);
   
   // Simplified main query without sink join
   const transactions = await selectMany<Transaction>(
@@ -90,7 +91,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       s.sale_date DESC`
   );
   
-  // Manually combine the transaction data with sink data
   const updatedTransactions = transactions.map(t => {
     const sinkInfo = sinkDetails.find(sd => sd.sale_id === t.id);
     if (sinkInfo) {
@@ -164,6 +164,14 @@ export default function AdminTransactions() {
 
   return (
     <PageLayout title="Sales Transactions">
+      <div className="mb-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Transactions</h1>
+        {/* <Link to="/admin/reports">
+          <Button variant="default" className="bg-blue-600 hover:bg-blue-700">
+            Reports
+          </Button>
+        </Link> */}
+      </div>
       <DataTable 
         columns={transactionColumns} 
         data={transactions} 

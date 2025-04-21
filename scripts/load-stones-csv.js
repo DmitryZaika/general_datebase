@@ -86,4 +86,3 @@ async function saveData(data) {
 const data = getCsvData();
 const cleanData = convertData(data);
 const updateData = await saveData(cleanData);
-console.log(updateData);

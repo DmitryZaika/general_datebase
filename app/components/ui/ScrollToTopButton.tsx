@@ -29,9 +29,7 @@ export function ScrollToTopButton() {
   }, []);
 
   const scrollToTop = () => {
-    console.log("Кнопка скролла вверх нажата");
     try {
-      // Пытаемся прокрутить элемент main плавно
       const mainElement = document.querySelector('main');
       if (mainElement) {
         mainElement.scrollTo({
@@ -39,7 +37,6 @@ export function ScrollToTopButton() {
           behavior: 'smooth'
         });
       } else {
-        // Если main не найден, пробуем плавно прокрутить window
         window.scrollTo({ 
           top: 0, 
           behavior: 'smooth' 
@@ -47,7 +44,6 @@ export function ScrollToTopButton() {
       }
     } catch (error) {
       console.error("Ошибка при прокрутке:", error);
-      // Резервный вариант без плавной прокрутки
       const mainElement = document.querySelector('main');
       if (mainElement) {
         mainElement.scrollTop = 0; 
