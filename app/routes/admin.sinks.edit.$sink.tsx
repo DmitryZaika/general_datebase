@@ -9,6 +9,7 @@ import {
 import { FormField } from "../components/ui/form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
+import mysql from "mysql2/promise";
 
 import {
   Dialog,
@@ -35,6 +36,29 @@ import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { sinkSchema } from "~/schemas/sinks";
 
+type SinkData = {
+  name: string;
+  type: string;
+  url: string;
+  is_display: boolean;
+  supplier_id: string;
+  length: string;
+  width: string;
+  cost: number | null;
+  retail_price: number | null;
+  amount: number;
+};
+
+type SupplierData = {
+  id: number;
+  supplier_name: string;
+};
+
+type LoaderData = {
+  sink: SinkData;
+  suppliers: SupplierData[];
+};
+
 export async function action({ request, params }: ActionFunctionArgs) {
   const user = await getAdminUser(request).catch((err) => {
     return redirect(`/login?error=${err}`);
@@ -51,56 +75,107 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { errors };
   }
   const newFile = data.file && data.file !== "undefined";
-  const sink = await selectId<{ url: string }>(
-    db,
-    "SELECT url FROM sinks WHERE id = ?",
-    sinkId,
-  );
+  
   try {
-    if (newFile) {
-      await db.execute(
-        `UPDATE sinks
-          SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, amount = ?, cost = ?, retail_price = ?
-         WHERE id = ?`,
-        [
-          data.name,
-          data.type,
-          data.file,
-          data.is_display,
-          data.supplier_id,
-          data.length,
-          data.width,
-          data.amount,
-          data.cost,
-          data.retail_price,
-          sinkId,
-        ],
+
+    
+    try {
+      if (newFile) {
+        await db.execute(
+          `UPDATE sink_type
+            SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, cost = ?, retail_price = ?
+           WHERE id = ?`,
+          [ 
+            data.name,
+            data.type,
+            data.file,
+            data.is_display,
+            data.supplier_id,
+            data.length,
+            data.width,
+            data.cost,
+            data.retail_price,
+            sinkId,
+          ],
+        );
+      } else {
+        await db.execute(
+          `UPDATE sink_type
+           SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, cost = ?, retail_price = ?
+           WHERE id = ?`,
+          [
+            data.name,
+            data.type,
+            data.is_display,
+            data.supplier_id,
+            data.length,
+            data.width,
+            data.cost,
+            data.retail_price,
+            sinkId,
+          ],
+        );
+      }
+      
+      const [countRows] = await db.execute<mysql.RowDataPacket[]>(
+        `SELECT COUNT(*) as count FROM sinks WHERE sink_type_id = ? AND is_deleted = 0`,
+        [sinkId]
       );
-    } else {
-      await db.execute(
-        `UPDATE sinks
-         SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, amount = ?, cost = ?, retail_price = ?
-         WHERE id = ?`,
-        [
-          data.name,
-          data.type,
-          data.is_display,
-          data.supplier_id,
-          data.length,
-          data.width,
-          data.amount,
-          data.cost,
-          data.retail_price,
-          sinkId,
-        ],
-      );
-    }
+      const currentAmount = countRows[0]?.count || 0;
+      const newAmount = data.amount || 0;
+      
+      if (newAmount > currentAmount) {
+        const toAdd = newAmount - currentAmount;
+        for (let i = 0; i < toAdd; i++) {
+          await db.execute(
+            `INSERT INTO sinks (sink_type_id, is_deleted) VALUES (?, 0)`,
+            [sinkId]
+          );
+        }
+      } else if (newAmount < currentAmount) {
+        const toDelete = currentAmount - newAmount;
+        
+        // Get all available sinks first
+        const [allUnusedRows] = await db.execute<mysql.RowDataPacket[]>(
+          `SELECT id FROM sinks 
+           WHERE sink_type_id = ? AND sale_id IS NULL AND is_deleted = 0`,
+          [sinkId]
+        );
+        
+        // Take only as many as we need to delete
+        const rowsToUpdate = allUnusedRows.slice(0, toDelete);
+        
+        // Update each one individually
+        for (const row of rowsToUpdate) {
+          await db.execute(
+            `UPDATE sinks SET is_deleted = 1 WHERE id = ?`,
+            [row.id]
+          );
+        }
+      }
+      
+     
+      
+      if (newFile) {
+        const [oldFileRows] = await db.execute<mysql.RowDataPacket[]>(
+          `SELECT url FROM sink_type WHERE id = ?`,
+          [sinkId]
+        );
+        
+        const oldUrl = oldFileRows[0]?.url;
+        if (oldUrl) {
+          await deleteFile(oldUrl);
+        }
+      }
+    } catch (error) {
+   
+      console.error("Error updating sink: ", error);
+      throw error;
+    } 
   } catch (error) {
     console.error("Error updating sink: ", error);
   }
-  if (sink?.url && newFile) {
-    await deleteFile(sink.url);
-  }
+  
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Sink Edited"));
   return redirect("..", {
@@ -112,10 +187,16 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request).catch((err) => {
     return redirect(`/login?error=${err}`);
   });
+  
+  if (!user || user instanceof Response) {
+    return redirect('/admin');
+  }
+  
   if (!params.sink) {
     return forceRedirectError(request.headers, "No sink id provided");
   }
   const sinkId = parseInt(params.sink, 10);
+  
   const sink = await selectId<{
     name: string;
     type: string;
@@ -124,17 +205,28 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     supplier_id: string;
     length: string;
     width: string;
-    amount: number | null;
     cost: number | null;
     retail_price: number | null;
   }>(
     db,
-    "SELECT name, type, url, is_display, supplier_id, length, width, amount, cost, retail_price FROM sinks WHERE id = ?",
+    "SELECT name, type, url, is_display, supplier_id, length, width, cost, retail_price FROM sink_type WHERE id = ?",
     sinkId,
   );
+  
   if (!sink) {
     return forceRedirectError(request.headers, "No sink found");
   }
+  
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) as count FROM sinks WHERE sink_type_id = ? AND is_deleted = 0`,
+    [sinkId]
+  );
+  
+  const sinkWithAmount = {
+    ...sink,
+    amount: rows[0]?.count || 0
+  };
+  
   const suppliers = await selectMany<{
     id: number;
     supplier_name: string;
@@ -142,7 +234,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     user.company_id,
   ]);
   return {
-    sink,
+    sink: sinkWithAmount,
     suppliers,
   };
 };
@@ -152,11 +244,8 @@ function SinkInformation({
   suppliers,
   refresh,
 }: {
-  sinkData: ReturnType<typeof loader>["sink"];
-  suppliers: {
-    id: number;
-    supplier_name: string;
-  }[];
+  sinkData: SinkData;
+  suppliers: SupplierData[];
   refresh: () => void;
 }) {
   const navigation = useNavigation();
@@ -289,8 +378,15 @@ function SinkInformation({
   );
 }
 export default function SinksEdit() {
+  const loaderData = useLoaderData<typeof loader>();
   const navigate = useNavigate();
-  const { sink, suppliers } = useLoaderData();
+  
+  if (!loaderData || loaderData instanceof Response || !('sink' in loaderData) || !('suppliers' in loaderData)) {
+    return null;
+  }
+  
+  const { sink, suppliers } = loaderData as LoaderData;
+  
   const handleChange = (open: boolean) => {
     if (!open) {
       navigate("..");

@@ -17,7 +17,6 @@ import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
 
-// Тип представления данных
 type ViewMode = "grid" | "table";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -34,7 +33,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { stones };
 };
 
-// Табличное представление данных с использованием DataTable
 function StoneTable({ stones, setCurrentId }: { stones: Stone[], setCurrentId: (value: number) => void }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -94,7 +92,6 @@ function StoneTable({ stones, setCurrentId }: { stones: Stone[], setCurrentId: (
       accessorFn: (row) => {
         const length = row.length || 0;
         const width = row.width || 0;
-        // Сортировка по площади (length * width)
         return length * width;
       },
       id: "size",
@@ -166,7 +163,7 @@ function InteractiveCard({
   };
 
   const handleImageClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Предотвращаем всплытие клика до родительского элемента
+    e.stopPropagation(); 
     setCurrentId(stone.id);
   };
 
@@ -196,7 +193,7 @@ function InteractiveCard({
         type="slabs"
         itemId={stone.id}
         fieldList={{
-          Avaliable: `${stone.available} / ${displayedAmount}`,
+          Available: `${stone.available} / ${displayedAmount}`,
 
           Size: `${displayedLength} x ${displayedWidth}`,
           Type: capitalizeFirstLetter(stone.type),
@@ -235,7 +232,6 @@ export default function Stones() {
   const { stones } = useLoaderData<typeof loader>();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones);
-  // Новое состояние для режима просмотра
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   useEffect(() => {
@@ -254,7 +250,6 @@ export default function Stones() {
     return 0;
   };
 
-  // Функция переключения режима просмотра
   const toggleViewMode = () => {
     setViewMode(viewMode === "grid" ? "table" : "grid");
   };
@@ -262,14 +257,7 @@ export default function Stones() {
   return (
     <>
      <div className="flex justify-between flex-wrap items-center items-end mb-2">
-        <div className="flex items-center gap-4">
-          {/* <StonesSort 
-            stones={stones} 
-            onSortedStones={setSortedStones}
-            priorityFn={priorityFunction}
-          /> */}
-          
-          {/* Кнопка переключения режима просмотра */}
+        <div className="flex items-center gap-4"> 
           <Button 
             variant="outline"
             onClick={toggleViewMode}
@@ -295,7 +283,6 @@ export default function Stones() {
         />
       </div>
       
-      {/* Условный рендеринг в зависимости от выбранного режима */}
       {viewMode === "grid" ? (
         <ModuleList>
           {sortedStones.map((stone) => (

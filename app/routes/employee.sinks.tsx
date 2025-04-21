@@ -1,9 +1,3 @@
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "~/components/ui/accordion";
 import { LoaderFunctionArgs, Outlet, redirect, useLocation } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
@@ -13,11 +7,9 @@ import { getEmployeeUser } from "~/utils/session.server";
 import { ImageCard } from "~/components/organisms/ImageCard";
 import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState, useEffect } from "react";
-import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
 import { sinkFilterSchema } from "~/schemas/sinks";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { Sink, sinkQueryBuilder } from "~/utils/queries";
-import { SidebarTrigger } from "~/components/ui/sidebar";
 import { SINK_TYPES } from "~/utils/constants";
 
 
@@ -41,11 +33,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 function InteractiveCard({
   sink,
   setCurrentId,
+  disabled,
   sinkType,
 }: {
   sink: Sink;
   setCurrentId: (value: number, type: string) => void;
   sinkType: string;
+  disabled: boolean;
 }) {
   const displayedAmount = sink.amount && sink.amount > 0 ? sink.amount : "—";
   const displayedWidth = sink.width && sink.width > 0 ? sink.width : "—";
@@ -63,8 +57,7 @@ function InteractiveCard({
       }}
     >
       <ImageCard
-        type="sinks"
-        itemId={sink.id}
+      disabled={true}
         fieldList={{
           Amount: `${displayedAmount}`,
           Size: `${displayedLength} x ${displayedWidth}  `,
@@ -97,21 +90,18 @@ export default function Sinks() {
   const [activeType, setActiveType] = useState<string | undefined>(undefined);
   const [sortedSinks, setSortedSinks] = useState<Sink[]>(sinks);
   const location = useLocation();
-  const [searchParams] = useSafeSearchParams(sinkFilterSchema);
+ 
 
-  // Helper function to get type priority based on SINK_TYPES array order
   const getTypePriority = (type: string) => {
     const index = SINK_TYPES.indexOf(type as any);
     return index === -1 ? SINK_TYPES.length : index;
   };
 
   useEffect(() => {
-    // First, separate sinks into display categories
     const inStock = sinks.filter(sink => Number(sink.amount) > 0 && Boolean(sink.is_display));
     const outOfStock = sinks.filter(sink => Number(sink.amount) <= 0 && Boolean(sink.is_display));
     const notDisplayed = sinks.filter(sink => !Boolean(sink.is_display));
     
-      // Sort each category first by type according to SINK_TYPES order, then by name
     const sortBySinkType = (a: Sink, b: Sink) => {
       const typePriorityA = getTypePriority(a.type);
       const typePriorityB = getTypePriority(b.type);
@@ -139,14 +129,6 @@ export default function Sinks() {
     }
   };
 
-  const sinkList = sortedSinks.reduce((acc: { [key: string]: Sink[] }, sink) => {
-    if (!acc[sink.type]) {
-      acc[sink.type] = [];
-    }
-    acc[sink.type].push(sink);
-    return acc;
-  }, {});
-
   return (
     <>
      
@@ -166,6 +148,7 @@ export default function Sinks() {
             sink={sink}
             setCurrentId={handleSetCurrentId}
             sinkType={sink.type}
+            disabled={true}
           />
         ))}
       </ModuleList>

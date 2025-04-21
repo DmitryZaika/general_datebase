@@ -94,7 +94,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       db,
       `SELECT s.id, s.supplier_name 
        FROM suppliers s
-       INNER JOIN sinks sk ON s.id = sk.supplier_id
+       INNER JOIN sink_type sk ON s.id = sk.supplier_id
        WHERE s.company_id = ?
        GROUP BY s.id, s.supplier_name`,
       [user.company_id]
@@ -148,18 +148,40 @@ export default function App() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <SidebarProvider open={!!basePath}>
-            <EmployeeSidebar suppliers={stoneSuppliers} sinkSuppliers={sinkSuppliers} />
+          {user ? (
+            <SidebarProvider open={!!basePath}>
+              <EmployeeSidebar suppliers={stoneSuppliers} sinkSuppliers={sinkSuppliers} />
+              <main className="h-screen overflow-y-auto bg-gray-100 w-full">
+                <AuthenticityTokenProvider token={token}>
+                  <Header
+                    isEmployee={user?.is_employee ?? false}
+                    user={user}
+                    isAdmin={user?.is_admin ?? false}
+                    isSuperUser={user?.is_superuser ?? false}
+                  />
+                  <div className="relative">
+                    {isMobile && <SidebarTrigger />}
+                    <Outlet />
+                  </div>
+                </AuthenticityTokenProvider>
+                <Toaster />
+                <ScrollRestoration />
+                <Scripts />
+                <Posthog />
+                {user && <Chat />}
+                <ScrollToTopButton />
+              </main>
+            </SidebarProvider>
+          ) : (
             <main className="h-screen overflow-y-auto bg-gray-100 w-full">
               <AuthenticityTokenProvider token={token}>
                 <Header
-                  isEmployee={user?.is_employee ?? false}
-                  user={user}
-                  isAdmin={user?.is_admin ?? false}
-                  isSuperUser={user?.is_superuser ?? false}
+                  isEmployee={false}
+                  user={null}
+                  isAdmin={false}
+                  isSuperUser={false}
                 />
                 <div className="relative">
-                  {isMobile && <SidebarTrigger />}
                   <Outlet />
                 </div>
               </AuthenticityTokenProvider>
@@ -167,11 +189,9 @@ export default function App() {
               <ScrollRestoration />
               <Scripts />
               <Posthog />
-
-              {user && <Chat />}
               <ScrollToTopButton />
             </main>
-          </SidebarProvider>
+          )}
         </QueryClientProvider>
       </body>
     </html>

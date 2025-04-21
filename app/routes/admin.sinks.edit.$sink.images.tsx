@@ -77,7 +77,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const sink = await selectId<{ url: string }>(
     db,
-    "select url from sinks WHERE id = ?",
+    "select url from sink_type WHERE id = ?",
     sinkId,
   );
 
