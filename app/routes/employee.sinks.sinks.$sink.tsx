@@ -32,7 +32,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const sinkId = parseInt(params.sink, 10);
   const sink = await selectId<Sink>(
     db,
-    "SELECT id, name, type, amount, url FROM sinks WHERE id = ?",
+    "SELECT id, name, type, amount, url FROM sink_type WHERE id = ?",
     sinkId,
   );
   if (!sink) {
@@ -59,7 +59,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const sink = await selectId<{ amount: number }>(
     db,
-    "SELECT amount FROM sinks WHERE id = ?",
+    "SELECT amount FROM sink_type WHERE id = ?",
     sinkId,
   );
   if (!sink) {
@@ -68,12 +68,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   if (action === "sell") {
     await db.execute(
-      "UPDATE sinks SET amount = GREATEST(amount - 1, 0) WHERE id = ?",
+      "UPDATE sink_type SET amount = GREATEST(amount - 1, 0) WHERE id = ?",
       [sinkId],
     );
   } else if (action === "increment") {
     await db.execute(
-      "UPDATE sinks SET amount = amount + 1 WHERE id = ?",
+      "UPDATE sink_type SET amount = amount + 1 WHERE id = ?",
       [sinkId],
     );
   }

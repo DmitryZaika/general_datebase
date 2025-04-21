@@ -1,17 +1,8 @@
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Form, useLoaderData, useNavigate, useLocation   } from "react-router";
+import { useLoaderData, useNavigate, useLocation   } from "react-router";
 import { selectId } from "~/utils/queryHelpers";
-import { Button } from "~/components/ui/button";
 import { deleteFile } from "~/utils/s3.server";
-
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
+import { DeleteRow } from "~/components/pages/DeleteRow";
 
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
@@ -92,24 +83,9 @@ export default function StonesAdd() {
       navigate(`..${location.search}`);
     }
   };
-  return (
-    <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Delete Stone</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete {name}?
-          </DialogDescription>
-        </DialogHeader>
-        <Form id="customerForm" method="post">
-          <DialogFooter>
-            <AuthenticityTokenInput />
-            <Button type="submit" autoFocus>
-              Delete Stone
-            </Button>
-          </DialogFooter>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
+  return (<DeleteRow 
+            handleChange={handleChange}
+            title='Delete stone'
+            description={`Are you sure you want to delete ${name}?`}
+          />);
 }

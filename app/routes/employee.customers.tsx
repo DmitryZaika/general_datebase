@@ -1,14 +1,4 @@
 import { ColumnDef } from "@tanstack/react-table";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "~/components/ui/table";
 import { LoaderFunctionArgs, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
@@ -35,7 +25,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const customers = await selectMany<Customer>(
     db,
-    "select id name, email, phone_number, address from customers",
+    "SELECT id, name, email, phone, address FROM customers",
   );
   return {
     customers,

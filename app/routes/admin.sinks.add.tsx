@@ -27,6 +27,7 @@ import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { selectMany } from "~/utils/queryHelpers";
 import { sinkSchema } from "~/schemas/sinks";
+import mysql from "mysql2/promise";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
@@ -46,22 +47,28 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   let user = await getAdminUser(request);
   try {
-    await db.execute(
-      `INSERT INTO main.sinks (name, type, url, company_id, is_display, supplier_id, width, length, amount, retail_price, cost) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-      [
-        data.name,
-        data.type,
-        data.file,
-        user.company_id,
-        data.is_display,
-        data.supplier_id,
-        data.width,
-        data.length,
-        data.amount,       
-        data.retail_price,
-        data.cost,
-      ],
-    );
+    
+    try {
+      const [result] = await db.execute<mysql.ResultSetHeader>(
+        `INSERT INTO sink_type (name, type, url, company_id, is_display, is_deleted, supplier_id, width, length, depth, retail_price, cost) 
+         VALUES (?, ?, ?, ?, ?, false, ?, ?, ?, 0, ?, ?);`,
+        [
+          data.name,
+          data.type,
+          data.file,
+          user.company_id,
+          data.is_display,
+          data.supplier_id,
+          data.width,
+          data.length,
+          data.retail_price,
+          data.cost
+        ]
+      );
+      
+    } catch (error) {
+      throw error;
+    } 
   } catch (error) {
     console.error("Error connecting to the database: ", error);
     const sinkId = parseInt(params.sink ?? "0", 10);
@@ -220,20 +227,6 @@ export default function SinksAdd() {
               )}
             />
           </div>
-          <div className="flexs gap-2">
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <InputItem
-                  name={"Amount"}
-                  placeholder={"Amount of the sink"}
-                  field={field}
-                />
-              )}
-            />
-          </div>
-          
           <div className="flex gap-2">
              <FormField
               control={form.control}

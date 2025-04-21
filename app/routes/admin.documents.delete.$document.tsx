@@ -1,16 +1,6 @@
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Form, useLoaderData, useNavigate } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import { selectId } from "~/utils/queryHelpers";
-import { Button } from "~/components/ui/button";
-
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
 
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
@@ -18,6 +8,7 @@ import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
+import { DeleteRow } from "~/components/pages/DeleteRow";
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
@@ -73,24 +64,9 @@ export default function DocumentsAdd() {
       navigate("..");
     }
   };
-  return (
-    <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Delete document</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete {name}?
-          </DialogDescription>
-        </DialogHeader>
-        <Form id="customerForm" method="post">
-          <DialogFooter>
-            <AuthenticityTokenInput />
-            <Button autoFocus type="submit">
-              Delete document
-            </Button>
-          </DialogFooter>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
+  return (<DeleteRow 
+            handleChange={handleChange}
+            title='Delete document'
+            description={`Are you sure you want to delete ${name}?`}
+          />);
 }

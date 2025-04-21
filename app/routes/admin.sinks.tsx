@@ -12,7 +12,6 @@ import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
 import { sinkFilterSchema } from "~/schemas/sinks";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { Sink, sinkQueryBuilder } from "~/utils/queries";
-import { SidebarTrigger } from "~/components/ui/sidebar";
 import { SINK_TYPES } from "~/utils/constants";
 
 const customOrder = [
@@ -44,6 +43,13 @@ function customSort(a: string, b: string) {
   return a.localeCompare(b);
 }
 
+const formatPrice = (price: number | null | undefined): string => {
+  if (price == null) return "-";
+  
+  // Convert to string and remove trailing zeros
+  return String(price).replace(/\.0+$/, '');
+};
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getAdminUser(request);
@@ -54,6 +60,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request);
   const [, searchParams] = request.url.split("?");
   const queryParams = new URLSearchParams(searchParams);
+  
+  // Set show_sold_out=true by default if it's not in the URL
+  if (!queryParams.has('show_sold_out')) {
+    queryParams.set('show_sold_out', 'true');
+  }
+  
   const filters = sinkFilterSchema.parse(cleanParams(queryParams));
 
   const sinks = await sinkQueryBuilder(filters, user.company_id);
@@ -76,8 +88,9 @@ export default function AdminSinks() {
   };
 
   useEffect(() => {
-    const inStock = sinks.filter(sink => Number(sink.amount) > 0 && Boolean(sink.is_display));
-    const outOfStock = sinks.filter(sink => Number(sink.amount) <= 0 && Boolean(sink.is_display));
+    // Make sure sinks with 0 or null amount still appear
+    const inStock = sinks.filter(sink => (Number(sink.amount) > 0) && Boolean(sink.is_display));
+    const outOfStock = sinks.filter(sink => (!sink.amount || Number(sink.amount) <= 0) && Boolean(sink.is_display));
     const notDisplayed = sinks.filter(sink => !Boolean(sink.is_display));
     
     const sortBySinkType = (a: Sink, b: Sink) => {
@@ -137,6 +150,8 @@ export default function AdminSinks() {
               sink.width && sink.width > 0 ? sink.width : "—";
             const displayedLength =
               sink.length && sink.length > 0 ? sink.length : "—";
+            const retailPrice = formatPrice(sink.retail_price);
+            const cost = formatPrice(sink.cost);
 
             return (
               <div key={sink.id} className="relative w-full module-item">
@@ -172,7 +187,7 @@ export default function AdminSinks() {
                     Size: {displayedLength} x {displayedWidth}
                   </p>
                   <p className="text-center text-sm">
-                    Price: ${sink.retail_price}/${sink.cost}
+                    Price: ${retailPrice}/${cost}
                   </p>
                 </div>
 

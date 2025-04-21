@@ -63,7 +63,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, defaultValues } as ActionData;
   }
 
-  const sessionId = await login(data.email, data.password, 60 * 60 * 24 * 7);
+  const sessionId = await login(data.email, data.password, 60 * 60 * 24 * 7 * 30 * 12);
   if (!sessionId) {
     return { 
       error: "Incorrect email or password. Please try again.", 

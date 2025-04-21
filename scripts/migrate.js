@@ -40,7 +40,6 @@ const umzug = new Umzug({
         }
       },
       down: async () => {
-        // Опционально: добавьте логику для отката миграции
         console.log(`Откат миграции: ${name}`);
       },
     }),
@@ -50,13 +49,11 @@ const umzug = new Umzug({
   logger: console,
 });
 
-// Функция для выполнения миграций
 const runMigrations = async () => {
   try {
     await sequelize.authenticate();
     console.log("Подключение к базе данных успешно.");
 
-    await umzug.up(); // Запуск всех миграций
     console.log("Миграции успешно выполнены.");
   } catch (error) {
     console.error("Ошибка выполнения миграций:", error);
@@ -65,5 +62,4 @@ const runMigrations = async () => {
   }
 };
 
-// Запуск миграций
 runMigrations();
