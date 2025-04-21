@@ -53,7 +53,7 @@ const runMigrations = async () => {
   try {
     await sequelize.authenticate();
     console.log("Подключение к базе данных успешно.");
-
+    await umzug.up();
     console.log("Миграции успешно выполнены.");
   } catch (error) {
     console.error("Ошибка выполнения миграций:", error);
