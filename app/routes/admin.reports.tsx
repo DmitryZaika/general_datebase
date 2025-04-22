@@ -395,7 +395,6 @@ const slabReportColumns: ColumnDef<SlabReport>[] = [
   },
 ];
 
-// Схема валидации для формы отчета
 const reportFormSchema = z.object({
   type: z.string(),
   supplier: z.string().optional(),
@@ -410,7 +409,6 @@ export default function ReportsPage() {
   const { slabs, suppliers, stones, reportType, fromDate, toDate, supplierId, stoneId } = useLoaderData<typeof loader>();
   const [isExporting, setIsExporting] = useState(false);
   
-  // Создаем форму с react-hook-form
   const form = useForm<ReportFormValues>({
     resolver: zodResolver(reportFormSchema),
     defaultValues: {
@@ -422,7 +420,6 @@ export default function ReportsPage() {
     },
   });
   
-  // Обновляем значения формы при изменении параметров
   useEffect(() => {
     form.reset({
       type: reportType || "cut_slabs",
@@ -433,21 +430,17 @@ export default function ReportsPage() {
     });
   }, [reportType, supplierId, stoneId, fromDate, toDate, form]);
 
-  // Наблюдаем за изменением типа отчета для динамической формы
   const watchReportType = form.watch("type");
 
-  // Function to export the current data to CSV
   const exportToCSV = () => {
     setIsExporting(true);
     
     try {
-      // Get table headers
       const headers = [
         "Bundle", "Stone", "Supplier", "Dimensions", "Square Feet", 
         "Cut Date", "Sale Date", "Customer", "Sold By", "Notes", "Status"
       ];
       
-      // Transform data to CSV rows
       const dataRows = slabs.map(slab => [
         slab.bundle || "",
         slab.stone_name || "",
@@ -462,13 +455,11 @@ export default function ReportsPage() {
         slab.status || ""
       ]);
       
-      // Combine headers and rows
       const csvContent = [
         headers.join(","),
         ...dataRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
       ].join("\n");
       
-      // Create download link
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -485,7 +476,6 @@ export default function ReportsPage() {
     }
   };
 
-  // Report type description
   const getReportTitle = () => {
     switch (reportType) {
       case "cut_slabs": return "Cut Slabs Report";
@@ -496,7 +486,6 @@ export default function ReportsPage() {
     }
   };
 
-  // Подготовка опций для селектов
   const reportTypeOptions = [
     { key: "cut_slabs", value: "Cut Slabs" },
     { key: "sold_slabs", value: "Sold Slabs" },
