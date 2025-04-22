@@ -17,10 +17,12 @@ interface Transaction {
   customer_name: string;
   seller_name: string;
   bundle: string;
+  bundle_with_cut: string;
   stone_name: string;
   sf?: number;
   is_deleted: string;
   sink_type?: string;
+  is_cut?: number;
 }
 
 // Component for showing limited text with Show more/less button
@@ -39,7 +41,6 @@ const ShowMoreText = ({ text, limit = 2 }: { text: string; limit?: number }) => 
     }
   });
   
-  // Create a new array with formatted items (e.g., "Item x 2")
   const formattedItems = Object.entries(itemCounts).map(([item, count]) => 
     count > 1 ? `${item} x ${count}` : item
   );
@@ -111,11 +112,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       s.sale_date,
       c.name as customer_name,
       u.name as seller_name,
+      GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', COALESCE(si.is_cut, 0)) SEPARATOR ',') as bundle_with_cut,
       GROUP_CONCAT(DISTINCT si.bundle SEPARATOR ', ') as bundle,
       GROUP_CONCAT(DISTINCT st.name SEPARATOR ', ') as stone_name,
       ROUND(SUM(si.square_feet), 2) as sf,
       s.status as is_deleted,
-      '' as sink_type
+      '' as sink_type,
+      COALESCE(MAX(si.is_cut), 0) as is_cut
     FROM 
       sales s
     JOIN 
@@ -173,7 +176,32 @@ const transactionColumns: ColumnDef<Transaction>[] = [
   {
     accessorKey: "bundle",
     header: ({ column }) => <SortableHeader column={column} title="Bundle" />,
-    cell: ({ row }) => <ShowMoreText text={row.original.bundle} />,
+    cell: ({ row }) => {
+      const bundlesWithCut = (row.original.bundle_with_cut || '').split(',').filter(Boolean);
+      if (!bundlesWithCut.length) return <span>N/A</span>;
+      
+      const cutMap = Object.fromEntries(
+        bundlesWithCut.map(item => {
+          const [bundle, isCut] = item.split(':');
+          return [bundle.trim(), Number(isCut) === 1];
+        })
+      );
+      
+      const bundles = (row.original.bundle || '').split(', ').filter(Boolean);
+      
+      return (
+        <div>
+          {bundles.map((bundle, index) => (
+            <span 
+              key={index} 
+              className={`${cutMap[bundle] ? "text-blue-500" : "text-green-500"} ${index > 0 ? "ml-1" : ""}`}
+            >
+              {bundle}{index < bundles.length - 1 ? ", " : ""}
+            </span>
+          ))}
+        </div>
+      );
+    },
   },
   {
     accessorKey: "sf",
