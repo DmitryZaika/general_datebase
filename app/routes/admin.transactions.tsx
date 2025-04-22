@@ -9,6 +9,7 @@ import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
 import { Button } from "~/components/ui/button";
 import { Link } from "react-router";
+import { useState } from "react";
 
 interface Transaction {
   id: number;
@@ -21,6 +22,33 @@ interface Transaction {
   is_deleted: string;
   sink_type?: string;
 }
+
+// Component for showing limited text with Show more/less button
+const ShowMoreText = ({ text, limit = 2 }: { text: string; limit?: number }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  if (!text) return <span>N/A</span>;
+  
+  const items = text.split(', ');
+  
+  if (items.length <= limit) return <span>{text}</span>;
+  
+  const displayText = isExpanded 
+    ? text 
+    : items.slice(0, limit).join(', ');
+  
+  return (
+    <div className="mr-[-10px]">
+      <span>{displayText}{!isExpanded && items.length > limit ? '...' : ''}</span>
+      <button
+        className="ml-2 text-xs text-blue-500 hover:text-blue-700 underline"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        {isExpanded ? 'Show less' : `Show ${items.length - limit} more`}
+      </button>
+    </div>
+  );
+};
 
 function formatDate(dateString: string) {
   if (!dateString) return "";
@@ -122,15 +150,17 @@ const transactionColumns: ColumnDef<Transaction>[] = [
   {
     accessorKey: "stone_name",
     header: ({ column }) => <SortableHeader column={column} title="Stone" />,
+    cell: ({ row }) => <ShowMoreText text={row.original.stone_name} />,
   },
   {
     accessorKey: "sink_type",
     header: ({ column }) => <SortableHeader column={column} title="Sink" />,
-    cell: ({ row }) => row.original.sink_type || "N/A",
+    cell: ({ row }) => <ShowMoreText text={row.original.sink_type || ""} />,
   },
   {
     accessorKey: "bundle",
     header: ({ column }) => <SortableHeader column={column} title="Bundle" />,
+    cell: ({ row }) => <ShowMoreText text={row.original.bundle} />,
   },
   {
     accessorKey: "sf",
@@ -148,7 +178,7 @@ const transactionColumns: ColumnDef<Transaction>[] = [
       let colorClass = "text-gray-500";
       if (formattedStatus === "Sold") {
         colorClass = "text-green-500";
-      } else if (formattedStatus === "Canceled" || formattedStatus === "Canceled") {
+      } else if (formattedStatus === "Canceled" || formattedStatus === "Cancelled") {
         colorClass = "text-red-500";
       } else if (formattedStatus === "Cut") {
         colorClass = "text-blue-500";
