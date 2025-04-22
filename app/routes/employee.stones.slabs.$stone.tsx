@@ -389,7 +389,7 @@ export default function SlabsModal() {
                               {slab.transaction.sink && (
                                 <>
                                   {formatSinkList(slab.transaction.sink).split(',').map((sink, index) => (
-                                    <p key={index} className={index > 0 ? "text-sm" : ""}>
+                                    <p key={index} className={index > 0 ? "text-sm ml-10" : ""}>
                                       {index === 0 ? <><strong>Sink:</strong> {sink}</> : sink}
                                     </p>
                                   ))}
