@@ -79,6 +79,23 @@ function formatDate(dateString: string) {
   }).format(date);  
 }
 
+function formatSinkList(sinkString: string): string {
+  if (!sinkString) return '';
+  
+  const sinks = sinkString.split(', ');
+  const sinkCounts: {[key: string]: number} = {};
+  
+  sinks.forEach(sink => {
+    if (sink) {
+      sinkCounts[sink] = (sinkCounts[sink] || 0) + 1;
+    }
+  });
+  
+  return Object.entries(sinkCounts)
+    .map(([sink, count]) => count > 1 ? `${sink} x ${count}` : sink)
+    .join(', ');
+}
+
 export async function loader({ request, params }: LoaderFunctionArgs) {
   await getEmployeeUser(request);
   if (!params.stone) {
@@ -365,14 +382,19 @@ export default function SlabsModal() {
                               <p><strong>Sold by:</strong> {slab.transaction.seller_name}</p>
                               <p><strong>Sale date:</strong> {formatDate(slab.transaction.sale_date)}</p>
                               
-                              {/* Always show square_feet if it's more than 0 */}
                               {(slab.transaction.square_feet ?? 0) > 0 && (
                                 <p><strong>Square Feet:</strong> {slab.transaction.square_feet}</p>
                               )}
                               
-                              {slab.transaction.sink ? (
-                                <p><strong>Sink:</strong> {slab.transaction.sink}</p>
-                              ) : null}
+                              {slab.transaction.sink && (
+                                <>
+                                  {formatSinkList(slab.transaction.sink).split(',').map((sink, index) => (
+                                    <p key={index} className={index > 0 ? "text-sm" : ""}>
+                                      {index === 0 ? <><strong>Sink:</strong> {sink}</> : sink}
+                                    </p>
+                                  ))}
+                                </>
+                              )}
                               
                               {slab.transaction.notes && (
                                 <p><strong>Notes:</strong> {slab.transaction.notes}</p>
