@@ -25,7 +25,6 @@ interface Transaction {
   is_cut?: number;
 }
 
-// Component for showing limited text with Show more/less button
 const ShowMoreText = ({ text, limit = 2 }: { text: string; limit?: number }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -33,7 +32,6 @@ const ShowMoreText = ({ text, limit = 2 }: { text: string; limit?: number }) => 
   
   const items = text.split(', ');
   
-  // Group identical items and count them
   const itemCounts: {[key: string]: number} = {};
   items.forEach(item => {
     if (item) {
@@ -166,12 +164,52 @@ const transactionColumns: ColumnDef<Transaction>[] = [
   {
     accessorKey: "stone_name",
     header: ({ column }) => <SortableHeader column={column} title="Stone" />,
-    cell: ({ row }) => <ShowMoreText text={row.original.stone_name} />,
+    cell: ({ row }) => {
+      const stones = (row.original.stone_name || '').split(', ').filter(Boolean);
+      if (!stones.length) return <span>N/A</span>;
+      
+      const stoneCounts: {[key: string]: number} = {};
+      stones.forEach(stone => {
+        stoneCounts[stone] = (stoneCounts[stone] || 0) + 1;
+      });
+      
+      const formattedStones = Object.entries(stoneCounts).map(([stone, count]) => 
+        count > 1 ? `${stone} x ${count}` : stone
+      );
+      
+      return (
+        <div className="flex flex-col">
+          {formattedStones.map((stone, index) => (
+            <span key={index}>{stone}</span>
+          ))}
+        </div>
+      );
+    },
   },
   {
     accessorKey: "sink_type",
     header: ({ column }) => <SortableHeader column={column} title="Sink" />,
-    cell: ({ row }) => <ShowMoreText text={row.original.sink_type || ""} />,
+    cell: ({ row }) => {
+      const sinks = (row.original.sink_type || '').split(', ').filter(Boolean);
+      if (!sinks.length) return <span>N/A</span>;
+      
+      const sinkCounts: {[key: string]: number} = {};
+      sinks.forEach(sink => {
+        sinkCounts[sink] = (sinkCounts[sink] || 0) + 1;
+      });
+      
+      const formattedSinks = Object.entries(sinkCounts).map(([sink, count]) => 
+        count > 1 ? `${sink} x ${count}` : sink
+      );
+      
+      return (
+        <div className="flex flex-col">
+          {formattedSinks.map((sink, index) => (
+            <span key={index}>{sink}</span>
+          ))}
+        </div>
+      );
+    },
   },
   {
     accessorKey: "bundle",
@@ -190,13 +228,13 @@ const transactionColumns: ColumnDef<Transaction>[] = [
       const bundles = (row.original.bundle || '').split(', ').filter(Boolean);
       
       return (
-        <div>
+        <div className="flex flex-col">
           {bundles.map((bundle, index) => (
             <span 
               key={index} 
-              className={`${cutMap[bundle] ? "text-blue-500" : "text-green-500"} ${index > 0 ? "ml-1" : ""}`}
+              className={cutMap[bundle] ? "text-blue-500" : "text-green-500"}
             >
-              {bundle}{index < bundles.length - 1 ? ", " : ""}
+              {bundle}
             </span>
           ))}
         </div>
