@@ -31,20 +31,33 @@ const ShowMoreText = ({ text, limit = 2 }: { text: string; limit?: number }) => 
   
   const items = text.split(', ');
   
-  if (items.length <= limit) return <span>{text}</span>;
+  // Group identical items and count them
+  const itemCounts: {[key: string]: number} = {};
+  items.forEach(item => {
+    if (item) {
+      itemCounts[item] = (itemCounts[item] || 0) + 1;
+    }
+  });
+  
+  // Create a new array with formatted items (e.g., "Item x 2")
+  const formattedItems = Object.entries(itemCounts).map(([item, count]) => 
+    count > 1 ? `${item} x ${count}` : item
+  );
+  
+  if (formattedItems.length <= limit) return <span>{formattedItems.join(', ')}</span>;
   
   const displayText = isExpanded 
-    ? text 
-    : items.slice(0, limit).join(', ');
+    ? formattedItems.join(', ') 
+    : formattedItems.slice(0, limit).join(', ');
   
   return (
     <div className="mr-[-10px]">
-      <span>{displayText}{!isExpanded && items.length > limit ? '...' : ''}</span>
+      <span>{displayText}{!isExpanded && formattedItems.length > limit ? '...' : ''}</span>
       <button
         className="ml-2 text-xs text-blue-500 hover:text-blue-700 underline"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        {isExpanded ? 'Show less' : `Show ${items.length - limit} more`}
+        {isExpanded ? 'Show less' : `Show ${formattedItems.length - limit} more`}
       </button>
     </div>
   );
