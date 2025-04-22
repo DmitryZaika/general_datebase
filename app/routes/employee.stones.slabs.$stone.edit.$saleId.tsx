@@ -123,6 +123,13 @@ const sinkAddSchema = z.object({
 type SinkAddFormData = z.infer<typeof sinkAddSchema>;
 const sinkAddResolver = zodResolver(sinkAddSchema);
 
+const customerSchema = z.object({
+  customer_name: z.string().min(1, "Customer name is required"),
+});
+
+type CustomerFormData = z.infer<typeof customerSchema>;
+const customerResolver = zodResolver(customerSchema);
+
 const saleInfoSchema = z.object({
   customer_name: z.string().min(1, "Customer name is required"),
   seller_id: z.coerce.number().min(1, "Seller is required"),
@@ -231,84 +238,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   };
 }
 
-/*
-async function handleSinks(formData: globalThis.FormData,  saleId: number, companyId: number) {
-  const sinkIds = formData.getAll("sinkId") as string[];
-  const sinkTypeIds = formData.getAll("sinkTypeId") as string[];
-  const sinkPrices = formData.getAll("sinkPrice") as string[];
-  const sinkIsDeleted = formData.getAll("sinkIsDeleted") as string[];
-  const sinkId = formData.get("sinkId") as string;
-  const newSinkTypeIds = formData.getAll("newSinkTypeId") as string[];
-  const newSinkPrices = formData.getAll("newSinkPrice") as string[];
- await db.execute(
-  `UPDATE sinks SET price = ?, sink_type_id = ? WHERE id = ? AND sale_id = ? AND company_id = ?`,
-  [sinkId, saleId, companyId]
-);
-for (let i = 0; i < sinkIds.length; i++) {
-  const id = parseInt(sinkIds[i]);
-  const sinkTypeId = parseInt(sinkTypeIds[i]);
-  const price = parseFloat(sinkPrices[i]);
-  const isDeleted = sinkIsDeleted[i] === "true" ? 1 : 0;
-  
-  if (isDeleted === 1) {
-    await db.execute(
-      `UPDATE sinks 
-       SET sink_type_id = ?, price = ?, is_deleted = 0, sale_id = NULL 
-       WHERE id = ? AND sale_id = ?`,
-      [sinkTypeId, price, id, saleId]
-    );
-  } else {
-    await db.execute(
-      `UPDATE sinks 
-       SET sink_type_id = ?, price = ? 
-       WHERE id = ? AND sale_id = ?`,
-      [sinkTypeId, price, id, saleId]
-    );
-  }
-}
 
-for (let i = 0; i < newSinkTypeIds.length; i++) {
-  const sinkTypeId = newSinkTypeIds[i];
-  
-  if (sinkTypeId && sinkTypeId !== "") {
-    let price = parseFloat(newSinkPrices[i] || "0");
-    
-    if (price === 0) {
-      const [sinkResult] = await db.execute<RowDataPacket[]>(
-        `SELECT retail_price FROM sink_type WHERE id = ?`,
-        [sinkTypeId]
-      );
-      
-      if (sinkResult && sinkResult.length > 0) {
-        price = parseFloat(sinkResult[0].retail_price) || 0;
-      }
-    }
-    
-    const [availableSinks] = await db.execute<RowDataPacket[]>(
-      `SELECT id FROM sinks 
-       WHERE sink_type_id = ? 
-       AND sale_id IS NULL 
-       AND is_deleted = 0
-       LIMIT 1`,
-      [sinkTypeId]
-    );
-    
-    if (availableSinks && availableSinks.length > 0) {
-      const sinkId = availableSinks[0].id;
-      
-      await db.execute(
-        `UPDATE sinks 
-         SET sale_id = ?, price = ?, is_deleted = 1 
-         WHERE id = ?`,
-        [saleId, price, sinkId]
-      );
-    } else {
-      console.warn(`No available sink found for type ID: ${sinkTypeId}`);
-    }
-  }
-}
-}
-*/
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request);
@@ -403,6 +333,35 @@ export async function action({ request, params }: ActionFunctionArgs) {
       } catch (dbError) {
         
       }
+    } else if (intent === "create-customer") {
+      const customer_name = formData.get("customer_name") as string;
+      
+      if (!customer_name) {
+        throw new Error("Customer name is required");
+      }
+      
+      const [customerResult] = await db.execute<RowDataPacket[]>(
+        `INSERT INTO customers (name, company_id) VALUES (?, ?)`,
+        [customer_name, user.company_id]
+      );
+      
+      const customerId = (customerResult as any).insertId;
+      
+      if (!customerId) {
+        throw new Error("Failed to create customer");
+      }
+      
+      await db.execute(
+        `UPDATE sales SET customer_id = ? WHERE id = ?`,
+        [customerId, saleId]
+      );
+      
+      const session = await getSession(request.headers.get("Cookie"));
+      session.flash("message", toastData("Success", "Customer created and assigned to sale"));
+      
+      return data({ success: true, customer_id: customerId, customer_name }, {
+        headers: { "Set-Cookie": await commitSession(session) },
+      });
     } else if (intent == "slab-delete") {
       const slabId = formData.get("id") as string;
       await db.execute(
@@ -624,6 +583,30 @@ function SinkAdd({ availableSinks }: { availableSinks: Sink[] }) {
 
 function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: number, name: string}[] }) {
   const [showUnsellConfirm, setShowUnsellConfirm] = useState(false);
+  const [showCreateCustomer, setShowCreateCustomer] = useState(false);
+  const [customerName, setCustomerName] = useState(sale.customer_name);
+  const fetcher = useFetcher();
+  const customerForm = useForm<CustomerFormData>({
+    resolver: customerResolver,
+    defaultValues: {
+      customer_name: "",
+    },
+  });
+  
+  const onSubmitCustomer = (data: CustomerFormData) => {
+    const formData = new FormData();
+    formData.append("intent", "create-customer");
+    formData.append("customer_name", data.customer_name);
+    fetcher.submit(formData, { method: "post" });
+    setShowCreateCustomer(false);
+    customerForm.reset();
+  };
+  
+  useEffect(() => {
+    if (fetcher.data?.success && fetcher.data?.customer_name) {
+      setCustomerName(fetcher.data.customer_name);
+    }
+  }, [fetcher.data]);
   
   return (
     <div className="mb-6">
@@ -633,12 +616,25 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2 sm:col-span-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-            <input 
-              type="text" 
-              name="customer_name" 
-              defaultValue={sale.customer_name}
-              className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+            <div className="flex items-center">
+              <div className="relative flex-grow">
+                <input 
+                  type="text" 
+                  name="customer_name" 
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="ml-2 px-2 py-2 h-[38px] border border-gray-300"
+                onClick={() => setShowCreateCustomer(true)}
+              >
+                <span className="text-lg">+</span>
+              </Button>
+            </div>
           </div>
           
           <div className="col-span-2 sm:col-span-1">
@@ -684,7 +680,7 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
         </div>
       </Form>
       
-      {/* Диалог подтверждения для Unsell */}
+      {/* Confirm Unsell Dialog */}
       <Dialog open={showUnsellConfirm} onOpenChange={setShowUnsellConfirm}>
         <DialogContent className="bg-white rounded-lg p-6 shadow-lg">
           <DialogHeader>
@@ -718,6 +714,58 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
               </Button>
             </Form>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Create Customer Dialog */}
+      <Dialog open={showCreateCustomer} onOpenChange={setShowCreateCustomer}>
+        <DialogContent className="bg-white rounded-lg p-6 shadow-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-gray-900">
+              Create New Customer
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="my-4">
+            <FormProvider {...customerForm}>
+              <form onSubmit={customerForm.handleSubmit(onSubmitCustomer)}>
+                <FormField
+                  control={customerForm.control}
+                  name="customer_name"
+                  render={({ field }) => (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
+                      <input
+                        {...field}
+                        type="text"
+                        className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      {customerForm.formState.errors.customer_name && (
+                        <p className="text-xs text-red-500 mt-1">{customerForm.formState.errors.customer_name.message}</p>
+                      )}
+                    </div>
+                  )}
+                />
+                
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button 
+                    variant="outline" 
+                    type="button"
+                    onClick={() => setShowCreateCustomer(false)}
+                  >
+                    Cancel
+                  </Button>
+                  
+                  <LoadingButton 
+                    type="submit"
+                    loading={customerForm.formState.isSubmitting || fetcher.state !== "idle"}
+                  >
+                    Create Customer
+                  </LoadingButton>
+                </div>
+              </form>
+            </FormProvider>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
