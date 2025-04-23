@@ -1,5 +1,5 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { LoaderFunctionArgs, redirect } from "react-router";
+import { LoaderFunctionArgs, Outlet, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
@@ -25,42 +25,6 @@ interface Transaction {
   is_cut?: number;
 }
 
-const ShowMoreText = ({ text, limit = 2 }: { text: string; limit?: number }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  
-  if (!text) return <span>N/A</span>;
-  
-  const items = text.split(', ');
-  
-  const itemCounts: {[key: string]: number} = {};
-  items.forEach(item => {
-    if (item) {
-      itemCounts[item] = (itemCounts[item] || 0) + 1;
-    }
-  });
-  
-  const formattedItems = Object.entries(itemCounts).map(([item, count]) => 
-    count > 1 ? `${item} x ${count}` : item
-  );
-  
-  if (formattedItems.length <= limit) return <span>{formattedItems.join(', ')}</span>;
-  
-  const displayText = isExpanded 
-    ? formattedItems.join(', ') 
-    : formattedItems.slice(0, limit).join(', ');
-  
-  return (
-    <div className="mr-[-10px]">
-      <span>{displayText}{!isExpanded && formattedItems.length > limit ? '...' : ''}</span>
-      <button
-        className="ml-2 text-xs text-blue-500 hover:text-blue-700 underline"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        {isExpanded ? 'Show less' : `Show ${formattedItems.length - limit} more`}
-      </button>
-    </div>
-  );
-};
 
 function formatDate(dateString: string) {
   if (!dateString) return "";
@@ -102,7 +66,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
   
   
-  // Simplified main query without sink join
   const transactions = await selectMany<Transaction>(
     db,
     `SELECT 
@@ -272,19 +235,22 @@ export default function AdminTransactions() {
   const { transactions } = useLoaderData<typeof loader>();
 
   return (
-    <PageLayout title="Sales Transactions">
-      <div className="mb-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Transactions</h1>
-        {/* <Link to="/admin/reports">
-          <Button variant="default" className="bg-blue-600 hover:bg-blue-700">
-            Reports
-          </Button>
-        </Link> */}
-      </div>
-      <DataTable 
-        columns={transactionColumns} 
-        data={transactions} 
-      />
-    </PageLayout>
+    <>
+      <PageLayout title="Sales Transactions">
+        <div className="mb-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Transactions</h1>
+          {/* <Link to="/admin/reports">
+            <Button variant="default" className="bg-blue-600 hover:bg-blue-700">
+              Reports
+            </Button>
+          </Link> */}
+        </div>
+        <DataTable 
+          columns={transactionColumns} 
+          data={transactions} 
+        />
+      </PageLayout>
+    
+    </>
   );
 } 

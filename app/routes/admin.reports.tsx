@@ -25,7 +25,6 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 
-// Interface for slab data with additional details
 interface SlabReport {
   id: number;
   bundle: string;
@@ -45,7 +44,10 @@ interface SlabReport {
 
 function formatDate(dateString: string | null) {
   if (!dateString) return "-";
+  
   const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "-";
+  
   return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "2-digit",
@@ -66,18 +68,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const toDate = url.searchParams.get("toDate") || "";
   const supplierId = url.searchParams.get("supplier") || "";
   const stoneId = url.searchParams.get("stone") || "";
-
-  // Приведение "all" к пустой строке для фильтрации
   const supplierFilter = supplierId === "all" ? "" : supplierId;
   const stoneFilter = stoneId === "all" ? "" : stoneId;
 
-  // Get suppliers for filter dropdown
   const suppliers = await selectMany<{ id: number; name: string }>(
     db,
     `SELECT id, supplier_name as name FROM suppliers ORDER BY supplier_name ASC`
   );
 
-  // Get stones for filter dropdown
   const stones = await selectMany<{ id: number; name: string }>(
     db,
     `SELECT id, name FROM stones ORDER BY name ASC`
@@ -87,7 +85,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   let query = "";
   const queryParams: any[] = [];
 
-  // Switch between different report types
   switch (reportType) {
     case "cut_slabs":
       query = `
@@ -98,17 +95,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           suppliers.supplier_name as supplier_name,
           slab_inventory.width,
           slab_inventory.length,
-          slab_inventory.is_sold,
-          slab_inventory.created_at as cut_date,
+          slab_inventory.is_cut,
+          slab_inventory.created_at,
+          (SELECT MIN(created_at) FROM slab_inventory WHERE parent_id = slab_inventory.id AND is_cut = 1) AS cut_date,
           sales.sale_date,
           customers.name as customer_name,
           users.name as seller_name,
           slab_inventory.square_feet,
           slab_inventory.notes,
           CASE 
-            WHEN slab_inventory.is_sold = 1 AND sales.id IS NOT NULL THEN 'Cut & Sold'
-            WHEN slab_inventory.sale_id IS NOT NULL THEN 'Sold'
-            ELSE 'In Stock'
+            WHEN slab_inventory.is_cut = 1 THEN 'Cut'
+            ELSE 'Sold'
           END as status
         FROM 
           slab_inventory
@@ -149,157 +146,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       query += ` ORDER BY slab_inventory.created_at DESC`;
       break;
 
-    case "sold_slabs":
-      query = `
-        SELECT 
-          slab_inventory.id,
-          bundle,
-          stones.name as stone_name,
-          suppliers.supplier_name as supplier_name,
-          slab_inventory.width,
-          slab_inventory.length,
-          slab_inventory.is_sold,
-          slab_inventory.created_at as cut_date,
-          sales.sale_date,
-          customers.name as customer_name,
-          users.name as seller_name,
-          slab_inventory.square_feet,
-          slab_inventory.notes,
-          CASE 
-            WHEN slab_inventory.is_sold = 1 AND sales.id IS NOT NULL THEN 'Cut & Sold'
-            WHEN slab_inventory.sale_id IS NOT NULL THEN 'Sold'
-            ELSE 'In Stock'
-          END as status
-        FROM 
-          slab_inventory
-        JOIN 
-          stones ON slab_inventory.stone_id = stones.id
-        JOIN 
-          suppliers ON stones.supplier_id = suppliers.id
-        JOIN 
-          sales ON slab_inventory.sale_id = sales.id
-        JOIN 
-          customers ON sales.customer_id = customers.id
-        JOIN 
-          users ON sales.seller_id = users.id
-        WHERE 
-          slab_inventory.sale_id IS NOT NULL
-      `;
+   
+    }
+  
 
-      if (fromDate) {
-        query += ` AND DATE(sales.sale_date) >= ?`;
-        queryParams.push(fromDate);
-      }
-      if (toDate) {
-        query += ` AND DATE(sales.sale_date) <= ?`;
-        queryParams.push(toDate);
-      }
-      
-      if (supplierFilter) {
-        query += ` AND suppliers.id = ?`;
-        queryParams.push(supplierFilter);
-      }
-      
-      if (stoneFilter) {
-        query += ` AND stones.id = ?`;
-        queryParams.push(stoneFilter);
-      }
-
-      query += ` ORDER BY sales.sale_date DESC`;
-      break;
-
-    case "inventory":
-      query = `
-        SELECT 
-          slab_inventory.id,
-          bundle,
-          stones.name as stone_name,
-          suppliers.supplier_name as supplier_name,
-          slab_inventory.width,
-          slab_inventory.length,
-          slab_inventory.is_sold,
-          NULL as cut_date,
-          NULL as sale_date,
-          NULL as customer_name,
-          NULL as seller_name,
-          slab_inventory.square_feet,
-          slab_inventory.notes,
-          'In Stock' as status
-        FROM 
-          slab_inventory
-        JOIN 
-          stones ON slab_inventory.stone_id = stones.id
-        JOIN 
-          suppliers ON stones.supplier_id = suppliers.id
-        WHERE 
-          slab_inventory.sale_id IS NULL
-          AND (slab_inventory.is_sold = 0 OR slab_inventory.is_sold IS NULL)
-      `;
-      
-      if (supplierFilter) {
-        query += ` AND suppliers.id = ?`;
-        queryParams.push(supplierFilter);
-      }
-      
-      if (stoneFilter) {
-        query += ` AND stones.id = ?`;
-        queryParams.push(stoneFilter);
-      }
-
-      query += ` ORDER BY bundle ASC`;
-      break;
-
-    case "stones_sales":
-      query = `
-        SELECT 
-          stones.id,
-          '' as bundle,
-          stones.name as stone_name,
-          suppliers.supplier_name as supplier_name,
-          '' as width,
-          '' as length,
-          0 as is_sold,
-          NULL as cut_date,
-          MAX(sales.sale_date) as sale_date,
-          '' as customer_name,
-          '' as seller_name,
-          ROUND(SUM(slab_inventory.square_feet), 2) as square_feet,
-          COUNT(DISTINCT slab_inventory.id) as notes,
-          'Sold' as status
-        FROM 
-          stones
-        JOIN 
-          slab_inventory ON stones.id = slab_inventory.stone_id
-        JOIN 
-          suppliers ON stones.supplier_id = suppliers.id
-        JOIN 
-          sales ON slab_inventory.sale_id = sales.id
-        WHERE 
-          slab_inventory.sale_id IS NOT NULL
-      `;
-
-      if (fromDate) {
-        query += ` AND DATE(sales.sale_date) >= ?`;
-        queryParams.push(fromDate);
-      }
-      if (toDate) {
-        query += ` AND DATE(sales.sale_date) <= ?`;
-        queryParams.push(toDate);
-      }
-      
-      if (supplierFilter) {
-        query += ` AND suppliers.id = ?`;
-        queryParams.push(supplierFilter);
-      }
-      
-      if (stoneFilter) {
-        query += ` AND stones.id = ?`;
-        queryParams.push(stoneFilter);
-      }
-
-      query += ` GROUP BY stones.id, stones.name, suppliers.supplier_name ORDER BY SUM(slab_inventory.square_feet) DESC`;
-      break;
-  }
+  
 
   slabs = await selectMany<SlabReport>(db, query, queryParams);
 
@@ -348,7 +199,10 @@ const slabReportColumns: ColumnDef<SlabReport>[] = [
   {
     accessorKey: "cut_date",
     header: ({ column }) => <SortableHeader column={column} title="Cut Date" />,
-    cell: ({ row }) => formatDate(row.original.cut_date),
+    cell: ({ row }) => {
+      const cutDate = row.original.cut_date;
+      return cutDate ? formatDate(cutDate) : "-";
+    },
     sortingFn: "datetime",
   },
   {
@@ -479,18 +333,12 @@ export default function ReportsPage() {
   const getReportTitle = () => {
     switch (reportType) {
       case "cut_slabs": return "Cut Slabs Report";
-      case "sold_slabs": return "Sold Slabs Report";
-      case "inventory": return "Current Inventory Report";
-      case "stones_sales": return "Stones Sales Report";
       default: return "Report";
     }
   };
 
   const reportTypeOptions = [
     { key: "cut_slabs", value: "Cut Slabs" },
-    { key: "sold_slabs", value: "Sold Slabs" },
-    { key: "inventory", value: "Current Inventory" },
-    { key: "stones_sales", value: "Stones Sales" },
   ];
 
   const supplierOptions = [
@@ -630,4 +478,4 @@ export default function ReportsPage() {
       </Card>
     </PageLayout>
   );
-} 
+}
