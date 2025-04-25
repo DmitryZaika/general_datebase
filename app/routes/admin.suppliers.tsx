@@ -13,7 +13,6 @@ import { useEffect, useState } from "react";
 
 interface Supplier {
   id: number;
-  website: string;
   supplier_name: string;
   manager: string;
   phone: string;
@@ -39,10 +38,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 const columns: ColumnDef<Supplier>[] = [
-  {
-    accessorKey: "website",
-    header: ({ column }) => <SortableHeader column={column} title="Website" />,
-  },
   {
     accessorKey: "supplier_name",
     header: ({ column }) => (
@@ -71,7 +66,7 @@ const columns: ColumnDef<Supplier>[] = [
       return (
         <ActionDropdown
           actions={{
-            edit: `edit/${row.original.id}`,
+            edit: `edit/${row.original.id}/information`,
             delete: `delete/${row.original.id}`,
           }}
         />

@@ -12,9 +12,10 @@ import { Link } from "react-router";
 
 interface IProps {
   actions: Record<string, string>;
+  asBlank?: boolean;
 }
 
-export const ActionDropdown = ({ actions }: IProps) => {
+export const ActionDropdown = ({ actions, asBlank = false }: IProps) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -27,7 +28,9 @@ export const ActionDropdown = ({ actions }: IProps) => {
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         {Object.entries(actions).map(([action, link]) => (
           <DropdownMenuItem asChild>
-            <Link to={link}>{action}</Link>
+            <Link to={link} target={asBlank ? "_blank" : "_self"}>
+              {action.charAt(0).toUpperCase() + action.slice(1)}
+            </Link>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

@@ -1,0 +1,7 @@
+CREATE TABLE supplier_files (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    url VARCHAR(255) NOT NULL,
+    supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+    create_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
