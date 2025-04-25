@@ -145,7 +145,7 @@ import {
                 label="Document"
                 inputName="documents"
                 id="document"
-                type="pdf"
+                type="document"
                 onChange={field.onChange}
               />
             )}
