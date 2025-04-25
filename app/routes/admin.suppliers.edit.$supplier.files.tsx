@@ -145,7 +145,7 @@ import {
                 label="Document"
                 inputName="documents"
                 id="document"
-                type="document"
+                type="all"
                 onChange={field.onChange}
               />
             )}
