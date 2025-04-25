@@ -9,7 +9,7 @@ type FileInput = {
   inputName?: string;
   id: string;
   label?: string;
-  type: "image" | "pdf" | "document";
+  type?: "image" | "pdf" | "document" | "all";
   className?: string;
   onChange: (event: File | undefined) => void;
 };
@@ -18,7 +18,8 @@ const acceptsMap = {
   image:
     "image/png, image/jpeg, image/jpg, image/gif, image/webp, image/svg+xml, image/tiff, image/bmp, image/x-icon, image/heif, image/x-canon-cr2, image/x-nikon-nef",
   pdf: "application/pdf",
-  document: "application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document, text/plain, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+  all: "*/*"
 };
 
 function getQuality(size: number): number {
@@ -43,8 +44,8 @@ function getQuality(size: number): number {
 export function FileInput({
   onChange,
   id,
-  label = "Image",
-  type,
+  label = "File",
+  type = "all",
   className,
 }: FileInput) {
   function compressImage(file: File) {
@@ -66,7 +67,7 @@ export function FileInput({
 
   function handleChange(file: File | undefined) {
     if (!file) return;
-    if (type === "image") {
+    if (type === "image" || (type === "all" && file.type.startsWith("image/"))) {
       compressImage(file);
     } else {
       onChange(file);
@@ -81,7 +82,7 @@ export function FileInput({
           className={className}
           onChange={(event) => handleChange(event.target.files?.[0])}
           type="file"
-          accept={acceptsMap[type]}
+          accept={acceptsMap[type as keyof typeof acceptsMap]}
           id={id}
         />
       </FormControl>
