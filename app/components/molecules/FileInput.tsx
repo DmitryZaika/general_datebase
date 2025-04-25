@@ -9,7 +9,7 @@ type FileInput = {
   inputName?: string;
   id: string;
   label?: string;
-  type: "image" | "pdf";
+  type: "image" | "pdf" | "document";
   className?: string;
   onChange: (event: File | undefined) => void;
 };
@@ -18,6 +18,7 @@ const acceptsMap = {
   image:
     "image/png, image/jpeg, image/jpg, image/gif, image/webp, image/svg+xml, image/tiff, image/bmp, image/x-icon, image/heif, image/x-canon-cr2, image/x-nikon-nef",
   pdf: "application/pdf",
+  document: "application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document, text/plain, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
 
 function getQuality(size: number): number {
