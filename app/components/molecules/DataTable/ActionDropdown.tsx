@@ -13,19 +13,20 @@ import { Link } from "react-router";
 interface IProps {
   actions: Record<string, string>;
   asBlank?: boolean;
+  label?: string;
 }
 
-export const ActionDropdown = ({ actions, asBlank = false }: IProps) => {
+export const ActionDropdown = ({ actions, asBlank = false, label = "Actions" }: IProps) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 w-8 p-0">
+        <Button variant="ghost" className="h-8 w-8 p-0" disabled={Object.keys(actions).length === 0}>
           <span className="sr-only">Open menu</span>
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+        <DropdownMenuLabel>{label}</DropdownMenuLabel>
         {Object.entries(actions).map(([action, link]) => (
           <DropdownMenuItem asChild>
             <Link to={link} target={asBlank ? "_blank" : "_self"}>

@@ -149,8 +149,9 @@ const getColumns = (filesMap: Record<number, SupplierFile[]>): ColumnDef<Supplie
       return (
         <ActionDropdown
           asBlank={true}
-        actions={fileObject}
-      />
+          label="Files"
+          actions={fileObject}
+        />
       )
     },
   },
