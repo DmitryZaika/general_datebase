@@ -1,0 +1,9 @@
+CREATE TABLE stone_colors (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    stone_id INT NOT NULL,
+    color_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (stone_id) REFERENCES stones(id),
+    FOREIGN KEY (color_id) REFERENCES colors(id)
+);
+
