@@ -223,9 +223,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     [user.company_id]
   );
   
-  const sellers = await selectMany<{id: number, name: string}>(
+  const sellers = await selectMany<{id: number, name: string, position_id: number}>(
     db,
-    `SELECT id, name FROM users WHERE company_id = ? ORDER BY name ASC`,
+    `SELECT id, name, position_id FROM users WHERE company_id = ? AND position_id IN (1, 2, 5) ORDER BY name ASC`,
     [user.company_id]
   );
   
