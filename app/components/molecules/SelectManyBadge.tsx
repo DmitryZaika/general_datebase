@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { FieldValues, ControllerRenderProps } from "react-hook-form";
 import {
@@ -31,12 +31,19 @@ export function SelectManyBadge<TFieldValues extends FieldValues = FieldValues>(
   className,
   badges
 }: SelectManyBadgeProps<TFieldValues>) {
-  const value: string[] = field.value ?? [];
-  console.log(value)
+  const selectedValues: string[] = Array.isArray(field.value) ? field.value : 
+                         field.value ? [field.value] : [];
+  
   function handleChange(val: string) {
     if (!val) return;
-    if (value.includes(val)) return;
-    field.onChange([...value, val])
+    
+    if (selectedValues.includes(val)) return;
+    
+    field.onChange([...selectedValues, val]);
+  }
+  
+  function handleRemove(val: string) {
+    field.onChange(selectedValues.filter(v => v !== val));
   }
 
   function isLightColor(color: string) {
@@ -61,21 +68,36 @@ export function SelectManyBadge<TFieldValues extends FieldValues = FieldValues>(
           </SelectTrigger>
           <SelectContent>
             {options.map(({ key, value }) => (
-              <SelectItem key={key} value={key}>
+              <SelectItem key={key} value={String(key)}>
                 {value}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        
       </FormControl>
       <FormMessage />
-      {Object.keys(badges).map(item => (
-        <Badge key={item} style={{
-          backgroundColor: badges[item],
-          color: isLightColor(badges[item]) ? '#000000' : '#ffffff'
-        }}>{item}</Badge>
-      ))}
+      <div className="flex flex-wrap gap-1 mt-1">
+        {Object.entries(badges).map(([itemName, color]) => {
+          // Поиск опции по имени
+          const option = options.find(opt => opt.value === itemName);
+          if (!option) return null;
+          
+          return (
+            <Badge
+              key={itemName}
+              className="flex items-center gap-1 cursor-pointer"
+              style={{
+                backgroundColor: color,
+                color: isLightColor(color) ? '#000000' : '#ffffff'
+              }}
+              onClick={() => handleRemove(String(option.key))}
+            >
+              {itemName}
+              <span className="ml-1">×</span>
+            </Badge>
+          );
+        })}
+      </div>
     </FormItem>
   );
 }
