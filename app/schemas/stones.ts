@@ -13,7 +13,7 @@ export const stoneSchema = z.object({
   bundle: z.string().optional(),
   cost_per_sqft: z.coerce.number().default(0),
   retail_price: z.coerce.number().default(0),
-  level: z.number().optional(),
+  level: z.coerce.number().optional(),
   colors: z.array(z.number()).optional(),
 });
 
