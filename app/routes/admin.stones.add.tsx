@@ -94,6 +94,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
         "message",
         toastData("Failure", "Database Error Occured", "destructive"),
       );
+      try {
+        await db.execute(
+          `INSERT INTO main.stone_colors (stone_id, color_id) VALUES (?, ?);`,
+          [stoneId, data.color_id],
+        );
+      } catch (error) {
+        console.error("Error connecting to the database: ", error);
+      }
       return new Response(JSON.stringify({ error: "Database Error Occured" }), {
         headers: { "Set-Cookie": await commitSession(session) },
       });
@@ -298,6 +306,21 @@ export default function StonesAdd() {
             />
      
           </div>
+          {/* <FormField
+            control={form.control}
+            name="color_id"
+            render={({ field }) => (
+              <SelectInput
+                options={colors.map((item) => ({
+                  key: item.id.toString(),
+                  value: item.name,
+                }))}
+                name={"Color"}
+                placeholder={"Color of the stone"}
+                field={field}
+              />
+            )}
+          /> */}
 
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
