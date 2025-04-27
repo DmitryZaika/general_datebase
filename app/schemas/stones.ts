@@ -14,7 +14,7 @@ export const stoneSchema = z.object({
   cost_per_sqft: z.coerce.number().default(0),
   retail_price: z.coerce.number().default(0),
   level: z.coerce.number().optional(),
-  colors: z.array(z.number()).optional(),
+  colors: z.any().optional()
 });
 
 export const stoneFilterSchema = z.object({
