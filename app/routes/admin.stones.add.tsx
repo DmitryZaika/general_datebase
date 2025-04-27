@@ -31,7 +31,7 @@ import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { selectMany } from "~/utils/queryHelpers";
 import { stoneSchema } from "~/schemas/stones";
-
+import { SelectManyBadge } from "~/components/molecules/SelectManyBadge";
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await getAdminUser(request);
@@ -52,7 +52,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await db.execute(
       `INSERT INTO main.stones
-       (name, type, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price, level)
+       (name, type, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price,  level)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
@@ -97,7 +97,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       try {
         await db.execute(
           `INSERT INTO main.stone_colors (stone_id, color_id) VALUES (?, ?);`,
-          [stoneId, data.color_id],
+          [data.colors?.map(item => [stoneId, item])],
         );
       } catch (error) {
         console.error("Error connecting to the database: ", error);
@@ -128,7 +128,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }>(db, "SELECT id,  supplier_name FROM suppliers WHERE company_id = ?", [
       user.company_id,
     ]);
-    return { suppliers };
+    const colors = await selectMany<{
+      id: number;
+      name: string;
+      hex_code: string;
+    }>(db, "SELECT id, name, hex_code FROM colors ORDER BY name ASC");
+    return { suppliers, colors };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -138,11 +143,12 @@ export default function StonesAdd() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSubmitting = useNavigation().state !== "idle";
-  const { suppliers } = useLoaderData<typeof loader>();
+  const { suppliers, colors } = useLoaderData<typeof loader>();
 
   const form = useCustomOptionalForm(stoneSchema, {
     defaultValues: {
       is_display: true,
+      colors: [],
     },
   });
 
@@ -306,21 +312,28 @@ export default function StonesAdd() {
             />
      
           </div>
-          {/* <FormField
+          <FormField
             control={form.control}
-            name="color_id"
+            name="colors"
             render={({ field }) => (
-              <SelectInput
+              <SelectManyBadge
                 options={colors.map((item) => ({
                   key: item.id.toString(),
                   value: item.name,
                 }))}
                 name={"Color"}
+                className="w-1/2"
                 placeholder={"Color of the stone"}
                 field={field}
+                badges={colors
+                  .filter(item => field.value?.includes(item.id.toString()))
+                  .reduce((acc, item) => ({
+                    ...acc,
+                    [item.name]: item.hex_code
+                  }), {})}
               />
             )}
-          /> */}
+          />
 
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
