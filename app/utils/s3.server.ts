@@ -8,6 +8,7 @@ import {
   DeleteObjectCommand,
   S3ServiceException,
   waitUntilObjectNotExists,
+  GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import mime from "mime-types";
 import { v4 as uuidv4 } from "uuid";
@@ -139,4 +140,67 @@ export const s3UploadHandler = async (
     );
     return uploadedFileLocation;
   }
+};
+
+export const downloadPDF = async (url: string) => {
+  const finalKey = url.replace(
+    `https://${STORAGE_BUCKET}.s3.${STORAGE_REGION}.amazonaws.com/`,
+    "",
+  );
+  const client = getClient();
+  try {
+    const response = await client.send(
+      new GetObjectCommand({
+        Bucket: STORAGE_BUCKET,
+        Key: finalKey,
+      })
+    );
+    
+    // Check if the file is a PDF
+    const contentType = response.ContentType;
+    if (contentType !== 'application/pdf') {
+      throw new Error('The requested file is not a PDF');
+    }
+    
+    // Return the PDF data stream
+    return {
+      stream: response.Body,
+      contentType: contentType,
+      contentLength: response.ContentLength,
+      filename: finalKey.split('/').pop()
+    };
+  } catch (caught) {
+    if (
+      caught instanceof S3ServiceException &&
+      caught.name === "NoSuchBucket"
+    ) {
+      console.error(
+        `Error from S3 while downloading PDF from ${STORAGE_BUCKET}. The bucket doesn't exist.`,
+      );
+    } else if (caught instanceof S3ServiceException) {
+      console.error(
+        `Error from S3 while downloading PDF from ${STORAGE_BUCKET}. ${caught.name}: ${caught.message}`,
+      );
+    }
+    throw caught;
+  }
+};
+
+// Helper function to get PDF as a buffer directly
+export const downloadPDFAsBuffer = async (url: string) => {
+  const pdfData = await downloadPDF(url);
+  
+  // Convert the stream to a buffer
+  const chunks: Uint8Array[] = [];
+  // @ts-ignore - AWS SDK stream types
+  for await (const chunk of pdfData.stream) {
+    chunks.push(chunk);
+  }
+  
+  return {
+    buffer: Buffer.concat(chunks),
+    contentType: pdfData.contentType,
+    contentLength: pdfData.contentLength,
+    filename: pdfData.filename,
+  };
 };

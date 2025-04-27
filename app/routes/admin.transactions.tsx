@@ -7,9 +7,6 @@ import { getAdminUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
 import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
-import { Button } from "~/components/ui/button";
-import { Link } from "react-router";
-import { useState } from "react";
 
 interface Transaction {
   id: number;
@@ -234,10 +231,57 @@ const transactionColumns: ColumnDef<Transaction>[] = [
 export default function AdminTransactions() {
   const { transactions } = useLoaderData<typeof loader>();
 
+  const getPDF = async () => {
+    try {
+      // The fetch API will automatically handle the binary response
+      const response = await fetch("/api/pdf", { 
+        method: "POST",
+        headers: {
+          "Accept": "application/pdf"
+        }
+      });
+      
+      // Check if the response is OK
+      if (!response.ok) {
+        throw new Error(`Failed to download PDF: ${response.statusText}`);
+      }
+      
+      // Get the blob directly from the response
+      const blob = await response.blob();
+      
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from Content-Disposition or use default
+      const contentDisposition = response.headers.get('content-disposition');
+      const filename = contentDisposition
+        ? contentDisposition.split('filename=')[1]?.replace(/["']/g, '')
+        : 'transaction-report.pdf';
+      
+      link.download = filename;
+      
+      // Append to document, trigger click, and clean up
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      alert("Error downloading PDF. Please try again.");
+    }
+  };
+  
   return (
     <>
       <PageLayout title="Sales Transactions">
         <div className="mb-4 flex justify-between items-center">
+          <button onClick={() => getPDF()} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            Download PDF
+          </button>
           <h1 className="text-2xl font-bold">Transactions</h1>
           {/* <Link to="/admin/reports">
             <Button variant="default" className="bg-blue-600 hover:bg-blue-700">
