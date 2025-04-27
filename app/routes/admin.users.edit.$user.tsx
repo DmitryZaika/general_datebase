@@ -25,12 +25,14 @@ import { getAdminUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
+import { replaceUnderscoresWithSpaces } from "~/utils/words";
 
 const userschema = z.object({
   name: z.string().min(1),
   phone_number: z.union([z.coerce.string().min(10), z.literal("")]).optional(),
   email: z.union([z.string().email().optional(), z.literal("")]),
   company_id: z.coerce.number(),
+  position_id: z.coerce.number().optional(),
   is_admin: z.boolean(),
 });
 
@@ -67,7 +69,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       email = ?,
       phone_number = ?,
       company_id = ?,
-      is_admin = ?
+      is_admin = ?,
+      position_id = ?
     WHERE id = ?
     `,
     [
@@ -76,6 +79,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       data.phone_number,
       data.company_id,
       data.is_admin,
+      data.position_id,
       userId,
     ],
   );
@@ -97,6 +101,7 @@ interface User {
   email: null | string;
   phone_number: null | string;
   company_id: number;
+  position_id: number | null;
   is_admin: null | number;
 }
 
@@ -115,7 +120,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const user = await selectId<User>(
     db,
-    "SELECT id, name, email, phone_number, company_id, is_admin FROM users WHERE id = ?",
+    "SELECT id, name, email, phone_number, company_id, position_id, is_admin FROM users WHERE id = ?",
     userId,
   );
   if (!user) {
@@ -125,17 +130,23 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     db,
     "SELECT id, name FROM company",
   );
+  const positions = await selectMany<{ id: number; name: string }>(
+    db,
+    "SELECT id, name FROM positions",
+  );
   return {
     user,
     companies: companies.map((c) => ({ key: c.id, value: c.name })),
+    positions: positions.map((p) => ({ key: p.id, value: p.name })),
   };
 }
 
 export default function User() {
   const navigate = useNavigate();
-  const { user, companies } = useLoaderData<{
+  const { user, companies, positions } = useLoaderData<{
     user: User;
     companies: Array<{ key: number; value: string }>;
+    positions: Array<{ key: number; value: string }>;
   }>();
 
   const token = useAuthenticityToken();
@@ -146,6 +157,7 @@ export default function User() {
       phone_number: user.phone_number || "",
       email: user.email || "",
       company_id: user.company_id,
+      position_id: user.position_id || undefined,
       is_admin: user.is_admin === 1,
     },
   });
@@ -192,6 +204,20 @@ export default function User() {
               name="company_id"
               render={({ field }) => (
                 <SelectInput field={field} name="Company" options={companies} />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="position_id"
+              render={({ field }) => (
+                <SelectInput
+                  field={field}
+                  name="Position"
+                  options={positions.map((position) => ({
+                    key: position.key,
+                    value: replaceUnderscoresWithSpaces(position.value),
+                  }))}
+                />
               )}
             />
             <FormField
