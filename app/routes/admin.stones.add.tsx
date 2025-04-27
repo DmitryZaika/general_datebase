@@ -52,8 +52,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await db.execute(
       `INSERT INTO main.stones
-       (name, type, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+       (name, type, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price, level)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.name,
         data.type,
@@ -66,6 +66,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.length,
         data.cost_per_sqft,
         data.retail_price,
+        data.level,
       ],
     );
   } catch (error) {
@@ -211,6 +212,7 @@ export default function StonesAdd() {
                 )}
               />
             </div>
+          
             <FormField
               control={form.control}
               name="supplier_id"
@@ -226,8 +228,26 @@ export default function StonesAdd() {
                 />
               )}
             />
+           
+         
           </div>
-
+          <FormField
+         
+              control={form.control}
+              name="level"
+              render={({ field }) => (
+                <SelectInput
+                 className="w-1/2"
+                  options={[1, 2, 3, 4, 5, 6, 7].map((item) => ({
+                    key: item.toString(),
+                    value: item.toString(),
+                  }))}
+                  name={"Level"}
+                  placeholder={"Level of the stone"}
+                  field={field}
+                />
+              )}
+            />
           <div className="flex gap-2">
             <FormField
               control={form.control}

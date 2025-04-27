@@ -54,7 +54,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (newFile) {
         await db.execute(
           `UPDATE stones
-           SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
+           SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
            WHERE id = ?`,
           [
             data.name,
@@ -66,6 +66,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             data.width,
             data.on_sale,
             data.cost_per_sqft,
+            data.level,
             data.retail_price,
             stoneId,
           ]
@@ -73,7 +74,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       } else {
         await db.execute(
           `UPDATE stones
-           SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
+           SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
            WHERE id = ?`,
           [
             data.name,
@@ -84,6 +85,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             data.width,
             data.on_sale,
             data.cost_per_sqft,
+            data.level,
             data.retail_price,
             stoneId,
           ]
@@ -123,9 +125,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
       on_sale: boolean;
       cost_per_sqft: number;
       retail_price: number;
+      level: number | null;
     }>(
       db,
-      "SELECT name, type, url, is_display, supplier_id, length, width, on_sale, cost_per_sqft, retail_price FROM stones WHERE id = ?",
+      "SELECT name, type, url, is_display, supplier_id, length, width, on_sale, cost_per_sqft, retail_price, level FROM stones WHERE id = ?",
       stoneId
     );
     if (!stone) {
@@ -159,6 +162,7 @@ export default function Information() {
       on_sale,
       cost_per_sqft,
       retail_price,
+      level,
     } = stone;
     const defaultValues = {
       name,
@@ -171,6 +175,7 @@ export default function Information() {
       on_sale,
       cost_per_sqft,
       retail_price,
+      level,
     };
     const form = useCustomOptionalForm(stoneSchema, defaultValues);
     return (
@@ -241,6 +246,21 @@ export default function Information() {
           />
         </div>
         {url ? <img src={url} alt={name} className="w-48  mx-auto" /> : null}
+        <FormField
+          control={form.control}
+          name="level"
+          render={({ field }) => (
+            <SelectInput
+              name="Level"
+              placeholder="Stone level"
+              field={field}
+              options={[1, 2, 3, 4, 5, 6, 7].map((item) => ({
+                key: item.toString(),
+                value: item.toString(),
+              }))}
+            />
+          )}
+        />
         <div className="flex gap-2">
           <FormField
             control={form.control}

@@ -18,6 +18,7 @@ export interface Stone {
   on_sale: boolean;
   retail_price: number;
   cost_per_sqft: number;
+  level: number | null;
 }
 
 export const stoneQueryBuilder = async (
@@ -42,6 +43,7 @@ export const stoneQueryBuilder = async (
     stones.on_sale,
     stones.retail_price,
     stones.cost_per_sqft,
+    stones.level,
     COUNT(CASE WHEN slab_inventory.id IS NOT NULL AND (slab_inventory.cut_date IS NULL  OR slab_inventory.cut_date IS NOT NULL) THEN 1 ELSE NULL END) AS amount,
     CAST(SUM(CASE WHEN slab_inventory.id IS NOT NULL AND slab_inventory.sale_id IS NULL AND (slab_inventory.cut_date IS NULL OR slab_inventory.cut_date IS NOT NULL) THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM stones
@@ -69,7 +71,8 @@ export const stoneQueryBuilder = async (
       stones.length,
       stones.width,
       stones.created_date,
-      stones.on_sale
+      stones.on_sale,
+      stones.level
     `;
   if (!filters.show_sold_out) {
     query += `\nHAVING available > 0`;

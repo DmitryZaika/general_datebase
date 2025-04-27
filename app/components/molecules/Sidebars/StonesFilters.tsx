@@ -48,6 +48,8 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
     [searchParams.type]
   );
 
+
+
   const toggleStoneType = useCallback((typeToToggle: StoneFilter["type"][number]) => {
     if (isSubmitting) return;
     
@@ -62,6 +64,8 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
 
     setSearchParams({ ...searchParams, type: newTypes });
   }, [isSubmitting, searchParams, setSearchParams]);
+
+  
 
   const toggleSelectAllTypes = useCallback(() => {
     if (isSubmitting) return;
@@ -102,8 +106,7 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
         >
           {allTypesSelected ? "Clear" : "Select all"}
         </LinkSpan>
-      </SidebarGroupLabel>
-      
+      </SidebarGroupLabel>  
       {STONE_TYPES.map((item) => (
         <CheckOption
           value={item}
@@ -113,6 +116,8 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
           isLoading={isSubmitting}
         />
       ))}
+
+      
       
       {Array.isArray(suppliers) && (
         <>
