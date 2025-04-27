@@ -10,6 +10,7 @@ import { LinkSpan } from "~/components/atoms/LinkSpan";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Stone } from "~/utils/queries";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { Slider } from "~/components/ui/slider";
 
 import { SidebarGroupLabel, SidebarMenuSub } from "~/components/ui/sidebar";
 
@@ -63,6 +64,15 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
     }
 
     setSearchParams({ ...searchParams, type: newTypes });
+  }, [isSubmitting, searchParams, setSearchParams]);
+
+  const handleLevelChange = useCallback((newLevels: number[]) => {
+    if (isSubmitting) return;
+    
+    const type = searchParams.type ?? [];
+    let newTypes;
+
+    setSearchParams({ ...searchParams, levels: newLevels });
   }, [isSubmitting, searchParams, setSearchParams]);
 
   
@@ -165,17 +175,16 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
       )}
 
       { showSoldOutToggle && (
-        <>
-       
-          <CheckOption
-            value="Show sold out"
-            selected={!!searchParams.show_sold_out}
-            toggleValue={toggleShowSoldOut}
-            isLoading={isSubmitting}
-            defaultChecked={false}
-          />
-        </>
+        <CheckOption
+          value="Show sold out"
+          selected={!!searchParams.show_sold_out}
+          toggleValue={toggleShowSoldOut}
+          isLoading={isSubmitting}
+          defaultChecked={false}
+        />
       )}
+      <SidebarGroupLabel>Level</SidebarGroupLabel>
+      <Slider defaultValue={searchParams.levels} onCommit={handleLevelChange} max={7} showTooltip={true} className="mt-8"/>
     </SidebarMenuSub>
   );
 }
