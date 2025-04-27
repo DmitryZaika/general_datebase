@@ -148,7 +148,6 @@ export default function App() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          {user ? (
             <SidebarProvider open={!!basePath}>
               <EmployeeSidebar suppliers={stoneSuppliers} sinkSuppliers={sinkSuppliers} />
               <main className="h-screen overflow-y-auto bg-gray-100 w-full">
@@ -172,26 +171,6 @@ export default function App() {
                 <ScrollToTopButton />
               </main>
             </SidebarProvider>
-          ) : (
-            <main className="h-screen overflow-y-auto bg-gray-100 w-full">
-              <AuthenticityTokenProvider token={token}>
-                <Header
-                  isEmployee={false}
-                  user={null}
-                  isAdmin={false}
-                  isSuperUser={false}
-                />
-                <div className="relative">
-                  <Outlet />
-                </div>
-              </AuthenticityTokenProvider>
-              <Toaster />
-              <ScrollRestoration />
-              <Scripts />
-              <Posthog />
-              <ScrollToTopButton />
-            </main>
-          )}
         </QueryClientProvider>
       </body>
     </html>
