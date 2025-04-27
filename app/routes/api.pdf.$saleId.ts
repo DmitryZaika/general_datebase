@@ -10,7 +10,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
         const saleId = parseInt(params.saleId);
 
-        const 
+      
 
         const url = 'https://granite-database.s3.us-east-2.amazonaws.com/base-contracts/Contract.pdf';
         

@@ -42,7 +42,7 @@ interface Slab {
   sale_id: number | null;
   width: number;
   length: number;
-  is_cut: number;
+  cut_date: string | null;  
   transaction?: {
     sale_id: number;
     sale_date: string;
@@ -117,7 +117,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const slabs = await selectMany<Slab>(
     db,
-    "SELECT id, bundle, url, sale_id, width, length, is_cut FROM slab_inventory WHERE stone_id = ? AND (is_cut = 0 OR is_cut IS NULL)",
+    "SELECT id, bundle, url, sale_id, width, length, cut_date FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL",
     [stoneId]
   );
   
