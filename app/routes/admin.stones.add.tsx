@@ -32,7 +32,8 @@ import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { selectMany } from "~/utils/queryHelpers";
 import { stoneSchema } from "~/schemas/stones";
 import { SelectManyBadge } from "~/components/molecules/SelectManyBadge";
-export async function action({ request, params }: ActionFunctionArgs) {
+
+export async function action({ request }: ActionFunctionArgs) {
   try {
     await getAdminUser(request);
   } catch (error) {
@@ -48,63 +49,61 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
-  let user = await getAdminUser(request);
-  try {
-    await db.execute(
-      `INSERT INTO main.stones
-       (name, type, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price,  level)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-      [
-        data.name,
-        data.type,
-        data.file,
-        user.company_id,
-        data.is_display,
-        data.on_sale,
-        data.supplier_id,
-        data.width,
-        data.length,
-        data.cost_per_sqft,
-        data.retail_price,
-        data.level,
-      ],
-    );
-  } catch (error) {
-    console.error("Error connecting to the database: ", error);
-    const stoneId = parseInt(params.stone ?? "0", 10);
-    if (!stoneId) {
-      return new Response(
-        JSON.stringify({ error: "Invalid or missing stone ID" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
 
+  const user = await getAdminUser(request);
+  const [result]: any = await db.execute(
+    `INSERT INTO stones
+     (name, type, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price, level)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+    [
+      data.name,
+      data.type,
+      data.file,
+      user.company_id,
+      data.is_display,
+      data.on_sale,
+      data.supplier_id,
+      data.width || 0,
+      data.length || 0,
+      data.cost_per_sqft || 0,
+      data.retail_price || 0,
+      data.level ?? null,
+    ],
+  );
+
+  const stoneId = result.insertId;
+
+  let colorsArray: number[] = [];
+  
+  if (typeof data.colors === 'string') {
     try {
-      await db.execute(
-        `INSERT INTO main.slab_inventory (bundle, stone_id) VALUES (?, ?);`,
-        [data.bundle, stoneId],
-      );
-    } catch (error) {
-      console.error("Error connecting to the database: ", error);
-      const session = await getSession(request.headers.get("Cookie"));
-      session.flash(
-        "message",
-        toastData("Failure", "Database Error Occured", "destructive"),
-      );
+      if (data.colors.startsWith('[')) {
+        colorsArray = JSON.parse(data.colors).map(Number);
+      } else {
+        colorsArray = [Number(data.colors)];
+      }
+    } catch (e) {
+    }
+  }
+  else if (Array.isArray(data.colors)) {
+    colorsArray = data.colors.map(Number);
+  }
+  
+  colorsArray = colorsArray.filter(id => !isNaN(id) && id > 0);
+
+  if (colorsArray.length > 0) {
+    for (const colorId of colorsArray) {
+      if (isNaN(colorId) || colorId <= 0) {
+        continue;
+      }
+      
       try {
         await db.execute(
-          `INSERT INTO main.stone_colors (stone_id, color_id) VALUES (?, ?);`,
-          [data.colors?.map(item => [stoneId, item])],
+          `INSERT INTO stone_colors (stone_id, color_id) VALUES (?, ?)`,
+          [stoneId, colorId]
         );
-      } catch (error) {
-        console.error("Error connecting to the database: ", error);
+      } catch (err) {
       }
-      return new Response(JSON.stringify({ error: "Database Error Occured" }), {
-        headers: { "Set-Cookie": await commitSession(session) },
-      });
     }
   }
   
@@ -315,24 +314,40 @@ export default function StonesAdd() {
           <FormField
             control={form.control}
             name="colors"
-            render={({ field }) => (
-              <SelectManyBadge
-                options={colors.map((item) => ({
-                  key: item.id.toString(),
-                  value: item.name,
-                }))}
-                name={"Color"}
-                className="w-1/2"
-                placeholder={"Color of the stone"}
-                field={field}
-                badges={colors
-                  .filter(item => field.value?.includes(item.id.toString()))
-                  .reduce((acc, item) => ({
-                    ...acc,
-                    [item.name]: item.hex_code
-                  }), {})}
-              />
-            )}
+            render={({ field }) => {
+              if (!field.value) field.value = [];
+              if (!Array.isArray(field.value)) field.value = [String(field.value)];
+              
+              if (Array.isArray(field.value) && field.value.length > 0) {
+                const invalidIds = field.value.filter(id => 
+                  !colors.some(c => c.id.toString() === id)
+                );
+                if (invalidIds.length > 0) {
+                }
+              }
+              
+              return (
+                <SelectManyBadge
+                  options={colors.map((item) => ({
+                    key: item.id.toString(),
+                    value: item.name,
+                  }))}
+                  name={"Color"}
+                  className="w-1/2"
+                  placeholder={"Color of the stone"}
+                  field={field}
+                  badges={colors
+                    .filter(item => 
+                      Array.isArray(field.value) && 
+                      field.value.includes(item.id.toString())
+                    )
+                    .reduce((acc, item) => ({
+                      ...acc,
+                      [item.name]: item.hex_code
+                    }), {})}
+                />
+              );
+            }}
           />
 
           <DialogFooter>
