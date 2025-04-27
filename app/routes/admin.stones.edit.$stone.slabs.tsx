@@ -107,7 +107,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     length: number;
   }>(
     db,
-    "SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ? AND is_cut = 0",
+    "SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL",
     [stoneId],
   );
   const [stone] = await selectMany<{

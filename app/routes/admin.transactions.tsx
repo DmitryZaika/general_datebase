@@ -19,7 +19,7 @@ interface Transaction {
   sf?: number;
   is_deleted: string;
   sink_type?: string;
-  is_cut?: number;
+  cut_date?: string | null;
 }
 
 
@@ -70,13 +70,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       s.sale_date,
       c.name as customer_name,
       u.name as seller_name,
-      GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', COALESCE(si.is_cut, 0)) SEPARATOR ',') as bundle_with_cut,
+      GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', COALESCE(si.cut_date, 0)) SEPARATOR ',') as bundle_with_cut,
       GROUP_CONCAT(DISTINCT si.bundle SEPARATOR ', ') as bundle,
       GROUP_CONCAT(DISTINCT st.name SEPARATOR ', ') as stone_name,
       ROUND(SUM(si.square_feet), 2) as sf,
       s.status as is_deleted,
       '' as sink_type,
-      COALESCE(MAX(si.is_cut), 0) as is_cut
+      COALESCE(MAX(si.cut_date), '') as cut_date
     FROM 
       sales s
     JOIN 
@@ -279,9 +279,9 @@ export default function AdminTransactions() {
     <>
       <PageLayout title="Sales Transactions">
         <div className="mb-4 flex justify-between items-center">
-          <button onClick={() => getPDF()} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          {/* <button onClick={() => getPDF()} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
             Download PDF
-          </button>
+          </button> */}
           <h1 className="text-2xl font-bold">Transactions</h1>
           {/* <Link to="/admin/reports">
             <Button variant="default" className="bg-blue-600 hover:bg-blue-700">
