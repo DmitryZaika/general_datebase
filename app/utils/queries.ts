@@ -26,9 +26,9 @@ export const stoneQueryBuilder = async (
   companyId: number,
   show_hidden: boolean = false
 ): Promise<Stone[]> => {
-  if (filters.type.length === 0) {
-    return [];
-  }
+  // If no type filters are specified, we'll show all stones
+  // But if filters.type is an empty array (no types selected), we'll still process the query
+  // since the query might include other filters like supplier or colors
   const params: (string | number)[] = [companyId];
   let query = `
   SELECT 
@@ -48,19 +48,46 @@ export const stoneQueryBuilder = async (
     CAST(SUM(CASE WHEN slab_inventory.id IS NOT NULL AND slab_inventory.sale_id IS NULL AND (slab_inventory.cut_date IS NULL OR slab_inventory.cut_date IS NOT NULL) THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM stones
   LEFT JOIN slab_inventory ON slab_inventory.stone_id = stones.id
-  WHERE stones.company_id = ?
   `;
+  
+  // Add JOIN for color filtering if needed
+  if (filters.colors && filters.colors.length > 0) {
+    query += `LEFT JOIN stone_colors ON stone_colors.stone_id = stones.id `;
+  }
+  
+  query += `WHERE stones.company_id = ?`;
+  
   if (!show_hidden) {
     query += " AND stones.is_display = 1";
   }
-  if (filters.type.length < STONE_TYPES.length) {
+  
+  // Only apply type filter if specific types are selected
+  if (filters.type && filters.type.length > 0) {
     query += ` AND stones.type IN (${filters.type.map(() => "?").join(", ")})`;
     params.push(...filters.type);
   }
+  
   if (filters.supplier > 0) {
     query += " AND stones.supplier_id = ?";
     params.push(filters.supplier);
   }
+  
+  // Add color filter condition if colors are selected
+  if (filters.colors && filters.colors.length > 0) {
+    query += ` AND stone_colors.color_id IN (${filters.colors.map(() => "?").join(", ")})`;
+    params.push(...filters.colors);
+  }
+  
+  // Add level filter
+  if (filters.levels && filters.levels.length === 2) {
+    const [minLevel, maxLevel] = filters.levels;
+    // Only apply level filter if the range is not the full range (0-7)
+    if (!(minLevel === 0 && maxLevel === 7)) {
+      query += ` AND (stones.level IS NULL OR (stones.level >= ? AND stones.level <= ?))`;
+      params.push(minLevel, maxLevel);
+    }
+  }
+  
   query += `
     GROUP BY
       stones.id,

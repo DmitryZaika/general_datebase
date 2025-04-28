@@ -26,33 +26,65 @@ export const Slider = React.forwardRef<
   {
     className,
     defaultValue,
+    value,
     min = 0,
     max = 100,
     showTooltip = false,
     onCommit,
+    onValueChange,
     ...props
   },
   ref
 ) {
+  const [isDragging, setIsDragging] = React.useState(false);
+  // Track if we're in controlled or uncontrolled mode
+  const isControlled = value !== undefined;
+  
   // Локальное состояние для неконтролируемого режима и отображения в тултипе
   const [internalValue, setInternalValue] = React.useState<number[]>(
-    () => Array.isArray(defaultValue)
-        ? (defaultValue as number[])
-        : [min]
+    () => {
+      if (isControlled) {
+        return Array.isArray(value) ? value : [min];
+      }
+      return Array.isArray(defaultValue) ? defaultValue : [min];
+    }
   )
 
+  // Sync internal state with controlled value when it changes
+  React.useEffect(() => {
+    if (isControlled && value !== internalValue) {
+      setInternalValue(Array.isArray(value) ? value : [min]);
+    }
+  }, [isControlled, value, min, internalValue]);
+  
+  // Track dragging state
+  const handleDragStart = React.useCallback(() => {
+    setIsDragging(true);
+  }, []);
+  
+  const handleDragEnd = React.useCallback(() => {
+    setIsDragging(false);
+  }, []);
+  
   // Обновляем локальное состояние во время перетаскивания
   const handleChange = React.useCallback((val: number[]) => {
-    setInternalValue(val)
-  }, [])
+    setInternalValue(val);
+    if (!isDragging) {
+      // Only call external onChange when not dragging
+      onValueChange?.(val);
+    }
+  }, [isDragging, onValueChange]);
 
   // Однократный вызов колбэка после отпускания
   const handleCommit = React.useCallback(
     (val: number[]) => {
-      onCommit?.(val)
+      onCommit?.(val);
+      if (!isControlled) {
+        onValueChange?.(val);
+      }
     },
-    [onCommit]
-  )
+    [onCommit, onValueChange, isControlled]
+  );
 
   const renderThumb = (index: number) => {
     const thumb = (
@@ -63,7 +95,7 @@ export const Slider = React.forwardRef<
       />
     )
 
-    if (!showTooltip) return thumb
+    if (!showTooltip || !isDragging) return thumb;
 
     return (
       <TooltipPrimitive.Root key={index} delayDuration={0} open>
@@ -84,11 +116,14 @@ export const Slider = React.forwardRef<
     <SliderPrimitive.Root
       ref={ref}
       data-slot="slider"
-      defaultValue={defaultValue}
+      value={isControlled ? value : undefined}
+      defaultValue={!isControlled ? defaultValue : undefined}
       min={min}
       max={max}
       onValueChange={handleChange}
       onValueCommit={handleCommit}
+      onPointerDown={handleDragStart}
+      onPointerUp={handleDragEnd}
       className={cn(
         "relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col",
         className

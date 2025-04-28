@@ -24,7 +24,8 @@ export const stoneFilterSchema = z.object({
     return value === "true";
   }, z.boolean()).default(false),
   supplier: z.number().gte(0).default(0),
-  levels: z.number().gte(0).lte(7).array().default([0,7])
+  levels: z.coerce.number().array().default([0,7]),
+  colors: z.array(z.coerce.number()).default([])
 });
 
 export type StoneFilter = z.infer<typeof stoneFilterSchema>;
