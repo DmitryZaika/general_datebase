@@ -1,4 +1,4 @@
-import { useLocation, useNavigate, useNavigation, Outlet } from "react-router";
+import { useNavigation } from "react-router";
 import { FormLabel } from "~/components/ui/form";
 import { STONE_TYPES } from "~/utils/constants";
 import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
@@ -26,8 +26,6 @@ export function StonesFilters({ suppliers, colors, base, stones = [] }: IProps) 
     useSafeSearchParams(stoneFilterSchema);
   const navigation = useNavigation();
   const isSubmitting = useMemo(() => navigation.state !== "idle", [navigation.state]);
-  const navigate = useNavigate();
-  const location = useLocation();
   const [suppliersExpanded, setSuppliersExpanded] = useState(false);
   const [colorsExpanded, setColorsExpanded] = useState(false);
   
@@ -100,8 +98,7 @@ export function StonesFilters({ suppliers, colors, base, stones = [] }: IProps) 
   const handleLevelChange = useCallback((newLevels: number[]) => {
     if (isSubmitting) return;
     
-    const type = searchParams.type ?? [];
-    let newTypes;
+
 
     setSearchParams({ ...searchParams, levels: newLevels });
   }, [isSubmitting, searchParams, setSearchParams]);
@@ -142,10 +139,6 @@ export function StonesFilters({ suppliers, colors, base, stones = [] }: IProps) 
   
   const toggleSuppliersExpanded = useCallback(() => {
     setSuppliersExpanded(prev => !prev);
-  }, []);
-
-  const toggleColorsExpanded = useCallback(() => {
-    setColorsExpanded(prev => !prev);
   }, []);
 
   const clearLevelFilter = useCallback(() => {
