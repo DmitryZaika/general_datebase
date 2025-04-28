@@ -18,9 +18,10 @@ interface IProps {
   suppliers: ISupplier[] | undefined;
   base: string;
   stones?: Stone[];
+  colors?: { id: number; name: string; hex_code: string }[];
 }
 
-export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
+export function StonesFilters({ suppliers, colors, base, stones = [] }: IProps) {
   const [searchParams, setSearchParams] =
     useSafeSearchParams(stoneFilterSchema);
   const navigation = useNavigation();
@@ -28,12 +29,12 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [suppliersExpanded, setSuppliersExpanded] = useState(false);
+  const [colorsExpanded, setColorsExpanded] = useState(false);
   
-
   useEffect(() => {
     localStorage.setItem('suppliersExpanded', JSON.stringify(suppliersExpanded));
-  }, [suppliersExpanded]);
-  
+    localStorage.setItem('colorsExpanded', JSON.stringify(colorsExpanded));
+  }, [suppliersExpanded, colorsExpanded]);
 
   useEffect(() => {
     if (searchParams.supplier !== 0) {
@@ -41,15 +42,30 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
     }
   }, [searchParams.supplier]);
   
-  const cleanType = useMemo(() => searchParams.type || ["granite"], [searchParams.type]);
   const showSoldOutToggle = useMemo(() => ["admin", "employee"].includes(base), [base]);
   
-  const allTypesSelected = useMemo(() => 
-    searchParams?.type?.length === STONE_TYPES.length, 
+  const hasTypeFilters = useMemo(() => 
+    searchParams?.type && searchParams.type.length > 0, 
     [searchParams.type]
   );
 
+  const hasColorFilters = useMemo(() => 
+    searchParams?.colors && searchParams.colors.length > 0, 
+    [searchParams.colors]
+  );
 
+  const hasLevelFilter = useMemo(() => {
+    if (!searchParams?.levels || searchParams.levels.length !== 2) return false;
+    const [min, max] = searchParams.levels;
+    return !(min === 0 && max === 7);
+  }, [searchParams.levels]);
+ 
+  useEffect(() => {
+    const storedColorsExpanded = localStorage.getItem('colorsExpanded');
+    if (storedColorsExpanded) {
+      setColorsExpanded(JSON.parse(storedColorsExpanded));
+    }
+  }, []);
 
   const toggleStoneType = useCallback((typeToToggle: StoneFilter["type"][number]) => {
     if (isSubmitting) return;
@@ -66,6 +82,21 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
     setSearchParams({ ...searchParams, type: newTypes });
   }, [isSubmitting, searchParams, setSearchParams]);
 
+  const toggleColor = useCallback((colorId: number) => {
+    if (isSubmitting) return;
+    
+    const currentColors = searchParams.colors ?? [];
+    let newColors;
+
+    if (currentColors.includes(colorId)) {
+      newColors = currentColors.filter(id => id !== colorId);
+    } else {
+      newColors = [...currentColors, colorId];
+    }
+
+    setSearchParams({ ...searchParams, colors: newColors });
+  }, [isSubmitting, searchParams, setSearchParams]);
+
   const handleLevelChange = useCallback((newLevels: number[]) => {
     if (isSubmitting) return;
     
@@ -75,13 +106,22 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
     setSearchParams({ ...searchParams, levels: newLevels });
   }, [isSubmitting, searchParams, setSearchParams]);
 
-  
-
-  const toggleSelectAllTypes = useCallback(() => {
+  const clearTypeFilters = useCallback(() => {
     if (isSubmitting) return;
     
-    const newType = searchParams?.type?.length === STONE_TYPES.length ? [] : [...STONE_TYPES];
-    setSearchParams({ ...searchParams, type: newType });
+    setSearchParams({ ...searchParams, type: [] });
+  }, [isSubmitting, searchParams, setSearchParams]);
+
+  const clearColorFilters = useCallback(() => {
+    if (isSubmitting) return;
+    
+    setSearchParams({ ...searchParams, colors: [] });
+  }, [isSubmitting, searchParams, setSearchParams]);
+
+  const clearSupplierFilter = useCallback(() => {
+    if (isSubmitting) return;
+    
+    setSearchParams({ ...searchParams, supplier: 0 });
   }, [isSubmitting, searchParams, setSearchParams]);
 
   const toggleShowSoldOut = useCallback((val: string) => {
@@ -95,27 +135,39 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
     if (isSubmitting) return;
     
     setSearchParams({ 
-      supplier: supplierId,
-      type: [...STONE_TYPES]
+      ...searchParams,
+      supplier: supplierId
     });
-  }, [isSubmitting, setSearchParams]);
+  }, [isSubmitting, searchParams, setSearchParams]);
   
   const toggleSuppliersExpanded = useCallback(() => {
     setSuppliersExpanded(prev => !prev);
   }, []);
-  
+
+  const toggleColorsExpanded = useCallback(() => {
+    setColorsExpanded(prev => !prev);
+  }, []);
+
+  const clearLevelFilter = useCallback(() => {
+    if (isSubmitting) return;
+    
+    setSearchParams({ ...searchParams, levels: [0, 7] });
+  }, [isSubmitting, searchParams, setSearchParams]);
+
   return (
     <SidebarMenuSub>
       <SidebarGroupLabel>
         Types{" "}
-        <LinkSpan
-          className="ml-2"
-          onClick={toggleSelectAllTypes}
-          variant="blue"
-          disabled={isSubmitting}
-        >
-          {allTypesSelected ? "Clear" : "Select all"}
-        </LinkSpan>
+        {hasTypeFilters && (
+          <LinkSpan
+            className="ml-2"
+            onClick={clearTypeFilters}
+            variant="blue"
+            disabled={isSubmitting}
+          >
+            Clear
+          </LinkSpan>
+        )}
       </SidebarGroupLabel>  
       {STONE_TYPES.map((item) => (
         <CheckOption
@@ -127,7 +179,38 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
         />
       ))}
 
-      
+      {Array.isArray(colors) && colors.length > 0 && (
+        <>
+          <SidebarGroupLabel>
+            Colors{" "}
+            {hasColorFilters && (
+              <LinkSpan
+                className="ml-2"
+                onClick={clearColorFilters}
+                variant="blue"
+                disabled={isSubmitting}
+              >
+                Clear
+              </LinkSpan>
+            )}
+          </SidebarGroupLabel>
+          {colors.map((color) => (
+            <CheckOption
+              key={color.id}
+              value={color.name}
+              selected={searchParams.colors ? searchParams.colors.includes(color.id) : false}
+              toggleValue={() => toggleColor(color.id)}
+              isLoading={isSubmitting}
+              icon={
+                <div 
+                  className="w-3 h-3 mr-1 rounded-full inline-block" 
+                  style={{ backgroundColor: color.hex_code }}
+                />
+              }
+            />
+          ))}
+        </>
+      )}
       
       {Array.isArray(suppliers) && (
         <>
@@ -140,25 +223,25 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
               <FaChevronUp className="ml-1 text-gray-500" size={12} /> : 
               <FaChevronDown className="ml-1 text-gray-500" size={12} />
             }
-            { searchParams.supplier !== 0 && (
+            {searchParams.supplier !== 0 && (
               <LinkSpan
                 className="ml-2"
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleSupplier(0);
+                  clearSupplierFilter();
                 }}
                 variant="blue"
                 disabled={isSubmitting}
               >
-                Select all
+                Clear
               </LinkSpan>
-            ) }
+            )}
           </SidebarGroupLabel>
           
           {suppliersExpanded && suppliers.map((supplier) => (
             <div
               key={supplier.id}
-              onClick={() =>  toggleSupplier(supplier.id)}
+              onClick={() => toggleSupplier(supplier.id)}
               className={`p-1 cursor-pointer hover:bg-gray-100 transition-colors ${
                 searchParams.supplier === supplier.id ? "bg-gray-100" : ""
               } ${isSubmitting ? "opacity-60" : ""}`}
@@ -183,7 +266,19 @@ export function StonesFilters({ suppliers, base, stones = [] }: IProps) {
           defaultChecked={false}
         />
       )}
-      <SidebarGroupLabel>Level</SidebarGroupLabel>
+      <SidebarGroupLabel>
+        Level{" "}
+        {hasLevelFilter && (
+          <LinkSpan
+            className="ml-2"
+            onClick={clearLevelFilter}
+            variant="blue"
+            disabled={isSubmitting}
+          >
+            Clear
+          </LinkSpan>
+        )}
+      </SidebarGroupLabel>
       <Slider defaultValue={searchParams.levels} onCommit={handleLevelChange} max={7} showTooltip={true} className="mt-8"/>
     </SidebarMenuSub>
   );

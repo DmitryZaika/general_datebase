@@ -1,10 +1,13 @@
 import { Checkbox } from "~/components/ui/checkbox";
+import { ReactNode } from "react";
+
 interface ICheckOptionProps<T> {
   value: T;
   selected: boolean;
   toggleValue: (val: T) => void;
   isLoading?: boolean;
   defaultChecked?: boolean;
+  icon?: ReactNode;
 }
 
 export function CheckOption<T>({
@@ -13,6 +16,7 @@ export function CheckOption<T>({
   toggleValue,
   defaultChecked,
   isLoading = false,
+  icon,
 }: ICheckOptionProps<T>) {
   const id = `checkbox-${value as string}`;
   
@@ -32,12 +36,13 @@ export function CheckOption<T>({
         onCheckedChange={() => toggleValue(value)}
         defaultChecked={defaultChecked}
       />
-      <div className="grid  p-1.5 leading-none capitalize w-full">
+      <div className="grid p-1.5 leading-none capitalize w-full">
         <label
           htmlFor={id}
           className="text-sm font-medium leading-none cursor-pointer 
-            peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center"
         >
+          {icon}
           {value as string}
         </label>
       </div>

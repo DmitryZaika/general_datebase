@@ -39,13 +39,27 @@ interface ISidebarItem {
   component?: ({}) => React.ReactNode;
 }
 
-const getItems = (base: string, suppliers: ISupplier[] | undefined, sinkSuppliers?: ISupplier[] | undefined) => {
+interface IProps {
+  suppliers: ISupplier[] | undefined;
+  sinkSuppliers?: ISupplier[] | undefined;
+  colors?: { id: number; name: string; hex_code: string }[] | undefined;
+}
+
+const getItems = (
+  base: string, 
+  suppliers: ISupplier[] | undefined, 
+  colors?: { id: number; name: string; hex_code: string }[] | undefined,
+  sinkSuppliers?: ISupplier[] | undefined
+) => {
+  // For customer routes, we need to make sure the component is loaded properly
+  const isCustomerRoute = base === "customer";
+  
   const finalList: ISidebarItem[] = [
     {
       title: "Stones",
-      url: `/${base}/stones`,
+      url: isCustomerRoute ? `/customer/1/stones` : `/${base}/stones`,
       icon: Home,
-      component: () => <StonesFilters suppliers={suppliers} base={base}/>,
+      component: () => <StonesFilters suppliers={suppliers} base={base} colors={colors}/>,
     },
   ];
   if (["admin", "employee"].includes(base)) {
@@ -112,15 +126,18 @@ const getItems = (base: string, suppliers: ISupplier[] | undefined, sinkSupplier
   return finalList;
 };
 
-interface IProps {
-  suppliers: ISupplier[] | undefined;
-  sinkSuppliers?: ISupplier[] | undefined;
-}
-
-export function EmployeeSidebar({ suppliers, sinkSuppliers }: IProps) {
+export function EmployeeSidebar({ suppliers, sinkSuppliers, colors }: IProps) {
   const location = useLocation();
   const base = getBase(location.pathname);
-  const items = getItems(base as "employee" | "admin" | "customer", suppliers, sinkSuppliers);
+  
+  // Determine if we're in a customer route
+  const isCustomerRoute = typeof base === 'string' && base.startsWith('customer/');
+  
+  // Use "customer" as the base for customer routes in getItems
+  const itemsBase = isCustomerRoute ? "customer" : base as "employee" | "admin" | "customer";
+  
+  const items = getItems(itemsBase, suppliers, colors, sinkSuppliers);
+  
   return (
     <Sidebar>
       <SidebarContent>
@@ -129,7 +146,11 @@ export function EmployeeSidebar({ suppliers, sinkSuppliers }: IProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => {
-                const isActive = location.pathname.startsWith(item.url);
+                // Check if this route is active - for customer routes, check if pathname contains "stones"
+                const isActive = isCustomerRoute && item.title === "Stones" 
+                  ? location.pathname.includes("/stones") 
+                  : location.pathname.startsWith(item.url);
+                
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>
