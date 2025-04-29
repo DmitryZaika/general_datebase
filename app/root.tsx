@@ -120,6 +120,7 @@ export default function App() {
   const { pathname } = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const isLogin = pathname === "/login";
 
   useEffect(() => {
     if (message !== null && message !== undefined) {
@@ -137,6 +138,7 @@ export default function App() {
   }, [message?.nonce]);
 
   const basePath = getBase(pathname);
+  const showSidebar = !!basePath && !isLogin;
 
   return (
     <html lang="en">
@@ -148,8 +150,8 @@ export default function App() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-       
-            <SidebarProvider open={!!basePath}>
+          {showSidebar ? (
+            <SidebarProvider open={showSidebar}>
               <EmployeeSidebar suppliers={stoneSuppliers} sinkSuppliers={sinkSuppliers} />
               <main className="h-screen overflow-y-auto bg-gray-100 w-full">
                 <AuthenticityTokenProvider token={token}>
@@ -172,8 +174,27 @@ export default function App() {
                 <ScrollToTopButton />
               </main>
             </SidebarProvider>
-          
-        
+          ) : (
+            <main className="h-screen overflow-y-auto bg-gray-100 w-full">
+              <AuthenticityTokenProvider token={token}>
+                <Header
+                  isEmployee={user?.is_employee ?? false}
+                  user={user}
+                  isAdmin={user?.is_admin ?? false}
+                  isSuperUser={user?.is_superuser ?? false}
+                />
+                <div className="relative">
+                  <Outlet />
+                </div>
+              </AuthenticityTokenProvider>
+              <Toaster />
+              <ScrollRestoration />
+              <Scripts />
+              <Posthog />
+              {user && <Chat />}
+              <ScrollToTopButton />
+            </main>
+          )}
         </QueryClientProvider>
       </body>
     </html>
