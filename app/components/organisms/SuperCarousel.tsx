@@ -85,7 +85,7 @@ function ChildrenImagesDialog({
 
   return (
     <>
-      <div className="w-full relative">
+      <div className="w-full relative select-none">
         {showInfo && (
           <div className="absolute top-7 sm:top-0 left-[50%] -translate-x-1/2 z-10 bg-black/80 p-3  rounded shadow-lg text-white border border-gray-900">
             <h3 className="text-lg font-bold mb-2 text-center">{image?.name || name}</h3>
@@ -107,7 +107,7 @@ function ChildrenImagesDialog({
         <img
           src={selectedImage || "/path/to/placeholder.png"}
           alt={alt || name || "Image"}
-          className="w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] object-contain z-0"
+          className="w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] object-contain z-0 select-none"
           onClick={(e) => e.stopPropagation()}
         />
       </div>
@@ -115,7 +115,7 @@ function ChildrenImagesDialog({
       {data?.images && data.images.length > 0 && (
         <div className="w-screen max-w-full ">
           <Carousel
-            className=" flex justify-center items-center w-full  pl-10 pr-10"
+            className=" flex justify-center items-center w-full  pl-10 pr-10 select-none"
             opts={{
               slidesToScroll: 5,
               align: "start",
@@ -125,7 +125,7 @@ function ChildrenImagesDialog({
               {data.images.map((image) => (
                 <CarouselItem
                   key={image.id}
-                  className="basis-auto max-w-fit pl-2"
+                  className="basis-auto max-w-fit pl-2 select-none"
                 >
                   <img
                     src={image.url}
