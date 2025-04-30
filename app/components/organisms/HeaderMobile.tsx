@@ -142,7 +142,7 @@ export function BurgerMenu({
                     setOpen={setOpen}
                     onClick={handleRoleSwitchClick}
                   >
-                    <LinkButton >Employee</LinkButton>
+                    <LinkButton className="select-none">Employee</LinkButton>
                   </BurgerLink>
                 ) : (
                   <BurgerLink 
@@ -151,7 +151,7 @@ export function BurgerMenu({
                     setOpen={setOpen}
                     onClick={handleRoleSwitchClick}
                   >
-                    <LinkButton>Admin</LinkButton>
+                    <LinkButton className="select-none">Admin</LinkButton>
                   </BurgerLink>
                 )
               ) : null}
@@ -160,7 +160,7 @@ export function BurgerMenu({
                 setOpen={setOpen}
                 onClick={handleCustomerSwitchClick}
               >
-                <LinkButton>
+                <LinkButton className="select-none">
                   {isCustomerPage ? "Employee" : "Customer"}
                 </LinkButton>
               </BurgerLink>

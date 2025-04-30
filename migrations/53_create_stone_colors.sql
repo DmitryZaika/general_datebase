@@ -3,7 +3,7 @@ CREATE TABLE stone_colors (
     stone_id INT NOT NULL,
     color_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (stone_id) REFERENCES stones(id),
-    FOREIGN KEY (color_id) REFERENCES colors(id)
+    FOREIGN KEY (stone_id) REFERENCES stones(id) ON DELETE CASCADE,
+    FOREIGN KEY (color_id) REFERENCES colors(id) ON DELETE CASCADE
 );
 

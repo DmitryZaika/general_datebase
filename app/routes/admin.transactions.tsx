@@ -70,7 +70,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       s.sale_date,
       c.name as customer_name,
       u.name as seller_name,
-      GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', COALESCE(si.cut_date, 0)) SEPARATOR ',') as bundle_with_cut,
+      GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 1, 0)) SEPARATOR ',') as bundle_with_cut,
       GROUP_CONCAT(DISTINCT si.bundle SEPARATOR ', ') as bundle,
       GROUP_CONCAT(DISTINCT st.name SEPARATOR ', ') as stone_name,
       ROUND(SUM(si.square_feet), 2) as sf,
