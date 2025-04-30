@@ -40,13 +40,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return Response.json({ stones: [] });
   }
   
-  let query = `SELECT s.id, s.name, s.url, s.retail_price, s.cost_per_sqft,
-            CAST(SUM(CASE WHEN si.id IS NOT NULL AND si.sale_id IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available
+  let query = `SELECT s.id, s.type, s.width, s.length, s.name, s.url, s.retail_price, s.cost_per_sqft, s.is_display,
+            CAST(SUM(CASE WHEN si.id IS NOT NULL AND si.sale_id IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available,
+            CAST(COUNT(si.id) AS UNSIGNED) AS amount
     FROM main.stones s
     LEFT JOIN main.slab_inventory AS si ON si.stone_id = s.id
     WHERE UPPER(s.name) LIKE UPPER(?)
     AND s.is_display = 1
-    GROUP BY s.id, s.name, s.url, s.retail_price, s.cost_per_sqft`;
+    GROUP BY s.id, s.type, s.name, s.url, s.width, s.length, s.retail_price, s.cost_per_sqft, s.is_display`;
     
   if (!showSoldOut) {
     query += `\nHAVING available > 0`;
@@ -62,12 +63,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
     LIMIT 5`;
     
   const stones = await selectMany<{ 
-    id: number; 
-    name: string, 
-    url: string, 
-    retail_price: number, 
-    cost_per_sqft: number, 
-    available: number 
+    id: number;
+    type: string;
+    width: number;
+    length: number;
+    name: string;
+    url: string;
+    retail_price: number;
+    cost_per_sqft: number;
+    available: number;
+    amount: number;
+    is_display: boolean;
   }>(
     db,
     query,
