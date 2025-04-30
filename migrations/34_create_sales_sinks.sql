@@ -10,7 +10,7 @@ CREATE TABLE sink_type (
     length INT NOT NULL,
     width INT NOT NULL,
     depth INT NOT NULL,
-    supplier_id INT NOT NULL,
+    supplier_id INT,
     company_id INT NOT NULL,
     CONSTRAINT fk_supplier_junction
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,

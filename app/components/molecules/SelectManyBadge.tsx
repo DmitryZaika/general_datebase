@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { FieldValues, ControllerRenderProps } from "react-hook-form";
 import {
@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Badge } from "../ui/badge";
+import { Check } from "lucide-react";
 
 type Option = { key: string | number; value: string };
 
@@ -20,6 +21,7 @@ interface SelectManyBadgeProps<TFieldValues extends FieldValues = FieldValues> {
   options: Option[];
   className?: string;
   badges: Record<string, string>;
+  showCheckmarks?: boolean; 
 }
 
 export function SelectManyBadge<TFieldValues extends FieldValues = FieldValues>({
@@ -29,19 +31,24 @@ export function SelectManyBadge<TFieldValues extends FieldValues = FieldValues>(
   disabled,
   options,
   className,
-  badges
+  badges,
+  showCheckmarks = false 
 }: SelectManyBadgeProps<TFieldValues>) {
   const selectedValues: string[] = Array.isArray(field.value) ? field.value : 
-                         field.value ? [field.value] : [];
+                        field.value ? [field.value] : [];
+  
+  const [open, setOpen] = useState(false);
   
   function handleChange(val: string) {
     if (!val) return;
     
-    if (selectedValues.includes(val)) return;
+    if (!selectedValues.includes(val)) {
+      field.onChange([...selectedValues, val]);
+    }
     
-    field.onChange([...selectedValues, val]);
+    setTimeout(() => setOpen(true), 0);
   }
-  
+
   function handleRemove(val: string) {
     field.onChange(selectedValues.filter(v => v !== val));
   }
@@ -56,36 +63,47 @@ export function SelectManyBadge<TFieldValues extends FieldValues = FieldValues>(
   }
 
   return (
-    <FormItem className={className}>
+    <FormItem className={`${className}`}>
       <FormLabel htmlFor={field.name}>{name}</FormLabel>
       <FormControl>
         <Select
           onValueChange={handleChange}
           disabled={disabled}
+          open={open}
+          onOpenChange={setOpen}
         >
           <SelectTrigger className="min-w-[150px]">
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
-            {options.map(({ key, value }) => (
-              <SelectItem key={key} value={String(key)}>
-                {value}
-              </SelectItem>
-            ))}
+            {options.map(({ key, value }) => {
+              const isSelected = selectedValues.includes(String(key));
+              return (
+                <div className="relative flex items-center" key={key}>
+                  <SelectItem value={String(key)}>
+                    {value}
+                  </SelectItem>
+                  {!showCheckmarks && isSelected && (
+                    <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+                      <Check className="h-4 w-4" />
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </SelectContent>
         </Select>
       </FormControl>
       <FormMessage />
-      <div className="flex flex-wrap gap-1 mt-1">
+      <div className="flex flex-wrap gap-1 min-h-[22px]">
         {Object.entries(badges).map(([itemName, color]) => {
-          // Поиск опции по имени
           const option = options.find(opt => opt.value === itemName);
           if (!option) return null;
           
           return (
             <Badge
               key={itemName}
-              className="flex items-center gap-1 cursor-pointer"
+              className="flex items-center gap-1 cursor-pointer select-none"
               style={{
                 backgroundColor: color,
                 color: isLightColor(color) ? '#000000' : '#ffffff'

@@ -46,7 +46,6 @@ function customSort(a: string, b: string) {
 const formatPrice = (price: number | null | undefined): string => {
   if (price == null) return "-";
   
-  // Convert to string and remove trailing zeros
   return String(price).replace(/\.0+$/, '');
 };
 
@@ -61,7 +60,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const [, searchParams] = request.url.split("?");
   const queryParams = new URLSearchParams(searchParams);
   
-  // Set show_sold_out=true by default if it's not in the URL
   if (!queryParams.has('show_sold_out')) {
     queryParams.set('show_sold_out', 'true');
   }

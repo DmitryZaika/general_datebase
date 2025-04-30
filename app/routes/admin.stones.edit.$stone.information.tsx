@@ -47,15 +47,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return { errors };
     }
     const newFile = data.file && data.file !== "undefined";
+    
+    console.log("DEBUG data.file:", data.file);
+    console.log("DEBUG newFile:", newFile);
+    
     const stone = await selectId<{ url: string }>(
       db,
       "SELECT url FROM stones WHERE id = ?",
       stoneId
     );
+    
     try {
-      if (stone?.url && newFile) {
-        await deleteFile(stone.url);
-      }
       if (newFile) {
         await db.execute(
           `UPDATE stones
@@ -71,7 +73,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             data.width,
             data.on_sale,
             data.cost_per_sqft,
-            data.level,
+            data.level || null,
             data.retail_price,
             stoneId,
           ]
@@ -90,7 +92,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             data.width,
             data.on_sale,
             data.cost_per_sqft,
-            data.level,
+            data.level || null,
             data.retail_price,
             stoneId,
           ]
@@ -129,6 +131,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
       }
       
+      if (stone?.url && newFile) {
+        await deleteFile(stone.url);
+      }
+  
       const url = new URL(request.url);
       const searchParams = url.searchParams.toString();
       const searchString = searchParams ? `?${searchParams}` : '';
@@ -297,21 +303,7 @@ export default function Information() {
           />
         </div>
         {url ? <img src={url} alt={name} className="w-48  mx-auto" /> : null}
-        <FormField
-          control={form.control}
-          name="level"
-          render={({ field }) => (
-            <SelectInput
-              name="Level"
-              placeholder="Stone level"
-              field={field}
-              options={[1, 2, 3, 4, 5, 6, 7].map((item) => ({
-                key: item.toString(),
-                value: item.toString(),
-              }))}
-            />
-          )}
-        />
+       
         <div className="flex gap-2">
           <FormField
             control={form.control}
@@ -352,6 +344,22 @@ export default function Information() {
             )}
           />
         </div>
+        <FormField
+          control={form.control}
+          name="level"
+          render={({ field }) => (
+            <SelectInput
+              className="w-1/2"
+              name="Level"
+              placeholder="Stone level"
+              field={field}
+              options={[1, 2, 3, 4, 5, 6, 7].map((item) => ({
+                key: item.toString(),
+                value: item.toString(),
+              }))}
+            />
+          )}
+        />
         
         <FormField
           control={form.control}

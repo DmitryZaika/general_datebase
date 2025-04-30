@@ -42,17 +42,17 @@ export function HeaderDesktop({
           isAdminPage ? (
             <div className=" flex gap-4">
               <Link to={getMirroredUrl(isAdminPage, location)} >
-                <LinkButton>Employee</LinkButton>
+                <LinkButton className="select-none">Employee</LinkButton>
               </Link>
             </div>
           ) : (
             <Link to={getMirroredUrl(isAdminPage, location)}>
-              <LinkButton>Admin</LinkButton>
+              <LinkButton className="select-none">Admin</LinkButton>
             </Link>
           )
         ) : null}
         <Link to={getCustomerUrl(isCustomerPage, location)}>
-            <LinkButton >
+            <LinkButton className="select-none">
             {isCustomerPage ? "Employee" : "Customer"}
           </LinkButton>
         </Link>

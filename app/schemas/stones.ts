@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { NullableId, StringBoolean, StringBoolV2 } from "./general";
+import { NullableId, StringBoolean } from "./general";
 import { STONE_TYPES } from "~/utils/constants";
 
 export const stoneSchema = z.object({
@@ -13,8 +13,8 @@ export const stoneSchema = z.object({
   bundle: z.string().optional(),
   cost_per_sqft: z.coerce.number().default(0),
   retail_price: z.coerce.number().default(0),
-  level: z.coerce.number().optional(),
-  colors: z.any().optional()
+  level: NullableId,
+  colors: z.any().optional(),
 });
 
 export const stoneFilterSchema = z.object({
@@ -24,8 +24,7 @@ export const stoneFilterSchema = z.object({
     return value === "true";
   }, z.boolean()).default(false),
   supplier: z.number().gte(0).default(0),
-  levels: z.coerce.number().array().default([0,7]),
-  colors: z.array(z.coerce.number()).default([])
+  colors: z.any().optional(),
+  level: z.array(z.number()).default([])
 });
-
 export type StoneFilter = z.infer<typeof stoneFilterSchema>;

@@ -9,7 +9,6 @@ import {
   useLocation,
 } from "react-router";
 import { FormField } from "../components/ui/form";
-import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
 import {
   Dialog,
@@ -25,7 +24,7 @@ import { toastData } from "~/utils/toastHelpers";
 import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
-import { useCustomOptionalForm } from "~/utils/useCustomForm";
+import { useCustomForm } from "~/utils/useCustomForm";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
@@ -144,7 +143,7 @@ export default function StonesAdd() {
   const isSubmitting = useNavigation().state !== "idle";
   const { suppliers, colors } = useLoaderData<typeof loader>();
 
-  const form = useCustomOptionalForm(stoneSchema, {
+  const form = useCustomForm(stoneSchema, {
     defaultValues: {
       is_display: true,
       colors: [],
@@ -244,23 +243,7 @@ export default function StonesAdd() {
            
          
           </div>
-          <FormField
-         
-              control={form.control}
-              name="level"
-              render={({ field }) => (
-                <SelectInput
-                 className="w-1/2"
-                  options={[1, 2, 3, 4, 5, 6, 7].map((item) => ({
-                    key: item.toString(),
-                    value: item.toString(),
-                  }))}
-                  name={"Level"}
-                  placeholder={"Level of the stone"}
-                  field={field}
-                />
-              )}
-            />
+       
           <div className="flex gap-2">
             <FormField
               control={form.control}
@@ -285,7 +268,6 @@ export default function StonesAdd() {
               )}
             />
           </div>
-
           <div className="flex gap-2">
           <FormField
               control={form.control}
@@ -312,6 +294,22 @@ export default function StonesAdd() {
      
           </div>
           <FormField
+              control={form.control}
+              name="level"
+              render={({ field }) => (
+                <SelectInput
+                 className="w-1/2"
+                  options={[1, 2, 3, 4, 5, 6, 7].map((item) => ({
+                    key: item.toString(),
+                    value: item.toString(),
+                  }))}
+                  name={"Level"}
+                  placeholder={"Level of the stone"}
+                  field={field}
+                />
+              )}
+            />
+          <FormField
             control={form.control}
             name="colors"
             render={({ field }) => {
@@ -333,7 +331,6 @@ export default function StonesAdd() {
                     value: item.name,
                   }))}
                   name={"Color"}
-                  className="w-1/2"
                   placeholder={"Color of the stone"}
                   field={field}
                   badges={colors
@@ -345,6 +342,7 @@ export default function StonesAdd() {
                       ...acc,
                       [item.name]: item.hex_code
                     }), {})}
+                  showCheckmarks={false}
                 />
               );
             }}

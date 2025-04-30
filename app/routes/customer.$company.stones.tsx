@@ -54,7 +54,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   filters.show_sold_out = false;
   const stones = await stoneQueryBuilder(filters, Number(params.company));
   
-  // Load colors data for filtering
   const colors = await selectMany<{
     id: number;
     name: string;

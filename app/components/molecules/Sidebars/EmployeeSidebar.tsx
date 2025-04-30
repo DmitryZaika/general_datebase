@@ -7,12 +7,7 @@ import {
   Settings,
   DollarSign,
 } from "lucide-react";
-import { useLocation, useNavigate, Outlet } from "react-router";
-import { FormLabel } from "~/components/ui/form";
-import { STONE_TYPES } from "~/utils/constants";
-import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
-import { stoneFilterSchema, StoneFilter } from "~/schemas/stones";
-import { CheckOption } from "~/components/molecules/CheckOption";
+import { useLocation } from "react-router";
 import { getBase } from "~/utils/urlHelpers";
 import { StonesFilters } from "./StonesFilters";
 import { SinksFilters } from "./SinksFilters";
@@ -27,7 +22,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
 } from "~/components/ui/sidebar";
 
 interface ISidebarItem {
@@ -51,7 +45,6 @@ const getItems = (
   colors?: { id: number; name: string; hex_code: string }[] | undefined,
   sinkSuppliers?: ISupplier[] | undefined
 ) => {
-  // For customer routes, we need to make sure the component is loaded properly
   const isCustomerRoute = base === "customer";
   
   const finalList: ISidebarItem[] = [
@@ -130,10 +123,8 @@ export function EmployeeSidebar({ suppliers, sinkSuppliers, colors }: IProps) {
   const location = useLocation();
   const base = getBase(location.pathname);
   
-  // Determine if we're in a customer route
   const isCustomerRoute = typeof base === 'string' && base.startsWith('customer/');
   
-  // Use "customer" as the base for customer routes in getItems
   const itemsBase = isCustomerRoute ? "customer" : base as "employee" | "admin" | "customer";
   
   const items = getItems(itemsBase, suppliers, colors, sinkSuppliers);
@@ -146,7 +137,6 @@ export function EmployeeSidebar({ suppliers, sinkSuppliers, colors }: IProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => {
-                // Check if this route is active - for customer routes, check if pathname contains "stones"
                 const isActive = isCustomerRoute && item.title === "Stones" 
                   ? location.pathname.includes("/stones") 
                   : location.pathname.startsWith(item.url);
