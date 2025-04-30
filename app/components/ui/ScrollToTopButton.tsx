@@ -5,26 +5,25 @@ export function ScrollToTopButton() {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    const mainElement = document.querySelector('main'); // Находим элемент main
+    const mainElement = document.querySelector('main');
     const handleScroll = () => {
       if (!mainElement) return;
-      // Используем scrollTop элемента main или pageYOffset окна
       const currentScroll = mainElement.scrollTop || window.pageYOffset;
-      if (currentScroll > 100) {
+      
+      const isAtBottom = mainElement.scrollHeight - mainElement.clientHeight <= currentScroll + 10;
+      
+      if (currentScroll > 300 && !isAtBottom) {
         setIsVisible(true);
       } else {
         setIsVisible(false);
       }
     };
 
-    // Проверяем видимость при монтировании
     handleScroll();
 
-    // Добавляем обработчик на элемент main или window
     const scrollTarget = mainElement || window;
     scrollTarget.addEventListener('scroll', handleScroll);
 
-    // Удаляем обработчик при размонтировании
     return () => scrollTarget.removeEventListener('scroll', handleScroll);
   }, []);
 

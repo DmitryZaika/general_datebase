@@ -63,6 +63,30 @@ export const Chat = () => {
   const [input, setInput] = useState<string>("");
   const [answer, setAnswer] = useState<string>("");
   const [isThinking, setIsThinking] = useState<boolean>(false);
+  const [isVisible, setIsVisible] = useState<boolean>(true);
+
+  useEffect(() => {
+    const mainElement = document.querySelector('main');
+    const handleScroll = () => {
+      if (!mainElement) return;
+      const currentScroll = mainElement.scrollTop || window.pageYOffset;
+      
+      const isAtBottom = mainElement.scrollHeight - mainElement.clientHeight <= currentScroll + 10;
+      
+      if (isAtBottom) {
+        setIsVisible(false);
+      } else {
+        setIsVisible(true);
+      }
+    };
+
+    handleScroll();
+
+    const scrollTarget = mainElement || window;
+    scrollTarget.addEventListener('scroll', handleScroll);
+
+    return () => scrollTarget.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const addMessage = (message: Message) =>
     setMessages((prevMessages) => [...prevMessages, message]);
@@ -107,22 +131,24 @@ export const Chat = () => {
 
   return (
     <Dialog modal={false}>
-      <DialogTrigger className="fixed rounded-full bottom-5 right-5 bg-blue-500 hover:bg-blue-600 duration-200 text-white size-14 flex items-center align-center justify-center cursor-pointer">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-          className="size-6"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z"
-          />
-        </svg>
-      </DialogTrigger>
+      {isVisible && (
+        <DialogTrigger className="fixed rounded-full bottom-5 right-5 bg-blue-500 hover:bg-blue-600 duration-200 text-white size-14 flex items-center align-center justify-center cursor-pointer">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            className="size-6"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z"
+            />
+          </svg>
+        </DialogTrigger>
+      )}
       <DialogContent
         hideClose
         className="h-full p-0 gap-0"
