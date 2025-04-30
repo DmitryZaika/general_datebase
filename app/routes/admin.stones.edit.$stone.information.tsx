@@ -28,6 +28,8 @@ import { csrf } from "~/utils/csrf.server";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { deleteFile } from "~/utils/s3.server";
 import { getSession } from "~/sessions";
+import { SelectManyBadge } from "~/components/molecules/SelectManyBadge";
+
 
 export async function action({ request, params }: ActionFunctionArgs) {
     await getAdminUser(request).catch((err) => {
@@ -45,16 +47,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return { errors };
     }
     const newFile = data.file && data.file !== "undefined";
+    
+    console.log("DEBUG data.file:", data.file);
+    console.log("DEBUG newFile:", newFile);
+    
     const stone = await selectId<{ url: string }>(
       db,
       "SELECT url FROM stones WHERE id = ?",
       stoneId
     );
+    
     try {
       if (newFile) {
         await db.execute(
           `UPDATE stones
-           SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
+           SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
            WHERE id = ?`,
           [
             data.name,
@@ -66,6 +73,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             data.width,
             data.on_sale,
             data.cost_per_sqft,
+            data.level || null,
             data.retail_price,
             stoneId,
           ]
@@ -73,7 +81,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       } else {
         await db.execute(
           `UPDATE stones
-           SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, retail_price = ?
+           SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
            WHERE id = ?`,
           [
             data.name,
@@ -84,26 +92,61 @@ export async function action({ request, params }: ActionFunctionArgs) {
             data.width,
             data.on_sale,
             data.cost_per_sqft,
+            data.level || null,
             data.retail_price,
             stoneId,
           ]
         );
       }
+      
+      let colorsArray: number[] = [];
+      const colorsField = data.colors;
+      
+      if (typeof colorsField === 'string') {
+        try {
+          if (colorsField.startsWith('[')) {
+            colorsArray = JSON.parse(colorsField).map(Number);
+          } else if (colorsField) {
+            colorsArray = [Number(colorsField)];
+          }
+        } catch (e) {
+        }
+      } else if (Array.isArray(colorsField)) {
+        colorsArray = colorsField.map(Number);
+      }
+      
+      colorsArray = colorsArray.filter(id => !isNaN(id) && id > 0);
+      
+      await db.execute(
+        `DELETE FROM stone_colors WHERE stone_id = ?`,
+        [stoneId]
+      );
+      
+      if (colorsArray.length > 0) {
+        for (const colorId of colorsArray) {
+          await db.execute(
+            `INSERT INTO stone_colors (stone_id, color_id) VALUES (?, ?)`,
+            [stoneId, colorId]
+          );
+        }
+      }
+      
+      if (stone?.url && newFile) {
+        await deleteFile(stone.url);
+      }
+  
+      const url = new URL(request.url);
+      const searchParams = url.searchParams.toString();
+      const searchString = searchParams ? `?${searchParams}` : '';
+  
+      const session = await getSession(request.headers.get("Cookie"));
+      session.flash("message", toastData("Success", "Stone Edited"));
+      return redirect(`../..${searchString}`, {
+        headers: { "Set-Cookie": await commitSession(session) },
+      });
     } catch (error) {
-      console.error("Error updating stone: ", error);
+      return { errors: { message: "Failed to update stone" } };
     }
-    if (stone?.url && newFile) {
-      await deleteFile(stone.url);
-    }
-    const url = new URL(request.url);
-    const searchParams = url.searchParams.toString();
-    const searchString = searchParams ? `?${searchParams}` : '';
-
-    const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Success", "Stone Edited"));
-    return redirect(`../..${searchString}`, {
-      headers: { "Set-Cookie": await commitSession(session) },
-    });
   }
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
@@ -123,9 +166,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
       on_sale: boolean;
       cost_per_sqft: number;
       retail_price: number;
+      level: number | null;
     }>(
       db,
-      "SELECT name, type, url, is_display, supplier_id, length, width, on_sale, cost_per_sqft, retail_price FROM stones WHERE id = ?",
+      "SELECT name, type, url, is_display, supplier_id, length, width, on_sale, cost_per_sqft, retail_price, level FROM stones WHERE id = ?",
       stoneId
     );
     if (!stone) {
@@ -137,16 +181,31 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     }>(db, "SELECT id, supplier_name FROM suppliers WHERE company_id = ?", [
       user.company_id,
     ]);
+    
+    const colors = await selectMany<{
+      id: number;
+      name: string;
+      hex_code: string;
+    }>(db, "SELECT id, name, hex_code FROM colors ORDER BY name ASC");
+    
+    const stoneColors = await selectMany<{
+      color_id: number;
+    }>(db, "SELECT color_id FROM stone_colors WHERE stone_id = ?", [stoneId]);
+    
+    const selectedColorIds = stoneColors.map(item => item.color_id.toString());
+    
     return {
       stone,
       suppliers,
+      colors,
+      selectedColorIds,
     };
   };
 
 
 export default function Information() {
     const navigation = useNavigation();
-    const { stone, suppliers } = useLoaderData<typeof loader>();
+    const { stone, suppliers, colors, selectedColorIds } = useLoaderData<typeof loader>();
     const isSubmitting = navigation.state !== "idle";
     const {
       name,
@@ -159,6 +218,7 @@ export default function Information() {
       on_sale,
       cost_per_sqft,
       retail_price,
+      level,
     } = stone;
     const defaultValues = {
       name,
@@ -171,6 +231,8 @@ export default function Information() {
       on_sale,
       cost_per_sqft,
       retail_price,
+      level,
+      colors: selectedColorIds,
     };
     const form = useCustomOptionalForm(stoneSchema, defaultValues);
     return (
@@ -241,6 +303,7 @@ export default function Information() {
           />
         </div>
         {url ? <img src={url} alt={name} className="w-48  mx-auto" /> : null}
+       
         <div className="flex gap-2">
           <FormField
             control={form.control}
@@ -280,8 +343,54 @@ export default function Information() {
               />
             )}
           />
-     
         </div>
+        <FormField
+          control={form.control}
+          name="level"
+          render={({ field }) => (
+            <SelectInput
+              className="w-1/2"
+              name="Level"
+              placeholder="Stone level"
+              field={field}
+              options={[1, 2, 3, 4, 5, 6, 7].map((item) => ({
+                key: item.toString(),
+                value: item.toString(),
+              }))}
+            />
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="colors"
+          render={({ field }) => {
+            if (!field.value) field.value = [];
+            if (!Array.isArray(field.value)) field.value = [String(field.value)];
+            
+            return (
+              <SelectManyBadge
+                options={colors?.map((item) => ({
+                  key: item.id.toString(),
+                  value: item.name,
+                })) || []}
+                name={"Colors"}
+                placeholder={"Select stone colors"}
+                field={field}
+                badges={(colors || [])
+                  .filter(item => 
+                    Array.isArray(field.value) && 
+                    field.value.includes(item.id.toString())
+                  )
+                  .reduce((acc, item) => ({
+                    ...acc,
+                    [item.name]: item.hex_code
+                  }), {})}
+              />
+            );
+          }}
+        />
+        
         <DialogFooter className="mt-4">
           <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
         </DialogFooter>

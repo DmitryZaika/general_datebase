@@ -9,7 +9,6 @@ import {
   useLocation,
 } from "react-router";
 import { FormField } from "../components/ui/form";
-import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
 import {
   Dialog,
@@ -25,14 +24,15 @@ import { toastData } from "~/utils/toastHelpers";
 import { FileInput } from "~/components/molecules/FileInput";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
-import { useCustomOptionalForm } from "~/utils/useCustomForm";
+import { useCustomForm } from "~/utils/useCustomForm";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
 import { selectMany } from "~/utils/queryHelpers";
 import { stoneSchema } from "~/schemas/stones";
+import { SelectManyBadge } from "~/components/molecules/SelectManyBadge";
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request }: ActionFunctionArgs) {
   try {
     await getAdminUser(request);
   } catch (error) {
@@ -48,54 +48,61 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors };
   }
-  let user = await getAdminUser(request);
-  try {
-    await db.execute(
-      `INSERT INTO main.stones
-       (name, type, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-      [
-        data.name,
-        data.type,
-        data.file,
-        user.company_id,
-        data.is_display,
-        data.on_sale,
-        data.supplier_id,
-        data.width,
-        data.length,
-        data.cost_per_sqft,
-        data.retail_price,
-      ],
-    );
-  } catch (error) {
-    console.error("Error connecting to the database: ", error);
-    const stoneId = parseInt(params.stone ?? "0", 10);
-    if (!stoneId) {
-      return new Response(
-        JSON.stringify({ error: "Invalid or missing stone ID" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
 
+  const user = await getAdminUser(request);
+  const [result]: any = await db.execute(
+    `INSERT INTO stones
+     (name, type, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price, level)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+    [
+      data.name,
+      data.type,
+      data.file,
+      user.company_id,
+      data.is_display,
+      data.on_sale,
+      data.supplier_id,
+      data.width || 0,
+      data.length || 0,
+      data.cost_per_sqft || 0,
+      data.retail_price || 0,
+      data.level ?? null,
+    ],
+  );
+
+  const stoneId = result.insertId;
+
+  let colorsArray: number[] = [];
+  
+  if (typeof data.colors === 'string') {
     try {
-      await db.execute(
-        `INSERT INTO main.slab_inventory (bundle, stone_id) VALUES (?, ?);`,
-        [data.bundle, stoneId],
-      );
-    } catch (error) {
-      console.error("Error connecting to the database: ", error);
-      const session = await getSession(request.headers.get("Cookie"));
-      session.flash(
-        "message",
-        toastData("Failure", "Database Error Occured", "destructive"),
-      );
-      return new Response(JSON.stringify({ error: "Database Error Occured" }), {
-        headers: { "Set-Cookie": await commitSession(session) },
-      });
+      if (data.colors.startsWith('[')) {
+        colorsArray = JSON.parse(data.colors).map(Number);
+      } else {
+        colorsArray = [Number(data.colors)];
+      }
+    } catch (e) {
+    }
+  }
+  else if (Array.isArray(data.colors)) {
+    colorsArray = data.colors.map(Number);
+  }
+  
+  colorsArray = colorsArray.filter(id => !isNaN(id) && id > 0);
+
+  if (colorsArray.length > 0) {
+    for (const colorId of colorsArray) {
+      if (isNaN(colorId) || colorId <= 0) {
+        continue;
+      }
+      
+      try {
+        await db.execute(
+          `INSERT INTO stone_colors (stone_id, color_id) VALUES (?, ?)`,
+          [stoneId, colorId]
+        );
+      } catch (err) {
+      }
     }
   }
   
@@ -119,7 +126,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }>(db, "SELECT id,  supplier_name FROM suppliers WHERE company_id = ?", [
       user.company_id,
     ]);
-    return { suppliers };
+    const colors = await selectMany<{
+      id: number;
+      name: string;
+      hex_code: string;
+    }>(db, "SELECT id, name, hex_code FROM colors ORDER BY name ASC");
+    return { suppliers, colors };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
@@ -129,11 +141,12 @@ export default function StonesAdd() {
   const navigate = useNavigate();
   const location = useLocation();
   const isSubmitting = useNavigation().state !== "idle";
-  const { suppliers } = useLoaderData<typeof loader>();
+  const { suppliers, colors } = useLoaderData<typeof loader>();
 
-  const form = useCustomOptionalForm(stoneSchema, {
+  const form = useCustomForm(stoneSchema, {
     defaultValues: {
       is_display: true,
+      colors: [],
     },
   });
 
@@ -211,6 +224,7 @@ export default function StonesAdd() {
                 )}
               />
             </div>
+          
             <FormField
               control={form.control}
               name="supplier_id"
@@ -226,8 +240,10 @@ export default function StonesAdd() {
                 />
               )}
             />
+           
+         
           </div>
-
+       
           <div className="flex gap-2">
             <FormField
               control={form.control}
@@ -252,7 +268,6 @@ export default function StonesAdd() {
               )}
             />
           </div>
-
           <div className="flex gap-2">
           <FormField
               control={form.control}
@@ -278,6 +293,60 @@ export default function StonesAdd() {
             />
      
           </div>
+          <FormField
+              control={form.control}
+              name="level"
+              render={({ field }) => (
+                <SelectInput
+                 className="w-1/2"
+                  options={[1, 2, 3, 4, 5, 6, 7].map((item) => ({
+                    key: item.toString(),
+                    value: item.toString(),
+                  }))}
+                  name={"Level"}
+                  placeholder={"Level of the stone"}
+                  field={field}
+                />
+              )}
+            />
+          <FormField
+            control={form.control}
+            name="colors"
+            render={({ field }) => {
+              if (!field.value) field.value = [];
+              if (!Array.isArray(field.value)) field.value = [String(field.value)];
+              
+              if (Array.isArray(field.value) && field.value.length > 0) {
+                const invalidIds = field.value.filter(id => 
+                  !colors.some(c => c.id.toString() === id)
+                );
+                if (invalidIds.length > 0) {
+                }
+              }
+              
+              return (
+                <SelectManyBadge
+                  options={colors.map((item) => ({
+                    key: item.id.toString(),
+                    value: item.name,
+                  }))}
+                  name={"Color"}
+                  placeholder={"Color of the stone"}
+                  field={field}
+                  badges={colors
+                    .filter(item => 
+                      Array.isArray(field.value) && 
+                      field.value.includes(item.id.toString())
+                    )
+                    .reduce((acc, item) => ({
+                      ...acc,
+                      [item.name]: item.hex_code
+                    }), {})}
+                  showCheckmarks={false}
+                />
+              );
+            }}
+          />
 
           <DialogFooter>
             <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>

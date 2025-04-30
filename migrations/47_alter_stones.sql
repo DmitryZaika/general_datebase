@@ -1,0 +1,1 @@
+ALTER TABLE stones ADD COLUMN level INT;
