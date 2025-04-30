@@ -156,7 +156,7 @@ export default function SupportsEdit() {
           />
           <img src={url} alt={name} className="w-48  mx-auto" />
           <DialogFooter>
-            <LoadingButton loading={isSubmitting}>Edit Support</LoadingButton>
+            <LoadingButton loading={isSubmitting}>Save Changes</LoadingButton>
           </DialogFooter>
         </MultiPartForm>
       </DialogContent>

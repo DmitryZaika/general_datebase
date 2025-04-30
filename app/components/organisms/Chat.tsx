@@ -65,28 +65,12 @@ export const Chat = () => {
   const [isThinking, setIsThinking] = useState<boolean>(false);
   const [isVisible, setIsVisible] = useState<boolean>(true);
 
-  useEffect(() => {
-    const mainElement = document.querySelector('main');
-    const handleScroll = () => {
-      if (!mainElement) return;
-      const currentScroll = mainElement.scrollTop || window.pageYOffset;
-      
-      const isAtBottom = mainElement.scrollHeight - mainElement.clientHeight <= currentScroll + 10;
-      
-      if (isAtBottom) {
-        setIsVisible(false);
-      } else {
-        setIsVisible(true);
-      }
-    };
 
-    handleScroll();
+ 
 
-    const scrollTarget = mainElement || window;
-    scrollTarget.addEventListener('scroll', handleScroll);
 
-    return () => scrollTarget.removeEventListener('scroll', handleScroll);
-  }, []);
+
+
 
   const addMessage = (message: Message) =>
     setMessages((prevMessages) => [...prevMessages, message]);

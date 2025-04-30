@@ -157,7 +157,7 @@ export default function DocumentsEdit() {
           />
           <p> {url}</p>
           <DialogFooter>
-            <LoadingButton loading={isSubmitting}>Edit Document</LoadingButton>
+            <LoadingButton loading={isSubmitting}>Save Changes</LoadingButton>
           </DialogFooter>
         </MultiPartForm>
       </DialogContent>

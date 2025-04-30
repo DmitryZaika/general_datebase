@@ -40,7 +40,6 @@ function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkPro
 function getMirroredUrl(path: string, search: string) {
   const segments = path.split('/').filter(Boolean);
   
-  // Специальная обработка перехода из customer/:company/stones в admin/stones
   if (segments.length >= 2 && segments[0] === "customer" && segments[2] === "stones") {
     return `/admin/stones${search}`;
   }
