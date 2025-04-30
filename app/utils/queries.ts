@@ -18,6 +18,7 @@ export interface Stone {
   on_sale: boolean;
   retail_price: number;
   cost_per_sqft: number;
+  level: number | null;
 }
 
 export const stoneQueryBuilder = async (
@@ -25,9 +26,6 @@ export const stoneQueryBuilder = async (
   companyId: number,
   show_hidden: boolean = false
 ): Promise<Stone[]> => {
-  if (filters.type.length === 0) {
-    return [];
-  }
   const params: (string | number)[] = [companyId];
   let query = `
   SELECT 
@@ -42,23 +40,43 @@ export const stoneQueryBuilder = async (
     stones.on_sale,
     stones.retail_price,
     stones.cost_per_sqft,
-    COUNT(CASE WHEN slab_inventory.id IS NOT NULL AND (slab_inventory.is_cut = 0 OR slab_inventory.is_cut IS NULL) THEN 1 ELSE NULL END) AS amount,
-    CAST(SUM(CASE WHEN slab_inventory.id IS NOT NULL AND slab_inventory.sale_id IS NULL AND (slab_inventory.is_cut = 0 OR slab_inventory.is_cut IS NULL) THEN 1 ELSE 0 END) AS UNSIGNED) AS available
+    stones.level,
+    COUNT(CASE WHEN slab_inventory.id IS NOT NULL AND (slab_inventory.cut_date IS NULL) THEN 1 ELSE NULL END) AS amount,
+    CAST(SUM(CASE WHEN slab_inventory.id IS NOT NULL AND slab_inventory.sale_id IS NULL AND slab_inventory.cut_date IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM stones
   LEFT JOIN slab_inventory ON slab_inventory.stone_id = stones.id
-  WHERE stones.company_id = ?
   `;
+  
+  if (filters.colors && filters.colors.length > 0) {
+    query += `LEFT JOIN stone_colors ON stone_colors.stone_id = stones.id `;
+  }
+  
+  query += `WHERE stones.company_id = ?`;
+  
   if (!show_hidden) {
     query += " AND stones.is_display = 1";
   }
-  if (filters.type.length < STONE_TYPES.length) {
+  
+  if (filters.type && filters.type.length > 0) {
     query += ` AND stones.type IN (${filters.type.map(() => "?").join(", ")})`;
     params.push(...filters.type);
   }
+  
   if (filters.supplier > 0) {
     query += " AND stones.supplier_id = ?";
     params.push(filters.supplier);
   }
+  
+  if (filters.colors && filters.colors.length > 0) {
+    query += ` AND stone_colors.color_id IN (${filters.colors.map(() => "?").join(", ")})`;
+    params.push(...filters.colors);
+  }
+  
+  if (filters.level && filters.level.length > 0) {
+    query += ` AND stones.level IN (${filters.level.map(() => "?").join(", ")})`;
+    params.push(...filters.level);
+  }
+  
   query += `
     GROUP BY
       stones.id,
@@ -69,7 +87,8 @@ export const stoneQueryBuilder = async (
       stones.length,
       stones.width,
       stones.created_date,
-      stones.on_sale
+      stones.on_sale,
+      stones.level
     `;
   if (!filters.show_sold_out) {
     query += `\nHAVING available > 0`;

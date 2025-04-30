@@ -130,6 +130,7 @@ export function SinksFilters({ base, suppliers }: IProps) {
             ) }
           </SidebarGroupLabel>
           
+          
           {suppliersExpanded && suppliers.map((supplier) => (
             <div
               key={supplier.id}
