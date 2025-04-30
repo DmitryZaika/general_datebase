@@ -7,9 +7,6 @@ import { getAdminUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
 import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
-import { Button } from "~/components/ui/button";
-import { Link } from "react-router";
-import { useState } from "react";
 
 interface Transaction {
   id: number;
@@ -22,7 +19,7 @@ interface Transaction {
   sf?: number;
   is_deleted: string;
   sink_type?: string;
-  is_cut?: number;
+  cut_date?: string | null;
 }
 
 
@@ -73,13 +70,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       s.sale_date,
       c.name as customer_name,
       u.name as seller_name,
-      GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', COALESCE(si.is_cut, 0)) SEPARATOR ',') as bundle_with_cut,
+      GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 1, 0)) SEPARATOR ',') as bundle_with_cut,
       GROUP_CONCAT(DISTINCT si.bundle SEPARATOR ', ') as bundle,
       GROUP_CONCAT(DISTINCT st.name SEPARATOR ', ') as stone_name,
       ROUND(SUM(si.square_feet), 2) as sf,
       s.status as is_deleted,
       '' as sink_type,
-      COALESCE(MAX(si.is_cut), 0) as is_cut
+      COALESCE(MAX(si.cut_date), '') as cut_date
     FROM 
       sales s
     JOIN 
@@ -234,10 +231,57 @@ const transactionColumns: ColumnDef<Transaction>[] = [
 export default function AdminTransactions() {
   const { transactions } = useLoaderData<typeof loader>();
 
+  const getPDF = async () => {
+    try {
+      // The fetch API will automatically handle the binary response
+      const response = await fetch("/api/pdf", { 
+        method: "POST",
+        headers: {
+          "Accept": "application/pdf"
+        }
+      });
+      
+      // Check if the response is OK
+      if (!response.ok) {
+        throw new Error(`Failed to download PDF: ${response.statusText}`);
+      }
+      
+      // Get the blob directly from the response
+      const blob = await response.blob();
+      
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from Content-Disposition or use default
+      const contentDisposition = response.headers.get('content-disposition');
+      const filename = contentDisposition
+        ? contentDisposition.split('filename=')[1]?.replace(/["']/g, '')
+        : 'transaction-report.pdf';
+      
+      link.download = filename;
+      
+      // Append to document, trigger click, and clean up
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      alert("Error downloading PDF. Please try again.");
+    }
+  };
+  
   return (
     <>
       <PageLayout title="Sales Transactions">
         <div className="mb-4 flex justify-between items-center">
+          {/* <button onClick={() => getPDF()} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            Download PDF
+          </button> */}
           <h1 className="text-2xl font-bold">Transactions</h1>
           {/* <Link to="/admin/reports">
             <Button variant="default" className="bg-blue-600 hover:bg-blue-700">

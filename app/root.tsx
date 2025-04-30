@@ -78,6 +78,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   let stoneSuppliers: ISupplier[] | undefined = undefined;
   let sinkSuppliers: ISupplier[] | undefined = undefined;
+  let colors: { id: number; name: string; hex_code: string }[] | undefined = undefined;
+  
+  // Always load colors for the filters
+  colors = await selectMany<{ id: number; name: string; hex_code: string }>(
+    db,
+    `SELECT c.id, c.name, c.hex_code 
+      FROM colors c
+      ORDER BY c.name ASC`,
+    []
+  );
   
   if (user) {
     stoneSuppliers = await selectMany<ISupplier>(
@@ -102,7 +112,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   return data(
-    { message, token, user, stoneSuppliers, sinkSuppliers },
+    { message, token, user, stoneSuppliers, sinkSuppliers, colors },
 
     {
       headers: [
@@ -116,7 +126,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 const queryClient = new QueryClient();
 
 export default function App() {
-  const { message, token, user, stoneSuppliers, sinkSuppliers } = useLoaderData<typeof loader>();
+  const { message, token, user, stoneSuppliers, sinkSuppliers, colors } = useLoaderData<typeof loader>();
   const { pathname } = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -150,9 +160,8 @@ export default function App() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          {showSidebar ? (
-            <SidebarProvider open={showSidebar}>
-              <EmployeeSidebar suppliers={stoneSuppliers} sinkSuppliers={sinkSuppliers} />
+            <SidebarProvider open={!!basePath}>
+              <EmployeeSidebar suppliers={stoneSuppliers} sinkSuppliers={sinkSuppliers} colors={colors} />
               <main className="h-screen overflow-y-auto bg-gray-100 w-full">
                 <AuthenticityTokenProvider token={token}>
                   <Header
@@ -174,27 +183,6 @@ export default function App() {
                 <ScrollToTopButton />
               </main>
             </SidebarProvider>
-          ) : (
-            <main className="h-screen overflow-y-auto bg-gray-100 w-full">
-              <AuthenticityTokenProvider token={token}>
-                <Header
-                  isEmployee={user?.is_employee ?? false}
-                  user={user}
-                  isAdmin={user?.is_admin ?? false}
-                  isSuperUser={user?.is_superuser ?? false}
-                />
-                <div className="relative">
-                  <Outlet />
-                </div>
-              </AuthenticityTokenProvider>
-              <Toaster />
-              <ScrollRestoration />
-              <Scripts />
-              <Posthog />
-              {user && <Chat />}
-              <ScrollToTopButton />
-            </main>
-          )}
         </QueryClientProvider>
       </body>
     </html>

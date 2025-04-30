@@ -20,7 +20,6 @@ import { DataTable } from "~/components/ui/data-table";
 import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
 
-// Тип представления данных
 type ViewMode = "grid" | "table";
 
 interface Stone {

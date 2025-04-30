@@ -95,16 +95,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           suppliers.supplier_name as supplier_name,
           slab_inventory.width,
           slab_inventory.length,
-          slab_inventory.is_cut,
+          slab_inventory.cut_date,
           slab_inventory.created_at,
-          (SELECT MIN(created_at) FROM slab_inventory WHERE parent_id = slab_inventory.id AND is_cut = 1) AS cut_date,
           sales.sale_date,
           customers.name as customer_name,
           users.name as seller_name,
           slab_inventory.square_feet,
           slab_inventory.notes,
           CASE 
-            WHEN slab_inventory.is_cut = 1 THEN 'Cut'
+            WHEN slab_inventory.cut_date IS NOT NULL THEN 'Cut'
             ELSE 'Sold'
           END as status
         FROM 
@@ -120,7 +119,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         LEFT JOIN 
           users ON sales.seller_id = users.id
         WHERE 
-          slab_inventory.is_cut = 1
+          slab_inventory.cut_date IS NOT NULL
           AND (slab_inventory.parent_id IS NULL OR slab_inventory.parent_id = 0)
       `;
 

@@ -61,7 +61,7 @@ interface SaleSlab {
   stone_id: number;
   bundle: string;
   stone_name: string;
-  is_cut: number;
+  cut_date: string | null;
   notes: string | null;
   square_feet: number | null;
 }
@@ -190,10 +190,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     db,
     `SELECT 
       slab_inventory.id, slab_inventory.stone_id, slab_inventory.bundle, stones.name as stone_name, 
-      slab_inventory.is_cut, slab_inventory.notes, slab_inventory.square_feet
+      slab_inventory.cut_date, slab_inventory.notes, slab_inventory.square_feet
      FROM slab_inventory
      JOIN stones ON slab_inventory.stone_id = stones.id
-     WHERE slab_inventory.sale_id = ? AND (slab_inventory.is_cut = 0 OR slab_inventory.is_cut IS NULL)
+     WHERE slab_inventory.sale_id = ? AND slab_inventory.cut_date IS NULL
      ORDER BY slab_inventory.id`,
     [saleId]
   );
@@ -223,9 +223,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     [user.company_id]
   );
   
-  const sellers = await selectMany<{id: number, name: string}>(
+  const sellers = await selectMany<{id: number, name: string, position_id: number}>(
     db,
-    `SELECT id, name FROM users WHERE company_id = ? ORDER BY name ASC`,
+    `SELECT id, name, position_id FROM users WHERE company_id = ? AND position_id IN (1, 2, 5) ORDER BY name ASC`,
     [user.company_id]
   );
   
@@ -837,7 +837,7 @@ export default function EditSale() {
             ) : (
               <div className="space-y-3">
                 {slabs.map((slab, index) => (
-                  <div key={slab.id} className={`p-3 rounded-md border shadow-sm ${slab.is_cut === 1 ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'}`}>
+                  <div key={slab.id} className={`p-3 rounded-md border shadow-sm ${slab.cut_date ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'}`}>
                     <input type="hidden" name="slabId" value={slab.id} />
                     
                     <div className="flex justify-between">
