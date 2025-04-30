@@ -1,26 +1,17 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { LoaderFunctionArgs, redirect } from "react-router";
-import { Form, useLoaderData, useSearchParams } from "react-router";
+import { Form, useLoaderData } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { getAdminUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
 import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
 import { useEffect, useState } from "react";
-import { FormProvider, FormField } from "~/components/ui/form";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { InputItem } from "~/components/molecules/InputItem";
-import { SelectInput } from "~/components/molecules/SelectItem";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
@@ -29,30 +20,29 @@ interface SlabReport {
   id: number;
   bundle: string;
   stone_name: string;
+  stone_id: number;
   supplier_name: string;
-  width: number;
-  length: number;
-  is_cut: number;
+  supplier_id: number;
   cut_date: string;
   sale_date: string;
-  customer_name: string;
   seller_name: string;
-  square_feet: number;
-  notes: string;
-  status: string;
 }
 
 function formatDate(dateString: string | null) {
   if (!dateString) return "-";
   
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return "-";
-  
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "-";
+    
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
+  } catch (e) {
+    return "-";
+  }
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -66,10 +56,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const reportType = url.searchParams.get("type") || "cut_slabs";
   const fromDate = url.searchParams.get("fromDate") || "";
   const toDate = url.searchParams.get("toDate") || "";
-  const supplierId = url.searchParams.get("supplier") || "";
-  const stoneId = url.searchParams.get("stone") || "";
-  const supplierFilter = supplierId === "all" ? "" : supplierId;
-  const stoneFilter = stoneId === "all" ? "" : stoneId;
+  const supplierId = url.searchParams.get("supplier") || "all";
+  const stoneId = url.searchParams.get("stone") || "all";
 
   const suppliers = await selectMany<{ id: number; name: string }>(
     db,
@@ -90,66 +78,57 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       query = `
         SELECT 
           slab_inventory.id,
-          bundle,
+          slab_inventory.bundle,
           stones.name as stone_name,
+          stones.id as stone_id,
           suppliers.supplier_name as supplier_name,
-          slab_inventory.width,
-          slab_inventory.length,
+          suppliers.id as supplier_id,
           slab_inventory.cut_date,
-          slab_inventory.created_at,
           sales.sale_date,
-          customers.name as customer_name,
-          users.name as seller_name,
-          slab_inventory.square_feet,
-          slab_inventory.notes,
-          CASE 
-            WHEN slab_inventory.cut_date IS NOT NULL THEN 'Cut'
-            ELSE 'Sold'
-          END as status
+          users.name as seller_name
         FROM 
           slab_inventory
-        JOIN 
+        LEFT JOIN 
           stones ON slab_inventory.stone_id = stones.id
-        JOIN 
+        LEFT JOIN 
           suppliers ON stones.supplier_id = suppliers.id
         LEFT JOIN 
           sales ON slab_inventory.sale_id = sales.id
         LEFT JOIN 
-          customers ON sales.customer_id = customers.id
-        LEFT JOIN 
           users ON sales.seller_id = users.id
         WHERE 
           slab_inventory.cut_date IS NOT NULL
-          AND (slab_inventory.parent_id IS NULL OR slab_inventory.parent_id = 0)
+          AND slab_inventory.parent_id IS NULL
       `;
 
       if (fromDate) {
-        query += ` AND DATE(slab_inventory.created_at) >= ?`;
+        query += ` AND DATE(slab_inventory.cut_date) >= ?`;
         queryParams.push(fromDate);
       }
       if (toDate) {
-        query += ` AND DATE(slab_inventory.created_at) <= ?`;
+        query += ` AND DATE(slab_inventory.cut_date) <= ?`;
         queryParams.push(toDate);
       }
       
-      if (supplierFilter) {
-        query += ` AND suppliers.id = ?`;
-        queryParams.push(supplierFilter);
+      if (supplierId && supplierId !== "all") {
+        const supplierIdNumber = parseInt(supplierId, 10);
+        if (!isNaN(supplierIdNumber)) {
+          query += ` AND suppliers.id = ?`;
+          queryParams.push(supplierIdNumber);
+        }
       }
       
-      if (stoneFilter) {
-        query += ` AND stones.id = ?`;
-        queryParams.push(stoneFilter);
+      if (stoneId && stoneId !== "all") {
+        const stoneIdNumber = parseInt(stoneId, 10);
+        if (!isNaN(stoneIdNumber)) {
+          query += ` AND stones.id = ?`;
+          queryParams.push(stoneIdNumber);
+        }
       }
 
-      query += ` ORDER BY slab_inventory.created_at DESC`;
+      query += ` ORDER BY slab_inventory.cut_date DESC`;
       break;
-
-   
-    }
-  
-
-  
+  }
 
   slabs = await selectMany<SlabReport>(db, query, queryParams);
 
@@ -166,6 +145,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 const slabReportColumns: ColumnDef<SlabReport>[] = [
+    {
+    accessorKey: "cut_date",
+    header: ({ column }) => <SortableHeader column={column} title="Cut Date" />,
+    cell: ({ row }) => {
+      const cutDate = row.original.cut_date;
+      return cutDate ? formatDate(cutDate) : "-";
+    },
+    sortingFn: "datetime",
+  },
+  
+    {
+    accessorKey: "sale_date",
+    header: ({ column }) => <SortableHeader column={column} title="Sale Date" />,
+    cell: ({ row }) => formatDate(row.original.sale_date),
+    sortingFn: "datetime",
+  },
+   {
+    accessorKey: "supplier_name",
+    header: ({ column }) => <SortableHeader column={column} title="Supplier" />,
+    cell: ({ row }) => row.original.supplier_name || "-", 
+  },
   {
     accessorKey: "bundle",
     header: ({ column }) => <SortableHeader column={column} title="Bundle" />,
@@ -176,136 +176,60 @@ const slabReportColumns: ColumnDef<SlabReport>[] = [
     header: ({ column }) => <SortableHeader column={column} title="Stone" />,
     cell: ({ row }) => row.original.stone_name || "-",
   },
-  {
-    accessorKey: "supplier_name",
-    header: ({ column }) => <SortableHeader column={column} title="Supplier" />,
-    cell: ({ row }) => row.original.supplier_name || "-", 
-  },
-  {
-    accessorKey: "dimensions",
-    header: ({ column }) => <SortableHeader column={column} title="Dimensions" />,
-    cell: ({ row }) => {
-      const length = row.original.length;
-      const width = row.original.width;
-      return (length && width) ? `${length}x${width}` : "-";
-    },
-  },
-  {
-    accessorKey: "square_feet",
-    header: ({ column }) => <SortableHeader column={column} title="Sq. Feet" />,
-    cell: ({ row }) => row.original.square_feet || "-",
-  },
-  {
-    accessorKey: "cut_date",
-    header: ({ column }) => <SortableHeader column={column} title="Cut Date" />,
-    cell: ({ row }) => {
-      const cutDate = row.original.cut_date;
-      return cutDate ? formatDate(cutDate) : "-";
-    },
-    sortingFn: "datetime",
-  },
-  {
-    accessorKey: "sale_date",
-    header: ({ column }) => <SortableHeader column={column} title="Sale Date" />,
-    cell: ({ row }) => formatDate(row.original.sale_date),
-    sortingFn: "datetime",
-  },
-  {
-    accessorKey: "customer_name",
-    header: ({ column }) => <SortableHeader column={column} title="Customer" />,
-    cell: ({ row }) => row.original.customer_name || "-",
-  },
+ 
+
+
   {
     accessorKey: "seller_name",
     header: ({ column }) => <SortableHeader column={column} title="Sold By" />,
     cell: ({ row }) => row.original.seller_name || "-",
   },
-  {
-    accessorKey: "notes",
-    header: ({ column }) => <SortableHeader column={column} title="Notes/Count" />,
-    cell: ({ row }) => {
-      if (row.original.status === 'Seller') {
-        return `${row.original.notes} sales`;
-      }
-      return row.original.notes || "-";
-    },
-  },
-  {
-    accessorKey: "status",
-    header: ({ column }) => <SortableHeader column={column} title="Status" />,
-    cell: ({ row }) => {
-      const status = row.original.status || "";
-      
-      let colorClass = "text-gray-500";
-      if (status.includes("Cut")) {
-        colorClass = "text-blue-500";
-      } else if (status.includes("Sold") || status === "Seller") {
-        colorClass = "text-green-500";
-      }
-      
-      return <span className={`${colorClass} font-medium`}>{status}</span>;
-    },
-  },
 ];
-
-const reportFormSchema = z.object({
-  type: z.string(),
-  supplier: z.string().optional(),
-  stone: z.string().optional(),
-  fromDate: z.string().optional(),
-  toDate: z.string().optional(),
-});
-
-type ReportFormValues = z.infer<typeof reportFormSchema>;
 
 export default function ReportsPage() {
   const { slabs, suppliers, stones, reportType, fromDate, toDate, supplierId, stoneId } = useLoaderData<typeof loader>();
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedSupplierId, setSelectedSupplierId] = useState(supplierId || "all");
+  const [selectedStoneId, setSelectedStoneId] = useState(stoneId || "all");
   
-  const form = useForm<ReportFormValues>({
-    resolver: zodResolver(reportFormSchema),
-    defaultValues: {
-      type: reportType || "cut_slabs",
-      supplier: supplierId || "all",
-      stone: stoneId || "all",
-      fromDate,
-      toDate,
-    },
-  });
+  const getFilteredStones = () => {
+    if (selectedSupplierId === "all") return stones;
+    
+    const stonesFromSelectedSupplier = slabs
+      .filter(slab => slab.supplier_id && slab.supplier_id.toString() === selectedSupplierId)
+      .map(slab => ({ id: slab.stone_id, name: slab.stone_name }));
+    
+    const uniqueStones = Array.from(
+      new Map(stonesFromSelectedSupplier.map(stone => [stone.id, stone])).values()
+    );
+    
+    return uniqueStones.length > 0 ? uniqueStones : stones;
+  };
   
-  useEffect(() => {
-    form.reset({
-      type: reportType || "cut_slabs",
-      supplier: supplierId || "all",
-      stone: stoneId || "all",
-      fromDate,
-      toDate,
-    });
-  }, [reportType, supplierId, stoneId, fromDate, toDate, form]);
-
-  const watchReportType = form.watch("type");
-
+  const filteredStones = getFilteredStones();
+  
+  const handleSupplierChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newSupplierId = e.target.value;
+    setSelectedSupplierId(newSupplierId);
+    setSelectedStoneId("all");
+  };
+  
+  const handleStoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedStoneId(e.target.value);
+  };
+  
   const exportToCSV = () => {
     setIsExporting(true);
     
     try {
-      const headers = [
-        "Bundle", "Stone", "Supplier", "Dimensions", "Square Feet", 
-        "Cut Date", "Sale Date", "Customer", "Sold By", "Notes", "Status"
-      ];
-      
+      const headers = ["Cut Date", "Bundle", "Stone", "Supplier", "Sale Date", "Sold By"];
       const dataRows = slabs.map(slab => [
+        slab.cut_date ? formatDate(slab.cut_date) : "",
         slab.bundle || "",
         slab.stone_name || "",
         slab.supplier_name || "",
-        (slab.length && slab.width) ? `${slab.length}x${slab.width}` : "",
-        slab.square_feet || "",
-        slab.cut_date ? formatDate(slab.cut_date) : "",
         slab.sale_date ? formatDate(slab.sale_date) : "",
-        slab.customer_name || "",
-        slab.seller_name || "",
-        slab.status === 'Seller' ? `${slab.notes} sales` : (slab.notes || ""),
-        slab.status || ""
+        slab.seller_name || ""
       ]);
       
       const csvContent = [
@@ -322,42 +246,13 @@ export default function ReportsPage() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (error) {
-      console.error("Export failed:", error);
     } finally {
       setIsExporting(false);
     }
   };
-
-  const getReportTitle = () => {
-    switch (reportType) {
-      case "cut_slabs": return "Cut Slabs Report";
-      default: return "Report";
-    }
-  };
-
-  const reportTypeOptions = [
-    { key: "cut_slabs", value: "Cut Slabs" },
-  ];
-
-  const supplierOptions = [
-    { key: "all", value: "All Suppliers" },
-    ...suppliers.map(supplier => ({
-      key: supplier.id.toString(),
-      value: supplier.name
-    }))
-  ];
-
-  const stoneOptions = [
-    { key: "all", value: "All Stones" },
-    ...stones.map(stone => ({
-      key: stone.id.toString(),
-      value: stone.name
-    }))
-  ];
-
+  
   return (
-    <PageLayout title={getReportTitle()}>
+    <PageLayout title="Reports">
       <div className="mb-6 w-[600px] mx-auto">
         <Card>
           <CardHeader>
@@ -365,114 +260,121 @@ export default function ReportsPage() {
             <CardDescription>Configure your report parameters</CardDescription>
           </CardHeader>
           <CardContent>
-            <FormProvider {...form}>
-              <Form method="get" className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <SelectInput
-                        name="Report Type"
-                        field={field}
-                        options={reportTypeOptions}
-                      />
-                    )}
-                  />
-                  
-                  {watchReportType !== "sales_by_seller" && (
-                    <FormField
-                      control={form.control}
-                      name="supplier"
-                      render={({ field }) => (
-                        <SelectInput
-                          name="Supplier"
-                          field={field}
-                          options={supplierOptions}
-                        />
-                      )}
-                    />
-                  )}
-                  
-                  {watchReportType !== "sales_by_seller" && (
-                    <FormField
-                      control={form.control}
-                      name="stone"
-                      render={({ field }) => (
-                        <SelectInput
-                          name="Stone"
-                          field={field}
-                          options={stoneOptions}
-                        />
-                      )}
-                    />
-                  )}
-                  
-                  {watchReportType !== "inventory" && (
-                    <>
-                      <FormField
-                        control={form.control}
-                        name="fromDate"
-                        render={({ field }) => (
-                          <InputItem
-                            name="From Date"
-                            type="date"
-                            field={field}
-                          />
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="toDate"
-                        render={({ field }) => (
-                          <InputItem
-                            name="To Date"
-                            type="date"
-                            field={field}
-                          />
-                        )}
-                      />
-                    </>
-                  )}
+            <form action="" method="get" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Report Type</label>
+                  <select 
+                    name="type" 
+                    className="w-full border border-gray-300 rounded-md p-2"
+                    defaultValue={reportType || "cut_slabs"}
+                  >
+                    <option value="cut_slabs">Cut Slabs</option>
+                  </select>
                 </div>
                 
-                <CardFooter className="px-0 pb-0 pt-4">
-                  <div className="flex justify-between w-full">
-                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                      Generate Report
-                    </Button>
-                    
-                    <Button 
-                      type="button" 
-                      onClick={exportToCSV}
-                      disabled={isExporting || slabs.length === 0}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      {isExporting ? "Exporting..." : "Export to CSV"}
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Form>
-            </FormProvider>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Supplier</label>
+                  <select 
+                    name="supplier" 
+                    className="w-full border border-gray-300 rounded-md p-2"
+                    value={selectedSupplierId}
+                    onChange={handleSupplierChange}
+                  >
+                    <option value="all">All Suppliers</option>
+                    {suppliers.map(supplier => (
+                      <option 
+                        key={supplier.id} 
+                        value={supplier.id.toString()}
+                      >
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Stone</label>
+                  <select 
+                    name="stone" 
+                    className="w-full border border-gray-300 rounded-md p-2"
+                    value={selectedStoneId}
+                    onChange={handleStoneChange}
+                  >
+                    <option value="all">All Stones</option>
+                    {filteredStones.map(stone => (
+                      <option 
+                        key={stone.id} 
+                        value={stone.id.toString()}
+                      >
+                        {stone.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">From Date</label>
+                  <input 
+                    type="date" 
+                    name="fromDate" 
+                    className="w-full border border-gray-300 rounded-md p-2"
+                    defaultValue={fromDate}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">To Date</label>
+                  <input 
+                    type="date" 
+                    name="toDate" 
+                    className="w-full border border-gray-300 rounded-md p-2"
+                    defaultValue={toDate}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-between w-full pt-4">
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                >
+                  Generate Report
+                </button>
+                
+                <button 
+                  type="button" 
+                  onClick={exportToCSV}
+                  disabled={isExporting || slabs.length === 0}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md disabled:opacity-50"
+                >
+                  {isExporting ? "Exporting..." : "Export to CSV"}
+                </button>
+              </div>
+            </form>
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>{getReportTitle()}</CardTitle>
+          <CardTitle>{reportType === "cut_slabs" ? "Cut Slabs Report" : "Report"}</CardTitle>
           <CardDescription>
             Total items: {slabs.length}
             {fromDate && ` • From: ${fromDate}`}
             {toDate && ` • To: ${toDate}`}
+            {supplierId !== "all" && ` • Supplier: ${suppliers.find(s => s.id.toString() === supplierId)?.name || supplierId}`}
+            {stoneId !== "all" && ` • Stone: ${stones.find(s => s.id.toString() === stoneId)?.name || stoneId}`}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <DataTable 
-            columns={slabReportColumns} 
-            data={slabs} 
-          />
+          {slabs.length > 0 ? (
+            <DataTable columns={slabReportColumns} data={slabs} />
+          ) : (
+            <div className="py-10 text-center">
+              <p className="text-lg text-gray-500">No data found for the selected filters.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </PageLayout>
