@@ -82,7 +82,7 @@ function ChildrenImagesDialog({
     : image?.cost_per_sqft 
       ? `By slab $${image.cost_per_sqft} sqft` 
       : "—";
-
+      console.log(displayedType);
   return (
     <>
       <div className="w-full relative select-none">
@@ -217,7 +217,7 @@ export function SuperCarousel({
                   isOpen={currentId === image.id}
                   setImage={(value) => setCurrentId?.(value)}
                   image={image}
-                  showInfo={(userRole === "customer" || userRole === "employee") && type === "stones"}
+                  showInfo={true}
                   userRole={userRole}
                 />
               </CarouselItem>

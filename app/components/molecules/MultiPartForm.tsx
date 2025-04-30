@@ -7,19 +7,12 @@ function createFromData(data: object) {
   const formData = new FormData();
   
   for (const [key, value] of Object.entries(data)) {
-     formData.append(key, value);
     if (Array.isArray(value)) {
       formData.append(key, JSON.stringify(value));
-    } else if (value instanceof File) {
+    } else {
       formData.append(key, value);
-    } else if (value !== null && value !== undefined) {
-      formData.append(key, String(value));
     }
   }
-
- 
-  
-  
   return formData;
 }
 
