@@ -111,7 +111,6 @@ function StoneTable({ stones }: { stones: Stone[] }) {
       accessorFn: (row) => {
         const length = row.length || 0;
         const width = row.width || 0;
-        // Сортировка по площади (length * width)
         return length * width;
       },
       id: "size",
@@ -241,7 +240,6 @@ export default function AdminStones() {
       </div>
 
       <div>
-        {/* Условный рендеринг в зависимости от выбранного режима */}
         {viewMode === "grid" ? (
           <ModuleList>
             {sortedStones.map((stone) => {
