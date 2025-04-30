@@ -279,7 +279,7 @@ export default function SlabSell() {
                   variant="blue"
                   onClick={() => setShowExistingSales(true)}
                 >
-                  Add to Sale
+                  Add to Existing  Sale
                 </Button>
               </div>
               
@@ -329,7 +329,7 @@ export default function SlabSell() {
             </div>
           
             <DialogFooter>
-              <LoadingButton loading={isSubmitting}>Complete Sale</LoadingButton>
+              <LoadingButton loading={isSubmitting}>Create Sale</LoadingButton>
             </DialogFooter>
           </Form>
         </FormProvider>

@@ -12,7 +12,7 @@ import { getEmployeeUser } from "~/utils/session.server";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { commitSession, getSession } from "~/sessions";
 import { db } from "~/db.server";
-import { selectMany } from "~/utils/queryHelpers";
+import { selectId, selectMany } from "~/utils/queryHelpers";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { Button } from "~/components/ui/button";
 import { useRef, useEffect, useState } from "react";
@@ -32,13 +32,24 @@ interface SlabDetails {
   stone_id: number;
   bundle: string;
   stone_name: string;
-  is_cut: number;
+  cut_date: string | null;
   notes: string | null;
   square_feet: number | null;
   length: number | null;
   width: number | null;
   sale_id: number | null;
 }
+
+interface SlabDetailsWithUrl {
+  id: number;
+  stone_id: number;
+  bundle: string;
+  sale_id: number | null;
+  notes: string | null;
+  url: string | null;
+  cut_date: string | null;
+}
+
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
@@ -66,7 +77,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     db,
     `SELECT 
       slab_inventory.id, slab_inventory.stone_id, slab_inventory.bundle, 
-      stones.name as stone_name, slab_inventory.is_cut, 
+      stones.name as stone_name, slab_inventory.cut_date, 
       slab_inventory.notes, slab_inventory.square_feet,
       slab_inventory.length, slab_inventory.width, slab_inventory.sale_id
      FROM slab_inventory
@@ -137,21 +148,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   
   try {    
-    const [slabResult] = await db.execute<RowDataPacket[]>(
-      `SELECT id, stone_id, bundle, sale_id, notes, url, is_cut FROM slab_inventory WHERE id = ?`,
-      [slabIdNum]
+    const slabResult = await selectId<SlabDetailsWithUrl>(
+      db,
+      `SELECT id, stone_id, bundle, sale_id, notes, url, cut_date FROM slab_inventory WHERE id = ?`,
+      slabIdNum
     );
     
-    if (!slabResult || slabResult.length === 0) {
+    if (!slabResult) {
       throw new Error("Slab not found");
     }
     
-    const originalSlab = slabResult[0];
+    const originalSlab = slabResult;
     const actualStoneId = originalSlab.stone_id;
     
-    if (originalSlab.is_cut !== 1) {
+    if (originalSlab.cut_date === null) {
       await db.execute(
-        `UPDATE slab_inventory SET is_cut = 1 WHERE id = ?`,
+        `UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`,
         [slabIdNum]
       );
     }
@@ -187,7 +199,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     
     const [remainingSlabsResult] = await db.execute<RowDataPacket[]>(
       `SELECT COUNT(*) as count FROM slab_inventory 
-       WHERE sale_id = ? AND (is_cut = 0 OR is_cut IS NULL)`,
+       WHERE sale_id = ? AND cut_date IS NULL`,
       [saleIdNum]
     );
     
@@ -287,7 +299,7 @@ export default function CutSlab() {
     setShowConfirmDialog(false);
   };
   
-  const isAlreadyCut = slab?.is_cut === 1;
+  const isAlreadyCut = slab?.cut_date !== null;
   
   return (
     <>

@@ -109,7 +109,7 @@ function EditForm({ refresh, todo }: EditFormProps) {
             />
           ) : (
             <p
-              className={clsx("break-words max-w-[233px]", {
+              className={clsx("break-words max-w-[260px]", {
                 "line-through": todo.is_done,
               })}
             >
@@ -208,16 +208,19 @@ function SortableTodoItem({ todo, refresh }: SortableTodoItemProps) {
   };
 
   return (
+    <>
+    
     <div
       ref={setNodeRef}
       style={style}
       className={clsx(
-        "flex items-center px-3 py-2 border-b border-gray-200 hover:bg-gray-100 transition-colors",
+        "flex items-center py-2 border-b border-gray-200 hover:bg-gray-100 transition-colors rounded-lg",
         isDragging && "opacity-50"
       )}
     >
+    
       <button
-        className="touch-none p-1 opacity-40 hover:opacity-100"
+        className="touch-none p-1 opacity-40 hover:opacity-100 cursor-pointer"
         {...attributes}
         {...listeners}
       >
@@ -226,7 +229,12 @@ function SortableTodoItem({ todo, refresh }: SortableTodoItemProps) {
       <FinishForm todo={todo} refresh={refresh} />
       <EditForm todo={todo} refresh={refresh} />
       <DeleteForm todo={todo} refresh={refresh} />
+      <p className="text-sm text-gray-500">
+      {new Date(todo.created_date).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
+    </p>
     </div>
+   
+    </>
   );
 }
 

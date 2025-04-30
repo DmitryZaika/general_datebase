@@ -137,14 +137,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     
     const [slabInSaleCheck] = await db.execute<RowDataPacket[]>(
-      `SELECT id, is_cut FROM slab_inventory WHERE sale_id = ? AND id = ?`,
+      `SELECT id, cut_date FROM slab_inventory WHERE sale_id = ? AND id = ?`,
       [saleId, slab]
     );
 
     if (slabInSaleCheck && slabInSaleCheck.length > 0) {
-      if (slabInSaleCheck[0].is_cut === 1) {
+      if (slabInSaleCheck[0].cut_date) {
         await db.execute(
-          `UPDATE slab_inventory SET is_cut = 0, notes = ?, square_feet = ? WHERE id = ?`,
+          `UPDATE slab_inventory SET cut_date = NULL, notes = ?, square_feet = ? WHERE id = ?`,
           [data.notes || null, data.square_feet || null, slabInSaleCheck[0].id]
         );
       } else {

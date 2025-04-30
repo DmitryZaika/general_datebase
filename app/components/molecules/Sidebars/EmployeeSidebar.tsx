@@ -7,12 +7,7 @@ import {
   Settings,
   DollarSign,
 } from "lucide-react";
-import { useLocation, useNavigate, Outlet } from "react-router";
-import { FormLabel } from "~/components/ui/form";
-import { STONE_TYPES } from "~/utils/constants";
-import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
-import { stoneFilterSchema, StoneFilter } from "~/schemas/stones";
-import { CheckOption } from "~/components/molecules/CheckOption";
+import { useLocation } from "react-router";
 import { getBase } from "~/utils/urlHelpers";
 import { StonesFilters } from "./StonesFilters";
 import { SinksFilters } from "./SinksFilters";
@@ -27,7 +22,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
 } from "~/components/ui/sidebar";
 
 interface ISidebarItem {
@@ -39,13 +33,26 @@ interface ISidebarItem {
   component?: ({}) => React.ReactNode;
 }
 
-const getItems = (base: string, suppliers: ISupplier[] | undefined, sinkSuppliers?: ISupplier[] | undefined) => {
+interface IProps {
+  suppliers: ISupplier[] | undefined;
+  sinkSuppliers?: ISupplier[] | undefined;
+  colors?: { id: number; name: string; hex_code: string }[] | undefined;
+}
+
+const getItems = (
+  base: string, 
+  suppliers: ISupplier[] | undefined, 
+  colors?: { id: number; name: string; hex_code: string }[] | undefined,
+  sinkSuppliers?: ISupplier[] | undefined
+) => {
+  const isCustomerRoute = base === "customer";
+  
   const finalList: ISidebarItem[] = [
     {
       title: "Stones",
-      url: `/${base}/stones`,
+      url: isCustomerRoute ? `/customer/1/stones` : `/${base}/stones`,
       icon: Home,
-      component: () => <StonesFilters suppliers={suppliers} base={base}/>,
+      component: () => <StonesFilters suppliers={suppliers} base={base} colors={colors}/>,
     },
   ];
   if (["admin", "employee"].includes(base)) {
@@ -112,15 +119,16 @@ const getItems = (base: string, suppliers: ISupplier[] | undefined, sinkSupplier
   return finalList;
 };
 
-interface IProps {
-  suppliers: ISupplier[] | undefined;
-  sinkSuppliers?: ISupplier[] | undefined;
-}
-
-export function EmployeeSidebar({ suppliers, sinkSuppliers }: IProps) {
+export function EmployeeSidebar({ suppliers, sinkSuppliers, colors }: IProps) {
   const location = useLocation();
   const base = getBase(location.pathname);
-  const items = getItems(base as "employee" | "admin" | "customer", suppliers, sinkSuppliers);
+  
+  const isCustomerRoute = typeof base === 'string' && base.startsWith('customer/');
+  
+  const itemsBase = isCustomerRoute ? "customer" : base as "employee" | "admin" | "customer";
+  
+  const items = getItems(itemsBase, suppliers, colors, sinkSuppliers);
+  
   return (
     <Sidebar>
       <SidebarContent>
@@ -129,7 +137,10 @@ export function EmployeeSidebar({ suppliers, sinkSuppliers }: IProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => {
-                const isActive = location.pathname.startsWith(item.url);
+                const isActive = isCustomerRoute && item.title === "Stones" 
+                  ? location.pathname.includes("/stones") 
+                  : location.pathname.startsWith(item.url);
+                
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>

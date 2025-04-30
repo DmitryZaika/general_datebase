@@ -7,7 +7,7 @@ import { s3UploadHandler } from "~/utils/s3.server";
 import { csrf } from "~/utils/csrf.server";
 
 const fileSchema = z.object({
-  file: z.string(),
+  file: z.string()
 });
 interface ValidatedData<T> {
   data: z.infer<T & typeof fileSchema> | undefined;

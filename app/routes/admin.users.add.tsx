@@ -26,6 +26,7 @@ import { SelectInput } from "~/components/molecules/SelectItem";
 import { selectMany } from "~/utils/queryHelpers";
 import bcrypt from "bcryptjs";
 import { SwitchItem } from "~/components/molecules/SwitchItem";
+import { replaceUnderscoresWithSpaces } from "~/utils/words";
 
 interface Company {
   id: number;
@@ -38,6 +39,7 @@ const userschema = z.object({
   email: z.union([z.string().email().optional(), z.literal("")]),
   password: z.coerce.string().min(4),
   company_id: z.coerce.number(),
+  position_id: z.coerce.number().optional(),
   is_employee: z.boolean(),
   is_admin: z.boolean(),
 });
@@ -67,8 +69,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const password = await bcrypt.hash(data.password, 10);
   try {
     await db.execute(
-      `INSERT INTO main.users (name, phone_number, email, password, company_id, is_employee, is_admin)
-       VALUES (?, ?, ?, ?, ?, 1, ?)`,
+      `INSERT INTO main.users (name, phone_number, email, password, company_id, is_employee, is_admin, position_id)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
       [
         data.name,
         data.phone_number,
@@ -76,6 +78,7 @@ export async function action({ request }: ActionFunctionArgs) {
         password,
         data.company_id,
         data.is_admin,
+        data.position_id,
       ],
     );
   } catch (error) {
@@ -98,15 +101,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, name from company",
   );
-  return { companies };
+  const positions = await selectMany<{ id: number; name: string }>(
+    db,
+    "select id, name from positions",
+  );
+  return { companies, positions };
 };
 
 export default function UsersAdd() {
   const navigate = useNavigate();
-  const { companies } = useLoaderData<typeof loader>();
+  const { companies, positions } = useLoaderData<typeof loader>();
   const cleanCompanies = companies.map((company) => ({
     key: company.id,
     value: company.name,
+  }));
+  const cleanPositions = positions.map((position) => ({
+    key: position.id,
+    value: position.name,
   }));
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
@@ -117,6 +128,7 @@ export default function UsersAdd() {
       email: "",
       password: "",
       company_id: 0,
+      position_id: 0,
       is_employee: false,
       is_admin: false,
     },
@@ -184,6 +196,20 @@ export default function UsersAdd() {
                   field={field}
                   name="Company"
                   options={cleanCompanies}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="position_id"
+              render={({ field }) => (
+                <SelectInput
+                  field={field}
+                  name="Position"
+                  options={cleanPositions.map((position) => ({
+                    key: position.key,
+                    value: replaceUnderscoresWithSpaces(position.value),
+                  }))}
                 />
               )}
             />
