@@ -151,9 +151,9 @@ function InteractiveCard({
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
   const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
   const createdDate = new Date(stone.created_date);
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  const isNew = createdDate > oneWeekAgo;
+  const threeWeeksAgo = new Date();
+  threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
+  const isNew = createdDate > threeWeeksAgo;
   const isOnSale = !!stone.on_sale;
   const navigate = useNavigate();
   const location = useLocation();
