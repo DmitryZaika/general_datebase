@@ -206,7 +206,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       `SELECT s.id, c.name as customer_name, s.sale_date
        FROM sales s
        JOIN customers c ON s.customer_id = c.id
-       WHERE s.company_id = ?
+       WHERE s.company_id = ? AND s.status != 'cancelled'
        ORDER BY s.sale_date DESC
        LIMIT 20`,
       [user.company_id]
