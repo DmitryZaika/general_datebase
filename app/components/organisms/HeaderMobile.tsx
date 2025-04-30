@@ -40,6 +40,11 @@ function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkPro
 function getMirroredUrl(path: string, search: string) {
   const segments = path.split('/').filter(Boolean);
   
+  // Специальная обработка перехода из customer/:company/stones в admin/stones
+  if (segments.length >= 2 && segments[0] === "customer" && segments[2] === "stones") {
+    return `/admin/stones${search}`;
+  }
+  
   if (segments.length < 1) return `/employee${search}`;
   
   const currentRole = segments[0]; 
@@ -85,6 +90,11 @@ export function BurgerMenu({
   
  
   const getCustomerUrl = () => {
+    // Если переходим из admin/stones в customer/:company/stones, сохраняем фильтры
+    if (!isCustomerPage && location.pathname.startsWith("/admin/stones")) {
+      return `/customer/${companyId}/stones${location.search}`;
+    }
+    
     return isCustomerPage 
       ? `/employee/stones${location.search}` 
       : `/customer/${companyId}/stones${location.search}`;
