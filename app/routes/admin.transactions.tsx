@@ -278,11 +278,11 @@ export default function AdminTransactions() {
             Download PDF
           </button> */}
           <h1 className="text-2xl font-bold">Transactions</h1>
-          <Link to="/admin/reports">
+          {/* <Link to="/admin/reports">
             <Button variant="default" className="bg-blue-600 hover:bg-blue-700">
               Reports
             </Button>
-          </Link>
+          </Link> */}
         </div>
         <DataTable 
           columns={transactionColumns} 
