@@ -392,7 +392,7 @@ export default function Information() {
         />
         
         <DialogFooter className="mt-4">
-          <LoadingButton loading={isSubmitting}>Edit Stone</LoadingButton>
+          <LoadingButton loading={isSubmitting}>Save Changes</LoadingButton>
         </DialogFooter>
       </MultiPartForm>
     );

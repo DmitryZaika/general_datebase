@@ -5,6 +5,8 @@ import clsx from "clsx";
 import { HeaderProps } from "~/types";
 import { getMirroredUrl, getCustomerUrl  } from "~/utils/headerNav";
 import { LinkButton } from "../molecules/LinkButton";
+import { useLoaderData } from "react-router";
+
 interface HeaderDesktopProps extends HeaderProps {
   className: string;
 }
@@ -19,6 +21,8 @@ export function HeaderDesktop({
   const location = useLocation();
   const isAdminPage = location.pathname.startsWith("/admin");
   const isCustomerPage = location.pathname.startsWith("/customer");
+  const data = useLoaderData<{ user: { company_id: number } | null }>();
+  const companyId = data?.user?.company_id || 1;
 
   return (
     <header
@@ -51,7 +55,7 @@ export function HeaderDesktop({
             </Link>
           )
         ) : null}
-        <Link to={getCustomerUrl(isCustomerPage, location)}>
+        <Link to={getCustomerUrl(isCustomerPage, location, companyId)}>
             <LinkButton className="select-none">
             {isCustomerPage ? "Employee" : "Customer"}
           </LinkButton>

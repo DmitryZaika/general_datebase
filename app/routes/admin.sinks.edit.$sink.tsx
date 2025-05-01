@@ -75,9 +75,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { errors };
   }
   const newFile = data.file && data.file !== "undefined";
+  console.log("Data received:", data);
   
   try {
-
+    let oldUrl = null;
+    if (newFile) {
+      const [oldFileRows] = await db.execute<mysql.RowDataPacket[]>(
+        `SELECT url FROM sink_type WHERE id = ?`,
+        [sinkId]
+      );
+      oldUrl = oldFileRows[0]?.url;
+      console.log("Old URL before update:", oldUrl);
+    }
     
     try {
       if (newFile) {
@@ -98,6 +107,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             sinkId,
           ],
         );
+        console.log("Updated with new file:", data.file);
       } else {
         await db.execute(
           `UPDATE sink_type
@@ -135,17 +145,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
       } else if (newAmount < currentAmount) {
         const toDelete = currentAmount - newAmount;
         
-        // Get all available sinks first
         const [allUnusedRows] = await db.execute<mysql.RowDataPacket[]>(
           `SELECT id FROM sinks 
            WHERE sink_type_id = ? AND sale_id IS NULL AND is_deleted = 0`,
           [sinkId]
         );
         
-        // Take only as many as we need to delete
         const rowsToUpdate = allUnusedRows.slice(0, toDelete);
         
-        // Update each one individually
         for (const row of rowsToUpdate) {
           await db.execute(
             `UPDATE sinks SET is_deleted = 1 WHERE id = ?`,
@@ -154,21 +161,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
       }
       
-     
-      
-      if (newFile) {
-        const [oldFileRows] = await db.execute<mysql.RowDataPacket[]>(
-          `SELECT url FROM sink_type WHERE id = ?`,
-          [sinkId]
-        );
-        
-        const oldUrl = oldFileRows[0]?.url;
-        if (oldUrl) {
-          await deleteFile(oldUrl);
-        }
+      if (newFile && oldUrl) {
+        await deleteFile(oldUrl);
       }
+      
     } catch (error) {
-   
       console.error("Error updating sink: ", error);
       throw error;
     } 
@@ -372,7 +369,7 @@ function SinkInformation({
       </div>
 
       <DialogFooter className="mt-4">
-        <LoadingButton loading={isSubmitting}>Edit Sink</LoadingButton>
+        <LoadingButton loading={isSubmitting}>Save Changes</LoadingButton>
       </DialogFooter>
     </MultiPartForm>
   );

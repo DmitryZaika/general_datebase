@@ -7,11 +7,12 @@ import {
   Settings,
   DollarSign,
 } from "lucide-react";
-import { useLocation } from "react-router";
+import { redirect, useLocation } from "react-router";
 import { getBase } from "~/utils/urlHelpers";
 import { StonesFilters } from "./StonesFilters";
 import { SinksFilters } from "./SinksFilters";
 import { ISupplier } from "~/schemas/suppliers";
+import { useLoaderData } from "react-router";
 
 import {
   Sidebar,
@@ -33,6 +34,8 @@ interface ISidebarItem {
   component?: ({}) => React.ReactNode;
 }
 
+
+
 interface IProps {
   suppliers: ISupplier[] | undefined;
   sinkSuppliers?: ISupplier[] | undefined;
@@ -43,14 +46,14 @@ const getItems = (
   base: string, 
   suppliers: ISupplier[] | undefined, 
   colors?: { id: number; name: string; hex_code: string }[] | undefined,
-  sinkSuppliers?: ISupplier[] | undefined
+  sinkSuppliers?: ISupplier[] | undefined,
+  companyId: number | string = 1
 ) => {
   const isCustomerRoute = base === "customer";
-  
   const finalList: ISidebarItem[] = [
     {
       title: "Stones",
-      url: isCustomerRoute ? `/customer/1/stones` : `/${base}/stones`,
+      url: isCustomerRoute ? `/customer/${companyId}/stones` : `/${base}/stones`,
       icon: Home,
       component: () => <StonesFilters suppliers={suppliers} base={base} colors={colors}/>,
     },
@@ -122,12 +125,14 @@ const getItems = (
 export function EmployeeSidebar({ suppliers, sinkSuppliers, colors }: IProps) {
   const location = useLocation();
   const base = getBase(location.pathname);
+  const data = useLoaderData<{ user: { company_id: number } | null }>();
+  const companyId = data?.user?.company_id || 1;
   
   const isCustomerRoute = typeof base === 'string' && base.startsWith('customer/');
   
   const itemsBase = isCustomerRoute ? "customer" : base as "employee" | "admin" | "customer";
   
-  const items = getItems(itemsBase, suppliers, colors, sinkSuppliers);
+  const items = getItems(itemsBase, suppliers, colors, sinkSuppliers, companyId);
   
   return (
     <Sidebar>

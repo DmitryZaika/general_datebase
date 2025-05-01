@@ -1,5 +1,5 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { LoaderFunctionArgs, Outlet, redirect } from "react-router";
+import { Link, LoaderFunctionArgs, Outlet, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
@@ -7,6 +7,7 @@ import { getAdminUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
 import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
+import { Button } from "~/components/ui/button";
 
 interface Transaction {
   id: number;
@@ -35,75 +36,85 @@ function formatDate(dateString: string) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    await getAdminUser(request);
+    const user = await getAdminUser(request);
+    if (!user || !user.company_id) {
+      return redirect('/login');
+    }
+    
+    const companyId = user.company_id;
+    
+    interface SinkInfo {
+      sale_id: number;
+      sink_types: string;
+    }
+    
+    const sinkDetails = await selectMany<SinkInfo>(
+      db,
+      `SELECT 
+         s.id as sale_id, 
+         GROUP_CONCAT(st.name SEPARATOR ', ') as sink_types
+       FROM 
+         sales s
+       JOIN 
+         sinks sk ON s.id = sk.sale_id
+       JOIN 
+         sink_type st ON sk.sink_type_id = st.id
+       WHERE
+         s.company_id = ?
+       GROUP BY 
+         s.id
+       ORDER BY 
+         s.id`,
+      [companyId]
+    );
+    
+    
+    const transactions = await selectMany<Transaction>(
+      db,
+      `SELECT 
+        s.id,
+        s.sale_date,
+        c.name as customer_name,
+        u.name as seller_name,
+        GROUP_CONCAT(DISTINCT si.bundle) as bundle,
+        s.status as is_deleted,
+        '' as sink_type,
+        GROUP_CONCAT(DISTINCT st.name) as stone_name,
+        ROUND(SUM(si.square_feet), 2) as sf,
+        GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'))) as bundle_with_cut
+      FROM 
+        sales s
+      JOIN 
+        customers c ON s.customer_id = c.id
+      JOIN 
+        users u ON s.seller_id = u.id
+      LEFT JOIN
+        slab_inventory si ON s.id = si.sale_id
+      LEFT JOIN
+        stones st ON si.stone_id = st.id
+      WHERE
+        s.company_id = ?
+      GROUP BY
+        s.id, s.sale_date, c.name, u.name
+      ORDER BY 
+        s.sale_date DESC`,
+      [companyId]
+    );
+    
+    const updatedTransactions = transactions.map(t => {
+      const sinkInfo = sinkDetails.find(sd => sd.sale_id === t.id);
+      if (sinkInfo) {
+        return {...t, sink_type: sinkInfo.sink_types};
+      }
+      return t;
+    });
+    
+    return {
+      transactions: updatedTransactions,
+    };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  
-  interface SinkInfo {
-    sale_id: number;
-    sink_types: string;
-  }
-  
-  const sinkDetails = await selectMany<SinkInfo>(
-    db,
-    `SELECT 
-       s.id as sale_id, 
-       GROUP_CONCAT(st.name SEPARATOR ', ') as sink_types
-     FROM 
-       sales s
-     JOIN 
-       sinks sk ON s.id = sk.sale_id
-     JOIN 
-       sink_type st ON sk.sink_type_id = st.id
-     GROUP BY 
-       s.id
-     ORDER BY 
-       s.id`
-  );
-  
-  
-  const transactions = await selectMany<Transaction>(
-    db,
-    `SELECT 
-      s.id,
-      s.sale_date,
-      c.name as customer_name,
-      u.name as seller_name,
-      GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 1, 0)) SEPARATOR ',') as bundle_with_cut,
-      GROUP_CONCAT(DISTINCT si.bundle SEPARATOR ', ') as bundle,
-      GROUP_CONCAT(DISTINCT st.name SEPARATOR ', ') as stone_name,
-      ROUND(SUM(si.square_feet), 2) as sf,
-      s.status as is_deleted,
-      '' as sink_type,
-      COALESCE(MAX(si.cut_date), '') as cut_date
-    FROM 
-      sales s
-    JOIN 
-      customers c ON s.customer_id = c.id
-    JOIN 
-      users u ON s.seller_id = u.id
-    LEFT JOIN
-      slab_inventory si ON s.id = si.sale_id
-    LEFT JOIN
-      stones st ON si.stone_id = st.id
-    GROUP BY
-      s.id, s.sale_date, c.name, u.name
-    ORDER BY 
-      s.sale_date DESC`
-  );
-  
-  const updatedTransactions = transactions.map(t => {
-    const sinkInfo = sinkDetails.find(sd => sd.sale_id === t.id);
-    if (sinkInfo) {
-      return {...t, sink_type: sinkInfo.sink_types};
-    }
-    return t;
-  });
-  
-  return {
-    transactions: updatedTransactions,
-  };
 };
 
 const transactionColumns: ColumnDef<Transaction>[] = [
@@ -175,28 +186,30 @@ const transactionColumns: ColumnDef<Transaction>[] = [
     accessorKey: "bundle",
     header: ({ column }) => <SortableHeader column={column} title="Bundle" />,
     cell: ({ row }) => {
-      const bundlesWithCut = (row.original.bundle_with_cut || '').split(',').filter(Boolean);
-      if (!bundlesWithCut.length) return <span>N/A</span>;
+      const bundleInfo = (row.original.bundle_with_cut || '').split(',').filter(Boolean);
+      if (!bundleInfo.length) return <span>N/A</span>;
       
-      const cutMap = Object.fromEntries(
-        bundlesWithCut.map(item => {
-          const [bundle, isCut] = item.split(':');
-          return [bundle.trim(), Number(isCut) === 1];
-        })
-      );
+      const bundleStatusMap: {[key: string]: boolean} = {};
+      bundleInfo.forEach(item => {
+        const [bundle, status] = item.split(':');
+        bundleStatusMap[bundle] = status === 'CUT';
+      });
       
-      const bundles = (row.original.bundle || '').split(', ').filter(Boolean);
+      const bundles = (row.original.bundle || '').split(',').filter(Boolean);
       
       return (
         <div className="flex flex-col">
-          {bundles.map((bundle, index) => (
-            <span 
-              key={index} 
-              className={cutMap[bundle] ? "text-blue-500" : "text-green-500"}
-            >
-              {bundle}
-            </span>
-          ))}
+          {bundles.map((bundle, index) => {
+            const isCut = bundleStatusMap[bundle] === true;
+            return (
+              <span 
+                key={index} 
+                className={isCut ? "text-blue-500" : "text-green-500"}
+              >
+                {bundle}
+              </span>
+            );
+          })}
         </div>
       );
     },
@@ -233,7 +246,6 @@ export default function AdminTransactions() {
 
   const getPDF = async () => {
     try {
-      // The fetch API will automatically handle the binary response
       const response = await fetch("/api/pdf", { 
         method: "POST",
         headers: {
@@ -241,22 +253,17 @@ export default function AdminTransactions() {
         }
       });
       
-      // Check if the response is OK
       if (!response.ok) {
         throw new Error(`Failed to download PDF: ${response.statusText}`);
       }
       
-      // Get the blob directly from the response
       const blob = await response.blob();
       
-      // Create a URL for the blob
       const url = window.URL.createObjectURL(blob);
       
-      // Create a temporary link element
       const link = document.createElement('a');
       link.href = url;
       
-      // Get filename from Content-Disposition or use default
       const contentDisposition = response.headers.get('content-disposition');
       const filename = contentDisposition
         ? contentDisposition.split('filename=')[1]?.replace(/["']/g, '')
@@ -264,7 +271,6 @@ export default function AdminTransactions() {
       
       link.download = filename;
       
-      // Append to document, trigger click, and clean up
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

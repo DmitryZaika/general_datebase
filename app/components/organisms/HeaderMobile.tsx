@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigation } from "react-router";
 import { TodoList } from "../organisms/TodoList";
 import { HeaderProps } from "~/types";
+import { useLoaderData } from "react-router";
 
 interface HeaderMobileProps extends HeaderProps {
   className: string;
@@ -39,22 +40,25 @@ function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkPro
 function getMirroredUrl(path: string, search: string) {
   const segments = path.split('/').filter(Boolean);
   
-  if (segments.length < 1) return "/employee";
+  if (segments.length >= 2 && segments[0] === "customer" && segments[2] === "stones") {
+    return `/admin/stones${search}`;
+  }
+  
+  if (segments.length < 1) return `/employee${search}`;
   
   const currentRole = segments[0]; 
   const targetRole = currentRole === "admin" ? "employee" : "admin";
   
-  if (segments.length < 2) return `/${targetRole}`;
+  if (segments.length < 2) return `/${targetRole}${search}`;
   
   const currentSection = segments[1];
   
   const supportedSections = ["stones", "instructions", "sinks", "suppliers", "supports", "documents", "images"];
-  const cleanSearch = currentSection === "stones" ? search : "";
-    if (supportedSections.includes(currentSection)) {
-      return `/${targetRole}/${currentSection}${cleanSearch}`;
-    }
+  if (supportedSections.includes(currentSection)) {
+    return `/${targetRole}/${currentSection}${search}`;
+  }
   
-  return `/${targetRole}`;
+  return `/${targetRole}${search}`;
 }
 
 export function BurgerMenu({
@@ -69,6 +73,8 @@ export function BurgerMenu({
   const [open, setOpen] = useState(false);
   const [isRoleSwitching, setIsRoleSwitching] = useState(false);
   const [isCustomerSwitching, setIsCustomerSwitching] = useState(false);
+  const data = useLoaderData<{ user: { company_id: number } | null }>();
+  const companyId = data?.user?.company_id || 1;
   
 
   useEffect(() => {
@@ -83,7 +89,14 @@ export function BurgerMenu({
   
  
   const getCustomerUrl = () => {
-    return isCustomerPage ? `/employee/stones` : `/customer/1/stones`;
+    // Если переходим из admin/stones в customer/:company/stones, сохраняем фильтры
+    if (!isCustomerPage && location.pathname.startsWith("/admin/stones")) {
+      return `/customer/${companyId}/stones${location.search}`;
+    }
+    
+    return isCustomerPage 
+      ? `/employee/stones${location.search}` 
+      : `/customer/${companyId}/stones${location.search}`;
   };
   
 

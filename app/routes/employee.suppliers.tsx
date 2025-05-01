@@ -41,71 +41,50 @@ interface SupplierFile {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    await getEmployeeUser(request);
-  } catch (error) {
-    return redirect(`/login?error=${error}`);
-  }
-  const user = await getEmployeeUser(request);
-  const suppliers = await selectMany<Supplier>(
-    db,
-    "select id,website, supplier_name,  manager, phone, email, notes from suppliers WHERE company_id = ?",
-    [user.company_id],
-  );
-  const files = await selectMany<SupplierFile>(
-    db,
-    "select id, name, url from supplier_files WHERE supplier_id = ?",
-    [suppliers[0].id],
-  );
-  const allFiles = await selectMany<{ supplier_id: number } & SupplierFile>(
-    db,
-    "select id, supplier_id, name, url from supplier_files",
-    []
-  );
-
-  const filesMap: Record<number, SupplierFile[]> = {};
-  allFiles.forEach(file => {
-    if (!filesMap[file.supplier_id]) {
-      filesMap[file.supplier_id] = [];
+    const user = await getEmployeeUser(request);
+    if (!user || !user.company_id) {
+      return redirect('/login');
     }
-    filesMap[file.supplier_id].push({
-      id: file.id,
-      supplier_id: file.supplier_id,
-      name: file.name,
-      url: file.url
+
+    const suppliers = await selectMany<Supplier>(
+      db,
+      "SELECT id, website, supplier_name, manager, phone, email, notes FROM suppliers WHERE company_id = ?",
+      [user.company_id],
+    );
+    
+    if (suppliers.length === 0) {
+      return { suppliers: [], filesMap: {} };
+    }
+    
+    const supplierIds = suppliers.map(s => s.id);
+    
+    const allFiles = await selectMany<{ supplier_id: number } & SupplierFile>(
+      db,
+      "SELECT id, supplier_id, name, url FROM supplier_files WHERE supplier_id IN (?) AND EXISTS (SELECT 1 FROM suppliers s WHERE s.id = supplier_id AND s.company_id = ?)",
+      [supplierIds, user.company_id]
+    );
+
+    const filesMap: Record<number, SupplierFile[]> = {};
+    allFiles.forEach(file => {
+      if (!filesMap[file.supplier_id]) {
+        filesMap[file.supplier_id] = [];
+      }
+      filesMap[file.supplier_id].push({
+        id: file.id,
+        supplier_id: file.supplier_id,
+        name: file.name,
+        url: file.url
+      });
     });
-  });
-  return { suppliers, filesMap };
+    
+    return { suppliers, filesMap };
+  } catch (error) {
+    console.error("Error loading suppliers:", error);
+    return { suppliers: [], filesMap: {} };
+  }
 };
 
-function FileDropdown({ files }: { files: SupplierFile[] }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <FaFile /> Files ({files.length})
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
-        {files.length > 0 ? (
-          files.map(file => (
-            <DropdownMenuItem key={file.id} asChild>
-              <a 
-                href={file.url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="w-full cursor-pointer"
-              >
-                {file.name}
-              </a>
-            </DropdownMenuItem>
-          ))
-        ) : (
-          <DropdownMenuItem disabled>No files</DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+
 
 const getColumns = (filesMap: Record<number, SupplierFile[]>): ColumnDef<Supplier>[] => [
   {
