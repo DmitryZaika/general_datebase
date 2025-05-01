@@ -128,7 +128,7 @@ export default function DocumentsEdit() {
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className=" overflow-auto sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Edit Document</DialogTitle>
+          <DialogTitle>Save Changes</DialogTitle>
         </DialogHeader>
         <MultiPartForm form={form}>
           <FormField
@@ -157,7 +157,7 @@ export default function DocumentsEdit() {
           />
           <p> {url}</p>
           <DialogFooter>
-            <LoadingButton loading={isSubmitting}>Edit Document</LoadingButton>
+            <LoadingButton loading={isSubmitting}>Save Changes</LoadingButton>
           </DialogFooter>
         </MultiPartForm>
       </DialogContent>
