@@ -7,7 +7,6 @@ import { LinkSpan } from "~/components/atoms/LinkSpan";
 import { useMemo, useCallback, useState, useEffect } from "react";
 import { ISupplier } from "~/schemas/suppliers";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
-
 import { SidebarGroupLabel, SidebarMenuSub } from "~/components/ui/sidebar";
 
 interface IProps {
@@ -21,8 +20,6 @@ export function SinksFilters({ base, suppliers }: IProps) {
   const isSubmitting = useMemo(() => navigation.state !== "idle", [navigation.state]);
   const [suppliersExpanded, setSuppliersExpanded] = useState(false);
   
-  const showSoldOutToggle = useMemo(() => ["admin", "employee"].includes(base), [base]);
-  
   useEffect(() => {
     localStorage.setItem('suppliersExpanded', JSON.stringify(suppliersExpanded));
   }, [suppliersExpanded]);
@@ -33,9 +30,27 @@ export function SinksFilters({ base, suppliers }: IProps) {
     }
   }, [searchParams.supplier]);
   
-  const allTypesSelected = useMemo(() => 
-    searchParams?.type?.length === SINK_TYPES.length, 
-    [searchParams.type]
+  const showSoldOutToggle = useMemo(() => ["admin", "employee"].includes(base), [base]);
+  
+  function createClearFilterHandler(
+    searchParams: any, 
+    setSearchParams: (params: any) => void, 
+    isSubmitting: boolean,
+    filterKey: string,
+    defaultValue: any
+  ) {
+    return useCallback(() => {
+      if (isSubmitting) return;
+      setSearchParams({ ...searchParams, [filterKey]: defaultValue });
+    }, [searchParams, setSearchParams, isSubmitting, filterKey, defaultValue]);
+  }
+
+  const clearTypeFilters = createClearFilterHandler(
+    searchParams, setSearchParams, isSubmitting, 'type', []
+  );
+  
+  const clearSupplier = createClearFilterHandler(
+    searchParams, setSearchParams, isSubmitting, 'supplier', 0
   );
 
   const toggleSinkType = useCallback((typeToToggle: SinkFilter["type"][number]) => {
@@ -51,13 +66,6 @@ export function SinksFilters({ base, suppliers }: IProps) {
     }
 
     setSearchParams({ ...searchParams, type: newTypes });
-  }, [isSubmitting, searchParams, setSearchParams]);
-
-  const toggleSelectAllTypes = useCallback(() => {
-    if (isSubmitting) return;
-    
-    const newType = searchParams?.type?.length === SINK_TYPES.length ? [] : [...SINK_TYPES];
-    setSearchParams({ ...searchParams, type: newType });
   }, [isSubmitting, searchParams, setSearchParams]);
 
   const toggleShowSoldOut = useCallback((val: string) => {
@@ -84,14 +92,16 @@ export function SinksFilters({ base, suppliers }: IProps) {
     <SidebarMenuSub>
       <SidebarGroupLabel>
         Sink Types{" "}
+        {searchParams.type && searchParams.type.length > 0 && (
         <LinkSpan
           className="ml-2"
-          onClick={toggleSelectAllTypes}
+            onClick={clearTypeFilters}
           variant="blue"
           disabled={isSubmitting}
         >
-          {allTypesSelected ? "Clear" : "Select all"}
+            Clear
         </LinkSpan>
+        )}
       </SidebarGroupLabel>
       
       {SINK_TYPES.map((item) => (
@@ -125,7 +135,7 @@ export function SinksFilters({ base, suppliers }: IProps) {
                 variant="blue"
                 disabled={isSubmitting}
               >
-                Select all
+                Clear
               </LinkSpan>
             ) }
           </SidebarGroupLabel>

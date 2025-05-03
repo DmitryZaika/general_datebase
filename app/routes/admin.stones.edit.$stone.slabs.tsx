@@ -5,7 +5,10 @@ import {
   Form,
   useLoaderData,
   useNavigation,
-  data
+  data,
+  useActionData,
+  useParams,
+  useNavigate,
 } from "react-router";
 import { z } from "zod";
 import { getAdminUser } from "~/utils/session.server";
@@ -16,7 +19,7 @@ import { db } from "~/db.server";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { Button } from "~/components/ui/button";
-import { FaTimes } from "react-icons/fa";
+import { FaTimes, FaLink } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { FormField } from "~/components/ui/form";
@@ -25,12 +28,53 @@ import { FileInput } from "~/components/molecules/FileInput";
 import { useCustomOptionalForm } from "~/utils/useCustomForm";
 import { parseMutliForm } from "~/utils/parseMultiForm";
 import { deleteFile } from "~/utils/s3.server";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 
 const slabSchema = z.object({
   bundle: z.string().min(1),
   length: z.coerce.number().default(0),
   width: z.coerce.number().default(0),
 });
+
+function LinkedSlabsGroup({ slabs, sourceStoneName }: { slabs: Array<{id: number; bundle: string; url: string; width: number; length: number;}>; sourceStoneName: string }) {
+  return (
+    <div className="mt-4">
+   
+      <div className="flex flex-col gap-2">
+        {slabs && slabs.length > 0 ? (
+          slabs.map((slab) => (
+            <div
+              key={slab.id}
+              className="flex gap-1 justify-between items-center"
+            >
+              <img
+                src={slab.url === "undefined" ? "" : slab.url}
+                alt="Slab"
+                className="size-9"
+              />
+              <div className="p-1.5 border w-full border-gray-300">
+                <p className="w-full">Slab number: {slab.bundle}</p>
+                <p>
+                  Size {slab.length} x {slab.width}
+                </p>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-gray-500">No slabs available</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
@@ -46,51 +90,106 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!params.stone) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
+  
   const stoneId = parseInt(params.stone, 10);
+  
+  const requestClone = request.clone();
+
   if (request.method === "DELETE") {
-    const form = await request.formData();
+    const form = await requestClone.formData();
     const id = form.get("id");
-    if (!id) {
+    const unlinkSourceId = form.get("unlinkSourceId");
+    
+    if (unlinkSourceId) {
+      try {
+        await db.execute(
+          `DELETE FROM stone_slab_links 
+           WHERE stone_id = ? AND source_stone_id = ?`,
+          [stoneId, unlinkSourceId]
+        );
+        
+        const session = await getSession(request.headers.get("Cookie"));
+        session.flash("message", toastData("Success", "Slabs unlinked successfully"));
+        return data({ success: true }, {
+          headers: { "Set-Cookie": await commitSession(session) },
+        });
+      } catch (error) {
+        console.error("Error unlinking slabs:", error);
+        return { error: "Failed to unlink slabs" };
+      }
+    } else if (id) {
+      const slabId = parseInt(id.toString(), 10);
+      const record = await selectId<{ url: string | null }>(
+        db,
+        "SELECT url FROM slab_inventory WHERE id = ?",
+        slabId,
+      );
+      await db.execute("DELETE FROM slab_inventory WHERE id = ?", [slabId]);
+      const session = await getSession(request.headers.get("Cookie"));
+      if (record?.url) {
+        deleteFile(record.url);
+      }
+      session.flash("message", toastData("Success", "Image Deleted"));
+      return data({ success: true }, {
+        headers: { "Set-Cookie": await commitSession(session) },
+      });
+    } else {
       return forceRedirectError(request.headers, "No id provided");
     }
-    const slabId = parseInt(id.toString(), 10);
-    const record = await selectId<{ url: string | null }>(
-      db,
-      "SELECT url FROM slab_inventory WHERE id = ?",
-      slabId,
-    );
-    await db.execute("DELETE FROM slab_inventory WHERE id = ?", [slabId]);
-    const session = await getSession(request.headers.get("Cookie"));
-    if (record?.url) {
-      deleteFile(record.url);
+  } else if (request.method === "POST") {
+    const formData = await requestClone.formData();
+    const intent = formData.get("intent");
+    
+    if (intent === "link_slabs") {
+      const fromStoneId = formData.get("fromStoneId");
+      
+      if (!fromStoneId) {
+        return { error: "No stone ID provided to link from" };
+      }
+      
+      try {
+        await db.execute(
+          `INSERT INTO stone_slab_links (stone_id, source_stone_id) 
+           VALUES (?, ?)`,
+          [stoneId, fromStoneId]
+        );
+        
+        const session = await getSession(request.headers.get("Cookie"));
+        session.flash("message", toastData("Success", "Slabs linked successfully"));
+        return data({ success: true }, {
+          headers: { "Set-Cookie": await commitSession(session) },
+        });
+      } catch (error) {
+        console.error("Error linking slabs:", error);
+        return { error: "Failed to link slabs" };
+      }
+    } else {
+      const { errors, data: formData } = await parseMutliForm(requestClone, slabSchema, "stones");
+      if (errors || !formData) {
+        return { errors };
+      }
+      if (formData.length === 0 && formData.width === 0) {
+        const [stoneRecord] = await selectMany<{ width: number; length: number }>(
+          db,
+          "SELECT width, length FROM stones WHERE id = ? LIMIT 1",
+          [stoneId],
+        );
+        formData.length = stoneRecord?.length ?? 0;
+        formData.width = stoneRecord?.width ?? 0;
+      }
+      await db.execute(
+        "INSERT INTO slab_inventory (bundle, stone_id, url, width, length) VALUES (?, ?, ?, ?, ?)",
+        [formData.bundle, stoneId, formData.file ?? "", formData.width, formData.length],
+      );
+      const session = await getSession(request.headers.get("Cookie"));
+      session.flash("message", toastData("Success", "Image Added"));
+      return data({ success: true }, {
+        headers: { "Set-Cookie": await commitSession(session) },
+      });
     }
-    session.flash("message", toastData("Success", "Image Deleted"));
-    return data({ success: true }, {
-      headers: { "Set-Cookie": await commitSession(session) },
-    });
   }
-  const { errors, data: formData } = await parseMutliForm(request, slabSchema, "stones");
-  if (errors || !formData) {
-    return { errors };
-  }
-  if (formData.length === 0 && formData.width === 0) {
-    const [stoneRecord] = await selectMany<{ width: number; length: number }>(
-      db,
-      "SELECT width, length FROM stones WHERE id = ? LIMIT 1",
-      [stoneId],
-    );
-    formData.length = stoneRecord?.length ?? 0;
-    formData.width = stoneRecord?.width ?? 0;
-  }
-  await db.execute(
-    "INSERT INTO slab_inventory (bundle, stone_id, url, width, length) VALUES (?, ?, ?, ?, ?)",
-    [formData.bundle, stoneId, formData.file ?? "", formData.width, formData.length],
-  );
-  const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Image Added"));
-  return data({ success: true }, {
-    headers: { "Set-Cookie": await commitSession(session) },
-  });
+
+  return null;
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -99,6 +198,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
   const stoneId = parseInt(params.stone, 10);
+  
   const slabs = await selectMany<{
     id: number;
     bundle: string;
@@ -110,6 +210,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     "SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL",
     [stoneId],
   );
+  
   const [stone] = await selectMany<{
     id: number;
     width: number;
@@ -118,7 +219,176 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }>(db, "SELECT id, width, length, url FROM stones WHERE id = ? LIMIT 1", [
     stoneId,
   ]);
-  return { slabs, stone };
+  
+  // Get only stones that have slabs for the dropdown
+  const allStones = await selectMany<{ id: number; name: string }>(
+    db,
+    `SELECT DISTINCT s.id, s.name 
+     FROM stones s
+     WHERE s.id != ? 
+     AND EXISTS (
+       SELECT 1 FROM slab_inventory si WHERE si.stone_id = s.id AND si.cut_date IS NULL
+     )
+     ORDER BY s.name ASC`,
+    [stoneId]
+  );
+  
+  let linkedSlabs: Array<{
+    source_stone_id: number;
+    source_stone_name: string;
+    slabs: Array<{
+      id: number;
+      bundle: string;
+      url: string;
+      width: number;
+      length: number;
+    }>;
+  }> = [];
+  
+  try {
+    const stoneLinks = await selectMany<{ 
+      source_stone_id: number;
+      source_stone_name: string;
+    }>(
+      db,
+      `SELECT 
+         stone_slab_links.source_stone_id, 
+         s.name as source_stone_name
+       FROM stone_slab_links
+       JOIN stones s ON stone_slab_links.source_stone_id = s.id
+       WHERE stone_slab_links.stone_id = ?
+       GROUP BY stone_slab_links.source_stone_id, s.name
+       ORDER BY s.name ASC`,
+      [stoneId]
+    );
+    
+    for (const link of stoneLinks) {
+      const slabs = await selectMany<{
+        id: number;
+        bundle: string;
+        url: string;
+        width: number;
+        length: number;
+      }>(
+        db,
+        `SELECT 
+           id, bundle, url, width, length
+         FROM slab_inventory 
+         WHERE stone_id = ? AND cut_date IS NULL`,
+        [link.source_stone_id]
+      );
+      
+      linkedSlabs.push({
+        source_stone_id: link.source_stone_id,
+        source_stone_name: link.source_stone_name,
+        slabs
+      });
+    }
+  } catch (err) {
+    console.error("Error fetching linked slabs:", err);
+  }
+  
+  return { 
+    slabs, 
+    stone, 
+    allStones, 
+    linkedSlabs,
+    currentStoneId: stoneId
+  };
+}
+
+interface LinkSlabsDialogProps {
+  allStones: Array<{ id: number; name: string }>;
+  isOpen: boolean;
+  onClose: () => void;
+  currentStoneId: number;
+}
+
+function LinkSlabsDialog({ allStones, isOpen, onClose, currentStoneId }: LinkSlabsDialogProps) {
+  const [selectedStoneId, setSelectedStoneId] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
+  const actionData = useActionData();
+  
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedStoneId("");
+      setSearchTerm("");
+    }
+  }, [isOpen]);
+  
+  useEffect(() => {
+    if (actionData?.success && navigation.state === "idle") {
+      onClose();
+    }
+  }, [actionData, navigation.state, onClose]);
+  
+  const filteredStones = allStones.filter(stone => 
+    stone.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) onClose();
+    }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Link Slabs from Another Stone</DialogTitle>
+        </DialogHeader>
+        
+        <div className="mb-4">
+          <Input
+            placeholder="Search stones..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="mb-2"
+          />
+          
+          <div className="max-h-60 overflow-y-auto border rounded p-2">
+            {filteredStones.length === 0 ? (
+              <p className="text-gray-500 text-center py-2">No stones found</p>
+            ) : (
+              filteredStones.map(stone => (
+                <div 
+                  key={stone.id}
+                  className={`p-2 cursor-pointer rounded hover:bg-gray-100 ${
+                    selectedStoneId === String(stone.id) ? 'bg-gray-100' : ''
+                  }`}
+                  onClick={() => setSelectedStoneId(String(stone.id))}
+                >
+                  {stone.name}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+        
+        <Form method="post" className="flex justify-end gap-2" onSubmit={() => {
+          if (selectedStoneId) {
+            setTimeout(() => onClose(), 100);
+          }
+        }}>
+          <AuthenticityTokenInput />
+          <input type="hidden" name="intent" value="link_slabs" />
+          <input type="hidden" name="fromStoneId" value={selectedStoneId} />
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            disabled={!selectedStoneId || isSubmitting}
+          >
+            Link Slabs
+          </Button>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function AddSlab() {
@@ -210,13 +480,49 @@ export function AddSlab() {
 }
 
 export default function EditStoneSlabs() {
-  const { slabs, stone } = useLoaderData<typeof loader>();
+  const { slabs, stone, allStones, linkedSlabs, currentStoneId } = useLoaderData<typeof loader>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [unlinkSourceId, setUnlinkSourceId] = useState<number | null>(null);
+  const [unlinkStoneName, setUnlinkStoneName] = useState<string>("");
+  const navigate = useNavigate();
+  const params = useParams();
   const navigation = useNavigation();
+  const actionData = useActionData();
   const isSubmitting = navigation.state === "submitting";
+  
+  // Handle successful actions (linking or unlinking)
+  useEffect(() => {
+    if (actionData?.success && navigation.state === "idle") {
+      // Refresh the page data without reloading the page
+      navigate(`/admin/stones/edit/${params.stone}/slabs`, { replace: true });
+    }
+  }, [actionData, navigation.state, navigate, params.stone]);
+  
+  // Function to open the confirmation dialog
+  const handleUnlinkClick = (sourceId: number, name: string) => {
+    setUnlinkSourceId(sourceId);
+    setUnlinkStoneName(name);
+    setShowConfirmDialog(true);
+  };
+  
   return (
     <>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">Stone Slabs</h2>
+        <Button 
+          onClick={() => setShowLinkDialog(true)}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <FaLink size={14} />
+          Link Slabs from Different Stone
+        </Button>
+      </div>
+      
       <AddSlab />
+      
       <div className="flex flex-col gap-2">
         {slabs.map((slab) => (
           <div
@@ -247,7 +553,68 @@ export default function EditStoneSlabs() {
           </div>
         ))}
       </div>
-    
+      
+      {linkedSlabs.length > 0 && (
+        <div className="mt-8 pt-6 border-t border-gray-200 w-full">
+          <h3 className="text-lg font-semibold mb-2">Linked Slabs</h3>
+          
+          {linkedSlabs.map((item) => (
+            <div key={item.source_stone_id} className="mb-6 relative">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-md font-medium">From: {item.source_stone_name}</h4>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-red-500 border-red-300 hover:bg-red-50 flex items-center gap-1"
+                  onClick={() => handleUnlinkClick(item.source_stone_id, item.source_stone_name)}
+                >
+                  <FaTimes size={12} />
+                  Unlink
+                </Button>
+              </div>
+              <LinkedSlabsGroup slabs={item.slabs} sourceStoneName={item.source_stone_name} />
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* Confirmation Dialog for Unlinking */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Unlink</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to unlink slabs from {unlinkStoneName}?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Form method="delete" onSubmit={() => setShowConfirmDialog(false)}>
+              <AuthenticityTokenInput />
+              <input type="hidden" name="unlinkSourceId" value={unlinkSourceId || ""} />
+              <Button
+                type="submit"
+                variant="destructive"
+              >
+                Unlink
+              </Button>
+            </Form>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <LinkSlabsDialog 
+        allStones={allStones} 
+        isOpen={showLinkDialog} 
+        onClose={() => setShowLinkDialog(false)}
+        currentStoneId={currentStoneId}
+      />
     </>
   );
 }

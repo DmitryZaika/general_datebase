@@ -36,22 +36,7 @@ interface Stone {
   cost_per_sqft: number;
 }
 
-function customSortType(
-  a: (typeof STONE_TYPES)[number],
-  b: (typeof STONE_TYPES)[number]
-) {
-  return STONE_TYPES.indexOf(a) - STONE_TYPES.indexOf(b);
-}
 
-function getStonePriority(stone: Stone) {
-  const hasStock = stone.available > 0;
-  const isDisplayed = !!stone.is_display;
-
-  if (isDisplayed && hasStock) return 0;
-  if (isDisplayed && !hasStock) return 1;
-  if (!isDisplayed && hasStock) return 2;
-  return 3;
-}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request);

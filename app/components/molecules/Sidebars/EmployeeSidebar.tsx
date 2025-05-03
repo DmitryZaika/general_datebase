@@ -94,16 +94,23 @@ const getItems = (
     );
   }
   if (base === "employee") {
-    finalList.push({
-      title: "Special Order",
-      url: `/employee/special-order`,
-      icon: Settings,
-    },
-    {
-      title: "My Account",
-      url: `/employee/user`,
-      icon: Settings,
-    });
+    finalList.push(
+      {
+        title: "Transactions",
+        url: `/employee/transactions`,
+        icon: DollarSign,
+      },
+      {
+        title: "Special Order",
+        url: `/employee/special-order`,
+        icon: Settings,
+      },
+      {
+        title: "My Account",
+        url: `/employee/user`,
+        icon: Settings,
+      }
+    );
   }
   if (base === "admin") {
     finalList.push(

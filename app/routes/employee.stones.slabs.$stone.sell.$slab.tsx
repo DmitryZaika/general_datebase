@@ -34,6 +34,8 @@ import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { selectMany } from "~/utils/queryHelpers";
 import { useState } from "react";
+import { Search } from "lucide-react";
+import { Input } from "~/components/ui/input";
 
 interface Sink {
   id: number;
@@ -196,7 +198,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [user.company_id]
     );
     
-    
     const recentSales = await selectMany<{
       id: number;
       customer_name: string;
@@ -212,17 +213,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [user.company_id]
     );
     
-    return { user, sinks, recentSales };
+    const customers = await selectMany<{
+      id: number;
+      name: string;
+    }>(
+      db,
+      `SELECT id, name FROM customers 
+       WHERE company_id = ? 
+       ORDER BY name ASC 
+       LIMIT 100`,
+      [user.company_id]
+    );
+    
+    return { user, sinks, recentSales, customers };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
 };
 
 export default function SlabSell() {
-  const { sinks, recentSales } = useLoaderData<typeof loader>();
+  const { sinks, recentSales, customers } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state === "submitting";
   const [showExistingSales, setShowExistingSales] = useState(false);
+  const [showExistingCustomers, setShowExistingCustomers] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [isExistingCustomer, setIsExistingCustomer] = useState(false);
   const params = useParams();
   const location = useLocation();
   
@@ -248,6 +264,16 @@ export default function SlabSell() {
     navigate(`/employee/stones/slabs/${params.stone}/add-to-sale/${params.slab}/${saleId}${location.search}`);
   };
 
+  const handleSelectCustomer = (customerName: string) => {
+    form.setValue("name", customerName);
+    setIsExistingCustomer(true);
+    setShowExistingCustomers(false);
+  };
+
+  const filteredCustomers = customers.filter(customer => 
+    customer.name.toLowerCase().includes(customerSearch.toLowerCase())
+  );
+
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -258,7 +284,7 @@ export default function SlabSell() {
           <Form id="customerForm" method="post" onSubmit={fullSubmit}>
             <div className="">
               <div className="flex items-start gap-2">
-                <div className="flex-grow">
+                <div className="flex-grow relative">
                   <FormField
                     control={form.control}
                     name="name"
@@ -267,19 +293,27 @@ export default function SlabSell() {
                         inputAutoFocus={true}
                         name={"Customer Name"}
                         placeholder={"Enter customer name"}
-                        field={field}
+                        field={{
+                          ...field,
+                          disabled: isExistingCustomer
+                        }}
                       />
                     )}
                   />
+                  {isExistingCustomer && (
+                    <div className="absolute right-0 top-0 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-1 mr-1">
+                      Existing
+                    </div>
+                  )}
                 </div>
                 <Button 
                   size="sm" 
                   className="h-9 mt-7 whitespace-nowrap mt-[24.5px]"
                   type="button"
-                  variant="blue"
-                  onClick={() => setShowExistingSales(true)}
+                  variant="outline"
+                  onClick={() => setShowExistingCustomers(true)}
                 >
-                  Add to Existing  Sale
+                  Existing Customer
                 </Button>
               </div>
               
@@ -328,8 +362,18 @@ export default function SlabSell() {
               />
             </div>
           
-            <DialogFooter>
-              <LoadingButton loading={isSubmitting}>Create Sale</LoadingButton>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 items-center justify-between mt-4">
+              <Button 
+                type="button"
+                variant="blue"
+                className="sm:order-1 order-2 sm:ml-0 ml-auto"
+                onClick={() => setShowExistingSales(true)}
+              >
+                Add to Existing Sale
+              </Button>
+              <LoadingButton loading={isSubmitting} className="sm:order-2 order-1 sm:ml-auto ml-0">
+                Create Sale
+              </LoadingButton>
             </DialogFooter>
           </Form>
         </FormProvider>
@@ -355,6 +399,42 @@ export default function SlabSell() {
                         <div className="text-sm text-gray-500">
                           {new Date(sale.sale_date).toLocaleDateString()}
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {showExistingCustomers && (
+          <Dialog open={showExistingCustomers} onOpenChange={setShowExistingCustomers}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Select Existing Customer</DialogTitle>
+              </DialogHeader>
+              <div className="relative mb-4">
+                <Input
+                  placeholder="Search customers..."
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  className="pl-9"
+                />
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {filteredCustomers.length === 0 ? (
+                  <p className="text-center py-4">No customers found</p>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredCustomers.map(customer => (
+                      <div 
+                        key={customer.id} 
+                        className="p-3 border rounded hover:bg-gray-50 cursor-pointer"
+                        onClick={() => handleSelectCustomer(customer.name)}
+                      >
+                        <div className="font-medium">{customer.name}</div>
                       </div>
                     ))}
                   </div>
