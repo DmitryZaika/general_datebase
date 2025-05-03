@@ -413,7 +413,7 @@ export function StonesFilters({ suppliers, colors, base, stones = [] }: IProps) 
       {Array.isArray(suppliers) && (
         <FilterGroup
           title="Suppliers"
-          items={suppliers}
+          items={suppliersExpanded ? suppliers : suppliers.slice(0, VISIBLE_ITEMS_COUNT)}
           renderItem={(supplier) => (
             <div
               key={supplier.id}
@@ -437,6 +437,7 @@ export function StonesFilters({ suppliers, colors, base, stones = [] }: IProps) 
           onCollapseToggle={toggleSuppliersExpanded}
           isSubmitting={isSubmitting}
           id="suppliers"
+          noShowAll={true}
         />
       )}
 
