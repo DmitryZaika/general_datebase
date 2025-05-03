@@ -3,15 +3,15 @@ import { Link, LoaderFunctionArgs, Outlet, redirect } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
-import { getAdminUser } from "~/utils/session.server";
+import { getEmployeeUser } from "~/utils/session.server";
 import { PageLayout } from "~/components/PageLayout";
 import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
 import { Button } from "~/components/ui/button";
-import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
 import { useState } from "react";
 import { Input } from "~/components/ui/input";
 import { Search } from "lucide-react";
+import React from "react";
 
 interface Transaction {
   id: number;
@@ -27,7 +27,6 @@ interface Transaction {
   cut_date?: string | null;
 }
 
-
 function formatDate(dateString: string) {
   if (!dateString) return "";
   const date = new Date(dateString);
@@ -40,7 +39,7 @@ function formatDate(dateString: string) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request);
+    const user = await getEmployeeUser(request);
     if (!user || !user.company_id) {
       return redirect('/login');
     }
@@ -124,7 +123,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 const transactionColumns: ColumnDef<Transaction>[] = [
   {
     accessorKey: "sale_date",
-    header: ({ column }) => <SortableHeader column={column} title="Date" />,
+    header: ({ column }) => <SortableHeader column={column} title="Sale Date" />,
     cell: ({ row }) => formatDate(row.original.sale_date),
     sortingFn: "datetime",
   },
@@ -248,98 +247,68 @@ const transactionColumns: ColumnDef<Transaction>[] = [
         colorClass = "text-blue-500";
       }
       
-      return <span className={`${colorClass} font-medium`}>{formattedStatus || "Active"}</span>;
+      return <span className={colorClass}>{formattedStatus}</span>;
     },
   },
   {
     id: "actions",
     cell: ({ row }) => {
       return (
-        <ActionDropdown
-          actions={{
-            edit: `edit/${row.original.id}`,
-            delete: `delete/${row.original.id}`,
-          }}
-        />
+        <div className="flex items-center justify-end gap-2">
+          <Link to={`edit/${row.original.id}`}>
+            <Button variant="outline" size="sm">
+              View
+            </Button>
+          </Link>
+        </div>
       );
     },
   },
 ];
 
-export default function AdminTransactions() {
+export default function EmployeeTransactions() {
   const { transactions } = useLoaderData<typeof loader>();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [globalFilter, setGlobalFilter] = useState("");
 
-  const filteredTransactions = transactions.filter(transaction => 
-    transaction.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter transactions based on global filter
+  const filteredData = React.useMemo(() => {
+    if (!globalFilter) return transactions;
+    
+    const searchTerm = globalFilter.toLowerCase();
+    return transactions.filter(transaction => {
+      return (
+        transaction.customer_name.toLowerCase().includes(searchTerm) ||
+        transaction.seller_name.toLowerCase().includes(searchTerm) ||
+        transaction.stone_name?.toLowerCase().includes(searchTerm) ||
+        transaction.bundle?.toLowerCase().includes(searchTerm) ||
+        transaction.sink_type?.toLowerCase().includes(searchTerm) ||
+        formatDate(transaction.sale_date).toLowerCase().includes(searchTerm)
+      );
+    });
+  }, [transactions, globalFilter]);
 
-  const getPDF = async () => {
-    try {
-      const response = await fetch("/api/pdf", { 
-        method: "POST",
-        headers: {
-          "Accept": "application/pdf"
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to download PDF: ${response.statusText}`);
-      }
-      
-      const blob = await response.blob();
-      
-      const url = window.URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      
-      const contentDisposition = response.headers.get('content-disposition');
-      const filename = contentDisposition
-        ? contentDisposition.split('filename=')[1]?.replace(/["']/g, '')
-        : 'transaction-report.pdf';
-      
-      link.download = filename;
-      
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error downloading PDF:", error);
-      alert("Error downloading PDF. Please try again.");
-    }
-  };
-  
   return (
-    <>
-      <PageLayout title="Sales Transactions">
-        <div className="mb-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Transactions</h1>
-          <Link to="/admin/reports">
-              <Button variant="default" className="bg-blue-600 hover:bg-blue-700">
-                Reports
-              </Button>
-            </Link>
-          <div className="flex gap-4">
-            <div className="relative">
-              <Input
-                placeholder="Search by customer"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 w-64"
-              />
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-            </div>
-           
+    <PageLayout title="Transactions">
+      <div className="container mx-auto py-10">
+        <div className="mb-4 flex items-center gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+            <Input
+              placeholder="Search transactions..."
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="pl-8"
+            />
           </div>
         </div>
-        <DataTable 
-          columns={transactionColumns} 
-          data={filteredTransactions} 
+
+        <DataTable
+          columns={transactionColumns}
+          data={filteredData}
         />
-      </PageLayout>
-      <Outlet />
-    </>
+
+        <Outlet />
+      </div>
+    </PageLayout>
   );
 } 

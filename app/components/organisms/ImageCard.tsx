@@ -30,7 +30,8 @@ export function ImageCard({
       <CardHeader className="grid gap-1 p-[2px]">
         <CardTitle className="text-md text-center">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="py-0 px-1 text-xs">
+      <CardContent className={`py-0 px-1 text-xs relative group  rounded-md ${!disabled && itemId && type ? "hover:bg-blue-50 duration-200" : ""}`}>
+     {(!disabled && itemId && type) && <span className="absolute opacity-0 group-hover:opacity-20 text-black px-2 py-1 text-sm rounded top-0 left-1/2 transform -translate-x-1/2 transition-opacity duration-200">Sell</span>}
         {(() => {
           const content = (
             <>

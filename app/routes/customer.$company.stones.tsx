@@ -29,6 +29,7 @@ interface Stone {
   width: number | null;
   amount: number | null;
   on_sale: boolean | number;
+  created_date: string;
 }
 
 const customOrder = ["granite", "quartz", "marble", "dolomite", "quartzite"];
@@ -74,6 +75,10 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
   const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
   const isOnSale = !!stone.on_sale;
+  const createdDate = new Date(stone.created_date);
+  const threeWeeksAgo = new Date();
+  threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 29);
+  const isNew = createdDate > threeWeeksAgo;
 
   return (
     <div
@@ -113,11 +118,16 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
           onClick={() => setCurrentId(stone.id, stoneType)}
         />
       </ImageCard>
-      {displayedAmount === "—" && (
-        <div className="absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
+      {stone.available === 0 && (
+        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
           <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
             Out of Stock
           </div>
+        </div>
+      )}
+      {isNew && (
+        <div className="absolute top-0 right-0 bg-green-500 text-white px-2 py-1 rounded-bl text-sm font-bold">
+          New Color
         </div>
       )}
     </div>

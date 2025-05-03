@@ -120,11 +120,11 @@ export async function sinkQueryBuilder(
   const numericCompanyId = typeof companyId === 'string' ? Number(companyId) : companyId;
   
   let whereClause = "WHERE sink_type.company_id = ? AND sink_type.is_deleted = 0";
-  let params: (string | number | boolean)[] = [numericCompanyId];
+  let params: any[] = [numericCompanyId];
 
   if (type && type.length > 0 && type.length < 5) {
-    whereClause += " AND sink_type.type IN (?)";
-    params.push(type.join(","));
+    whereClause += ` AND sink_type.type IN (${type.map(() => '?').join(',')})`;
+    params.push(...type);
   }
 
   if (supplier > 0) {

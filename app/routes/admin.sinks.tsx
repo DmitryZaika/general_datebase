@@ -22,26 +22,7 @@ const customOrder = [
   "farm house",
 ];
 
-function customSort(a: string, b: string) {
-  const aIndex = customOrder.findIndex(
-    (item) => item.toLowerCase() === a.toLowerCase()
-  );
-  const bIndex = customOrder.findIndex(
-    (item) => item.toLowerCase() === b.toLowerCase()
-  );
 
-  if (aIndex !== -1 && bIndex !== -1) {
-    return aIndex - bIndex;
-  }
-  if (aIndex !== -1 && bIndex === -1) {
-    return -1;
-  }
-  if (aIndex === -1 && bIndex !== -1) {
-    return 1;
-  }
-
-  return a.localeCompare(b);
-}
 
 const formatPrice = (price: number | null | undefined): string => {
   if (price == null) return "-";
