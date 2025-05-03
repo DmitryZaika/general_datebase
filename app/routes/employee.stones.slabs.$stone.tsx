@@ -42,7 +42,9 @@ interface Slab {
   sale_id: number | null;
   width: number;
   length: number;
-  cut_date: string | null;  
+  cut_date: string | null;
+  source_stone_id?: number;
+  source_stone_name?: string;
   transaction?: {
     sale_id: number;
     sale_date: string;
@@ -115,17 +117,58 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!stone) {
     return forceRedirectError(request.headers, "No stone found for given ID");
   }
+  
   const slabs = await selectMany<Slab>(
     db,
     "SELECT id, bundle, url, sale_id, width, length, cut_date FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL",
     [stoneId]
   );
   
-  const soldSlabIds = slabs.filter(slab => slab.sale_id).map(slab => slab.id);
+  let linkedSlabs: Slab[] = [];
+  
+  try {
+    const stoneLinks = await selectMany<{ 
+      source_stone_id: number;
+      source_stone_name: string;
+    }>(
+      db,
+      `SELECT 
+         stone_slab_links.source_stone_id, 
+         s.name as source_stone_name
+       FROM stone_slab_links
+       JOIN stones s ON stone_slab_links.source_stone_id = s.id
+       WHERE stone_slab_links.stone_id = ?
+       GROUP BY stone_slab_links.source_stone_id, s.name
+       ORDER BY s.name ASC`,
+      [stoneId]
+    );
+    
+    for (const link of stoneLinks) {
+      const linkedStoneSlabs = await selectMany<Slab>(
+        db,
+        `SELECT 
+           id, bundle, url, sale_id, width, length, cut_date
+         FROM slab_inventory 
+         WHERE stone_id = ? AND cut_date IS NULL`,
+        [link.source_stone_id]
+      );
+      
+      linkedStoneSlabs.forEach(slab => {
+        slab.source_stone_id = link.source_stone_id;
+        slab.source_stone_name = link.source_stone_name;
+      });
+      
+      linkedSlabs = [...linkedSlabs, ...linkedStoneSlabs];
+    }
+  } catch (err) {
+    console.error("Error fetching linked slabs:", err);
+  }
+  
+  const allSlabs = [...slabs, ...linkedSlabs];
+  const soldSlabIds = allSlabs.filter(slab => slab.sale_id).map(slab => slab.id);
   
   if (soldSlabIds.length > 0) {
     const placeholders = soldSlabIds.map(() => '?').join(',');
-    
     
     const sqlQuery = `
       SELECT 
@@ -156,7 +199,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         slab_inventory.id DESC
     `;
     
-    
     const rawTransactions = await selectMany<Record<string, any>>(
       db,
       sqlQuery,
@@ -180,7 +222,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       return acc;
     }, {} as Record<number, Transaction[]>);
     
-    slabs.forEach(slab => {
+    allSlabs.forEach(slab => {
       const slabTransactions = transactionsBySlab[slab.id];
       
       if (slabTransactions && slabTransactions.length > 0) {
@@ -200,7 +242,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       }
     });
   }
-  return { slabs, stone };
+  
+  return { slabs, linkedSlabs, stone };
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -240,9 +283,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   return null;
 }
 
-
 export default function SlabsModal() {
-  const { slabs, stone } = useLoaderData<typeof loader>();
+  const { slabs, linkedSlabs, stone } = useLoaderData<typeof loader>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [editingSlab, setEditingSlab] = useState<number | null>(null);
   const navigation = useNavigation();
@@ -265,6 +307,139 @@ export default function SlabsModal() {
     setEditingSlab(slabId);
   };
 
+  const renderSlabItem = (slab: Slab) => {
+    const isEditing = editingSlab === slab.id;
+    
+    return (
+      <TooltipProvider key={slab.id}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={`transition-colors duration-300 flex items-center gap-4 p-2 sm:px-5 rounded-lg border border-gray-200 ${
+                slab.sale_id ? "bg-red-300" : "bg-white"
+              }`}
+            >
+              <img
+                src={
+                  slab.url === "undefined" || slab.url === null
+                    ? stone.url
+                    : slab.url
+                }
+                alt="Slab"
+                className="w-7 h-7 sm:w-15 sm:h-15 object-cover cursor-pointer rounded"
+                onClick={() => {
+                  if (slab.url) {
+                    setSelectedImage(slab.url);
+                  }
+                }}
+              />
+              
+              <span
+                className={`font-semibold whitespace-nowrap ${
+                  slab.sale_id ? "text-red-900" : "text-gray-800"
+                }`}
+              >
+                {slab.bundle}
+              </span>
+
+              <div className="flex items-center gap-2 w-full">
+                {isEditing ? (
+                  <Form method="post" className="flex items-center gap-2 w-full">
+                    <AuthenticityTokenInput />
+                    <input type="hidden" name="intent" value="updateSize" />
+                    <input type="hidden" name="slabId" value={slab.id} />
+                    <Input
+                      type="number"
+                      name="length"
+                      defaultValue={slab.length}
+                      className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      inputMode="numeric"
+                    />
+                    <span>x</span>
+                    <Input
+                      type="number"
+                      name="width"
+                      defaultValue={slab.width}
+                      className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      inputMode="numeric"
+                    />
+                    <Button type="submit" size="sm" className="ml-auto">Save</Button>
+                  </Form>
+                ) : (
+                  <button 
+                    type="button"
+                    onClick={() => handleEditClick(slab.id)}
+                    className="text-gray-500 hover:text-gray-700 cursor-pointer"
+                  >
+                    {slab.length} x {slab.width}
+                  </button>
+                )}
+              </div>
+
+              {!isEditing && (
+                <>
+                  <div className="flex gap-2 ml-auto">
+                    {slab.transaction ? (
+                      <Link to={`edit/${slab.transaction.sale_id}/${location.search}`}>
+                        <Button type="button">
+                          Edit
+                        </Button>
+                      </Link>
+                    ) : (
+                    <Link to={`sell/${slab.id}/${location.search}`} className="ml-auto">
+                      <Button className="px-4 py-2">
+                        Sell
+                      </Button>
+                    </Link>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </TooltipTrigger>
+          {slab.sale_id && (
+            <TooltipContent className="bg-gray-900 text-white p-2 rounded shadow-lg max-w-xs">
+              <div className="flex flex-col gap-1 text-sm">
+                {slab.transaction ? (
+                  <>
+                    <p><strong>Sold to:</strong> {slab.transaction.customer_name}</p>
+                    <p><strong>Sold by:</strong> {slab.transaction.seller_name}</p>
+                    <p><strong>Sale date:</strong> {formatDate(slab.transaction.sale_date)}</p>
+                    
+                    {(slab.transaction.square_feet ?? 0) > 0 && (
+                      <p><strong>Square Feet:</strong> {slab.transaction.square_feet}</p>
+                    )}
+                    
+                    {slab.transaction.sink && (
+                      <>
+                        {formatSinkList(slab.transaction.sink).split(',').map((sink, index) => (
+                          <p key={index} className={index > 0 ? "text-sm ml-10" : ""}>
+                            {index === 0 ? <><strong>Sink:</strong> {sink}</> : sink}
+                          </p>
+                        ))}
+                      </>
+                    )}
+                    
+                    {slab.transaction.notes && (
+                      <p><strong>Notes:</strong> {slab.transaction.notes}</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p><strong>Status:</strong> Sold</p>
+                    <p className="text-red-400">Transaction data not available</p>
+                    <p className="text-xs mt-1">This slab is marked as sold but has no transaction details.</p>
+                  </>
+                )}
+              </div>
+            </TooltipContent>
+          )}
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
+  const allSlabs = [...linkedSlabs, ...slabs];
 
   return (
     <Dialog
@@ -275,145 +450,10 @@ export default function SlabsModal() {
         <DialogTitle>Slabs for {stone.name}</DialogTitle>
 
         <div className="flex flex-col gap-4">
-          {slabs.length === 0 ? (
+          {allSlabs.length === 0 ? (
             <p className="text-center text-gray-500">No Slabs available</p>
           ) : (
-            slabs.map((slab) => {
-              const isEditing = editingSlab === slab.id;
-
-              return (
-                <TooltipProvider key={slab.id}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div
-                        className={`transition-colors duration-300 flex items-center gap-4 p-2 sm:px-5 rounded-lg border border-gray-200 ${
-                          slab.sale_id ? "bg-red-300" : "bg-white"
-                        }`}
-                      >
-                        <img
-                          src={
-                            slab.url === "undefined" || slab.url === null
-                              ? stone.url
-                              : slab.url
-                          }
-                          alt="Slab"
-                          className="w-7 h-7 sm:w-15 sm:h-15 object-cover cursor-pointer rounded"
-                          onClick={() => {
-                            if (slab.url) {
-                              setSelectedImage(slab.url);
-                            }
-                          }}
-                        />
-                        
-                        <span
-                          className={`font-semibold whitespace-nowrap ${
-                            slab.sale_id ? "text-red-900" : "text-gray-800"
-                          }`}
-                        >
-                          {slab.bundle}
-                        </span>
-
-                        <div className="flex items-center gap-2 w-full">
-                          {isEditing ? (
-                            <Form method="post" className="flex items-center gap-2 w-full">
-                              <AuthenticityTokenInput />
-                              <input type="hidden" name="intent" value="updateSize" />
-                              <input type="hidden" name="slabId" value={slab.id} />
-                              <Input
-                                type="number"
-                                name="length"
-                                defaultValue={slab.length}
-                                className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                inputMode="numeric"
-                              />
-                              <span>x</span>
-                              <Input
-                                type="number"
-                                name="width"
-                                defaultValue={slab.width}
-                                className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                inputMode="numeric"
-                              />
-                              <Button type="submit" size="sm" className="ml-auto">Save</Button>
-                            </Form>
-                          ) : (
-                            <button 
-                              type="button"
-                              onClick={() => handleEditClick(slab.id)}
-                              className="text-gray-500 hover:text-gray-700 cursor-pointer"
-                            >
-                              {slab.length} x {slab.width}
-                            </button>
-                          )}
-                        </div>
-
-                        {!isEditing && (
-                          <>
-                            {slab.transaction ? (
-                              <div className="flex gap-2 ml-auto">
-                                <Link to={`edit/${slab.transaction.sale_id}/${location.search}`}>
-                                  <Button type="button">
-                                    Edit
-                                  </Button>
-                                </Link>
-                                  {/* <Link to={`unsell/${slab.transaction.sale_id}/${location.search}`} className="ml-auto">
-                                  <Button type="submit" className="px-4 py-2 bg-red-600 hover:bg-red-700">
-                                    Unsell
-                                  </Button>
-                                  </Link> */}
-                              </div>
-                            ) : (
-                                <Link to={`sell/${slab.id}/${location.search}`} className="ml-auto">
-                                  <Button className="px-4 py-2">
-                                    Sell
-                                  </Button>
-                                </Link>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </TooltipTrigger>
-                    {slab.sale_id && (
-                      <TooltipContent className="bg-gray-900 text-white p-2 rounded shadow-lg max-w-xs">
-                        <div className="flex flex-col gap-1 text-sm">
-                          {slab.transaction ? (
-                            <>
-                              <p><strong>Sold to:</strong> {slab.transaction.customer_name}</p>
-                              <p><strong>Sold by:</strong> {slab.transaction.seller_name}</p>
-                              <p><strong>Sale date:</strong> {formatDate(slab.transaction.sale_date)}</p>
-                              
-                              {(slab.transaction.square_feet ?? 0) > 0 && (
-                                <p><strong>Square Feet:</strong> {slab.transaction.square_feet}</p>
-                              )}
-                              
-                              {slab.transaction.sink && (
-                                <>
-                                  {formatSinkList(slab.transaction.sink).split(',').map((sink, index) => (
-                                    <p key={index} className={index > 0 ? "text-sm ml-10" : ""}>
-                                      {index === 0 ? <><strong>Sink:</strong> {sink}</> : sink}
-                                    </p>
-                                  ))}
-                                </>
-                              )}
-                              
-                              {slab.transaction.notes && (
-                                <p><strong>Notes:</strong> {slab.transaction.notes}</p>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <p><strong>Status:</strong> Sold</p>
-                              <p className="text-red-400">Transaction data not available</p>
-                              <p className="text-xs mt-1">This slab is marked as sold but has no transaction details.</p>
-                            </>
-                          )}
-                        </div>
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </TooltipProvider>
-              );
-            })
+            allSlabs.map(renderSlabItem)
           )}
         </div>
 
