@@ -21,6 +21,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@hookform/resolvers": "^3.9.1",
+    "@lucide/lab": "^0.1.2",
     "@mjackson/form-data-parser": "^0.7.0",
     "@oslojs/crypto": "^1.0.1",
     "@oslojs/encoding": "^1.1.0",
