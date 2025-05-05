@@ -44,9 +44,17 @@ interface Sink {
 }
 
 const customerSchema = z.object({
-  name: z.string().min(1, "Customer name is required"),
+  name: z.union([z.string(), z.number()])
+    .refine(val => val !== undefined && val !== null && val.toString().trim() !== "", "Customer name is required")
+    .transform(val => String(val)),
+  customer_id: z.coerce.number().optional(),
   sink_type_id: z.preprocess(val => String(val), z.string().optional()),
-  notes: z.union([z.string(), z.number()]).transform(val => val ? String(val) : "").optional(),
+  notes_to_slab: z.union([z.string(), z.number(), z.null()])
+    .transform(val => val ? String(val) : "")
+    .optional(),
+  notes_to_sale: z.union([z.string(), z.number(), z.null()])
+    .transform(val => val ? String(val) : "")
+    .optional(),
   square_feet: z.coerce.number().default(0),
 });
 
@@ -76,8 +84,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { errors, receivedValues };
   }
   
-
-  
   const slabId = params.slab;
   if (!slabId) {
     return { error: "Slab ID is missing" };
@@ -97,22 +103,40 @@ export async function action({ request, params }: ActionFunctionArgs) {
       throw new Error("Slab not found");
     }
     
-    const [customerResult] = await db.execute<ResultSetHeader>(
-      `INSERT INTO customers (name, company_id) VALUES (?, ?)`,
-      [
-        data.name,
-        user.company_id
-      ]
-    );
-    const customerId = customerResult.insertId;
+    let customerId: number;
+    
+    if (data.customer_id) {
+      customerId = data.customer_id;
+      
+      const [customerVerify] = await db.execute<RowDataPacket[]>(
+        `SELECT id FROM customers WHERE id = ? AND company_id = ?`,
+        [customerId, user.company_id]
+      );
+      
+      if (!customerVerify || customerVerify.length === 0) {
+        throw new Error("Customer not found");
+      }
+    } else {
+      const [customerResult] = await db.execute<ResultSetHeader>(
+        `INSERT INTO customers (name, company_id) VALUES (?, ?)`,
+        [
+          data.name,
+          user.company_id
+        ]
+      );
+      customerId = customerResult.insertId;
+    }
     
     const [salesResult] = await db.execute<ResultSetHeader>(
-      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, status) 
-       VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'sold')`,
+      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, status, notes) 
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'sold', ?)`,
       [
         customerId,
         user.id, 
-        user.company_id
+        user.company_id,
+        data.notes_to_sale || null,
+        
+
       ]
     );
     
@@ -154,8 +178,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   
 
       await db.execute(
-      `UPDATE slab_inventory SET sale_id = ?, notes = ?, square_feet = ? WHERE id = ?`,
-      [saleId, data.notes || null, data.square_feet || 0, slabId]
+      `UPDATE slab_inventory SET sale_id = ?, square_feet = ? WHERE id = ?`,
+      [saleId, data.square_feet || 0, slabId]
     );
     
  
@@ -202,9 +226,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       id: number;
       customer_name: string;
       sale_date: string;
+      notes: string | null;
     }>(
       db,
-      `SELECT s.id, c.name as customer_name, s.sale_date
+      `SELECT s.id, c.name as customer_name, s.sale_date, s.notes
        FROM sales s
        JOIN customers c ON s.customer_id = c.id
        WHERE s.company_id = ? AND s.status != 'cancelled'
@@ -220,7 +245,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       db,
       `SELECT id, name FROM customers 
        WHERE company_id = ? 
-       ORDER BY name ASC 
+       ORDER BY id DESC
        LIMIT 100`,
       [user.company_id]
     );
@@ -246,8 +271,9 @@ export default function SlabSell() {
     resolver,
     defaultValues: {
       name: "",
+      customer_id: undefined,
       sink_type_id: "",
-      notes: "",
+      notes_to_slab: "",
     },
   });
   const fullSubmit = useFullSubmit(form);
@@ -264,8 +290,9 @@ export default function SlabSell() {
     navigate(`/employee/stones/slabs/${params.stone}/add-to-sale/${params.slab}/${saleId}${location.search}`);
   };
 
-  const handleSelectCustomer = (customerName: string) => {
+  const handleSelectCustomer = (customerName: string, customerId: number) => {
     form.setValue("name", customerName);
+    form.setValue("customer_id", customerId);
     setIsExistingCustomer(true);
     setShowExistingCustomers(false);
   };
@@ -317,6 +344,14 @@ export default function SlabSell() {
                 </Button>
               </div>
               
+              <FormField
+                control={form.control}
+                name="customer_id"
+                render={({ field }) => (
+                  <input type="hidden" {...field} />
+                )}
+              />
+              
               <div className="flex flex-row gap-2">
                 <FormField  
                   control={form.control}
@@ -351,11 +386,11 @@ export default function SlabSell() {
               </div>
               <FormField
                 control={form.control}
-                name="notes"
+                name="notes_to_sale"
                 render={({ field }) => (
                   <InputItem
                     name={"Notes"}
-                    placeholder={"Additional notes"}
+                    placeholder={"Notes to Sale"}
                     field={field}
                   />
                 )}
@@ -398,7 +433,13 @@ export default function SlabSell() {
                         <div className="font-medium">{sale.customer_name}</div>
                         <div className="text-sm text-gray-500">
                           {new Date(sale.sale_date).toLocaleDateString()}
+                          {sale.notes && (
+                            <div className="text-xs text-gray-600 mt-1">
+                              <span className="font-semibold">Notes:</span> {sale.notes}
+                            </div>
+                          )}
                         </div>
+                        
                       </div>
                     ))}
                   </div>
@@ -432,7 +473,7 @@ export default function SlabSell() {
                       <div 
                         key={customer.id} 
                         className="p-3 border rounded hover:bg-gray-50 cursor-pointer"
-                        onClick={() => handleSelectCustomer(customer.name)}
+                        onClick={() => handleSelectCustomer(customer.name, customer.id)}
                       >
                         <div className="font-medium">{customer.name}</div>
                       </div>

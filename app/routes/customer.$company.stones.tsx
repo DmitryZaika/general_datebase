@@ -108,6 +108,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
           Type: capitalizeFirstLetter(stone.type)
 
         }}
+        disabled={true}
         title={stone.name}
       >
         <img

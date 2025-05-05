@@ -7,7 +7,6 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import {  forceRedirectError, toastData } from "~/utils/toastHelpers";
 import {  getEmployeeUser } from "~/utils/session.server";
-import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 
 export async function action({ params, request }: ActionFunctionArgs) {
   await getEmployeeUser(request);
