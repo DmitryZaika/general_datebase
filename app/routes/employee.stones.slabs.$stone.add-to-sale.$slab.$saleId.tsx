@@ -49,7 +49,7 @@ interface Sink {
 }
 
 const schema = z.object({
-  notes: z.union([z.string(), z.number()]).transform(val => val ? String(val) : "").optional(),
+  notes_to_slab: z.union([z.string(), z.number()]).transform(val => val ? String(val) : "").optional(),
   sink: z.union([z.string(), z.number()]).optional(),
   square_feet: z.coerce.number().optional(),
 });
@@ -145,7 +145,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (slabInSaleCheck[0].cut_date) {
         await db.execute(
           `UPDATE slab_inventory SET cut_date = NULL, notes = ?, square_feet = ? WHERE id = ?`,
-          [data.notes || null, data.square_feet || null, slabInSaleCheck[0].id]
+          [data.notes_to_slab || null, data.square_feet || null, slabInSaleCheck[0].id]
         );
       } else {
         throw new Error("This slab is already added to this sale");
@@ -153,7 +153,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     } else {
       await db.execute(
         `UPDATE slab_inventory SET sale_id = ?, notes = ?, square_feet = ? WHERE id = ?`,
-        [saleId, data.notes || null, data.square_feet || null, slab]
+        [saleId, data.notes_to_slab || null, data.square_feet || null, slab]
       );
     }
     
@@ -277,9 +277,9 @@ export default function AddToSale() {
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
-      notes: "",
+      notes_to_slab: "",
       sink: "",
-      square_feet: 0,
+      square_feet: "",
     },
   });
   
@@ -356,10 +356,10 @@ export default function AddToSale() {
               />
               <FormField
                 control={form.control}
-                name="notes"
+                name="notes_to_slab"
                 render={({ field }) => (
                   <InputItem
-                    name={"Notes"}
+                    name={"Notes to Slab"}
                     placeholder={"Additional notes"}
                     field={field}
                   />

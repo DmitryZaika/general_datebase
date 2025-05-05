@@ -50,7 +50,8 @@ interface Slab {
     sale_date: string;
     customer_name: string;
     seller_name: string;
-    notes?: string;
+    sale_notes?: string;
+    slab_notes?: string;
     square_feet?: number;
     sink?: string;
   };
@@ -64,7 +65,8 @@ const TransactionSchema = z.object({
   ),
   customer_name: z.string(),
   seller_name: z.string(),
-  notes: z.string().nullable().optional(),
+  sale_notes: z.string().nullable().optional(),
+  slab_notes: z.string().nullable().optional(),
   square_feet: z.coerce.number().default(0),
   sink_names: z.string().nullable().optional(),
 });
@@ -177,7 +179,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         sales.sale_date,
         customers.name as customer_name,
         users.name as seller_name,
-        slab_inventory.notes,
+        sales.notes as sale_notes,
+        slab_inventory.notes as slab_notes,
         slab_inventory.square_feet,
         (
           SELECT GROUP_CONCAT(sink_type.name SEPARATOR ', ')
@@ -207,7 +210,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     
     const transactionResults = rawTransactions.map(raw => {
       try {
-        return TransactionSchema.parse(raw);
+        const parsed = TransactionSchema.parse(raw);
+        return parsed;
       } catch (error) {
         console.error(`Validation error for transaction:`, error);
         return null;
@@ -233,7 +237,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           sale_date: transaction.sale_date,
           customer_name: transaction.customer_name,
           seller_name: transaction.seller_name,
-          notes: transaction.notes || '',
+          sale_notes: transaction.sale_notes || '',
+          slab_notes: transaction.slab_notes || '',
           square_feet: transaction.square_feet || 0,
           sink: transaction.sink_names || '',
         };
@@ -420,8 +425,12 @@ export default function SlabsModal() {
                       </>
                     )}
                     
-                    {slab.transaction.notes && (
-                      <p><strong>Notes:</strong> {slab.transaction.notes}</p>
+                    {slab.transaction.sale_notes && (
+                      <p><strong>Notes to Sale:</strong> {slab.transaction.sale_notes}</p>
+                    )}
+                    
+                    {slab.transaction.slab_notes && (
+                      <p><strong>Notes to Slab:</strong> {slab.transaction.slab_notes}</p>
                     )}
                   </>
                 ) : (

@@ -93,15 +93,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   
   const stoneId = parseInt(params.stone, 10);
   
-  const requestClone = request.clone();
-
   if (request.method === "DELETE") {
-    const form = await requestClone.formData();
-    const id = form.get("id");
-    const unlinkSourceId = form.get("unlinkSourceId");
-    
-    if (unlinkSourceId) {
-      try {
+    try {
+      const form = await request.formData();
+      const id = form.get("id");
+      const unlinkSourceId = form.get("unlinkSourceId");
+      
+      if (unlinkSourceId) {
         await db.execute(
           `DELETE FROM stone_slab_links 
            WHERE stone_id = ? AND source_stone_id = ?`,
@@ -113,80 +111,100 @@ export async function action({ request, params }: ActionFunctionArgs) {
         return data({ success: true }, {
           headers: { "Set-Cookie": await commitSession(session) },
         });
-      } catch (error) {
-        console.error("Error unlinking slabs:", error);
-        return { error: "Failed to unlink slabs" };
-      }
-    } else if (id) {
-      const slabId = parseInt(id.toString(), 10);
-      const record = await selectId<{ url: string | null }>(
-        db,
-        "SELECT url FROM slab_inventory WHERE id = ?",
-        slabId,
-      );
-      await db.execute("DELETE FROM slab_inventory WHERE id = ?", [slabId]);
-      const session = await getSession(request.headers.get("Cookie"));
-      if (record?.url) {
-        deleteFile(record.url);
-      }
-      session.flash("message", toastData("Success", "Image Deleted"));
-      return data({ success: true }, {
-        headers: { "Set-Cookie": await commitSession(session) },
-      });
-    } else {
-      return forceRedirectError(request.headers, "No id provided");
-    }
-  } else if (request.method === "POST") {
-    const formData = await requestClone.formData();
-    const intent = formData.get("intent");
-    
-    if (intent === "link_slabs") {
-      const fromStoneId = formData.get("fromStoneId");
-      
-      if (!fromStoneId) {
-        return { error: "No stone ID provided to link from" };
-      }
-      
-      try {
-        await db.execute(
-          `INSERT INTO stone_slab_links (stone_id, source_stone_id) 
-           VALUES (?, ?)`,
-          [stoneId, fromStoneId]
+      } else if (id) {
+        const slabId = parseInt(id.toString(), 10);
+        const record = await selectId<{ url: string | null }>(
+          db,
+          "SELECT url FROM slab_inventory WHERE id = ?",
+          slabId,
         );
-        
+        await db.execute("DELETE FROM slab_inventory WHERE id = ?", [slabId]);
         const session = await getSession(request.headers.get("Cookie"));
-        session.flash("message", toastData("Success", "Slabs linked successfully"));
+        if (record?.url) {
+          deleteFile(record.url);
+        }
+        session.flash("message", toastData("Success", "Image Deleted"));
         return data({ success: true }, {
           headers: { "Set-Cookie": await commitSession(session) },
         });
-      } catch (error) {
-        console.error("Error linking slabs:", error);
-        return { error: "Failed to link slabs" };
+      } else {
+        return forceRedirectError(request.headers, "No id provided");
       }
-    } else {
-      const { errors, data: formData } = await parseMutliForm(requestClone, slabSchema, "stones");
-      if (errors || !formData) {
-        return { errors };
-      }
-      if (formData.length === 0 && formData.width === 0) {
-        const [stoneRecord] = await selectMany<{ width: number; length: number }>(
-          db,
-          "SELECT width, length FROM stones WHERE id = ? LIMIT 1",
-          [stoneId],
-        );
-        formData.length = stoneRecord?.length ?? 0;
-        formData.width = stoneRecord?.width ?? 0;
-      }
-      await db.execute(
-        "INSERT INTO slab_inventory (bundle, stone_id, url, width, length) VALUES (?, ?, ?, ?, ?)",
-        [formData.bundle, stoneId, formData.file ?? "", formData.width, formData.length],
-      );
-      const session = await getSession(request.headers.get("Cookie"));
-      session.flash("message", toastData("Success", "Image Added"));
-      return data({ success: true }, {
-        headers: { "Set-Cookie": await commitSession(session) },
-      });
+    } catch (error) {
+      console.error("Error processing DELETE request:", error);
+      return { error: "Failed to process delete request" };
     }
+  } else if (request.method === "POST") {
+    const contentType = request.headers.get("Content-Type") || "";
+    
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      try {
+        const formData = await request.formData();
+        const intent = formData.get("intent");
+        
+        if (intent === "link_slabs") {
+          const fromStoneId = formData.get("fromStoneId");
+          
+          if (!fromStoneId) {
+            return { error: "No stone ID provided to link from" };
+          }
+          
+          await db.execute(
+            `INSERT INTO stone_slab_links (stone_id, source_stone_id) 
+             VALUES (?, ?)`,
+            [stoneId, fromStoneId]
+          );
+          
+          const session = await getSession(request.headers.get("Cookie"));
+          session.flash("message", toastData("Success", "Slabs linked successfully"));
+          return data({ success: true }, {
+            headers: { "Set-Cookie": await commitSession(session) },
+          });
+        }
+        
+        return { error: "Invalid form data" };
+      } catch (error) {
+        console.error("Error processing form data:", error);
+        return { error: "Failed to process form data" };
+      }
+    }
+    
+    if (contentType.includes("multipart/form-data")) {
+      try {
+        const { errors, data: formData } = await parseMutliForm(request, slabSchema, "stones");
+        
+        if (errors || !formData) {
+          return { errors };
+        }
+        
+        if (formData.length === 0 && formData.width === 0) {
+          const [stoneRecord] = await selectMany<{ width: number; length: number }>(
+            db,
+            "SELECT width, length FROM stones WHERE id = ? LIMIT 1",
+            [stoneId],
+          );
+          formData.length = stoneRecord?.length ?? 0;
+          formData.width = stoneRecord?.width ?? 0;
+        }
+        
+        await db.execute(
+          "INSERT INTO slab_inventory (bundle, stone_id, url, width, length) VALUES (?, ?, ?, ?, ?)",
+          [formData.bundle, stoneId, formData.file ?? "", formData.width, formData.length],
+        );
+        
+        const session = await getSession(request.headers.get("Cookie"));
+        session.flash("message", toastData("Success", "Image Added"));
+        return data({ success: true }, {
+          headers: { "Set-Cookie": await commitSession(session) },
+        });
+      } catch (error: unknown) {
+        console.error("Error processing slab form:", error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { error: `Failed to add slab: ${errorMessage}` };
+      }
+    }
+    
+    return { error: "Unsupported content type" };
   }
 
   return null;
@@ -220,7 +238,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     stoneId,
   ]);
   
-  // Get only stones that have slabs for the dropdown
   const allStones = await selectMany<{ id: number; name: string }>(
     db,
     `SELECT DISTINCT s.id, s.name 
@@ -395,87 +412,120 @@ export function AddSlab() {
   const { stone } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const [resetKey, setResetKey] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const isSubmitting = navigation.state === "submitting";
+  const actionData = useActionData();
+  
+  // Reset error when navigation state changes
+  useEffect(() => {
+    if (navigation.state === "submitting") {
+      setUploadError(null);
+    }
+  }, [navigation.state]);
+  
+  // Check for action data errors
+  useEffect(() => {
+    if (actionData?.error && typeof actionData.error === 'string' && actionData.error.includes("ReadableStream is locked")) {
+      setUploadError("There was an issue with the file upload. Please try again.");
+    }
+  }, [actionData]);
+  
   const form = useCustomOptionalForm(slabSchema, {
     defaultValues: {
       bundle: "",
       file: stone.url || undefined,
-      length: "",
-      width: "",
+      length: stone?.length?.toString() || "",
+      width: stone?.width?.toString() || "",
     },
   });
+  
   useEffect(() => {
-    if (navigation.state === "idle") {
+    if (navigation.state === "idle" && !uploadError) {
       form.reset({
         bundle: "",
         file: undefined,
-        length: stone?.length ?? "",
-        width: stone?.width ?? "",
+        length: stone?.length?.toString() || "",
+        width: stone?.width?.toString() || "",
       });
       setResetKey((prev) => prev + 1);
     }
-  }, [navigation.state, stone, form]);
+  }, [navigation.state, stone, form, uploadError]);
+  
   return (
-    <MultiPartForm form={form} className="mb-5">
-      <AuthenticityTokenInput />
-      <div className="flex gap-2 [&>*:first-child]:w-[70%] [&>*:last-child]:w-[30%]">
-        <FormField
-          control={form.control}
-          name="bundle"
-          render={({ field }) => (
-            <InputItem
-              name="Bundle"
-              className="-mb-3"
-              placeholder="Slab"
-              field={field}
-            />
-          )}
-        />
-        <FormField
-          key={resetKey}
-          control={form.control}
-          name="file"
-          render={({ field }) => (
-            <FileInput
-              className="-mb-3"
-              inputName="stones"
-              type="image"
-              id="image"
-              onChange={field.onChange}
-            />
-          )}
-        />
-      </div>
-      <div className="flex gap-2">
-        <FormField
-          control={form.control}
-          name="length"
-          render={({ field }) => (
-            <InputItem
-              name="Length"
-              className="-mb-3"
-              placeholder={stone?.length?.toString() || "Length"}
-              field={field}
-            />
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="width"
-          render={({ field }) => (
-            <InputItem
-              name="Width"
-              className="-mb-3"
-              placeholder={stone?.width?.toString() || "Width"}
-              field={field}
-            />
-          )}
-        />
-      </div>
-      <Button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? "Uploading..." : "Add Slab"}
-      </Button>
-    </MultiPartForm>
+    <>
+      {uploadError && (
+        <div className="mb-4 p-2 bg-red-100 text-red-700 rounded border border-red-300">
+          {uploadError}
+        </div>
+      )}
+      <MultiPartForm form={form} className="mb-5">
+        <AuthenticityTokenInput />
+        <div className="flex gap-2 [&>*:first-child]:w-[70%] [&>*:last-child]:w-[30%]">
+          <FormField
+            control={form.control}
+            name="bundle"
+            render={({ field }) => (
+              <InputItem
+                name="Bundle"
+                className="-mb-3"
+                placeholder="Slab"
+                field={field}
+              />
+            )}
+          />
+          <FormField
+            key={resetKey}
+            control={form.control}
+            name="file"
+            render={({ field }) => (
+              <FileInput
+                className="-mb-3"
+                inputName="stones"
+                type="image"
+                id="image"
+                onChange={(value) => {
+                  setUploadError(null);
+                  field.onChange(value);
+                }}
+              />
+            )}
+          />
+        </div>
+        <div className="flex gap-2">
+          <FormField
+            control={form.control}
+            name="length"
+            render={({ field }) => (
+              <InputItem
+                name="Length"
+                className="-mb-3"
+                placeholder={stone?.length?.toString() || "Length"}
+                field={field}
+              />
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="width"
+            render={({ field }) => (
+              <InputItem
+                name="Width"
+                className="-mb-3"
+                placeholder={stone?.width?.toString() || "Width"}
+                field={field}
+              />
+            )}
+          />
+        </div>
+        <Button 
+          type="submit" 
+          disabled={isSubmitting}
+          onClick={() => setUploadError(null)}
+        >
+          {isSubmitting ? "Uploading..." : "Add Slab"}
+        </Button>
+      </MultiPartForm>
+    </>
   );
 }
 
@@ -492,15 +542,12 @@ export default function EditStoneSlabs() {
   const actionData = useActionData();
   const isSubmitting = navigation.state === "submitting";
   
-  // Handle successful actions (linking or unlinking)
   useEffect(() => {
     if (actionData?.success && navigation.state === "idle") {
-      // Refresh the page data without reloading the page
       navigate(`/admin/stones/edit/${params.stone}/slabs`, { replace: true });
     }
   }, [actionData, navigation.state, navigate, params.stone]);
   
-  // Function to open the confirmation dialog
   const handleUnlinkClick = (sourceId: number, name: string) => {
     setUnlinkSourceId(sourceId);
     setUnlinkStoneName(name);
