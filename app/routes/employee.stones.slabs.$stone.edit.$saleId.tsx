@@ -14,13 +14,10 @@ import {
   data
 } from "react-router";
 import { getEmployeeUser } from "~/utils/session.server";
-import { useFullSubmit } from "~/hooks/useFullSubmit";
-import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { commitSession, getSession } from "~/sessions";
 import { selectMany, selectId } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
-import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { Button } from "~/components/ui/button";
 import { DeleteRow } from "~/components/pages/DeleteRow";
 import {
@@ -54,6 +51,7 @@ interface SaleDetails {
   sale_date: string;
   seller_id: number;
   seller_name: string;
+  notes: string | null;
 }
 
 interface SaleSlab {
@@ -133,6 +131,7 @@ const customerResolver = zodResolver(customerSchema);
 const saleInfoSchema = z.object({
   customer_name: z.string().min(1, "Customer name is required"),
   seller_id: z.coerce.number().min(1, "Seller is required"),
+  notes: z.string().optional(),
 });
 
 type SaleInfoFormData = z.infer<typeof saleInfoSchema>;
@@ -171,7 +170,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     db,
     `SELECT 
       s.id, s.customer_id, c.name as customer_name, 
-      s.sale_date, s.seller_id, u.name as seller_name
+      s.sale_date, s.seller_id, u.name as seller_name, s.notes
      FROM sales s
      JOIN customers c ON s.customer_id = c.id
      JOIN users u ON s.seller_id = u.id
@@ -277,7 +276,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       
       await db.execute(
         `UPDATE slab_inventory 
-         SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL 
+         SET sale_id = NULL, price = NULL, square_feet = NULL, notes = NULL 
          WHERE sale_id = ?`,
         [saleId]
       );
@@ -304,6 +303,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     else if (intent === "sale-info-update") {
       const customer_name = formData.get("customer_name") as string;
       const seller_id = parseInt(formData.get("seller_id") as string);
+      const notes = formData.get("notes") as string;
     
       
       if (!customer_name || isNaN(seller_id)) {
@@ -320,8 +320,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         );
         
         await db.execute(
-          `UPDATE sales SET seller_id = ? WHERE id = ?`,
-          [seller_id, saleId]
+          `UPDATE sales SET seller_id = ?, notes = ? WHERE id = ?`,
+          [seller_id, notes || null, saleId]
         );
         
         const session = await getSession(request.headers.get("Cookie"));
@@ -362,21 +362,50 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return data({ success: true, customer_id: customerId, customer_name }, {
         headers: { "Set-Cookie": await commitSession(session) },
       });
+    } else if (intent === "select-customer") {
+      const customerId = formData.get("customer_id") as string;
+      
+      if (!customerId) {
+        throw new Error("Customer ID is required");
+      }
+      
+      // Get customer details
+      const customers = await selectMany<Customer>(
+        db,
+        `SELECT id, name FROM customers WHERE id = ? AND company_id = ?`,
+        [customerId, user.company_id]
+      );
+      
+      if (customers.length === 0) {
+        throw new Error("Customer not found");
+      }
+      
+      // Update the sale with the selected customer
+      await db.execute(
+        `UPDATE sales SET customer_id = ? WHERE id = ?`,
+        [customerId, saleId]
+      );
+      
+      const session = await getSession(request.headers.get("Cookie"));
+      session.flash("message", toastData("Success", "Customer assigned to sale"));
+      
+      return data({ success: true, customer_id: parseInt(customerId), customer_name: customers[0].name }, {
+        headers: { "Set-Cookie": await commitSession(session) },
+      });
     } else if (intent == "slab-delete") {
       const slabId = formData.get("id") as string;
       await db.execute(
-        `UPDATE slab_inventory SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL WHERE id = ?`,
+        `UPDATE slab_inventory SET sale_id = NULL, price = NULL, square_feet = NULL, notes = NULL WHERE id = ?`,
         [slabId]
       );
     } else if (intent == "slab-update") {
       const slabId = formData.get("id") as string;
       const notes = formData.get("notes") as string;
       const squareFeet = parseFloat(formData.get("square_feet") as string) || null;
+      
       await db.execute(
-        `UPDATE slab_inventory 
-         SET notes = ?, square_feet = ? 
-         WHERE id = ?`,
-        [notes, squareFeet, slabId]
+        `UPDATE slab_inventory SET notes = ?, square_feet = ? WHERE id = ?`,
+        [notes || null, squareFeet, slabId]
       );
     } else if (intent == "sink-delete") {
       const sinkId = formData.get("id") as string;
@@ -462,14 +491,23 @@ function SlabEdit({ slab }: { slab: SaleSlab }) {
           control={form.control}
           name="notes"
           render={({ field }) => (
-            <InputItem name="Notes" field={field} />
+            <InputItem 
+              name="Notes to Slab" 
+              placeholder="Notes for this specific slab"
+              field={field} 
+            />
           )}
         />
         <FormField
           control={form.control}
           name="square_feet"
           render={({ field }) => (
-            <InputItem name="Square Feet" field={field} />
+            <InputItem 
+              name="Square Feet" 
+              placeholder="Square feet"
+              field={field} 
+              type="number"
+            />
           )}
         />
         <LoadingButton type="submit" loading={form.formState.isSubmitting}>
@@ -585,6 +623,10 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
   const [showUnsellConfirm, setShowUnsellConfirm] = useState(false);
   const [showCreateCustomer, setShowCreateCustomer] = useState(false);
   const [customerName, setCustomerName] = useState(sale.customer_name);
+  const [saleNotes, setSaleNotes] = useState(sale.notes || "");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const fetcher = useFetcher();
   const customerForm = useForm<CustomerFormData>({
     resolver: customerResolver,
@@ -593,92 +635,168 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
     },
   });
   
-  const onSubmitCustomer = (data: CustomerFormData) => {
+  const saleInfoForm = useForm<SaleInfoFormData>({
+    resolver: saleInfoResolver,
+    defaultValues: {
+      customer_name: sale.customer_name,
+      seller_id: sale.seller_id,
+      notes: sale.notes || "",
+    },
+  });
+  
+  useEffect(() => {
+    // Fetch customers when dialog opens
+    if (showCreateCustomer) {
+      const fetchData = async () => {
+        try {
+          const response = await fetch('/api/customers/search?term=' + encodeURIComponent(searchTerm));
+          if (response.ok) {
+            const data = await response.json();
+            setCustomers(data.customers || []);
+          }
+        } catch (error) {
+          console.error('Error fetching customers:', error);
+        }
+      };
+      
+      fetchData();
+    }
+  }, [showCreateCustomer, searchTerm]);
+
+  const handleCustomerSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+  
+  const selectCustomer = (customer: Customer) => {
+    setSelectedCustomerId(customer.id);
+    setCustomerName(customer.name);
+    saleInfoForm.setValue("customer_name", customer.name);
+    
     const formData = new FormData();
-    formData.append("intent", "create-customer");
-    formData.append("customer_name", data.customer_name);
+    formData.append("intent", "select-customer");
+    formData.append("customer_id", customer.id.toString());
     fetcher.submit(formData, { method: "post" });
+    
     setShowCreateCustomer(false);
-    customerForm.reset();
   };
   
   useEffect(() => {
     if (fetcher.data?.success && fetcher.data?.customer_name) {
       setCustomerName(fetcher.data.customer_name);
+      saleInfoForm.setValue("customer_name", fetcher.data.customer_name);
     }
-  }, [fetcher.data]);
+  }, [fetcher.data, saleInfoForm]);
   
   return (
     <div className="mb-6">
-      <Form method="post">
-        <input type="hidden" name="intent" value="sale-info-update" />
-        
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 sm:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-            <div className="flex items-center">
-              <div className="relative flex-grow">
-                <input 
-                  type="text" 
-                  name="customer_name" 
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
+      <FormProvider {...saleInfoForm}>
+        <Form method="post">
+          <input type="hidden" name="intent" value="sale-info-update" />
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-2">
+              <FormField
+                control={saleInfoForm.control}
+                name="customer_name"
+                render={({ field }) => (
+                  <div className="flex  gap-2">
+                    <InputItem
+                      name="Customer"
+                      placeholder="Customer name"
+                      field={{
+                        ...field,
+                        value: customerName,
+                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                          setCustomerName(e.target.value);
+                          field.onChange(e);
+                        }
+                      }}
+                      formClassName="flex-grow"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="mt-6 px-2 py-2 h-[38px] border border-gray-300"
+                      onClick={() => setShowCreateCustomer(true)}
+                    >
+                      <span className="text-lg">+</span>
+                    </Button>
+                  </div>
+                )}
+              />
+            </div>
+            
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
+              <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
+                {new Date(sale.sale_date).toLocaleDateString()}
               </div>
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="ml-2 px-2 py-2 h-[38px] border border-gray-300"
-                onClick={() => setShowCreateCustomer(true)}
+            </div>
+            
+            <div className="col-span-2 sm:col-span-1">
+              <FormField
+                control={saleInfoForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <InputItem
+                    name="Notes to Sale"
+                    placeholder="Notes for entire sale"
+                    field={{
+                      ...field,
+                      value: saleNotes,
+                      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                        setSaleNotes(e.target.value);
+                        field.onChange(e);
+                      }
+                    }}
+                  />
+                )}
+              />
+            </div>
+            
+            <div className="col-span-2 sm:col-span-1">
+              <FormField
+                control={saleInfoForm.control}
+                name="seller_id"
+                render={({ field }) => (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Seller</label>
+                    <select 
+                      {...field}
+                      className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      {sellers.map(seller => (
+                        <option key={seller.id} value={seller.id}>
+                          {seller.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              />
+            </div>
+            
+            <div className="col-span-2 flex items-end gap-2 mt-2">
+              <LoadingButton
+                type="submit"
+                className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md shadow-sm transition-colors flex-1" 
+                loading={false}
               >
-                <span className="text-lg">+</span>
+                Save Changes
+              </LoadingButton>
+              
+              <Button
+                type="button"
+                variant="destructive"
+                className="py-2 px-4"
+                onClick={() => setShowUnsellConfirm(true)}
+              >
+                Unsell
               </Button>
             </div>
           </div>
-          
-          <div className="col-span-2 sm:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
-            <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
-              {new Date(sale.sale_date).toLocaleDateString()}
-            </div>
-          </div>
-          
-          <div className="col-span-2 sm:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Seller</label>
-            <select 
-              name="seller_id" 
-              defaultValue={sale.seller_id.toString()}
-              className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              {sellers.map(seller => (
-                <option key={seller.id} value={seller.id}>
-                  {seller.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="col-span-2 sm:col-span-1 flex items-end gap-2">
-            <LoadingButton
-              type="submit"
-              className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md shadow-sm transition-colors flex-1" 
-              loading={false}
-            >
-              Save Changes
-            </LoadingButton>
-            
-            <Button
-              type="button"
-              variant="destructive"
-              className="py-2 px-4"
-              onClick={() => setShowUnsellConfirm(true)}
-            >
-              Unsell
-            </Button>
-          </div>
-        </div>
-      </Form>
+        </Form>
+      </FormProvider>
       
       {/* Confirm Unsell Dialog */}
       <Dialog open={showUnsellConfirm} onOpenChange={setShowUnsellConfirm}>
@@ -717,54 +835,54 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
         </DialogContent>
       </Dialog>
       
-      {/* Create Customer Dialog */}
+      {/* Customer Selection Dialog */}
       <Dialog open={showCreateCustomer} onOpenChange={setShowCreateCustomer}>
         <DialogContent className="bg-white rounded-lg p-6 shadow-lg">
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-gray-900">
-              Create New Customer
+              Add Existing Customer
             </DialogTitle>
           </DialogHeader>
           
           <div className="my-4">
-            <FormProvider {...customerForm}>
-              <form onSubmit={customerForm.handleSubmit(onSubmitCustomer)}>
-                <FormField
-                  control={customerForm.control}
-                  name="customer_name"
-                  render={({ field }) => (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
-                      <input
-                        {...field}
-                        type="text"
-                        className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                      {customerForm.formState.errors.customer_name && (
-                        <p className="text-xs text-red-500 mt-1">{customerForm.formState.errors.customer_name.message}</p>
-                      )}
-                    </div>
-                  )}
-                />
-                
-                <div className="flex justify-end gap-2 mt-4">
-                  <Button 
-                    variant="outline" 
-                    type="button"
-                    onClick={() => setShowCreateCustomer(false)}
-                  >
-                    Cancel
-                  </Button>
-                  
-                  <LoadingButton 
-                    type="submit"
-                    loading={customerForm.formState.isSubmitting || fetcher.state !== "idle"}
-                  >
-                    Create Customer
-                  </LoadingButton>
-                </div>
-              </form>
-            </FormProvider>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search Customers</label>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={handleCustomerSearch}
+                placeholder="Type to search..."
+                className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md">
+              {customers.length === 0 ? (
+                <p className="text-center text-gray-500 py-4">No customers found</p>
+              ) : (
+                <ul className="divide-y divide-gray-200">
+                  {customers.map(customer => (
+                    <li 
+                      key={customer.id}
+                      className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => selectCustomer(customer)}
+                    >
+                      {customer.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-4">
+              <Button 
+                variant="outline" 
+                type="button"
+                onClick={() => setShowCreateCustomer(false)}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
