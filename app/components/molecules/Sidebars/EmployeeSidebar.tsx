@@ -6,7 +6,19 @@ import {
   Search,
   Settings,
   DollarSign,
+  Layers,
+  ShowerHead,
+  Building2,
+  Hammer,
+  FileIcon,
+  ImageIcon,
+  Lightbulb,
+  Calculator,
+  User,
+  Users
 } from "lucide-react";
+import { SinkIcon } from "~/components/icons/SinkIcon";
+import { CorbelIcon } from "~/components/icons/CorbelIcon";
 import { redirect, useLocation } from "react-router";
 import { getBase } from "~/utils/urlHelpers";
 import { StonesFilters } from "./StonesFilters";
@@ -54,7 +66,7 @@ const getItems = (
     {
       title: "Stones",
       url: isCustomerRoute ? `/customer/${companyId}/stones` : `/${base}/stones`,
-      icon: Home,
+      icon: Layers,
       component: () => <StonesFilters suppliers={suppliers} base={base} colors={colors}/>,
     },
   ];
@@ -63,33 +75,33 @@ const getItems = (
       {
         title: "Sinks",
         url: `/${base}/sinks`,
-        icon: Inbox,
+        icon: SinkIcon,
         component: () => <SinksFilters base={base} suppliers={sinkSuppliers}/>,
       },
       {
         title: "Suppliers",
         url: `/${base}/suppliers`,
-        icon: Calendar,
+        icon: Building2,
       },
       {
         title: "Supports",
         url: `/${base}/supports`,
-        icon: Search,
+        icon: CorbelIcon,
       },
       {
         title: "Documents",
         url: `/${base}/documents`,
-        icon: Settings,
+        icon: FileIcon,
       },
       {
         title: "Images",
         url: `/${base}/images`,
-        icon: Settings,
+        icon: ImageIcon,
       },
       {
         title: "Instructions",
         url: `/${base}/instructions`,
-        icon: Settings,
+        icon: Lightbulb,
       },
     );
   }
@@ -103,12 +115,12 @@ const getItems = (
       {
         title: "Special Order",
         url: `/employee/special-order`,
-        icon: Settings,
+        icon: Calculator,
       },
       {
         title: "My Account",
         url: `/employee/user`,
-        icon: Settings,
+        icon: User,
       }
     );
   }
@@ -122,7 +134,7 @@ const getItems = (
       {
         title: "User Panel",
         url: `/admin/users`,
-        icon: Settings,
+        icon: Users,
       }
     );
   }
