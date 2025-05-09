@@ -10,7 +10,6 @@ import { stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { Stone, stoneQueryBuilder } from "~/utils/queries";
 import { StoneSearch } from "~/components/molecules/StoneSearch";
-import { StonesSort } from "~/components/molecules/StonesSort";
 import { Button } from "~/components/ui/button";
 import { TableIcon, GridIcon } from "@radix-ui/react-icons";
 import { ColumnDef } from "@tanstack/react-table";
