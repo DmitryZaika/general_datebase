@@ -1,5 +1,5 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { Link, LoaderFunctionArgs, Outlet, redirect, useSearchParams, useNavigate, Form, ActionFunctionArgs } from "react-router";
+import { Link, LoaderFunctionArgs, Outlet, redirect, useSearchParams, useNavigate, Form, ActionFunctionArgs, useLocation } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
@@ -8,7 +8,7 @@ import { PageLayout } from "~/components/PageLayout";
 import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
 import { Button } from "~/components/ui/button";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Input } from "~/components/ui/input";
 import { Search, MoreHorizontal } from "lucide-react";
 import {
@@ -37,10 +37,14 @@ interface Transaction {
   bundle_with_cut: string;
   stone_name: string;
   sf?: number;
-  is_deleted: string;
-  sink_type?: string;
-  cut_date?: string | null;
   all_cut?: number;
+  any_cut?: number;
+  total_slabs?: number;
+  cut_slabs?: number;
+  cancelled_date: string | null;
+  installed_date: string | null;
+  sink_type?: string;
+  status?: string;
 }
 
 interface SlabInfo {
@@ -57,6 +61,174 @@ function formatDate(dateString: string) {
     day: "2-digit",
   }).format(date);
 }
+
+const transactionColumns: ColumnDef<Transaction>[] = [
+  {
+    accessorKey: "sale_date",
+    header: ({ column }) => <SortableHeader column={column} title="Sale Date" />,
+    cell: ({ row }) => formatDate(row.original.sale_date),
+    sortingFn: "datetime",
+  },
+  {
+    accessorKey: "customer_name",
+    header: ({ column }) => <SortableHeader column={column} title="Customer" />,
+    cell: ({ row }) => row.original.customer_name,
+  },
+  {
+    accessorKey: "seller_name",
+    header: ({ column }) => <SortableHeader column={column} title="Sold By" />,
+  },
+  {
+    accessorKey: "stone_name",
+    header: ({ column }) => <SortableHeader column={column} title="Stone" />,
+    cell: ({ row }) => {
+      const stones = (row.original.stone_name || '').split(', ').filter(Boolean);
+      if (!stones.length) return <span>N/A</span>;
+      
+      const stoneCounts: {[key: string]: number} = {};
+      stones.forEach(stone => {
+        stoneCounts[stone] = (stoneCounts[stone] || 0) + 1;
+      });
+      
+      const formattedStones = Object.entries(stoneCounts).map(([stone, count]) => 
+        count > 1 ? `${stone} x ${count}` : stone
+      );
+      
+      return (
+        <div className="flex flex-col">
+          {formattedStones.map((stone, index) => (
+            <span key={index}>{stone}</span>
+          ))}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: "sink_type",
+    header: ({ column }) => <SortableHeader column={column} title="Sink" />,
+    cell: ({ row }) => {
+      const sinks = (row.original.sink_type || '').split(', ').filter(Boolean);
+      if (!sinks.length) return <span>N/A</span>;
+      
+      const sinkCounts: {[key: string]: number} = {};
+      sinks.forEach(sink => {
+        sinkCounts[sink] = (sinkCounts[sink] || 0) + 1;
+      });
+      
+      const formattedSinks = Object.entries(sinkCounts).map(([sink, count]) => 
+        count > 1 ? `${sink} x ${count}` : sink
+      );
+      
+      return (
+        <div className="flex flex-col">
+          {formattedSinks.map((sink, index) => (
+            <span key={index}>{sink}</span>
+          ))}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: "bundle",
+    header: ({ column }) => <SortableHeader column={column} title="Bundle" />,
+    cell: ({ row }) => {
+      const bundleInfo = (row.original.bundle_with_cut || '').split(',').filter(Boolean);
+      if (!bundleInfo.length) return <span>N/A</span>;
+      
+      const bundleStatusMap: {[key: string]: boolean} = {};
+      bundleInfo.forEach(item => {
+        const [bundle, status] = item.split(':');
+        bundleStatusMap[bundle] = status === 'CUT';
+      });
+      
+      const bundles = (row.original.bundle || '').split(',').filter(Boolean);
+      
+      return (
+        <div className="flex flex-col">
+          {bundles.map((bundle, index) => {
+            const isCut = bundleStatusMap[bundle] === true;
+            return (
+              <span 
+                key={index} 
+                className={isCut ? "text-blue-500" : "text-green-500"}
+              >
+                {bundle}
+              </span>
+            );
+          })}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: "sf",
+    header: ({ column }) => <SortableHeader column={column} title="SF" />,
+    cell: ({ row }) => row.original.sf ? `${row.original.sf}` : "N/A",
+  },
+  {
+    accessorKey: "status",
+    header: ({ column }) => <SortableHeader column={column} title="Status" />,
+    cell: ({ row }) => {
+      let colorClass = "text-green-500";
+      if (row.original.cancelled_date) {
+        colorClass = "text-red-500";
+      } else if (row.original.installed_date) {
+        colorClass = "text-purple-500";
+      } else if (row.original.all_cut === 1) {
+        colorClass = "text-blue-500";
+      } else if (row.original.any_cut === 1) {
+        colorClass = "text-gray-500";
+      }
+      
+      return <span className={colorClass}>{row.original.status}</span>;
+    },
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => {
+      const isInstalled = row.original.installed_date !== null;
+      const isCancelled = row.original.cancelled_date !== null;
+      const allCut = row.original.all_cut === 1;
+      
+      const canInstall = allCut && !isInstalled && !isCancelled;
+      
+      return (
+        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const formData = new FormData();
+                  formData.append("intent", "mark-installed");
+                  formData.append("transactionId", row.original.id.toString());
+                  
+                  fetch("/employee/transactions", {
+                    method: "POST",
+                    body: formData
+                  }).then(() => {
+                    // Reload page
+                    window.location.reload();
+                  });
+                }}
+                disabled={!canInstall}
+                className={!canInstall ? "opacity-50 cursor-not-allowed" : ""}
+              >
+                Mark as Installed
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      );
+    },
+  },
+];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
@@ -79,12 +251,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         c.name as customer_name,
         u.name as seller_name,
         GROUP_CONCAT(DISTINCT si.bundle) as bundle,
-        s.status as is_deleted,
-        '' as sink_type,
+        s.cancelled_date,
+        s.installed_date,
         GROUP_CONCAT(DISTINCT st.name) as stone_name,
         ROUND(SUM(si.square_feet), 2) as sf,
         GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'))) as bundle_with_cut,
-        MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) as all_cut
+        MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) as all_cut,
+        MAX(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as any_cut,
+        COUNT(si.id) as total_slabs,
+        SUM(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as cut_slabs
       FROM 
         sales s
       JOIN 
@@ -107,9 +282,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
     
     if (status === "in_progress") {
-      query += " AND s.status IN ('Cut', 'Sold')";
+      query += " AND s.installed_date IS NULL AND s.cancelled_date IS NULL";
     } else if (status === "finished") {
-      query += " AND s.status IN ('Installed', 'Cancelled')";
+      query += " AND (s.installed_date IS NOT NULL OR s.cancelled_date IS NOT NULL)";
     }
     
     if (searchTerm) {
@@ -170,10 +345,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     
     const updatedTransactions = transactions.map(t => {
       const sinkInfo = sinkDetails.find(sd => sd.sale_id === t.id);
-      if (sinkInfo) {
-        return {...t, sink_type: sinkInfo.sink_types};
+      let status = "Sold";
+      
+      if (t.cancelled_date) {
+        status = "Cancelled";
+      } else if (t.installed_date) {
+        status = "Installed";
+      } else if (t.all_cut === 1) {
+        status = "Cut";
+      } else if (t.any_cut === 1) {
+        status = "Partially Cut";
       }
-      return t;
+      
+      return {
+        ...t, 
+        sink_type: sinkInfo ? sinkInfo.sink_types : undefined,
+        status: status
+      };
     });
     
     return {
@@ -203,9 +391,9 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (intent === "mark-installed") {
     try {
-      const transaction = await selectMany<{ status: string }>(
+      const transaction = await selectMany<{ installed_date: string | null }>(
         db,
-        `SELECT status FROM sales WHERE id = ?`,
+        `SELECT installed_date FROM sales WHERE id = ?`,
         [transactionId]
       );
       
@@ -218,19 +406,45 @@ export async function action({ request }: ActionFunctionArgs) {
         };
       }
       
-      const status = transaction[0].status.toLowerCase();
-      if (status !== "cut") {
+      if (transaction[0].installed_date) {
         const session = await getSession(request.headers.get("Cookie"));
-        session.flash("message", toastData("Error", "Only transactions with 'Cut' status can be marked as installed", "destructive"));
+        session.flash("message", toastData("Error", "Transaction is already marked as installed", "destructive"));
         return { 
-          error: "Only transactions with 'Cut' status can be marked as installed",
+          error: "Transaction is already marked as installed",
           headers: { "Set-Cookie": await commitSession(session) }
         };
       }
       
-      await db.execute(
-        `UPDATE sales SET status = 'installed' WHERE id = ?`,
+      const slabs = await selectMany<SlabInfo>(
+        db,
+        `SELECT id, cut_date FROM slab_inventory WHERE sale_id = ?`,
         [transactionId]
+      );
+      
+      if (slabs.length === 0) {
+        const session = await getSession(request.headers.get("Cookie"));
+        session.flash("message", toastData("Error", "No slabs found for this transaction", "destructive"));
+        return { 
+          error: "No slabs found for this transaction",
+          headers: { "Set-Cookie": await commitSession(session) }
+        };
+      }
+      
+      const allCut = slabs.every(slab => slab.cut_date !== null);
+      
+      if (!allCut) {
+        const session = await getSession(request.headers.get("Cookie"));
+        session.flash("message", toastData("Error", "Cannot mark as installed - not all slabs are cut", "destructive"));
+        return { 
+          error: "Cannot mark as installed - not all slabs are cut",
+          headers: { "Set-Cookie": await commitSession(session) }
+        };
+      }
+      
+      const currentDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      await db.execute(
+        `UPDATE sales SET installed_date = ? WHERE id = ?`,
+        [currentDate, transactionId]
       );
       
       const session = await getSession(request.headers.get("Cookie"));
@@ -261,6 +475,7 @@ export default function EmployeeTransactions() {
   const [searchParams, setSearchParams] = useSearchParams();  
   const [searchValue, setSearchValue] = useState(filters.search);
   const navigate = useNavigate();
+  const location = useLocation();
   
   const handleSalesRepChange = (value: string) => {
     searchParams.set('salesRep', value);
@@ -279,7 +494,7 @@ export default function EmployeeTransactions() {
   };
 
   const handleRowClick = (id: number) => {
-    navigate(`edit/${id}`);
+    navigate(`edit/${id}${location.search}`);
   };
   
   const handleInstall = async (id: number) => {
@@ -293,221 +508,66 @@ export default function EmployeeTransactions() {
         body: formData
       });
       
-      window.location.reload();
+      window.location.href = `/employee/transactions${location.search}`;
     } catch (error) {
       console.error("Error:", error);
     }
   };
 
-  const transactionColumns: ColumnDef<Transaction>[] = [
-    {
-      accessorKey: "sale_date",
-      header: ({ column }) => <SortableHeader column={column} title="Sale Date" />,
-      cell: ({ row }) => formatDate(row.original.sale_date),
-      sortingFn: "datetime",
-    },
-    {
-      accessorKey: "customer_name",
-      header: ({ column }) => <SortableHeader column={column} title="Customer" />,
-      cell: ({ row }) => row.original.customer_name,
-    },
-    {
-      accessorKey: "seller_name",
-      header: ({ column }) => <SortableHeader column={column} title="Sold By" />,
-    },
-    {
-      accessorKey: "stone_name",
-      header: ({ column }) => <SortableHeader column={column} title="Stone" />,
-      cell: ({ row }) => {
-        const stones = (row.original.stone_name || '').split(', ').filter(Boolean);
-        if (!stones.length) return <span>N/A</span>;
-        
-        const stoneCounts: {[key: string]: number} = {};
-        stones.forEach(stone => {
-          stoneCounts[stone] = (stoneCounts[stone] || 0) + 1;
-        });
-        
-        const formattedStones = Object.entries(stoneCounts).map(([stone, count]) => 
-          count > 1 ? `${stone} x ${count}` : stone
-        );
-        
-        return (
-          <div className="flex flex-col">
-            {formattedStones.map((stone, index) => (
-              <span key={index}>{stone}</span>
-            ))}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "sink_type",
-      header: ({ column }) => <SortableHeader column={column} title="Sink" />,
-      cell: ({ row }) => {
-        const sinks = (row.original.sink_type || '').split(', ').filter(Boolean);
-        if (!sinks.length) return <span>N/A</span>;
-        
-        const sinkCounts: {[key: string]: number} = {};
-        sinks.forEach(sink => {
-          sinkCounts[sink] = (sinkCounts[sink] || 0) + 1;
-        });
-        
-        const formattedSinks = Object.entries(sinkCounts).map(([sink, count]) => 
-          count > 1 ? `${sink} x ${count}` : sink
-        );
-        
-        return (
-          <div className="flex flex-col">
-            {formattedSinks.map((sink, index) => (
-              <span key={index}>{sink}</span>
-            ))}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "bundle",
-      header: ({ column }) => <SortableHeader column={column} title="Bundle" />,
-      cell: ({ row }) => {
-        const bundleInfo = (row.original.bundle_with_cut || '').split(',').filter(Boolean);
-        if (!bundleInfo.length) return <span>N/A</span>;
-        
-        const bundleStatusMap: {[key: string]: boolean} = {};
-        bundleInfo.forEach(item => {
-          const [bundle, status] = item.split(':');
-          bundleStatusMap[bundle] = status === 'CUT';
-        });
-        
-        const bundles = (row.original.bundle || '').split(',').filter(Boolean);
-        
-        return (
-          <div className="flex flex-col">
-            {bundles.map((bundle, index) => {
-              const isCut = bundleStatusMap[bundle] === true;
-              return (
-                <span 
-                  key={index} 
-                  className={isCut ? "text-blue-500" : "text-green-500"}
-                >
-                  {bundle}
-                </span>
-              );
-            })}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "sf",
-      header: ({ column }) => <SortableHeader column={column} title="SF" />,
-      cell: ({ row }) => row.original.sf ? `${row.original.sf}` : "N/A",
-    },
-   
-    {
-      accessorKey: "is_deleted",
-      header: ({ column }) => <SortableHeader column={column} title="Status" />,
-      cell: ({ row }) => {
-        const status = row.original.is_deleted || "";
-        const formattedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-        
-        let colorClass = "text-gray-500";
-        if (formattedStatus === "Sold") {
-          colorClass = "text-green-500";
-        } else if (formattedStatus === "Cancelled") {
-          colorClass = "text-red-500";
-        } else if (formattedStatus === "Cut") {
-          colorClass = "text-blue-500";
-        } else if (formattedStatus === "Installed") {
-          colorClass = "text-purple-500";
-        }
-        
-        return <span className={colorClass}>{formattedStatus}</span>;
-      },
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => {
-        const status = (row.original.is_deleted || "").toLowerCase();
-        const canInstall = status === "cut";
-        
-        return (
-          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => handleInstall(row.original.id)}
-                  disabled={!canInstall}
-                  className={!canInstall ? "opacity-50 cursor-not-allowed" : ""}
-                >
-                  Mark as Installed
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        );
-      },
-    },
-  ];
-  
   return (
-    <PageLayout title="Transactions">
-      <div className="container mx-auto py-10">
-        <div className="mb-4 flex flex-col gap-4">
-          <Form onSubmit={handleSearchSubmit} className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+    <>
+      <PageLayout title="Sales Transactions">
+        <div className="mb-4 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold">Transactions</h1>
+            <div className="flex gap-4 items-center">
+              <div className="w-1/8 min-w-[120px]">
+                <div className="mb-1 text-sm font-medium">Sales Rep</div>
+                <Select 
+                  value={filters.salesRep} 
+                  onValueChange={handleSalesRepChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sales Rep" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salesReps.map((rep) => (
+                      <SelectItem key={rep} value={rep}>
+                        {rep}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="w-1/8 min-w-[120px]">
+                <div className="mb-1 text-sm font-medium">Status</div>
+                <Select 
+                  value={filters.status} 
+                  onValueChange={handleStatusChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="finished">Finished</SelectItem>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
             <Input
               placeholder="Search transactions..."
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
-              className="pl-8"
+              className="pl-8 w-64"
             />
-          </Form>
-          
-          <div className="flex gap-4">
-            <div className="w-1/8 min-w-[120px]">
-              <div className="mb-1 text-sm font-medium">Sales Rep</div>
-              <Select 
-                value={filters.salesRep} 
-                onValueChange={handleSalesRepChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sales Rep" />
-                </SelectTrigger>
-                <SelectContent>
-                  {salesReps.map((rep) => (
-                    <SelectItem key={rep} value={rep}>
-                      {rep}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="w-1/8 min-w-[120px]">
-              <div className="mb-1 text-sm font-medium">Status</div>
-              <Select 
-                value={filters.status} 
-                onValueChange={handleStatusChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="finished">Finished</SelectItem>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </div>
-
         <DataTable
           columns={transactionColumns}
           data={transactions.map(transaction => ({
@@ -516,9 +576,8 @@ export default function EmployeeTransactions() {
             onClick: () => handleRowClick(transaction.id)
           }))}
         />
-
-        <Outlet />
-      </div>
-    </PageLayout>
+      </PageLayout>
+      <Outlet />
+    </>
   );
-} 
+}

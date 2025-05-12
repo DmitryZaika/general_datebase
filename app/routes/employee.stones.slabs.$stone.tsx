@@ -181,7 +181,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         users.name as seller_name,
         sales.notes as sale_notes,
         slab_inventory.notes as slab_notes,
-        slab_inventory.square_feet,
+        sales.square_feet,
         (
           SELECT GROUP_CONCAT(sink_type.name SEPARATOR ', ')
           FROM sinks
@@ -412,7 +412,7 @@ export default function SlabsModal() {
                     <p><strong>Sale date:</strong> {formatDate(slab.transaction.sale_date)}</p>
                     
                     {(slab.transaction.square_feet ?? 0) > 0 && (
-                      <p><strong>Square Feet:</strong> {slab.transaction.square_feet}</p>
+                      <p><strong>Total Square Feet:</strong> {slab.transaction.square_feet}</p>
                     )}
                     
                     {slab.transaction.sink && (
