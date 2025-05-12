@@ -1,5 +1,5 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { Link, LoaderFunctionArgs, Outlet, redirect } from "react-router";
+import { Link, LoaderFunctionArgs, Outlet, redirect, useLocation } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
@@ -22,9 +22,14 @@ interface Transaction {
   bundle_with_cut: string;
   stone_name: string;
   sf?: number;
-  is_deleted: string;
+  all_cut?: number;
+  any_cut?: number;
+  total_slabs?: number;
+  cut_slabs?: number;
+  cancelled_date: string | null;
+  installed_date: string | null;
   sink_type?: string;
-  cut_date?: string | null;
+  status?: string;
 }
 
 
@@ -81,11 +86,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         c.name as customer_name,
         u.name as seller_name,
         GROUP_CONCAT(DISTINCT si.bundle) as bundle,
-        s.status as is_deleted,
-        '' as sink_type,
+        s.cancelled_date,
+        s.installed_date,
         GROUP_CONCAT(DISTINCT st.name) as stone_name,
         ROUND(SUM(si.square_feet), 2) as sf,
-        GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'))) as bundle_with_cut
+        GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'))) as bundle_with_cut,
+        MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) as all_cut,
+        MAX(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as any_cut,
+        COUNT(si.id) as total_slabs,
+        SUM(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as cut_slabs
       FROM 
         sales s
       JOIN 
@@ -107,10 +116,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     
     const updatedTransactions = transactions.map(t => {
       const sinkInfo = sinkDetails.find(sd => sd.sale_id === t.id);
-      if (sinkInfo) {
-        return {...t, sink_type: sinkInfo.sink_types};
+      let status = "Sold"; // Default status is Sold if there's a sale_date
+      
+      if (t.cancelled_date) {
+        status = "Cancelled";
+      } else if (t.installed_date) {
+        status = "Installed";
+      } else if (t.all_cut === 1) {
+        status = "Cut";
+      } else if (t.any_cut === 1) {
+        status = "Partially Cut";
       }
-      return t;
+      
+      return {
+        ...t, 
+        sink_type: sinkInfo ? sinkInfo.sink_types : undefined,
+        status: status
+      };
     });
     
     return {
@@ -131,14 +153,17 @@ const transactionColumns: ColumnDef<Transaction>[] = [
   {
     accessorKey: "customer_name",
     header: ({ column }) => <SortableHeader column={column} title="Customer" />,
-    cell: ({ row }) => (
-      <Link 
-        to={`edit/${row.original.id}`} 
-        className="text-blue-600 hover:underline"
-      >
-        {row.original.customer_name}
-      </Link>
-    ),
+    cell: ({ row }) => {
+      const location = useLocation();
+      return (
+        <Link 
+          to={`edit/${row.original.id}${location.search}`} 
+          className="text-blue-600 hover:underline"
+        >
+          {row.original.customer_name}
+        </Link>
+      );
+    },
   },
   {
     accessorKey: "seller_name",
@@ -231,34 +256,33 @@ const transactionColumns: ColumnDef<Transaction>[] = [
     header: ({ column }) => <SortableHeader column={column} title="SF" />,
     cell: ({ row }) => row.original.sf ? `${row.original.sf}` : "N/A",
   },
- 
   {
-    accessorKey: "is_deleted",
+    accessorKey: "status",
     header: ({ column }) => <SortableHeader column={column} title="Status" />,
     cell: ({ row }) => {
-      const status = row.original.is_deleted || "";
-      const formattedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-      
-      let colorClass = "text-gray-500";
-      if (formattedStatus === "Sold") {
-        colorClass = "text-green-500";
-      } else if (formattedStatus === "Canceled" || formattedStatus === "Cancelled") {
+      let colorClass = "text-green-500"; // Default color for Sold
+      if (row.original.cancelled_date) {
         colorClass = "text-red-500";
-      } else if (formattedStatus === "Cut") {
+      } else if (row.original.installed_date) {
+        colorClass = "text-purple-500";
+      } else if (row.original.all_cut === 1) {
         colorClass = "text-blue-500";
+      } else if (row.original.any_cut === 1) {
+        colorClass = "text-gray-500";
       }
       
-      return <span className={`${colorClass} font-medium`}>{formattedStatus || "Active"}</span>;
+      return <span className={colorClass}>{row.original.status}</span>;
     },
   },
   {
     id: "actions",
     cell: ({ row }) => {
+      const location = useLocation();
       return (
         <ActionDropdown
           actions={{
-            edit: `edit/${row.original.id}`,
-            delete: `delete/${row.original.id}`,
+            edit: `edit/${row.original.id}${location.search}`,
+            delete: `delete/${row.original.id}${location.search}`,
           }}
         />
       );
@@ -269,6 +293,7 @@ const transactionColumns: ColumnDef<Transaction>[] = [
 export default function AdminTransactions() {
   const { transactions } = useLoaderData<typeof loader>();
   const [searchTerm, setSearchTerm] = useState("");
+  const location = useLocation();
 
   const filteredTransactions = transactions.filter(transaction => 
     transaction.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -315,23 +340,22 @@ export default function AdminTransactions() {
     <>
       <PageLayout title="Sales Transactions">
         <div className="mb-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Transactions</h1>
-          <Link to="/admin/reports">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold">Transactions</h1>
+            <Link to="/admin/reports">
               <Button variant="default" className="bg-blue-600 hover:bg-blue-700">
                 Reports
               </Button>
             </Link>
-          <div className="flex gap-4">
-            <div className="relative">
-              <Input
-                placeholder="Search by customer"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 w-64"
-              />
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-            </div>
-           
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+            <Input
+              placeholder="Search by customer"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 w-64"
+            />
           </div>
         </div>
         <DataTable 

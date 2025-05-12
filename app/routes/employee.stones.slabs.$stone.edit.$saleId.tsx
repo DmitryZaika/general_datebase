@@ -52,6 +52,7 @@ interface SaleDetails {
   seller_id: number;
   seller_name: string;
   notes: string | null;
+  square_feet: number | null;
 }
 
 interface SaleSlab {
@@ -132,6 +133,7 @@ const saleInfoSchema = z.object({
   customer_name: z.string().min(1, "Customer name is required"),
   seller_id: z.coerce.number().min(1, "Seller is required"),
   notes: z.string().optional(),
+  total_square_feet: z.coerce.number().optional(),
 });
 
 type SaleInfoFormData = z.infer<typeof saleInfoSchema>;
@@ -170,7 +172,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     db,
     `SELECT 
       s.id, s.customer_id, c.name as customer_name, 
-      s.sale_date, s.seller_id, u.name as seller_name, s.notes
+      s.sale_date, s.seller_id, u.name as seller_name, s.notes, s.square_feet
      FROM sales s
      JOIN customers c ON s.customer_id = c.id
      JOIN users u ON s.seller_id = u.id
@@ -289,7 +291,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       );
       
       await db.execute(
-        `UPDATE sales SET status = 'cancelled' WHERE id = ?`,
+        `UPDATE sales SET cancelled_date = NOW() WHERE id = ?`,
         [saleId]
       );
       
@@ -304,6 +306,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const customer_name = formData.get("customer_name") as string;
       const seller_id = parseInt(formData.get("seller_id") as string);
       const notes = formData.get("notes") as string;
+      const total_square_feet = parseFloat(formData.get("total_square_feet") as string) || 0;
     
       
       if (!customer_name || isNaN(seller_id)) {
@@ -320,8 +323,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         );
         
         await db.execute(
-          `UPDATE sales SET seller_id = ?, notes = ? WHERE id = ?`,
-          [seller_id, notes || null, saleId]
+          `UPDATE sales SET seller_id = ?, notes = ?, square_feet = ? WHERE id = ?`,
+          [seller_id, notes || null, total_square_feet, saleId]
         );
         
         const session = await getSession(request.headers.get("Cookie"));
@@ -624,6 +627,7 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
   const [showCreateCustomer, setShowCreateCustomer] = useState(false);
   const [customerName, setCustomerName] = useState(sale.customer_name);
   const [saleNotes, setSaleNotes] = useState(sale.notes || "");
+  const [totalSquareFeet, setTotalSquareFeet] = useState(sale.square_feet || 0);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
@@ -641,11 +645,11 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
       customer_name: sale.customer_name,
       seller_id: sale.seller_id,
       notes: sale.notes || "",
+      total_square_feet: sale.square_feet || 0,
     },
   });
   
   useEffect(() => {
-    // Fetch customers when dialog opens
     if (showCreateCustomer) {
       const fetchData = async () => {
         try {
@@ -694,96 +698,127 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
           <input type="hidden" name="intent" value="sale-info-update" />
           
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <FormField
-                control={saleInfoForm.control}
-                name="customer_name"
-                render={({ field }) => (
-                  <div className="flex  gap-2">
-                    <InputItem
-                      name="Customer"
-                      placeholder="Customer name"
-                      field={{
-                        ...field,
-                        value: customerName,
-                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                          setCustomerName(e.target.value);
-                          field.onChange(e);
-                        }
-                      }}
-                      formClassName="flex-grow"
-                    />
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      className="mt-6 px-2 py-2 h-[38px] border border-gray-300"
-                      onClick={() => setShowCreateCustomer(true)}
-                    >
-                      <span className="text-lg">+</span>
-                    </Button>
-                  </div>
-                )}
-              />
-            </div>
+            <div className="col-span-2 flex gap-2">
+              <div className="w-2/5">
+                <FormField
+                  control={saleInfoForm.control}
+                  name="customer_name"
+                  render={({ field }) => (
+                    <div>
+                      <div className="flex gap-2">
+                        <InputItem
             
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
-              <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
-                {new Date(sale.sale_date).toLocaleDateString()}
+                          name="Customer"
+                          placeholder="Customer name"
+                          field={{
+                            ...field,
+                            value: customerName,
+                            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                              setCustomerName(e.target.value);
+                              field.onChange(e);
+                            }
+                          }}
+                          formClassName="flex-grow mb-0"
+                        />
+                        <Button 
+                          type="button" 
+                          variant="blue" 
+                          className="px-2 py-2 h-[38px] border border-gray-300 mt-6"
+                          onClick={() => setShowCreateCustomer(true)}
+                        >
+                          <span className="text-sm">+</span>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                />
+              </div>
+              
+             
+              
+              <div className="w-2/5">
+                <FormField
+                  control={saleInfoForm.control}
+                  name="seller_id"
+                  render={({ field }) => (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Seller</label>
+                      <select 
+                        {...field}
+                        className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        {sellers.map(seller => (
+                          <option key={seller.id} value={seller.id}>
+                            {seller.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                />
+              </div>
+              <div className="w-1/5">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
+                <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
+                  {new Date(sale.sale_date).toLocaleDateString()}
+                </div>
               </div>
             </div>
             
-            <div className="col-span-2 sm:col-span-1">
-              <FormField
-                control={saleInfoForm.control}
-                name="notes"
-                render={({ field }) => (
-                  <InputItem
-                    name="Notes to Sale"
-                    placeholder="Notes for entire sale"
-                    field={{
-                      ...field,
-                      value: saleNotes,
-                      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                        setSaleNotes(e.target.value);
-                        field.onChange(e);
-                      }
-                    }}
-                  />
-                )}
-              />
+            <div className="col-span-2 flex gap-2">
+              <div className="w-3/4">
+                <FormField
+                  control={saleInfoForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <InputItem
+                      formClassName="mb-0"
+                      name="Notes to Sale"
+                      placeholder="Notes for entire sale"
+                   
+                      field={{
+                        ...field,
+                        value: saleNotes,
+                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                          setSaleNotes(e.target.value);
+                          field.onChange(e);
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </div>
+              
+              <div className="w-1/4">
+                <FormField
+                  control={saleInfoForm.control}
+                  name="total_square_feet"
+                  render={({ field }) => (
+                    <InputItem
+                      formClassName="mb-0"
+                      name="Total Square Feet"
+                      placeholder="Total square feet"
+                      field={{
+                        ...field,
+                        value: totalSquareFeet,
+                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                          setTotalSquareFeet(parseFloat(e.target.value) || 0);
+                          field.onChange(e);
+                        }
+                      }}
+                      type="number"
+                    />
+                  )}
+                />
+              </div>
             </div>
             
-            <div className="col-span-2 sm:col-span-1">
-              <FormField
-                control={saleInfoForm.control}
-                name="seller_id"
-                render={({ field }) => (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Seller</label>
-                    <select 
-                      {...field}
-                      className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      {sellers.map(seller => (
-                        <option key={seller.id} value={seller.id}>
-                          {seller.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              />
-            </div>
-            
-            <div className="col-span-2 flex items-end gap-2 mt-2">
-              <LoadingButton
+            <div className="col-span-2 flex items-end justify-end gap-2 mt-2">
+              <Button
                 type="submit"
-                className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md shadow-sm transition-colors flex-1" 
-                loading={false}
               >
                 Save Changes
-              </LoadingButton>
+              </Button>
               
               <Button
                 type="button"
@@ -798,7 +833,6 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
         </Form>
       </FormProvider>
       
-      {/* Confirm Unsell Dialog */}
       <Dialog open={showUnsellConfirm} onOpenChange={setShowUnsellConfirm}>
         <DialogContent className="bg-white rounded-lg p-6 shadow-lg">
           <DialogHeader>
@@ -835,7 +869,6 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
         </DialogContent>
       </Dialog>
       
-      {/* Customer Selection Dialog */}
       <Dialog open={showCreateCustomer} onOpenChange={setShowCreateCustomer}>
         <DialogContent className="bg-white rounded-lg p-6 shadow-lg">
           <DialogHeader>

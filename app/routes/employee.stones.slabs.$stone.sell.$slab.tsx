@@ -55,7 +55,7 @@ const customerSchema = z.object({
   notes_to_sale: z.union([z.string(), z.number(), z.null()])
     .transform(val => val ? String(val) : "")
     .optional(),
-  square_feet: z.coerce.number().default(0),
+  total_square_feet: z.coerce.number().default(0),
 });
 
 type FormData = z.infer<typeof customerSchema>;
@@ -128,15 +128,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     
     const [salesResult] = await db.execute<ResultSetHeader>(
-      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, status, notes) 
-       VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'sold', ?)`,
+      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date) 
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL)`,
       [
         customerId,
         user.id, 
         user.company_id,
         data.notes_to_sale || null,
-        
-
+        data.total_square_feet || 0
       ]
     );
     
@@ -177,9 +176,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
   
 
-      await db.execute(
-      `UPDATE slab_inventory SET sale_id = ?, square_feet = ? WHERE id = ?`,
-      [saleId, data.square_feet || 0, slabId]
+    await db.execute(
+      `UPDATE slab_inventory SET sale_id = ? WHERE id = ?`,
+      [saleId, slabId]
     );
     
  
@@ -227,12 +226,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       customer_name: string;
       sale_date: string;
       notes: string | null;
+      square_feet: number;
     }>(
       db,
-      `SELECT s.id, c.name as customer_name, s.sale_date, s.notes
+      `SELECT s.id, c.name as customer_name, s.sale_date, s.notes, s.square_feet
        FROM sales s
        JOIN customers c ON s.customer_id = c.id
-       WHERE s.company_id = ? AND s.status != 'cancelled'
+       WHERE s.company_id = ? AND s.cancelled_date IS NULL
        ORDER BY s.sale_date DESC
        LIMIT 20`,
       [user.company_id]
@@ -274,6 +274,7 @@ export default function SlabSell() {
       customer_id: undefined,
       sink_type_id: "",
       notes_to_slab: "",
+      total_square_feet: 0,
     },
   });
   const fullSubmit = useFullSubmit(form);
@@ -374,11 +375,11 @@ export default function SlabSell() {
                 />
                 <FormField
                   control={form.control}
-                  name="square_feet"
+                  name="total_square_feet"
                   render={({ field }) => (
                     <InputItem
-                      name={"Square Feet"}
-                      placeholder={"Square Feet"}
+                      name={"Total Square Feet"}
+                      placeholder={"Total Square Feet"}
                       field={field}
                     />
                   )}
@@ -436,6 +437,11 @@ export default function SlabSell() {
                           {sale.notes && (
                             <div className="text-xs text-gray-600 mt-1">
                               <span className="font-semibold">Notes:</span> {sale.notes}
+                            </div>
+                          )}
+                          {sale.square_feet > 0 && (
+                            <div className="text-xs text-gray-600">
+                              <span className="font-semibold">Total Square Feet:</span> {sale.square_feet}
                             </div>
                           )}
                         </div>
