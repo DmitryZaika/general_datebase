@@ -10,7 +10,7 @@ import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader"
 import { Button } from "~/components/ui/button";
 import { useState } from "react";
 import { Input } from "~/components/ui/input";
-import { Search, MoreHorizontal } from "lucide-react";
+import { Search, MoreHorizontal, Calendar } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -25,6 +25,16 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { Label } from "~/components/ui/label";
+import { Switch } from "~/components/ui/switch";
 import { toastData } from "~/utils/toastHelpers";
 import { getSession, commitSession } from "~/sessions";
 
@@ -61,174 +71,6 @@ function formatDate(dateString: string) {
     day: "2-digit",
   }).format(date);
 }
-
-const transactionColumns: ColumnDef<Transaction>[] = [
-  {
-    accessorKey: "sale_date",
-    header: ({ column }) => <SortableHeader column={column} title="Sale Date" />,
-    cell: ({ row }) => formatDate(row.original.sale_date),
-    sortingFn: "datetime",
-  },
-  {
-    accessorKey: "customer_name",
-    header: ({ column }) => <SortableHeader column={column} title="Customer" />,
-    cell: ({ row }) => row.original.customer_name,
-  },
-  {
-    accessorKey: "seller_name",
-    header: ({ column }) => <SortableHeader column={column} title="Sold By" />,
-  },
-  {
-    accessorKey: "stone_name",
-    header: ({ column }) => <SortableHeader column={column} title="Stone" />,
-    cell: ({ row }) => {
-      const stones = (row.original.stone_name || '').split(', ').filter(Boolean);
-      if (!stones.length) return <span>N/A</span>;
-      
-      const stoneCounts: {[key: string]: number} = {};
-      stones.forEach(stone => {
-        stoneCounts[stone] = (stoneCounts[stone] || 0) + 1;
-      });
-      
-      const formattedStones = Object.entries(stoneCounts).map(([stone, count]) => 
-        count > 1 ? `${stone} x ${count}` : stone
-      );
-      
-      return (
-        <div className="flex flex-col">
-          {formattedStones.map((stone, index) => (
-            <span key={index}>{stone}</span>
-          ))}
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: "sink_type",
-    header: ({ column }) => <SortableHeader column={column} title="Sink" />,
-    cell: ({ row }) => {
-      const sinks = (row.original.sink_type || '').split(', ').filter(Boolean);
-      if (!sinks.length) return <span>N/A</span>;
-      
-      const sinkCounts: {[key: string]: number} = {};
-      sinks.forEach(sink => {
-        sinkCounts[sink] = (sinkCounts[sink] || 0) + 1;
-      });
-      
-      const formattedSinks = Object.entries(sinkCounts).map(([sink, count]) => 
-        count > 1 ? `${sink} x ${count}` : sink
-      );
-      
-      return (
-        <div className="flex flex-col">
-          {formattedSinks.map((sink, index) => (
-            <span key={index}>{sink}</span>
-          ))}
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: "bundle",
-    header: ({ column }) => <SortableHeader column={column} title="Bundle" />,
-    cell: ({ row }) => {
-      const bundleInfo = (row.original.bundle_with_cut || '').split(',').filter(Boolean);
-      if (!bundleInfo.length) return <span>N/A</span>;
-      
-      const bundleStatusMap: {[key: string]: boolean} = {};
-      bundleInfo.forEach(item => {
-        const [bundle, status] = item.split(':');
-        bundleStatusMap[bundle] = status === 'CUT';
-      });
-      
-      const bundles = (row.original.bundle || '').split(',').filter(Boolean);
-      
-      return (
-        <div className="flex flex-col">
-          {bundles.map((bundle, index) => {
-            const isCut = bundleStatusMap[bundle] === true;
-            return (
-              <span 
-                key={index} 
-                className={isCut ? "text-blue-500" : "text-green-500"}
-              >
-                {bundle}
-              </span>
-            );
-          })}
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: "sf",
-    header: ({ column }) => <SortableHeader column={column} title="SF" />,
-    cell: ({ row }) => row.original.sf ? `${row.original.sf}` : "N/A",
-  },
-  {
-    accessorKey: "status",
-    header: ({ column }) => <SortableHeader column={column} title="Status" />,
-    cell: ({ row }) => {
-      let colorClass = "text-green-500";
-      if (row.original.cancelled_date) {
-        colorClass = "text-red-500";
-      } else if (row.original.installed_date) {
-        colorClass = "text-purple-500";
-      } else if (row.original.all_cut === 1) {
-        colorClass = "text-blue-500";
-      } else if (row.original.any_cut === 1) {
-        colorClass = "text-gray-500";
-      }
-      
-      return <span className={colorClass}>{row.original.status}</span>;
-    },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const isInstalled = row.original.installed_date !== null;
-      const isCancelled = row.original.cancelled_date !== null;
-      const allCut = row.original.all_cut === 1;
-      
-      const canInstall = allCut && !isInstalled && !isCancelled;
-      
-      return (
-        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const formData = new FormData();
-                  formData.append("intent", "mark-installed");
-                  formData.append("transactionId", row.original.id.toString());
-                  
-                  fetch("/employee/transactions", {
-                    method: "POST",
-                    body: formData
-                  }).then(() => {
-                    // Reload page
-                    window.location.reload();
-                  });
-                }}
-                disabled={!canInstall}
-                className={!canInstall ? "opacity-50 cursor-not-allowed" : ""}
-              >
-                Mark as Installed
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      );
-    },
-  },
-];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
@@ -382,12 +224,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export async function action({ request }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request);
   if (!user || !user.company_id) {
-    return { error: "Unauthorized" };
+    const session = await getSession(request.headers.get("Cookie"));
+    session.flash("message", toastData("Error", "Unauthorized", "destructive"));
+    return redirect("/login", {
+      headers: { "Set-Cookie": await commitSession(session) }
+    });
   }
 
   const formData = await request.formData();
   const intent = formData.get("intent");
   const transactionId = formData.get("transactionId");
+  const installedDate = formData.get("installedDate") as string;
+  const isPaid = formData.get("isPaid") === "true";
+
+  // Сохраняем текущий URL для редиректа обратно
+  const url = new URL(request.url);
+  const redirectUrl = url.searchParams.get("redirectTo") || `/employee/transactions${url.search}`;
 
   if (intent === "mark-installed") {
     try {
@@ -400,19 +252,17 @@ export async function action({ request }: ActionFunctionArgs) {
       if (transaction.length === 0) {
         const session = await getSession(request.headers.get("Cookie"));
         session.flash("message", toastData("Error", "Transaction not found", "destructive"));
-        return { 
-          error: "Transaction not found",
+        return redirect(redirectUrl, {
           headers: { "Set-Cookie": await commitSession(session) }
-        };
+        });
       }
       
       if (transaction[0].installed_date) {
         const session = await getSession(request.headers.get("Cookie"));
         session.flash("message", toastData("Error", "Transaction is already marked as installed", "destructive"));
-        return { 
-          error: "Transaction is already marked as installed",
+        return redirect(redirectUrl, {
           headers: { "Set-Cookie": await commitSession(session) }
-        };
+        });
       }
       
       const slabs = await selectMany<SlabInfo>(
@@ -424,10 +274,9 @@ export async function action({ request }: ActionFunctionArgs) {
       if (slabs.length === 0) {
         const session = await getSession(request.headers.get("Cookie"));
         session.flash("message", toastData("Error", "No slabs found for this transaction", "destructive"));
-        return { 
-          error: "No slabs found for this transaction",
+        return redirect(redirectUrl, {
           headers: { "Set-Cookie": await commitSession(session) }
-        };
+        });
       }
       
       const allCut = slabs.every(slab => slab.cut_date !== null);
@@ -435,39 +284,52 @@ export async function action({ request }: ActionFunctionArgs) {
       if (!allCut) {
         const session = await getSession(request.headers.get("Cookie"));
         session.flash("message", toastData("Error", "Cannot mark as installed - not all slabs are cut", "destructive"));
-        return { 
-          error: "Cannot mark as installed - not all slabs are cut",
+        return redirect(redirectUrl, {
           headers: { "Set-Cookie": await commitSession(session) }
-        };
+        });
       }
       
-      const currentDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      await db.execute(
-        `UPDATE sales SET installed_date = ? WHERE id = ?`,
-        [currentDate, transactionId]
-      );
+      // Format the date for SQL or use current date if not provided
+      const dateToUse = installedDate 
+        ? new Date(installedDate).toISOString().slice(0, 19).replace('T', ' ')
+        : new Date().toISOString().slice(0, 19).replace('T', ' ');
+      
+      // If paid is true, update both installed_date and paid_date
+      if (isPaid) {
+        await db.execute(
+          `UPDATE sales SET installed_date = ?, paid_date = ? WHERE id = ?`,
+          [dateToUse, dateToUse, transactionId]
+        );
+      } else {
+        await db.execute(
+          `UPDATE sales SET installed_date = ? WHERE id = ?`,
+          [dateToUse, transactionId]
+        );
+      }
       
       const session = await getSession(request.headers.get("Cookie"));
       session.flash("message", toastData("Success", "Transaction marked as installed"));
       
-      return { 
-        success: true,
+      return redirect(redirectUrl, {
         headers: { "Set-Cookie": await commitSession(session) }
-      };
+      });
     } catch (error) {
       console.error("Error updating status:", error);
       
       const session = await getSession(request.headers.get("Cookie"));
       session.flash("message", toastData("Error", "Failed to update status", "destructive"));
       
-      return { 
-        error: "Failed to update status",
+      return redirect(redirectUrl, {
         headers: { "Set-Cookie": await commitSession(session) }
-      };
+      });
     }
   }
   
-  return { error: "Invalid action" };
+  const session = await getSession(request.headers.get("Cookie"));
+  session.flash("message", toastData("Error", "Invalid action", "destructive"));
+  return redirect(redirectUrl, {
+    headers: { "Set-Cookie": await commitSession(session) }
+  });
 }
 
 export default function EmployeeTransactions() {
@@ -476,6 +338,12 @@ export default function EmployeeTransactions() {
   const [searchValue, setSearchValue] = useState(filters.search);
   const navigate = useNavigate();
   const location = useLocation();
+  const [installDialogOpen, setInstallDialogOpen] = useState(false);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<number | null>(null);
+  const [installDate, setInstallDate] = useState<string>(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [isPaid, setIsPaid] = useState(true);
   
   const handleSalesRepChange = (value: string) => {
     searchParams.set('salesRep', value);
@@ -497,29 +365,184 @@ export default function EmployeeTransactions() {
     navigate(`edit/${id}${location.search}`);
   };
   
-  const handleInstall = async (id: number) => {
-    try {
-      const formData = new FormData();
-      formData.append("intent", "mark-installed");
-      formData.append("transactionId", id.toString());
-      
-      await fetch("/employee/transactions", {
-        method: "POST",
-        body: formData
-      });
-      
-      window.location.href = `/employee/transactions${location.search}`;
-    } catch (error) {
-      console.error("Error:", error);
-    }
+  const openInstallDialog = (id: number) => {
+    setSelectedTransactionId(id);
+    setInstallDate(new Date().toISOString().slice(0, 10)); // Reset to today
+    setIsPaid(true); // Reset paid to default true
+    setInstallDialogOpen(true);
   };
+  
+  const handleFormSubmit = (e: React.FormEvent) => {
+    // Закрываем диалог перед отправкой формы
+    setInstallDialogOpen(false);
+    // Не прерываем стандартную отправку формы
+  };
+
+  const transactionColumns: ColumnDef<Transaction>[] = [
+    {
+      accessorKey: "sale_date",
+      header: ({ column }) => <SortableHeader column={column} title="Sale Date" />,
+      cell: ({ row }) => formatDate(row.original.sale_date),
+      sortingFn: "datetime",
+    },
+    {
+      accessorKey: "customer_name",
+      header: ({ column }) => <SortableHeader column={column} title="Customer" />,
+      cell: ({ row }) => row.original.customer_name,
+    },
+    {
+      accessorKey: "seller_name",
+      header: ({ column }) => <SortableHeader column={column} title="Sold By" />,
+    },
+    {
+      accessorKey: "stone_name",
+      header: ({ column }) => <SortableHeader column={column} title="Stone" />,
+      cell: ({ row }) => {
+        const stones = (row.original.stone_name || '').split(', ').filter(Boolean);
+        if (!stones.length) return <span>N/A</span>;
+        
+        const stoneCounts: {[key: string]: number} = {};
+        stones.forEach(stone => {
+          stoneCounts[stone] = (stoneCounts[stone] || 0) + 1;
+        });
+        
+        const formattedStones = Object.entries(stoneCounts).map(([stone, count]) => 
+          count > 1 ? `${stone} x ${count}` : stone
+        );
+        
+        return (
+          <div className="flex flex-col">
+            {formattedStones.map((stone, index) => (
+              <span key={index}>{stone}</span>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "sink_type",
+      header: ({ column }) => <SortableHeader column={column} title="Sink" />,
+      cell: ({ row }) => {
+        const sinks = (row.original.sink_type || '').split(', ').filter(Boolean);
+        if (!sinks.length) return <span>N/A</span>;
+        
+        const sinkCounts: {[key: string]: number} = {};
+        sinks.forEach(sink => {
+          sinkCounts[sink] = (sinkCounts[sink] || 0) + 1;
+        });
+        
+        const formattedSinks = Object.entries(sinkCounts).map(([sink, count]) => 
+          count > 1 ? `${sink} x ${count}` : sink
+        );
+        
+        return (
+          <div className="flex flex-col">
+            {formattedSinks.map((sink, index) => (
+              <span key={index}>{sink}</span>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "bundle",
+      header: ({ column }) => <SortableHeader column={column} title="Bundle" />,
+      cell: ({ row }) => {
+        const bundleInfo = (row.original.bundle_with_cut || '').split(',').filter(Boolean);
+        if (!bundleInfo.length) return <span>N/A</span>;
+        
+        const bundleStatusMap: {[key: string]: boolean} = {};
+        bundleInfo.forEach(item => {
+          const [bundle, status] = item.split(':');
+          bundleStatusMap[bundle] = status === 'CUT';
+        });
+        
+        const bundles = (row.original.bundle || '').split(',').filter(Boolean);
+        
+        return (
+          <div className="flex flex-col">
+            {bundles.map((bundle, index) => {
+              const isCut = bundleStatusMap[bundle] === true;
+              return (
+                <span 
+                  key={index} 
+                  className={isCut ? "text-blue-500" : "text-green-500"}
+                >
+                  {bundle}
+                </span>
+              );
+            })}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "sf",
+      header: ({ column }) => <SortableHeader column={column} title="SF" />,
+      cell: ({ row }) => row.original.sf ? `${row.original.sf}` : "N/A",
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <SortableHeader column={column} title="Status" />,
+      cell: ({ row }) => {
+        let colorClass = "text-green-500";
+        if (row.original.cancelled_date) {
+          colorClass = "text-red-500";
+        } else if (row.original.installed_date) {
+          colorClass = "text-purple-500";
+        } else if (row.original.all_cut === 1) {
+          colorClass = "text-blue-500";
+        } else if (row.original.any_cut === 1) {
+          colorClass = "text-gray-500";
+        }
+        
+        return <span className={colorClass}>{row.original.status}</span>;
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const isInstalled = row.original.installed_date !== null;
+        const isCancelled = row.original.cancelled_date !== null;
+        const allCut = row.original.all_cut === 1;
+        
+        const canInstall = allCut && !isInstalled && !isCancelled;
+        
+        return (
+          <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openInstallDialog(row.original.id);
+                  }}
+                  disabled={!canInstall}
+                  className={!canInstall ? "opacity-50 cursor-not-allowed" : ""}
+                >
+                  Mark as Installed
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+    },
+  ];
+
+  const formAction = `/employee/transactions${location.search}`;
 
   return (
     <>
       <PageLayout title="Sales Transactions">
-        <div className="mb-4 flex justify-between items-center">
+        <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold">Transactions</h1>
             <div className="flex gap-4 items-center">
               <div className="w-1/8 min-w-[120px]">
                 <div className="mb-1 text-sm font-medium">Sales Rep</div>
@@ -577,6 +600,71 @@ export default function EmployeeTransactions() {
           }))}
         />
       </PageLayout>
+      
+      <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Transaction as Installed</DialogTitle>
+          </DialogHeader>
+          
+          <Form method="post" action={formAction} onSubmit={handleFormSubmit}>
+            <input type="hidden" name="intent" value="mark-installed" />
+            <input type="hidden" name="transactionId" value={selectedTransactionId?.toString() || ''} />
+            
+            <div className="py-4 space-y-4">
+              <div className="flex items-center gap-4">
+                <Label htmlFor="installation-date" className="text-right w-[140px]">
+                  Installation Date
+                </Label>
+                <div className="relative ">
+                  <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    id="installation-date"
+                    name="installedDate"
+                    type="date"
+                    value={installDate}
+                    onChange={(e) => setInstallDate(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <Label htmlFor="paid-switch" className="text-right w-[140px]">
+                  Paid
+                </Label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="hidden" 
+                    name="isPaid" 
+                    value={isPaid ? "true" : "false"} 
+                  />
+                  <Switch 
+                    id="paid-switch"
+                    checked={isPaid}
+                    onCheckedChange={setIsPaid}
+                  />
+                  <span className="text-sm text-gray-500">
+                    {isPaid ? "Mark as paid on same date" : "Do not mark as paid"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setInstallDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Confirm</Button>
+            </DialogFooter>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
       <Outlet />
     </>
   );
