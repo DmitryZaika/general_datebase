@@ -1,5 +1,2 @@
 ALTER TABLE sales
-ADD COLUMN cancelled_date DATETIME NULL,
-ADD COLUMN installed_date DATETIME NULL;
-
-
+ADD COLUMN sales_payroll INT NULL;
