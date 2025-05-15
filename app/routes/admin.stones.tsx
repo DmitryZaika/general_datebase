@@ -19,6 +19,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "~/components/ui/data-table";
 import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
+import { Search, Plus } from "lucide-react";
 
 type ViewMode = "grid" | "table";
 
@@ -130,7 +131,9 @@ function StoneTable({ stones }: { stones: Stone[] }) {
     },
     {
       id: "actions",
-      header: "Actions",
+      meta: {
+        className: "w-[50px]"
+      },
       cell: ({ row }) => {
         return (
           <ActionDropdown
@@ -216,7 +219,10 @@ export default function AdminStones() {
           </Button>
           
           <Link to={`add${location.search}`} onClick={handleAddStoneClick} className="mr-auto">
-            <LoadingButton loading={isAddingStone}>Add Stone</LoadingButton>
+            <LoadingButton loading={isAddingStone}>
+              <Plus className="w-4 h-4 mr-1" />
+              Add Stone
+            </LoadingButton>
           </Link>
         </div>
         <div className="flex-1 flex justify-center md:justify-end ">

@@ -36,7 +36,7 @@ import { selectMany } from "~/utils/queryHelpers";
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "~/components/ui/input";
-
+import { coerceNumber, coerceNumberRequired, StringOrNumber } from "~/schemas/general";
 interface Sink {
   id: number;
   name: string;
@@ -44,18 +44,13 @@ interface Sink {
 }
 
 const customerSchema = z.object({
-  name: z.union([z.string(), z.number()])
-    .refine(val => val !== undefined && val !== null && val.toString().trim() !== "", "Customer name is required")
-    .transform(val => String(val)),
+  name: z.string().min(1, "Name is required"),
   customer_id: z.coerce.number().optional(),
   sink_type_id: z.preprocess(val => String(val), z.string().optional()),
-  notes_to_slab: z.union([z.string(), z.number(), z.null()])
-    .transform(val => val ? String(val) : "")
-    .optional(),
-  notes_to_sale: z.union([z.string(), z.number(), z.null()])
-    .transform(val => val ? String(val) : "")
-    .optional(),
-  total_square_feet: z.coerce.number().default(0),
+  notes_to_slab: StringOrNumber,
+  notes_to_sale: StringOrNumber,
+  total_square_feet: coerceNumberRequired,
+  price: coerceNumberRequired 
 });
 
 type FormData = z.infer<typeof customerSchema>;
@@ -128,14 +123,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     
     const [salesResult] = await db.execute<ResultSetHeader>(
-      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date) 
-       VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL)`,
+      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price) 
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL, ?)`,
       [
         customerId,
         user.id, 
         user.company_id,
         data.notes_to_sale || null,
-        data.total_square_feet || 0
+        data.total_square_feet || 0,
+        data.price || 0
       ]
     );
     
@@ -269,13 +265,6 @@ export default function SlabSell() {
   
   const form = useForm<FormData>({
     resolver,
-    defaultValues: {
-      name: "",
-      customer_id: undefined,
-      sink_type_id: "",
-      notes_to_slab: "",
-      total_square_feet: 0,
-    },
   });
   const fullSubmit = useFullSubmit(form);
 
@@ -363,6 +352,7 @@ export default function SlabSell() {
                         field={field}
                         placeholder="Select a Sink"
                         name="Sink"
+                        className="mb-0"
                         options={sinks.map((sink) => {
                           return {
                             key: String(sink.id),
@@ -381,10 +371,23 @@ export default function SlabSell() {
                       name={"Total Square Feet"}
                       placeholder={"Total Square Feet"}
                       field={field}
+                      formClassName="mb-0"
                     />
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <InputItem
+                    name={"Price"}
+                    placeholder={"Enter price"}
+                    field={field}
+                    formClassName="mb-0"
+                  />
+                )}
+              />
               <FormField
                 control={form.control}
                 name="notes_to_sale"

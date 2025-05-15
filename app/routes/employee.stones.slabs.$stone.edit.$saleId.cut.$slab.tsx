@@ -213,7 +213,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     
     const session = await getSession(request.headers.get("Cookie"));
     session.flash("message", toastData("Success", noLeftovers ? "Slab marked as cut with no leftovers" : "Slab cut successfully"));
-    
+
+    if (remainingSlabsCount === 0) {
+      return redirect(`/employee/stones${searchString}`, {
+        headers: { "Set-Cookie": await commitSession(session) }
+      });
+    }
+
     if (addAnother && !noLeftovers) {
       return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleIdNum}/cut/${slabIdNum}${searchString}`, {
         headers: { "Set-Cookie": await commitSession(session) }

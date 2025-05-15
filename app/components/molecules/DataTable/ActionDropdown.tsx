@@ -3,12 +3,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Button } from "~/components/ui/button";
 import { MoreHorizontal } from "lucide-react";
 import { Link } from "react-router";
+import { useState } from "react";
 
 interface IProps {
   actions: Record<string, string>;
@@ -17,24 +17,36 @@ interface IProps {
 }
 
 export const ActionDropdown = ({ actions, asBlank = false, label = "Actions" }: IProps) => {
+  const [open, setOpen] = useState(false);
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 w-8 p-0" disabled={Object.keys(actions).length === 0}>
-          <span className="sr-only">Open menu</span>
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>{label}</DropdownMenuLabel>
-        {Object.entries(actions).map(([action, link]) => (
-          <DropdownMenuItem asChild>
-            <Link to={link} target={asBlank ? "_blank" : "_self"}>
-              {action.charAt(0).toUpperCase() + action.slice(1)}
-            </Link>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex justify-end pr-5">
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button 
+            variant="ghost" 
+            className="h-8 w-8 p-0" 
+            disabled={Object.keys(actions).length === 0}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(true);
+            }}
+          >
+            <span className="sr-only">Open menu</span>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>{label}</DropdownMenuLabel>
+          {Object.entries(actions).map(([action, link]) => (
+            <DropdownMenuItem key={action} asChild>
+              <Link to={link} target={asBlank ? "_blank" : "_self"}>
+                {action.charAt(0).toUpperCase() + action.slice(1)}
+              </Link>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 };
