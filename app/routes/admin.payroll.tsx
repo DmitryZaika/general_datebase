@@ -111,13 +111,13 @@ export async function action({ request }: ActionFunctionArgs) {
       if (payrollAmount) {
         // Устанавливаем сумму зарплаты
         await db.execute(
-          `UPDATE sales SET sales_payroll = ?, updated_at = NOW() WHERE id = ?`,
+          `UPDATE sales SET sales_payroll = ? WHERE id = ?`,
           [payrollAmount, saleId]
         );
       } else {
         // Если сумма не указана, устанавливаем NULL (отмечаем как неоплаченную)
         await db.execute(
-          `UPDATE sales SET sales_payroll = NULL, updated_at = NOW() WHERE id = ?`,
+          `UPDATE sales SET sales_payroll = NULL WHERE id = ?`,
           [saleId]
         );
       }
@@ -245,37 +245,42 @@ export default function AdminPayroll() {
         const isPaid = row.original.sales_payroll !== null;
         
         return (
-          <Form method="post" className="inline-flex gap-2 items-center">
-            <input type="hidden" name="intent" value="set-payroll" />
-            <input type="hidden" name="saleId" value={row.original.sale_id} />
-            
+          <>
             {isPaid ? (
-              <>
-                <input 
-                  type="number" 
-                  name="payrollAmount" 
-                  defaultValue={row.original.sales_payroll || ""} 
-                  className="w-24 px-2 py-1 border rounded"
-                  min="0"
-                  step="0.01"
-                />
-                <Button type="submit" variant="default" size="sm">
-                  Update
-                </Button>
-                <Button 
-                  type="submit" 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => {
-                    const input = document.getElementsByName("payrollAmount")[0] as HTMLInputElement;
-                    input.value = "";
-                  }}
-                >
-                  Mark Unpaid
-                </Button>
-              </>
+              <div className="flex gap-2 items-center">
+                <Form method="post" className="inline-flex gap-2 items-center">
+                  <input type="hidden" name="intent" value="set-payroll" />
+                  <input type="hidden" name="saleId" value={row.original.sale_id} />
+                  <input 
+                    type="number" 
+                    name="payrollAmount" 
+                    defaultValue={row.original.sales_payroll || ""} 
+                    className="w-24 px-2 py-1 border rounded"
+                    min="0"
+                    step="0.01"
+                  />
+                  <Button type="submit" variant="default" size="sm">
+                    Update
+                  </Button>
+                </Form>
+                
+                <Form method="post">
+                  <input type="hidden" name="intent" value="set-payroll" />
+                  <input type="hidden" name="saleId" value={row.original.sale_id} />
+                  <input type="hidden" name="payrollAmount" value="" />
+                  <Button 
+                    type="submit" 
+                    variant="destructive" 
+                    size="sm"
+                  >
+                    Mark Unpaid
+                  </Button>
+                </Form>
+              </div>
             ) : (
-              <>
+              <Form method="post" className="inline-flex gap-2 items-center">
+                <input type="hidden" name="intent" value="set-payroll" />
+                <input type="hidden" name="saleId" value={row.original.sale_id} />
                 <input 
                   type="number" 
                   name="payrollAmount" 
@@ -287,9 +292,9 @@ export default function AdminPayroll() {
                 <Button type="submit" variant="default" size="sm">
                   Set Payroll
                 </Button>
-              </>
+              </Form>
             )}
-          </Form>
+          </>
         );
       },
     },

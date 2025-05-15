@@ -276,6 +276,9 @@ const transactionColumns: ColumnDef<Transaction>[] = [
   },
   {
     id: "actions",
+    meta: {
+      className: "w-[50px]"
+    },
     cell: ({ row }) => {
       const location = useLocation();
       return (
