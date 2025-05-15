@@ -26,3 +26,9 @@ export interface HeaderProps {
   isSuperUser: boolean;
   isEmployee?: boolean;
 }
+
+export interface TokenSet {
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: number;
+}

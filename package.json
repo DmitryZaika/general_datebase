@@ -53,6 +53,7 @@
     "crypto-js": "^4.2.0",
     "dotenv": "^16.4.7",
     "embla-carousel-react": "^8.5.2",
+    "intuit-oauth": "^4.2.0",
     "isbot": "^5.1.18",
     "lucide-react": "^0.469.0",
     "mysql2": "^3.11.5",
