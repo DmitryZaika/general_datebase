@@ -36,6 +36,7 @@ import { selectMany } from "~/utils/queryHelpers";
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "~/components/ui/input";
+import { queryQboCustomers } from "~/quickbooks.server";
 
 interface Sink {
   id: number;
@@ -203,6 +204,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const result = await queryQboCustomers();
+  console.log(result);
   try {
     const user = await getEmployeeUser(request);
     
