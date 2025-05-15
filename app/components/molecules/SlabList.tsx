@@ -73,7 +73,7 @@ export function SlabList() {
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="sm:max-w-[425px] overflow-y-auto max-h-[95vh]">
         <DialogHeader>
-          <DialogTitle>Add Stone</DialogTitle>
+          <DialogTitle>+ Add Stone</DialogTitle>
         </DialogHeader>
         <MultiPartForm form={form}>
           {inputFields.map((field, index) => (
