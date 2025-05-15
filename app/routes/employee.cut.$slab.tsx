@@ -1,16 +1,14 @@
-
 import React, { useState } from "react";
-import { Stage, Layer, Line, Shape } from "react-konva";
+import { Stage, Layer, Line } from "react-konva";
 import * as polygonClipping from "polygon-clipping";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Send } from "lucide-react";
 
-/** Типы **/
+/** Типы и константы */
 export type Point = { x: number; y: number };
 export type Polygon = Point[];
 
-/** Начальный «слэб» — весь холст */
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const initialSlab: Polygon = [
@@ -21,42 +19,59 @@ const initialSlab: Polygon = [
 ];
 
 /**
- * Разделяет полигоны линией и возвращает новые полигоны.
- * Реализация демонстрационная: если линия не пересекает полигон, он остаётся.
- * TODO: заменить на точный алгоритм с использованием polygon-clipping.
+ * Разрезает полигоны линией и возвращает новые полигоны.
+ * TODO: Реализовать на polygon‑clipping.
  */
 function splitShapesWithLine(shapes: Polygon[], line: [Point, Point]): Polygon[] {
-  // Пример вызова polygonClipping:
-  // const result = polygonClipping.splitPolygonWithLine(shapesAsArrays, lineAsArrays);
-  // Преобразовать результат обратно в массив Polygon.
-  // Пока возвращаем исходное.
-  return shapes;
+  /* Пример, как это может быть реализовано:
+  const linePoly = [
+    [ [line[0].x, line[0].y], [line[1].x, line[1].y] ]
+  ];
+  const newShapes: Polygon[] = [];
+  for (const poly of shapes) {
+    const result = polygonClipping.splitPolygon(polyAsArray, linePoly);
+    // Преобразовать результат в Point[][] и push в newShapes
+  }
+  return newShapes;
+  */
+  return shapes; // заглушка
 }
 
 /** Главный компонент */
-export default function SlabCutting() {
+export default function SlabCuttingApp() {
   const [shapes, setShapes] = useState<Polygon[]>([initialSlab]);
-  const [tempLine, setTempLine] = useState<Point[]>([]);
+  const [startPoint, setStartPoint] = useState<Point | null>(null); // первая точка линии
+  const [cursorPos, setCursorPos] = useState<Point | null>(null); // позиция курсора для предпросмотра
 
-  /** Обработчик клика по сцене */
+  /** Клик по сцене */
   const handleStageClick = (e: any) => {
     const stage = e.target.getStage();
     const pointer = stage?.getPointerPosition();
     if (!pointer) return;
 
-    if (tempLine.length === 0) {
-      // первая точка линии
-      setTempLine([pointer]);
+    if (!startPoint) {
+      // ставим первую точку линии
+      setStartPoint(pointer);
     } else {
-      // вторая точка – завершаем линию и режем
-      const newLine: [Point, Point] = [tempLine[0], pointer];
+      // вторая точка → режем
+      const newLine: [Point, Point] = [startPoint, pointer];
       const newShapes = splitShapesWithLine(shapes, newLine);
       setShapes(newShapes);
-      setTempLine([]);
+      setStartPoint(null);
+      setCursorPos(null);
     }
   };
 
-  /** Отправка на бэкенд */
+  /** Движение мыши для предпросмотра */
+  const handleMouseMove = (e: any) => {
+    if (!startPoint) return;
+    const stage = e.target.getStage();
+    const pointer = stage?.getPointerPosition();
+    if (!pointer) return;
+    setCursorPos(pointer);
+  };
+
+  /** Отправка результата */
   const sendToBackend = async () => {
     try {
       await fetch("/api/slabs", {
@@ -71,38 +86,35 @@ export default function SlabCutting() {
     }
   };
 
+  /** Рендер */
   return (
     <Card className="m-4 p-4 space-y-4 shadow-lg rounded-2xl">
       <CardContent className="space-y-4">
         <Stage
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
-          className="border rounded-2xl shadow-inner"
+          className="border rounded-2xl shadow-inner bg-white"
           onClick={handleStageClick}
+          onMouseMove={handleMouseMove}
         >
           <Layer>
+            {/* Рисуем существующие полигоны */}
             {shapes.map((poly, idx) => (
-              <Shape
+              <Line
                 key={idx}
-                sceneFunc={(context, shape) => {
-                  if (poly.length === 0) return;
-                  context.beginPath();
-                  context.moveTo(poly[0].x, poly[0].y);
-                  for (let i = 1; i < poly.length; i++) {
-                    context.lineTo(poly[i].x, poly[i].y);
-                  }
-                  context.closePath();
-                  context.fillStrokeShape(shape);
-                }}
-                fill="#e5e7eb" // tailwind gray-200
-                stroke="#374151" // tailwind gray-700
+                points={poly.flatMap((p) => [p.x, p.y])}
+                closed
+                fill="#f3f4f6" // gray‑100
+                stroke="#1f2937" // gray‑800
                 strokeWidth={1}
               />
             ))}
-            {tempLine.length === 1 && (
+
+            {/* Линия предпросмотра */}
+            {startPoint && cursorPos && (
               <Line
-                points={[tempLine[0].x, tempLine[0].y, tempLine[0].x, tempLine[0].y]}
-                stroke="#ef4444" // tailwind red-500
+                points={[startPoint.x, startPoint.y, cursorPos.x, cursorPos.y]}
+                stroke="#ef4444" // red‑500
                 strokeWidth={2}
                 dash={[4, 4]}
               />
@@ -111,10 +123,18 @@ export default function SlabCutting() {
         </Stage>
 
         <Button onClick={sendToBackend} className="w-full gap-2">
-          <Send size={16} /> Отправить на бэкенд
+          <Send size={16} /> Отправить на бэкенд
         </Button>
       </CardContent>
     </Card>
   );
 }
+
+/**
+ * Шаги интеграции:
+ * 1. yarn add react-konva konva polygon-clipping lucide-react @shadcn/ui tailwindcss
+ * 2. Подключите <SlabCuttingApp /> в своём приложении.
+ * 3. Реализуйте splitShapesWithLine.
+ * 4. Настройте /api/slabs на сервере.
+ */
 
