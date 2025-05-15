@@ -276,6 +276,9 @@ const transactionColumns: ColumnDef<Transaction>[] = [
   },
   {
     id: "actions",
+    meta: {
+      className: "w-[50px]"
+    },
     cell: ({ row }) => {
       const location = useLocation();
       return (
@@ -341,7 +344,6 @@ export default function AdminTransactions() {
       <PageLayout title="Sales Transactions">
         <div className="mb-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold">Transactions</h1>
             <Link to="/admin/reports">
               <Button variant="default" className="bg-blue-600 hover:bg-blue-700">
                 Reports
