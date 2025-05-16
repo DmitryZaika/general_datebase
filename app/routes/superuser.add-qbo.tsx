@@ -7,13 +7,6 @@ import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
 import { Button } from "~/components/ui/button";
 import { useForm } from "react-hook-form";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
 import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
@@ -24,9 +17,7 @@ import { getSuperUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { selectMany } from "~/utils/queryHelpers";
-import bcrypt from "bcryptjs";
-import { SwitchItem } from "~/components/molecules/SwitchItem";
-import { replaceUnderscoresWithSpaces } from "~/utils/words";
+import { saveCompanyQBO } from "~/utils/quickbooks.server";
 
 interface Company {
   id: number;
@@ -63,15 +54,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, receivedValues };
   }
   try {
-    await db.execute(
-      'UPDATE SET main.company SET qbo_client_id = ?, qbo_client_secret = ?, qbo_realm_id = ? WHERE id = ?',
-      [
-        data.qboClientId,
-        data.qboClientSecret,
-        data.qboRealmId,
-        data.companyId,
-      ],
-    );
+    saveCompanyQBO(data.companyId, data.qboClientId, data.qboClientSecret, data.qboRealmId);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
@@ -92,24 +75,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     "select id, name from company",
   );
-  const positions = await selectMany<{ id: number; name: string }>(
-    db,
-    "select id, name from positions",
-  );
-  return { companies, positions };
+  return { companies };
 };
 
 export default function UsersAdd() {
   const navigate = useNavigate();
-  const { companies, positions } = useLoaderData<typeof loader>();
-  const cleanCompanies = companies.map((company) => ({
-    key: company.id,
-    value: company.name,
-  }));
-  const cleanPositions = positions.map((position) => ({
-    key: position.id,
-    value: position.name,
-  }));
+  const { companies } = useLoaderData<typeof loader>();
   const token = useAuthenticityToken();
   const form = useForm<FormData>({
     resolver,
@@ -121,54 +92,45 @@ export default function UsersAdd() {
     }
   };
   return (
-    <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add user</DialogTitle>
-        </DialogHeader>
-        <FormProvider {...form}>
-          <Form onSubmit={fullSubmit}>
-            <FormField
-              control={form.control}
-              name="companyId"
-              render={({ field }) => (
-                <SelectInput
-                  field={field}
-                  name="Position"
-                  options={cleanPositions.map((position) => ({
-                    key: position.key,
-                    value: replaceUnderscoresWithSpaces(position.value),
-                  }))}
-                />
-              )}
+    <FormProvider {...form}>
+      <Form onSubmit={fullSubmit} className="container mx-auto py-5">
+        <FormField
+          control={form.control}
+          name="companyId"
+          render={({ field }) => (
+            <SelectInput
+              field={field}
+              name="Company"
+              options={companies.map((company) => ({
+                key: company.id,
+                value: company.name,
+              }))}
             />
-            <FormField
-              control={form.control}
-              name="qboClientId"
-              render={({ field }) => (
-                <InputItem name="QBO Client Id"field={field}/>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="qboClientSecret"
-              render={({ field }) => (
-                <InputItem name="QBO Client Secret" field={field}/>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="qboRealmId"
-              render={({ field }) => (
-                <InputItem name="QBO Realm Id" field={field}/>
-              )}
-            />
-            <DialogFooter>
-              <Button type="submit">Save changes</Button>
-            </DialogFooter>
-          </Form>
-        </FormProvider>
-      </DialogContent>
-    </Dialog>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="qboClientId"
+          render={({ field }) => (
+            <InputItem name="QBO Client Id"field={field}/>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="qboClientSecret"
+          render={({ field }) => (
+            <InputItem name="QBO Client Secret" field={field}/>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="qboRealmId"
+          render={({ field }) => (
+            <InputItem name="QBO Realm Id" field={field}/>
+          )}
+        />
+          <Button type="submit">Save changes</Button>
+      </Form>
+    </FormProvider>
   );
 }

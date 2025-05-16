@@ -18,7 +18,7 @@ import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { RowDataPacket } from "mysql2";
 // @ts-ignore
 import bcrypt from "bcryptjs";
-import { getTokenCache } from "~/quickbooks.server";
+import { getQboUrl } from "~/utils/quickbooks.server";
 
 const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -88,7 +88,6 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const quickBooksUrl = await getTokenCache()
   try {
     const user = await getEmployeeUser(request);
     
@@ -101,6 +100,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       throw new Error("User not found");
     }
     
+    const quickBooksUrl = await getQboUrl(user.company_id);
     return { userData: rows[0], quickBooksUrl };
   } catch (error) {
     return redirect(`/login?error=${error}`);
