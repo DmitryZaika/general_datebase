@@ -13,6 +13,7 @@ import { sinkFilterSchema } from "~/schemas/sinks";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { Sink, sinkQueryBuilder } from "~/utils/queries";
 import { SINK_TYPES } from "~/utils/constants";
+import { Plus } from "lucide-react";
 
 const customOrder = [
   "stainless 18 gauge",
@@ -108,7 +109,10 @@ export default function AdminSinks() {
     <>
       <div className="flex justify-start mb-2">
         <Link to="add" onClick={handleAddSinkClick}>
-          <LoadingButton className="mt-2 ml-2 -mb-3" loading={isAddingSink}>Add Sink</LoadingButton>
+          <LoadingButton className="mt-2 ml-2 -mb-3" loading={isAddingSink}>
+            <Plus className="w-4 h-4 mr-1" />
+            Add Sink
+          </LoadingButton>
         </Link>
       </div>
 

@@ -17,7 +17,7 @@ export const getMirroredUrl = (isAdminPage: boolean, location: Location) => {
     
     const currentSection = segments[1];
     
-    const supportedSections = ["stones", "instructions", "sinks", "suppliers", "supports", "documents", "images"];
+    const supportedSections = ["stones", "instructions", "sinks", "suppliers", "supports", "documents", "images", "transactions"];
     
     if (supportedSections.includes(currentSection)) {
       return `/${targetRole}/${currentSection}${search}`;
@@ -26,6 +26,10 @@ export const getMirroredUrl = (isAdminPage: boolean, location: Location) => {
 };
 
 export const getCustomerUrl = (isCustomerPage: boolean, location: Location, companyId: number | string = 1) => {
+  if (location.pathname.includes('/transactions')) {
+    return isCustomerPage ? `/employee/stones` : `/customer/${companyId}/stones`;
+  }
+  
   const search = location.search || '';
   
   if (!isCustomerPage && location.pathname.startsWith("/admin/stones")) {

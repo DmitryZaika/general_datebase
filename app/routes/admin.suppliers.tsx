@@ -10,6 +10,7 @@ import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown"
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 
 interface Supplier {
   id: number;
@@ -62,6 +63,9 @@ const columns: ColumnDef<Supplier>[] = [
   },
   {
     id: "actions",
+    meta: {
+      className: "w-[50px]"
+    },
     cell: ({ row }) => {
       return (
         <ActionDropdown
@@ -93,7 +97,10 @@ export default function Suppliers() {
   return (
     <div >
       <Link to={`add`} relative="path" onClick={handleAddSupplierClick}>
-        <LoadingButton loading={isAddingSupplier}>Add Supplier</LoadingButton>
+        <LoadingButton loading={isAddingSupplier}>
+          <Plus className="w-4 h-4 mr-1" />
+          Add Supplier
+        </LoadingButton>
       </Link>
       <DataTable columns={columns} data={suppliers} />
       <Outlet />

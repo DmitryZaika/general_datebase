@@ -42,8 +42,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "~/components/ui/tabs";
-import React, { useRef, useState, useEffect } from "react";
-
+import React, { useState, useEffect } from "react";
+import { coerceNumberRequired } from "~/schemas/general";
 interface SaleDetails {
   id: number;
   customer_id: number;
@@ -52,6 +52,8 @@ interface SaleDetails {
   seller_id: number;
   seller_name: string;
   notes: string | null;
+  square_feet: number | null;
+  price: number | null;
 }
 
 interface SaleSlab {
@@ -99,19 +101,6 @@ const sinkSchema = z.object({
 type SinkFormData = z.infer<typeof sinkSchema>;
 const sinksResolver = zodResolver(sinkSchema);
 
-const schema = z.object({
-  sinks: z.array(
-    z.object({
-      is_deleted: z.boolean().default(false),
-    })
-  ),
-  new_sinks: z.array(
-    z.object({
-      sink_type_id: z.string().optional(),
-      price: z.coerce.number().optional(),
-    })
-  ).optional(),
-});
 
 const sinkAddSchema = z.object({
   sink_type_id: z.string().min(1, "Please select a sink"),
@@ -132,6 +121,8 @@ const saleInfoSchema = z.object({
   customer_name: z.string().min(1, "Customer name is required"),
   seller_id: z.coerce.number().min(1, "Seller is required"),
   notes: z.string().optional(),
+  total_square_feet: coerceNumberRequired,
+  price: coerceNumberRequired
 });
 
 type SaleInfoFormData = z.infer<typeof saleInfoSchema>;
@@ -170,7 +161,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     db,
     `SELECT 
       s.id, s.customer_id, c.name as customer_name, 
-      s.sale_date, s.seller_id, u.name as seller_name, s.notes
+      s.sale_date, s.seller_id, u.name as seller_name, s.notes, s.square_feet, s.price
      FROM sales s
      JOIN customers c ON s.customer_id = c.id
      JOIN users u ON s.seller_id = u.id
@@ -289,7 +280,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       );
       
       await db.execute(
-        `UPDATE sales SET status = 'cancelled' WHERE id = ?`,
+        `UPDATE sales SET cancelled_date = NOW() WHERE id = ?`,
         [saleId]
       );
       
@@ -302,9 +293,33 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     else if (intent === "sale-info-update") {
       const customer_name = formData.get("customer_name") as string;
-      const seller_id = parseInt(formData.get("seller_id") as string);
+      const seller_id = parseInt(formData.get("seller_id") as string, 10);
       const notes = formData.get("notes") as string;
-    
+      const total_square_feet = parseFloat(formData.get("total_square_feet") as string) || 0;
+      
+      const rawPriceValue = formData.get("price");
+      console.log("[DEBUG] Raw price value:", rawPriceValue, "type:", typeof rawPriceValue);
+      
+      // Пробуем несколько подходов для безопасного получения значения
+      let price = null; // Начинаем с null, чтобы можно было использовать NULL в SQL
+      
+      if (rawPriceValue !== null && rawPriceValue !== "") {
+        // Стандартный подход через parseFloat
+        const parsedPrice = parseFloat(rawPriceValue as string);
+        if (!isNaN(parsedPrice)) {
+          price = parsedPrice;
+        }
+      }
+      
+      console.log("[DEBUG] Updating sale with values:", { 
+        customer_name, 
+        seller_id, 
+        notes, 
+        total_square_feet,
+        price,
+        rawPrice: rawPriceValue,
+        priceType: typeof price
+      });
       
       if (!customer_name || isNaN(seller_id)) {
         console.error(`[ERROR] Invalid sale info data: customer_name=${customer_name}, seller_id=${seller_id}`);
@@ -312,6 +327,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
       
       try {
+        // Обновляем данные клиента
         await db.execute(
           `UPDATE customers SET name = ? WHERE id = (
             SELECT customer_id FROM sales WHERE id = ?
@@ -319,10 +335,31 @@ export async function action({ request, params }: ActionFunctionArgs) {
           [customer_name, saleId]
         );
         
-        await db.execute(
-          `UPDATE sales SET seller_id = ?, notes = ? WHERE id = ?`,
-          [seller_id, notes || null, saleId]
+        // Получаем существующие данные продажи для сравнения
+        const [existingSale] = await db.execute(
+          `SELECT price FROM sales WHERE id = ?`,
+          [saleId]
         );
+        console.log("[DEBUG] Existing sale data:", existingSale);
+        
+        // Создадим отдельные запросы для обновления цены и других полей
+        let updateQuery;
+        let updateParams;
+        
+        if (price === null) {
+          // Если цена null, установим NULL в базе данных
+          updateQuery = `UPDATE sales SET seller_id = ?, notes = ?, square_feet = ?, price = NULL WHERE id = ?`;
+          updateParams = [seller_id, notes || null, total_square_feet, saleId];
+        } else {
+          // Иначе установим числовое значение
+          updateQuery = `UPDATE sales SET seller_id = ?, notes = ?, square_feet = ?, price = ? WHERE id = ?`;
+          updateParams = [seller_id, notes || null, total_square_feet, price, saleId];
+        }
+        
+        console.log("[DEBUG] Update query:", updateQuery);
+        console.log("[DEBUG] Update params:", updateParams);
+        
+        await db.execute(updateQuery, updateParams);
         
         const session = await getSession(request.headers.get("Cookie"));
         session.flash("message", toastData("Success", "Sale information updated successfully"));
@@ -331,7 +368,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
           headers: { "Set-Cookie": await commitSession(session) },
         });
       } catch (dbError) {
+        console.error("[DB ERROR] Failed to update sale:", dbError);
         
+        const session = await getSession(request.headers.get("Cookie"));
+        session.flash("message", toastData("Error", "Failed to update sale information: " + (dbError as Error).message, "destructive"));
+        
+        return data({ success: false, error: (dbError as Error).message || "Database error" }, {
+          headers: { "Set-Cookie": await commitSession(session) },
+        });
       }
     } else if (intent === "create-customer") {
       const customer_name = formData.get("customer_name") as string;
@@ -599,8 +643,7 @@ function SinkAdd({ availableSinks }: { availableSinks: Sink[] }) {
                     type="number"
                     name="newSinkPrice"
                     placeholder="Auto"
-                    step="1"
-                    min="0"
+                  
                     className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
@@ -623,7 +666,6 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
   const [showUnsellConfirm, setShowUnsellConfirm] = useState(false);
   const [showCreateCustomer, setShowCreateCustomer] = useState(false);
   const [customerName, setCustomerName] = useState(sale.customer_name);
-  const [saleNotes, setSaleNotes] = useState(sale.notes || "");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
@@ -641,11 +683,27 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
       customer_name: sale.customer_name,
       seller_id: sale.seller_id,
       notes: sale.notes || "",
+      total_square_feet: sale.square_feet || 0,
+      price: sale.price || undefined,
     },
   });
   
+  const handleFormSubmit = () => {
+    const formValues = saleInfoForm.getValues();
+    console.log("[DEBUG] Form values on submit:", formValues);
+    
+    const formData = new FormData();
+    formData.append("intent", "sale-info-update");
+    formData.append("customer_name", formValues.customer_name);
+    formData.append("seller_id", String(formValues.seller_id));
+    formData.append("notes", formValues.notes || "");
+    formData.append("total_square_feet", String(formValues.total_square_feet || 0));
+    formData.append("price", String(formValues.price));
+    
+    fetcher.submit(formData, { method: "post" });
+  };
+  
   useEffect(() => {
-    // Fetch customers when dialog opens
     if (showCreateCustomer) {
       const fetchData = async () => {
         try {
@@ -694,96 +752,124 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
           <input type="hidden" name="intent" value="sale-info-update" />
           
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <FormField
-                control={saleInfoForm.control}
-                name="customer_name"
-                render={({ field }) => (
-                  <div className="flex  gap-2">
-                    <InputItem
-                      name="Customer"
-                      placeholder="Customer name"
-                      field={{
-                        ...field,
-                        value: customerName,
-                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                          setCustomerName(e.target.value);
-                          field.onChange(e);
-                        }
-                      }}
-                      formClassName="flex-grow"
+            <div className="col-span-2 flex gap-2">
+              <div className="w-2/5">
+                <FormField
+                  control={saleInfoForm.control}
+                  name="customer_name"
+                  render={({ field }) => (
+                    <div>
+                      <div className="flex gap-2">
+                        <InputItem
+                          name="Customer"
+                          placeholder="Customer name"
+                          field={{
+                            ...field,
+                            value: customerName,
+                            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                              setCustomerName(e.target.value);
+                              field.onChange(e);
+                            }
+                          }}
+                          formClassName="flex-grow mb-0"
+                        />
+                        <Button 
+                          type="button" 
+                          variant="blue" 
+                          className="px-2 py-2 h-[38px] border border-gray-300 mt-6"
+                          onClick={() => setShowCreateCustomer(true)}
+                        >
+                          <span className="text-sm">+</span>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                />
+              </div>
+              
+              <div className="w-2/5">
+                <FormField
+                  control={saleInfoForm.control}
+                  name="seller_id"
+                  render={({ field }) => (
+                    <SelectInput
+                      field={field}
+                      placeholder="Select a seller"
+                      name="Seller"
+                      options={sellers.map((seller) => {
+                        return {
+                          key: String(seller.id),
+                          value: seller.name,
+                        };
+                      })}
                     />
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      className="mt-6 px-2 py-2 h-[38px] border border-gray-300"
-                      onClick={() => setShowCreateCustomer(true)}
-                    >
-                      <span className="text-lg">+</span>
-                    </Button>
-                  </div>
-                )}
-              />
-            </div>
-            
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
-              <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
-                {new Date(sale.sale_date).toLocaleDateString()}
+                  )}
+                />
+              </div>
+              <div className="w-1/5">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
+                <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
+                  {new Date(sale.sale_date).toLocaleDateString()}
+                </div>
               </div>
             </div>
             
-            <div className="col-span-2 sm:col-span-1">
-              <FormField
-                control={saleInfoForm.control}
-                name="notes"
-                render={({ field }) => (
-                  <InputItem
-                    name="Notes to Sale"
-                    placeholder="Notes for entire sale"
-                    field={{
-                      ...field,
-                      value: saleNotes,
-                      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                        setSaleNotes(e.target.value);
-                        field.onChange(e);
-                      }
-                    }}
+            <div className="col-span-2 flex gap-2">
+              <div className="w-5/8">
+                <FormField
+                  control={saleInfoForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <InputItem
+                      formClassName="mb-0"
+                      name="Notes to Sale"
+                      placeholder="Notes for entire sale"
+                      field={field}
+                    />
+                  )}
+                />
+              </div>
+              
+              <div className="w-3/8 flex gap-2">
+                <div className="flex-1">
+                  <FormField
+                    control={saleInfoForm.control}
+                    name="total_square_feet"
+                    render={({ field }) => (
+                      <InputItem
+                        formClassName="mb-0"
+                        name="Total Sqft"   
+                        field={field}
+                        type="number"
+                      />
+                    )}
                   />
-                )}
-              />
+                </div>
+                <div className="flex-1 w-full">
+                  <FormField
+                    control={saleInfoForm.control}
+                    name="price"
+                    render={({ field }) => (
+                      <InputItem
+                        name="Price"
+                        placeholder="Enter price"
+                        field={field}
+                        formClassName="mb-0"
+                        type="number"
+                      />
+                    )}
+                  />
+                </div>
+              </div>
             </div>
             
-            <div className="col-span-2 sm:col-span-1">
-              <FormField
-                control={saleInfoForm.control}
-                name="seller_id"
-                render={({ field }) => (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Seller</label>
-                    <select 
-                      {...field}
-                      className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      {sellers.map(seller => (
-                        <option key={seller.id} value={seller.id}>
-                          {seller.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              />
-            </div>
-            
-            <div className="col-span-2 flex items-end gap-2 mt-2">
-              <LoadingButton
-                type="submit"
-                className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md shadow-sm transition-colors flex-1" 
-                loading={false}
+            <div className="col-span-2 flex items-end justify-end gap-2 mt-2">
+              <Button
+                type="button"
+                onClick={handleFormSubmit}
               >
                 Save Changes
-              </LoadingButton>
+              </Button>
               
               <Button
                 type="button"
@@ -798,7 +884,6 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
         </Form>
       </FormProvider>
       
-      {/* Confirm Unsell Dialog */}
       <Dialog open={showUnsellConfirm} onOpenChange={setShowUnsellConfirm}>
         <DialogContent className="bg-white rounded-lg p-6 shadow-lg">
           <DialogHeader>
@@ -835,7 +920,6 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
         </DialogContent>
       </Dialog>
       
-      {/* Customer Selection Dialog */}
       <Dialog open={showCreateCustomer} onOpenChange={setShowCreateCustomer}>
         <DialogContent className="bg-white rounded-lg p-6 shadow-lg">
           <DialogHeader>

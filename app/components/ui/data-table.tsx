@@ -71,6 +71,14 @@ export function DataTable<TData, TValue>({
                 data-state={row.getIsSelected() && "selected"}
                 // @ts-ignore
                 className={row.original?.className}
+                // @ts-ignore
+                onClick={(e) => {
+                  // @ts-ignore
+                  if (row.original?.onClick) {
+                    // @ts-ignore
+                    row.original.onClick(e);
+                  }
+                }}
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="whitespace-nowrap pl-4">

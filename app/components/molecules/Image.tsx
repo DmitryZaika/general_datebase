@@ -43,7 +43,7 @@ export function Image({
           <img
             src={src || "/path/to/placeholder.png"}
             alt={alt || name || "Image"}
-            className={`object-cover  w-full h-40 border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300 ${className}`}
+            className={`object-cover  w-full h-40 border-2  rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300 ${className}`}
             loading="lazy"
             onClick={() => setImage(id)}
           />

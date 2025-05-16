@@ -19,8 +19,8 @@ import { db } from "~/db.server";
 import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { Button } from "~/components/ui/button";
-import { FaTimes, FaLink } from "react-icons/fa";
-import { useEffect, useState } from "react";
+import { FaTimes, FaLink, FaQrcode } from "react-icons/fa";
+import { useEffect, useState, Fragment, useRef } from "react";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
@@ -37,6 +37,7 @@ import {
   DialogDescription,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
+import { simplePrintQRCode } from "~/components/molecules/QRCodeGenerator";
 
 const slabSchema = z.object({
   bundle: z.string().min(1),
@@ -44,29 +45,78 @@ const slabSchema = z.object({
   width: z.coerce.number().default(0),
 });
 
+// Общая функция для рендеринга слеба
+function SlabItem({ slab, stoneUrl, onImageClick, showDeleteButton, isSubmitting, onDeleteClick }: {
+  slab: {
+    id: number;
+    bundle: string;
+    url: string | null;
+    width: number;
+    length: number;
+  };
+  stoneUrl?: string;
+  onImageClick?: (url: string) => void;
+  showDeleteButton?: boolean;
+  isSubmitting?: boolean;
+  onDeleteClick?: (slab: {id: number, bundle: string}) => void;
+}) {
+  return (
+    <div className="flex gap-1 justify-between items-center">
+      <img
+        src={slab.url === "undefined" || slab.url === null ? (stoneUrl || "") : slab.url}
+        alt="Slab"
+        className={`size-9 ${onImageClick ? "cursor-pointer" : ""}`}
+        onClick={() => slab.url && onImageClick?.(slab.url)}
+      />
+      <div className="p-1.5 border w-full flex justify-between items-center border-gray-300">
+        <div className="">
+        <p className="w-full">Slab number: {slab.bundle}</p>
+        <p>
+          Size {slab.length} x {slab.width}
+        </p>
+        </div>
+    
+        
+        <div className="flex gap-2">
+        <Button  onClick={(e) => {
+          e.preventDefault();
+          const url = `${window.location.origin}/redirects/slab/${slab.id}`;
+          simplePrintQRCode(url, `Слеб ID: ${slab.id}`);
+        }} className=" size-9 flex items-center gap-2"
+        variant="blue">
+          <FaQrcode style={{ height: "1.2rem", width: "1.2rem" }} />
+       
+        </Button>
+        </div>
+        </div>
+     
+     
+      {showDeleteButton && (
+        <div>
+          <Button 
+            type="button" 
+            onClick={() => onDeleteClick && onDeleteClick(slab)}
+            disabled={isSubmitting}
+          >
+            <FaTimes />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LinkedSlabsGroup({ slabs, sourceStoneName }: { slabs: Array<{id: number; bundle: string; url: string; width: number; length: number;}>; sourceStoneName: string }) {
   return (
     <div className="mt-4">
-   
       <div className="flex flex-col gap-2">
         {slabs && slabs.length > 0 ? (
           slabs.map((slab) => (
-            <div
+            <SlabItem 
               key={slab.id}
-              className="flex gap-1 justify-between items-center"
-            >
-              <img
-                src={slab.url === "undefined" ? "" : slab.url}
-                alt="Slab"
-                className="size-9"
-              />
-              <div className="p-1.5 border w-full border-gray-300">
-                <p className="w-full">Slab number: {slab.bundle}</p>
-                <p>
-                  Size {slab.length} x {slab.width}
-                </p>
-              </div>
-            </div>
+              slab={slab}
+              showDeleteButton={false}
+            />
           ))
         ) : (
           <p className="text-gray-500">No slabs available</p>
@@ -434,8 +484,8 @@ export function AddSlab() {
     defaultValues: {
       bundle: "",
       file: stone.url || undefined,
-      length: stone?.length?.toString() || "",
-      width: stone?.width?.toString() || "",
+      length: stone?.length || 0,
+      width: stone?.width || 0,
     },
   });
   
@@ -444,8 +494,8 @@ export function AddSlab() {
       form.reset({
         bundle: "",
         file: undefined,
-        length: stone?.length?.toString() || "",
-        width: stone?.width?.toString() || "",
+        length: stone?.length || 0,
+        width: stone?.width || 0,
       });
       setResetKey((prev) => prev + 1);
     }
@@ -536,6 +586,8 @@ export default function EditStoneSlabs() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [unlinkSourceId, setUnlinkSourceId] = useState<number | null>(null);
   const [unlinkStoneName, setUnlinkStoneName] = useState<string>("");
+  const [slabToDelete, setSlabToDelete] = useState<{id: number, bundle: string} | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const navigate = useNavigate();
   const params = useParams();
   const navigation = useNavigation();
@@ -552,6 +604,11 @@ export default function EditStoneSlabs() {
     setUnlinkSourceId(sourceId);
     setUnlinkStoneName(name);
     setShowConfirmDialog(true);
+  };
+
+  const handleDeleteClick = (slab: {id: number, bundle: string}) => {
+    setSlabToDelete(slab);
+    setShowDeleteConfirm(true);
   };
   
   return (
@@ -572,32 +629,15 @@ export default function EditStoneSlabs() {
       
       <div className="flex flex-col gap-2">
         {slabs.map((slab) => (
-          <div
+          <SlabItem 
             key={slab.id}
-            className="flex gap-1 justify-between items-center"
-          >
-            <img
-              src={slab.url === "undefined" ? stone.url : slab.url}
-              alt="Slab"
-              className="size-9 cursor-pointer"
-              onClick={() => setSelectedImage(slab.url)}
-            />
-            <div className="p-1.5 border w-full  border-gray-300">
-              <p className="w-full">Slab number: {slab.bundle}</p>
-              <p>
-                Size {slab.length} x {slab.width}
-              </p>
-            </div>
-            <div>
-              <Form method="delete">
-                <AuthenticityTokenInput />
-                <input type="hidden" name="id" value={slab.id} />
-                <Button type="submit" disabled={isSubmitting}>
-                  <FaTimes />
-                </Button>
-              </Form>
-            </div>
-          </div>
+            slab={slab}
+            stoneUrl={stone.url}
+            onImageClick={setSelectedImage}
+            showDeleteButton={true}
+            isSubmitting={isSubmitting}
+            onDeleteClick={handleDeleteClick}
+          />
         ))}
       </div>
       
@@ -655,6 +695,37 @@ export default function EditStoneSlabs() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog for Deleting Slab */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete slab {slabToDelete?.bundle}?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Form method="delete" onSubmit={() => setShowDeleteConfirm(false)}>
+              <AuthenticityTokenInput />
+              <input type="hidden" name="id" value={slabToDelete?.id || ""} />
+              <Button
+                type="submit"
+                variant="destructive"
+              >
+                Delete
+              </Button>
+            </Form>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <LinkSlabsDialog 
         allStones={allStones} 
@@ -662,6 +733,27 @@ export default function EditStoneSlabs() {
         onClose={() => setShowLinkDialog(false)}
         currentStoneId={currentStoneId}
       />
+      
+      {/* QR Preview Dialog */}
+      <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
+        <DialogContent className="max-w-4xl w-full h-auto flex items-center justify-center bg-black bg-opacity-90 p-1">
+          <Button
+            variant="ghost"
+            className="absolute top-4 right-4 text-white hover:bg-black/20"
+            onClick={() => setSelectedImage(null)}
+          >
+            <FaTimes />
+            <span className="sr-only">Close</span>
+          </Button>
+          {selectedImage && (
+            <img
+              src={selectedImage}
+              alt="Slab large view"
+              className="max-w-full max-h-[80vh] object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
