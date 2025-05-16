@@ -10,16 +10,19 @@ interface QboCompanyInfo {
     qbo_realm_id: string;
 }
 
+export const AES_KEY = Buffer.from(process.env.AES_KEY, 'hex');
+if (AES_KEY.length !== 32) throw new Error('QBO_AES_KEY должен быть 256‑битным');
+
 
 export async function saveCompanyQBO(
   companyId: number,
   clientId: string,
   clientSecret: string,
-  realmId: string,
+  realmId: number,
 ) {
   const encClientId     = encrypt(clientId);
   const encClientSecret = encrypt(clientSecret);
-  const encRealmId      = encrypt(realmId);
+  const encRealmId      = encrypt(realmId.toString());
 
   await db.execute(
     `UPDATE companies
@@ -44,12 +47,12 @@ export async function loadCompanyQBO(companyId: number) {
   return {
     clientId:     decrypt(rows[0].qbo_client_id),
     clientSecret: decrypt(rows[0].qbo_client_secret),
-    realmId:      decrypt(rows[0].qbo_realm_id),
+    realmId:      parseInt(decrypt(rows[0].qbo_realm_id)),
   };
 }
 
 
-async function getQboClient(companyId: number): OAuthClient {
+export async function getQboUrl(companyId: number): OAuthClient {
   const { clientId, clientSecret, realmId } = await loadCompanyQBO(companyId);
   return new OAuthClient({
     clientId,
