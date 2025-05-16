@@ -77,7 +77,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
   const isOnSale = !!stone.on_sale;
   const createdDate = new Date(stone.created_date);
   const threeWeeksAgo = new Date();
-  threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 60);
+  threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 30);
   const isNew = createdDate > threeWeeksAgo;
 
   return (
