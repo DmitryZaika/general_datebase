@@ -59,7 +59,7 @@ export async function action({ request }: ActionFunctionArgs) {
     console.error("Error connecting to the database: ", error);
   }
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "user added"));
+  session.flash("message", toastData("Success", "keys added"));
   return redirect("..", {
     headers: { "Set-Cookie": await commitSession(session) },
   });
