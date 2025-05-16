@@ -12,6 +12,7 @@ import { getAdminUser } from "~/utils/session.server";
 import { useArrowToggle } from "~/hooks/useArrowToggle";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 
 interface Support {
   id: number;
@@ -58,7 +59,10 @@ export default function AdminSupports() {
   return (
     <>
       <Link to={`add`} className="mb-6 inline-block" onClick={handleAddSupportClick}>
-        <LoadingButton loading={isAddingSupport}>Add Support</LoadingButton>
+        <LoadingButton loading={isAddingSupport}>
+          <Plus className="w-4 h-4 mr-1" />
+          Add Support
+        </LoadingButton>
       </Link>
       <div >
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">

@@ -19,6 +19,7 @@ import { DataTable } from "~/components/ui/data-table";
 import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 
 interface Instructions {
   id: number;
@@ -89,7 +90,10 @@ export default function AdminInstructions() {
   return (
     <PageLayout title="Instructions">
       <Link to={`add`} relative="path" onClick={handleAddInstructionClick}>
-        <LoadingButton loading={isAddingInstruction}>Add Instruction</LoadingButton>
+        <LoadingButton loading={isAddingInstruction}>
+          <Plus className="w-4 h-4 mr-1" />
+          Add Instruction
+        </LoadingButton>
       </Link>
       <DataTable columns={instructionsColumn} data={instructions} />
       <Outlet />

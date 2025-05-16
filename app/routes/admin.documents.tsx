@@ -18,6 +18,7 @@ import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown"
 import { DataTable } from "~/components/ui/data-table";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 
 interface Document {
   id: number;
@@ -47,6 +48,9 @@ const documentColumns: ColumnDef<Document>[] = [
   },
   {
     id: "actions",
+    meta: {
+      className: "w-[50px]"
+    },
     cell: ({ row }) => {
       return (
         <ActionDropdown
@@ -78,7 +82,10 @@ export default function Documents() {
   return (
     <div >
       <Link to={`add`} relative="path" onClick={handleAddDocumentClick}>
-        <LoadingButton loading={isAddingDocument}>Add Document</LoadingButton>
+        <LoadingButton loading={isAddingDocument}>
+          <Plus className="w-4 h-4 mr-1" />
+          Add Document
+        </LoadingButton>
       </Link>
       <DataTable columns={documentColumns} data={documents} />
       <Outlet />
