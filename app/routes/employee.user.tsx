@@ -18,6 +18,7 @@ import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { RowDataPacket } from "mysql2";
 // @ts-ignore
 import bcrypt from "bcryptjs";
+import { getTokenCache } from "~/quickbooks.server";
 
 const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -87,6 +88,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const quickBooksUrl = await getTokenCache()
   try {
     const user = await getEmployeeUser(request);
     
@@ -99,14 +101,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
       throw new Error("User not found");
     }
     
-    return { userData: rows[0] };
+    return { userData: rows[0], quickBooksUrl };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
 }
 
 export default function UserProfile() {
-  const { userData } = useLoaderData<typeof loader>();
+  const { userData, quickBooksUrl } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
   const token = useAuthenticityToken();
@@ -128,6 +130,7 @@ export default function UserProfile() {
       <h1 className="text-2xl  font-bold mb-6 ml-3">My Account</h1>
       <div className="bg-card  rounded-lg shadow p-6 w-full">
         <h2 className="text-xl font-semibold mb-4">Personal Information</h2>
+        <Button asChild><a href={quickBooksUrl}>Authorize Quickbooks</a></Button>
         <FormProvider {...form}>
           <Form method="post" onSubmit={fullSubmit}>
             <input type="hidden" name="csrf" value={token} />

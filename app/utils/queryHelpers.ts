@@ -1,6 +1,7 @@
 import mysql from "mysql2/promise";
 import { RowDataPacket } from "mysql2";
 
+
 export async function selectMany<T>(
   db: mysql.Pool,
   query: string,

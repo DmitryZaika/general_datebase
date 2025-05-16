@@ -15,3 +15,7 @@ export const SINK_TYPES = [
   "ceramic",
   "farm house",
 ] as const;
+
+
+export const AES_KEY = Buffer.from(process.env.AES_KEY, 'hex');
+if (AES_KEY.length !== 32) throw new Error('QBO_AES_KEY должен быть 256‑битным');
