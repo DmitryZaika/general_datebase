@@ -413,11 +413,13 @@ export default function SlabsModal() {
                         </Button>
                       </Link>
                     ) : (
+                      <>
                     <Link to={`sell/${slab.id}/${location.search}`} className="ml-auto">
                       <Button className="px-4 py-2">
                         Sell
                       </Button>
                     </Link>
+                      </>
                     )}
                   </div>
                 </>
