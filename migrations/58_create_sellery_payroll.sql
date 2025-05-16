@@ -1,9 +1,0 @@
-CREATE TABLE payroll (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
-    type VARCHAR(255) NOT NULL,
-    company_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (company_id) REFERENCES company(id)
-);

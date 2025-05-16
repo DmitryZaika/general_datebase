@@ -29,7 +29,6 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 
-// Define the validation schema
 const payrollRuleSchema = z.object({
   name: z.string().min(1, "Name is required"),
   amount: z.number().positive("Amount must be a positive number"),

@@ -292,9 +292,27 @@ export default function SlabsModal() {
   const { slabs, linkedSlabs, stone } = useLoaderData<typeof loader>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [editingSlab, setEditingSlab] = useState<number | null>(null);
+  const [highlightedSlab, setHighlightedSlab] = useState<number | null>(null);
   const navigation = useNavigation();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const slabId = searchParams.get('slab');
+    
+    if (slabId) {
+      const id = parseInt(slabId);
+      setHighlightedSlab(id);
+      
+      // Удаляем подсветку через 5 секунд
+      const timer = setTimeout(() => {
+        setHighlightedSlab(null);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [location.search]);
  
   const handleChange = (open: boolean) => {
     if (!open) {
@@ -314,14 +332,18 @@ export default function SlabsModal() {
 
   const renderSlabItem = (slab: Slab) => {
     const isEditing = editingSlab === slab.id;
+    const isHighlighted = highlightedSlab === slab.id;
     
     return (
       <TooltipProvider key={slab.id}>
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className={`transition-colors duration-300 flex items-center gap-4 p-2 sm:px-5 rounded-lg border border-gray-200 ${
-                slab.sale_id ? "bg-red-300" : "bg-white"
+              className={`transition-all duration-300 flex items-center gap-4 p-2 sm:px-5 rounded-lg ${
+                slab.sale_id ? "bg-red-300 " : "bg-white "
+              }${
+                isHighlighted ? "border-2 border-blue-500" : 
+                slab.sale_id ? "border border-red-400" : "border border-gray-200"
               }`}
             >
               <img
@@ -455,7 +477,7 @@ export default function SlabsModal() {
       open={true}
       onOpenChange={handleChange}
     >
-      <DialogContent className=" bg-white rounded-md pt-5 px-2 shadow-lg text-gray-800 overflow-y-auto max-h-[95vh]">
+      <DialogContent className="bg-white rounded-md pt-5 px-2 shadow-lg text-gray-800 overflow-y-auto max-h-[95vh]">
         <DialogTitle>Slabs for {stone.name}</DialogTitle>
 
         <div className="flex flex-col gap-4">
