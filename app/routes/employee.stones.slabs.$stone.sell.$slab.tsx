@@ -36,7 +36,7 @@ import { selectMany } from "~/utils/queryHelpers";
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "~/components/ui/input";
-
+import { coerceNumber, coerceNumberRequired, StringOrNumber } from "~/schemas/general";
 interface Sink {
   id: number;
   name: string;
@@ -44,18 +44,13 @@ interface Sink {
 }
 
 const customerSchema = z.object({
-  name: z.union([z.string(), z.number()])
-    .refine(val => val !== undefined && val !== null && val.toString().trim() !== "", "Customer name is required")
-    .transform(val => String(val)),
+  name: z.string().min(1, "Name is required"),
   customer_id: z.coerce.number().optional(),
   sink_type_id: z.preprocess(val => String(val), z.string().optional()),
-  notes_to_slab: z.union([z.string(), z.number(), z.null()])
-    .transform(val => val ? String(val) : "")
-    .optional(),
-  notes_to_sale: z.union([z.string(), z.number(), z.null()])
-    .transform(val => val ? String(val) : "")
-    .optional(),
-  square_feet: z.coerce.number().default(0),
+  notes_to_slab: StringOrNumber,
+  notes_to_sale: StringOrNumber,
+  total_square_feet: coerceNumberRequired,
+  price: coerceNumberRequired 
 });
 
 type FormData = z.infer<typeof customerSchema>;
@@ -128,15 +123,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     
     const [salesResult] = await db.execute<ResultSetHeader>(
-      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, status, notes) 
-       VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'sold', ?)`,
+      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price) 
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL, ?)`,
       [
         customerId,
         user.id, 
         user.company_id,
         data.notes_to_sale || null,
-        
-
+        data.total_square_feet || 0,
+        data.price || 0
       ]
     );
     
@@ -177,9 +172,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
   
 
-      await db.execute(
-      `UPDATE slab_inventory SET sale_id = ?, square_feet = ? WHERE id = ?`,
-      [saleId, data.square_feet || 0, slabId]
+    await db.execute(
+      `UPDATE slab_inventory SET sale_id = ? WHERE id = ?`,
+      [saleId, slabId]
     );
     
  
@@ -227,12 +222,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       customer_name: string;
       sale_date: string;
       notes: string | null;
+      square_feet: number;
     }>(
       db,
-      `SELECT s.id, c.name as customer_name, s.sale_date, s.notes
+      `SELECT s.id, c.name as customer_name, s.sale_date, s.notes, s.square_feet
        FROM sales s
        JOIN customers c ON s.customer_id = c.id
-       WHERE s.company_id = ? AND s.status != 'cancelled'
+       WHERE s.company_id = ? AND s.cancelled_date IS NULL
        ORDER BY s.sale_date DESC
        LIMIT 20`,
       [user.company_id]
@@ -269,12 +265,6 @@ export default function SlabSell() {
   
   const form = useForm<FormData>({
     resolver,
-    defaultValues: {
-      name: "",
-      customer_id: undefined,
-      sink_type_id: "",
-      notes_to_slab: "",
-    },
   });
   const fullSubmit = useFullSubmit(form);
 
@@ -362,6 +352,7 @@ export default function SlabSell() {
                         field={field}
                         placeholder="Select a Sink"
                         name="Sink"
+                        className="mb-0"
                         options={sinks.map((sink) => {
                           return {
                             key: String(sink.id),
@@ -374,16 +365,29 @@ export default function SlabSell() {
                 />
                 <FormField
                   control={form.control}
-                  name="square_feet"
+                  name="total_square_feet"
                   render={({ field }) => (
                     <InputItem
-                      name={"Square Feet"}
-                      placeholder={"Square Feet"}
+                      name={"Total Square Feet"}
+                      placeholder={"Total Square Feet"}
                       field={field}
+                      formClassName="mb-0"
                     />
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <InputItem
+                    name={"Price"}
+                    placeholder={"Enter price"}
+                    field={field}
+                    formClassName="mb-0"
+                  />
+                )}
+              />
               <FormField
                 control={form.control}
                 name="notes_to_sale"
@@ -436,6 +440,11 @@ export default function SlabSell() {
                           {sale.notes && (
                             <div className="text-xs text-gray-600 mt-1">
                               <span className="font-semibold">Notes:</span> {sale.notes}
+                            </div>
+                          )}
+                          {sale.square_feet > 0 && (
+                            <div className="text-xs text-gray-600">
+                              <span className="font-semibold">Total Square Feet:</span> {sale.square_feet}
                             </div>
                           )}
                         </div>

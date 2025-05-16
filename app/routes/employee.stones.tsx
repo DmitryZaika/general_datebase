@@ -151,7 +151,7 @@ function InteractiveCard({
   const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
   const createdDate = new Date(stone.created_date);
   const threeWeeksAgo = new Date();
-  threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 30);
+  threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 60);
   const isNew = createdDate > threeWeeksAgo;
   const isOnSale = !!stone.on_sale;
   const navigate = useNavigate();
@@ -204,7 +204,7 @@ function InteractiveCard({
           <img
             src={stone.url || "/placeholder.png"}
             alt={stone.name || "Stone Image"}
-            className="object-cover w-full h-40 border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none"
+            className="object-cover w-full h-40 border-2 border-gray-300 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none"
             loading="lazy"
             onClick={handleImageClick}
           />

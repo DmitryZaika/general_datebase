@@ -30,7 +30,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
       [params.sale]
     );
     await db.execute(
-      "UPDATE sales SET status = 'canceled' WHERE id = ?",
+      "UPDATE sales SET cancelled_date = NOW() WHERE id = ?",
       [params.sale]
     );
  
