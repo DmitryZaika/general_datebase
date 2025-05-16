@@ -1,5 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { AES_KEY } from "~/utils/constants";
+
+export const AES_KEY = Buffer.from(process.env.AES_KEY, 'hex');
+if (AES_KEY.length !== 32) throw new Error('QBO_AES_KEY должен быть 256‑битным');
 
 function pack(iv: Buffer<ArrayBufferLike>, tag: Buffer<ArrayBufferLike>, ciphertext: Buffer<ArrayBuffer>) {
   return Buffer.concat([iv, tag, ciphertext]).toString('base64');

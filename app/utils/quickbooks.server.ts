@@ -2,17 +2,13 @@ import OAuthClient from "intuit-oauth";
 import { db } from "../db.server";
 import { RowDataPacket } from "mysql2";
 import { TokenSet } from "~/types";
-import { encrypt, decrypt } from "~/utils/cryptoHelpers";
+import { encrypt, decrypt } from "~/utils/cryptoHelpers.server";
 
 interface QboCompanyInfo {
     qbo_client_id: string;
     qbo_client_secret: string;
     qbo_realm_id: string;
 }
-
-export const AES_KEY = Buffer.from(process.env.AES_KEY, 'hex');
-if (AES_KEY.length !== 32) throw new Error('QBO_AES_KEY должен быть 256‑битным');
-
 
 export async function saveCompanyQBO(
   companyId: number,
@@ -25,7 +21,7 @@ export async function saveCompanyQBO(
   const encRealmId      = encrypt(realmId.toString());
 
   await db.execute(
-    `UPDATE companies
+    `UPDATE company
        SET qbo_client_id     = ?,
            qbo_client_secret = ?,
            qbo_realm_id      = ?
@@ -37,7 +33,7 @@ export async function saveCompanyQBO(
 export async function loadCompanyQBO(companyId: number) {
   const [rows] = await db.query<QboCompanyInfo[] & RowDataPacket[]>(
     `SELECT qbo_client_id, qbo_client_secret, qbo_realm_id
-       FROM companies
+       FROM company
       WHERE id = ?`,
     [companyId],
   );
