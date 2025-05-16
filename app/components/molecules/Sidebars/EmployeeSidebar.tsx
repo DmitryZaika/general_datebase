@@ -132,16 +132,6 @@ const getItems = (
         icon: DollarSign,
       },
       {
-        title: "Payroll",
-        url: `/admin/payroll`,
-        icon: DollarSign,
-      },
-      {
-        title: "Payroll Rules",
-        url: `/admin/payroll_rules`,
-        icon: DollarSign,
-      },
-      {
         title: "User Panel",
         url: `/admin/users`,
         icon: Users,

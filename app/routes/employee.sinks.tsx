@@ -68,7 +68,7 @@ function InteractiveCard({
         <img
           src={sink.url || "/placeholder.png"}
           alt={sink.name || "Sink Image"}
-          className="object-cover w-full h-40 border-2 border-blue-500 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none"
+          className="object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none"
           loading="lazy"
           onClick={() => setCurrentId(sink.id, sinkType)}
         />
