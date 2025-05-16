@@ -1,5 +1,5 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { Link, LoaderFunctionArgs, Outlet, redirect, useSearchParams, useNavigate, Form, ActionFunctionArgs } from "react-router";
+import { Link, LoaderFunctionArgs, Outlet, redirect, useSearchParams, useNavigate, Form, ActionFunctionArgs, useLocation } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
@@ -8,9 +8,9 @@ import { PageLayout } from "~/components/PageLayout";
 import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
 import { Button } from "~/components/ui/button";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Input } from "~/components/ui/input";
-import { Search, MoreHorizontal } from "lucide-react";
+import { Search, MoreHorizontal, Calendar } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -25,6 +25,16 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { Label } from "~/components/ui/label";
+import { Switch } from "~/components/ui/switch";
 import { toastData } from "~/utils/toastHelpers";
 import { getSession, commitSession } from "~/sessions";
 
@@ -37,10 +47,14 @@ interface Transaction {
   bundle_with_cut: string;
   stone_name: string;
   sf?: number;
-  is_deleted: string;
-  sink_type?: string;
-  cut_date?: string | null;
   all_cut?: number;
+  any_cut?: number;
+  total_slabs?: number;
+  cut_slabs?: number;
+  cancelled_date: string | null;
+  installed_date: string | null;
+  sink_type?: string;
+  status?: string;
 }
 
 interface SlabInfo {
@@ -79,12 +93,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         c.name as customer_name,
         u.name as seller_name,
         GROUP_CONCAT(DISTINCT si.bundle) as bundle,
-        s.status as is_deleted,
-        '' as sink_type,
+        s.cancelled_date,
+        s.installed_date,
         GROUP_CONCAT(DISTINCT st.name) as stone_name,
         ROUND(SUM(si.square_feet), 2) as sf,
         GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'))) as bundle_with_cut,
-        MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) as all_cut
+        MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) as all_cut,
+        MAX(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as any_cut,
+        COUNT(si.id) as total_slabs,
+        SUM(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as cut_slabs
       FROM 
         sales s
       JOIN 
@@ -107,9 +124,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
     
     if (status === "in_progress") {
-      query += " AND s.status IN ('Cut', 'Sold')";
+      query += " AND s.installed_date IS NULL AND s.cancelled_date IS NULL";
     } else if (status === "finished") {
-      query += " AND s.status IN ('Installed', 'Cancelled')";
+      query += " AND (s.installed_date IS NOT NULL OR s.cancelled_date IS NOT NULL)";
     }
     
     if (searchTerm) {
@@ -170,10 +187,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     
     const updatedTransactions = transactions.map(t => {
       const sinkInfo = sinkDetails.find(sd => sd.sale_id === t.id);
-      if (sinkInfo) {
-        return {...t, sink_type: sinkInfo.sink_types};
+      let status = "Sold";
+      
+      if (t.cancelled_date) {
+        status = "Cancelled";
+      } else if (t.installed_date) {
+        status = "Installed";
+      } else if (t.all_cut === 1) {
+        status = "Cut";
+      } else if (t.any_cut === 1) {
+        status = "Partially Cut";
       }
-      return t;
+      
+      return {
+        ...t, 
+        sink_type: sinkInfo ? sinkInfo.sink_types : undefined,
+        status: status
+      };
     });
     
     return {
@@ -194,66 +224,112 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export async function action({ request }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request);
   if (!user || !user.company_id) {
-    return { error: "Unauthorized" };
+    const session = await getSession(request.headers.get("Cookie"));
+    session.flash("message", toastData("Error", "Unauthorized", "destructive"));
+    return redirect("/login", {
+      headers: { "Set-Cookie": await commitSession(session) }
+    });
   }
 
   const formData = await request.formData();
   const intent = formData.get("intent");
   const transactionId = formData.get("transactionId");
+  const installedDate = formData.get("installedDate") as string;
+  const isPaid = formData.get("isPaid") === "true";
+
+  // Сохраняем текущий URL для редиректа обратно
+  const url = new URL(request.url);
+  const redirectUrl = url.searchParams.get("redirectTo") || `/employee/transactions${url.search}`;
 
   if (intent === "mark-installed") {
     try {
-      const transaction = await selectMany<{ status: string }>(
+      const transaction = await selectMany<{ installed_date: string | null }>(
         db,
-        `SELECT status FROM sales WHERE id = ?`,
+        `SELECT installed_date FROM sales WHERE id = ?`,
         [transactionId]
       );
       
       if (transaction.length === 0) {
         const session = await getSession(request.headers.get("Cookie"));
         session.flash("message", toastData("Error", "Transaction not found", "destructive"));
-        return { 
-          error: "Transaction not found",
+        return redirect(redirectUrl, {
           headers: { "Set-Cookie": await commitSession(session) }
-        };
+        });
       }
       
-      const status = transaction[0].status.toLowerCase();
-      if (status !== "cut") {
+      if (transaction[0].installed_date) {
         const session = await getSession(request.headers.get("Cookie"));
-        session.flash("message", toastData("Error", "Only transactions with 'Cut' status can be marked as installed", "destructive"));
-        return { 
-          error: "Only transactions with 'Cut' status can be marked as installed",
+        session.flash("message", toastData("Error", "Transaction is already marked as installed", "destructive"));
+        return redirect(redirectUrl, {
           headers: { "Set-Cookie": await commitSession(session) }
-        };
+        });
       }
       
-      await db.execute(
-        `UPDATE sales SET status = 'installed' WHERE id = ?`,
+      const slabs = await selectMany<SlabInfo>(
+        db,
+        `SELECT id, cut_date FROM slab_inventory WHERE sale_id = ?`,
         [transactionId]
       );
+      
+      if (slabs.length === 0) {
+        const session = await getSession(request.headers.get("Cookie"));
+        session.flash("message", toastData("Error", "No slabs found for this transaction", "destructive"));
+        return redirect(redirectUrl, {
+          headers: { "Set-Cookie": await commitSession(session) }
+        });
+      }
+      
+      const allCut = slabs.every(slab => slab.cut_date !== null);
+      
+      if (!allCut) {
+        const session = await getSession(request.headers.get("Cookie"));
+        session.flash("message", toastData("Error", "Cannot mark as installed - not all slabs are cut", "destructive"));
+        return redirect(redirectUrl, {
+          headers: { "Set-Cookie": await commitSession(session) }
+        });
+      }
+      
+      // Format the date for SQL or use current date if not provided
+      const dateToUse = installedDate 
+        ? new Date(installedDate).toISOString().slice(0, 19).replace('T', ' ')
+        : new Date().toISOString().slice(0, 19).replace('T', ' ');
+      
+      // If paid is true, update both installed_date and paid_date
+      if (isPaid) {
+        await db.execute(
+          `UPDATE sales SET installed_date = ?, paid_date = ? WHERE id = ?`,
+          [dateToUse, dateToUse, transactionId]
+        );
+      } else {
+        await db.execute(
+          `UPDATE sales SET installed_date = ? WHERE id = ?`,
+          [dateToUse, transactionId]
+        );
+      }
       
       const session = await getSession(request.headers.get("Cookie"));
       session.flash("message", toastData("Success", "Transaction marked as installed"));
       
-      return { 
-        success: true,
+      return redirect(redirectUrl, {
         headers: { "Set-Cookie": await commitSession(session) }
-      };
+      });
     } catch (error) {
       console.error("Error updating status:", error);
       
       const session = await getSession(request.headers.get("Cookie"));
       session.flash("message", toastData("Error", "Failed to update status", "destructive"));
       
-      return { 
-        error: "Failed to update status",
+      return redirect(redirectUrl, {
         headers: { "Set-Cookie": await commitSession(session) }
-      };
+      });
     }
   }
   
-  return { error: "Invalid action" };
+  const session = await getSession(request.headers.get("Cookie"));
+  session.flash("message", toastData("Error", "Invalid action", "destructive"));
+  return redirect(redirectUrl, {
+    headers: { "Set-Cookie": await commitSession(session) }
+  });
 }
 
 export default function EmployeeTransactions() {
@@ -261,6 +337,13 @@ export default function EmployeeTransactions() {
   const [searchParams, setSearchParams] = useSearchParams();  
   const [searchValue, setSearchValue] = useState(filters.search);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [installDialogOpen, setInstallDialogOpen] = useState(false);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<number | null>(null);
+  const [installDate, setInstallDate] = useState<string>(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [isPaid, setIsPaid] = useState(true);
   
   const handleSalesRepChange = (value: string) => {
     searchParams.set('salesRep', value);
@@ -279,24 +362,20 @@ export default function EmployeeTransactions() {
   };
 
   const handleRowClick = (id: number) => {
-    navigate(`edit/${id}`);
+    navigate(`edit/${id}${location.search}`);
   };
   
-  const handleInstall = async (id: number) => {
-    try {
-      const formData = new FormData();
-      formData.append("intent", "mark-installed");
-      formData.append("transactionId", id.toString());
-      
-      await fetch("/employee/transactions", {
-        method: "POST",
-        body: formData
-      });
-      
-      window.location.reload();
-    } catch (error) {
-      console.error("Error:", error);
-    }
+  const openInstallDialog = (id: number) => {
+    setSelectedTransactionId(id);
+    setInstallDate(new Date().toISOString().slice(0, 10)); // Reset to today
+    setIsPaid(true); // Reset paid to default true
+    setInstallDialogOpen(true);
+  };
+  
+  const handleFormSubmit = (e: React.FormEvent) => {
+    // Закрываем диалог перед отправкой формы
+    setInstallDialogOpen(false);
+    // Не прерываем стандартную отправку формы
   };
 
   const transactionColumns: ColumnDef<Transaction>[] = [
@@ -402,36 +481,35 @@ export default function EmployeeTransactions() {
       header: ({ column }) => <SortableHeader column={column} title="SF" />,
       cell: ({ row }) => row.original.sf ? `${row.original.sf}` : "N/A",
     },
-   
     {
-      accessorKey: "is_deleted",
+      accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} title="Status" />,
       cell: ({ row }) => {
-        const status = row.original.is_deleted || "";
-        const formattedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-        
-        let colorClass = "text-gray-500";
-        if (formattedStatus === "Sold") {
-          colorClass = "text-green-500";
-        } else if (formattedStatus === "Cancelled") {
+        let colorClass = "text-green-500";
+        if (row.original.cancelled_date) {
           colorClass = "text-red-500";
-        } else if (formattedStatus === "Cut") {
-          colorClass = "text-blue-500";
-        } else if (formattedStatus === "Installed") {
+        } else if (row.original.installed_date) {
           colorClass = "text-purple-500";
+        } else if (row.original.all_cut === 1) {
+          colorClass = "text-blue-500";
+        } else if (row.original.any_cut === 1) {
+          colorClass = "text-gray-500";
         }
         
-        return <span className={colorClass}>{formattedStatus}</span>;
+        return <span className={colorClass}>{row.original.status}</span>;
       },
     },
     {
       id: "actions",
       cell: ({ row }) => {
-        const status = (row.original.is_deleted || "").toLowerCase();
-        const canInstall = status === "cut";
+        const isInstalled = row.original.installed_date !== null;
+        const isCancelled = row.original.cancelled_date !== null;
+        const allCut = row.original.all_cut === 1;
+        
+        const canInstall = allCut && !isInstalled && !isCancelled;
         
         return (
-          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -441,7 +519,10 @@ export default function EmployeeTransactions() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  onClick={() => handleInstall(row.original.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openInstallDialog(row.original.id);
+                  }}
                   disabled={!canInstall}
                   className={!canInstall ? "opacity-50 cursor-not-allowed" : ""}
                 >
@@ -454,60 +535,62 @@ export default function EmployeeTransactions() {
       },
     },
   ];
-  
+
+  const formAction = `/employee/transactions${location.search}`;
+
   return (
-    <PageLayout title="Transactions">
-      <div className="container mx-auto py-10">
-        <div className="mb-4 flex flex-col gap-4">
-          <Form onSubmit={handleSearchSubmit} className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+    <>
+      <PageLayout title="Sales Transactions">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="flex gap-4 items-center">
+              <div className="w-1/8 min-w-[120px]">
+                <div className="mb-1 text-sm font-medium">Sales Rep</div>
+                <Select 
+                  value={filters.salesRep} 
+                  onValueChange={handleSalesRepChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sales Rep" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salesReps.map((rep) => (
+                      <SelectItem key={rep} value={rep}>
+                        {rep}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="w-1/8 min-w-[120px]">
+                <div className="mb-1 text-sm font-medium">Status</div>
+                <Select 
+                  value={filters.status} 
+                  onValueChange={handleStatusChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="finished">Finished</SelectItem>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
             <Input
               placeholder="Search transactions..."
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
-              className="pl-8"
+              className="pl-8 w-64"
             />
-          </Form>
-          
-          <div className="flex gap-4">
-            <div className="w-1/8 min-w-[120px]">
-              <div className="mb-1 text-sm font-medium">Sales Rep</div>
-              <Select 
-                value={filters.salesRep} 
-                onValueChange={handleSalesRepChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sales Rep" />
-                </SelectTrigger>
-                <SelectContent>
-                  {salesReps.map((rep) => (
-                    <SelectItem key={rep} value={rep}>
-                      {rep}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="w-1/8 min-w-[120px]">
-              <div className="mb-1 text-sm font-medium">Status</div>
-              <Select 
-                value={filters.status} 
-                onValueChange={handleStatusChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="finished">Finished</SelectItem>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </div>
-
         <DataTable
           columns={transactionColumns}
           data={transactions.map(transaction => ({
@@ -516,9 +599,73 @@ export default function EmployeeTransactions() {
             onClick: () => handleRowClick(transaction.id)
           }))}
         />
-
-        <Outlet />
-      </div>
-    </PageLayout>
+      </PageLayout>
+      
+      <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Transaction as Installed</DialogTitle>
+          </DialogHeader>
+          
+          <Form method="post" action={formAction} onSubmit={handleFormSubmit}>
+            <input type="hidden" name="intent" value="mark-installed" />
+            <input type="hidden" name="transactionId" value={selectedTransactionId?.toString() || ''} />
+            
+            <div className="py-4 space-y-4">
+              <div className="flex items-center gap-4">
+                <Label htmlFor="installation-date" className="text-right w-[140px]">
+                  Installation Date
+                </Label>
+                <div className="relative ">
+                  <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    id="installation-date"
+                    name="installedDate"
+                    type="date"
+                    value={installDate}
+                    onChange={(e) => setInstallDate(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <Label htmlFor="paid-switch" className="text-right w-[140px]">
+                  Paid
+                </Label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="hidden" 
+                    name="isPaid" 
+                    value={isPaid ? "true" : "false"} 
+                  />
+                  <Switch 
+                    id="paid-switch"
+                    checked={isPaid}
+                    onCheckedChange={setIsPaid}
+                  />
+                  <span className="text-sm text-gray-500">
+                    {isPaid ? "Mark as paid on same date" : "Do not mark as paid"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setInstallDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Confirm</Button>
+            </DialogFooter>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
+      <Outlet />
+    </>
   );
-} 
+}

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { NullableId, StringBoolean } from "./general";
+import { coerceNumber, NullableId, StringBoolean } from "./general";
 import { STONE_TYPES } from "~/utils/constants";
 
 export const stoneSchema = z.object({
@@ -7,12 +7,12 @@ export const stoneSchema = z.object({
   type: z.enum(STONE_TYPES),
   is_display: StringBoolean,
   on_sale: StringBoolean,
-  length: z.coerce.number().default(0),
-  width: z.coerce.number().default(0),
+  length: coerceNumber,
+  width: coerceNumber,
   supplier_id: NullableId,
   bundle: z.string().optional(),
-  cost_per_sqft: z.coerce.number().default(0),
-  retail_price: z.coerce.number().default(0),
+  cost_per_sqft: coerceNumber,
+  retail_price: coerceNumber,
   level: NullableId,
   colors: z.any().optional(),
 });
