@@ -20,7 +20,7 @@ import { csrf } from "~/utils/csrf.server";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { Button } from "~/components/ui/button";
 import { FaTimes, FaLink, FaQrcode } from "react-icons/fa";
-import { useEffect, useState, Fragment, useRef } from "react";
+import { useEffect, useState } from "react";
 import { MultiPartForm } from "~/components/molecules/MultiPartForm";
 import { FormField } from "~/components/ui/form";
 import { InputItem } from "~/components/molecules/InputItem";
@@ -37,29 +37,50 @@ import {
   DialogDescription,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
-import { simplePrintQRCode } from "~/components/molecules/QRCodeGenerator";
+import { SlabData, printSingleSlabQRCode, printAllSlabsQRCodes } from "~/utils/slabQRCode";
 
+// Form schema
 const slabSchema = z.object({
   bundle: z.string().min(1),
   length: z.coerce.number().default(0),
   width: z.coerce.number().default(0),
 });
 
-// Общая функция для рендеринга слеба
-function SlabItem({ slab, stoneUrl, onImageClick, showDeleteButton, isSubmitting, onDeleteClick }: {
-  slab: {
-    id: number;
-    bundle: string;
+// Interface definitions
+interface SlabItemProps {
+  slab: SlabData & {
     url: string | null;
-    width: number;
-    length: number;
   };
   stoneUrl?: string;
   onImageClick?: (url: string) => void;
   showDeleteButton?: boolean;
   isSubmitting?: boolean;
-  onDeleteClick?: (slab: {id: number, bundle: string}) => void;
-}) {
+  onDeleteClick?: (slab: { id: number, bundle: string }) => void;
+  onPrintQRCode?: (slab: SlabData) => void;
+}
+
+interface LinkedSlabsGroupProps {
+  slabs: Array<SlabData & { url: string }>;
+  sourceStoneName: string;
+}
+
+interface LinkSlabsDialogProps {
+  allStones: Array<{ id: number; name: string }>;
+  isOpen: boolean;
+  onClose: () => void;
+  currentStoneId: number;
+}
+
+// Component definitions
+function SlabItem({ 
+  slab, 
+  stoneUrl, 
+  onImageClick, 
+  showDeleteButton, 
+  isSubmitting, 
+  onDeleteClick,
+  onPrintQRCode
+}: SlabItemProps) {
   return (
     <div className="flex gap-1 justify-between items-center">
       <img
@@ -70,26 +91,23 @@ function SlabItem({ slab, stoneUrl, onImageClick, showDeleteButton, isSubmitting
       />
       <div className="p-1.5 border w-full flex justify-between items-center border-gray-300">
         <div className="">
-        <p className="w-full">Slab number: {slab.bundle}</p>
-        <p>
-          Size {slab.length} x {slab.width}
-        </p>
+          <p className="w-full">Slab number: {slab.bundle}</p>
+          <p>Size {slab.length} x {slab.width}</p>
         </div>
-    
         
         <div className="flex gap-2">
-        <Button  onClick={(e) => {
-          e.preventDefault();
-          const url = `${window.location.origin}/redirects/slab/${slab.id}`;
-          simplePrintQRCode(url, `Слеб ID: ${slab.id}`);
-        }} className=" size-9 flex items-center gap-2"
-        variant="blue">
-          <FaQrcode style={{ height: "1.2rem", width: "1.2rem" }} />
-       
-        </Button>
+          <Button 
+            onClick={(e) => {
+              e.preventDefault();
+              onPrintQRCode && onPrintQRCode(slab);
+            }} 
+            className="size-9 flex items-center gap-2"
+            variant="blue"
+          >
+            <FaQrcode style={{ height: "1.2rem", width: "1.2rem" }} />
+          </Button>
         </div>
-        </div>
-     
+      </div>
      
       {showDeleteButton && (
         <div>
@@ -106,7 +124,12 @@ function SlabItem({ slab, stoneUrl, onImageClick, showDeleteButton, isSubmitting
   );
 }
 
-function LinkedSlabsGroup({ slabs, sourceStoneName }: { slabs: Array<{id: number; bundle: string; url: string; width: number; length: number;}>; sourceStoneName: string }) {
+function LinkedSlabsGroup({ slabs, sourceStoneName }: LinkedSlabsGroupProps) {
+  // Create handler for printing QR codes with source stone name
+  const handleLinkedSlabQRCodePrint = (slab: SlabData) => {
+    printSingleSlabQRCode(slab, sourceStoneName);
+  };
+
   return (
     <div className="mt-4">
       <div className="flex flex-col gap-2">
@@ -116,6 +139,7 @@ function LinkedSlabsGroup({ slabs, sourceStoneName }: { slabs: Array<{id: number
               key={slab.id}
               slab={slab}
               showDeleteButton={false}
+              onPrintQRCode={handleLinkedSlabQRCodePrint}
             />
           ))
         ) : (
@@ -126,252 +150,12 @@ function LinkedSlabsGroup({ slabs, sourceStoneName }: { slabs: Array<{id: number
   );
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  try {
-    await getAdminUser(request);
-  } catch (error) {
-    return redirect(`/login?error=${error}`);
-  }
-  try {
-    await csrf.validate(request);
-  } catch (error) {
-    return { error: "Invalid CSRF token" };
-  }
-  if (!params.stone) {
-    return forceRedirectError(request.headers, "No stone id provided");
-  }
-  
-  const stoneId = parseInt(params.stone, 10);
-  
-  if (request.method === "DELETE") {
-    try {
-      const form = await request.formData();
-      const id = form.get("id");
-      const unlinkSourceId = form.get("unlinkSourceId");
-      
-      if (unlinkSourceId) {
-        await db.execute(
-          `DELETE FROM stone_slab_links 
-           WHERE stone_id = ? AND source_stone_id = ?`,
-          [stoneId, unlinkSourceId]
-        );
-        
-        const session = await getSession(request.headers.get("Cookie"));
-        session.flash("message", toastData("Success", "Slabs unlinked successfully"));
-        return data({ success: true }, {
-          headers: { "Set-Cookie": await commitSession(session) },
-        });
-      } else if (id) {
-        const slabId = parseInt(id.toString(), 10);
-        const record = await selectId<{ url: string | null }>(
-          db,
-          "SELECT url FROM slab_inventory WHERE id = ?",
-          slabId,
-        );
-        await db.execute("DELETE FROM slab_inventory WHERE id = ?", [slabId]);
-        const session = await getSession(request.headers.get("Cookie"));
-        if (record?.url) {
-          deleteFile(record.url);
-        }
-        session.flash("message", toastData("Success", "Image Deleted"));
-        return data({ success: true }, {
-          headers: { "Set-Cookie": await commitSession(session) },
-        });
-      } else {
-        return forceRedirectError(request.headers, "No id provided");
-      }
-    } catch (error) {
-      console.error("Error processing DELETE request:", error);
-      return { error: "Failed to process delete request" };
-    }
-  } else if (request.method === "POST") {
-    const contentType = request.headers.get("Content-Type") || "";
-    
-    if (contentType.includes("application/x-www-form-urlencoded")) {
-      try {
-        const formData = await request.formData();
-        const intent = formData.get("intent");
-        
-        if (intent === "link_slabs") {
-          const fromStoneId = formData.get("fromStoneId");
-          
-          if (!fromStoneId) {
-            return { error: "No stone ID provided to link from" };
-          }
-          
-          await db.execute(
-            `INSERT INTO stone_slab_links (stone_id, source_stone_id) 
-             VALUES (?, ?)`,
-            [stoneId, fromStoneId]
-          );
-          
-          const session = await getSession(request.headers.get("Cookie"));
-          session.flash("message", toastData("Success", "Slabs linked successfully"));
-          return data({ success: true }, {
-            headers: { "Set-Cookie": await commitSession(session) },
-          });
-        }
-        
-        return { error: "Invalid form data" };
-      } catch (error) {
-        console.error("Error processing form data:", error);
-        return { error: "Failed to process form data" };
-      }
-    }
-    
-    if (contentType.includes("multipart/form-data")) {
-      try {
-        const { errors, data: formData } = await parseMutliForm(request, slabSchema, "stones");
-        
-        if (errors || !formData) {
-          return { errors };
-        }
-        
-        if (formData.length === 0 && formData.width === 0) {
-          const [stoneRecord] = await selectMany<{ width: number; length: number }>(
-            db,
-            "SELECT width, length FROM stones WHERE id = ? LIMIT 1",
-            [stoneId],
-          );
-          formData.length = stoneRecord?.length ?? 0;
-          formData.width = stoneRecord?.width ?? 0;
-        }
-        
-        await db.execute(
-          "INSERT INTO slab_inventory (bundle, stone_id, url, width, length) VALUES (?, ?, ?, ?, ?)",
-          [formData.bundle, stoneId, formData.file ?? "", formData.width, formData.length],
-        );
-        
-        const session = await getSession(request.headers.get("Cookie"));
-        session.flash("message", toastData("Success", "Image Added"));
-        return data({ success: true }, {
-          headers: { "Set-Cookie": await commitSession(session) },
-        });
-      } catch (error: unknown) {
-        console.error("Error processing slab form:", error);
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-        return { error: `Failed to add slab: ${errorMessage}` };
-      }
-    }
-    
-    return { error: "Unsupported content type" };
-  }
-
-  return null;
-}
-
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  await getAdminUser(request);
-  if (!params.stone) {
-    return forceRedirectError(request.headers, "No stone id provided");
-  }
-  const stoneId = parseInt(params.stone, 10);
-  
-  const slabs = await selectMany<{
-    id: number;
-    bundle: string;
-    url: string;
-    width: number;
-    length: number;
-  }>(
-    db,
-    "SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL",
-    [stoneId],
-  );
-  
-  const [stone] = await selectMany<{
-    id: number;
-    width: number;
-    length: number;
-    url: string;
-  }>(db, "SELECT id, width, length, url FROM stones WHERE id = ? LIMIT 1", [
-    stoneId,
-  ]);
-  
-  const allStones = await selectMany<{ id: number; name: string }>(
-    db,
-    `SELECT DISTINCT s.id, s.name 
-     FROM stones s
-     WHERE s.id != ? 
-     AND EXISTS (
-       SELECT 1 FROM slab_inventory si WHERE si.stone_id = s.id AND si.cut_date IS NULL
-     )
-     ORDER BY s.name ASC`,
-    [stoneId]
-  );
-  
-  let linkedSlabs: Array<{
-    source_stone_id: number;
-    source_stone_name: string;
-    slabs: Array<{
-      id: number;
-      bundle: string;
-      url: string;
-      width: number;
-      length: number;
-    }>;
-  }> = [];
-  
-  try {
-    const stoneLinks = await selectMany<{ 
-      source_stone_id: number;
-      source_stone_name: string;
-    }>(
-      db,
-      `SELECT 
-         stone_slab_links.source_stone_id, 
-         s.name as source_stone_name
-       FROM stone_slab_links
-       JOIN stones s ON stone_slab_links.source_stone_id = s.id
-       WHERE stone_slab_links.stone_id = ?
-       GROUP BY stone_slab_links.source_stone_id, s.name
-       ORDER BY s.name ASC`,
-      [stoneId]
-    );
-    
-    for (const link of stoneLinks) {
-      const slabs = await selectMany<{
-        id: number;
-        bundle: string;
-        url: string;
-        width: number;
-        length: number;
-      }>(
-        db,
-        `SELECT 
-           id, bundle, url, width, length
-         FROM slab_inventory 
-         WHERE stone_id = ? AND cut_date IS NULL`,
-        [link.source_stone_id]
-      );
-      
-      linkedSlabs.push({
-        source_stone_id: link.source_stone_id,
-        source_stone_name: link.source_stone_name,
-        slabs
-      });
-    }
-  } catch (err) {
-    console.error("Error fetching linked slabs:", err);
-  }
-  
-  return { 
-    slabs, 
-    stone, 
-    allStones, 
-    linkedSlabs,
-    currentStoneId: stoneId
-  };
-}
-
-interface LinkSlabsDialogProps {
-  allStones: Array<{ id: number; name: string }>;
-  isOpen: boolean;
-  onClose: () => void;
-  currentStoneId: number;
-}
-
-function LinkSlabsDialog({ allStones, isOpen, onClose, currentStoneId }: LinkSlabsDialogProps) {
+function LinkSlabsDialog({ 
+  allStones, 
+  isOpen, 
+  onClose, 
+  currentStoneId 
+}: LinkSlabsDialogProps) {
   const [selectedStoneId, setSelectedStoneId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const navigation = useNavigation();
@@ -458,6 +242,123 @@ function LinkSlabsDialog({ allStones, isOpen, onClose, currentStoneId }: LinkSla
   );
 }
 
+function UnlinkConfirmDialog({ 
+  showDialog, 
+  setShowDialog, 
+  unlinkSourceId,
+  unlinkStoneName
+}: {
+  showDialog: boolean;
+  setShowDialog: (show: boolean) => void;
+  unlinkSourceId: number | null;
+  unlinkStoneName: string;
+}) {
+  return (
+    <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Confirm Unlink</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to unlink slabs from {unlinkStoneName}?
+          </DialogDescription>
+        </DialogHeader>
+        
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setShowDialog(false)}
+          >
+            Cancel
+          </Button>
+          <Form method="delete" onSubmit={() => setShowDialog(false)}>
+            <AuthenticityTokenInput />
+            <input type="hidden" name="unlinkSourceId" value={unlinkSourceId || ""} />
+            <Button
+              type="submit"
+              variant="destructive"
+            >
+              Unlink
+            </Button>
+          </Form>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteConfirmDialog({ 
+  showDialog, 
+  setShowDialog, 
+  slabToDelete 
+}: {
+  showDialog: boolean;
+  setShowDialog: (show: boolean) => void;
+  slabToDelete: {id: number, bundle: string} | null;
+}) {
+  return (
+    <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Confirm Delete</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete slab {slabToDelete?.bundle}?
+          </DialogDescription>
+        </DialogHeader>
+        
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setShowDialog(false)}
+          >
+            Cancel
+          </Button>
+          <Form method="delete" onSubmit={() => setShowDialog(false)}>
+            <AuthenticityTokenInput />
+            <input type="hidden" name="id" value={slabToDelete?.id || ""} />
+            <Button
+              type="submit"
+              variant="destructive"
+            >
+              Delete
+            </Button>
+          </Form>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ImagePreviewDialog({
+  selectedImage,
+  setSelectedImage
+}: {
+  selectedImage: string | null;
+  setSelectedImage: (image: string | null) => void;
+}) {
+  return (
+    <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
+      <DialogContent className="max-w-4xl w-full h-auto flex items-center justify-center bg-black bg-opacity-90 p-1">
+        <Button
+          variant="ghost"
+          className="absolute top-4 right-4 text-white hover:bg-black/20"
+          onClick={() => setSelectedImage(null)}
+        >
+          <FaTimes />
+          <span className="sr-only">Close</span>
+        </Button>
+        {selectedImage && (
+          <img
+            src={selectedImage}
+            alt="Slab large view"
+            className="max-w-full max-h-[80vh] object-contain"
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Main form component for adding a slab
 export function AddSlab() {
   const { stone } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
@@ -579,6 +480,261 @@ export function AddSlab() {
   );
 }
 
+// Server-side functions
+
+export async function action({ request, params }: ActionFunctionArgs) {
+  try {
+    await getAdminUser(request);
+  } catch (error) {
+    return redirect(`/login?error=${error}`);
+  }
+  try {
+    await csrf.validate(request);
+  } catch (error) {
+    return { error: "Invalid CSRF token" };
+  }
+  if (!params.stone) {
+    return forceRedirectError(request.headers, "No stone id provided");
+  }
+  
+  const stoneId = parseInt(params.stone, 10);
+  
+  // Handle DELETE requests
+  if (request.method === "DELETE") {
+    try {
+      const form = await request.formData();
+      const id = form.get("id");
+      const unlinkSourceId = form.get("unlinkSourceId");
+      
+      if (unlinkSourceId) {
+        await db.execute(
+          `DELETE FROM stone_slab_links 
+           WHERE stone_id = ? AND source_stone_id = ?`,
+          [stoneId, unlinkSourceId]
+        );
+        
+        const session = await getSession(request.headers.get("Cookie"));
+        session.flash("message", toastData("Success", "Slabs unlinked successfully"));
+        return data({ success: true }, {
+          headers: { "Set-Cookie": await commitSession(session) },
+        });
+      } else if (id) {
+        const slabId = parseInt(id.toString(), 10);
+        const record = await selectId<{ url: string | null }>(
+          db,
+          "SELECT url FROM slab_inventory WHERE id = ?",
+          slabId,
+        );
+        await db.execute("DELETE FROM slab_inventory WHERE id = ?", [slabId]);
+        const session = await getSession(request.headers.get("Cookie"));
+        if (record?.url) {
+          deleteFile(record.url);
+        }
+        session.flash("message", toastData("Success", "Image Deleted"));
+        return data({ success: true }, {
+          headers: { "Set-Cookie": await commitSession(session) },
+        });
+      } else {
+        return forceRedirectError(request.headers, "No id provided");
+      }
+    } catch (error) {
+      console.error("Error processing DELETE request:", error);
+      return { error: "Failed to process delete request" };
+    }
+  } 
+  // Handle POST requests
+  else if (request.method === "POST") {
+    const contentType = request.headers.get("Content-Type") || "";
+    
+    // Handle form submissions
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      try {
+        const formData = await request.formData();
+        const intent = formData.get("intent");
+        
+        if (intent === "link_slabs") {
+          const fromStoneId = formData.get("fromStoneId");
+          
+          if (!fromStoneId) {
+            return { error: "No stone ID provided to link from" };
+          }
+          
+          await db.execute(
+            `INSERT INTO stone_slab_links (stone_id, source_stone_id) 
+             VALUES (?, ?)`,
+            [stoneId, fromStoneId]
+          );
+          
+          const session = await getSession(request.headers.get("Cookie"));
+          session.flash("message", toastData("Success", "Slabs linked successfully"));
+          return data({ success: true }, {
+            headers: { "Set-Cookie": await commitSession(session) },
+          });
+        }
+        
+        return { error: "Invalid form data" };
+      } catch (error) {
+        console.error("Error processing form data:", error);
+        return { error: "Failed to process form data" };
+      }
+    }
+    
+    // Handle multipart form data (file uploads)
+    if (contentType.includes("multipart/form-data")) {
+      try {
+        const { errors, data: formData } = await parseMutliForm(request, slabSchema, "stones");
+        
+        if (errors || !formData) {
+          return { errors };
+        }
+        
+        // Use stone dimensions if not provided
+        if (formData.length === 0 && formData.width === 0) {
+          const [stoneRecord] = await selectMany<{ width: number; length: number }>(
+            db,
+            "SELECT width, length FROM stones WHERE id = ? LIMIT 1",
+            [stoneId],
+          );
+          formData.length = stoneRecord?.length ?? 0;
+          formData.width = stoneRecord?.width ?? 0;
+        }
+        
+        // Insert new slab record
+        await db.execute(
+          "INSERT INTO slab_inventory (bundle, stone_id, url, width, length) VALUES (?, ?, ?, ?, ?)",
+          [formData.bundle, stoneId, formData.file ?? "", formData.width, formData.length],
+        );
+        
+        const session = await getSession(request.headers.get("Cookie"));
+        session.flash("message", toastData("Success", "Image Added"));
+        return data({ success: true }, {
+          headers: { "Set-Cookie": await commitSession(session) },
+        });
+      } catch (error: unknown) {
+        console.error("Error processing slab form:", error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        return { error: `Failed to add slab: ${errorMessage}` };
+      }
+    }
+    
+    return { error: "Unsupported content type" };
+  }
+
+  return null;
+}
+
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  await getAdminUser(request);
+  if (!params.stone) {
+    return forceRedirectError(request.headers, "No stone id provided");
+  }
+  const stoneId = parseInt(params.stone, 10);
+  
+  // Load slabs for current stone
+  const slabs = await selectMany<{
+    id: number;
+    bundle: string;
+    url: string;
+    width: number;
+    length: number;
+  }>(
+    db,
+    "SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL",
+    [stoneId],
+  );
+  
+  // Load stone details
+  const [stone] = await selectMany<{
+    id: number;
+    width: number;
+    length: number;
+    url: string;
+    name: string;
+  }>(db, "SELECT id, width, length, url, name FROM stones WHERE id = ? LIMIT 1", [
+    stoneId,
+  ]);
+  
+  // Load all stones for linking
+  const allStones = await selectMany<{ id: number; name: string }>(
+    db,
+    `SELECT DISTINCT s.id, s.name 
+     FROM stones s
+     WHERE s.id != ? 
+     AND EXISTS (
+       SELECT 1 FROM slab_inventory si WHERE si.stone_id = s.id AND si.cut_date IS NULL
+     )
+     ORDER BY s.name ASC`,
+    [stoneId]
+  );
+  
+  // Load linked slabs
+  let linkedSlabs: Array<{
+    source_stone_id: number;
+    source_stone_name: string;
+    slabs: Array<{
+      id: number;
+      bundle: string;
+      url: string;
+      width: number;
+      length: number;
+    }>;
+  }> = [];
+  
+  try {
+    // Get stone links
+    const stoneLinks = await selectMany<{ 
+      source_stone_id: number;
+      source_stone_name: string;
+    }>(
+      db,
+      `SELECT 
+         stone_slab_links.source_stone_id, 
+         s.name as source_stone_name
+       FROM stone_slab_links
+       JOIN stones s ON stone_slab_links.source_stone_id = s.id
+       WHERE stone_slab_links.stone_id = ?
+       GROUP BY stone_slab_links.source_stone_id, s.name
+       ORDER BY s.name ASC`,
+      [stoneId]
+    );
+    
+    // Get slabs for each linked stone
+    for (const link of stoneLinks) {
+      const slabs = await selectMany<{
+        id: number;
+        bundle: string;
+        url: string;
+        width: number;
+        length: number;
+      }>(
+        db,
+        `SELECT 
+           id, bundle, url, width, length
+         FROM slab_inventory 
+         WHERE stone_id = ? AND cut_date IS NULL`,
+        [link.source_stone_id]
+      );
+      
+      linkedSlabs.push({
+        source_stone_id: link.source_stone_id,
+        source_stone_name: link.source_stone_name,
+        slabs
+      });
+    }
+  } catch (err) {
+    console.error("Error fetching linked slabs:", err);
+  }
+  
+  return { 
+    slabs, 
+    stone, 
+    allStones, 
+    linkedSlabs,
+    currentStoneId: stoneId
+  };
+}
+
+// Main component
 export default function EditStoneSlabs() {
   const { slabs, stone, allStones, linkedSlabs, currentStoneId } = useLoaderData<typeof loader>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -594,12 +750,14 @@ export default function EditStoneSlabs() {
   const actionData = useActionData();
   const isSubmitting = navigation.state === "submitting";
   
+  // Handle navigation after action
   useEffect(() => {
     if (actionData?.success && navigation.state === "idle") {
       navigate(`/admin/stones/edit/${params.stone}/slabs`, { replace: true });
     }
   }, [actionData, navigation.state, navigate, params.stone]);
   
+  // Event handlers
   const handleUnlinkClick = (sourceId: number, name: string) => {
     setUnlinkSourceId(sourceId);
     setUnlinkStoneName(name);
@@ -610,24 +768,67 @@ export default function EditStoneSlabs() {
     setSlabToDelete(slab);
     setShowDeleteConfirm(true);
   };
+
+  // Handle single QR code printing
+  const handleSlabQRCodePrint = (slab: SlabData) => {
+    printSingleSlabQRCode(slab, stone.name);
+  };
+  
+  // Handle printing all QR codes
+  const handlePrintAllQRCodes = () => {
+    // Gather all slabs including linked ones
+    const allSlabsForPrinting = [...slabs].map(slab => ({
+      ...slab,
+      stoneName: stone.name
+    })) as SlabData[];
+    
+    // Add linked slabs with their source stone names
+    linkedSlabs.forEach(linkedGroup => {
+      linkedGroup.slabs.forEach(linkedSlab => {
+        allSlabsForPrinting.push({
+          id: linkedSlab.id,
+          bundle: linkedSlab.bundle,
+          length: linkedSlab.length,
+          width: linkedSlab.width,
+          stoneName: linkedGroup.source_stone_name
+        });
+      });
+    });
+    
+    printAllSlabsQRCodes(allSlabsForPrinting);
+  };
   
   return (
     <>
+      {/* Header section */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Stone Slabs</h2>
-        <Button 
-          onClick={() => setShowLinkDialog(true)}
-          variant="outline"
-          className="flex items-center gap-2"
-        >
-          <FaLink size={14} />
-          Link Slabs from Different Stone
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setShowLinkDialog(true)}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <FaLink size={14} />
+            Link Slabs from Different Stone
+          </Button>
+        </div>
       </div>
       
+      {/* Add slab form */}
       <AddSlab />
       
+      {/* List of slabs */}
       <div className="flex flex-col gap-2">
+        <Button 
+          onClick={handlePrintAllQRCodes}
+          variant="default"
+          className="flex items-center gap-2"
+        >
+          <FaQrcode size={14} />
+          ALL QR codes
+        </Button>
+        
         {slabs.map((slab) => (
           <SlabItem 
             key={slab.id}
@@ -637,10 +838,12 @@ export default function EditStoneSlabs() {
             showDeleteButton={true}
             isSubmitting={isSubmitting}
             onDeleteClick={handleDeleteClick}
+            onPrintQRCode={handleSlabQRCodePrint}
           />
         ))}
       </div>
       
+      {/* Linked slabs section */}
       {linkedSlabs.length > 0 && (
         <div className="mt-8 pt-6 border-t border-gray-200 w-full">
           <h3 className="text-lg font-semibold mb-2">Linked Slabs</h3>
@@ -665,67 +868,19 @@ export default function EditStoneSlabs() {
         </div>
       )}
       
-      {/* Confirmation Dialog for Unlinking */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Unlink</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to unlink slabs from {unlinkStoneName}?
-            </DialogDescription>
-          </DialogHeader>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowConfirmDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Form method="delete" onSubmit={() => setShowConfirmDialog(false)}>
-              <AuthenticityTokenInput />
-              <input type="hidden" name="unlinkSourceId" value={unlinkSourceId || ""} />
-              <Button
-                type="submit"
-                variant="destructive"
-              >
-                Unlink
-              </Button>
-            </Form>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirmation Dialog for Deleting Slab */}
-      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Delete</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete slab {slabToDelete?.bundle}?
-            </DialogDescription>
-          </DialogHeader>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteConfirm(false)}
-            >
-              Cancel
-            </Button>
-            <Form method="delete" onSubmit={() => setShowDeleteConfirm(false)}>
-              <AuthenticityTokenInput />
-              <input type="hidden" name="id" value={slabToDelete?.id || ""} />
-              <Button
-                type="submit"
-                variant="destructive"
-              >
-                Delete
-              </Button>
-            </Form>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Dialogs */}
+      <UnlinkConfirmDialog
+        showDialog={showConfirmDialog}
+        setShowDialog={setShowConfirmDialog}
+        unlinkSourceId={unlinkSourceId}
+        unlinkStoneName={unlinkStoneName}
+      />
+      
+      <DeleteConfirmDialog
+        showDialog={showDeleteConfirm}
+        setShowDialog={setShowDeleteConfirm}
+        slabToDelete={slabToDelete}
+      />
       
       <LinkSlabsDialog 
         allStones={allStones} 
@@ -734,26 +889,10 @@ export default function EditStoneSlabs() {
         currentStoneId={currentStoneId}
       />
       
-      {/* QR Preview Dialog */}
-      <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
-        <DialogContent className="max-w-4xl w-full h-auto flex items-center justify-center bg-black bg-opacity-90 p-1">
-          <Button
-            variant="ghost"
-            className="absolute top-4 right-4 text-white hover:bg-black/20"
-            onClick={() => setSelectedImage(null)}
-          >
-            <FaTimes />
-            <span className="sr-only">Close</span>
-          </Button>
-          {selectedImage && (
-            <img
-              src={selectedImage}
-              alt="Slab large view"
-              className="max-w-full max-h-[80vh] object-contain"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <ImagePreviewDialog
+        selectedImage={selectedImage}
+        setSelectedImage={setSelectedImage}
+      />
     </>
   );
 }
