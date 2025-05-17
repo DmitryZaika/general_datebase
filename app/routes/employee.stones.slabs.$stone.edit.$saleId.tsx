@@ -35,7 +35,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { csrf } from "~/utils/csrf.server";
-import { RowDataPacket } from "mysql2";
+import { RowDataPacket, ResultSetHeader } from "mysql2";
 import {
   Tabs,
   TabsContent,
@@ -264,6 +264,38 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     if (intent === "sale-unsell") {
    
+      // First find all slabs in this sale to check for child slabs later
+      const [slabsToUnsell] = await db.execute<RowDataPacket[]>(
+        "SELECT id FROM slab_inventory WHERE sale_id = ?",
+        [saleId]
+      );
+
+      console.log(`Found ${slabsToUnsell.length} slabs to unsell:`, JSON.stringify(slabsToUnsell));
+
+      // Delete all unpurchased child slabs for each slab in the sale
+      if (slabsToUnsell && slabsToUnsell.length > 0) {
+        for (const slabRow of slabsToUnsell) {
+          const parentId = slabRow.id;
+          console.log(`Checking for children of slab ID ${parentId}`);
+          
+          // Check for all child slabs that don't have a sale (are unsold)
+          const [childSlabs] = await db.execute<RowDataPacket[]>(
+            "SELECT id FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0)",
+            [parentId]
+          );
+          
+          console.log(`Found ${childSlabs.length} unpurchased child slabs for parent ID ${parentId}`);
+          
+          if (childSlabs && childSlabs.length > 0) {
+            // Delete all unsold child slabs of this parent
+            const [result] = await db.execute<ResultSetHeader>(
+              "DELETE FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0)",
+              [parentId]
+            );
+            console.log(`Deleted ${result.affectedRows} unpurchased child slabs of parent ID ${parentId}`);
+          }
+        }
+      }
       
       await db.execute(
         `UPDATE slab_inventory 
