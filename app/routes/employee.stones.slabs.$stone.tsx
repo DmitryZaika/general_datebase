@@ -488,17 +488,16 @@ export default function SlabsModal() {
               <div className="flex flex-col gap-1 text-sm">
                 {slab.transaction ? (
                   <>
+                    {slab.parent_id && slab.parent_transaction && (
+                      <>
+                        <p><strong>Parent slab sold by:</strong> {slab.parent_transaction.seller_name}</p>
+                        <div className="mb-1 border-b border-gray-700"></div>
+                      </>
+                    )}
+                    
                     <p><strong>Sold to:</strong> {slab.transaction.customer_name}</p>
                     <p><strong>Sold by:</strong> {slab.transaction.seller_name}</p>
                     <p><strong>Sale date:</strong> {formatDate(slab.transaction.sale_date)}</p>
-                    
-                    {slab.parent_id && slab.parent_transaction && (
-                      <>
-                        <div className="mt-1 pt-1 border-t border-gray-700">
-                          <p><strong>Parent slab sold by:</strong> {slab.parent_transaction.seller_name}</p>
-                        </div>
-                      </>
-                    )}
                     
                     {(slab.transaction.square_feet ?? 0) > 0 && (
                       <p><strong>Total Square Feet:</strong> {slab.transaction.square_feet}</p>
@@ -542,27 +541,57 @@ export default function SlabsModal() {
     );
   };
 
-  // Сортируем слэбы, чтобы дочерние отображались после родительских
-  const sortedSlabs = [...linkedSlabs, ...slabs].reduce<Slab[]>((acc, slab) => {
-    // Добавляем текущий слэб
-    acc.push(slab);
+  // Group slabs by their bundle name first
+  const allSlabs = [...linkedSlabs, ...slabs];
+  
+  // Create a map of bundle names to slabs
+  const slabsByBundle: Record<string, Slab[]> = {};
+  
+  // Group slabs by bundle
+  allSlabs.forEach(slab => {
+    if (!slabsByBundle[slab.bundle]) {
+      slabsByBundle[slab.bundle] = [];
+    }
+    slabsByBundle[slab.bundle].push(slab);
+  });
+  
+  // Order the bundle names naturally (Slab 1, Slab 2, etc.)
+  const orderedBundles = Object.keys(slabsByBundle).sort((a, b) => {
+    // Extract numbers from bundle names if they exist
+    const aMatch = a.match(/(\d+)/);
+    const bMatch = b.match(/(\d+)/);
     
-    // Если у слэба есть дочерние слэбы, добавляем их сразу после родителя
-    const childSlabs = [...linkedSlabs, ...slabs].filter(
-      childSlab => childSlab.parent_id === slab.id
-    );
-    
-    if (childSlabs.length > 0) {
-      acc.push(...childSlabs);
+    if (aMatch && bMatch) {
+      const aNum = parseInt(aMatch[0], 10);
+      const bNum = parseInt(bMatch[0], 10);
+      if (aNum !== bNum) {
+        return aNum - bNum;
+      }
     }
     
-    return acc;
-  }, []);
+    // Fallback to string comparison
+    return a.localeCompare(b);
+  });
   
-  // Удаляем дубликаты (так как каждый дочерний слэб будет добавлен и как самостоятельный элемент)
-  const uniqueSlabs = sortedSlabs.filter((slab, index, self) => 
-    index === self.findIndex(s => s.id === slab.id)
-  );
+  // Create final ordered list
+  const sortedSlabs: Slab[] = [];
+  
+  // For each bundle, add all slabs with that bundle name
+  orderedBundles.forEach(bundle => {
+    const bundleSlabs = slabsByBundle[bundle];
+    
+    // Within a bundle group, place parents first, then children
+    const parents = bundleSlabs.filter(slab => slab.parent_id === null);
+    const children = bundleSlabs.filter(slab => slab.parent_id !== null);
+    
+    // Add parents first
+    sortedSlabs.push(...parents);
+    
+    // Then add children
+    sortedSlabs.push(...children);
+  });
+  
+  const uniqueSlabs = sortedSlabs;
 
   return (
     <Dialog
