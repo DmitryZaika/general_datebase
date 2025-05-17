@@ -29,32 +29,49 @@ export async function action({ params, request }: ActionFunctionArgs) {
 
     console.log(`Found ${slabsToUnsell.length} slabs to unsell:`, JSON.stringify(slabsToUnsell));
 
-    // Удалить все непроданные дочерние слэбы для каждого слэба из продажи
+    // Process all slabs that are being unsold
     if (slabsToUnsell && slabsToUnsell.length > 0) {
       for (const slabRow of slabsToUnsell) {
         const parentId = slabRow.id;
         console.log(`Checking for children of slab ID ${parentId}`);
         
-        // Check for all child slabs that don't have a sale (are unsold)
-        const [childSlabs] = await db.execute<RowDataPacket[]>(
-          "SELECT id FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0)",
+        // Check if this slab has any sold child slabs
+        const [soldChildSlabs] = await db.execute<RowDataPacket[]>(
+          "SELECT id FROM slab_inventory WHERE parent_id = ? AND sale_id IS NOT NULL",
           [parentId]
         );
         
-        console.log(`Found ${childSlabs.length} unpurchased child slabs for parent ID ${parentId}`);
-        
-        if (childSlabs && childSlabs.length > 0) {
-          // Delete all unsold child slabs of this parent
-          const [result] = await db.execute<ResultSetHeader>(
-            "DELETE FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0)",
+        if (soldChildSlabs && soldChildSlabs.length > 0) {
+          console.log(`Found ${soldChildSlabs.length} sold child slabs for parent ID ${parentId} - will delete parent slab`);
+          
+          // If this slab has sold children, delete it entirely rather than unselling it
+          const [deleteResult] = await db.execute<ResultSetHeader>(
+            "DELETE FROM slab_inventory WHERE id = ?",
             [parentId]
           );
-          console.log(`Deleted ${result.affectedRows} unpurchased child slabs of parent ID ${parentId}`);
+          console.log(`Deleted parent slab ID ${parentId}, leaving sold child slabs as main slabs`);
+        } else {
+          // Check for unsold child slabs
+          const [unsoldChildSlabs] = await db.execute<RowDataPacket[]>(
+            "SELECT id FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0)",
+            [parentId]
+          );
+          
+          console.log(`Found ${unsoldChildSlabs.length} unpurchased child slabs for parent ID ${parentId}`);
+          
+          if (unsoldChildSlabs && unsoldChildSlabs.length > 0) {
+            // Delete all unsold child slabs of this parent
+            const [result] = await db.execute<ResultSetHeader>(
+              "DELETE FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0)",
+              [parentId]
+            );
+            console.log(`Deleted ${result.affectedRows} unpurchased child slabs of parent ID ${parentId}`);
+          }
         }
       }
     }
 
-    // Отменить продажу для всех слэбов в этой продаже
+    // Mark slabs as unsold (this will now only affect slabs that weren't completely deleted)
     const [updateResult] = await db.execute<ResultSetHeader>(
       "UPDATE slab_inventory SET sale_id = NULL, notes = NULL, square_feet = NULL WHERE sale_id = ?",
       [params.sale]
