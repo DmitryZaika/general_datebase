@@ -295,9 +295,25 @@ function DeleteConfirmDialog({
   setShowDialog: (show: boolean) => void;
   slabToDelete: {id: number, bundle: string} | null;
 }) {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      document.getElementById('deleteSlabButton')?.click();
+    }
+  };
+
+  useEffect(() => {
+    if (showDialog) {
+      window.addEventListener('keydown', handleKeyDown as any);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown as any);
+    };
+  }, [showDialog]);
+
   return (
     <Dialog open={showDialog} onOpenChange={setShowDialog}>
-      <DialogContent>
+      <DialogContent onKeyDown={handleKeyDown}>
         <DialogHeader>
           <DialogTitle>Confirm Delete</DialogTitle>
           <DialogDescription>
@@ -316,6 +332,7 @@ function DeleteConfirmDialog({
             <AuthenticityTokenInput />
             <input type="hidden" name="id" value={slabToDelete?.id || ""} />
             <Button
+              id="deleteSlabButton"
               type="submit"
               variant="destructive"
             >

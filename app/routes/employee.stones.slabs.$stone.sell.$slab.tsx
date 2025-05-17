@@ -36,7 +36,9 @@ import { selectMany } from "~/utils/queryHelpers";
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "~/components/ui/input";
-import { coerceNumber, coerceNumberRequired, StringOrNumber } from "~/schemas/general";
+import { coerceNumberRequired, StringOrNumber } from "~/schemas/general";
+import { Switch } from "~/components/ui/switch";
+
 interface Sink {
   id: number;
   name: string;
@@ -50,7 +52,8 @@ const customerSchema = z.object({
   notes_to_slab: StringOrNumber,
   notes_to_sale: StringOrNumber,
   total_square_feet: coerceNumberRequired,
-  price: coerceNumberRequired 
+  price: coerceNumberRequired,
+  is_full_slab_sold: z.boolean().default(false)
 });
 
 type FormData = z.infer<typeof customerSchema>;
@@ -90,7 +93,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   try {    
     const [slabDimensions] = await db.execute<RowDataPacket[]>(
-      `SELECT length, width FROM slab_inventory WHERE id = ?`,
+      `SELECT length, width, stone_id, bundle, url FROM slab_inventory WHERE id = ?`,
       [slabId]
     );
     
@@ -171,15 +174,37 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
     }
   
+    if (data.is_full_slab_sold) {
+      await db.execute(
+        `UPDATE slab_inventory SET sale_id = ? WHERE id = ?`,
+        [saleId, slabId]
+      );
+    } else {
+      await db.execute<ResultSetHeader>(
+        `INSERT INTO slab_inventory 
+         (stone_id, bundle, length, width, url, parent_id) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          slabDimensions[0].stone_id,
+          slabDimensions[0].bundle,
+          slabDimensions[0].length,
+          slabDimensions[0].width,
+          slabDimensions[0].url,
+          slabId
+        ]
+      );
+      
+      await db.execute(
+        `UPDATE slab_inventory SET sale_id = ? WHERE id = ?`,
+        [saleId, slabId]
+      );
 
-    await db.execute(
-      `UPDATE slab_inventory SET sale_id = ? WHERE id = ?`,
-      [saleId, slabId]
-    );
-    
- 
-    
-    
+      const session = await getSession(request.headers.get("Cookie"));
+      session.flash("message", toastData("Info", "Created a copy of partially sold slab"));
+      return redirect(`..${searchString}`, {
+        headers: { "Set-Cookie": await commitSession(session) },
+      });
+    }
     
   } catch (error) {
     console.error("Error during sale process: ", error);
@@ -265,6 +290,9 @@ export default function SlabSell() {
   
   const form = useForm<FormData>({
     resolver,
+    defaultValues: {
+      is_full_slab_sold: false
+    }
   });
   const fullSubmit = useFullSubmit(form);
 
@@ -399,6 +427,28 @@ export default function SlabSell() {
                   />
                 )}
               />
+                            
+              <div className="flex items-center space-x-2 mt-4">
+                <FormField
+                  control={form.control}
+                  name="is_full_slab_sold"
+                  render={({ field }) => (
+                    <>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        id="is_full_slab_sold"
+                      />
+                      <label
+                        htmlFor="is_full_slab_sold"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Full Slab Sold
+                      </label>
+                    </>
+                  )}
+                />
+              </div>
             </div>
           
             <DialogFooter className="flex flex-col sm:flex-row gap-2 items-center justify-between mt-4">
