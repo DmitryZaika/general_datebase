@@ -25,8 +25,14 @@ export function encrypt(text: string): string {
   return pack(iv, tag, ct);                              // base64 ⇒ БД
 }
 
-export function decrypt(blob: string): string {
-  const { iv, tag, ct } = unpack(blob);
+export function decrypt(blob: string | Buffer): string {
+  // если это Buffer, превращаем в utf‑8 строку
+  const b64   = Buffer.isBuffer(blob) ? blob.toString('utf8') : blob;
+  const bytes = Buffer.from(b64, 'base64');
+
+  const iv  = bytes.subarray(0, 12);   // 12‑байтовый IV
+  const tag = bytes.subarray(12, 28);  // 16‑байтовый auth‑tag
+  const ct  = bytes.subarray(28);      // шифртекст
 
   const decipher = createDecipheriv('aes-256-gcm', AES_KEY, iv);
   decipher.setAuthTag(tag);

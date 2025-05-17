@@ -28,7 +28,6 @@ const userschema = z.object({
   companyId: z.coerce.number().min(1),
   qboClientId: z.string().min(10),
   qboClientSecret: z.string().min(10),
-  qboRealmId: z.coerce.number().gt(10000)
 });
 
 type FormData = z.infer<typeof userschema>;
@@ -54,7 +53,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, receivedValues };
   }
   try {
-    saveCompanyQBO(data.companyId, data.qboClientId, data.qboClientSecret, data.qboRealmId);
+    saveCompanyQBO(data.companyId, data.qboClientId, data.qboClientSecret);
   } catch (error) {
     console.error("Error connecting to the database: ", error);
   }
@@ -120,13 +119,6 @@ export default function UsersAdd() {
           name="qboClientSecret"
           render={({ field }) => (
             <InputItem name="QBO Client Secret" field={field}/>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="qboRealmId"
-          render={({ field }) => (
-            <InputItem name="QBO Realm Id" field={field}/>
           )}
         />
           <Button type="submit">Save changes</Button>

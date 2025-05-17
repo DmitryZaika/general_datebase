@@ -1,13 +1,20 @@
-import { createCookieSessionStorage } from "react-router";
+import { createCookieSessionStorage, Session } from "react-router";
 import { ToastMessage } from "./utils/toastHelpers";
 
 type SessionData = {
   sessionId: string;
-};
+  qboRealmId: string;
+  qboAccessToken: string;
+  qboRefreshToken: string;
+  expires: number;
+  refreshExpires: number;
+}
 
 type SessionFlashData = {
   message: ToastMessage;
 };
+
+export type RemixSession = Session<SessionData, SessionFlashData>;
 
 const { getSession, commitSession, destroySession } =
   createCookieSessionStorage<SessionData, SessionFlashData>({

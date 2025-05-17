@@ -88,10 +88,14 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const cookieHeader = request.headers.get('Cookie');
+  const session = await getSession(cookieHeader);
+
+  let user, rows
   try {
-    const user = await getEmployeeUser(request);
+    user = await getEmployeeUser(request);
     
-    const [rows] = await db.query<UserData[]>(
+    [rows] = await db.query<UserData[]>(
       `SELECT name, email, phone_number FROM users WHERE id = ?`,
       [user.id]
     );
@@ -100,11 +104,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
       throw new Error("User not found");
     }
     
-    const quickBooksUrl = await getQboUrl(user.company_id);
-    return { userData: rows[0], quickBooksUrl };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const quickBooksUrl = await getQboUrl(request, user.company_id);
+  return { userData: rows[0], quickBooksUrl };
 }
 
 export default function UserProfile() {

@@ -28,7 +28,9 @@ export interface HeaderProps {
 }
 
 export interface TokenSet {
-  access_token?: string;
-  refresh_token?: string;
-  expires_at?: number;
+  token_type: string;
+  expires_in: number;
+  access_token: string;
+  refresh_token: string;
+  x_refresh_token_expires_in: number;
 }
