@@ -50,6 +50,7 @@ const customerSchema = z.object({
   customer_id: z.coerce.number().optional(),
   billing_address: z.string().min(10, "Billing address is required"),
   project_address: z.string().min(10, "Project address is required"),
+  same_address: z.boolean().default(true),
   phone: z.string().regex(/^\d{3}-\d{3}-\d{4}$/, "Required format: 317-316-1456"),
   email: z.string().email("Please enter a valid email"),
   sink_type_id: z.preprocess(val => String(val), z.string().optional()),
@@ -111,36 +112,79 @@ export async function action({ request, params }: ActionFunctionArgs) {
       customerId = data.customer_id;
       
       const [customerVerify] = await db.execute<RowDataPacket[]>(
-        `SELECT id FROM customers WHERE id = ? AND company_id = ?`,
+        `SELECT id, name, address, phone, email FROM customers WHERE id = ? AND company_id = ?`,
         [customerId, user.company_id]
       );
       
       if (!customerVerify || customerVerify.length === 0) {
         throw new Error("Customer not found");
       }
+      
+      // Check if we need to update customer information (address, phone, email)
+      const updateFields = [];
+      const updateValues = [];
+      
+      // If we have a billing address and customer doesn't have an address
+      if (data.billing_address && (!customerVerify[0].address || customerVerify[0].address === '')) {
+        updateFields.push('address = ?');
+        updateValues.push(data.billing_address);
+      }
+      
+      // If we have a phone number and customer doesn't have one
+      if (data.phone && (!customerVerify[0].phone || customerVerify[0].phone === '')) {
+        updateFields.push('phone = ?');
+        updateValues.push(data.phone);
+      }
+      
+      // If we have an email and customer doesn't have one
+      if (data.email && (!customerVerify[0].email || customerVerify[0].email === '')) {
+        updateFields.push('email = ?');
+        updateValues.push(data.email);
+      }
+      
+      // If we have fields to update, run the update query
+      if (updateFields.length > 0) {
+        await db.execute(
+          `UPDATE customers SET ${updateFields.join(', ')} WHERE id = ? AND company_id = ?`,
+          [...updateValues, customerId, user.company_id]
+        );
+      }
+      
+      // If the customer already has an address but the form submission doesn't,
+      // use the existing address
+      if (!data.billing_address && customerVerify[0].address) {
+        data.billing_address = customerVerify[0].address;
+      }
+      
+      // Same for project address - if using same address
+      if (data.same_address && data.billing_address) {
+        data.project_address = data.billing_address;
+      }
     } else {
       const [customerResult] = await db.execute<ResultSetHeader>(
-        `INSERT INTO customers (name, company_id, phone, email) VALUES (?, ?, ?, ?)`,
+        `INSERT INTO customers (name, company_id, phone, email, address) VALUES (?, ?, ?, ?, ?)`,
         [
           data.name,
           user.company_id,
-          data.phone,
-          data.email 
+          data.phone || null,
+          data.email || null,
+          data.billing_address || null
         ]
       );
       customerId = customerResult.insertId;
     }
     
     const [salesResult] = await db.execute<ResultSetHeader>(
-      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price) 
-       VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL, ?)`,
+      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price, project_address) 
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL, ?, ?)`,
       [
         customerId,
         user.id, 
         user.company_id,
         data.notes_to_sale || null,
         data.total_square_feet || 0,
-        data.price || 0
+        data.price || 0,
+        data.project_address || null
       ]
     );
     
@@ -293,17 +337,31 @@ export default function SlabSell() {
   const params = useParams();
   const location = useLocation();
   const customerInputRef = useRef<HTMLInputElement>(null);
-  const [customerSuggestions, setCustomerSuggestions] = useState<{id: number, name: string}[]>([]);
+  const [customerSuggestions, setCustomerSuggestions] = useState<{
+    id: number, 
+    name: string,
+    address: string | null,
+    phone: string | null,
+    email: string | null
+  }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
-      is_full_slab_sold: false
+      is_full_slab_sold: false,
+      same_address: true
     }
   });
   const fullSubmit = useFullSubmit(form);
+
+  // Add state to track disabled fields
+  const [disabledFields, setDisabledFields] = useState({
+    phone: false,
+    email: false,
+    billing_address: false
+  });
 
   // Focus the customer name input when the component mounts
   useEffect(() => {
@@ -345,6 +403,22 @@ export default function SlabSell() {
     }
   }, [form.watch("name"), isExistingCustomer]);
 
+  // Add useEffect to handle same_address changes
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'same_address' || name === 'billing_address') {
+        const sameAddress = form.getValues('same_address');
+        const billingAddress = form.getValues('billing_address');
+        
+        if (sameAddress && billingAddress) {
+          form.setValue('project_address', billingAddress);
+        }
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form]);
+
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate(`..${location.search}`);
@@ -357,15 +431,97 @@ export default function SlabSell() {
     navigate(`/employee/stones/slabs/${params.stone}/add-to-sale/${params.slab}/${saleId}${location.search}`);
   };
 
-  const handleSelectCustomer = (customerName: string, customerId: number) => {
-    form.setValue("name", customerName);
-    form.setValue("customer_id", customerId);
+  const handleSelectSuggestion = (customer: {
+    id: number, 
+    name: string,
+    address: string | null,
+    phone: string | null,
+    email: string | null
+  }) => {
+    form.setValue("name", customer.name);
+    form.setValue("customer_id", customer.id);
+    
+    // Set initial fields based on available suggestion data
+    if (customer.address) {
+      form.setValue("billing_address", customer.address);
+      setDisabledFields(prev => ({ ...prev, billing_address: true }));
+      if (form.getValues("same_address")) {
+        form.setValue("project_address", customer.address);
+      }
+    } else {
+      form.setValue("billing_address", "");
+      setDisabledFields(prev => ({ ...prev, billing_address: false }));
+    }
+    
+    // Handle phone - disable only if it has a value
+    if (customer.phone) {
+      form.setValue("phone", customer.phone);
+      setDisabledFields(prev => ({ ...prev, phone: true }));
+    } else {
+      setDisabledFields(prev => ({ ...prev, phone: false }));
+    }
+    
+    // Handle email - disable only if it has a value
+    if (customer.email) {
+      form.setValue("email", customer.email);
+      setDisabledFields(prev => ({ ...prev, email: true }));
+    } else {
+      setDisabledFields(prev => ({ ...prev, email: false }));
+    }
+    
     setIsExistingCustomer(true);
     setShowSuggestions(false);
+    
+    // Fetch full customer details to ensure we have complete data
+    fetchCustomerDetails(customer.id);
   };
-
-  const handleSelectSuggestion = (customer: {id: number, name: string}) => {
-    handleSelectCustomer(customer.name, customer.id);
+  
+  // Function to load full customer details when selecting a customer
+  const fetchCustomerDetails = async (customerId: number) => {
+    try {
+      const response = await fetch(`/api/customers/${customerId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.customer) {
+          // Update form with all customer details
+          form.setValue("name", data.customer.name);
+          
+          // Set billing address and track if it should be disabled (only if it has a value)
+          if (data.customer.address) {
+            form.setValue("billing_address", data.customer.address);
+            setDisabledFields(prev => ({ ...prev, billing_address: true }));
+            
+            // If same_address is true, also set project_address
+            if (form.getValues("same_address")) {
+              form.setValue("project_address", data.customer.address);
+            }
+          } else {
+            form.setValue("billing_address", "");
+            setDisabledFields(prev => ({ ...prev, billing_address: false }));
+          }
+          
+          // Set phone and track if it should be disabled (only if it has a value)
+          if (data.customer.phone) {
+            form.setValue("phone", data.customer.phone);
+            setDisabledFields(prev => ({ ...prev, phone: true }));
+          } else {
+            form.setValue("phone", "");
+            setDisabledFields(prev => ({ ...prev, phone: false }));
+          }
+          
+          // Set email and track if it should be disabled (only if it has a value)
+          if (data.customer.email) {
+            form.setValue("email", data.customer.email);
+            setDisabledFields(prev => ({ ...prev, email: true }));
+          } else {
+            form.setValue("email", "");
+            setDisabledFields(prev => ({ ...prev, email: false }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching customer details:', error);
+    }
   };
 
   const filteredSales = allSales.filter(sale => 
@@ -429,6 +585,12 @@ export default function SlabSell() {
                         onClick={() => {
                           setIsExistingCustomer(false);
                           form.setValue("customer_id", undefined);
+                          setDisabledFields(prev => ({
+                            ...prev,
+                            billing_address: false,
+                            phone: false,
+                            email: false
+                          }));
                         }}
                       >
                         <X className="h-3 w-3" />
@@ -467,15 +629,54 @@ export default function SlabSell() {
               
               <FormField
                 control={form.control}
-                name="project_address"
+                name="billing_address"
                 render={({ field }) => (
                   <InputItem
-                    name={"Project Address"}
-                    placeholder={"Enter project address"}
-                    field={field}
+                    name={"Billing Address"}
+                    placeholder={"Enter billing address"}
+                    field={{
+                      ...field,
+                      disabled: disabledFields.billing_address
+                    }}
                   />
                 )}
               />
+              
+              <div className="flex items-center space-x-2 my-2">
+                <FormField
+                  control={form.control}
+                  name="same_address"
+                  render={({ field }) => (
+                    <>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        id="same_address"
+                      />
+                      <label
+                        htmlFor="same_address"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Project address same as billing address
+                      </label>
+                    </>
+                  )}
+                />
+              </div>
+              
+              {!form.watch("same_address") && (
+                <FormField
+                  control={form.control}
+                  name="project_address"
+                  render={({ field }) => (
+                    <InputItem
+                      name={"Project Address"}
+                      placeholder={"Enter project address"}
+                      field={field}
+                    />
+                  )}
+                />
+              )}
               
               <div className="flex flex-row gap-2">
                 <FormField
@@ -485,7 +686,10 @@ export default function SlabSell() {
                     <InputItem
                       name={"Phone Number"}
                       placeholder={"317-316-1456"}
-                      field={field}
+                      field={{
+                        ...field,
+                        disabled: disabledFields.phone
+                      }}
                       formClassName="mb-0 w-1/2"
                     />
                   )}
@@ -497,7 +701,10 @@ export default function SlabSell() {
                     <InputItem
                       name={"Email"}
                       placeholder={"Colin@gmail.com"}
-                      field={field}
+                      field={{
+                        ...field,
+                        disabled: disabledFields.email
+                      }}
                       formClassName="mb-0 w-1/2"
                     />
                   )}

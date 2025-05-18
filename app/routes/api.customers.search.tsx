@@ -6,6 +6,9 @@ import { selectMany } from "~/utils/queryHelpers";
 interface Customer {
   id: number;
   name: string;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -17,7 +20,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // Search for customers with the search term
     const customers = await selectMany<Customer>(
       db,
-      `SELECT id, name 
+      `SELECT id, name, address, phone, email 
        FROM customers 
        WHERE company_id = ? AND name LIKE ? 
        ORDER BY name DESC
