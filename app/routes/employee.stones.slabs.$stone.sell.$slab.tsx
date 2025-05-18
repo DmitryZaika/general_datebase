@@ -33,10 +33,10 @@ import { useFullSubmit } from "~/hooks/useFullSubmit";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { selectMany } from "~/utils/queryHelpers";
-import { useState } from "react";
-import { Search } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Search, X } from "lucide-react";
 import { Input } from "~/components/ui/input";
-import { coerceNumberRequired, StringOrNumber } from "~/schemas/general";
+import { coerceNumber, coerceNumberRequired, StringOrNumber } from "~/schemas/general";
 import { Switch } from "~/components/ui/switch";
 
 interface Sink {
@@ -52,7 +52,7 @@ const customerSchema = z.object({
   notes_to_slab: StringOrNumber,
   notes_to_sale: StringOrNumber,
   total_square_feet: coerceNumberRequired,
-  price: coerceNumberRequired,
+  price: coerceNumber,
   is_full_slab_sold: z.boolean().default(false)
 });
 
@@ -242,7 +242,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [user.company_id]
     );
     
-    const recentSales = await selectMany<{
+    const allSales = await selectMany<{
       id: number;
       customer_name: string;
       sale_date: string;
@@ -254,8 +254,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        FROM sales s
        JOIN customers c ON s.customer_id = c.id
        WHERE s.company_id = ? AND s.cancelled_date IS NULL
-       ORDER BY s.sale_date DESC
-       LIMIT 20`,
+       ORDER BY s.sale_date DESC`,
       [user.company_id]
     );
     
@@ -271,22 +270,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [user.company_id]
     );
     
-    return { user, sinks, recentSales, customers };
+    return { user, sinks, allSales, customers };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
 };
 
 export default function SlabSell() {
-  const { sinks, recentSales, customers } = useLoaderData<typeof loader>();
+  const { sinks, allSales, customers } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state === "submitting";
   const [showExistingSales, setShowExistingSales] = useState(false);
-  const [showExistingCustomers, setShowExistingCustomers] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [saleSearch, setSaleSearch] = useState("");
   const [isExistingCustomer, setIsExistingCustomer] = useState(false);
   const params = useParams();
   const location = useLocation();
+  const customerInputRef = useRef<HTMLInputElement>(null);
+  const [customerSuggestions, setCustomerSuggestions] = useState<{id: number, name: string}[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
   
   const form = useForm<FormData>({
     resolver,
@@ -295,6 +298,46 @@ export default function SlabSell() {
     }
   });
   const fullSubmit = useFullSubmit(form);
+
+  // Focus the customer name input when the component mounts
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (customerInputRef.current) {
+        customerInputRef.current.focus();
+      }
+    }, 50);
+    
+    return () => clearTimeout(timeout);
+  }, []);
+
+  // Watch for customer name changes to provide real-time suggestions
+  useEffect(() => {
+    const customerName = form.watch("name");
+    
+    if (customerName && customerName.length >= 2 && !isExistingCustomer) {
+      const fetchCustomers = async () => {
+        try {
+          const response = await fetch('/api/customers/search?term=' + encodeURIComponent(customerName));
+          if (response.ok) {
+            const data = await response.json();
+            // Limit to only the top 1 customer
+            const limitedCustomers = (data.customers || []).slice(0, 1);
+            setCustomerSuggestions(limitedCustomers);
+            setShowSuggestions(limitedCustomers.length > 0);
+          }
+        } catch (error) {
+          console.error('Error fetching customer suggestions:', error);
+          setCustomerSuggestions([]);
+          setShowSuggestions(false);
+        }
+      };
+      
+      fetchCustomers();
+    } else {
+      setCustomerSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [form.watch("name"), isExistingCustomer]);
 
   const handleChange = (open: boolean) => {
     if (open === false) {
@@ -312,12 +355,26 @@ export default function SlabSell() {
     form.setValue("name", customerName);
     form.setValue("customer_id", customerId);
     setIsExistingCustomer(true);
-    setShowExistingCustomers(false);
+    setShowSuggestions(false);
   };
 
-  const filteredCustomers = customers.filter(customer => 
-    customer.name.toLowerCase().includes(customerSearch.toLowerCase())
+  const handleSelectSuggestion = (customer: {id: number, name: string}) => {
+    handleSelectCustomer(customer.name, customer.id);
+  };
+
+  const filteredSales = allSales.filter(sale => 
+    sale.customer_name.toLowerCase().includes(saleSearch.toLowerCase())
   );
+
+  // Handle blur event to hide suggestions
+  const handleInputBlur = (e: React.FocusEvent) => {
+    // Small delay to allow clicking on suggestions
+    setTimeout(() => {
+      if (!suggestionsRef.current?.contains(document.activeElement)) {
+        setShowSuggestions(false);
+      }
+    }, 150);
+  };
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -340,26 +397,58 @@ export default function SlabSell() {
                         placeholder={"Enter customer name"}
                         field={{
                           ...field,
-                          disabled: isExistingCustomer
+                          disabled: isExistingCustomer,
+                          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                            field.onChange(e);
+                            if (isExistingCustomer) {
+                              setIsExistingCustomer(false);
+                              form.setValue("customer_id", undefined);
+                            }
+                          },
+                          onBlur: (e) => {
+                            field.onBlur();
+                            handleInputBlur(e);
+                          }
                         }}
+                        ref={customerInputRef}
                       />
                     )}
                   />
                   {isExistingCustomer && (
-                    <div className="absolute right-0 top-0 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-1 mr-1">
-                      Existing
+                    <div className="absolute right-0 top-0 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-1 mr-1 flex items-center gap-1">
+                      <span>Existing</span>
+                      <button
+                        type="button"
+                        className="ml-1 rounded-full hover:bg-blue-200 p-0.5"
+                        onClick={() => {
+                          setIsExistingCustomer(false);
+                          form.setValue("customer_id", undefined);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                  
+                  {showSuggestions && customerSuggestions.length > 0 && (
+                    <div 
+                      ref={suggestionsRef} 
+                      className="absolute z-10 w-full -mt-4 max-h-20 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg"
+                    >
+                      <ul className="py-1 divide-y divide-gray-200">
+                        {customerSuggestions.map((customer) => (
+                          <li 
+                            key={customer.id}
+                            className="px-2 py-0.5 hover:bg-gray-50 cursor-pointer"
+                            onClick={() => handleSelectSuggestion(customer)}
+                          >
+                            {customer.name}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                 </div>
-                <Button 
-                  size="sm" 
-                  className="h-9 mt-7 whitespace-nowrap mt-[24.5px]"
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowExistingCustomers(true)}
-                >
-                  Existing Customer
-                </Button>
               </div>
               
               <FormField
@@ -391,31 +480,33 @@ export default function SlabSell() {
                     );
                   }}
                 />
-                <FormField
-                  control={form.control}
-                  name="total_square_feet"
-                  render={({ field }) => (
-                    <InputItem
-                      name={"Total Square Feet"}
-                      placeholder={"Total Square Feet"}
-                      field={field}
-                      formClassName="mb-0"
-                    />
-                  )}
-                />
-              </div>
-              <FormField
-                control={form.control}
-                name="price"
-                render={({ field }) => (
-                  <InputItem
-                    name={"Price"}
-                    placeholder={"Enter price"}
-                    field={field}
-                    formClassName="mb-0"
+                <div className="flex flex-row gap-2 w-full">
+                  <FormField
+                    control={form.control}
+                    name="total_square_feet"
+                    render={({ field }) => (
+                      <InputItem
+                        name={"Total Sqft"}
+                        placeholder={"Total Sqft"}
+                        field={field}
+                        formClassName="mb-0"
+                      />
+                    )}
                   />
-                )}
-              />
+                  <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                      <InputItem
+                        name={"Price"}
+                        placeholder={"Enter price"}
+                        field={field}
+                        formClassName="mb-0"
+                      />
+                    )}
+                  />
+                </div>
+              </div>
               <FormField
                 control={form.control}
                 name="notes_to_sale"
@@ -473,12 +564,21 @@ export default function SlabSell() {
               <DialogHeader>
                 <DialogTitle>Select Existing Sale</DialogTitle>
               </DialogHeader>
+              <div className="relative mb-4">
+                <Input
+                  placeholder="Search sales by customer..."
+                  value={saleSearch}
+                  onChange={(e) => setSaleSearch(e.target.value)}
+                  className="pl-9"
+                />
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+              </div>
               <div className="max-h-80 overflow-y-auto">
-                {recentSales.length === 0 ? (
-                  <p className="text-center py-4">No recent sales found</p>
+                {filteredSales.length === 0 ? (
+                  <p className="text-center py-4">No sales found</p>
                 ) : (
                   <div className="space-y-2">
-                    {recentSales.map(sale => (
+                    {filteredSales.map(sale => (
                       <div 
                         key={sale.id} 
                         className="p-3 border rounded hover:bg-gray-50 cursor-pointer"
@@ -499,42 +599,6 @@ export default function SlabSell() {
                           )}
                         </div>
                         
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-
-        {showExistingCustomers && (
-          <Dialog open={showExistingCustomers} onOpenChange={setShowExistingCustomers}>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Select Existing Customer</DialogTitle>
-              </DialogHeader>
-              <div className="relative mb-4">
-                <Input
-                  placeholder="Search customers..."
-                  value={customerSearch}
-                  onChange={(e) => setCustomerSearch(e.target.value)}
-                  className="pl-9"
-                />
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-              </div>
-              <div className="max-h-80 overflow-y-auto">
-                {filteredCustomers.length === 0 ? (
-                  <p className="text-center py-4">No customers found</p>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredCustomers.map(customer => (
-                      <div 
-                        key={customer.id} 
-                        className="p-3 border rounded hover:bg-gray-50 cursor-pointer"
-                        onClick={() => handleSelectCustomer(customer.name, customer.id)}
-                      >
-                        <div className="font-medium">{customer.name}</div>
                       </div>
                     ))}
                   </div>

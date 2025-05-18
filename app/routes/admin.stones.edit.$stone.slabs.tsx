@@ -91,21 +91,21 @@ function SlabItem({
       />
       <div className="p-1.5 border w-full flex justify-between items-center border-gray-300">
         <div className="">
-          <p className="w-full">Slab number: {slab.bundle}</p>
+        <p className="w-full">Slab number: {slab.bundle}</p>
           <p>Size {slab.length} x {slab.width}</p>
         </div>
         
         <div className="flex gap-2">
           <Button 
             onClick={(e) => {
-              e.preventDefault();
+          e.preventDefault();
               onPrintQRCode && onPrintQRCode(slab);
             }} 
             className="size-9 flex items-center gap-2"
             variant="blue"
           >
-            <FaQrcode style={{ height: "1.2rem", width: "1.2rem" }} />
-          </Button>
+          <FaQrcode style={{ height: "1.2rem", width: "1.2rem" }} />
+        </Button>
         </div>
       </div>
      
@@ -116,8 +116,8 @@ function SlabItem({
             onClick={() => onDeleteClick && onDeleteClick(slab)}
             disabled={isSubmitting}
           >
-            <FaTimes />
-          </Button>
+              <FaTimes />
+            </Button>
         </div>
       )}
     </div>
@@ -151,7 +151,7 @@ function LinkedSlabsGroup({ slabs, sourceStoneName }: LinkedSlabsGroupProps) {
 }
 
 function LinkSlabsDialog({ 
-  allStones, 
+    allStones, 
   isOpen, 
   onClose, 
   currentStoneId 
@@ -821,14 +821,14 @@ export default function EditStoneSlabs() {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Stone Slabs</h2>
         <div className="flex gap-2">
-          <Button 
-            onClick={() => setShowLinkDialog(true)}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <FaLink size={14} />
-            Link Slabs from Different Stone
-          </Button>
+        <Button 
+          onClick={() => setShowLinkDialog(true)}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <FaLink size={14} />
+          Link Slabs from Different Stone
+        </Button>
         </div>
       </div>
       
@@ -892,7 +892,7 @@ export default function EditStoneSlabs() {
         unlinkSourceId={unlinkSourceId}
         unlinkStoneName={unlinkStoneName}
       />
-      
+          
       <DeleteConfirmDialog
         showDialog={showDeleteConfirm}
         setShowDialog={setShowDeleteConfirm}

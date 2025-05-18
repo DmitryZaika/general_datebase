@@ -19,21 +19,17 @@ export async function action({ params, request }: ActionFunctionArgs) {
   const searchParams = url.searchParams.toString();
   const searchString = searchParams ? `?${searchParams}` : '';
 
-
   try {
-    // Найти все ID слэбов, которые связаны с этой продажей
+    // Find all slabs linked to this sale
     const [slabsToUnsell] = await db.execute<RowDataPacket[]>(
       "SELECT id FROM slab_inventory WHERE sale_id = ?",
       [params.sale]
     );
 
-    console.log(`Found ${slabsToUnsell.length} slabs to unsell:`, JSON.stringify(slabsToUnsell));
-
     // Process all slabs that are being unsold
     if (slabsToUnsell && slabsToUnsell.length > 0) {
       for (const slabRow of slabsToUnsell) {
         const parentId = slabRow.id;
-        console.log(`Checking for children of slab ID ${parentId}`);
         
         // Check if this slab has any sold child slabs
         const [soldChildSlabs] = await db.execute<RowDataPacket[]>(
@@ -42,57 +38,77 @@ export async function action({ params, request }: ActionFunctionArgs) {
         );
         
         if (soldChildSlabs && soldChildSlabs.length > 0) {
-          console.log(`Found ${soldChildSlabs.length} sold child slabs for parent ID ${parentId} - will delete parent slab`);
+          // If parent and child are both sold, remove parent_id from children and delete parent
+          await db.execute(
+            "UPDATE slab_inventory SET parent_id = NULL WHERE parent_id = ?",
+            [parentId]
+          );
           
-          // If this slab has sold children, delete it entirely rather than unselling it
-          const [deleteResult] = await db.execute<ResultSetHeader>(
+          // Delete the parent slab (this is the new behavior we want)
+          await db.execute(
             "DELETE FROM slab_inventory WHERE id = ?",
             [parentId]
           );
-          console.log(`Deleted parent slab ID ${parentId}, leaving sold child slabs as main slabs`);
         } else {
           // Check for unsold child slabs
           const [unsoldChildSlabs] = await db.execute<RowDataPacket[]>(
-            "SELECT id FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0)",
+            "SELECT id FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '')",
             [parentId]
           );
           
-          console.log(`Found ${unsoldChildSlabs.length} unpurchased child slabs for parent ID ${parentId}`);
-          
           if (unsoldChildSlabs && unsoldChildSlabs.length > 0) {
             // Delete all unsold child slabs of this parent
-            const [result] = await db.execute<ResultSetHeader>(
-              "DELETE FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0)",
+            await db.execute(
+              "DELETE FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '')",
               [parentId]
             );
-            console.log(`Deleted ${result.affectedRows} unpurchased child slabs of parent ID ${parentId}`);
           }
         }
       }
     }
+    
+    // Additional cleanup step - delete all unsold slabs with the same bundle
+    const [bundleInfo] = await db.execute<RowDataPacket[]>(
+      "SELECT DISTINCT bundle, stone_id FROM slab_inventory WHERE sale_id = ?",
+      [params.sale]
+    );
+    
+    if (bundleInfo && bundleInfo.length > 0) {
+      for (const info of bundleInfo) {
+        const bundle = info.bundle;
+        const stoneId = info.stone_id;
+        
+        // Delete all unsold slabs with the same bundle in the same stone
+        await db.execute(
+          `DELETE FROM slab_inventory 
+           WHERE bundle = ? 
+           AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '') 
+           AND stone_id = ?`,
+          [bundle, stoneId]
+        );
+      }
+    }
 
-    // Mark slabs as unsold (this will now only affect slabs that weren't completely deleted)
-    const [updateResult] = await db.execute<ResultSetHeader>(
+    // Mark remaining slabs as unsold
+    await db.execute(
       "UPDATE slab_inventory SET sale_id = NULL, notes = NULL, square_feet = NULL WHERE sale_id = ?",
       [params.sale]
     );
     
-    console.log(`Updated ${updateResult.affectedRows} slabs to remove sale information`);
-    
-    // Отменить привязку раковин к этой продаже
+    // Unsell sinks from this sale
     await db.execute(
       "UPDATE sinks SET sale_id = NULL, is_deleted = 0, price = NULL WHERE sale_id = ?",
       [params.sale]
     );
     
-    // Отметить продажу как отмененную
+    // Mark the sale as cancelled
     await db.execute(
       "UPDATE sales SET cancelled_date = NOW() WHERE id = ?",
       [params.sale]
     );
  
     const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Success", "Slab marked as unsold and child slabs removed"));
+    session.flash("message", toastData("Success", "Transaction canceled, slabs processed successfully"));
     return redirect(`..${searchString}`, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
