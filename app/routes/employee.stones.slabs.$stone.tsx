@@ -43,6 +43,7 @@ interface Slab {
   width: number;
   length: number;
   cut_date: string | null;
+  parent_id: number | null;
   source_stone_id?: number;
   source_stone_name?: string;
   transaction?: {
@@ -54,6 +55,10 @@ interface Slab {
     slab_notes?: string;
     square_feet?: number;
     sink?: string;
+  };
+  parent_transaction?: {
+    customer_name: string;
+    seller_name: string;
   };
 }
 
@@ -122,7 +127,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   
   const slabs = await selectMany<Slab>(
     db,
-    "SELECT id, bundle, url, sale_id, width, length, cut_date FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL",
+    "SELECT id, bundle, url, sale_id, width, length, cut_date, parent_id FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL",
     [stoneId]
   );
   
@@ -149,7 +154,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       const linkedStoneSlabs = await selectMany<Slab>(
         db,
         `SELECT 
-           id, bundle, url, sale_id, width, length, cut_date
+           id, bundle, url, sale_id, width, length, cut_date, parent_id
          FROM slab_inventory 
          WHERE stone_id = ? AND cut_date IS NULL`,
         [link.source_stone_id]
@@ -248,6 +253,54 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     });
   }
   
+  // Get parent transactions for slabs with parent_id
+  const slabsWithParent = allSlabs.filter(slab => slab.parent_id).map(slab => slab.parent_id);
+  
+  if (slabsWithParent.length > 0) {
+    const parentPlaceholders = slabsWithParent.map(() => '?').join(',');
+    
+    const parentSqlQuery = `
+      SELECT 
+        slab_inventory.id as slab_id,
+        customers.name as customer_name,
+        users.name as seller_name
+      FROM 
+        sales
+      JOIN 
+        customers ON sales.customer_id = customers.id
+      JOIN 
+        users ON sales.seller_id = users.id
+      JOIN 
+        slab_inventory ON sales.id = slab_inventory.sale_id
+      WHERE 
+        slab_inventory.id IN (${parentPlaceholders})
+    `;
+    
+    const parentTransactions = await selectMany<{
+      slab_id: number;
+      customer_name: string;
+      seller_name: string;
+    }>(
+      db,
+      parentSqlQuery,
+      slabsWithParent
+    );
+    
+    const parentTransactionsBySlabId = parentTransactions.reduce((acc, transaction) => {
+      acc[transaction.slab_id] = transaction;
+      return acc;
+    }, {} as Record<number, {customer_name: string, seller_name: string}>);
+    
+    allSlabs.forEach(slab => {
+      if (slab.parent_id && parentTransactionsBySlabId[slab.parent_id]) {
+        slab.parent_transaction = {
+          customer_name: parentTransactionsBySlabId[slab.parent_id].customer_name,
+          seller_name: parentTransactionsBySlabId[slab.parent_id].seller_name
+        };
+      }
+    });
+  }
+  
   return { slabs, linkedSlabs, stone };
 }
 
@@ -333,6 +386,7 @@ export default function SlabsModal() {
   const renderSlabItem = (slab: Slab) => {
     const isEditing = editingSlab === slab.id;
     const isHighlighted = highlightedSlab === slab.id;
+    const hasParent = slab.parent_id !== null;
     
     return (
       <TooltipProvider key={slab.id}>
@@ -340,10 +394,12 @@ export default function SlabsModal() {
           <TooltipTrigger asChild>
             <div
               className={`transition-all duration-300 flex items-center gap-4 p-2 sm:px-5 rounded-lg ${
-                slab.sale_id ? "bg-red-300 " : "bg-white "
+                slab.sale_id ? "bg-red-300 " : 
+                hasParent ? "bg-yellow-200 " : "bg-white "
               }${
                 isHighlighted ? "border-2 border-blue-500" : 
-                slab.sale_id ? "border border-red-400" : "border border-gray-200"
+                slab.sale_id ? "border border-red-400" : 
+                hasParent ? "border border-yellow-400" : "border border-gray-200"
               }`}
             >
               <img
@@ -363,7 +419,8 @@ export default function SlabsModal() {
               
               <span
                 className={`font-semibold whitespace-nowrap ${
-                  slab.sale_id ? "text-red-900" : "text-gray-800"
+                  slab.sale_id ? "text-red-900" : 
+                  hasParent ? "text-yellow-800" : "text-gray-800"
                 }`}
               >
                 {slab.bundle}
@@ -426,11 +483,18 @@ export default function SlabsModal() {
               )}
             </div>
           </TooltipTrigger>
-          {slab.sale_id && (
+          {(slab.sale_id || slab.parent_transaction) && (
             <TooltipContent className="bg-gray-900 text-white p-2 rounded shadow-lg max-w-xs">
               <div className="flex flex-col gap-1 text-sm">
                 {slab.transaction ? (
                   <>
+                    {slab.parent_id && slab.parent_transaction && (
+                      <>
+                        <p><strong>Partially Sold by:</strong> {slab.parent_transaction.seller_name}</p>
+                        <div className="mb-1 border-b border-gray-700"></div>
+                      </>
+                    )}
+                    
                     <p><strong>Sold to:</strong> {slab.transaction.customer_name}</p>
                     <p><strong>Sold by:</strong> {slab.transaction.seller_name}</p>
                     <p><strong>Sale date:</strong> {formatDate(slab.transaction.sale_date)}</p>
@@ -457,6 +521,11 @@ export default function SlabsModal() {
                       <p><strong>Notes to Slab:</strong> {slab.transaction.slab_notes}</p>
                     )}
                   </>
+                ) : slab.parent_transaction ? (
+                  <>
+                    <p><strong>Partially sold to:</strong> {slab.parent_transaction.customer_name}</p>
+                    <p><strong>Partially sold by:</strong> {slab.parent_transaction.seller_name}</p>
+                  </>
                 ) : (
                   <>
                     <p><strong>Status:</strong> Sold</p>
@@ -472,7 +541,57 @@ export default function SlabsModal() {
     );
   };
 
+  // Group slabs by their bundle name first
   const allSlabs = [...linkedSlabs, ...slabs];
+  
+  // Create a map of bundle names to slabs
+  const slabsByBundle: Record<string, Slab[]> = {};
+  
+  // Group slabs by bundle
+  allSlabs.forEach(slab => {
+    if (!slabsByBundle[slab.bundle]) {
+      slabsByBundle[slab.bundle] = [];
+    }
+    slabsByBundle[slab.bundle].push(slab);
+  });
+  
+  // Order the bundle names naturally (Slab 1, Slab 2, etc.)
+  const orderedBundles = Object.keys(slabsByBundle).sort((a, b) => {
+    // Extract numbers from bundle names if they exist
+    const aMatch = a.match(/(\d+)/);
+    const bMatch = b.match(/(\d+)/);
+    
+    if (aMatch && bMatch) {
+      const aNum = parseInt(aMatch[0], 10);
+      const bNum = parseInt(bMatch[0], 10);
+      if (aNum !== bNum) {
+        return aNum - bNum;
+      }
+    }
+    
+    // Fallback to string comparison
+    return a.localeCompare(b);
+  });
+  
+  // Create final ordered list
+  const sortedSlabs: Slab[] = [];
+  
+  // For each bundle, add all slabs with that bundle name
+  orderedBundles.forEach(bundle => {
+    const bundleSlabs = slabsByBundle[bundle];
+    
+    // Within a bundle group, place parents first, then children
+    const parents = bundleSlabs.filter(slab => slab.parent_id === null);
+    const children = bundleSlabs.filter(slab => slab.parent_id !== null);
+    
+    // Add parents first
+    sortedSlabs.push(...parents);
+    
+    // Then add children
+    sortedSlabs.push(...children);
+  });
+  
+  const uniqueSlabs = sortedSlabs;
 
   return (
     <Dialog
@@ -483,10 +602,10 @@ export default function SlabsModal() {
         <DialogTitle>Slabs for {stone.name}</DialogTitle>
 
         <div className="flex flex-col gap-4">
-          {allSlabs.length === 0 ? (
+          {uniqueSlabs.length === 0 ? (
             <p className="text-center text-gray-500">No Slabs available</p>
           ) : (
-            allSlabs.map(renderSlabItem)
+            uniqueSlabs.map(renderSlabItem)
           )}
         </div>
 

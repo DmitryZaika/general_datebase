@@ -89,7 +89,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         s.cancelled_date,
         s.installed_date,
         GROUP_CONCAT(DISTINCT st.name) as stone_name,
-        ROUND(SUM(si.square_feet), 2) as sf,
+        s.square_feet as sf,
         GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'))) as bundle_with_cut,
         MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) as all_cut,
         MAX(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as any_cut,
@@ -220,6 +220,15 @@ const transactionColumns: ColumnDef<Transaction>[] = [
     },
   },
   {
+    accessorKey: "sf",
+    header: ({ column }) => <SortableHeader column={column} title="Sqft" />,
+    cell: ({ row }) => {
+      return row.original.sf ? 
+        <span>{row.original.sf}</span> : 
+        <span>N/A</span>;
+    },
+  },
+  {
     accessorKey: "bundle",
     header: ({ column }) => <SortableHeader column={column} title="Bundle" />,
     cell: ({ row }) => {
@@ -250,11 +259,6 @@ const transactionColumns: ColumnDef<Transaction>[] = [
         </div>
       );
     },
-  },
-  {
-    accessorKey: "sf",
-    header: ({ column }) => <SortableHeader column={column} title="SF" />,
-    cell: ({ row }) => row.original.sf ? `${row.original.sf}` : "N/A",
   },
   {
     accessorKey: "status",
