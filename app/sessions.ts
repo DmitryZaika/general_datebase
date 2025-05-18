@@ -6,8 +6,8 @@ type SessionData = {
   qboRealmId: string;
   qboAccessToken: string;
   qboRefreshToken: string;
-  expires: number;
-  refreshExpires: number;
+  qboAccessExpires: number;
+  qboRefreshExpires: number;
 }
 
 type SessionFlashData = {
