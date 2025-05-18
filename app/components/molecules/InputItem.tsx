@@ -10,9 +10,10 @@ interface InputItemProps {
   className?: string;
   formClassName?: string;
   inputAutoFocus?: boolean;
+  ref?: React.Ref<HTMLInputElement>;
 }
 
-export const InputItem = ({
+export const InputItem = forwardRef<HTMLInputElement, InputItemProps>(({
   name,
   placeholder,
   field,
@@ -20,7 +21,7 @@ export const InputItem = ({
   className,
   formClassName,
   inputAutoFocus,
-}: InputItemProps) => {
+}: InputItemProps, ref) => {
   return (
     <FormItem className={formClassName}>
       {name && <FormLabel>{name}</FormLabel>}
@@ -30,12 +31,13 @@ export const InputItem = ({
           type={type}
           placeholder={placeholder}
           autoFocus={inputAutoFocus}
+          ref={ref}
           {...field}
         />
       </FormControl>
       <FormMessage />
     </FormItem>
   );
-};
+});
 
 InputItem.displayName = "InputItem";

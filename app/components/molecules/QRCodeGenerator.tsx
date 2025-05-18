@@ -117,57 +117,111 @@ export function simplePrintQRCode(url: string, title?: string) {
   const titleText = title || 'QR Code';
   const encodedUrl = encodeURIComponent(url);
   
+  const hasCustomLayout = title?.includes('<div');
+  
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
       <head>
-        <title>${titleText}</title>
+        <title>${!hasCustomLayout ? titleText : 'QR Code'}</title>
         <style>
+          @page {
+            size: auto;
+            margin: 0mm;
+          }
+          html, body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+          }
           body {
+            width: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
           }
           .qr-container {
+            margin: 0;
+            padding: 0;
             text-align: center;
+            font-size: 10pt;
           }
           .qr-title {
-            margin-bottom: 15px;
-            font-size: 18px;
+            margin-bottom: 5px;
+            font-size: 12pt;
             font-weight: bold;
           }
           .qr-url {
-            margin-top: 15px;
-            font-size: 12px;
+            margin-top: 5px;
+            font-size: 8pt;
             word-break: break-all;
-            max-width: 300px;
+            max-width: 1in;
             text-align: center;
           }
+          .custom-layout {
+            width: 1in;
+            height: 1in;
+            border: 1px solid #ddd;
+            overflow: hidden;
+            padding: 0;
+            margin: 0 auto;
+            font-size: 7pt;
+            box-sizing: border-box;
+          }
+          .custom-layout img {
+            width: 0.6in;
+            height: 0.6in;
+            margin: 0;
+            padding: 0;
+          }
+          img.qr-standard {
+            width: 1in;
+            height: 1in;
+          }
           @media print {
+            @page {
+              size: 1.2in 1.2in;
+              margin: 0.1in;
+            }
             body {
-              height: auto;
+              width: 1in;
+              height: 1in;
+            }
+            .custom-layout {
+              transform-origin: top left;
+              transform: scale(1);
             }
           }
         </style>
       </head>
       <body>
         <div class="qr-container">
-          ${title ? `<div class="qr-title">${title}</div>` : ''}
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodedUrl}" alt="QR Code" style="max-width: 100%; height: auto;">
-          <div class="qr-url">${url}</div>
+          ${hasCustomLayout ? 
+            `<div class="custom-layout">
+              ${title}
+             </div>` 
+            : 
+            `${title ? `<div class="qr-title">${title}</div>` : ''}
+             <img class="qr-standard" src="https://api.qrserver.com/v1/create-qr-code/?size=96x96&data=${encodedUrl}" alt="QR Code">
+             <div class="qr-url">${url}</div>`
+          }
         </div>
         <script>
           window.onload = function() {
+            // If custom layout, replace first div with QR code image
+            ${hasCustomLayout ? 
+              `const layoutDiv = document.querySelector('.custom-layout > div > div:first-child');
+               if (layoutDiv) {
+                 layoutDiv.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=96x96&data=${encodedUrl}" alt="QR Code" style="width:0.6in; height:0.6in;">';
+               }` 
+              : ''
+            }
+            
             setTimeout(function() {
               window.print();
               window.close();
-            }, 500); // даем больше времени для загрузки изображения
+            }, 500);
           };
         </script>
       </body>
