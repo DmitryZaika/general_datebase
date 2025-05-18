@@ -159,7 +159,6 @@ export async function queryQboCustomers(accessToken: string, realmId: string, wh
 
 export async function getQboCompanyInformation(accessToken: string, realmId: string): Promise<object | number> {
   const prefix = process.env.QBO_ENV === "production" ? "" : "sandbox-";
-  console.log({ accessToken, realmId })
   const url = `https://${prefix}quickbooks.api.intuit.com/v3/company/${realmId}/companyinfo/${realmId}?minorversion=75`;
   const res = await fetch(url, {
     headers: {
