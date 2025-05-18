@@ -139,13 +139,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const addAnother = formData.get("addAnother") === "true";
   const noLeftovers = formData.get("noLeftovers") === "true";
   
-  if (!noLeftovers && (isNaN(length) || isNaN(width) || length <= 0 || width <= 0)) {
-    const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Error", "Please provide valid dimensions"));
-    return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleIdNum}/cut/${slabIdNum}${searchString}`, {
-      headers: { "Set-Cookie": await commitSession(session) }
-    });
-  }
+  // Set noLeftovers to true if dimensions are missing or invalid
+  const hasValidDimensions = !isNaN(length) && !isNaN(width) && length > 0 && width > 0;
+  const effectiveNoLeftovers = !hasValidDimensions || noLeftovers;
   
   try {    
     const slabResult = await selectId<SlabDetailsWithUrl>(
@@ -169,7 +165,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     
     let insertId = null;
-    if (!noLeftovers) {
+    if (!effectiveNoLeftovers) {
       const [insertResult] = await db.execute<RowDataPacket[] & { insertId: number }>(
         `INSERT INTO slab_inventory 
         (stone_id, bundle, length, width, parent_id, sale_id, url) 
@@ -191,9 +187,26 @@ export async function action({ request, params }: ActionFunctionArgs) {
         await db.execute(
           `UPDATE slab_inventory 
            SET sale_id = NULL, notes = NULL 
-           WHERE parent_id = ? AND id != ?`,
+           WHERE parent_id = ? AND id != ? AND sale_id IS NULL`,
           [slabIdNum, insertId]
         );
+      }
+      
+      // Check if there are any child slabs with sale_id that need fixing
+      const [childSlabs] = await db.execute<RowDataPacket[]>(
+        `SELECT id, sale_id FROM slab_inventory 
+         WHERE parent_id = ? AND sale_id IS NOT NULL AND id != ?`,
+        [slabIdNum, insertId]
+      );
+      
+      // Log for debugging purposes
+      console.log(`Found ${childSlabs.length} child slabs with sales that need to be preserved`);
+      
+      // Ensure we don't clear sale_id for sold child slabs
+      if (childSlabs && childSlabs.length > 0) {
+        for (const childSlab of childSlabs) {
+          console.log(`Preserving sale_id ${childSlab.sale_id} for child slab ${childSlab.id}`);
+        }
       }
     }
     
@@ -212,7 +225,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     );
     
     const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Success", noLeftovers ? "Slab marked as cut with no leftovers" : "Slab cut successfully"));
+    session.flash("message", toastData("Success", effectiveNoLeftovers ? "Slab marked as cut with no leftovers" : "Slab cut successfully"));
 
     if (remainingSlabsCount === 0) {
       return redirect(`/employee/stones${searchString}`, {
@@ -220,7 +233,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       });
     }
 
-    if (addAnother && !noLeftovers) {
+    if (addAnother && !effectiveNoLeftovers) {
       return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleIdNum}/cut/${slabIdNum}${searchString}`, {
         headers: { "Set-Cookie": await commitSession(session) }
       });
@@ -257,52 +270,32 @@ export default function CutSlab() {
   const isSubmitting = useNavigation().state !== "idle";
   const formRef = useRef<HTMLFormElement>(null);
   const location = useLocation();
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [addAnotherValue, setAddAnotherValue] = useState(false);
   
+  // Auto-submit form when component mounts
   useEffect(() => {
-    if (!isSubmitting && formRef.current) {
-      formRef.current.reset();
+    if (formRef.current && !isSubmitting) {
+      // Use a simple form submit approach
+      try {
+        const form = formRef.current;
+        // We need to ensure the hidden fields are set before submitting
+        const noLeftoversInput = form.querySelector('input[name="noLeftovers"]') as HTMLInputElement;
+        const addAnotherInput = form.querySelector('input[name="addAnother"]') as HTMLInputElement;
+        
+        if (noLeftoversInput) noLeftoversInput.value = "true";
+        if (addAnotherInput) addAnotherInput.value = "false";
+        
+        // Directly submit the form
+        form.submit();
+      } catch (error) {
+        console.error("Error auto-submitting form:", error);
+        // Fallback: redirect back to the edit page
+        navigate(`/employee/stones/slabs/${stoneId}/edit/${saleId}${location.search}`);
+      }
     }
-  }, [isSubmitting]);
+  }, [stoneId, saleId, location.search, navigate, isSubmitting]);
   
   const handleDialogClose = () => {
     navigate(`/employee/stones/slabs/${stoneId}/edit/${saleId}${location.search}`);
-  };
-  
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    const form = e.currentTarget;
-    const addAnother = form.querySelector('button[name="addAnother"][value="true"]') === document.activeElement;
-    
-    setAddAnotherValue(addAnother);
-    
-    const length = parseFloat((form.elements.namedItem('length') as HTMLInputElement)?.value || '');
-    const width = parseFloat((form.elements.namedItem('width') as HTMLInputElement)?.value || '');
-    
-    if (isNaN(length) || isNaN(width) || length <= 0 || width <= 0) {
-      e.preventDefault();
-      setShowConfirmDialog(true);
-      return;
-    }
-  };
-  
-  const handleConfirmNoLeftovers = () => {
-    if (formRef.current) {
-      const noLeftoversInput = document.createElement('input');
-      noLeftoversInput.type = 'hidden';
-      noLeftoversInput.name = 'noLeftovers';
-      noLeftoversInput.value = 'true';
-      
-      const addAnotherInput = document.createElement('input');
-      addAnotherInput.type = 'hidden';
-      addAnotherInput.name = 'addAnother';
-      addAnotherInput.value = addAnotherValue ? 'true' : 'false';
-      
-      formRef.current.appendChild(noLeftoversInput);
-      formRef.current.appendChild(addAnotherInput);
-      formRef.current.submit();
-    }
-    setShowConfirmDialog(false);
   };
   
   const isAlreadyCut = slab?.cut_date !== null;
@@ -310,7 +303,7 @@ export default function CutSlab() {
   return (
     <>
       <Dialog
-        open={true}
+        open={false}
         onOpenChange={(open) => {
           if (!open) handleDialogClose();
         }}
@@ -327,48 +320,12 @@ export default function CutSlab() {
             )}
           </DialogHeader>
           
-          <Form method="post" className="space-y-4" ref={formRef} onSubmit={handleSubmit}>
+          <Form method="post" ref={formRef}>
             <AuthenticityTokenInput />
             
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Enter the dimensions of the piece you're cutting off. This will create a new slab piece with the specified dimensions.
-              </p>
-              
-              <p className="text-xs text-gray-500">
-                • <strong>Save</strong>: Creates one piece with the entered dimensions and returns to the edit page.<br />
-                • <strong>Add Piece</strong>: Creates a piece and allows you to add more pieces.<br />
-                • Leave dimensions empty if there are no leftovers.
-              </p>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Length
-                  </label>
-                  <input
-                    type="number"
-                    name="length"
-                    step="1"
-                    min="0"
-                    className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Width
-                  </label>
-                  <input
-                    type="number"
-                    name="width"
-                    step="1"
-                    min="0"
-                    className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-              </div>
-            </div>
+            {/* Hidden inputs for auto cut */}
+            <input type="hidden" name="noLeftovers" value="true" />
+            <input type="hidden" name="addAnother" value="false" />
             
             <DialogFooter className="pt-3 border-t border-gray-200 space-x-2">
               <Button 
@@ -381,17 +338,6 @@ export default function CutSlab() {
                 Cancel
               </Button>
               
-              <Button
-                type="submit"
-                name="addAnother"
-                value="true"
-                variant="default"
-                disabled={isSubmitting}
-                className="text-sm font-medium"
-              >
-                Add Piece {isAlreadyCut ? "(again)" : ""}
-              </Button>
-              
               <LoadingButton 
                 loading={isSubmitting} 
                 type="submit"
@@ -402,35 +348,6 @@ export default function CutSlab() {
               </LoadingButton>
             </DialogFooter>
           </Form>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent className="bg-white rounded-lg p-6 shadow-lg text-gray-800 max-w-md">
-          <DialogHeader className="mb-4">
-            <DialogTitle className="text-lg font-semibold text-gray-900">
-              Are you sure there are no leftovers?
-            </DialogTitle>
-          </DialogHeader>
-          
-          <p className="text-sm text-gray-600 mb-6">
-            You haven't specified any dimensions for the cut piece. If there are any leftover pieces, they will not be tracked in the system.
-          </p>
-          
-          <DialogFooter className="space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowConfirmDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="default"
-              onClick={handleConfirmNoLeftovers}
-            >
-              Yes, no leftovers
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

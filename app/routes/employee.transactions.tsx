@@ -8,7 +8,7 @@ import { PageLayout } from "~/components/PageLayout";
 import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
 import { Button } from "~/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "~/components/ui/input";
 import { Search, MoreHorizontal, Calendar } from "lucide-react";
 import {
@@ -336,6 +336,8 @@ export default function EmployeeTransactions() {
   const { transactions, currentUser, salesReps, filters } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();  
   const [searchValue, setSearchValue] = useState(filters.search);
+  const [customers, setCustomers] = useState<{id: number, name: string}[]>([]);
+  const [showCustomers, setShowCustomers] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const [installDialogOpen, setInstallDialogOpen] = useState(false);
@@ -344,6 +346,35 @@ export default function EmployeeTransactions() {
     new Date().toISOString().slice(0, 10)
   );
   const [isPaid, setIsPaid] = useState(true);
+  
+  // Fetch customers when search value changes
+  useEffect(() => {
+    // Only search when there's at least 2 characters to avoid excessive API calls
+    if (searchValue.length >= 2) {
+      const fetchCustomers = async () => {
+        try {
+          const response = await fetch('/api/customers/search?term=' + encodeURIComponent(searchValue));
+          if (response.ok) {
+            const data = await response.json();
+            setCustomers(data.customers || []);
+            setShowCustomers(data.customers && data.customers.length > 0);
+          } else {
+            setCustomers([]);
+            setShowCustomers(false);
+          }
+        } catch (error) {
+          console.error('Error fetching customers:', error);
+          setCustomers([]);
+          setShowCustomers(false);
+        }
+      };
+      
+      fetchCustomers();
+    } else {
+      setCustomers([]);
+      setShowCustomers(false);
+    }
+  }, [searchValue]);
   
   const handleSalesRepChange = (value: string) => {
     searchParams.set('salesRep', value);
@@ -359,6 +390,18 @@ export default function EmployeeTransactions() {
     e.preventDefault();
     searchParams.set('search', searchValue);
     setSearchParams(searchParams);
+    setShowCustomers(false);
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchValue(e.target.value);
+  };
+
+  const handleSelectCustomer = (customer: {id: number, name: string}) => {
+    setSearchValue(customer.name);
+    searchParams.set('search', customer.name);
+    setSearchParams(searchParams);
+    setShowCustomers(false);
   };
 
   const handleRowClick = (id: number) => {
@@ -595,13 +638,35 @@ export default function EmployeeTransactions() {
             </div>
           </div>
           <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              placeholder="Search transactions..."
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              className="pl-8 w-64"
-            />
+            <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+                <Input
+                  placeholder="Search transactions..."
+                  value={searchValue}
+                  onChange={handleSearchChange}
+                  className="pl-8 w-64"
+                />
+                {showCustomers && customers.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg">
+                    <ul className="py-1 divide-y divide-gray-200">
+                      {customers.map((customer) => (
+                        <li 
+                          key={customer.id}
+                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => handleSelectCustomer(customer)}
+                        >
+                          {customer.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <Button type="submit" variant="outline" size="sm">
+                Search
+              </Button>
+            </form>
           </div>
         </div>
         <DataTable

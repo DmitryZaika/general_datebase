@@ -10,8 +10,7 @@ import {
   useFetcher,
   Outlet,
   useLocation,
-  Params,
-  data
+  Params
 } from "react-router";
 import { getEmployeeUser } from "~/utils/session.server";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
@@ -34,7 +33,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
-import { csrf } from "~/utils/csrf.server";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
 import {
   Tabs,
@@ -44,6 +42,11 @@ import {
 } from "~/components/ui/tabs";
 import React, { useState, useEffect } from "react";
 import { coerceNumberRequired } from "~/schemas/general";
+import { AuthenticityTokenInput } from "remix-utils/csrf/react";
+import { csrf } from "~/utils/csrf.server";
+import { Switch } from "~/components/ui/switch";
+import { Label } from "~/components/ui/label";
+
 interface SaleDetails {
   id: number;
   customer_id: number;
@@ -64,6 +67,8 @@ interface SaleSlab {
   cut_date: string | null;
   notes: string | null;
   square_feet: number | null;
+  has_children?: boolean;
+  child_count?: number;
 }
 
 interface SaleSink {
@@ -88,6 +93,7 @@ interface Customer {
 const slabSchema = z.object({
   notes: z.string().optional(),
   square_feet: z.coerce.number().optional(),
+  full_slab_sold: z.boolean().optional(),
 })
 
 type SlabFormData = z.infer<typeof slabSchema>;
@@ -122,7 +128,8 @@ const saleInfoSchema = z.object({
   seller_id: z.coerce.number().min(1, "Seller is required"),
   notes: z.string().optional(),
   total_square_feet: coerceNumberRequired,
-  price: coerceNumberRequired
+  price: coerceNumberRequired,
+  sale_date: z.string().min(1, "Sale date is required")
 });
 
 type SaleInfoFormData = z.infer<typeof saleInfoSchema>;
@@ -188,6 +195,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     [saleId]
   );
   
+  // Проверяем наличие дочерних слебов для каждого слеба
+  for (const slab of slabs) {
+    const [childSlabsResult] = await db.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) as count FROM slab_inventory WHERE parent_id = ?`,
+      [slab.id]
+    );
+    
+    const childCount = childSlabsResult[0].count;
+    slab.has_children = childCount > 0;
+    slab.child_count = childCount;
+  }
+  
   const sinks = await selectMany<SaleSink>(
     db,
     `SELECT 
@@ -232,7 +251,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request);
-  
   if (!params.saleId) {
     return forceRedirectError(request.headers, "No sale ID provided");
   }
@@ -252,6 +270,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   
   try {
+    await csrf.validate(request);
   } catch (error) {
     console.error("CSRF validation error:", error);
     return { error: "Invalid CSRF token" };
@@ -260,7 +279,45 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
   
+  // Add a new intent for cutting slabs directly
+  if (intent === "cut-slab") {
+    const slabId = Number(formData.get("slabId"));
+    
+    if (isNaN(slabId)) {
+      return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleId}?error=Invalid+slab+ID`);
+    }
+    
+    // Update the slab's cut_date
+    await db.execute(
+      `UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`,
+      [slabId]
+    );
+    
+    // Check if there are any uncut slabs remaining
+    const [remainingSlabsResult] = await db.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) as count FROM slab_inventory 
+       WHERE sale_id = ? AND cut_date IS NULL`,
+      [saleId]
+    );
+    
+    const remainingSlabsCount = remainingSlabsResult[0].count;
+    const cutType = remainingSlabsCount > 0 ? "partially cut" : "cut";
+    
+    await db.execute(
+      `UPDATE sales SET status = ? WHERE id = ?`,
+      [cutType, saleId]
+    );
+    
+    const session = await getSession(request.headers.get("Cookie"));
+    session.flash("message", toastData("Success", "Slab marked as cut"));
+    
+    // Return redirect instead of json
+    return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleId}${new URL(request.url).search}`, {
+      headers: { "Set-Cookie": await commitSession(session) }
+    });
+  }
   
+  // Original action code continues below
   try {
     if (intent === "sale-unsell") {
    
@@ -346,6 +403,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const seller_id = parseInt(formData.get("seller_id") as string, 10);
       const notes = formData.get("notes") as string;
       const total_square_feet = parseFloat(formData.get("total_square_feet") as string) || 0;
+      const sale_date = formData.get("sale_date") as string;
       
       const rawPriceValue = formData.get("price");
       console.log("[DEBUG] Raw price value:", rawPriceValue, "type:", typeof rawPriceValue);
@@ -367,6 +425,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         notes, 
         total_square_feet,
         price,
+        sale_date,
         rawPrice: rawPriceValue,
         priceType: typeof price
       });
@@ -398,12 +457,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
         
         if (price === null) {
           // Если цена null, установим NULL в базе данных
-          updateQuery = `UPDATE sales SET seller_id = ?, notes = ?, square_feet = ?, price = NULL WHERE id = ?`;
-          updateParams = [seller_id, notes || null, total_square_feet, saleId];
+          updateQuery = `UPDATE sales SET seller_id = ?, notes = ?, square_feet = ?, price = NULL, sale_date = ? WHERE id = ?`;
+          updateParams = [seller_id, notes || null, total_square_feet, sale_date, saleId];
         } else {
           // Иначе установим числовое значение
-          updateQuery = `UPDATE sales SET seller_id = ?, notes = ?, square_feet = ?, price = ? WHERE id = ?`;
-          updateParams = [seller_id, notes || null, total_square_feet, price, saleId];
+          updateQuery = `UPDATE sales SET seller_id = ?, notes = ?, square_feet = ?, price = ?, sale_date = ? WHERE id = ?`;
+          updateParams = [seller_id, notes || null, total_square_feet, price, sale_date, saleId];
         }
         
         console.log("[DEBUG] Update query:", updateQuery);
@@ -414,8 +473,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const session = await getSession(request.headers.get("Cookie"));
         session.flash("message", toastData("Success", "Sale information updated successfully"));
         
-        return data({ success: true }, {
-          headers: { "Set-Cookie": await commitSession(session) },
+        return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleId}`, {
+          headers: { "Set-Cookie": await commitSession(session) }
         });
       } catch (dbError) {
         console.error("[DB ERROR] Failed to update sale:", dbError);
@@ -423,8 +482,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const session = await getSession(request.headers.get("Cookie"));
         session.flash("message", toastData("Error", "Failed to update sale information: " + (dbError as Error).message, "destructive"));
         
-        return data({ success: false, error: (dbError as Error).message || "Database error" }, {
-          headers: { "Set-Cookie": await commitSession(session) },
+        return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleId}`, {
+          headers: { "Set-Cookie": await commitSession(session) }
         });
       }
     } else if (intent === "create-customer") {
@@ -453,8 +512,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const session = await getSession(request.headers.get("Cookie"));
       session.flash("message", toastData("Success", "Customer created and assigned to sale"));
       
-      return data({ success: true, customer_id: customerId, customer_name }, {
-        headers: { "Set-Cookie": await commitSession(session) },
+      return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleId}`, {
+        headers: { "Set-Cookie": await commitSession(session) }
       });
     } else if (intent === "select-customer") {
       const customerId = formData.get("customer_id") as string;
@@ -483,8 +542,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const session = await getSession(request.headers.get("Cookie"));
       session.flash("message", toastData("Success", "Customer assigned to sale"));
       
-      return data({ success: true, customer_id: parseInt(customerId), customer_name: customers[0].name }, {
-        headers: { "Set-Cookie": await commitSession(session) },
+      return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleId}`, {
+        headers: { "Set-Cookie": await commitSession(session) }
       });
     } else if (intent == "slab-delete") {
       const slabId = formData.get("id") as string;
@@ -496,11 +555,81 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const slabId = formData.get("id") as string;
       const notes = formData.get("notes") as string;
       const squareFeet = parseFloat(formData.get("square_feet") as string) || null;
+      const fullSlabSold = formData.get("full_slab_sold") === "true";
       
+      // Обновляем сам слеб
       await db.execute(
         `UPDATE slab_inventory SET notes = ?, square_feet = ? WHERE id = ?`,
         [notes || null, squareFeet, slabId]
       );
+      
+      let message = "Slab updated successfully";
+      
+      // Сначала получаем информацию о всех дочерних слебах
+      const [childSlabs] = await db.execute<RowDataPacket[]>(
+        `SELECT id, sale_id FROM slab_inventory WHERE parent_id = ?`,
+        [slabId]
+      );
+      
+      // Get information about the current slab
+      const [slabInfo] = await db.execute<RowDataPacket[]>(
+        `SELECT stone_id, bundle, square_feet FROM slab_inventory WHERE id = ?`,
+        [slabId]
+      );
+      
+      const stoneId = slabInfo[0]?.stone_id;
+      const bundle = slabInfo[0]?.bundle;
+      const parentSquareFeet = slabInfo[0]?.square_feet || 0;
+      
+      if (fullSlabSold) {
+        // If fullSlabSold is true, delete unsold child slabs
+        if (childSlabs && childSlabs.length > 0) {
+          console.log(`Found ${childSlabs.length} child slabs for parent ID ${slabId}`);
+          
+          // Подсчитываем, сколько дочерних слебов можно удалить (не имеют sale_id)
+          const deleteableSlabs = childSlabs.filter(
+            s => s.sale_id === null || s.sale_id === 0
+          ).length;
+          
+          // Удаляем только те дочерние слебы, у которых нет sale_id (не проданы)
+          const [deleteResult] = await db.execute<ResultSetHeader>(
+            `DELETE FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0)`,
+            [slabId]
+          );
+          
+          console.log(`Deleted ${deleteResult.affectedRows} child slabs without sale_id for parent ID ${slabId}`);
+          
+          if (deleteResult.affectedRows > 0) {
+            message = `Slab updated and ${deleteResult.affectedRows} unsold child ${
+              deleteResult.affectedRows === 1 ? 'piece was' : 'pieces were'
+            } removed`;
+          }
+        }
+      } else {
+        // If fullSlabSold is false, check if we need to create a child slab
+        const hasUnsoldChildSlabs = childSlabs && childSlabs.some(s => s.sale_id === null || s.sale_id === 0);
+        
+        if (!hasUnsoldChildSlabs) {
+          // Calculate a smaller square footage for the child piece (e.g., 60% of parent)
+          const childSquareFeet = parentSquareFeet > 0 ? Math.round(parentSquareFeet * 0.6 * 100) / 100 : null;
+          
+          // Create a new child slab
+          await db.execute(
+            `INSERT INTO slab_inventory (stone_id, bundle, parent_id, square_feet) 
+             VALUES (?, ?, ?, ?)`,
+            [stoneId, bundle, slabId, childSquareFeet]
+          );
+          
+          message = "Slab updated and a new child piece was created";
+        }
+      }
+      
+      const session = await getSession(request.headers.get("Cookie"));
+      session.flash("message", toastData("Success", message));
+      
+      return redirect(`/employee/stones/slabs/${stoneId}/edit/${saleId}${new URL(request.url).search}`, {
+        headers: { "Set-Cookie": await commitSession(session) }
+      });
     } else if (intent == "sink-delete") {
       const sinkId = formData.get("id") as string;
       await db.execute(
@@ -552,8 +681,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     
     session.flash("message", toastData("Success", "Sale updated successfully"));
     
-    return data({ success: true }, {
-      headers: { "Set-Cookie": await commitSession(session) },
+    return redirect(`/employee/stones/slabs/${params.stone}/edit/${saleId}`, {
+      headers: { "Set-Cookie": await commitSession(session) }
     });
     
   } catch (error) {
@@ -562,51 +691,87 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const session = await getSession(request.headers.get("Cookie"));
     session.flash("message", toastData("Error", "Failed to update sale", "destructive"));
     
-    return data({ success: false }, {
-      headers: { "Set-Cookie": await commitSession(session) },
+    return redirect(`/employee/stones/slabs/${params.stone}/edit/${saleId}`, {
+      headers: { "Set-Cookie": await commitSession(session) }
     });
   } 
 }
 
 function SlabEdit({ slab }: { slab: SaleSlab }) {
+  const [fullSlabSold, setFullSlabSold] = useState(!slab.has_children);
   const form = useForm<SlabFormData>({
     resolver: slabsResolver,
     defaultValues: {
       notes: slab.notes || "",
       square_feet: slab.square_feet || 0,
+      full_slab_sold: !slab.has_children,
     },
   });
+  
   return (
     <FormProvider {...form}>
-      <Form id="customerForm" method="post" className="flex items-center gap-2">
+      <Form id={`slabForm_${slab.id}`} method="post">
         <input type="hidden" name="id" value={slab.id} />
         <input type="hidden" name="intent" value="slab-update" />
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <InputItem 
-              name="Notes to Slab" 
-              placeholder="Notes for this specific slab"
-              field={field} 
+        <AuthenticityTokenInput />
+        
+        <div className="flex items-center gap-2">
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <InputItem 
+                name="Notes to Slab" 
+                placeholder="Notes for this specific slab"
+                field={field}
+                className="flex-grow"
+              />
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="square_feet"
+            render={({ field }) => (
+              <InputItem 
+                name="Square Feet" 
+                placeholder="Sqft"
+                field={field} 
+                type="number"
+                className="w-25"
+              />
+            )}
+          />
+          
+          <div className="flex flex-col">
+            <FormField
+              control={form.control}
+              name="full_slab_sold"
+              render={({ field }) => (
+                <div className="flex items-center gap-1 mt-6">
+                  <Switch
+                    id={`full_slab_sold_${slab.id}`}
+                    checked={field.value}
+                    onCheckedChange={(checked) => {
+                      field.onChange(checked);
+                      setFullSlabSold(checked);
+                    }}
+                  />
+                  <Label 
+                    htmlFor={`full_slab_sold_${slab.id}`} 
+                    className="text-xs font-medium text-gray-700 whitespace-nowrap ml-2"
+                  >
+                    Full Slab sold
+                  </Label>
+                </div>
+              )}
             />
-          )}
+          </div>
+        </div>
+        <input 
+          type="hidden" 
+          name="full_slab_sold" 
+          value={fullSlabSold ? "true" : "false"} 
         />
-        <FormField
-          control={form.control}
-          name="square_feet"
-          render={({ field }) => (
-            <InputItem 
-              name="Square Feet" 
-              placeholder="Square feet"
-              field={field} 
-              type="number"
-            />
-          )}
-        />
-        <LoadingButton type="submit" loading={form.formState.isSubmitting}>
-          Save
-        </LoadingButton>
       </Form>
     </FormProvider>
   )
@@ -625,6 +790,7 @@ function SinkEdit({ sink }: { sink: SaleSink }) {
       <Form method="post" className="flex items-center gap-2 -mb-6">
         <input type="hidden" name="id" value={sink.id} />
         <input type="hidden" name="intent" value="sink-update" />
+        <AuthenticityTokenInput />
         <FormField
           control={form.control}
           name="price"
@@ -653,6 +819,7 @@ function SinkAdd({ availableSinks }: { availableSinks: Sink[] }) {
     <FormProvider {...form}>
       <Form method="post">
         <input type="hidden" name="intent" value="sink-add" />
+        <AuthenticityTokenInput />
         <div className="grid grid-cols-6 gap-2">
           <div className="col-span-3">
             <FormField
@@ -735,6 +902,7 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
       notes: sale.notes || "",
       total_square_feet: sale.square_feet || 0,
       price: sale.price || undefined,
+      sale_date: new Date(sale.sale_date).toISOString().split('T')[0]
     },
   });
   
@@ -744,11 +912,18 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
     
     const formData = new FormData();
     formData.append("intent", "sale-info-update");
-    formData.append("customer_name", formValues.customer_name);
+    formData.append("customer_name", String(formValues.customer_name));
     formData.append("seller_id", String(formValues.seller_id));
     formData.append("notes", formValues.notes || "");
     formData.append("total_square_feet", String(formValues.total_square_feet || 0));
     formData.append("price", String(formValues.price));
+    formData.append("sale_date", formValues.sale_date);
+    
+    // Add CSRF token from hidden input
+    const csrfToken = document.querySelector('input[name="csrf"]')?.getAttribute('value');
+    if (csrfToken) {
+      formData.append("csrf", csrfToken);
+    }
     
     fetcher.submit(formData, { method: "post" });
   };
@@ -800,6 +975,7 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
       <FormProvider {...saleInfoForm}>
         <Form method="post">
           <input type="hidden" name="intent" value="sale-info-update" />
+          <AuthenticityTokenInput />
           
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 flex gap-2">
@@ -857,10 +1033,20 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
                 />
               </div>
               <div className="w-1/5">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
-                <div className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner">
-                  {new Date(sale.sale_date).toLocaleDateString()}
-                </div>
+                <FormField
+                  control={saleInfoForm.control}
+                  name="sale_date"
+                  render={({ field }) => (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Sale Date</label>
+                      <input
+                        {...field}
+                        type="date"
+                        className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  )}
+                />
               </div>
             </div>
             
@@ -959,6 +1145,7 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
             
             <Form method="post">
               <input type="hidden" name="intent" value="sale-unsell" />
+              <AuthenticityTokenInput />
               <Button 
                 type="submit"
                 variant="destructive"
@@ -1032,6 +1219,7 @@ export default function EditSale() {
   const location = useLocation();
   
   const navigation = useNavigation();
+  const fetcher = useFetcher();
   
   useEffect(() => {
     if (navigation.state === "loading" || navigation.state === "idle") {
@@ -1040,6 +1228,14 @@ export default function EditSale() {
     }
   }, [navigation.state]);
   
+  // Refresh the page when the fetcher completes
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data?.success) {
+      // Refresh the data
+      window.location.reload();
+    }
+  }, [fetcher.state, fetcher.data]);
+
   const handleDialogClose = (open: boolean) => {
     if (!open) {
       setDeleteSlabId(null);
@@ -1056,7 +1252,6 @@ export default function EditSale() {
   const hasSingleSlab = slabs.length === 1;
   
   const formattedDate = new Date(sale.sale_date).toLocaleDateString();
-  const fetcher = useFetcher();
   const isSubmittingFetched = useNavigation().state !== "idle" || fetcher.state !== "idle";
   
   return (
@@ -1095,7 +1290,26 @@ export default function EditSale() {
                     <div className="flex justify-between">
                       <span className="font-medium text-sm text-gray-800">{slab.stone_name} - {slab.bundle}</span>
                       
-                      <Button variant="destructive" disabled={hasSingleSlab} onClick={() => setDeleteSlabId(slab.id)}>Delete</Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          type="button" 
+                          onClick={() => {
+                            const form = document.getElementById(`slabForm_${slab.id}`) as HTMLFormElement;
+                            if (form) {
+                              // Ensure CSRF token is present in the form before submitting
+                              const csrf = document.querySelector('input[name="csrf"]');
+                              if (csrf && !form.querySelector('input[name="csrf"]')) {
+                                const csrfInput = csrf.cloneNode(true);
+                                form.appendChild(csrfInput);
+                              }
+                              form.submit();
+                            }
+                          }}
+                        >
+                          Save
+                        </Button>
+                        <Button variant="destructive" disabled={hasSingleSlab} onClick={() => setDeleteSlabId(slab.id)}>Delete</Button>
+                      </div>
                       {deleteSlabId === slab.id && (
                         <DeleteRow 
                           handleChange={handleDialogClose}
@@ -1109,11 +1323,20 @@ export default function EditSale() {
                     
                     <div className="flex items-center">
                       <SlabEdit slab={slab}/>
-                      <Link to={`cut/${slab.id}/${location.search}`}>
-                        <Button className="ml-2" variant="blue">
-                          Cut Slab
+                      {!slab.cut_date ? (
+                        <fetcher.Form method="post" className="ml-auto">
+                          <AuthenticityTokenInput />
+                          <input type="hidden" name="intent" value="cut-slab" />
+                          <input type="hidden" name="slabId" value={slab.id} />
+                          <Button type="submit" variant="blue">
+                            Cut Slab
+                          </Button>
+                        </fetcher.Form>
+                      ) : (
+                        <Button className="ml-auto" variant="blue" disabled>
+                          Already Cut
                         </Button>
-                      </Link>
+                      )}
                     </div>
                   </div>
                 ))}

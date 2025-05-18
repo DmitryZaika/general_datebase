@@ -490,7 +490,7 @@ export default function SlabsModal() {
                   <>
                     {slab.parent_id && slab.parent_transaction && (
                       <>
-                        <p><strong>Parent slab sold by:</strong> {slab.parent_transaction.seller_name}</p>
+                        <p><strong>Partially Sold by:</strong> {slab.parent_transaction.seller_name}</p>
                         <div className="mb-1 border-b border-gray-700"></div>
                       </>
                     )}
@@ -523,8 +523,8 @@ export default function SlabsModal() {
                   </>
                 ) : slab.parent_transaction ? (
                   <>
-                    <p><strong>Parent slab sold to:</strong> {slab.parent_transaction.customer_name}</p>
-                    <p><strong>Parent slab sold by:</strong> {slab.parent_transaction.seller_name}</p>
+                    <p><strong>Partially sold to:</strong> {slab.parent_transaction.customer_name}</p>
+                    <p><strong>Partially sold by:</strong> {slab.parent_transaction.seller_name}</p>
                   </>
                 ) : (
                   <>
