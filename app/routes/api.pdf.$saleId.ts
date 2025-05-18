@@ -9,18 +9,27 @@ interface IQuery {
     customer_name: string | null;
     seller_name: string | null;
     sale_date: Date | null;
+    project_address: string | null;
+    phone: string | null;
+    email: string | null;
 }
 
 const QUERY_FORM_MAPPING: Record<keyof IQuery, string> = {
     sale_date: 'Text84',
     seller_name: 'Text85',
-    customer_name: 'Text86'
+    customer_name: 'Text86',
+    project_address: 'Text87',
+    phone: 'Text88',
+    email: 'Text89'
 }
 
 const query = `
     select
         main.sales.sale_date,
+        main.sales.project_address,
         main.customers.name as customer_name,
+        main.customers.phone,
+        main.customers.email,
         main.users.name as seller_name
     from main.sales
     join main.customers on main.customers.id = main.sales.customer_id
