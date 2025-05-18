@@ -17,4 +17,7 @@ export default defineConfig({
       transformMixedEsModules: true,
     },
   },
+  server: {
+     allowedHosts: [".ngrok-free.app"],
+  }
 });
