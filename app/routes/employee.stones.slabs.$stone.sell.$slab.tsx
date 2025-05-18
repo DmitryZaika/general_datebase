@@ -38,6 +38,8 @@ import { Search, X } from "lucide-react";
 import { Input } from "~/components/ui/input";
 import { coerceNumber, coerceNumberRequired, StringOrNumber } from "~/schemas/general";
 import { Switch } from "~/components/ui/switch";
+import { useQuery } from "@tanstack/react-query";
+import { AddressInput } from "~/components/organisms/AddressInput";
 
 interface Sink {
   id: number;
@@ -346,6 +348,7 @@ export default function SlabSell() {
   }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+
   
   const form = useForm<FormData>({
     resolver,
@@ -354,6 +357,7 @@ export default function SlabSell() {
       same_address: true
     }
   });
+
   const fullSubmit = useFullSubmit(form);
 
   // Add state to track disabled fields
@@ -627,21 +631,8 @@ export default function SlabSell() {
                 )}
               />
               
-              <FormField
-                control={form.control}
-                name="billing_address"
-                render={({ field }) => (
-                  <InputItem
-                    name={"Billing Address"}
-                    placeholder={"Enter billing address"}
-                    field={{
-                      ...field,
-                      disabled: disabledFields.billing_address
-                    }}
-                  />
-                )}
-              />
               
+              <AddressInput form={form} field="billing_address" />
               <div className="flex items-center space-x-2 my-2">
                 <FormField
                   control={form.control}
