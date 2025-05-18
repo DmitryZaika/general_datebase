@@ -27,7 +27,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const tokenState = getQboTokenState(session)
   if (tokenState === QboTokenState.ACCESS_VALID) {
     const result = await getQboCompanyInformation(accessToken, realmId);
-    console.log("result", result);
     if (typeof result === 'object') {
       return result
     }

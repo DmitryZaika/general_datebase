@@ -82,7 +82,6 @@ function ChildrenImagesDialog({
     : image?.cost_per_sqft 
       ? `By slab $${image.cost_per_sqft} sqft` 
       : "—";
-      console.log(displayedType);
   return (
     <>
       <div className="w-full relative select-none">
