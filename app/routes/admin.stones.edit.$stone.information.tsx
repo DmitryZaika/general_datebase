@@ -48,9 +48,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     const newFile = data.file && data.file !== "undefined";
     
-    console.log("DEBUG data.file:", data.file);
-    console.log("DEBUG newFile:", newFile);
-    
     const stone = await selectId<{ url: string }>(
       db,
       "SELECT url FROM stones WHERE id = ?",
