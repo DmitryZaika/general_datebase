@@ -23,7 +23,7 @@ export const StringOrNumber = z.union([z.string(), z.number(), z.null()])
 .optional();
 
 export const coerceNumber = z.coerce.number().default(0)
-export const coerceNumberRequired = z.coerce.number().min(1)
+export const coerceNumberRequired = (message: string) => z.coerce.number().min(1, message)
 export const StringBoolV2 = z.preprocess((val) => {
   if (val === undefined) {
     return undefined;

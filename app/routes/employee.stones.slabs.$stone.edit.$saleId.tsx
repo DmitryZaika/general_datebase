@@ -127,8 +127,8 @@ const saleInfoSchema = z.object({
   customer_name: z.string().min(1, "Customer name is required"),
   seller_id: z.coerce.number().min(1, "Seller is required"),
   notes: z.string().optional(),
-  total_square_feet: coerceNumberRequired,
-  price: coerceNumberRequired,
+  total_square_feet: coerceNumberRequired("Please enter the total square footage of the slab"),
+  price: coerceNumberRequired("Please enter the price of the slab"),
   sale_date: z.string().min(1, "Sale date is required")
 });
 
