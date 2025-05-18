@@ -38,6 +38,17 @@ import { Search, X } from "lucide-react";
 import { Input } from "~/components/ui/input";
 import { coerceNumber, coerceNumberRequired, StringOrNumber } from "~/schemas/general";
 import { Switch } from "~/components/ui/switch";
+import { SelectInputOther } from "~/components/molecules/SelectInputOther";
+
+// Добавляем маппинг для преобразования полных названий в сокращения
+const seamNameToCode: Record<string, string> = {
+  "Phantom": "SPH",
+  "Standard": "STD",
+  "Extended": "EXT",
+  "No seam": "NONE!",
+  "European": "EU",
+  "N/A": "N/A"
+};
 
 interface Sink {
   id: number;
@@ -58,7 +69,16 @@ const customerSchema = z.object({
   notes_to_sale: StringOrNumber,
   total_square_feet: coerceNumberRequired("Please enter the total square footage of the slab"),
   price: coerceNumber,
-  is_full_slab_sold: z.boolean().default(false)
+  is_full_slab_sold: z.boolean().default(false),
+  seam: z.string().optional(),
+  edge: z.string().optional(),
+  room: z.string().optional(),
+  backsplash: z.string().optional(),
+  tearout: z.string().optional(),
+  stove: z.string().optional(),
+  ten_year_sealer: z.boolean().default(false),
+  waterfall: z.string().optional(),
+  corbels: z.string().optional()
 });
 
 type FormData = z.infer<typeof customerSchema>;
@@ -85,6 +105,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   );
   if (errors) {
     return { errors, receivedValues };
+  }
+  
+  // Преобразуем значение seam, если оно есть и соответствует одному из полных названий
+  if (data.seam && typeof data.seam === 'string' && seamNameToCode[data.seam]) {
+    data.seam = seamNameToCode[data.seam];
   }
   
   const slabId = params.slab;
@@ -226,21 +251,44 @@ export async function action({ request, params }: ActionFunctionArgs) {
   
     if (data.is_full_slab_sold) {
       await db.execute(
-        `UPDATE slab_inventory SET sale_id = ? WHERE id = ?`,
-        [saleId, slabId]
+        `UPDATE slab_inventory SET sale_id = ?, seam = ?, edge = ?, room = ?, backsplash = ?, tearout = ?, 
+        stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ? WHERE id = ?`,
+        [
+          saleId, 
+          data.seam || null, 
+          data.edge || null,
+          data.room || null,
+          data.backsplash || null,
+          data.tearout || null,
+          data.stove || null,
+          data.ten_year_sealer || false,
+          data.waterfall || null,
+          data.corbels || null,
+          slabId
+        ]
       );
     } else {
       await db.execute<ResultSetHeader>(
         `INSERT INTO slab_inventory 
-         (stone_id, bundle, length, width, url, parent_id) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
+         (stone_id, bundle, length, width, url, parent_id, seam, edge, room, backsplash, tearout, 
+          stove, ten_year_sealer, waterfall, corbels) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           slabDimensions[0].stone_id,
           slabDimensions[0].bundle,
           slabDimensions[0].length,
           slabDimensions[0].width,
           slabDimensions[0].url,
-          slabId
+          slabId,
+          data.seam || null,
+          data.edge || null,
+          data.room || null,
+          data.backsplash || null,
+          data.tearout || null,
+          data.stove || null,
+          data.ten_year_sealer || false,
+          data.waterfall || null,
+          data.corbels || null
         ]
       );
       
@@ -540,7 +588,7 @@ export default function SlabSell() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Sell Slab - Add Customer</DialogTitle>
         </DialogHeader>
@@ -770,7 +818,189 @@ export default function SlabSell() {
                   />
                 )}
               />
-                            
+              
+              <div className="mt-6 mb-2 font-semibold text-sm">Slab Installation Details</div>
+              
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <FormField
+                  control={form.control}
+                  name="edge"
+                  render={({ field }) => (
+                    <SelectInputOther
+                      field={field}
+                      placeholder="Edge"
+                      name="Edge"
+                      className="mb-0"
+                      options={[
+                        { key: "Flat", value: "Flat" },
+                        { key: "Eased", value: "Eased" },
+                        { key: "1/4 Bevel", value: "1/4 Bevel" },
+                        { key: "1/2 Bevel", value: "1/2 Bevel" },
+                        { key: "Bullnose", value: "Bullnose" },
+                        { key: "Ogee", value: "Ogee" }
+                      ]}
+                      defaultValue="Flat"
+                    />
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="room"
+                  render={({ field }) => (
+                    <SelectInputOther
+                      field={field}
+                      placeholder="Room"
+                      name="Room"
+                      className="mb-0"
+                      options={[
+                        { key: "Kitchen", value: "Kitchen" },
+                        { key: "Bathroom", value: "Bathroom" },
+                        { key: "Outdoor", value: "Outdoor" },
+                        { key: "Island", value: "Island" }
+                      ]}
+                      defaultValue="Kitchen"
+                    />
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="backsplash"
+                  render={({ field }) => (
+                    <SelectInputOther
+                      field={field}
+                      placeholder="Backsplash"
+                      name="Backsplash"
+                      className="mb-0"
+                      options={[
+                        { key: "No", value: "No" },
+                        { key: "4 inch", value: "4 inch" },
+                        { key: "Full Height", value: "Full Height" }
+                      ]}
+                      defaultValue="No"
+                    />
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="tearout"
+                  render={({ field }) => (
+                    <SelectInputOther
+                      field={field}
+                      placeholder="Tearout"
+                      name="Tearout"
+                      className="mb-0"
+                      options={[
+                        { key: "No", value: "No" },
+                        { key: "Laminate", value: "Laminate" },
+                        { key: "Stone", value: "Stone" }
+                      ]}
+                      defaultValue="No"
+                    />
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="stove"
+                  render={({ field }) => (
+                    <SelectInputOther
+                      field={field}
+                      placeholder="Stove"
+                      name="Stove"
+                      className="mb-0"
+                      options={[
+                        { key: "F/S", value: "F/S" },
+                        { key: "S/I", value: "S/I" },
+                        { key: "C/T", value: "C/T" },
+                        { key: "Greel", value: "Greel" }
+                      ]}
+                      defaultValue="F/S"
+                    />
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="waterfall"
+                  render={({ field }) => (
+                    <SelectInputOther
+                      field={field}
+                      placeholder="Waterfall"
+                      name="Waterfall"
+                      className="mb-0"
+                      options={[
+                        { key: "No", value: "No" },
+                        { key: "Yes", value: "Yes" }
+                      ]}
+                      defaultValue="No"
+                    />
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="corbels"
+                  render={({ field }) => (
+                    <SelectInputOther
+                      field={field}
+                      placeholder="Corbels"
+                      name="Corbels"
+                      className="mb-0"
+                      options={[
+                        { key: "No", value: "No" }
+                      ]}
+                      defaultValue="No"
+                    />
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="seam"
+                  render={({ field }) => (
+                    <SelectInput
+                      field={field}
+                      placeholder="Seam"
+                      name="Seam"
+                      className="mb-0"
+                      options={[
+                        { key: "Standard", value: "Standard" },
+                        { key: "Phantom", value: "Phantom" },
+                        { key: "Extended", value: "Extended" },
+                        { key: "No seam", value: "No seam" },
+                        { key: "European", value: "European" },
+                        { key: "N/A", value: "N/A" }
+                      ]}
+                    />
+                  )}
+                />
+              </div>
+              
+              <div className="flex items-center space-x-2 mt-4">
+                <FormField
+                  control={form.control}
+                  name="ten_year_sealer"
+                  render={({ field }) => (
+                    <>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        id="ten_year_sealer"
+                      />
+                      <label
+                        htmlFor="ten_year_sealer"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        10-Year Sealer
+                      </label>
+                    </>
+                  )}
+                />
+              </div>
+              
               <div className="flex items-center space-x-2 mt-4">
                 <FormField
                   control={form.control}
