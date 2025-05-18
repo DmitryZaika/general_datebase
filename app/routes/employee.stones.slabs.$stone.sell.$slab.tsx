@@ -48,10 +48,14 @@ interface Sink {
 const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   customer_id: z.coerce.number().optional(),
+  billing_address: z.string().min(10, "Billing address is required"),
+  project_address: z.string().min(10, "Project address is required"),
+  phone: z.string().regex(/^\d{3}-\d{3}-\d{4}$/, "Required format: 317-316-1456"),
+  email: z.string().email("Please enter a valid email"),
   sink_type_id: z.preprocess(val => String(val), z.string().optional()),
   notes_to_slab: StringOrNumber,
   notes_to_sale: StringOrNumber,
-  total_square_feet: coerceNumberRequired,
+  total_square_feet: coerceNumberRequired("Please enter the total square footage of the slab"),
   price: coerceNumber,
   is_full_slab_sold: z.boolean().default(false)
 });
@@ -116,10 +120,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
     } else {
       const [customerResult] = await db.execute<ResultSetHeader>(
-        `INSERT INTO customers (name, company_id) VALUES (?, ?)`,
+        `INSERT INTO customers (name, company_id, phone, email) VALUES (?, ?, ?, ?)`,
         [
           data.name,
-          user.company_id
+          user.company_id,
+          data.phone,
+          data.email 
         ]
       );
       customerId = customerResult.insertId;
@@ -367,7 +373,7 @@ export default function SlabSell() {
   );
 
   // Handle blur event to hide suggestions
-  const handleInputBlur = (e: React.FocusEvent) => {
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     // Small delay to allow clicking on suggestions
     setTimeout(() => {
       if (!suggestionsRef.current?.contains(document.activeElement)) {
@@ -405,7 +411,7 @@ export default function SlabSell() {
                               form.setValue("customer_id", undefined);
                             }
                           },
-                          onBlur: (e) => {
+                          onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
                             field.onBlur();
                             handleInputBlur(e);
                           }
@@ -458,6 +464,45 @@ export default function SlabSell() {
                   <input type="hidden" {...field} />
                 )}
               />
+              
+              <FormField
+                control={form.control}
+                name="project_address"
+                render={({ field }) => (
+                  <InputItem
+                    name={"Project Address"}
+                    placeholder={"Enter project address"}
+                    field={field}
+                  />
+                )}
+              />
+              
+              <div className="flex flex-row gap-2">
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <InputItem
+                      name={"Phone Number"}
+                      placeholder={"317-316-1456"}
+                      field={field}
+                      formClassName="mb-0 w-1/2"
+                    />
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <InputItem
+                      name={"Email"}
+                      placeholder={"Colin@gmail.com"}
+                      field={field}
+                      formClassName="mb-0 w-1/2"
+                    />
+                  )}
+                />
+              </div>
               
               <div className="flex flex-row gap-2">
                 <FormField  
