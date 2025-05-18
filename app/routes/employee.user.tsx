@@ -19,6 +19,7 @@ import { RowDataPacket } from "mysql2";
 // @ts-ignore
 import bcrypt from "bcryptjs";
 import { getQboUrl } from "~/utils/quickbooks.server";
+import { useQuery } from "@tanstack/react-query";
 
 const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -34,6 +35,15 @@ interface UserData extends RowDataPacket {
   name: string | null;
   email: string | null;
   phone_number: string | null;
+}
+
+async function getCompanyInfo(): Promise<object> {
+  const result = await fetch('/api/quickbooks/company-info')
+  const data = await result.json()
+  if (data.success === false) {
+    throw new Error("Failed to fetch company information");
+  }
+  return data
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -116,6 +126,11 @@ export default function UserProfile() {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
   const token = useAuthenticityToken();
+
+  const { data, isLoading} = useQuery({ 
+    queryKey: ['qbo', 'companyInfo'], 
+    queryFn: getCompanyInfo, 
+  })
   
   const form = useForm<FormData>({
     resolver,
@@ -128,13 +143,17 @@ export default function UserProfile() {
   });
 
   const fullSubmit = useFullSubmit(form);
+  console.log(data)
 
   return (
     <div className="container  py-5">
       <h1 className="text-2xl  font-bold mb-6 ml-3">My Account</h1>
       <div className="bg-card  rounded-lg shadow p-6 w-full">
         <h2 className="text-xl font-semibold mb-4">Personal Information</h2>
-        <Button asChild><a href={quickBooksUrl}>Authorize Quickbooks</a></Button>
+
+        {data ? <p>Logged into: {data.CompanyInfo.CompanyName}</p> : (
+          <Button asChild><a href={quickBooksUrl}>Authorize Quickbooks</a></Button>
+        )}
         <FormProvider {...form}>
           <Form method="post" onSubmit={fullSubmit}>
             <input type="hidden" name="csrf" value={token} />

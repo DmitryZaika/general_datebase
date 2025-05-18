@@ -82,9 +82,9 @@ export async function getQboToken(request: Request, companyId: number): Promise<
     return raw.getJson()
   }
 
-export async function refreshQboToken(request: Request, companyId: number): Promise<TokenSet> {
+export async function refreshQboToken(request: Request, companyId: number, refreshToken: string): Promise<TokenSet> {
   const oauthClient = await getOauthClient(request, companyId);
-  const raw = await oauthClient.refresh()
+  const raw = await oauthClient.refreshUsingToken(refreshToken)
   return raw.getJson()
 }
 
@@ -93,11 +93,52 @@ export function setQboSession(session: RemixSession, qboToken: TokenSet) {
   session.set('sessionId', session.get('sessionId') ?? crypto.randomUUID());
   session.set('qboAccessToken', qboToken.access_token);
   session.set('qboRefreshToken', qboToken.refresh_token);
-  session.set('expires', qboToken.expires_in + now);
-  session.set('refreshExpires', qboToken.x_refresh_token_expires_in + now);
+  session.set('qboAccessExpires', qboToken.expires_in + now);
+  session.set('qboRefreshExpires', qboToken.x_refresh_token_expires_in + now);
 }
 
-export async function queryQboCustomers(whereClause?: string, select = "*") {
+export function clearQboSession(session: RemixSession): RemixSession {
+  const keys = [
+    "qboAccessToken",
+    "qboRefreshToken",
+    "qboAccessExpires",
+    "qboRefreshExpires",
+  ] as const;
+
+  keys.forEach((key) => session.unset(key));
+
+  return session;
+}
+
+export enum QboTokenState {
+  ACCESS_VALID  = "ACCESS_VALID",   // access‑токен ещё жив
+  REFRESH_VALID = "REFRESH_VALID",  // access умер, но refresh ещё жив
+  INVALID       = "INVALID",        // оба истекли или отсутствуют
+}
+
+export function getQboTokenState(
+  session: RemixSession,
+  safetyGap = 60,           // секундный буфер
+): QboTokenState {
+  const now = Math.floor(Date.now() / 1000);
+
+  const accessToken      = session.get("qboAccessToken")     as string | undefined;
+  const accessExpiresAt  = session.get("qboAccessExpires")   as number | undefined;
+  const refreshToken     = session.get("qboRefreshToken")    as string | undefined;
+  const refreshExpiresAt = session.get("qboRefreshExpires")  as number | undefined;
+
+  const accessValid =
+    !!accessToken && !!accessExpiresAt && now < accessExpiresAt - safetyGap;
+  if (accessValid) return QboTokenState.ACCESS_VALID;
+
+  const refreshValid =
+    !!refreshToken && !!refreshExpiresAt && now < refreshExpiresAt - safetyGap;
+  if (refreshValid) return QboTokenState.REFRESH_VALID;
+
+  return QboTokenState.INVALID;
+}
+
+export async function queryQboCustomers(accessToken: string, realmId: string, whereClause?: string, select = "*") {
   const where = whereClause ? ` WHERE ${whereClause}` : "";
   const q = encodeURIComponent(`select ${select} from Customer${where}`);
   const url = `https://quickbooks.api.intuit.com/v3/company/${realmId}/query?query=${q}&minorversion=70`;
@@ -114,4 +155,21 @@ export async function queryQboCustomers(whereClause?: string, select = "*") {
   }
   const js = await res.json();
   return js.QueryResponse?.Customer ?? [];
+}
+
+export async function getQboCompanyInformation(accessToken: string, realmId: string): Promise<object | number> {
+  const prefix = process.env.QBO_ENV === "production" ? "" : "sandbox-";
+  console.log({ accessToken, realmId })
+  const url = `https://${prefix}quickbooks.api.intuit.com/v3/company/${realmId}/companyinfo/${realmId}?minorversion=75`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept:        "application/json",
+    },
+  });
+  if (!res.ok) {
+    console.error("Error fetching company information:", await res.text());
+    return res.status;
+  }
+  return await res.json();
 }
