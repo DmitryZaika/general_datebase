@@ -143,7 +143,6 @@ export default function UserProfile() {
   });
 
   const fullSubmit = useFullSubmit(form);
-  console.log(data)
 
   return (
     <div className="container  py-5">
