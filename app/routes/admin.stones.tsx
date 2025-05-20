@@ -1,6 +1,6 @@
 //// filepath: c:\Users\sarah\general_datebase\app\routes\admin.stones.tsx
 import { LoaderFunctionArgs, Outlet } from "react-router";
-import { useLoaderData, Link, useSearchParams, useNavigation, useLocation } from "react-router";
+import { useLoaderData, Link, useSearchParams, useNavigation, useLocation, useNavigate } from "react-router";
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { getAdminUser } from "~/utils/session.server";
 import { stoneQueryBuilder } from "~/utils/queries";
@@ -51,11 +51,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 function StoneTable({ stones }: { stones: Stone[] }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
   const getEditUrl = (stoneId: number) => {
     const currentParams = new URLSearchParams(searchParams);
     return `edit/${stoneId}/information?${currentParams.toString()}`;
+  };
+  
+  const handleRowClick = (stoneId: number) => {
+    // Use a relative path for Remix navigation
+    const navigationPath = `${stoneId}${location.search}`;
+    console.log(`Table view navigating to: ${navigationPath}`);
+    navigate(navigationPath);
   };
   
   const columns: ColumnDef<Stone>[] = [
@@ -67,7 +75,7 @@ function StoneTable({ stones }: { stones: Stone[] }) {
         const isOutOfStock = stone.available === 0;
         
         return (
-          <div className="w-12 h-12 overflow-hidden relative">
+          <div className="w-12 h-12 overflow-hidden relative cursor-pointer">
             <img 
               src={stone.url || "/placeholder.png"} 
               alt={stone.name} 
@@ -87,11 +95,20 @@ function StoneTable({ stones }: { stones: Stone[] }) {
     {
       accessorKey: "name",
       header: ({ column }) => <SortableHeader column={column} title="Name" />,
+      cell: ({ row }) => (
+        <div className="font-medium">
+          {row.original.name}
+        </div>
+      )
     },
     {
       accessorKey: "type",
       header: ({ column }) => <SortableHeader column={column} title="Type" />,
-      cell: ({ row }) => capitalizeFirstLetter(row.original.type)
+      cell: ({ row }) => (
+        <div>
+          {capitalizeFirstLetter(row.original.type)}
+        </div>
+      )
     },
     {
       accessorFn: (row) => {
@@ -105,29 +122,50 @@ function StoneTable({ stones }: { stones: Stone[] }) {
         const stone = row.original;
         const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
         const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
-        return `${displayedLength} × ${displayedWidth}`;
+        return (
+          <div>
+            {`${displayedLength} × ${displayedWidth}`}
+          </div>
+        );
       }
     },
     {
       accessorKey: "available",
       header: ({ column }) => <SortableHeader column={column} title="Available" />,
+      cell: ({ row }) => (
+        <div>
+          {row.original.available}
+        </div>
+      )
     },
     {
       accessorKey: "amount",
       header: ({ column }) => <SortableHeader column={column} title="Amount" />,
-      cell: ({ row }) => row.original.amount || "—"
+      cell: ({ row }) => (
+        <div>
+          {row.original.amount || "—"}
+        </div>
+      )
     },
     {
       accessorFn: (row) => row.retail_price || 0,
       id: "retailPrice",
       header: ({ column }) => <SortableHeader column={column} title="Retail Price" />,
-      cell: ({ row }) => row.original.retail_price ? `$${row.original.retail_price}` : "—"
+      cell: ({ row }) => (
+        <div>
+          {row.original.retail_price ? `$${row.original.retail_price}` : "—"}
+        </div>
+      )
     },
     {
       accessorFn: (row) => row.cost_per_sqft || 0,
       id: "costPerSqft",
       header: ({ column }) => <SortableHeader column={column} title="Cost per Sqft" />,
-      cell: ({ row }) => row.original.cost_per_sqft ? `$${row.original.cost_per_sqft}` : "—"
+      cell: ({ row }) => (
+        <div>
+          {row.original.cost_per_sqft ? `$${row.original.cost_per_sqft}` : "—"}
+        </div>
+      )
     },
     {
       id: "actions",
@@ -152,7 +190,9 @@ function StoneTable({ stones }: { stones: Stone[] }) {
       columns={columns} 
       data={stones.map(stone => ({
         ...stone,
-        className: `hover:bg-gray-50 cursor-pointer ${stone.is_display ? '' : 'opacity-60'}`
+        className: `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200 
+                   hover:shadow-md ${stone.is_display ? '' : 'opacity-60'}`,
+        onClick: () => handleRowClick(stone.id)
       }))} 
     />
   );
@@ -160,12 +200,16 @@ function StoneTable({ stones }: { stones: Stone[] }) {
 
 export default function AdminStones() {
   const { stones } = useLoaderData<typeof loader>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigation = useNavigation();
+  const navigate = useNavigate();
   const [isAddingStone, setIsAddingStone] = useState(false);
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones);
   const location = useLocation();
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  
+  // Получаем viewMode из URL или используем "grid" по умолчанию
+  const initialViewMode = searchParams.get("viewMode") as ViewMode || "grid";
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
 
   useEffect(() => {
     const inStock = stones.filter(stone => Number(stone.available) > 0 && Boolean(stone.is_display));
@@ -199,7 +243,15 @@ export default function AdminStones() {
   };
   
   const toggleViewMode = () => {
-    setViewMode(viewMode === "grid" ? "table" : "grid");
+    const newViewMode = viewMode === "grid" ? "table" : "grid";
+    
+    // Обновить состояние
+    setViewMode(newViewMode);
+    
+    // Обновить URL параметры
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("viewMode", newViewMode);
+    setSearchParams(newParams);
   };
 
   return (
@@ -240,13 +292,18 @@ export default function AdminStones() {
                 stone.width && stone.width > 0 ? stone.width : "—";
               const displayedLength =
                 stone.length && stone.length > 0 ? stone.length : "—";
+              
+              const handleGridItemClick = () => {
+                navigate(`${stone.id}${location.search}`);
+              };
 
               return (
                 <div id={`stone-${stone.id}`} key={stone.id} className="relative w-full module-item">
                   <div
-                    className={`border-2 border-blue-500 rounded ${
+                    className={`border-2 border-blue-500 rounded cursor-pointer hover:shadow-lg transition-all duration-200 ${
                       !stone.is_display ? "opacity-30" : ""
                     }`}
+                    onClick={handleGridItemClick}
                   >
                     <div className="relative">
                       <img

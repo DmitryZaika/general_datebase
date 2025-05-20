@@ -1,5 +1,5 @@
 import { capitalizeFirstLetter } from "~/utils/words";
-import { LoaderFunctionArgs, redirect, Outlet, useLocation, Link } from "react-router";
+import { LoaderFunctionArgs, redirect, Outlet, useLocation, Link, useSearchParams } from "react-router";
 import { useLoaderData, useNavigate } from "react-router";
 import ModuleList from "~/components/ModuleList";
 import { getEmployeeUser } from "~/utils/session.server";
@@ -15,6 +15,7 @@ import { TableIcon, GridIcon } from "@radix-ui/react-icons";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
+import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
 
 type ViewMode = "grid" | "table";
 
@@ -147,8 +148,6 @@ function InteractiveCard({
   stoneType: string;
 }) {
   const displayedAmount = stone.amount > 0 ? stone.amount : "—";
-  const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
-  const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
   const createdDate = new Date(stone.created_date);
   const threeWeeksAgo = new Date();
   threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 30);
@@ -228,9 +227,13 @@ function InteractiveCard({
 
 export default function Stones() {
   const { stones } = useLoaderData<typeof loader>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones);
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  
+  // Получаем viewMode из URL или используем "grid" по умолчанию 
+  const initialViewMode = searchParams.get("viewMode") as ViewMode || "grid";
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
 
   useEffect(() => {
     const inStock = stones.filter(stone => Number(stone.available) > 0 && Boolean(stone.is_display));
@@ -249,7 +252,15 @@ export default function Stones() {
   };
 
   const toggleViewMode = () => {
-    setViewMode(viewMode === "grid" ? "table" : "grid");
+    const newViewMode = viewMode === "grid" ? "table" : "grid";
+    
+    // Обновить состояние
+    setViewMode(newViewMode);
+    
+    // Обновить URL параметры
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("viewMode", newViewMode);
+    setSearchParams(newParams);
   };
 
   return (

@@ -16,7 +16,13 @@ export function cleanParams(
 ): Record<string, unknown> {
   const rawObj: Record<string, unknown> = {};
   for (const [key, val] of searchParams.entries()) {
-    rawObj[key] = JSON.parse(val);
+    try {
+      rawObj[key] = JSON.parse(val);
+    } catch (e) {
+      // Если разбор не удается, сохраняем значение как есть
+      console.warn(`Failed to parse parameter "${key}" with value "${val}"`);
+      rawObj[key] = val;
+    }
   }
   return rawObj;
 }
