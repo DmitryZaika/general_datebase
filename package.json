@@ -113,7 +113,10 @@
     "lightningcss-darwin-arm64": "^1.29.1",
     "lightningcss-linux-x64-gnu": "^1.29.1",
     "@rollup/rollup-win32-x64-msvc": "^4.41.0",
-    "@tailwindcss/oxide-win32-x64-msvc": "4.1.7"
+    "@tailwindcss/oxide-win32-x64-msvc": "4.1.7",
+    "@rollup/rollup-linux-x64-gnu": "^4.41.0",
+    "@tailwindcss/oxide-linux-x64-gnu": "4.1.7"
+   
   },
   "engines": {
     "node": ">=20.0.0"
