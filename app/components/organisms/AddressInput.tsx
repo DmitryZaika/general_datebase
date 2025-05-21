@@ -3,23 +3,33 @@ import { useDebounce } from "use-debounce";
 import {
   Popover,
   PopoverContent,
-  PopoverAnchor,   // ⇦ вместо PopoverTrigger
+  PopoverAnchor, // ⇦ вместо PopoverTrigger
 } from "~/components/ui/popover";
 import { Command, CommandItem, CommandGroup } from "~/components/ui/command";
 import { Input } from "~/components/ui/input";
-import { FormField } from "~/components/ui/form";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "~/components/ui/form";
 import { useState } from "react";
 
-async function completeAddress(q: string): Promise<{ description: { text: string }; place_id: string }[]>{
-  const res = await fetch(`/api/google/address-complete?q=${encodeURIComponent(q)}`);
+async function completeAddress(
+  q: string
+): Promise<{ description: { text: string }; place_id: string }[]> {
+  const res = await fetch(
+    `/api/google/address-complete?q=${encodeURIComponent(q)}`
+  );
   if (!res.ok) throw new Error("Failed to fetch address");
-  const data = await res.json()
-  return data["suggestions"]
+  const data = await res.json();
+  return data["suggestions"];
 }
 
 type Props = {
-  form:  any;
-  field: string;          // имя поля формы
+  form: any;
+  field: string; // имя поля формы
 };
 
 export function AddressInput({ form, field }: Props) {
@@ -30,34 +40,44 @@ export function AddressInput({ form, field }: Props) {
 
   const { data = [], isFetching } = useQuery({
     queryKey: ["google", "address", debounced],
-    queryFn:  () => completeAddress(debounced),
-    enabled:  debounced?.length >= 8,
+    queryFn: () => completeAddress(debounced),
+    enabled: debounced?.length >= 8,
     staleTime: 60_000,
   });
-
-  const shouldOpen = open && data?.length > 0;
 
   return (
     <FormField
       control={form.control}
       name={field}
       render={({ field: rhf }) => (
-        <>
+        <FormItem>
+          <FormLabel>
+            {field === "billing_address"
+              ? "Billing Address"
+              : "Project Address"}
+          </FormLabel>
+          <FormControl>
             <Input
-              placeholder="Enter billing address"
+              placeholder={`Enter ${
+                field === "billing_address" ? "billing" : "project"
+              } address (min 10 characters)`}
               value={rhf.value}
               onChange={(e) => {
                 rhf.onChange(e);
-                setOpen(true);          // показываем список при вводе
+                setOpen(true); // показываем список при вводе
               }}
               onFocus={() => rhf.value && setOpen(true)}
+              onBlur={() => {
+                rhf.onBlur();
+                setTimeout(() => setOpen(false), 200);
+              }}
             />
+          </FormControl>
+          <FormMessage />
 
           {open && (
-            <Command>
-              <CommandGroup
-                heading={isFetching ? "Searching…" : "Suggestions"}
-              >
+            <Command className="mt-1 border rounded-md shadow-md">
+              <CommandGroup heading={isFetching ? "Searching…" : "Suggestions"}>
                 {data.map((s) => (
                   <CommandItem
                     key={s.place_id}
@@ -74,11 +94,9 @@ export function AddressInput({ form, field }: Props) {
                 ))}
               </CommandGroup>
             </Command>
-
           )}
-        </>
+        </FormItem>
       )}
     />
   );
 }
-

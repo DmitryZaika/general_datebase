@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { FieldValues, ControllerRenderProps } from "react-hook-form";
 import {
@@ -12,7 +12,9 @@ import { Input } from "~/components/ui/input";
 
 type Option = { key: string; value: string };
 
-interface SelectInputOtherProps<TFieldValues extends FieldValues = FieldValues> {
+interface SelectInputOtherProps<
+  TFieldValues extends FieldValues = FieldValues
+> {
   name: string;
   placeholder?: string;
   field: ControllerRenderProps<TFieldValues>;
@@ -22,7 +24,9 @@ interface SelectInputOtherProps<TFieldValues extends FieldValues = FieldValues> 
   defaultValue?: string;
 }
 
-export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>({
+export function SelectInputOther<
+  TFieldValues extends FieldValues = FieldValues
+>({
   name,
   field,
   placeholder,
@@ -31,9 +35,12 @@ export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>
   className,
   defaultValue,
 }: SelectInputOtherProps<TFieldValues>) {
-  const [showOtherInput, setShowOtherInput] = useState(false);
+  const [isOtherSelected, setIsOtherSelected] = useState(false);
   const [otherValue, setOtherValue] = useState("");
-  const [selectedValue, setSelectedValue] = useState<string | undefined>(undefined);
+  const [selectedValue, setSelectedValue] = useState<string | undefined>(
+    undefined
+  );
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Convert all option keys to strings
   const cleanOptions: Option[] = options.map((option) => {
@@ -50,16 +57,18 @@ export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>
 
   // Add "Other" option only if it doesn't already exist
   const otherOptionExists = cleanOptions.some(
-    option => option.key.toLowerCase() === 'other' || option.value === 'Other'
+    (option) => option.key.toLowerCase() === "other" || option.value === "Other"
   );
-  
+
   if (!otherOptionExists) {
     cleanOptions.push({ key: "other", value: "Other" });
   }
 
   // Get a display-friendly value from an option by key
   const getDisplayValue = (key: string) => {
-    const option = cleanOptions.find(opt => opt.key.toLowerCase() === key.toLowerCase());
+    const option = cleanOptions.find(
+      (opt) => opt.key.toLowerCase() === key.toLowerCase()
+    );
     return option ? option.value : key;
   };
 
@@ -67,43 +76,58 @@ export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>
   useEffect(() => {
     if (field.value) {
       const valueStr = String(field.value).toLowerCase();
-      const foundOption = cleanOptions.find(opt => opt.key.toLowerCase() === valueStr);
-      
+      const foundOption = cleanOptions.find(
+        (opt) => opt.key.toLowerCase() === valueStr
+      );
+
       if (foundOption) {
         setSelectedValue(foundOption.key);
-      } else if (valueStr !== 'other') {
-        setShowOtherInput(true);
+        setIsOtherSelected(false);
+      } else if (valueStr !== "other") {
+        setIsOtherSelected(true);
         setOtherValue(field.value as string);
-        setSelectedValue('other');
+        setSelectedValue("other");
       }
     } else if (defaultValue && !selectedValue) {
       // Only set from defaultValue if we don't already have a value
       const defaultValueLower = defaultValue.toLowerCase();
-      const foundOption = cleanOptions.find(opt => 
-        opt.key.toLowerCase() === defaultValueLower || 
-        opt.value.toLowerCase() === defaultValueLower
+      const foundOption = cleanOptions.find(
+        (opt) =>
+          opt.key.toLowerCase() === defaultValueLower ||
+          opt.value.toLowerCase() === defaultValueLower
       );
-      
+
       if (foundOption) {
         setSelectedValue(foundOption.key);
+        setIsOtherSelected(false);
         field.onChange(foundOption.key); // Update form value
       } else {
-        setShowOtherInput(true);
+        setIsOtherSelected(true);
         setOtherValue(defaultValue);
-        setSelectedValue('other');
+        setSelectedValue("other");
         field.onChange(defaultValue); // Update form value
       }
     }
   }, [field.value, cleanOptions, defaultValue, field, selectedValue]);
 
+  // Add effect to focus input when "Other" is selected
+  useEffect(() => {
+    if (isOtherSelected && inputRef.current) {
+      // Небольшая задержка, чтобы дать DOM время обновиться
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    }
+  }, [isOtherSelected]);
+
   // Handle value change from dropdown
   const handleValueChange = (value: string) => {
     if (value === "other") {
-      setShowOtherInput(true);
-      setSelectedValue('other');
+      setIsOtherSelected(true);
+      setSelectedValue("other");
       field.onChange(otherValue || "");
     } else {
-      setShowOtherInput(false);
+      setIsOtherSelected(false);
       setSelectedValue(value);
       field.onChange(value);
     }
@@ -117,14 +141,30 @@ export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>
   };
 
   // Determine what to display in the UI
-  const selectDisplayValue = selectedValue || 
+  const selectDisplayValue =
+    selectedValue ||
     (field.value ? String(field.value).toLowerCase() : undefined);
 
   return (
     <FormItem className={className}>
       <FormLabel htmlFor={field.name}>{name}</FormLabel>
       <FormControl>
-        <>
+        {isOtherSelected ? (
+          <Input
+            ref={inputRef}
+            placeholder="Enter custom value"
+            value={otherValue}
+            onChange={handleOtherChange}
+            disabled={disabled}
+            onBlur={() => {
+              if (!otherValue.trim()) {
+                setIsOtherSelected(false);
+                setSelectedValue(cleanOptions[0]?.key || "");
+                field.onChange(cleanOptions[0]?.key || "");
+              }
+            }}
+          />
+        ) : (
           <Select
             value={selectDisplayValue}
             onValueChange={handleValueChange}
@@ -132,8 +172,8 @@ export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>
           >
             <SelectTrigger className="min-w-[150px]">
               <SelectValue placeholder={placeholder}>
-                {selectDisplayValue && selectDisplayValue !== 'other' 
-                  ? getDisplayValue(selectDisplayValue) 
+                {selectDisplayValue
+                  ? getDisplayValue(selectDisplayValue)
                   : placeholder}
               </SelectValue>
             </SelectTrigger>
@@ -145,19 +185,9 @@ export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>
               ))}
             </SelectContent>
           </Select>
-          
-          {showOtherInput && (
-            <Input
-              className="mt-2"
-              placeholder="Enter custom value"
-              value={otherValue}
-              onChange={handleOtherChange}
-              disabled={disabled}
-            />
-          )}
-        </>
+        )}
       </FormControl>
       <FormMessage />
     </FormItem>
   );
-} 
+}
