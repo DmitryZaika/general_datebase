@@ -1,10 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "use-debounce";
-import {
-  Popover,
-  PopoverContent,
-  PopoverAnchor, // ⇦ вместо PopoverTrigger
-} from "~/components/ui/popover";
 import { Command, CommandItem, CommandGroup } from "~/components/ui/command";
 import { Input } from "~/components/ui/input";
 import {
@@ -29,7 +24,7 @@ async function completeAddress(
 
 type Props = {
   form: any;
-  field: string; // имя поля формы
+  field: string;
 };
 
 export function AddressInput({ form, field }: Props) {
