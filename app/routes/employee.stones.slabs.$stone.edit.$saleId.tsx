@@ -327,13 +327,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
         [saleId]
       );
 
-      console.log(`Found ${slabsToUnsell.length} slabs to unsell:`, JSON.stringify(slabsToUnsell));
 
       // Process all slabs that are being unsold
       if (slabsToUnsell && slabsToUnsell.length > 0) {
         for (const slabRow of slabsToUnsell) {
           const parentId = slabRow.id;
-          console.log(`Checking for children of slab ID ${parentId}`);
           
           // Check if this slab has any sold child slabs
           const [soldChildSlabs] = await db.execute<RowDataPacket[]>(
@@ -342,14 +340,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
           );
           
           if (soldChildSlabs && soldChildSlabs.length > 0) {
-            console.log(`Found ${soldChildSlabs.length} sold child slabs for parent ID ${parentId} - will delete parent slab`);
             
             // If this slab has sold children, delete it entirely rather than unselling it
             const [deleteResult] = await db.execute<ResultSetHeader>(
               "DELETE FROM slab_inventory WHERE id = ?",
               [parentId]
             );
-            console.log(`Deleted parent slab ID ${parentId}, leaving sold child slabs as main slabs`);
           } else {
             // Check for unsold child slabs
             const [unsoldChildSlabs] = await db.execute<RowDataPacket[]>(
@@ -357,7 +353,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
               [parentId]
             );
             
-            console.log(`Found ${unsoldChildSlabs.length} unpurchased child slabs for parent ID ${parentId}`);
             
             if (unsoldChildSlabs && unsoldChildSlabs.length > 0) {
               // Delete all unsold child slabs of this parent
@@ -365,7 +360,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
                 "DELETE FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0)",
                 [parentId]
               );
-              console.log(`Deleted ${result.affectedRows} unpurchased child slabs of parent ID ${parentId}`);
             }
           }
         }
@@ -406,7 +400,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const sale_date = formData.get("sale_date") as string;
       
       const rawPriceValue = formData.get("price");
-      console.log("[DEBUG] Raw price value:", rawPriceValue, "type:", typeof rawPriceValue);
       
       // Пробуем несколько подходов для безопасного получения значения
       let price = null; // Начинаем с null, чтобы можно было использовать NULL в SQL
@@ -418,17 +411,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
           price = parsedPrice;
         }
       }
-      
-      console.log("[DEBUG] Updating sale with values:", { 
-        customer_name, 
-        seller_id, 
-        notes, 
-        total_square_feet,
-        price,
-        sale_date,
-        rawPrice: rawPriceValue,
-        priceType: typeof price
-      });
       
       if (!customer_name || isNaN(seller_id)) {
         console.error(`[ERROR] Invalid sale info data: customer_name=${customer_name}, seller_id=${seller_id}`);
@@ -449,7 +431,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
           `SELECT price FROM sales WHERE id = ?`,
           [saleId]
         );
-        console.log("[DEBUG] Existing sale data:", existingSale);
         
         // Создадим отдельные запросы для обновления цены и других полей
         let updateQuery;
@@ -465,8 +446,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
           updateParams = [seller_id, notes || null, total_square_feet, price, sale_date, saleId];
         }
         
-        console.log("[DEBUG] Update query:", updateQuery);
-        console.log("[DEBUG] Update params:", updateParams);
         
         await db.execute(updateQuery, updateParams);
         
@@ -584,7 +563,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (fullSlabSold) {
         // If fullSlabSold is true, delete unsold child slabs
         if (childSlabs && childSlabs.length > 0) {
-          console.log(`Found ${childSlabs.length} child slabs for parent ID ${slabId}`);
           
           // Подсчитываем, сколько дочерних слебов можно удалить (не имеют sale_id)
           const deleteableSlabs = childSlabs.filter(
@@ -597,7 +575,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
             [slabId]
           );
           
-          console.log(`Deleted ${deleteResult.affectedRows} child slabs without sale_id for parent ID ${slabId}`);
           
           if (deleteResult.affectedRows > 0) {
             message = `Slab updated and ${deleteResult.affectedRows} unsold child ${
@@ -908,7 +885,6 @@ function SaleInfoEdit({ sale, sellers }: { sale: SaleDetails, sellers: {id: numb
   
   const handleFormSubmit = () => {
     const formValues = saleInfoForm.getValues();
-    console.log("[DEBUG] Form values on submit:", formValues);
     
     const formData = new FormData();
     formData.append("intent", "sale-info-update");

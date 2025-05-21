@@ -21,12 +21,12 @@ interface Support {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  let user;
   try {
-    await getEmployeeUser(request);
+    user = await getEmployeeUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  const user = await getEmployeeUser(request);
   const supports = await selectMany<Support>(
     db,
     "select id, name, url from supports WHERE company_id = ?",
