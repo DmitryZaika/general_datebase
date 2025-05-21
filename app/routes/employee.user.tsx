@@ -18,6 +18,8 @@ import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { RowDataPacket } from "mysql2";
 // @ts-ignore
 import bcrypt from "bcryptjs";
+import { getQboUrl } from "~/utils/quickbooks.server";
+import { useQuery } from "@tanstack/react-query";
 
 const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -33,6 +35,15 @@ interface UserData extends RowDataPacket {
   name: string | null;
   email: string | null;
   phone_number: string | null;
+}
+
+async function getCompanyInfo(): Promise<object> {
+  const result = await fetch('/api/quickbooks/company-info')
+  const data = await result.json()
+  if (data.success === false) {
+    throw new Error("Failed to fetch company information");
+  }
+  return data
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -87,10 +98,14 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const cookieHeader = request.headers.get('Cookie');
+  const session = await getSession(cookieHeader);
+
+  let user, rows
   try {
-    const user = await getEmployeeUser(request);
+    user = await getEmployeeUser(request);
     
-    const [rows] = await db.query<UserData[]>(
+    [rows] = await db.query<UserData[]>(
       `SELECT name, email, phone_number FROM users WHERE id = ?`,
       [user.id]
     );
@@ -99,17 +114,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
       throw new Error("User not found");
     }
     
-    return { userData: rows[0] };
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+  const quickBooksUrl = await getQboUrl(request, user.company_id);
+  return { userData: rows[0], quickBooksUrl };
 }
 
 export default function UserProfile() {
-  const { userData } = useLoaderData<typeof loader>();
+  const { userData, quickBooksUrl } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
   const token = useAuthenticityToken();
+
+  const { data, isLoading} = useQuery({ 
+    queryKey: ['qbo', 'companyInfo'], 
+    queryFn: getCompanyInfo, 
+  })
   
   const form = useForm<FormData>({
     resolver,
@@ -128,6 +149,10 @@ export default function UserProfile() {
       <h1 className="text-2xl  font-bold mb-6 ml-3">My Account</h1>
       <div className="bg-card  rounded-lg shadow p-6 w-full">
         <h2 className="text-xl font-semibold mb-4">Personal Information</h2>
+
+        {data ? <p>Logged into: {data.CompanyInfo.CompanyName}</p> : (
+          <Button asChild><a href={quickBooksUrl}>Authorize Quickbooks</a></Button>
+        )}
         <FormProvider {...form}>
           <Form method="post" onSubmit={fullSubmit}>
             <input type="hidden" name="csrf" value={token} />

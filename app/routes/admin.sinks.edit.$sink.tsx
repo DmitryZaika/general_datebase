@@ -75,7 +75,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { errors };
   }
   const newFile = data.file && data.file !== "undefined";
-  console.log("Data received:", data);
   
   try {
     let oldUrl = null;
@@ -85,7 +84,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         [sinkId]
       );
       oldUrl = oldFileRows[0]?.url;
-      console.log("Old URL before update:", oldUrl);
     }
     
     try {
@@ -107,7 +105,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
             sinkId,
           ],
         );
-        console.log("Updated with new file:", data.file);
       } else {
         await db.execute(
           `UPDATE sink_type

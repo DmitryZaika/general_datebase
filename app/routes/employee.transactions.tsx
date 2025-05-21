@@ -584,6 +584,13 @@ export default function EmployeeTransactions() {
                 >
                   Mark as Installed
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a
+                    href={`/api/pdf/${row.original.id}`}
+                  >
+                    Contract
+                  </a>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
