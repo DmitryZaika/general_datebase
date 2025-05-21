@@ -41,15 +41,11 @@ export const stoneQueryBuilder = async (
     stones.retail_price,
     stones.cost_per_sqft,
     stones.level,
-    COUNT(CASE WHEN slab_inventory.id IS NOT NULL AND (slab_inventory.cut_date IS NULL) THEN 1 ELSE NULL END) AS amount,
-    CAST(SUM(CASE WHEN slab_inventory.id IS NOT NULL AND slab_inventory.sale_id IS NULL AND slab_inventory.cut_date IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available
+    COUNT(DISTINCT CASE WHEN slab_inventory.id IS NOT NULL AND (slab_inventory.cut_date IS NULL) THEN slab_inventory.id ELSE NULL END) AS amount,
+    CAST(SUM(DISTINCT CASE WHEN slab_inventory.id IS NOT NULL AND slab_inventory.sale_id IS NULL AND slab_inventory.cut_date IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM stones
   LEFT JOIN slab_inventory ON slab_inventory.stone_id = stones.id
   `;
-  
-  if (filters.colors && filters.colors.length > 0) {
-    query += `LEFT JOIN stone_colors ON stone_colors.stone_id = stones.id `;
-  }
   
   query += `WHERE stones.company_id = ?`;
   
@@ -68,7 +64,11 @@ export const stoneQueryBuilder = async (
   }
   
   if (filters.colors && filters.colors.length > 0) {
-    query += ` AND stone_colors.color_id IN (${filters.colors.map(() => "?").join(", ")})`;
+    query += ` AND EXISTS (
+      SELECT 1 FROM stone_colors 
+      WHERE stone_colors.stone_id = stones.id 
+      AND stone_colors.color_id IN (${filters.colors.map(() => "?").join(", ")})
+    )`;
     params.push(...filters.colors);
   }
   
