@@ -41,42 +41,46 @@ export const stoneQueryBuilder = async (
     stones.retail_price,
     stones.cost_per_sqft,
     stones.level,
-    COUNT(CASE WHEN slab_inventory.id IS NOT NULL AND (slab_inventory.cut_date IS NULL) THEN 1 ELSE NULL END) AS amount,
-    CAST(SUM(CASE WHEN slab_inventory.id IS NOT NULL AND slab_inventory.sale_id IS NULL AND slab_inventory.cut_date IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available
+    COUNT(DISTINCT slab_inventory.id) AS amount,
+    COUNT(DISTINCT CASE WHEN slab_inventory.sale_id IS NULL THEN slab_inventory.id ELSE NULL END) AS available
   FROM stones
-  LEFT JOIN slab_inventory ON slab_inventory.stone_id = stones.id
+  LEFT JOIN slab_inventory ON slab_inventory.stone_id = stones.id AND slab_inventory.cut_date IS NULL
   `;
-  
+
   if (filters.colors && filters.colors.length > 0) {
     query += `LEFT JOIN stone_colors ON stone_colors.stone_id = stones.id `;
   }
-  
+
   query += `WHERE stones.company_id = ?`;
-  
+
   if (!show_hidden) {
     query += " AND stones.is_display = 1";
   }
-  
+
   if (filters.type && filters.type.length > 0) {
     query += ` AND stones.type IN (${filters.type.map(() => "?").join(", ")})`;
     params.push(...filters.type);
   }
-  
+
   if (filters.supplier > 0) {
     query += " AND stones.supplier_id = ?";
     params.push(filters.supplier);
   }
-  
+
   if (filters.colors && filters.colors.length > 0) {
-    query += ` AND stone_colors.color_id IN (${filters.colors.map(() => "?").join(", ")})`;
+    query += ` AND stone_colors.color_id IN (${filters.colors
+      .map(() => "?")
+      .join(", ")})`;
     params.push(...filters.colors);
   }
-  
+
   if (filters.level && filters.level.length > 0) {
-    query += ` AND stones.level IN (${filters.level.map(() => "?").join(", ")})`;
+    query += ` AND stones.level IN (${filters.level
+      .map(() => "?")
+      .join(", ")})`;
     params.push(...filters.level);
   }
-  
+
   query += `
     GROUP BY
       stones.id,
@@ -109,7 +113,6 @@ export interface Sink {
   supplier_id: number | null;
   retail_price: number | null;
   cost: number | null;
- 
 }
 
 export async function sinkQueryBuilder(
@@ -117,13 +120,15 @@ export async function sinkQueryBuilder(
   companyId: number | string
 ): Promise<Sink[]> {
   const { type, show_sold_out, supplier } = filters;
-  const numericCompanyId = typeof companyId === 'string' ? Number(companyId) : companyId;
-  
-  let whereClause = "WHERE sink_type.company_id = ? AND sink_type.is_deleted = 0";
+  const numericCompanyId =
+    typeof companyId === "string" ? Number(companyId) : companyId;
+
+  let whereClause =
+    "WHERE sink_type.company_id = ? AND sink_type.is_deleted = 0";
   let params: any[] = [numericCompanyId];
 
   if (type && type.length > 0 && type.length < 5) {
-    whereClause += ` AND sink_type.type IN (${type.map(() => '?').join(',')})`;
+    whereClause += ` AND sink_type.type IN (${type.map(() => "?").join(",")})`;
     params.push(...type);
   }
 
@@ -163,6 +168,6 @@ export async function sinkQueryBuilder(
   `;
 
   const sinks = await selectMany<Sink>(db, query, params);
-  
-  return show_sold_out ? sinks : sinks.filter(sink => (sink.amount || 0) > 0);
+
+  return show_sold_out ? sinks : sinks.filter((sink) => (sink.amount || 0) > 0);
 }

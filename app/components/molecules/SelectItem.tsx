@@ -18,6 +18,7 @@ interface SelectInputProps<TFieldValues extends FieldValues = FieldValues> {
   disabled?: boolean;
   options: Array<string | Option>;
   className?: string;
+  defaultValue?: string;
 }
 
 export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
@@ -27,6 +28,7 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
   disabled,
   options,
   className,
+  defaultValue,
 }: SelectInputProps<TFieldValues>) {
   const cleanOptions: Option[] = options.map((option) => {
     if (typeof option === "string") {
@@ -39,6 +41,25 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
       };
     }
   });
+
+  // If there's no value set yet but there is a defaultValue, use it
+  React.useEffect(() => {
+    if (!field.value && defaultValue) {
+      const defaultValueLower = defaultValue.toLowerCase();
+      const foundOption = cleanOptions.find(opt => {
+        const optKey = typeof opt.key === 'string' 
+          ? opt.key.toLowerCase() 
+          : String(opt.key).toLowerCase();
+        
+        return optKey === defaultValueLower || 
+          opt.value.toLowerCase() === defaultValueLower;
+      });
+      
+      if (foundOption) {
+        field.onChange(String(foundOption.key));
+      }
+    }
+  }, [defaultValue, field, cleanOptions]);
 
   const selectValue = String(field.value ?? "");
 
@@ -56,7 +77,7 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
           </SelectTrigger>
           <SelectContent>
             {cleanOptions.map(({ key, value }) => (
-              <SelectItem key={key} value={key}>
+              <SelectItem key={String(key)} value={String(key)}>
                 {value}
               </SelectItem>
             ))}
