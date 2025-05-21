@@ -36,11 +36,15 @@ export const ActionDropdown = ({ actions, asBlank = false, label = "Actions" }: 
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenuLabel>{label}</DropdownMenuLabel>
           {Object.entries(actions).map(([action, link]) => (
-            <DropdownMenuItem key={action} asChild>
-              <Link to={link} target={asBlank ? "_blank" : "_self"}>
+            <DropdownMenuItem key={action} asChild onClick={(e) => e.stopPropagation()}>
+              <Link 
+                to={link} 
+                target={asBlank ? "_blank" : "_self"}
+                onClick={(e) => e.stopPropagation()}
+              >
                 {action.charAt(0).toUpperCase() + action.slice(1)}
               </Link>
             </DropdownMenuItem>
