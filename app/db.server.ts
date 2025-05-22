@@ -7,4 +7,5 @@ const access: PoolOptions = {
   host: process.env.DB_HOST,
 };
 
+console.log(access);
 export const db = mysql.createPool(access);

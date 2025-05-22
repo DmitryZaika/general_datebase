@@ -52,7 +52,7 @@
     "clsx": "^2.1.1",
     "compressorjs": "^1.2.1",
     "crypto-js": "^4.2.0",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.5.2",
     "intuit-oauth": "^4.2.0",
     "isbot": "^5.1.18",
@@ -85,7 +85,7 @@
     "@react-router/dev": "^7.0.0",
     "@tailwindcss/vite": "^4.0.9",
     "@types/mime-types": "^2.1.4",
-    "@types/node": "^22.10.2",
+    "@types/node": "^22.15.21",
     "@types/react": "19.0.10",
     "@types/react-beautiful-dnd": "^13.1.8",
     "@types/react-dom": "19.0.4",
@@ -93,6 +93,7 @@
     "@types/validator": "^13.12.2",
     "@typescript-eslint/eslint-plugin": "^8.18.1",
     "@typescript-eslint/parser": "^8.18.1",
+    "@vitejs/plugin-react": "^4.4.1",
     "eslint": "^9.17.0",
     "eslint-import-resolver-typescript": "^3.7.0",
     "eslint-plugin-import": "^2.31.0",
@@ -103,20 +104,19 @@
     "sequelize-cli": "^6.6.2",
     "tailwindcss": "^4.0.9",
     "typescript": "^5.7.3",
-    "vite": "6.2.0",
+    "vite": "^6.2.0",
     "vite-tsconfig-paths": "^5.1.4"
   },
   "optionalDependencies": {
     "@esbuild/linux-x64": "0.25.0",
     "@rollup/rollup-darwin-arm64": "^4.34.8",
-    "@tailwindcss/oxide-darwin-arm64": "4.0.9",
-    "lightningcss-darwin-arm64": "^1.29.1",
-    "lightningcss-linux-x64-gnu": "^1.29.1",
-    "@rollup/rollup-win32-x64-msvc": "^4.41.0",
-    "@tailwindcss/oxide-win32-x64-msvc": "4.1.7",
     "@rollup/rollup-linux-x64-gnu": "^4.41.0",
-    "@tailwindcss/oxide-linux-x64-gnu": "4.1.7"
-   
+    "@rollup/rollup-win32-x64-msvc": "^4.41.0",
+    "@tailwindcss/oxide-darwin-arm64": "4.0.9",
+    "@tailwindcss/oxide-linux-x64-gnu": "4.1.7",
+    "@tailwindcss/oxide-win32-x64-msvc": "4.1.7",
+    "lightningcss-darwin-arm64": "^1.29.1",
+    "lightningcss-linux-x64-gnu": "^1.29.1"
   },
   "engines": {
     "node": ">=20.0.0"
