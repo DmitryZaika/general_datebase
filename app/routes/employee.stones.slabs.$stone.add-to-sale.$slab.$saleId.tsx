@@ -304,7 +304,8 @@ export default function AddToSale() {
     defaultValues: {
       notes_to_slab: "",
       sink: "",
-      square_feet: "",
+      square_feet: undefined,
+      is_full_slab_sold: false,
     },
   });
 
