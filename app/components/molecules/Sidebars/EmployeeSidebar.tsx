@@ -14,6 +14,7 @@ import {
   ImageIcon,
   Lightbulb,
   Calculator,
+  Receipt,
   User,
   Users
 } from "lucide-react";
@@ -130,6 +131,11 @@ const getItems = (
         title: "Transactions",
         url: `/admin/transactions`,
         icon: DollarSign,
+      },
+      {
+        title: "Invoices",
+        url: `/admin/invoices`,
+        icon: Receipt,
       },
       {
         title: "User Panel",
