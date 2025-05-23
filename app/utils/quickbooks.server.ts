@@ -138,10 +138,77 @@ export function getQboTokenState(
   return QboTokenState.INVALID;
 }
 
-export async function queryQboCustomers(accessToken: string, realmId: string, whereClause?: string, select = "*") {
-  const where = whereClause ? ` WHERE ${whereClause}` : "";
-  const q = encodeURIComponent(`select ${select} from Customer${where}`);
-  const url = `https://quickbooks.api.intuit.com/v3/company/${realmId}/query?query=${q}&minorversion=70`;
+export async function createQboCustomer(
+  accessToken: string,
+  realmId: string,
+  name: string,
+  email: string,
+  phone: string,
+  address: Partial<{
+    Line1: string;
+    Line2: string;
+    City: string;
+    CountrySubDivisionCode: string;
+    PostalCode: string;
+    Country: string;
+  }>,
+) {
+  if (!name) {
+    throw new Error("Нужно указать имя клиента");
+  }
+
+  const body: Record<string, any> = { DisplayName: name };
+
+  body.PrimaryEmailAddr = { Address: email };
+  body.PrimaryPhone = { FreeFormNumber: phone };
+  if (Object.keys(address).length) {
+    body.BillAddr = address;
+  }
+
+  const url = `https://quickbooks.api.intuit.com/v3/company/${realmId}/customer?minorversion=75`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(`QBO customer create failed: ${await res.text()}`);
+  }
+
+  const js = await res.json();
+  return js.Customer;
+}
+
+export async function queryQboCustomersByContact(
+  accessToken: string,
+  realmId: string,
+  email?: string,
+  phone?: string,
+) {
+  if (!email && !phone) {
+    throw new Error("Нужно указать хотя бы email или phone");
+  }
+
+  // экранируем одиночные кавычки
+  const esc = (v: string) => v.replace(/'/g, "''");
+
+  const whereParts: string[] = [];
+  if (email) {
+    whereParts.push(`PrimaryEmailAddr.Address = '${esc(email)}'`);
+  }
+  if (phone) {
+    whereParts.push(`PrimaryPhone.FreeFormNumber = '${esc(phone)}'`);
+  }
+  const whereClause = ` WHERE ${whereParts.join(" AND ")}`;
+
+  const q = encodeURIComponent(`select * from Customer${whereClause}`);
+  const url = `https://quickbooks.api.intuit.com/v3/company/${realmId}/query?query=${q}&minorversion=75`;
 
   const res = await fetch(url, {
     headers: {
@@ -153,6 +220,7 @@ export async function queryQboCustomers(accessToken: string, realmId: string, wh
   if (!res.ok) {
     throw new Error(`QBO customer query failed: ${await res.text()}`);
   }
+
   const js = await res.json();
   return js.QueryResponse?.Customer ?? [];
 }
