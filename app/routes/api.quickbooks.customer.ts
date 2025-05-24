@@ -9,7 +9,6 @@ import { toastData } from "~/utils/toastHelpers";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { searchParams } = new URL(request.url);
   const email = searchParams.get("email") ?? undefined;
-  const phone = searchParams.get("phone") ?? undefined;
   const cookieHeader = request.headers.get('Cookie');
   const session = await getSession(cookieHeader);
   const accessToken = session.get('qboAccessToken');
@@ -29,10 +28,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const tokenState = getQboTokenState(session)
   if (tokenState === QboTokenState.ACCESS_VALID) {
-    const result = await queryQboCustomersByContact(accessToken, realmId, email, phone);
-    if (typeof result === 'object') {
-      return result
-    }
+    const result = await queryQboCustomersByContact(accessToken, realmId, email);
+    return result
   }
   if (tokenState === QboTokenState.INVALID) {
     clearQboSession(session);
@@ -42,9 +39,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
       },
     });
   }
-  const refresh = await refreshQboToken(request, user.company_id, refreshToken); 
+  let refresh
+  try {
+    refresh = await refreshQboToken(request, user.company_id, refreshToken); 
+  } catch (error) {
+    clearQboSession(session);
+    return data({ success: false }, {
+      headers: {
+        'Set-Cookie': await commitSession(session),
+      },
+    });
+    
+  }
   setQboSession(session, refresh);
-  const result = await queryQboCustomersByContact(refresh.access_token, realmId, email, phone);
+  const result = await queryQboCustomersByContact(refresh.access_token, realmId, email);
   if (typeof result === 'number') {
     return data({ success: false })
   }
