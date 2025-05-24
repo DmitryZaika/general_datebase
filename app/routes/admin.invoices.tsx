@@ -1,5 +1,5 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { Link, LoaderFunctionArgs, Outlet, redirect, useLocation } from "react-router";
+import { Link, LoaderFunctionArgs, Outlet, redirect, useLocation, useNavigate } from "react-router";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { useLoaderData } from "react-router";
@@ -81,42 +81,18 @@ const transactionColumns: ColumnDef<Transaction>[] = [
   {
     accessorKey: "customer_name",
     header: ({ column }) => <SortableHeader column={column} title="Customer" />,
-    cell: ({ row }) => {
-      const location = useLocation();
-      return (
-        <Link 
-          to={`edit/${row.original.id}${location.search}`} 
-          className="text-blue-600 hover:underline"
-        >
-          {row.original.customer_name}
-        </Link>
-      );
-    },
+    cell: ({ row }) => row.original.customer_name
   },
   {
     accessorKey: "seller_name",
     header: ({ column }) => <SortableHeader column={column} title="Sold By" />,
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const location = useLocation();
-      return (
-        <ActionDropdown
-          actions={{
-            edit: `edit/${row.original.id}${location.search}`,
-            delete: `delete/${row.original.id}${location.search}`,
-          }}
-        />
-      );
-    },
   },
 ];
 
 export default function AdminTransactions() {
   const { transactions } = useLoaderData<typeof loader>();
   const [searchTerm, setSearchTerm] = useState("");
-  const location = useLocation();
+  let navigate = useNavigate();
 
   const filteredTransactions = transactions.filter(transaction => 
     transaction.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -127,7 +103,10 @@ export default function AdminTransactions() {
       <PageLayout title="Invoices">
         <DataTable 
           columns={transactionColumns} 
-          data={filteredTransactions} 
+          data={filteredTransactions.map(transaction => ({
+            ...transaction,
+            onClick: () => navigate(`${transaction.id}`)
+          }))} 
         />
       </PageLayout>
       <Outlet />
