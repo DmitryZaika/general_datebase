@@ -165,7 +165,8 @@ export async function createQboCustomer(
     body.BillAddr = address;
   }
 
-  const url = `https://quickbooks.api.intuit.com/v3/company/${realmId}/customer?minorversion=75`;
+  const prefix = process.env.QBO_ENV === "production" ? "" : "sandbox-";
+  const url = `https://${prefix}quickbooks.api.intuit.com/v3/company/${realmId}/customer?minorversion=75`;
 
   const res = await fetch(url, {
     method: "POST",
@@ -189,26 +190,18 @@ export async function queryQboCustomersByContact(
   accessToken: string,
   realmId: string,
   email?: string,
-  phone?: string,
 ) {
-  if (!email && !phone) {
+  if (!email) {
     throw new Error("Нужно указать хотя бы email или phone");
   }
 
   // экранируем одиночные кавычки
   const esc = (v: string) => v.replace(/'/g, "''");
 
-  const whereParts: string[] = [];
-  if (email) {
-    whereParts.push(`PrimaryEmailAddr.Address = '${esc(email)}'`);
-  }
-  if (phone) {
-    whereParts.push(`PrimaryPhone.FreeFormNumber = '${esc(phone)}'`);
-  }
-  const whereClause = ` WHERE ${whereParts.join(" AND ")}`;
-
-  const q = encodeURIComponent(`select * from Customer${whereClause}`);
-  const url = `https://quickbooks.api.intuit.com/v3/company/${realmId}/query?query=${q}&minorversion=75`;
+  const query = `select * from Customer WHERE PrimaryEmailAddr = '${esc(email)}'`;
+  const q = encodeURIComponent(query);
+  const prefix = process.env.QBO_ENV === "production" ? "" : "sandbox-";
+  const url = `https://${prefix}quickbooks.api.intuit.com/v3/company/${realmId}/query?query=${q}&minorversion=75`;
 
   const res = await fetch(url, {
     headers: {
@@ -222,7 +215,7 @@ export async function queryQboCustomersByContact(
   }
 
   const js = await res.json();
-  return js.QueryResponse?.Customer ?? [];
+  return js.QueryResponse.Customer || [];
 }
 
 export async function getQboCompanyInformation(accessToken: string, realmId: string): Promise<object | number> {
