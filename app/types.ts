@@ -34,3 +34,17 @@ export interface TokenSet {
   refresh_token: string;
   x_refresh_token_expires_in: number;
 }
+
+export interface StoneSearchResult {
+  id: number;
+  type: string;
+  width: number;
+  length: number;
+  name: string;
+  url: string;
+  retail_price: number;
+  cost_per_sqft: number;
+  available: number;
+  amount: number;
+  is_display: boolean;
+}

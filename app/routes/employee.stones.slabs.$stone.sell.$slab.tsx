@@ -14,7 +14,7 @@ import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
 import { Button } from "~/components/ui/button";
-import { useForm } from "react-hook-form";
+import { useForm, UseFormReturn } from "react-hook-form";
 import {
   Dialog,
   DialogContent,
@@ -36,15 +36,12 @@ import { selectMany } from "~/utils/queryHelpers";
 import { useState, useEffect, useRef } from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "~/components/ui/input";
-import {
-  coerceNumber,
-  coerceNumberRequired,
-  StringOrNumber,
-} from "~/schemas/general";
+import { coerceNumberRequired, StringOrNumber } from "~/schemas/general";
 import { Switch } from "~/components/ui/switch";
 import { SelectInputOther } from "~/components/molecules/SelectInputOther";
-
 import { AddressInput } from "~/components/organisms/AddressInput";
+import { useQuery } from "@tanstack/react-query";
+import { StoneSearchResult } from "~/types";
 
 interface Sink {
   id: number;
@@ -52,41 +49,80 @@ interface Sink {
   type: string;
 }
 
-// Добавляем маппинг для преобразования полных названий в сокращения
-const seamNameToCode: Record<string, string> = {
-  Phantom: "SPH",
-  Standard: "STD",
-  Extended: "EXT",
-  "No seam": "NONE!",
-  European: "EU",
-  "N/A": "N/A",
-};
-
-// Define Room interface
-interface Room {
-  id: string;
-  room: string;
-  sink_type_id?: string;
-  color: string;
-  slab_number: string;
-  edge: string;
-  backsplash: string;
-  total_square_feet: number | null;
-  tear_out: string;
-  stove?: string;
-  waterfall: string;
-  corbels: number;
-  seam: string;
-  ten_year_sealer: boolean;
-  is_full_slab: boolean;
-}
-
-// Add type for room slabs
 interface RoomSlab {
   id: number;
   bundle: string;
   is_full_slab: boolean;
 }
+
+const roomOptions = [
+  { key: "Kitchen", value: "Kitchen" },
+  { key: "Bathroom", value: "Bathroom" },
+  { key: "Outdoor", value: "Outdoor" },
+  { key: "Island", value: "Island" },
+];
+
+const edgeOptions = [
+  { key: "Flat", value: "Flat" },
+  { key: "Eased", value: "Eased" },
+  { key: "1/4 Bevel", value: "1/4 Bevel" },
+  { key: "1/2 Bevel", value: "1/2 Bevel" },
+  { key: "Bullnose", value: "Bullnose" },
+  { key: "Ogee", value: "Ogee" },
+];
+
+const backsplashOptions = [
+  { key: "No", value: "No" },
+  { key: "4 inch", value: "4 inch" },
+  { key: "Full Height", value: "Full Height" },
+];
+
+const tearOutOptions = [
+  { key: "No", value: "No" },
+  { key: "Laminate", value: "Laminate" },
+  { key: "Stone", value: "Stone" },
+];
+
+const stoveOptions = [
+  { key: "F/S", value: "F/S" },
+  { key: "S/I", value: "S/I" },
+  { key: "C/T", value: "C/T" },
+  { key: "Grill", value: "Grill" },
+];
+
+const waterfallOptions = [
+  { key: "No", value: "No" },
+  { key: "Yes", value: "Yes" },
+];
+
+const seamOptions = [
+  { key: "Standard", value: "Standard" },
+  { key: "Phantom", value: "Phantom" },
+  { key: "Extended", value: "Extended" },
+  { key: "No seam", value: "No seam" },
+  { key: "European", value: "European" },
+  { key: "N/A", value: "N/A" },
+];
+
+const slabOptionsSchema = z.object({
+  id: z.coerce.number(),
+  is_full: z.boolean(),
+});
+
+const roomSchema = z.object({
+  room: z.string().default("Kitchen"),
+  sinks: z.array(z.coerce.number()).default([]),
+  edge: z.string().default("Flat"),
+  backsplash: z.string().default("No"),
+  total_square_feet: z.number().default(0),
+  tear_out: z.string().default("No"),
+  stove: z.string().optional(),
+  waterfall: z.string().default("No"),
+  corbels: z.number().default(0),
+  seam: z.string().default("Standard"),
+  ten_year_sealer: z.boolean().default(false),
+  slabs: z.array(slabOptionsSchema).default([]),
+});
 
 const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -98,46 +134,22 @@ const customerSchema = z.object({
     .string()
     .regex(/^\d{3}-\d{3}-\d{4}$/, "Required format: 317-316-1456"),
   email: z.string().email("Please enter a valid email"),
-  sink_type_id: z.preprocess((val) => String(val), z.string()),
-  notes_to_slab: StringOrNumber,
-  notes_to_sale: StringOrNumber,
-  total_square_feet: coerceNumberRequired(
-    "Please enter the total square footage of the slab"
-  ),
   price: coerceNumberRequired("Please Enter Price"),
-  is_full_slab_sold: z.boolean().default(false),
-  seam: z.string(),
-  edge: z.string(),
-  room: z.string(),
-  backsplash: z.string(),
-  tear_out: z.string(),
-  stove: z.string(),
-  ten_year_sealer: z.boolean().default(false),
-  waterfall: z.string(),
-  corbels: z.coerce.number().default(0),
-  additional_slab_id: z.string().optional(),
-  additional_slab_ids: z.array(z.string()).optional(),
-  rooms: z
-    .array(
-      z.object({
-        room: z.string(),
-        sink_type_id: z.string().optional(),
-        color: z.string(),
-        slab_number: z.string(),
-        edge: z.string(),
-        backsplash: z.string(),
-        total_square_feet: z.number(),
-        tear_out: z.string(),
-        stove: z.string().optional(),
-        waterfall: z.string(),
-        corbels: z.number(),
-        seam: z.string(),
-        ten_year_sealer: z.boolean(),
-        is_full_slab: z.boolean(),
-      })
-    )
-    .optional(),
+  notes_to_sale: StringOrNumber,
+
+  rooms: z.array(roomSchema).optional(),
 });
+
+const seamNameToCode: Record<string, string> = {
+  Phantom: "SPH",
+  Standard: "STD",
+  Extended: "EXT",
+  "No seam": "NONE!",
+  European: "EU",
+  "N/A": "N/A",
+};
+
+type Room = z.infer<typeof roomSchema>;
 
 type FormData = z.infer<typeof customerSchema>;
 
@@ -150,13 +162,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-
   try {
     await csrf.validate(request);
   } catch (error) {
     return { error: "Invalid CSRF token" };
   }
-
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
     resolver
@@ -164,7 +174,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors) {
     return { errors, receivedValues };
   }
-
   // Преобразуем значение seam, если оно есть и соответствует одному из полных названий
   if (data.seam && typeof data.seam === "string" && seamNameToCode[data.seam]) {
     data.seam = seamNameToCode[data.seam];
@@ -180,28 +189,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const searchString = searchParams ? `?${searchParams}` : "";
 
   // Get additional slab IDs from already parsed data and fallback to URL params if needed
-  let additionalSlabIds: number[] = [];
+  let slabIds: number[] = [];
 
   // Parse additional slab IDs from the already parsed data
-  if (data.additional_slab_ids) {
-    additionalSlabIds = Array.isArray(data.additional_slab_ids)
-      ? data.additional_slab_ids
-          .map((id) => parseInt(id.toString(), 10))
-          .filter((id) => !isNaN(id))
-      : [];
-  } else if (data.additional_slab_id) {
-    // Single additional slab
-    const id = parseInt(data.additional_slab_id.toString(), 10);
-    if (!isNaN(id)) {
-      additionalSlabIds = [id];
-    }
-  }
 
   // If no additional slabs found in parsed data, try to get from URL search params
-  if (additionalSlabIds.length === 0) {
-    const urlAdditionalSlabs = url.searchParams.getAll("additional_slab_ids");
+  if (slabIds.length === 0) {
+    const urlAdditionalSlabs = url.searchParams.getAll("slab_ids");
     if (urlAdditionalSlabs.length > 0) {
-      additionalSlabIds = urlAdditionalSlabs
+      slabIds = urlAdditionalSlabs
         .map((id) => parseInt(id, 10))
         .filter((id) => !isNaN(id));
     }
@@ -455,22 +451,26 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     // Handle additional slab if selected
-    if (additionalSlabIds && additionalSlabIds.length > 0) {
-      for (const additionalSlabId of additionalSlabIds) {
-        if (!isNaN(additionalSlabId)) {
-          await db.execute(
-            `UPDATE slab_inventory SET sale_id = ? WHERE id = ?`,
-            [saleId, additionalSlabId]
-          );
-        }
-      }
-    } else if (data.additional_slab_id) {
-      const additionalSlabId = parseInt(data.additional_slab_id, 10);
-      if (!isNaN(additionalSlabId)) {
-        await db.execute(`UPDATE slab_inventory SET sale_id = ? WHERE id = ?`, [
-          saleId,
-          additionalSlabId,
-        ]);
+
+    for (const slabId of slabIds) {
+      if (slabId) {
+        await db.execute(
+          `UPDATE slab_inventory SET sale_id = ?, seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, 
+            stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ? WHERE id = ?`,
+          [
+            saleId,
+            data.seam || "Standard",
+            data.edge || "Flat",
+            data.room || "Kitchen",
+            data.backsplash || "No",
+            data.tear_out || "No",
+            data.stove || "F/S",
+            data.ten_year_sealer || false,
+            data.waterfall || "No",
+            data.corbels || 0,
+            slabId,
+          ]
+        );
       }
     }
   } catch (error) {
@@ -589,6 +589,472 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 };
 
+async function getSlabs(
+  stoneId: number,
+  slabId: number
+): Promise<
+  {
+    id: number;
+    bundle: string;
+  }[]
+> {
+  const response = await fetch(
+    `/api/stones/${stoneId}/slabs?exclude=${slabId}&available=true`
+  );
+  if (!response.ok) {
+    throw new Error("Failed to fetch slabs");
+  }
+  const data = await response.json();
+  return data.slabs;
+}
+
+const AddSlabDialog = ({
+  show,
+  setShow,
+  form,
+  stoneId,
+  roomIndex,
+  slabIndex,
+}: {
+  show: boolean;
+  setShow: (show: boolean) => void;
+  form: UseFormReturn<FormData>;
+  stoneId: number | undefined;
+  roomIndex: number;
+  slabIndex: number;
+}) => {
+  const slabId = 5;
+
+  const { data: availableSlabs = [] } = useQuery({
+    queryKey: ["slabs", stoneId, slabId],
+    queryFn: () => getSlabs(stoneId, slabId),
+    enabled: !!stoneId && !!slabId && show,
+  });
+
+  const handleAddSlab = () => {
+    const selectedSlabIds = form.watch(`rooms.${roomIndex}.slab_ids`);
+
+    if (selectedSlabIds) {
+      const selectedSlab = availableSlabs.find(
+        (slab) => slab.id === selectedSlabIds[0]
+      );
+
+      // Check if this slab is already added
+      const isDuplicate = additionalSlabs.some(
+        (slab) => slab.id === Number(selectedSlabId)
+      );
+
+      if (selectedSlab && !isDuplicate) {
+        setAdditionalSlabs([
+          ...additionalSlabs,
+          {
+            id: Number(selectedSlabId),
+            bundle: selectedSlab.bundle,
+            is_full_slab: false,
+          },
+        ]);
+        setShow(false);
+        form.setValue("slab_ids", "");
+      } else if (isDuplicate) {
+        alert("This slab has already been added");
+      }
+    } else {
+      alert("Please select a slab first");
+    }
+  };
+
+  return (
+    <Dialog open={show} onOpenChange={setShow}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Add Slab</DialogTitle>
+        </DialogHeader>
+        <FormProvider {...form}>
+          <div className="space-y-4">
+            {availableSlabs.length === 0 ? (
+              <div className="text-center py-4 text-gray-500">
+                No available slabs found for this stone
+              </div>
+            ) : (
+              <>
+                <FormField
+                  control={form.control}
+                  name={`rooms.${roomIndex}.slabs.${slabIndex}.id`}
+                  render={({ field }) => (
+                    <SelectInput
+                      field={field}
+                      placeholder="Select a slab"
+                      name="Additional Slab"
+                      className="mb-0"
+                      options={availableSlabs.map((slab) => ({
+                        key: String(slab.id),
+                        value: `Bundle ${slab.bundle}`,
+                      }))}
+                    />
+                  )}
+                />
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowAddSlabDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddSlab}
+              disabled={availableSlabs.length === 0}
+            >
+              Add Slab
+            </Button>
+          </DialogFooter>
+        </FormProvider>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const StoneTypeDisplay = ({ stoneType }: { stoneType: string }) => {
+  if (!stoneType) return null;
+
+  return (
+    <>
+      <span
+        className={`ml-2 text-xs px-2 py-1 rounded ${
+          stoneType.toLowerCase() === "quartz"
+            ? "bg-red-100 text-red-800"
+            : "bg-green-100 text-green-800"
+        }`}
+      >
+        {stoneType.charAt(0).toUpperCase() + stoneType.slice(1)}
+      </span>
+    </>
+  );
+};
+
+const fetchAvailableStones = async (query: string = "") => {
+  const response = await fetch(
+    `/api/stones/search?name=${encodeURIComponent(query)}&unsold_only=true`
+  );
+  if (!response.ok) {
+    throw new Error("Failed to fetch slabs");
+  }
+  const data = await response.json();
+  const stones: StoneSearchResult[] = data.stones || [];
+
+  const typeMap: Record<string, string> = {};
+  stones.forEach((stone) => {
+    typeMap[stone.name] = stone.type;
+  });
+
+  return { stoneType: typeMap, stoneSearchResults: stones };
+};
+
+const StoneSearch = ({
+  setStoneId,
+}: {
+  setStoneId: (stoneId: number) => void;
+}) => {
+  const [query, setQuery] = useState("");
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["availableStones", query],
+    queryFn: () => fetchAvailableStones(query),
+    enabled: !!query,
+  });
+
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium">Color</label>
+      <div className="relative">
+        <Input
+          placeholder="Search stone colors..."
+          value={"Stone Name"}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full"
+        />
+        {isLoading && (
+          <div className="absolute right-2 top-2">
+            <div className="animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent"></div>
+          </div>
+        )}
+      </div>
+
+      {/* Stone search results dropdown */}
+      {data?.stoneSearchResults?.length > 0 && (
+        <div className="absolute z-10 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg w-1/2">
+          <ul className="py-1 divide-y divide-gray-200">
+            {data?.stoneSearchResults?.map((stone) => (
+              <li
+                key={stone.id}
+                className="px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                onClick={() => setStoneId(stone.id)}
+              >
+                {stone.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const RoomSubForm = ({
+  form,
+  index,
+  sinks,
+}: {
+  form: UseFormReturn<FormData>;
+  index: number;
+  sinks: Sink[];
+}) => {
+  const [showAddSlabDialog, setShowAddSlabDialog] = useState(false);
+  const [stoneId, setStoneId] = useState<number | null>(null);
+  const stoneType = "Hello";
+  return (
+    <>
+      <div className="mt-6 mb-2 font-semibold text-sm">First Room</div>
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <FormField
+          control={form.control}
+          name={`rooms.${index}.room`}
+          render={({ field }) => (
+            <SelectInputOther
+              field={field}
+              name="Room"
+              className="mb-0"
+              options={roomOptions}
+            />
+          )}
+        />
+
+        <StoneSearch setStoneId={setStoneId} />
+
+        {/* <FormField
+          control={form.control}
+          name={`rooms.${index}.sink_type_id`}
+          render={({ field }) => {
+            return (
+              <SelectInput
+                field={field}
+                name="Sink"
+                className="mb-0"
+                placeholder="Select a Sink"
+                options={sinks.map((sink) => {
+                  return {
+                    key: String(sink.id),
+                    value: sink.name,
+                  };
+                })}
+              />
+            );
+          }}
+        /> */}
+
+        <FormField
+          control={form.control}
+          name={`rooms.${index}.edge`}
+          render={({ field }) => (
+            <SelectInputOther
+              field={field}
+              name="Edge"
+              className="mb-0"
+              options={edgeOptions}
+            />
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name={`rooms.${index}.backsplash`}
+          render={({ field }) => (
+            <SelectInputOther
+              field={field}
+              name="Backsplash"
+              className="mb-0"
+              options={backsplashOptions}
+            />
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name={`rooms.${index}.total_square_feet`}
+          render={({ field }) => (
+            <InputItem
+              name={"Square Feet"}
+              placeholder={"Enter Sqft"}
+              field={field}
+              formClassName="mb-0"
+            />
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name={`rooms.${index}.tear_out`}
+          render={({ field }) => (
+            <SelectInputOther
+              field={field}
+              name="Tear-Out"
+              className="mb-0"
+              options={tearOutOptions}
+            />
+          )}
+        />
+
+        {form.watch(`rooms.${index}.room`) !== "Bathroom" && (
+          <>
+            <FormField
+              control={form.control}
+              name={`rooms.${index}.stove`}
+              render={({ field }) => (
+                <SelectInputOther
+                  field={field}
+                  name="Stove"
+                  className="mb-0"
+                  options={stoveOptions}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name={`rooms.${index}.waterfall`}
+              render={({ field }) => (
+                <SelectInputOther
+                  field={field}
+                  name="Waterfall"
+                  className="mb-0"
+                  options={waterfallOptions}
+                />
+              )}
+            />
+          </>
+        )}
+
+        <FormField
+          control={form.control}
+          name={`rooms.${index}.corbels`}
+          render={({ field }) => (
+            <InputItem
+              name={"Corbels"}
+              placeholder={"Number of corbels"}
+              field={field}
+              formClassName="mb-0"
+            />
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name={`rooms.${index}.seam`}
+          render={({ field }) => (
+            <SelectInputOther
+              field={field}
+              name="Seam"
+              className="mb-0"
+              options={seamOptions}
+            />
+          )}
+        />
+      </div>
+
+      <div className="flex items-center space-x-2 mt-4">
+        <FormField
+          control={form.control}
+          name={`rooms.${index}.ten_year_sealer`}
+          render={({ field }) => (
+            <>
+              <Switch
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                id="ten_year_sealer"
+                disabled={Boolean(stoneType?.toLowerCase() === "quartz")}
+                label="10-Year Sealer"
+              />
+              <StoneTypeDisplay stoneType={stoneType} />
+            </>
+          )}
+        />
+      </div>
+
+      <div className="flex items-center space-x-2 mt-4">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowAddSlabDialog(true)}
+        >
+          Add Slab
+        </Button>
+      </div>
+
+      <div className="mt-2 space-y-2">
+        <h2 className="text-xs text-gray-600">Slabs:</h2>
+        {form.watch(`rooms.${index}.slabs`).map((slab, slabIndex) => (
+          <div
+            key={slab.id}
+            className="flex items-center justify-between bg-gray-50 p-2 rounded-md"
+          >
+            <div className="flex items-center space-x-2">
+              <Switch
+                checked={slab.is_full}
+                onCheckedChange={(checked) => {
+                  setAdditionalSlabs((prev) =>
+                    prev.map((s) =>
+                      s.id === slab.id ? { ...s, is_full: checked } : s
+                    )
+                  );
+                }}
+                id={`additional_slab_${slab.id}`}
+                label="Full Slab Sold"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <div
+                className={`px-2 py-1 rounded-md text-sm ${
+                  slab.is_full
+                    ? "bg-red-100 text-red-800"
+                    : "bg-yellow-100 text-yellow-800"
+                }`}
+              >
+                Bundle {slab.id}
+                {slab.is_full ? "(Full)" : "(Partial)"}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => handleRemoveAdditionalSlab(slab.id)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+            <input type="hidden" name="slab_ids[]" value={slab.id} />
+            <input
+              type="hidden"
+              name={`slab_${slab.id}_is_full`}
+              value={slab.is_full ? "1" : "0"}
+            />
+          </div>
+        ))}
+
+        <AddSlabDialog
+          show={showAddSlabDialog}
+          setShow={setShowAddSlabDialog}
+          roomIndex={index}
+          form={form}
+          stoneId={stoneId || undefined}
+        />
+      </div>
+    </>
+  );
+};
+
 export default function SlabSell() {
   const { sinks, allSales, customers, stoneType, stoneName, bundle, slabId } =
     useLoaderData<typeof loader>();
@@ -614,29 +1080,15 @@ export default function SlabSell() {
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Add state for add slab dialog and available slabs
-  const [showAddSlabDialog, setShowAddSlabDialog] = useState(false);
-  const [availableSlabs, setAvailableSlabs] = useState<
-    { id: number; bundle: string }[]
-  >([]);
+
   const [additionalRooms, setAdditionalRooms] = useState<Room[]>([]);
   const [stoneSearchResults, setStoneSearchResults] = useState<
     Array<{ id: number; name: string }>
   >([]);
-  const [isSearchingStones, setIsSearchingStones] = useState(false);
   const [roomSlabs, setRoomSlabs] = useState<Record<string, RoomSlab[]>>({});
-
-  // Add state for tracking selected additional slabs
-  const [additionalSlabs, setAdditionalSlabs] = useState<
-    {
-      id: number;
-      bundle: string;
-      is_full_slab: boolean;
-    }[]
-  >([]);
 
   const [stoneTypes, setStoneTypes] = useState<Record<string, string>>({});
 
-  // Function to open slab dialog for a specific room
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [showRoomSlabDialog, setShowRoomSlabDialog] = useState(false);
   const [currentRoomStoneId, setCurrentRoomStoneId] = useState<string | null>(
@@ -654,46 +1106,8 @@ export default function SlabSell() {
   >({});
 
   // Function to fetch available stones (those with unsold slabs)
-  const fetchAvailableStones = async (query: string = "") => {
-    setIsSearchingStones(true);
-    try {
-      // Use the search endpoint with the unsold parameter
-      const response = await fetch(
-        `/api/stones/search?name=${encodeURIComponent(query)}&unsold_only=true`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        const stones = data.stones || [];
-
-        // Create a map of stone name to stone type
-        const typeMap: Record<string, string> = {};
-        stones.forEach((stone: { id: number; name: string; type: string }) => {
-          typeMap[stone.name] = stone.type;
-        });
-
-        setStoneTypes((prev) => ({ ...prev, ...typeMap }));
-        setStoneSearchResults(stones);
-      }
-    } catch (error) {
-      console.error("Error searching stones:", error);
-    } finally {
-      setIsSearchingStones(false);
-    }
-  };
 
   // Modified search stones function to use the fetchAvailableStones
-  const searchStones = async (query: string) => {
-    if (!query || query.length < 2) {
-      setStoneSearchResults([]);
-      return;
-    }
-    fetchAvailableStones(query);
-  };
-
-  // Initial load of available stones
-  useEffect(() => {
-    fetchAvailableStones();
-  }, []);
 
   // Function to fetch slabs for a specific stone
   const fetchSlabsForStone = async (stoneName: string, roomId: string) => {
@@ -726,45 +1140,6 @@ export default function SlabSell() {
       console.error("Error fetching slabs for stone:", error);
     }
   };
-
-  // Add useEffect to fetch available slabs when the dialog opens
-  useEffect(() => {
-    if ((showAddSlabDialog || showRoomSlabDialog) && params.stone) {
-      const fetchAvailableSlabs = async () => {
-        try {
-          // Fetch slabs that belong to the same stone type, excluding the current slab
-          const response = await fetch(
-            `/api/stones/${params.stone}/slabs?exclude=${slabId}&available=true`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            setAvailableSlabs(data.slabs || []);
-          } else {
-            console.error("Failed to fetch slabs");
-            // Fallback to fetch all slabs if the API doesn't support the exclude parameter
-            const fallbackResponse = await fetch(
-              `/api/stones/${params.stone}/slabs`
-            );
-            if (fallbackResponse.ok) {
-              const fallbackData = await fallbackResponse.json();
-              // Filter out the current slab
-              const filteredSlabs = (fallbackData.slabs || []).filter(
-                (slab: any) => slab.id !== parseInt(slabId || "0", 10)
-              );
-              setAvailableSlabs(filteredSlabs);
-            } else {
-              setAvailableSlabs([]);
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching available slabs:", error);
-          setAvailableSlabs([]);
-        }
-      };
-
-      fetchAvailableSlabs();
-    }
-  }, [showAddSlabDialog, showRoomSlabDialog, params.stone, slabId]);
 
   // Handler for adding a new room
   const handleAddRoom = () => {
@@ -809,37 +1184,6 @@ export default function SlabSell() {
   };
 
   // Handler for selecting a slab in the add slab dialog
-  const handleAddSlab = () => {
-    const selectedSlabId = form.watch("additional_slab_id");
-
-    if (selectedSlabId) {
-      const selectedSlab = availableSlabs.find(
-        (slab) => String(slab.id) === selectedSlabId
-      );
-
-      // Check if this slab is already added
-      const isDuplicate = additionalSlabs.some(
-        (slab) => slab.id === Number(selectedSlabId)
-      );
-
-      if (selectedSlab && !isDuplicate) {
-        setAdditionalSlabs([
-          ...additionalSlabs,
-          {
-            id: Number(selectedSlabId),
-            bundle: selectedSlab.bundle,
-            is_full_slab: false, // Default to false, user can change with individual switch
-          },
-        ]);
-        setShowAddSlabDialog(false);
-        form.setValue("additional_slab_id", ""); // Clear selection
-      } else if (isDuplicate) {
-        alert("This slab has already been added");
-      }
-    } else {
-      alert("Please select a slab first");
-    }
-  };
 
   // Handler for removing an additional slab
   const handleRemoveAdditionalSlab = (slabId: number) => {
@@ -854,136 +1198,11 @@ export default function SlabSell() {
     resolver,
     defaultValues: {
       same_address: true,
-      ten_year_sealer: defaultTenYearSealer,
-      is_full_slab_sold: false, // Default to false
-      edge: "Flat",
-      backsplash: "No",
-      tear_out: "No",
-      stove: "F/S",
-      waterfall: "No",
-      corbels: 0,
-      seam: "Standard",
-      room: "Kitchen",
+      rooms: [roomSchema.parse({})],
     },
   });
 
   // Handler for adding a slab to a room
-  const handleAddSlabToRoom = () => {
-    if (!currentRoomId) return;
-
-    const selectedSlabId = form.watch("additional_slab_id");
-
-    if (selectedSlabId) {
-      // Use roomSlabs for the current room instead of availableSlabs
-      const roomSpecificSlabs = roomSlabs[currentRoomId] || [];
-      const selectedSlab = roomSpecificSlabs.find(
-        (slab) => String(slab.id) === selectedSlabId
-      );
-
-      // Check if this slab is already added to this room (check both added slabs and selected main slab)
-      const currentAddedSlabs = addedRoomSlabs[currentRoomId] || [];
-      const currentMainSlab = selectedRoomSlab[currentRoomId];
-
-      const isDuplicateInAdded = currentAddedSlabs.some(
-        (slab) => slab.id === Number(selectedSlabId)
-      );
-
-      const isDuplicateInMain = currentMainSlab?.id === Number(selectedSlabId);
-
-      if (selectedSlab && !isDuplicateInAdded && !isDuplicateInMain) {
-        const updatedAddedSlabs = {
-          ...addedRoomSlabs,
-          [currentRoomId]: [
-            ...currentAddedSlabs,
-            {
-              id: Number(selectedSlabId),
-              bundle: selectedSlab.bundle,
-              is_full_slab: false, // Default to false, user can change with individual switch
-            },
-          ],
-        };
-
-        setAddedRoomSlabs(updatedAddedSlabs);
-        setShowRoomSlabDialog(false);
-        form.setValue("additional_slab_id", ""); // Clear selection
-      } else if (isDuplicateInAdded || isDuplicateInMain) {
-        alert("This slab has already been added to this room");
-      }
-    } else {
-      alert("Please select a slab first");
-    }
-  };
-
-  // Handler for removing a slab from a room
-  const handleRemoveRoomSlab = (roomId: string, slabId: number) => {
-    if (roomSlabs[roomId]) {
-      const updatedRoomSlabs = {
-        ...roomSlabs,
-        [roomId]: roomSlabs[roomId].filter((slab) => slab.id !== slabId),
-      };
-      setRoomSlabs(updatedRoomSlabs);
-    }
-  };
-
-  // Custom submit handler to prepare rooms data
-  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    // If there are no additional rooms, ensure we don't validate the rooms array
-    if (additionalRooms.length === 0) {
-      form.unregister("rooms");
-    } else {
-      // Prepare rooms data for submission
-      const formattedRooms = additionalRooms.map((room) => {
-        // Get the slabs for this room
-        const slabs = roomSlabs[room.id] || [];
-        const slabIds = slabs.map((slab) => String(slab.id));
-
-        return {
-          room: room.room,
-          sink_type_id: room.sink_type_id || "",
-          color: room.color,
-          slab_number: room.slab_number,
-          edge: room.edge,
-          backsplash: room.backsplash,
-          total_square_feet:
-            room.total_square_feet === null ? 0 : room.total_square_feet,
-          tear_out: room.tear_out,
-          stove: room.room !== "Bathroom" ? room.stove : undefined,
-          waterfall: room.waterfall,
-          corbels: room.corbels,
-          seam: room.seam,
-          ten_year_sealer: room.ten_year_sealer,
-          is_full_slab: room.is_full_slab,
-          slab_ids: slabIds,
-        };
-      });
-
-      form.setValue("rooms", formattedRooms);
-    }
-
-    // Add selected slabs as hidden fields
-    if (additionalSlabs.length > 0) {
-      const slabIds = additionalSlabs.map((slab) => String(slab.id));
-      form.setValue("additional_slab_ids", slabIds);
-
-      // Add full_slab info as a comma-separated string
-      const fullSlabInfo = additionalSlabs
-        .map((slab) => `${slab.id}:${slab.is_full_slab ? "1" : "0"}`)
-        .join(",");
-
-      // Add this as a hidden field
-      const formElement = document.getElementById(
-        "customerForm"
-      ) as HTMLFormElement;
-      const hiddenInput = document.createElement("input");
-      hiddenInput.type = "hidden";
-      hiddenInput.name = "slab_full_info";
-      hiddenInput.value = fullSlabInfo;
-      formElement.appendChild(hiddenInput);
-    }
-
-    // Continue with the regular form submission
-    fullSubmit(event);
-  };
 
   // Устанавливаем значение ten_year_sealer при изменении stoneType
   useEffect(() => {
@@ -1197,24 +1416,6 @@ export default function SlabSell() {
   // Determine default room ten_year_sealer value based on stone type
 
   // Fix form.watch by using a direct approach
-  const getStoneTypeDisplay = () => {
-    if (!stoneType) return null;
-
-    // Return appropriate JSX for the stone type label
-    return (
-      <>
-        <span
-          className={`ml-2 text-xs px-2 py-1 rounded ${
-            stoneType.toLowerCase() === "quartz"
-              ? "bg-red-100 text-red-800"
-              : "bg-green-100 text-green-800"
-          }`}
-        >
-          {stoneType.charAt(0).toUpperCase() + stoneType.slice(1)}
-        </span>
-      </>
-    );
-  };
 
   // Helper for getting stone type display for additional rooms
   const getRoomStoneTypeDisplay = (roomColor: string) => {
@@ -1248,7 +1449,7 @@ export default function SlabSell() {
           <DialogTitle>Sell Slab - Add Customer</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form id="customerForm" method="post" onSubmit={handleFormSubmit}>
+          <Form id="customerForm" method="post">
             <div className="">
               <div className="flex items-start gap-2">
                 <div className="flex-grow relative">
@@ -1257,7 +1458,6 @@ export default function SlabSell() {
                     name="name"
                     render={({ field }) => (
                       <InputItem
-                        inputAutoFocus={true}
                         name={"Customer Name"}
                         placeholder={"Enter customer name"}
                         field={{
@@ -1271,10 +1471,6 @@ export default function SlabSell() {
                               setIsExistingCustomer(false);
                               form.setValue("customer_id", undefined);
                             }
-                          },
-                          onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                            field.onBlur();
-                            handleInputBlur(e);
                           },
                         }}
                         ref={customerInputRef}
@@ -1341,13 +1537,8 @@ export default function SlabSell() {
                         checked={field.value}
                         onCheckedChange={field.onChange}
                         id="same_address"
+                        label="Project address same as billing address"
                       />
-                      <label
-                        htmlFor="same_address"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Project address same as billing address
-                      </label>
                     </>
                   )}
                 />
@@ -1390,1262 +1581,16 @@ export default function SlabSell() {
                 />
               </div>
 
-              <div className="mt-6 mb-2 font-semibold text-sm">First Room</div>
-              <div className="flex items-center justify-between"></div>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <FormField
-                  control={form.control}
-                  name="room"
-                  render={({ field }) => (
-                    <SelectInputOther
-                      field={field}
-                      placeholder="Room"
-                      name="Room"
-                      className="mb-0"
-                      options={[
-                        { key: "Kitchen", value: "Kitchen" },
-                        { key: "Bathroom", value: "Bathroom" },
-                        { key: "Outdoor", value: "Outdoor" },
-                        { key: "Island", value: "Island" },
-                      ]}
-                    />
-                  )}
+              {form.watch("rooms").map((room, index) => (
+                <RoomSubForm
+                  form={form}
+                  index={index}
+                  sinks={sinks}
+                  stoneType={stoneName}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="sink_type_id"
-                  render={({ field }) => {
-                    return (
-                      <SelectInput
-                        field={field}
-                        placeholder="Select a Sink"
-                        name="Sink"
-                        className="mb-0"
-                        options={sinks.map((sink) => {
-                          return {
-                            key: String(sink.id),
-                            value: sink.name,
-                          };
-                        })}
-                      />
-                    );
-                  }}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="edge"
-                  render={({ field }) => (
-                    <SelectInputOther
-                      field={field}
-                      placeholder="Edge"
-                      name="Edge"
-                      className="mb-0"
-                      options={[
-                        { key: "Flat", value: "Flat" },
-                        { key: "Eased", value: "Eased" },
-                        { key: "1/4 Bevel", value: "1/4 Bevel" },
-                        { key: "1/2 Bevel", value: "1/2 Bevel" },
-                        { key: "Bullnose", value: "Bullnose" },
-                        { key: "Ogee", value: "Ogee" },
-                      ]}
-                      defaultValue="Flat"
-                    />
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="backsplash"
-                  render={({ field }) => (
-                    <SelectInputOther
-                      field={field}
-                      placeholder="Backsplash"
-                      name="Backsplash"
-                      className="mb-0"
-                      options={[
-                        { key: "No", value: "No" },
-                        { key: "4 inch", value: "4 inch" },
-                        { key: "Full Height", value: "Full Height" },
-                      ]}
-                      defaultValue="No"
-                    />
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="total_square_feet"
-                  render={({ field }) => (
-                    <InputItem
-                      name={"Square Feet"}
-                      placeholder={"Enter Sqft"}
-                      field={field}
-                      formClassName="mb-0"
-                    />
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="tear_out"
-                  render={({ field }) => (
-                    <SelectInputOther
-                      field={field}
-                      placeholder="Tear-Out"
-                      name="Tear-Out"
-                      className="mb-0"
-                      options={[
-                        { key: "No", value: "No" },
-                        { key: "Laminate", value: "Laminate" },
-                        { key: "Stone", value: "Stone" },
-                      ]}
-                      defaultValue="No"
-                    />
-                  )}
-                />
-
-                {form.watch("room") !== "Bathroom" && (
-                  <FormField
-                    control={form.control}
-                    name="stove"
-                    render={({ field }) => (
-                      <SelectInputOther
-                        field={field}
-                        placeholder="Stove"
-                        name="Stove"
-                        className="mb-0"
-                        options={[
-                          { key: "F/S", value: "F/S" },
-                          { key: "S/I", value: "S/I" },
-                          { key: "C/T", value: "C/T" },
-                          { key: "Grill", value: "Grill" },
-                        ]}
-                        defaultValue="F/S"
-                      />
-                    )}
-                  />
-                )}
-
-                <FormField
-                  control={form.control}
-                  name="waterfall"
-                  render={({ field }) => (
-                    <SelectInputOther
-                      field={field}
-                      placeholder="Waterfall"
-                      name="Waterfall"
-                      className="mb-0"
-                      options={[
-                        { key: "No", value: "No" },
-                        { key: "Yes", value: "Yes" },
-                      ]}
-                    />
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="corbels"
-                  render={({ field }) => (
-                    <InputItem
-                      name={"Corbels"}
-                      placeholder={"Number of corbels"}
-                      field={field}
-                      formClassName="mb-0"
-                    />
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="seam"
-                  render={({ field }) => (
-                    <SelectInputOther
-                      field={field}
-                      placeholder="Seam"
-                      name="Seam"
-                      className="mb-0"
-                      options={[
-                        { key: "Standard", value: "Standard" },
-                        { key: "Phantom", value: "Phantom" },
-                        { key: "Extended", value: "Extended" },
-                        { key: "No seam", value: "No seam" },
-                        { key: "European", value: "European" },
-                        { key: "N/A", value: "N/A" },
-                      ]}
-                    />
-                  )}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2 mt-4">
-                <FormField
-                  control={form.control}
-                  name="ten_year_sealer"
-                  render={({ field }) => (
-                    <>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        id="ten_year_sealer"
-                        disabled={Boolean(
-                          stoneType?.toLowerCase() === "quartz"
-                        )}
-                      />
-                      <label
-                        htmlFor="ten_year_sealer"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        10-Year Sealer
-                      </label>
-                      {getStoneTypeDisplay()}
-                    </>
-                  )}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2 mt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAddSlabDialog(true)}
-                >
-                  Add Slab
-                </Button>
-              </div>
-
-              {/* Display main slab being sold with individual switch */}
-              <div className="mt-2 space-y-2">
-                <div className="text-xs text-gray-600">Main Slab:</div>
-                <div className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
-                  <div className="flex items-center space-x-2">
-                    <FormField
-                      control={form.control}
-                      name="is_full_slab_sold"
-                      render={({ field }) => (
-                        <>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            id="main_slab_full"
-                          />
-                          <label
-                            htmlFor="main_slab_full"
-                            className="text-sm font-medium"
-                          >
-                            Full Slab Sold
-                          </label>
-                        </>
-                      )}
-                    />
-                  </div>
-                  <div
-                    className={`px-2 py-1 rounded-md text-sm ${
-                      form.watch("is_full_slab_sold")
-                        ? "bg-red-100 text-red-800"
-                        : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    Bundle {bundle}{" "}
-                    {form.watch("is_full_slab_sold") ? "(Full)" : "(Partial)"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Display additional slabs with individual switches */}
-              {additionalSlabs.length > 0 && (
-                <div className="mt-2 space-y-2">
-                  <div className="text-xs text-gray-600">Additional Slabs:</div>
-                  {additionalSlabs.map((slab) => (
-                    <div
-                      key={slab.id}
-                      className="flex items-center justify-between bg-gray-50 p-2 rounded-md"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={slab.is_full_slab}
-                          onCheckedChange={(checked) => {
-                            setAdditionalSlabs((prev) =>
-                              prev.map((s) =>
-                                s.id === slab.id
-                                  ? { ...s, is_full_slab: checked }
-                                  : s
-                              )
-                            );
-                          }}
-                          id={`additional_slab_${slab.id}`}
-                        />
-                        <label
-                          htmlFor={`additional_slab_${slab.id}`}
-                          className="text-sm font-medium"
-                        >
-                          Full Slab Sold
-                        </label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div
-                          className={`px-2 py-1 rounded-md text-sm ${
-                            slab.is_full_slab
-                              ? "bg-red-100 text-red-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          Bundle {slab.bundle}{" "}
-                          {slab.is_full_slab ? "(Full)" : "(Partial)"}
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0"
-                          onClick={() => handleRemoveAdditionalSlab(slab.id)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <input
-                        type="hidden"
-                        name="additional_slab_ids[]"
-                        value={slab.id}
-                      />
-                      <input
-                        type="hidden"
-                        name={`slab_${slab.id}_is_full`}
-                        value={slab.is_full_slab ? "1" : "0"}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
+              ))}
 
               {/* Additional Rooms */}
-              {additionalRooms.map((room, index) => (
-                <div key={room.id} className="mt-6 border-t pt-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-semibold text-sm">
-                      Room {index + 2}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveRoom(room.id)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <FormField
-                      control={form.control}
-                      name={`rooms.${index}.room`}
-                      render={({ field }) => (
-                        <SelectInputOther
-                          field={{
-                            ...field,
-                            value: room.room,
-                            onChange: (value) => {
-                              let newValue;
-                              if (typeof value === "object" && value !== null) {
-                                if (
-                                  "target" in value &&
-                                  typeof value.target === "object" &&
-                                  value.target !== null &&
-                                  "value" in value.target
-                                ) {
-                                  newValue = value.target.value;
-                                }
-                              } else {
-                                newValue = String(value);
-                              }
-
-                              if (newValue) {
-                                setAdditionalRooms((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? { ...r, room: newValue }
-                                      : r
-                                  )
-                                );
-                              }
-                            },
-                          }}
-                          placeholder="Room"
-                          name="Room"
-                          className="mb-0"
-                          options={[
-                            { key: "Kitchen", value: "Kitchen" },
-                            { key: "Bathroom", value: "Bathroom" },
-                            { key: "Outdoor", value: "Outdoor" },
-                            { key: "Island", value: "Island" },
-                          ]}
-                        />
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`rooms.${index}.sink_type_id`}
-                      render={({ field }) => (
-                        <SelectInput
-                          field={{
-                            ...field,
-                            value: room.sink_type_id || "",
-                            onChange: (value) => {
-                              let newValue;
-                              if (typeof value === "object" && value !== null) {
-                                if (
-                                  "target" in value &&
-                                  typeof value.target === "object" &&
-                                  value.target !== null &&
-                                  "value" in value.target
-                                ) {
-                                  newValue = value.target.value;
-                                }
-                              } else {
-                                newValue = String(value);
-                              }
-
-                              if (newValue) {
-                                setAdditionalRooms((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? { ...r, sink_type_id: newValue }
-                                      : r
-                                  )
-                                );
-                              }
-                            },
-                          }}
-                          placeholder="Select a Sink"
-                          name="Sink"
-                          className="mb-0"
-                          options={sinks.map((sink) => ({
-                            key: String(sink.id),
-                            value: sink.name,
-                          }))}
-                        />
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`rooms.${index}.color`}
-                      render={({ field }) => (
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">
-                            Other Color
-                          </label>
-                          <div className="relative">
-                            <Input
-                              placeholder="Search stone colors..."
-                              value={room.color}
-                              onChange={(e) => {
-                                const newValue = e.target.value;
-
-                                // Update the room color
-                                setAdditionalRooms((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? {
-                                          ...r,
-                                          color: newValue,
-                                          slab_number: "",
-                                        }
-                                      : r
-                                  )
-                                );
-
-                                // Trigger stone search when typing
-                                if (newValue && newValue.length >= 2) {
-                                  searchStones(newValue);
-                                }
-                              }}
-                              onFocus={() => {
-                                // Show search results when input is focused
-                                if (room.color && room.color.length >= 2) {
-                                  searchStones(room.color);
-                                }
-                              }}
-                              className="w-full"
-                            />
-                            {isSearchingStones && (
-                              <div className="absolute right-2 top-2">
-                                <div className="animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent"></div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Stone search results dropdown */}
-                          {stoneSearchResults.length > 0 && (
-                            <div className="absolute z-10 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg w-1/2">
-                              <ul className="py-1 divide-y divide-gray-200">
-                                {stoneSearchResults.map((stone) => (
-                                  <li
-                                    key={stone.id}
-                                    className="px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                                    onClick={() => {
-                                      // Set the selected stone color
-                                      setAdditionalRooms((prev) =>
-                                        prev.map((r) =>
-                                          r.id === room.id
-                                            ? {
-                                                ...r,
-                                                color: stone.name,
-                                                slab_number: "",
-                                              }
-                                            : r
-                                        )
-                                      );
-
-                                      // Fetch slabs for this stone
-                                      fetchSlabsForStone(stone.name, room.id);
-
-                                      // Clear search results
-                                      setStoneSearchResults([]);
-                                    }}
-                                  >
-                                    {stone.name}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`rooms.${index}.slab_number`}
-                      render={({ field, fieldState }) => (
-                        <div className="space-y-1">
-                          <SelectInput
-                            field={{
-                              ...field,
-                              value: room.slab_number,
-                              onChange: (value) => {
-                                let newValue;
-                                if (
-                                  typeof value === "object" &&
-                                  value !== null
-                                ) {
-                                  if (
-                                    "target" in value &&
-                                    typeof value.target === "object" &&
-                                    value.target !== null &&
-                                    "value" in value.target
-                                  ) {
-                                    newValue = value.target.value;
-                                  }
-                                } else {
-                                  newValue = String(value);
-                                }
-
-                                if (newValue) {
-                                  // Update room slab_number
-                                  setAdditionalRooms((prev) =>
-                                    prev.map((r) =>
-                                      r.id === room.id
-                                        ? { ...r, slab_number: newValue }
-                                        : r
-                                    )
-                                  );
-
-                                  // Update form field for validation
-                                  field.onChange(newValue);
-
-                                  // Set the selected main slab for this room (replace, not add)
-                                  const selectedSlabId = newValue;
-                                  const roomSpecificSlabs =
-                                    roomSlabs[room.id] || [];
-                                  const selectedSlab = roomSpecificSlabs.find(
-                                    (slab) => String(slab.id) === selectedSlabId
-                                  );
-
-                                  if (selectedSlab) {
-                                    setSelectedRoomSlab((prev) => ({
-                                      ...prev,
-                                      [room.id]: {
-                                        id: Number(selectedSlabId),
-                                        bundle: selectedSlab.bundle,
-                                        is_full_slab: room.is_full_slab, // Use room's full slab status
-                                      },
-                                    }));
-                                  }
-                                }
-                              },
-                            }}
-                            placeholder="Select Slab Number"
-                            name="Slab Number"
-                            className={`mb-0 ${
-                              fieldState.error ? "border-red-500" : ""
-                            }`}
-                            options={(roomSlabs[room.id] || []).map((slab) => ({
-                              key: String(slab.id),
-                              value: `Bundle ${slab.bundle}`,
-                            }))}
-                          />
-                          {fieldState.error && (
-                            <p className="text-red-500 text-xs">
-                              {fieldState.error.message}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`rooms.${index}.edge`}
-                      render={({ field }) => (
-                        <SelectInputOther
-                          field={{
-                            ...field,
-                            value: room.edge,
-                            onChange: (value) => {
-                              let newValue;
-                              if (typeof value === "object" && value !== null) {
-                                if (
-                                  "target" in value &&
-                                  typeof value.target === "object" &&
-                                  value.target !== null &&
-                                  "value" in value.target
-                                ) {
-                                  newValue = value.target.value;
-                                }
-                              } else {
-                                newValue = String(value);
-                              }
-
-                              if (newValue) {
-                                setAdditionalRooms((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? { ...r, edge: newValue }
-                                      : r
-                                  )
-                                );
-                              }
-                            },
-                          }}
-                          placeholder="Edge"
-                          name="Edge"
-                          className="mb-0"
-                          options={[
-                            { key: "Flat", value: "Flat" },
-                            { key: "Eased", value: "Eased" },
-                            { key: "1/4 Bevel", value: "1/4 Bevel" },
-                            { key: "1/2 Bevel", value: "1/2 Bevel" },
-                            { key: "Bullnose", value: "Bullnose" },
-                            { key: "Ogee", value: "Ogee" },
-                          ]}
-                        />
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`rooms.${index}.backsplash`}
-                      render={({ field }) => (
-                        <SelectInputOther
-                          field={{
-                            ...field,
-                            value: room.backsplash,
-                            onChange: (value) => {
-                              let newValue;
-                              if (typeof value === "object" && value !== null) {
-                                if (
-                                  "target" in value &&
-                                  typeof value.target === "object" &&
-                                  value.target !== null &&
-                                  "value" in value.target
-                                ) {
-                                  newValue = value.target.value;
-                                }
-                              } else {
-                                newValue = String(value);
-                              }
-
-                              if (newValue) {
-                                setAdditionalRooms((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? { ...r, backsplash: newValue }
-                                      : r
-                                  )
-                                );
-                              }
-                            },
-                          }}
-                          placeholder="Backsplash"
-                          name="Backsplash"
-                          className="mb-0"
-                          options={[
-                            { key: "No", value: "No" },
-                            { key: "4 inch", value: "4 inch" },
-                            { key: "Full Height", value: "Full Height" },
-                          ]}
-                          defaultValue="No"
-                        />
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`rooms.${index}.tear_out`}
-                      render={({ field }) => (
-                        <SelectInputOther
-                          field={{
-                            ...field,
-                            value: room.tear_out,
-                            onChange: (value) => {
-                              let newValue;
-                              if (typeof value === "object" && value !== null) {
-                                if (
-                                  "target" in value &&
-                                  typeof value.target === "object" &&
-                                  value.target !== null &&
-                                  "value" in value.target
-                                ) {
-                                  newValue = value.target.value;
-                                }
-                              } else {
-                                newValue = String(value);
-                              }
-
-                              if (newValue) {
-                                setAdditionalRooms((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? { ...r, tear_out: newValue }
-                                      : r
-                                  )
-                                );
-                              }
-                            },
-                          }}
-                          placeholder="Tear-Out"
-                          name="Tear-Out"
-                          className="mb-0"
-                          options={[
-                            { key: "No", value: "No" },
-                            { key: "Laminate", value: "Laminate" },
-                            { key: "Stone", value: "Stone" },
-                          ]}
-                        />
-                      )}
-                    />
-
-                    {room.room !== "Bathroom" && (
-                      <FormField
-                        control={form.control}
-                        name={`rooms.${index}.stove`}
-                        render={({ field }) => (
-                          <SelectInputOther
-                            field={{
-                              ...field,
-                              value: room.stove,
-                              onChange: (value) => {
-                                let newValue;
-                                if (
-                                  typeof value === "object" &&
-                                  value !== null
-                                ) {
-                                  if (
-                                    "target" in value &&
-                                    typeof value.target === "object" &&
-                                    value.target !== null &&
-                                    "value" in value.target
-                                  ) {
-                                    newValue = value.target.value;
-                                  }
-                                } else {
-                                  newValue = String(value);
-                                }
-
-                                if (newValue) {
-                                  setAdditionalRooms((prev) =>
-                                    prev.map((r) =>
-                                      r.id === room.id
-                                        ? { ...r, stove: newValue }
-                                        : r
-                                    )
-                                  );
-                                }
-                              },
-                            }}
-                            placeholder="Stove"
-                            name="Stove"
-                            className="mb-0"
-                            options={[
-                              { key: "F/S", value: "F/S" },
-                              { key: "S/I", value: "S/I" },
-                              { key: "C/T", value: "C/T" },
-                              { key: "Grill", value: "Grill" },
-                            ]}
-                          />
-                        )}
-                      />
-                    )}
-
-                    <FormField
-                      control={form.control}
-                      name={`rooms.${index}.waterfall`}
-                      render={({ field }) => (
-                        <SelectInputOther
-                          field={{
-                            ...field,
-                            value: room.waterfall,
-                            onChange: (value) => {
-                              let newValue;
-                              if (typeof value === "object" && value !== null) {
-                                if (
-                                  "target" in value &&
-                                  typeof value.target === "object" &&
-                                  value.target !== null &&
-                                  "value" in value.target
-                                ) {
-                                  newValue = value.target.value;
-                                }
-                              } else {
-                                newValue = String(value);
-                              }
-
-                              if (newValue) {
-                                setAdditionalRooms((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? { ...r, waterfall: newValue }
-                                      : r
-                                  )
-                                );
-                              }
-                            },
-                          }}
-                          placeholder="Waterfall"
-                          name="Waterfall"
-                          className="mb-0"
-                          options={[
-                            { key: "No", value: "No" },
-                            { key: "Yes", value: "Yes" },
-                          ]}
-                        />
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`rooms.${index}.corbels`}
-                      render={({ field }) => (
-                        <InputItem
-                          name={"Corbels"}
-                          placeholder={"Number of corbels"}
-                          field={{
-                            ...field,
-                            value: room.corbels,
-                            onChange: (
-                              e: React.ChangeEvent<HTMLInputElement>
-                            ) => {
-                              const val = parseInt(e.target.value) || 0;
-                              const newValue = val < 0 ? 0 : val;
-                              setAdditionalRooms((prev) =>
-                                prev.map((r) =>
-                                  r.id === room.id
-                                    ? { ...r, corbels: newValue }
-                                    : r
-                                )
-                              );
-                            },
-                            min: 0,
-                          }}
-                          formClassName="mb-0"
-                          type="number"
-                        />
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`rooms.${index}.seam`}
-                      render={({ field }) => (
-                        <SelectInputOther
-                          field={{
-                            ...field,
-                            value: room.seam,
-                            onChange: (value) => {
-                              let newValue;
-                              if (typeof value === "object" && value !== null) {
-                                if (
-                                  "target" in value &&
-                                  typeof value.target === "object" &&
-                                  value.target !== null &&
-                                  "value" in value.target
-                                ) {
-                                  newValue = value.target.value;
-                                }
-                              } else {
-                                newValue = String(value);
-                              }
-
-                              if (newValue) {
-                                setAdditionalRooms((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? { ...r, seam: newValue }
-                                      : r
-                                  )
-                                );
-                              }
-                            },
-                          }}
-                          placeholder="Seam"
-                          name="Seam"
-                          className="mb-0"
-                          options={[
-                            { key: "Standard", value: "Standard" },
-                            { key: "Phantom", value: "Phantom" },
-                            { key: "Extended", value: "Extended" },
-                            { key: "No seam", value: "No seam" },
-                            { key: "European", value: "European" },
-                            { key: "N/A", value: "N/A" },
-                          ]}
-                        />
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`rooms.${index}.total_square_feet`}
-                      render={({ field }) => (
-                        <InputItem
-                          name={"Square Feet"}
-                          placeholder={"Enter Sqft"}
-                          field={{
-                            ...field,
-                            value:
-                              room.total_square_feet === null
-                                ? ""
-                                : room.total_square_feet,
-                            onChange: (
-                              e: React.ChangeEvent<HTMLInputElement>
-                            ) => {
-                              const value = e.target.value;
-                              const newValue =
-                                value === "" ? null : parseFloat(value);
-                              setAdditionalRooms((prev) =>
-                                prev.map((r) =>
-                                  r.id === room.id
-                                    ? { ...r, total_square_feet: newValue }
-                                    : r
-                                )
-                              );
-                            },
-                          }}
-                          formClassName="mb-0"
-                          type="number"
-                        />
-                      )}
-                    />
-
-                    <div className="col-span-2 flex items-center space-x-2 mt-2">
-                      <FormField
-                        control={form.control}
-                        name={`rooms.${index}.ten_year_sealer`}
-                        render={({ field }) => (
-                          <>
-                            <Switch
-                              checked={room.ten_year_sealer}
-                              onCheckedChange={(checked) => {
-                                setAdditionalRooms((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? { ...r, ten_year_sealer: checked }
-                                      : r
-                                  )
-                                );
-
-                                // Update the status of the main selected slab for this room
-                                if (selectedRoomSlab[room.id]) {
-                                  setSelectedRoomSlab((prev) => ({
-                                    ...prev,
-                                    [room.id]: {
-                                      ...prev[room.id]!,
-                                      ten_year_sealer: checked,
-                                    },
-                                  }));
-                                }
-
-                                // Update the status of added slabs for this room
-                                if (addedRoomSlabs[room.id]) {
-                                  setAddedRoomSlabs((prev) => ({
-                                    ...prev,
-                                    [room.id]: prev[room.id].map((slab) => ({
-                                      ...slab,
-                                      ten_year_sealer: checked,
-                                    })),
-                                  }));
-                                }
-                              }}
-                              id={`ten_year_sealer_${room.id}`}
-                              disabled={Boolean(
-                                room.color &&
-                                  stoneTypes[room.color]?.toLowerCase() ===
-                                    "quartz"
-                              )}
-                            />
-                            <label
-                              htmlFor={`ten_year_sealer_${room.id}`}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              10-Year Sealer
-                            </label>
-                            {room.color && getRoomStoneTypeDisplay(room.color)}
-                          </>
-                        )}
-                      />
-                    </div>
-
-                    <div className="col-span-2 flex items-center space-x-2">
-                      <FormField
-                        control={form.control}
-                        name={`rooms.${index}.is_full_slab`}
-                        render={({ field }) => (
-                          <>
-                            <Switch
-                              checked={room.is_full_slab}
-                              onCheckedChange={(checked) => {
-                                setAdditionalRooms((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? { ...r, is_full_slab: checked }
-                                      : r
-                                  )
-                                );
-
-                                // Update the status of the main selected slab for this room
-                                if (selectedRoomSlab[room.id]) {
-                                  setSelectedRoomSlab((prev) => ({
-                                    ...prev,
-                                    [room.id]: {
-                                      ...prev[room.id]!,
-                                      is_full_slab: checked,
-                                    },
-                                  }));
-                                }
-
-                                // Update the status of added slabs for this room
-                                if (addedRoomSlabs[room.id]) {
-                                  setAddedRoomSlabs((prev) => ({
-                                    ...prev,
-                                    [room.id]: prev[room.id].map((slab) => ({
-                                      ...slab,
-                                      is_full_slab: checked,
-                                    })),
-                                  }));
-                                }
-                              }}
-                              id={`is_full_slab_${room.id}`}
-                            />
-                            <label
-                              htmlFor={`is_full_slab_${room.id}`}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              Full Slab
-                            </label>
-                          </>
-                        )}
-                      />
-                      <div className="col-span-2 flex items-center space-x-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setCurrentRoomId(room.id);
-                            setShowRoomSlabDialog(true);
-                          }}
-                        >
-                          Add Slab
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Display room slabs */}
-                    {(selectedRoomSlab[room.id] ||
-                      (addedRoomSlabs[room.id] &&
-                        addedRoomSlabs[room.id].length > 0)) && (
-                      <div className="col-span-2 mt-2 space-y-2">
-                        {/* Main selected slab */}
-                        {selectedRoomSlab[room.id] && (
-                          <div className="space-y-2">
-                            <div className="text-xs text-gray-600">
-                              Main Slab:
-                            </div>
-                            <div className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
-                              <div className="flex items-center space-x-2">
-                                <Switch
-                                  checked={
-                                    selectedRoomSlab[room.id]!.is_full_slab
-                                  }
-                                  onCheckedChange={(checked) => {
-                                    setSelectedRoomSlab((prev) => ({
-                                      ...prev,
-                                      [room.id]: {
-                                        ...prev[room.id]!,
-                                        is_full_slab: checked,
-                                      },
-                                    }));
-                                  }}
-                                  id={`main_slab_${room.id}`}
-                                />
-                                <label
-                                  htmlFor={`main_slab_${room.id}`}
-                                  className="text-sm font-medium"
-                                >
-                                  Full Slab Sold
-                                </label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <div
-                                  className={`px-2 py-1 rounded-md text-sm ${
-                                    selectedRoomSlab[room.id]!.is_full_slab
-                                      ? "bg-red-100 text-red-800"
-                                      : "bg-yellow-100 text-yellow-800"
-                                  }`}
-                                >
-                                  Bundle {selectedRoomSlab[room.id]!.bundle}{" "}
-                                  {selectedRoomSlab[room.id]!.is_full_slab
-                                    ? "(Full)"
-                                    : "(Partial)"}
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => {
-                                    setSelectedRoomSlab((prev) => ({
-                                      ...prev,
-                                      [room.id]: null,
-                                    }));
-                                    // Also clear the slab_number in the room
-                                    setAdditionalRooms((prev) =>
-                                      prev.map((r) =>
-                                        r.id === room.id
-                                          ? { ...r, slab_number: "" }
-                                          : r
-                                      )
-                                    );
-                                  }}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Additional slabs */}
-                        {addedRoomSlabs[room.id] &&
-                          addedRoomSlabs[room.id].length > 0 && (
-                            <div className="space-y-2">
-                              <div className="text-xs text-gray-600">
-                                Additional Slabs:
-                              </div>
-                              {addedRoomSlabs[room.id].map((slab) => (
-                                <div
-                                  key={slab.id}
-                                  className="flex items-center justify-between bg-gray-50 p-2 rounded-md"
-                                >
-                                  <div className="flex items-center space-x-2">
-                                    <Switch
-                                      checked={slab.is_full_slab}
-                                      onCheckedChange={(checked) => {
-                                        setAddedRoomSlabs((prev) => ({
-                                          ...prev,
-                                          [room.id]: prev[room.id].map((s) =>
-                                            s.id === slab.id
-                                              ? { ...s, is_full_slab: checked }
-                                              : s
-                                          ),
-                                        }));
-                                      }}
-                                      id={`additional_slab_${room.id}_${slab.id}`}
-                                    />
-                                    <label
-                                      htmlFor={`additional_slab_${room.id}_${slab.id}`}
-                                      className="text-sm font-medium"
-                                    >
-                                      Full Slab Sold
-                                    </label>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <div
-                                      className={`px-2 py-1 rounded-md text-sm ${
-                                        slab.is_full_slab
-                                          ? "bg-red-100 text-red-800"
-                                          : "bg-yellow-100 text-yellow-800"
-                                      }`}
-                                    >
-                                      Bundle {slab.bundle}{" "}
-                                      {slab.is_full_slab
-                                        ? "(Full)"
-                                        : "(Partial)"}
-                                    </div>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 w-6 p-0"
-                                      onClick={() =>
-                                        handleRemoveRoomSlab(room.id, slab.id)
-                                      }
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                  <input
-                                    type="hidden"
-                                    name={`room_${index}_additional_slab_ids[]`}
-                                    value={slab.id}
-                                  />
-                                  <input
-                                    type="hidden"
-                                    name={`room_${index}_additional_slab_${slab.id}_is_full`}
-                                    value={slab.is_full_slab ? "1" : "0"}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                        {/* Hidden inputs for main slab */}
-                        {selectedRoomSlab[room.id] && (
-                          <>
-                            <input
-                              type="hidden"
-                              name={`room_${index}_main_slab_id`}
-                              value={selectedRoomSlab[room.id]!.id}
-                            />
-                            <input
-                              type="hidden"
-                              name={`room_${index}_main_slab_is_full`}
-                              value={
-                                selectedRoomSlab[room.id]!.is_full_slab
-                                  ? "1"
-                                  : "0"
-                              }
-                            />
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
 
               {/* Move Add Room button after all rooms */}
               <div className="flex mt-4">
@@ -2758,122 +1703,6 @@ export default function SlabSell() {
             </DialogContent>
           </Dialog>
         )}
-
-        {/* Add Slab Dialog for Rooms */}
-        <Dialog open={showRoomSlabDialog} onOpenChange={setShowRoomSlabDialog}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Add Slab to Room</DialogTitle>
-            </DialogHeader>
-            <FormProvider {...form}>
-              <div className="space-y-4">
-                {!currentRoomId ||
-                !roomSlabs[currentRoomId] ||
-                roomSlabs[currentRoomId].length === 0 ? (
-                  <div className="text-center py-4 text-gray-500">
-                    No available slabs found for the selected stone in this room
-                  </div>
-                ) : (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="additional_slab_id"
-                      render={({ field }) => (
-                        <SelectInput
-                          field={field}
-                          placeholder="Select a slab"
-                          name="Additional Slab"
-                          className="mb-0"
-                          options={(roomSlabs[currentRoomId] || []).map(
-                            (slab) => ({
-                              key: String(slab.id),
-                              value: `Bundle ${slab.bundle}`,
-                            })
-                          )}
-                        />
-                      )}
-                    />
-                  </>
-                )}
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowRoomSlabDialog(false);
-                    setCurrentRoomId(null);
-                    setCurrentRoomStoneId(null);
-                    form.setValue("additional_slab_id", "");
-                    form.setValue("is_full_slab_sold", false);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleAddSlabToRoom}
-                  disabled={
-                    !currentRoomId ||
-                    !roomSlabs[currentRoomId] ||
-                    roomSlabs[currentRoomId].length === 0
-                  }
-                >
-                  Add Slab
-                </Button>
-              </DialogFooter>
-            </FormProvider>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add Slab Dialog */}
-        <Dialog open={showAddSlabDialog} onOpenChange={setShowAddSlabDialog}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Add Slab</DialogTitle>
-            </DialogHeader>
-            <FormProvider {...form}>
-              <div className="space-y-4">
-                {availableSlabs.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500">
-                    No available slabs found for this stone
-                  </div>
-                ) : (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="additional_slab_id"
-                      render={({ field }) => (
-                        <SelectInput
-                          field={field}
-                          placeholder="Select a slab"
-                          name="Additional Slab"
-                          className="mb-0"
-                          options={availableSlabs.map((slab) => ({
-                            key: String(slab.id),
-                            value: `Bundle ${slab.bundle}`,
-                          }))}
-                        />
-                      )}
-                    />
-                  </>
-                )}
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowAddSlabDialog(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleAddSlab}
-                  disabled={availableSlabs.length === 0}
-                >
-                  Add Slab
-                </Button>
-              </DialogFooter>
-            </FormProvider>
-          </DialogContent>
-        </Dialog>
       </DialogContent>
     </Dialog>
   );
