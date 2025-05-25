@@ -1,5 +1,6 @@
-import { LoaderFunctionArgs } from "react-router";
+import { data, LoaderFunctionArgs } from "react-router";
 import { db } from "~/db.server";
+import { StoneSearchResult } from "~/types";
 import { selectMany } from "~/utils/queryHelpers";
 
 /*
@@ -35,11 +36,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const cleanParams = new URLSearchParams(searchParams);
   const searchTerm = cleanParams.get("name");
   const showSoldOut = cleanParams.get("show_sold_out") === "true";
-  
+
   if (!searchTerm) {
     return Response.json({ stones: [] });
   }
-  
+
   let query = `SELECT s.id, s.type, s.width, s.length, s.name, s.url, s.retail_price, s.cost_per_sqft, s.is_display,
             CAST(SUM(CASE WHEN si.id IS NOT NULL AND si.sale_id IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available,
             CAST(COUNT(si.id) AS UNSIGNED) AS amount
@@ -48,11 +49,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     WHERE UPPER(s.name) LIKE UPPER(?)
     AND s.is_display = 1
     GROUP BY s.id, s.type, s.name, s.url, s.width, s.length, s.retail_price, s.cost_per_sqft, s.is_display`;
-    
+
   if (!showSoldOut) {
     query += `\nHAVING available > 0`;
   }
-  
+
   query += `\nORDER BY 
       CASE 
         WHEN UPPER(s.name) LIKE UPPER(?) THEN 0  
@@ -61,28 +62,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
       END,
       s.name ASC
     LIMIT 5`;
-    
-  const stones = await selectMany<{ 
-    id: number;
-    type: string;
-    width: number;
-    length: number;
-    name: string;
-    url: string;
-    retail_price: number;
-    cost_per_sqft: number;
-    available: number;
-    amount: number;
-    is_display: boolean;
-  }>(
-    db,
-    query,
-    [
-      `%${searchTerm}%`, 
-      `${searchTerm}%`,   
-      `% ${searchTerm} %`
-    ]
-  );
-  
-  return Response.json({ stones });
+
+  const stones = await selectMany<StoneSearchResult>(db, query, [
+    `%${searchTerm}%`,
+    `${searchTerm}%`,
+    `% ${searchTerm} %`,
+  ]);
+
+  return data({ stones });
 }

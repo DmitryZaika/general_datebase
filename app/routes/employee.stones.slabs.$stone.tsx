@@ -65,9 +65,9 @@ interface Slab {
 const TransactionSchema = z.object({
   slab_id: z.number(),
   sale_id: z.number(),
-  sale_date: z
-    .union([z.string(), z.date()])
-    .transform((val) => (typeof val === "string" ? val : val.toISOString())),
+  sale_date: z.union([z.string(), z.date()]).transform(val => 
+    typeof val === 'string' ? val : val.toISOString()
+  ),
   customer_name: z.string(),
   seller_name: z.string(),
   sale_notes: z.string().nullable().optional(),
@@ -89,20 +89,20 @@ function formatDate(dateString: string) {
 }
 
 function formatSinkList(sinkString: string): string {
-  if (!sinkString) return "";
-
-  const sinks = sinkString.split(", ");
-  const sinkCounts: { [key: string]: number } = {};
-
-  sinks.forEach((sink) => {
+  if (!sinkString) return '';
+  
+  const sinks = sinkString.split(', ');
+  const sinkCounts: {[key: string]: number} = {};
+  
+  sinks.forEach(sink => {
     if (sink) {
       sinkCounts[sink] = (sinkCounts[sink] || 0) + 1;
     }
   });
 
   return Object.entries(sinkCounts)
-    .map(([sink, count]) => (count > 1 ? `${sink} x ${count}` : sink))
-    .join(", ");
+    .map(([sink, count]) => count > 1 ? `${sink} x ${count}` : sink)
+    .join(', ');
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

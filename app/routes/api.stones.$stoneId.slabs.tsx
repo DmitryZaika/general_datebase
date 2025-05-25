@@ -1,4 +1,4 @@
-import { LoaderFunctionArgs } from "react-router";
+import { LoaderFunctionArgs, data } from "react-router";
 import { db } from "~/db.server";
 import { selectMany } from "~/utils/queryHelpers";
 
@@ -42,9 +42,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       queryParams
     );
 
-    return new Response(JSON.stringify({ slabs }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    return data({ slabs });
   } catch (error) {
     console.error("Error fetching slabs:", error);
     return new Response(JSON.stringify({ error: "Failed to fetch slabs" }), {
