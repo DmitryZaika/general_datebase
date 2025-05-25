@@ -65,9 +65,9 @@ interface Slab {
 const TransactionSchema = z.object({
   slab_id: z.number(),
   sale_id: z.number(),
-  sale_date: z.union([z.string(), z.date()]).transform(val => 
-    typeof val === 'string' ? val : val.toISOString()
-  ),
+  sale_date: z
+    .union([z.string(), z.date()])
+    .transform((val) => (typeof val === "string" ? val : val.toISOString())),
   customer_name: z.string(),
   seller_name: z.string(),
   sale_notes: z.string().nullable().optional(),
@@ -85,24 +85,24 @@ function formatDate(dateString: string) {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(date);  
+  }).format(date);
 }
 
 function formatSinkList(sinkString: string): string {
-  if (!sinkString) return '';
-  
-  const sinks = sinkString.split(', ');
-  const sinkCounts: {[key: string]: number} = {};
-  
-  sinks.forEach(sink => {
+  if (!sinkString) return "";
+
+  const sinks = sinkString.split(", ");
+  const sinkCounts: { [key: string]: number } = {};
+
+  sinks.forEach((sink) => {
     if (sink) {
       sinkCounts[sink] = (sinkCounts[sink] || 0) + 1;
     }
   });
-  
+
   return Object.entries(sinkCounts)
-    .map(([sink, count]) => count > 1 ? `${sink} x ${count}` : sink)
-    .join(', ');
+    .map(([sink, count]) => (count > 1 ? `${sink} x ${count}` : sink))
+    .join(", ");
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -111,11 +111,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return forceRedirectError(request.headers, "No stone id provided");
   }
   const stoneId = parseInt(params.stone, 10);
-  
+
   if (isNaN(stoneId)) {
     return forceRedirectError(request.headers, "Invalid stone ID format");
   }
-  
+
   const stone = await selectId<{ id: number; name: string; url: string }>(
     db,
     "SELECT id, name, url FROM stones WHERE id = ?",
@@ -124,17 +124,17 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!stone) {
     return forceRedirectError(request.headers, "No stone found for given ID");
   }
-  
+
   const slabs = await selectMany<Slab>(
     db,
     "SELECT id, bundle, url, sale_id, width, length, cut_date, parent_id FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL",
     [stoneId]
   );
-  
+
   let linkedSlabs: Slab[] = [];
-  
+
   try {
-    const stoneLinks = await selectMany<{ 
+    const stoneLinks = await selectMany<{
       source_stone_id: number;
       source_stone_name: string;
     }>(
@@ -149,7 +149,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
        ORDER BY s.name ASC`,
       [stoneId]
     );
-    
+
     for (const link of stoneLinks) {
       const linkedStoneSlabs = await selectMany<Slab>(
         db,
@@ -159,24 +159,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
          WHERE stone_id = ? AND cut_date IS NULL`,
         [link.source_stone_id]
       );
-      
-      linkedStoneSlabs.forEach(slab => {
+
+      linkedStoneSlabs.forEach((slab) => {
         slab.source_stone_id = link.source_stone_id;
         slab.source_stone_name = link.source_stone_name;
       });
-      
+
       linkedSlabs = [...linkedSlabs, ...linkedStoneSlabs];
     }
   } catch (err) {
     console.error("Error fetching linked slabs:", err);
   }
-  
+
   const allSlabs = [...slabs, ...linkedSlabs];
-  const soldSlabIds = allSlabs.filter(slab => slab.sale_id).map(slab => slab.id);
-  
+  const soldSlabIds = allSlabs
+    .filter((slab) => slab.sale_id)
+    .map((slab) => slab.id);
+
   if (soldSlabIds.length > 0) {
-    const placeholders = soldSlabIds.map(() => '?').join(',');
-    
+    const placeholders = soldSlabIds.map(() => "?").join(",");
+
     const sqlQuery = `
       SELECT 
         slab_inventory.id as slab_id,
@@ -195,9 +197,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         ) as sink_names
       FROM 
         sales
-      JOIN 
+      LEFT JOIN 
         customers ON sales.customer_id = customers.id
-      JOIN 
+      LEFT JOIN 
         users ON sales.seller_id = users.id
       JOIN 
         slab_inventory ON sales.id = slab_inventory.sale_id
@@ -206,23 +208,29 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       ORDER BY
         slab_inventory.id DESC
     `;
-    
+
     const rawTransactions = await selectMany<Record<string, any>>(
       db,
       sqlQuery,
       soldSlabIds
     );
-    
-    const transactionResults = rawTransactions.map(raw => {
-      try {
-        const parsed = TransactionSchema.parse(raw);
-        return parsed;
-      } catch (error) {
-        console.error(`Validation error for transaction:`, error);
-        return null;
-      }
-    }).filter(Boolean) as Transaction[];
-    
+
+    const transactionResults = rawTransactions
+      .map((raw) => {
+        try {
+          const parsed = TransactionSchema.parse(raw);
+          return parsed;
+        } catch (error) {
+          console.error(
+            `Validation error for transaction with sale_id ${raw.sale_id}:`,
+            error
+          );
+          console.error("Raw transaction data:", raw);
+          return null;
+        }
+      })
+      .filter(Boolean) as Transaction[];
+
     const transactionsBySlab = transactionResults.reduce((acc, transaction) => {
       if (!acc[transaction.slab_id]) {
         acc[transaction.slab_id] = [];
@@ -230,77 +238,81 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       acc[transaction.slab_id].push(transaction);
       return acc;
     }, {} as Record<number, Transaction[]>);
-    
-    allSlabs.forEach(slab => {
+
+    allSlabs.forEach((slab) => {
       const slabTransactions = transactionsBySlab[slab.id];
-      
+
       if (slabTransactions && slabTransactions.length > 0) {
         let transaction = slabTransactions[0];
-        
+
         slab.transaction = {
           sale_id: transaction.sale_id,
           sale_date: transaction.sale_date,
           customer_name: transaction.customer_name,
           seller_name: transaction.seller_name,
-          sale_notes: transaction.sale_notes || '',
-          slab_notes: transaction.slab_notes || '',
+          sale_notes: transaction.sale_notes || "",
+          slab_notes: transaction.slab_notes || "",
           square_feet: transaction.square_feet || 0,
-          sink: transaction.sink_names || '',
+          sink: transaction.sink_names || "",
         };
       } else if (slab.sale_id) {
-        console.warn(`WARNING: Slab ${slab.id} is marked as sold but has no transaction data!`);
+        console.warn(
+          `WARNING: Slab ${slab.id} is marked as sold but has no transaction data!`
+        );
       }
     });
   }
-  
+
   // Get parent transactions for slabs with parent_id
-  const slabsWithParent = allSlabs.filter(slab => slab.parent_id).map(slab => slab.parent_id);
-  
+  const slabsWithParent = allSlabs
+    .filter((slab) => slab.parent_id)
+    .map((slab) => slab.parent_id);
+
   if (slabsWithParent.length > 0) {
-    const parentPlaceholders = slabsWithParent.map(() => '?').join(',');
-    
+    const parentPlaceholders = slabsWithParent.map(() => "?").join(",");
+
     const parentSqlQuery = `
       SELECT 
         slab_inventory.id as slab_id,
-        customers.name as customer_name,
-        users.name as seller_name
+        COALESCE(customers.name, 'Unknown Customer') as customer_name,
+        COALESCE(users.name, 'Unknown Seller') as seller_name
       FROM 
         sales
-      JOIN 
+      LEFT JOIN 
         customers ON sales.customer_id = customers.id
-      JOIN 
+      LEFT JOIN 
         users ON sales.seller_id = users.id
       JOIN 
         slab_inventory ON sales.id = slab_inventory.sale_id
       WHERE 
         slab_inventory.id IN (${parentPlaceholders})
     `;
-    
+
     const parentTransactions = await selectMany<{
       slab_id: number;
       customer_name: string;
       seller_name: string;
-    }>(
-      db,
-      parentSqlQuery,
-      slabsWithParent
+    }>(db, parentSqlQuery, slabsWithParent);
+
+    const parentTransactionsBySlabId = parentTransactions.reduce(
+      (acc, transaction) => {
+        acc[transaction.slab_id] = transaction;
+        return acc;
+      },
+      {} as Record<number, { customer_name: string; seller_name: string }>
     );
-    
-    const parentTransactionsBySlabId = parentTransactions.reduce((acc, transaction) => {
-      acc[transaction.slab_id] = transaction;
-      return acc;
-    }, {} as Record<number, {customer_name: string, seller_name: string}>);
-    
-    allSlabs.forEach(slab => {
+
+    allSlabs.forEach((slab) => {
       if (slab.parent_id && parentTransactionsBySlabId[slab.parent_id]) {
         slab.parent_transaction = {
-          customer_name: parentTransactionsBySlabId[slab.parent_id].customer_name,
-          seller_name: parentTransactionsBySlabId[slab.parent_id].seller_name
+          customer_name:
+            parentTransactionsBySlabId[slab.parent_id].customer_name,
+          seller_name: parentTransactionsBySlabId[slab.parent_id].seller_name,
         };
       }
     });
   }
-  
+
   return { slabs, linkedSlabs, stone };
 }
 
@@ -311,33 +323,39 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const url = new URL(request.url);
   const searchParams = url.searchParams.toString();
-  const searchString = searchParams ? `?${searchParams}` : '';
+  const searchString = searchParams ? `?${searchParams}` : "";
 
   if (intent === "updateSize") {
     const slabId = Number(formData.get("slabId"));
     const length = Number(formData.get("length"));
     const width = Number(formData.get("width"));
-    
+
     if (isNaN(slabId) || isNaN(length) || isNaN(width)) {
       const session = await getSession(request.headers.get("Cookie"));
-      session.flash("message", toastData("Error", "Invalid values provided", "destructive"));
+      session.flash(
+        "message",
+        toastData("Error", "Invalid values provided", "destructive")
+      );
       return redirect(`/employee/stones/slabs/${params.stone}${searchString}`, {
         headers: { "Set-Cookie": await commitSession(session) },
       });
     }
-    
+
     await db.execute(
       "UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?",
       [length, width, slabId]
     );
-    
+
     const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Success", "Slab dimensions updated successfully"));
+    session.flash(
+      "message",
+      toastData("Success", "Slab dimensions updated successfully")
+    );
     return redirect(`/employee/stones/slabs/${params.stone}${searchString}`, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
   }
-  
+
   return null;
 }
 
@@ -349,24 +367,24 @@ export default function SlabsModal() {
   const navigation = useNavigation();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const slabId = searchParams.get('slab');
-    
+    const slabId = searchParams.get("slab");
+
     if (slabId) {
       const id = parseInt(slabId);
       setHighlightedSlab(id);
-      
+
       // Удаляем подсветку через 5 секунд
       const timer = setTimeout(() => {
         setHighlightedSlab(null);
       }, 5000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [location.search]);
- 
+
   const handleChange = (open: boolean) => {
     if (!open) {
       navigate(`..${location.search}`);
@@ -387,19 +405,26 @@ export default function SlabsModal() {
     const isEditing = editingSlab === slab.id;
     const isHighlighted = highlightedSlab === slab.id;
     const hasParent = slab.parent_id !== null;
-    
+
     return (
       <TooltipProvider key={slab.id}>
         <Tooltip>
           <TooltipTrigger asChild>
             <div
               className={`transition-all duration-300 flex items-center gap-4 p-2 sm:px-5 rounded-lg ${
-                slab.sale_id ? "bg-red-300 " : 
-                hasParent ? "bg-yellow-200 " : "bg-white "
+                slab.sale_id
+                  ? "bg-red-300 "
+                  : hasParent
+                  ? "bg-yellow-200 "
+                  : "bg-white "
               }${
-                isHighlighted ? "border-2 border-blue-500" : 
-                slab.sale_id ? "border border-red-400" : 
-                hasParent ? "border border-yellow-400" : "border border-gray-200"
+                isHighlighted
+                  ? "border-2 border-blue-500"
+                  : slab.sale_id
+                  ? "border border-red-400"
+                  : hasParent
+                  ? "border border-yellow-400"
+                  : "border border-gray-200"
               }`}
             >
               <img
@@ -416,11 +441,14 @@ export default function SlabsModal() {
                   }
                 }}
               />
-              
+
               <span
                 className={`font-semibold whitespace-nowrap ${
-                  slab.sale_id ? "text-red-900" : 
-                  hasParent ? "text-yellow-800" : "text-gray-800"
+                  slab.sale_id
+                    ? "text-red-900"
+                    : hasParent
+                    ? "text-yellow-800"
+                    : "text-gray-800"
                 }`}
               >
                 {slab.bundle}
@@ -428,7 +456,10 @@ export default function SlabsModal() {
 
               <div className="flex items-center gap-2 w-full">
                 {isEditing ? (
-                  <Form method="post" className="flex items-center gap-2 w-full">
+                  <Form
+                    method="post"
+                    className="flex items-center gap-2 w-full"
+                  >
                     <AuthenticityTokenInput />
                     <input type="hidden" name="intent" value="updateSize" />
                     <input type="hidden" name="slabId" value={slab.id} />
@@ -447,10 +478,12 @@ export default function SlabsModal() {
                       className="w-12 px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       inputMode="numeric"
                     />
-                    <Button type="submit" size="sm" className="ml-auto">Save</Button>
+                    <Button type="submit" size="sm" className="ml-auto">
+                      Save
+                    </Button>
                   </Form>
                 ) : (
-                  <button 
+                  <button
                     type="button"
                     onClick={() => handleEditClick(slab.id)}
                     className="text-gray-500 hover:text-gray-700 cursor-pointer"
@@ -463,19 +496,18 @@ export default function SlabsModal() {
               {!isEditing && (
                 <>
                   <div className="flex gap-2 ml-auto">
-                    {slab.transaction ? (
-                      <Link to={`edit/${slab.transaction.sale_id}/${location.search}`}>
-                        <Button type="button">
-                          Edit
-                        </Button>
+                    {slab.sale_id ? (
+                      <Link to={`edit/${slab.sale_id}/${location.search}`}>
+                        <Button type="button">Edit</Button>
                       </Link>
                     ) : (
                       <>
-                    <Link to={`sell/${slab.id}/${location.search}`} className="ml-auto">
-                      <Button className="px-4 py-2">
-                        Sell
-                      </Button>
-                    </Link>
+                        <Link
+                          to={`sell/${slab.id}/${location.search}`}
+                          className="ml-auto"
+                        >
+                          <Button className="px-4 py-2">Sell</Button>
+                        </Link>
                       </>
                     )}
                   </div>
@@ -490,49 +522,93 @@ export default function SlabsModal() {
                   <>
                     {slab.parent_id && slab.parent_transaction && (
                       <>
-                        <p><strong>Partially Sold by:</strong> {slab.parent_transaction.seller_name}</p>
+                        <p>
+                          <strong>Partially Sold by:</strong>{" "}
+                          {slab.parent_transaction.seller_name}
+                        </p>
                         <div className="mb-1 border-b border-gray-700"></div>
                       </>
                     )}
-                    
-                    <p><strong>Sold to:</strong> {slab.transaction.customer_name}</p>
-                    <p><strong>Sold by:</strong> {slab.transaction.seller_name}</p>
-                    <p><strong>Sale date:</strong> {formatDate(slab.transaction.sale_date)}</p>
-                    
+
+                    <p>
+                      <strong>Sold to:</strong> {slab.transaction.customer_name}
+                    </p>
+                    <p>
+                      <strong>Sold by:</strong> {slab.transaction.seller_name}
+                    </p>
+                    <p>
+                      <strong>Sale date:</strong>{" "}
+                      {formatDate(slab.transaction.sale_date)}
+                    </p>
+
                     {(slab.transaction.square_feet ?? 0) > 0 && (
-                      <p><strong>Total Square Feet:</strong> {slab.transaction.square_feet}</p>
+                      <p>
+                        <strong>Total Square Feet:</strong>{" "}
+                        {slab.transaction.square_feet}
+                      </p>
                     )}
-                    
+
                     {slab.transaction.sink && (
                       <>
-                        {formatSinkList(slab.transaction.sink).split(',').map((sink, index) => (
-                          <p key={index} className={index > 0 ? "text-sm ml-10" : ""}>
-                            {index === 0 ? <><strong>Sink:</strong> {sink}</> : sink}
-                          </p>
-                        ))}
+                        {formatSinkList(slab.transaction.sink)
+                          .split(",")
+                          .map((sink, index) => (
+                            <p
+                              key={index}
+                              className={index > 0 ? "text-sm ml-10" : ""}
+                            >
+                              {index === 0 ? (
+                                <>
+                                  <strong>Sink:</strong> {sink}
+                                </>
+                              ) : (
+                                sink
+                              )}
+                            </p>
+                          ))}
                       </>
                     )}
-                    
+
                     {slab.transaction.sale_notes && (
-                      <p><strong>Notes to Sale:</strong> {slab.transaction.sale_notes}</p>
+                      <p>
+                        <strong>Notes to Sale:</strong>{" "}
+                        {slab.transaction.sale_notes}
+                      </p>
                     )}
-                    
+
                     {slab.transaction.slab_notes && (
-                      <p><strong>Notes to Slab:</strong> {slab.transaction.slab_notes}</p>
+                      <p>
+                        <strong>Notes to Slab:</strong>{" "}
+                        {slab.transaction.slab_notes}
+                      </p>
                     )}
                   </>
                 ) : slab.parent_transaction ? (
                   <>
-                    <p><strong>Partially sold to:</strong> {slab.parent_transaction.customer_name}</p>
-                    <p><strong>Partially sold by:</strong> {slab.parent_transaction.seller_name}</p>
+                    <p>
+                      <strong>Partially sold to:</strong>{" "}
+                      {slab.parent_transaction.customer_name}
+                    </p>
+                    <p>
+                      <strong>Partially sold by:</strong>{" "}
+                      {slab.parent_transaction.seller_name}
+                    </p>
                   </>
-                ) : (
+                ) : slab.sale_id ? (
                   <>
-                    <p><strong>Status:</strong> Sold</p>
-                    <p className="text-red-400">Transaction data not available</p>
-                    <p className="text-xs mt-1">This slab is marked as sold but has no transaction details.</p>
+                    <p>
+                      <strong>Status:</strong> Sold
+                    </p>
+                    <p className="text-red-400">
+                      Transaction data not available
+                    </p>
+                    <p className="text-xs mt-1">
+                      This slab is marked as sold but has no transaction
+                      details.
+                    </p>
+                    <p className="text-xs mt-1">Sale ID: {slab.sale_id}</p>
                   </>
-                )}
+                ) : null}
               </div>
             </TooltipContent>
           )}
@@ -543,24 +619,24 @@ export default function SlabsModal() {
 
   // Group slabs by their bundle name first
   const allSlabs = [...linkedSlabs, ...slabs];
-  
+
   // Create a map of bundle names to slabs
   const slabsByBundle: Record<string, Slab[]> = {};
-  
+
   // Group slabs by bundle
-  allSlabs.forEach(slab => {
+  allSlabs.forEach((slab) => {
     if (!slabsByBundle[slab.bundle]) {
       slabsByBundle[slab.bundle] = [];
     }
     slabsByBundle[slab.bundle].push(slab);
   });
-  
+
   // Order the bundle names naturally (Slab 1, Slab 2, etc.)
   const orderedBundles = Object.keys(slabsByBundle).sort((a, b) => {
     // Extract numbers from bundle names if they exist
     const aMatch = a.match(/(\d+)/);
     const bMatch = b.match(/(\d+)/);
-    
+
     if (aMatch && bMatch) {
       const aNum = parseInt(aMatch[0], 10);
       const bNum = parseInt(bMatch[0], 10);
@@ -568,36 +644,33 @@ export default function SlabsModal() {
         return aNum - bNum;
       }
     }
-    
+
     // Fallback to string comparison
     return a.localeCompare(b);
   });
-  
+
   // Create final ordered list
   const sortedSlabs: Slab[] = [];
-  
+
   // For each bundle, add all slabs with that bundle name
-  orderedBundles.forEach(bundle => {
+  orderedBundles.forEach((bundle) => {
     const bundleSlabs = slabsByBundle[bundle];
-    
+
     // Within a bundle group, place parents first, then children
-    const parents = bundleSlabs.filter(slab => slab.parent_id === null);
-    const children = bundleSlabs.filter(slab => slab.parent_id !== null);
-    
+    const parents = bundleSlabs.filter((slab) => slab.parent_id === null);
+    const children = bundleSlabs.filter((slab) => slab.parent_id !== null);
+
     // Add parents first
     sortedSlabs.push(...parents);
-    
+
     // Then add children
     sortedSlabs.push(...children);
   });
-  
+
   const uniqueSlabs = sortedSlabs;
 
   return (
-    <Dialog
-      open={true}
-      onOpenChange={handleChange}
-    >
+    <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className="bg-white rounded-md pt-5 px-2 shadow-lg text-gray-800 overflow-y-auto max-h-[95vh]">
         <DialogTitle>Slabs for {stone.name}</DialogTitle>
 
@@ -618,7 +691,7 @@ export default function SlabsModal() {
           }}
         >
           <DialogContent className="max-w-4xl w-full h-auto flex items-center justify-center bg-black bg-opacity-90 p-1">
-            <DialogClose 
+            <DialogClose
               className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
               onClick={(e) => {
                 e.preventDefault();

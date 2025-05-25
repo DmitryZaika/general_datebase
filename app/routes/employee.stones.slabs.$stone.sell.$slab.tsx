@@ -179,18 +179,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const searchParams = url.searchParams.toString();
   const searchString = searchParams ? `?${searchParams}` : "";
 
-  // Get additional slab IDs from form data
-  const formData = await request.formData();
+  // Get additional slab IDs from already parsed data and fallback to URL params if needed
   let additionalSlabIds: number[] = [];
 
-  // Parse additional slab IDs
-  if (formData.getAll("additional_slab_ids[]")) {
-    const slabIdValues = formData.getAll("additional_slab_ids[]");
-    additionalSlabIds = slabIdValues
-      .map((value) => parseInt(value.toString(), 10))
-      .filter((id) => !isNaN(id));
-  } else if (data.additional_slab_ids) {
-    // Alternative way of receiving additional slabs
+  // Parse additional slab IDs from the already parsed data
+  if (data.additional_slab_ids) {
     additionalSlabIds = Array.isArray(data.additional_slab_ids)
       ? data.additional_slab_ids
           .map((id) => parseInt(id.toString(), 10))
@@ -201,6 +194,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const id = parseInt(data.additional_slab_id.toString(), 10);
     if (!isNaN(id)) {
       additionalSlabIds = [id];
+    }
+  }
+
+  // If no additional slabs found in parsed data, try to get from URL search params
+  if (additionalSlabIds.length === 0) {
+    const urlAdditionalSlabs = url.searchParams.getAll("additional_slab_ids");
+    if (urlAdditionalSlabs.length > 0) {
+      additionalSlabIds = urlAdditionalSlabs
+        .map((id) => parseInt(id, 10))
+        .filter((id) => !isNaN(id));
     }
   }
 
@@ -636,6 +639,19 @@ export default function SlabSell() {
   // Function to open slab dialog for a specific room
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [showRoomSlabDialog, setShowRoomSlabDialog] = useState(false);
+  const [currentRoomStoneId, setCurrentRoomStoneId] = useState<string | null>(
+    null
+  );
+
+  // Add state for added slabs per room (separate from available slabs)
+  const [addedRoomSlabs, setAddedRoomSlabs] = useState<
+    Record<string, RoomSlab[]>
+  >({});
+
+  // Add state for selected main slab per room (from Slab Number dropdown)
+  const [selectedRoomSlab, setSelectedRoomSlab] = useState<
+    Record<string, RoomSlab | null>
+  >({});
 
   // Function to fetch available stones (those with unsold slabs)
   const fetchAvailableStones = async (query: string = "") => {
@@ -795,7 +811,6 @@ export default function SlabSell() {
   // Handler for selecting a slab in the add slab dialog
   const handleAddSlab = () => {
     const selectedSlabId = form.watch("additional_slab_id");
-    const isFullSlab = form.watch("is_full_slab_sold");
 
     if (selectedSlabId) {
       const selectedSlab = availableSlabs.find(
@@ -813,12 +828,11 @@ export default function SlabSell() {
           {
             id: Number(selectedSlabId),
             bundle: selectedSlab.bundle,
-            is_full_slab: isFullSlab,
+            is_full_slab: false, // Default to false, user can change with individual switch
           },
         ]);
         setShowAddSlabDialog(false);
         form.setValue("additional_slab_id", ""); // Clear selection
-        form.setValue("is_full_slab_sold", false); // Reset to default
       } else if (isDuplicate) {
         alert("This slab has already been added");
       }
@@ -841,6 +855,15 @@ export default function SlabSell() {
     defaultValues: {
       same_address: true,
       ten_year_sealer: defaultTenYearSealer,
+      is_full_slab_sold: false, // Default to false
+      edge: "Flat",
+      backsplash: "No",
+      tear_out: "No",
+      stove: "F/S",
+      waterfall: "No",
+      corbels: 0,
+      seam: "Standard",
+      room: "Kitchen",
     },
   });
 
@@ -849,37 +872,41 @@ export default function SlabSell() {
     if (!currentRoomId) return;
 
     const selectedSlabId = form.watch("additional_slab_id");
-    const isFullSlab = form.watch("is_full_slab_sold");
 
     if (selectedSlabId) {
-      const selectedSlab = availableSlabs.find(
+      // Use roomSlabs for the current room instead of availableSlabs
+      const roomSpecificSlabs = roomSlabs[currentRoomId] || [];
+      const selectedSlab = roomSpecificSlabs.find(
         (slab) => String(slab.id) === selectedSlabId
       );
 
-      // Check if this slab is already added to this room
-      const currentRoomSlabs = roomSlabs[currentRoomId] || [];
-      const isDuplicate = currentRoomSlabs.some(
+      // Check if this slab is already added to this room (check both added slabs and selected main slab)
+      const currentAddedSlabs = addedRoomSlabs[currentRoomId] || [];
+      const currentMainSlab = selectedRoomSlab[currentRoomId];
+
+      const isDuplicateInAdded = currentAddedSlabs.some(
         (slab) => slab.id === Number(selectedSlabId)
       );
 
-      if (selectedSlab && !isDuplicate) {
-        const updatedRoomSlabs = {
-          ...roomSlabs,
+      const isDuplicateInMain = currentMainSlab?.id === Number(selectedSlabId);
+
+      if (selectedSlab && !isDuplicateInAdded && !isDuplicateInMain) {
+        const updatedAddedSlabs = {
+          ...addedRoomSlabs,
           [currentRoomId]: [
-            ...currentRoomSlabs,
+            ...currentAddedSlabs,
             {
               id: Number(selectedSlabId),
               bundle: selectedSlab.bundle,
-              is_full_slab: isFullSlab,
+              is_full_slab: false, // Default to false, user can change with individual switch
             },
           ],
         };
 
-        setRoomSlabs(updatedRoomSlabs);
+        setAddedRoomSlabs(updatedAddedSlabs);
         setShowRoomSlabDialog(false);
         form.setValue("additional_slab_id", ""); // Clear selection
-        form.setValue("is_full_slab_sold", false); // Reset to default
-      } else if (isDuplicate) {
+      } else if (isDuplicateInAdded || isDuplicateInMain) {
         alert("This slab has already been added to this room");
       }
     } else {
@@ -1168,10 +1195,6 @@ export default function SlabSell() {
   }, [additionalRooms, stoneTypes]);
 
   // Determine default room ten_year_sealer value based on stone type
-  const getRoomTenYearSealerDefault = (color: string): boolean => {
-    if (!color || !stoneTypes[color]) return true;
-    return stoneTypes[color].toLowerCase() !== "quartz";
-  };
 
   // Fix form.watch by using a direct approach
   const getStoneTypeDisplay = () => {
@@ -1189,11 +1212,6 @@ export default function SlabSell() {
         >
           {stoneType.charAt(0).toUpperCase() + stoneType.slice(1)}
         </span>
-        <p className="text-xs text-gray-500 ml-10 mt-1">
-          {stoneType.toLowerCase() === "quartz"
-            ? "Quartz doesn't require a 10-year sealer"
-            : "Natural stones require a 10-year sealer"}
-        </p>
       </>
     );
   };
@@ -1266,9 +1284,9 @@ export default function SlabSell() {
                   {isExistingCustomer && (
                     <div className="absolute right-0 top-0 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-1 mr-1 flex items-center gap-1">
                       <span>Existing</span>
-                      <button
-                        type="button"
-                        className="ml-1 rounded-full hover:bg-blue-200 p-0.5"
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => {
                           setIsExistingCustomer(false);
                           form.setValue("customer_id", undefined);
@@ -1281,7 +1299,7 @@ export default function SlabSell() {
                         }}
                       >
                         <X className="h-3 w-3" />
-                      </button>
+                      </Button>
                     </div>
                   )}
 
@@ -1373,17 +1391,13 @@ export default function SlabSell() {
               </div>
 
               <div className="mt-6 mb-2 font-semibold text-sm">First Room</div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">
-                  {stoneName} - Bundle {bundle}
-                </span>
-              </div>
+              <div className="flex items-center justify-between"></div>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 <FormField
                   control={form.control}
                   name="room"
                   render={({ field }) => (
-                    <SelectInput
+                    <SelectInputOther
                       field={field}
                       placeholder="Room"
                       name="Room"
@@ -1394,7 +1408,6 @@ export default function SlabSell() {
                         { key: "Outdoor", value: "Outdoor" },
                         { key: "Island", value: "Island" },
                       ]}
-                      defaultValue="Kitchen"
                     />
                   )}
                 />
@@ -1424,7 +1437,7 @@ export default function SlabSell() {
                   control={form.control}
                   name="edge"
                   render={({ field }) => (
-                    <SelectInput
+                    <SelectInputOther
                       field={field}
                       placeholder="Edge"
                       name="Edge"
@@ -1446,7 +1459,7 @@ export default function SlabSell() {
                   control={form.control}
                   name="backsplash"
                   render={({ field }) => (
-                    <SelectInput
+                    <SelectInputOther
                       field={field}
                       placeholder="Backsplash"
                       name="Backsplash"
@@ -1470,7 +1483,6 @@ export default function SlabSell() {
                       placeholder={"Enter Sqft"}
                       field={field}
                       formClassName="mb-0"
-                      type="number"
                     />
                   )}
                 />
@@ -1479,7 +1491,7 @@ export default function SlabSell() {
                   control={form.control}
                   name="tear_out"
                   render={({ field }) => (
-                    <SelectInput
+                    <SelectInputOther
                       field={field}
                       placeholder="Tear-Out"
                       name="Tear-Out"
@@ -1499,7 +1511,7 @@ export default function SlabSell() {
                     control={form.control}
                     name="stove"
                     render={({ field }) => (
-                      <SelectInput
+                      <SelectInputOther
                         field={field}
                         placeholder="Stove"
                         name="Stove"
@@ -1520,7 +1532,7 @@ export default function SlabSell() {
                   control={form.control}
                   name="waterfall"
                   render={({ field }) => (
-                    <SelectInput
+                    <SelectInputOther
                       field={field}
                       placeholder="Waterfall"
                       name="Waterfall"
@@ -1529,7 +1541,6 @@ export default function SlabSell() {
                         { key: "No", value: "No" },
                         { key: "Yes", value: "Yes" },
                       ]}
-                      defaultValue="No"
                     />
                   )}
                 />
@@ -1541,17 +1552,8 @@ export default function SlabSell() {
                     <InputItem
                       name={"Corbels"}
                       placeholder={"Number of corbels"}
-                      field={{
-                        ...field,
-                        value: field.value === undefined ? 0 : field.value,
-                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                          const val = parseInt(e.target.value) || 0;
-                          field.onChange(val < 0 ? 0 : val);
-                        },
-                        min: 0,
-                      }}
+                      field={field}
                       formClassName="mb-0"
-                      type="number"
                     />
                   )}
                 />
@@ -1560,7 +1562,7 @@ export default function SlabSell() {
                   control={form.control}
                   name="seam"
                   render={({ field }) => (
-                    <SelectInput
+                    <SelectInputOther
                       field={field}
                       placeholder="Seam"
                       name="Seam"
@@ -1573,7 +1575,6 @@ export default function SlabSell() {
                         { key: "European", value: "European" },
                         { key: "N/A", value: "N/A" },
                       ]}
-                      defaultValue="Standard"
                     />
                   )}
                 />
@@ -1606,25 +1607,6 @@ export default function SlabSell() {
               </div>
 
               <div className="flex items-center space-x-2 mt-4">
-                <FormField
-                  control={form.control}
-                  name="is_full_slab_sold"
-                  render={({ field }) => (
-                    <>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        id="is_full_slab_sold"
-                      />
-                      <label
-                        htmlFor="is_full_slab_sold"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Full Slab Sold
-                      </label>
-                    </>
-                  )}
-                />
                 <Button
                   type="button"
                   variant="outline"
@@ -1635,31 +1617,95 @@ export default function SlabSell() {
                 </Button>
               </div>
 
-              {/* Display selected additional slabs */}
+              {/* Display main slab being sold with individual switch */}
+              <div className="mt-2 space-y-2">
+                <div className="text-xs text-gray-600">Main Slab:</div>
+                <div className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
+                  <div className="flex items-center space-x-2">
+                    <FormField
+                      control={form.control}
+                      name="is_full_slab_sold"
+                      render={({ field }) => (
+                        <>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            id="main_slab_full"
+                          />
+                          <label
+                            htmlFor="main_slab_full"
+                            className="text-sm font-medium"
+                          >
+                            Full Slab Sold
+                          </label>
+                        </>
+                      )}
+                    />
+                  </div>
+                  <div
+                    className={`px-2 py-1 rounded-md text-sm ${
+                      form.watch("is_full_slab_sold")
+                        ? "bg-red-100 text-red-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    Bundle {bundle}{" "}
+                    {form.watch("is_full_slab_sold") ? "(Full)" : "(Partial)"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Display additional slabs with individual switches */}
               {additionalSlabs.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 space-y-2">
+                  <div className="text-xs text-gray-600">Additional Slabs:</div>
                   {additionalSlabs.map((slab) => (
                     <div
                       key={slab.id}
-                      className={`px-2 py-1 rounded-md flex items-center text-sm ${
-                        slab.is_full_slab
-                          ? "bg-red-100 text-red-800"
-                          : "bg-yellow-100 text-yellow-800"
-                      }`}
+                      className="flex items-center justify-between bg-gray-50 p-2 rounded-md"
                     >
-                      <span>
-                        {slab.bundle}{" "}
-                        {slab.is_full_slab ? "(Full)" : "(Partial)"}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-4 w-4 p-0 ml-1"
-                        onClick={() => handleRemoveAdditionalSlab(slab.id)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={slab.is_full_slab}
+                          onCheckedChange={(checked) => {
+                            setAdditionalSlabs((prev) =>
+                              prev.map((s) =>
+                                s.id === slab.id
+                                  ? { ...s, is_full_slab: checked }
+                                  : s
+                              )
+                            );
+                          }}
+                          id={`additional_slab_${slab.id}`}
+                        />
+                        <label
+                          htmlFor={`additional_slab_${slab.id}`}
+                          className="text-sm font-medium"
+                        >
+                          Full Slab Sold
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className={`px-2 py-1 rounded-md text-sm ${
+                            slab.is_full_slab
+                              ? "bg-red-100 text-red-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          Bundle {slab.bundle}{" "}
+                          {slab.is_full_slab ? "(Full)" : "(Partial)"}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => handleRemoveAdditionalSlab(slab.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
                       <input
                         type="hidden"
                         name="additional_slab_ids[]"
@@ -1696,7 +1742,7 @@ export default function SlabSell() {
                       control={form.control}
                       name={`rooms.${index}.room`}
                       render={({ field }) => (
-                        <SelectInput
+                        <SelectInputOther
                           field={{
                             ...field,
                             value: room.room,
@@ -1735,7 +1781,6 @@ export default function SlabSell() {
                             { key: "Outdoor", value: "Outdoor" },
                             { key: "Island", value: "Island" },
                           ]}
-                          defaultValue="Kitchen"
                         />
                       )}
                     />
@@ -1835,7 +1880,7 @@ export default function SlabSell() {
 
                           {/* Stone search results dropdown */}
                           {stoneSearchResults.length > 0 && (
-                            <div className="absolute z-10 w-full mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg">
+                            <div className="absolute z-10 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg w-1/2">
                               <ul className="py-1 divide-y divide-gray-200">
                                 {stoneSearchResults.map((stone) => (
                                   <li
@@ -1875,47 +1920,80 @@ export default function SlabSell() {
                     <FormField
                       control={form.control}
                       name={`rooms.${index}.slab_number`}
-                      render={({ field }) => (
-                        <SelectInput
-                          field={{
-                            ...field,
-                            value: room.slab_number,
-                            onChange: (value) => {
-                              let newValue;
-                              if (typeof value === "object" && value !== null) {
+                      render={({ field, fieldState }) => (
+                        <div className="space-y-1">
+                          <SelectInput
+                            field={{
+                              ...field,
+                              value: room.slab_number,
+                              onChange: (value) => {
+                                let newValue;
                                 if (
-                                  "target" in value &&
-                                  typeof value.target === "object" &&
-                                  value.target !== null &&
-                                  "value" in value.target
+                                  typeof value === "object" &&
+                                  value !== null
                                 ) {
-                                  newValue = value.target.value;
+                                  if (
+                                    "target" in value &&
+                                    typeof value.target === "object" &&
+                                    value.target !== null &&
+                                    "value" in value.target
+                                  ) {
+                                    newValue = value.target.value;
+                                  }
+                                } else {
+                                  newValue = String(value);
                                 }
-                              } else {
-                                newValue = String(value);
-                              }
 
-                              if (newValue) {
-                                setAdditionalRooms((prev) =>
-                                  prev.map((r) =>
-                                    r.id === room.id
-                                      ? { ...r, slab_number: newValue }
-                                      : r
-                                  )
-                                );
-                              }
-                            },
-                          }}
-                          placeholder="Select Slab Number"
-                          name="Slab Number"
-                          className="mb-0"
-                          options={(roomSlabs[room.id] || availableSlabs).map(
-                            (slab) => ({
+                                if (newValue) {
+                                  // Update room slab_number
+                                  setAdditionalRooms((prev) =>
+                                    prev.map((r) =>
+                                      r.id === room.id
+                                        ? { ...r, slab_number: newValue }
+                                        : r
+                                    )
+                                  );
+
+                                  // Update form field for validation
+                                  field.onChange(newValue);
+
+                                  // Set the selected main slab for this room (replace, not add)
+                                  const selectedSlabId = newValue;
+                                  const roomSpecificSlabs =
+                                    roomSlabs[room.id] || [];
+                                  const selectedSlab = roomSpecificSlabs.find(
+                                    (slab) => String(slab.id) === selectedSlabId
+                                  );
+
+                                  if (selectedSlab) {
+                                    setSelectedRoomSlab((prev) => ({
+                                      ...prev,
+                                      [room.id]: {
+                                        id: Number(selectedSlabId),
+                                        bundle: selectedSlab.bundle,
+                                        is_full_slab: room.is_full_slab, // Use room's full slab status
+                                      },
+                                    }));
+                                  }
+                                }
+                              },
+                            }}
+                            placeholder="Select Slab Number"
+                            name="Slab Number"
+                            className={`mb-0 ${
+                              fieldState.error ? "border-red-500" : ""
+                            }`}
+                            options={(roomSlabs[room.id] || []).map((slab) => ({
                               key: String(slab.id),
                               value: `Bundle ${slab.bundle}`,
-                            })
+                            }))}
+                          />
+                          {fieldState.error && (
+                            <p className="text-red-500 text-xs">
+                              {fieldState.error.message}
+                            </p>
                           )}
-                        />
+                        </div>
                       )}
                     />
 
@@ -1923,7 +2001,7 @@ export default function SlabSell() {
                       control={form.control}
                       name={`rooms.${index}.edge`}
                       render={({ field }) => (
-                        <SelectInput
+                        <SelectInputOther
                           field={{
                             ...field,
                             value: room.edge,
@@ -1964,7 +2042,6 @@ export default function SlabSell() {
                             { key: "Bullnose", value: "Bullnose" },
                             { key: "Ogee", value: "Ogee" },
                           ]}
-                          defaultValue="Flat"
                         />
                       )}
                     />
@@ -1973,7 +2050,7 @@ export default function SlabSell() {
                       control={form.control}
                       name={`rooms.${index}.backsplash`}
                       render={({ field }) => (
-                        <SelectInput
+                        <SelectInputOther
                           field={{
                             ...field,
                             value: room.backsplash,
@@ -2020,7 +2097,7 @@ export default function SlabSell() {
                       control={form.control}
                       name={`rooms.${index}.tear_out`}
                       render={({ field }) => (
-                        <SelectInput
+                        <SelectInputOther
                           field={{
                             ...field,
                             value: room.tear_out,
@@ -2058,7 +2135,6 @@ export default function SlabSell() {
                             { key: "Laminate", value: "Laminate" },
                             { key: "Stone", value: "Stone" },
                           ]}
-                          defaultValue="No"
                         />
                       )}
                     />
@@ -2068,7 +2144,7 @@ export default function SlabSell() {
                         control={form.control}
                         name={`rooms.${index}.stove`}
                         render={({ field }) => (
-                          <SelectInput
+                          <SelectInputOther
                             field={{
                               ...field,
                               value: room.stove,
@@ -2110,7 +2186,6 @@ export default function SlabSell() {
                               { key: "C/T", value: "C/T" },
                               { key: "Grill", value: "Grill" },
                             ]}
-                            defaultValue="F/S"
                           />
                         )}
                       />
@@ -2120,7 +2195,7 @@ export default function SlabSell() {
                       control={form.control}
                       name={`rooms.${index}.waterfall`}
                       render={({ field }) => (
-                        <SelectInput
+                        <SelectInputOther
                           field={{
                             ...field,
                             value: room.waterfall,
@@ -2157,7 +2232,6 @@ export default function SlabSell() {
                             { key: "No", value: "No" },
                             { key: "Yes", value: "Yes" },
                           ]}
-                          defaultValue="No"
                         />
                       )}
                     />
@@ -2197,7 +2271,7 @@ export default function SlabSell() {
                       control={form.control}
                       name={`rooms.${index}.seam`}
                       render={({ field }) => (
-                        <SelectInput
+                        <SelectInputOther
                           field={{
                             ...field,
                             value: room.seam,
@@ -2238,7 +2312,6 @@ export default function SlabSell() {
                             { key: "European", value: "European" },
                             { key: "N/A", value: "N/A" },
                           ]}
-                          defaultValue="Standard"
                         />
                       )}
                     />
@@ -2293,6 +2366,28 @@ export default function SlabSell() {
                                       : r
                                   )
                                 );
+
+                                // Update the status of the main selected slab for this room
+                                if (selectedRoomSlab[room.id]) {
+                                  setSelectedRoomSlab((prev) => ({
+                                    ...prev,
+                                    [room.id]: {
+                                      ...prev[room.id]!,
+                                      ten_year_sealer: checked,
+                                    },
+                                  }));
+                                }
+
+                                // Update the status of added slabs for this room
+                                if (addedRoomSlabs[room.id]) {
+                                  setAddedRoomSlabs((prev) => ({
+                                    ...prev,
+                                    [room.id]: prev[room.id].map((slab) => ({
+                                      ...slab,
+                                      ten_year_sealer: checked,
+                                    })),
+                                  }));
+                                }
                               }}
                               id={`ten_year_sealer_${room.id}`}
                               disabled={Boolean(
@@ -2329,6 +2424,28 @@ export default function SlabSell() {
                                       : r
                                   )
                                 );
+
+                                // Update the status of the main selected slab for this room
+                                if (selectedRoomSlab[room.id]) {
+                                  setSelectedRoomSlab((prev) => ({
+                                    ...prev,
+                                    [room.id]: {
+                                      ...prev[room.id]!,
+                                      is_full_slab: checked,
+                                    },
+                                  }));
+                                }
+
+                                // Update the status of added slabs for this room
+                                if (addedRoomSlabs[room.id]) {
+                                  setAddedRoomSlabs((prev) => ({
+                                    ...prev,
+                                    [room.id]: prev[room.id].map((slab) => ({
+                                      ...slab,
+                                      is_full_slab: checked,
+                                    })),
+                                  }));
+                                }
                               }}
                               id={`is_full_slab_${room.id}`}
                             />
@@ -2341,58 +2458,189 @@ export default function SlabSell() {
                           </>
                         )}
                       />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setCurrentRoomId(room.id);
-                          setShowRoomSlabDialog(true);
-                        }}
-                      >
-                        Add Slab
-                      </Button>
+                      <div className="col-span-2 flex items-center space-x-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCurrentRoomId(room.id);
+                            setShowRoomSlabDialog(true);
+                          }}
+                        >
+                          Add Slab
+                        </Button>
+                      </div>
                     </div>
 
                     {/* Display room slabs */}
-                    {roomSlabs[room.id] && roomSlabs[room.id].length > 0 && (
-                      <div className="col-span-2 mt-2 flex flex-wrap gap-2">
-                        {roomSlabs[room.id].map((slab) => (
-                          <div
-                            key={slab.id}
-                            className={`px-2 py-1 rounded-md flex items-center text-sm ${
-                              slab.is_full_slab
-                                ? "bg-red-100 text-red-800"
-                                : "bg-yellow-100 text-yellow-800"
-                            }`}
-                          >
-                            <span>
-                              {slab.bundle}{" "}
-                              {slab.is_full_slab ? "(Full)" : "(Partial)"}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-4 w-4 p-0 ml-1"
-                              onClick={() =>
-                                handleRemoveRoomSlab(room.id, slab.id)
-                              }
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                            <input
-                              type="hidden"
-                              name={`room_${index}_slab_ids[]`}
-                              value={slab.id}
-                            />
-                            <input
-                              type="hidden"
-                              name={`room_${index}_slab_${slab.id}_is_full`}
-                              value={slab.is_full_slab ? "1" : "0"}
-                            />
+                    {(selectedRoomSlab[room.id] ||
+                      (addedRoomSlabs[room.id] &&
+                        addedRoomSlabs[room.id].length > 0)) && (
+                      <div className="col-span-2 mt-2 space-y-2">
+                        {/* Main selected slab */}
+                        {selectedRoomSlab[room.id] && (
+                          <div className="space-y-2">
+                            <div className="text-xs text-gray-600">
+                              Main Slab:
+                            </div>
+                            <div className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  checked={
+                                    selectedRoomSlab[room.id]!.is_full_slab
+                                  }
+                                  onCheckedChange={(checked) => {
+                                    setSelectedRoomSlab((prev) => ({
+                                      ...prev,
+                                      [room.id]: {
+                                        ...prev[room.id]!,
+                                        is_full_slab: checked,
+                                      },
+                                    }));
+                                  }}
+                                  id={`main_slab_${room.id}`}
+                                />
+                                <label
+                                  htmlFor={`main_slab_${room.id}`}
+                                  className="text-sm font-medium"
+                                >
+                                  Full Slab Sold
+                                </label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div
+                                  className={`px-2 py-1 rounded-md text-sm ${
+                                    selectedRoomSlab[room.id]!.is_full_slab
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-yellow-100 text-yellow-800"
+                                  }`}
+                                >
+                                  Bundle {selectedRoomSlab[room.id]!.bundle}{" "}
+                                  {selectedRoomSlab[room.id]!.is_full_slab
+                                    ? "(Full)"
+                                    : "(Partial)"}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => {
+                                    setSelectedRoomSlab((prev) => ({
+                                      ...prev,
+                                      [room.id]: null,
+                                    }));
+                                    // Also clear the slab_number in the room
+                                    setAdditionalRooms((prev) =>
+                                      prev.map((r) =>
+                                        r.id === room.id
+                                          ? { ...r, slab_number: "" }
+                                          : r
+                                      )
+                                    );
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                        ))}
+                        )}
+
+                        {/* Additional slabs */}
+                        {addedRoomSlabs[room.id] &&
+                          addedRoomSlabs[room.id].length > 0 && (
+                            <div className="space-y-2">
+                              <div className="text-xs text-gray-600">
+                                Additional Slabs:
+                              </div>
+                              {addedRoomSlabs[room.id].map((slab) => (
+                                <div
+                                  key={slab.id}
+                                  className="flex items-center justify-between bg-gray-50 p-2 rounded-md"
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <Switch
+                                      checked={slab.is_full_slab}
+                                      onCheckedChange={(checked) => {
+                                        setAddedRoomSlabs((prev) => ({
+                                          ...prev,
+                                          [room.id]: prev[room.id].map((s) =>
+                                            s.id === slab.id
+                                              ? { ...s, is_full_slab: checked }
+                                              : s
+                                          ),
+                                        }));
+                                      }}
+                                      id={`additional_slab_${room.id}_${slab.id}`}
+                                    />
+                                    <label
+                                      htmlFor={`additional_slab_${room.id}_${slab.id}`}
+                                      className="text-sm font-medium"
+                                    >
+                                      Full Slab Sold
+                                    </label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <div
+                                      className={`px-2 py-1 rounded-md text-sm ${
+                                        slab.is_full_slab
+                                          ? "bg-red-100 text-red-800"
+                                          : "bg-yellow-100 text-yellow-800"
+                                      }`}
+                                    >
+                                      Bundle {slab.bundle}{" "}
+                                      {slab.is_full_slab
+                                        ? "(Full)"
+                                        : "(Partial)"}
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0"
+                                      onClick={() =>
+                                        handleRemoveRoomSlab(room.id, slab.id)
+                                      }
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                  <input
+                                    type="hidden"
+                                    name={`room_${index}_additional_slab_ids[]`}
+                                    value={slab.id}
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name={`room_${index}_additional_slab_${slab.id}_is_full`}
+                                    value={slab.is_full_slab ? "1" : "0"}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                        {/* Hidden inputs for main slab */}
+                        {selectedRoomSlab[room.id] && (
+                          <>
+                            <input
+                              type="hidden"
+                              name={`room_${index}_main_slab_id`}
+                              value={selectedRoomSlab[room.id]!.id}
+                            />
+                            <input
+                              type="hidden"
+                              name={`room_${index}_main_slab_is_full`}
+                              value={
+                                selectedRoomSlab[room.id]!.is_full_slab
+                                  ? "1"
+                                  : "0"
+                              }
+                            />
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2519,9 +2767,11 @@ export default function SlabSell() {
             </DialogHeader>
             <FormProvider {...form}>
               <div className="space-y-4">
-                {availableSlabs.length === 0 ? (
+                {!currentRoomId ||
+                !roomSlabs[currentRoomId] ||
+                roomSlabs[currentRoomId].length === 0 ? (
                   <div className="text-center py-4 text-gray-500">
-                    No available slabs found for this stone
+                    No available slabs found for the selected stone in this room
                   </div>
                 ) : (
                   <>
@@ -2534,48 +2784,38 @@ export default function SlabSell() {
                           placeholder="Select a slab"
                           name="Additional Slab"
                           className="mb-0"
-                          options={availableSlabs.map((slab) => ({
-                            key: String(slab.id),
-                            value: `Bundle ${slab.bundle}`,
-                          }))}
+                          options={(roomSlabs[currentRoomId] || []).map(
+                            (slab) => ({
+                              key: String(slab.id),
+                              value: `Bundle ${slab.bundle}`,
+                            })
+                          )}
                         />
                       )}
                     />
-
-                    <div className="flex items-center space-x-2 mt-4">
-                      <FormField
-                        control={form.control}
-                        name="is_full_slab_sold"
-                        render={({ field }) => (
-                          <>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              id="is_full_slab_sold_room_dialog"
-                            />
-                            <label
-                              htmlFor="is_full_slab_sold_room_dialog"
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              Full Slab Sold
-                            </label>
-                          </>
-                        )}
-                      />
-                    </div>
                   </>
                 )}
               </div>
               <DialogFooter>
                 <Button
                   variant="outline"
-                  onClick={() => setShowRoomSlabDialog(false)}
+                  onClick={() => {
+                    setShowRoomSlabDialog(false);
+                    setCurrentRoomId(null);
+                    setCurrentRoomStoneId(null);
+                    form.setValue("additional_slab_id", "");
+                    form.setValue("is_full_slab_sold", false);
+                  }}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleAddSlabToRoom}
-                  disabled={availableSlabs.length === 0}
+                  disabled={
+                    !currentRoomId ||
+                    !roomSlabs[currentRoomId] ||
+                    roomSlabs[currentRoomId].length === 0
+                  }
                 >
                   Add Slab
                 </Button>
@@ -2584,7 +2824,7 @@ export default function SlabSell() {
           </DialogContent>
         </Dialog>
 
-        {/* Add Slab Dialog for Rooms */}
+        {/* Add Slab Dialog */}
         <Dialog open={showAddSlabDialog} onOpenChange={setShowAddSlabDialog}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
@@ -2614,28 +2854,6 @@ export default function SlabSell() {
                         />
                       )}
                     />
-
-                    <div className="flex items-center space-x-2 mt-4">
-                      <FormField
-                        control={form.control}
-                        name="is_full_slab_sold"
-                        render={({ field }) => (
-                          <>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              id="is_full_slab_sold_dialog"
-                            />
-                            <label
-                              htmlFor="is_full_slab_sold_dialog"
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              Full Slab Sold
-                            </label>
-                          </>
-                        )}
-                      />
-                    </div>
                   </>
                 )}
               </div>
