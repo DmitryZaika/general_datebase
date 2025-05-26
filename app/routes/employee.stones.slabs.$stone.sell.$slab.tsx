@@ -31,7 +31,13 @@ import { csrf } from "~/utils/csrf.server";
 import { getEmployeeUser } from "~/utils/session.server";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
-import { SelectInput } from "~/components/molecules/SelectItem";
+import {
+  Select,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+} from "~/components/ui/select";
 import { selectMany } from "~/utils/queryHelpers";
 import { useState, useEffect, useRef } from "react";
 import { Search, X } from "lucide-react";
@@ -137,7 +143,7 @@ const customerSchema = z.object({
   price: coerceNumberRequired("Please Enter Price"),
   notes_to_sale: StringOrNumber,
 
-  rooms: z.array(roomSchema).optional(),
+  rooms: z.array(roomSchema).default([]),
 });
 
 const seamNameToCode: Record<string, string> = {
@@ -492,13 +498,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
     const user = await getEmployeeUser(request);
-    const slabId = params.slab;
 
-    if (!slabId) {
+    if (!params.slab) {
       throw new Error("Slab ID is missing");
     }
+    const slabId = parseInt(params.slab, 10);
 
-    // Получаем информацию о типе камня для этой плиты
     const stoneInfo = await selectMany<{
       id: number;
       type: string;
@@ -511,7 +516,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
        WHERE slab_inventory.id = ?`,
       [slabId]
     );
-
+    const stoneId = stoneInfo.length > 0 ? stoneInfo[0].id : null;
     const stoneType = stoneInfo.length > 0 ? stoneInfo[0].type : null;
     const stoneName = stoneInfo.length > 0 ? stoneInfo[0].name : null;
 
@@ -582,6 +587,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       stoneType,
       stoneName,
       bundle,
+      stoneId,
       slabId,
     };
   } catch (error) {
@@ -591,15 +597,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 async function getSlabs(
   stoneId: number,
-  slabId: number
+  slabIds: number[]
 ): Promise<
   {
     id: number;
     bundle: string;
   }[]
 > {
+  const cleanParam = encodeURIComponent(JSON.stringify(slabIds));
   const response = await fetch(
-    `/api/stones/${stoneId}/slabs?exclude=${slabId}&available=true`
+    `/api/stones/${stoneId}/slabs?exclude=${cleanParam}&available=true`
   );
   if (!response.ok) {
     throw new Error("Failed to fetch slabs");
@@ -614,69 +621,50 @@ const AddSlabDialog = ({
   form,
   stoneId,
   roomIndex,
+  setSlabMap,
 }: {
   show: boolean;
   setShow: (show: boolean) => void;
   form: UseFormReturn<FormData>;
   stoneId: number;
   roomIndex: number;
+  setSlabMap: (
+    slabMap: (
+      prev: Record<number, string | null>
+    ) => Record<number, string | null>
+  ) => void;
 }) => {
-  const params = useParams();
-  const currentSlabId = Number(params.slab);
-  const [selectedSlabId, setSelectedSlabId] = useState<string>("");
+  type SlabState = { id: number; bundle: string } | undefined;
+  const [selectedSlab, setSelectedSlab] = useState<SlabState>();
 
-  const { data: availableSlabs = [] } = useQuery({
-    queryKey: ["slabs", stoneId, currentSlabId],
-    queryFn: () => getSlabs(stoneId, currentSlabId),
-    enabled: !!stoneId && !!currentSlabId && show,
-  });
-
-  const currentSlabs = form.watch(`rooms.${roomIndex}.slabs`) || [];
-  const addedSlabIds = currentSlabs.map((slab) => slab.id);
-
-  const filteredSlabs = availableSlabs.filter(
-    (slab) => !addedSlabIds.includes(slab.id)
+  const allRooms = form.watch("rooms");
+  const addedSlabIds = allRooms.flatMap((room) =>
+    room.slabs.map((slab) => slab.id)
   );
 
-  useEffect(() => {
-    if (filteredSlabs.length > 0 && show) {
-      form.setValue("selectedSlabId", String(filteredSlabs[0].id));
-    }
-  }, [filteredSlabs, show, form]);
+  const { data = [] } = useQuery({
+    queryKey: ["slabs", stoneId, addedSlabIds],
+    queryFn: () => getSlabs(stoneId, addedSlabIds),
+    enabled: !!stoneId && show,
+  });
 
   useEffect(() => {
-    if (!show) {
-      form.setValue("selectedSlabId", "");
-    }
-  }, [show, form]);
+    setSelectedSlab(data[0]);
+  }, [data, addedSlabIds]);
 
   const handleAddSlab = () => {
-    const selectedValue = form.getValues("selectedSlabId");
-    if (!selectedValue) {
-      alert("Please select a slab first");
+    if (!selectedSlab) {
       return;
     }
-
-    const currentSlabsPath = `rooms.${roomIndex}.slabs`;
-    const currentSlabs = form.getValues(currentSlabsPath) || [];
-    const alreadyExists = currentSlabs.some(
-      (slab) => slab.id === Number(selectedValue)
-    );
-
-    if (alreadyExists) {
-      alert("This slab is already added to this room");
-      return;
-    }
-
-    const newSlab = {
-      id: Number(selectedValue),
-      is_full: false,
-    };
-
-    form.setValue(currentSlabsPath, [...currentSlabs, newSlab]);
-
-    form.setValue("selectedSlabId", "");
+    form.setValue(`rooms.${roomIndex}.slabs`, [
+      ...form.getValues(`rooms.${roomIndex}.slabs`),
+      {
+        id: selectedSlab.id,
+        is_full: false,
+      },
+    ]);
     setShow(false);
+    setSlabMap((prev) => ({ ...prev, [selectedSlab.id]: selectedSlab.bundle }));
   };
 
   return (
@@ -685,50 +673,39 @@ const AddSlabDialog = ({
         <DialogHeader>
           <DialogTitle>Add Slab</DialogTitle>
         </DialogHeader>
-        <FormProvider {...form}>
-          <div className="space-y-4">
-            {filteredSlabs.length === 0 ? (
-              <div className="text-center py-4 text-gray-500">
-                No available slabs found for this stone
-              </div>
-            ) : (
-              <>
-                <FormField
-                  control={form.control}
-                  name={`selectedSlabId`}
-                  defaultValue={
-                    availableSlabs.length > 0
-                      ? String(availableSlabs[0].id)
-                      : ""
-                  }
-                  render={({ field }) => (
-                    <SelectInput
-                      field={field}
-                      placeholder="Select a slab"
-                      name="Additional Slab"
-                      className="mb-0"
-                      options={filteredSlabs.map((slab) => ({
-                        key: String(slab.id),
-                        value: `Bundle ${slab.bundle}`,
-                      }))}
-                    />
-                  )}
-                />
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShow(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAddSlab}
-              disabled={filteredSlabs.length === 0}
+        <div className="space-y-4">
+          {data.length === 0 ? (
+            <div className="text-center py-4 text-gray-500">
+              No available slabs found for this stone
+            </div>
+          ) : (
+            <Select
+              value={selectedSlab?.bundle}
+              onValueChange={(val) =>
+                setSelectedSlab(data.find((slab) => slab.bundle === val))
+              }
             >
-              Add Slab
-            </Button>
-          </DialogFooter>
-        </FormProvider>
+              <SelectTrigger className="min-w-[150px]">
+                <SelectValue placeholder="Select a slab" />
+              </SelectTrigger>
+              <SelectContent>
+                {data.map((slab) => (
+                  <SelectItem key={slab.id} value={slab.bundle}>
+                    {slab.bundle}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShow(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleAddSlab} disabled={!selectedSlab}>
+            Add Slab
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -771,12 +748,14 @@ const fetchAvailableStones = async (query: string = "") => {
 };
 
 const StoneSearch = ({
+  stoneName,
   setStoneId,
 }: {
+  stoneName: string | null;
   setStoneId: (stoneId: number) => void;
 }) => {
-  const [searchValue, setSearchValue] = useState("");
-  const [show, setShow] = useState(true);
+  const [searchValue, setSearchValue] = useState(stoneName || undefined);
+  const [show, setShow] = useState(!stoneName);
   const { data, isLoading } = useQuery({
     queryKey: ["availableStones", searchValue],
     queryFn: () => fetchAvailableStones(searchValue),
@@ -793,16 +772,17 @@ const StoneSearch = ({
     setSearchValue(value);
     if (show === false) {
       setShow(true);
-    } 
+    }
   };
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium">Color</label>
+      <label className="text-sm font-medium">Stone</label>
       <div className="relative">
         <Input
           placeholder="Search stone colors..."
           value={searchValue}
+          disabled={!!stoneName}
           onChange={(e) => handleValueChange(e.target.value)}
           className="w-full"
         />
@@ -838,15 +818,27 @@ const RoomSubForm = ({
   index,
   sinks,
   stoneType,
+  slabMap,
+  setSlabMap,
 }: {
   form: UseFormReturn<FormData>;
   index: number;
   sinks: Sink[];
   stoneType: string | null;
+  slabMap: Record<number, string | null>;
+  setSlabMap: (slabMap: Record<number, string | null>) => void;
 }) => {
   const [showAddSlabDialog, setShowAddSlabDialog] = useState(false);
-  const [stoneId, setStoneId] = useState<number | null>(null);
-  const { slabId, bundle } = useLoaderData<typeof loader>();
+
+  const {
+    slabId,
+    stoneId: tempStoneId,
+    bundle,
+    stoneName,
+  } = useLoaderData<typeof loader>();
+  const [stoneId, setStoneId] = useState<number | null>(
+    index === 0 ? tempStoneId : null
+  );
 
   useEffect(() => {
     if (slabId && bundle && index === 0) {
@@ -884,10 +876,28 @@ const RoomSubForm = ({
         .filter((slab) => slab.id !== slabId)
     );
   };
+  const handleRemoveRoom = () => {
+    const rooms = form.getValues("rooms");
+    rooms.splice(index, 1);
+    form.setValue("rooms", rooms);
+  };
 
   return (
     <>
-      <div className="mt-6 mb-2 font-semibold text-sm">First Room</div>
+      <div className="h-[1px] bg-gray-200 w-full my-2"></div>
+      <div className="flex items-center justify-between">
+        <h2 className="mt-6 mb-2 font-semibold text-sm">Room {index + 1}</h2>{" "}
+        {index !== 0 && (
+          <Button
+            className=" top-0 right-0"
+            variant="ghost"
+            size="sm"
+            onClick={handleRemoveRoom}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-2 mt-2">
         <FormField
           control={form.control}
@@ -901,8 +911,10 @@ const RoomSubForm = ({
             />
           )}
         />
-
-        <StoneSearch setStoneId={setStoneId} />
+        <StoneSearch
+          stoneName={index === 0 ? stoneName : null}
+          setStoneId={setStoneId}
+        />
 
         {/* <FormField
           control={form.control}
@@ -1033,7 +1045,6 @@ const RoomSubForm = ({
           )}
         />
       </div>
-
       <div className="flex items-center space-x-2 mt-4">
         <FormField
           control={form.control}
@@ -1052,7 +1063,6 @@ const RoomSubForm = ({
           )}
         />
       </div>
-
       <div className="flex items-center space-x-2 mt-4">
         <Button
           type="button"
@@ -1063,8 +1073,7 @@ const RoomSubForm = ({
           Add Slab
         </Button>
       </div>
-
-      <div className="mt-2 space-y-2">
+      <div className="mt-1 space-y-2">
         <h2 className="text-xs text-gray-600">Slabs:</h2>
         {form.watch(`rooms.${index}.slabs`).map((slab, slabIndex) => (
           <div
@@ -1089,7 +1098,7 @@ const RoomSubForm = ({
                     : "bg-yellow-100 text-yellow-800"
                 }`}
               >
-                Bundle {slab.id}
+                Bundle {slabMap[slab.id]}
                 {slab.is_full ? "(Full)" : "(Partial)"}
               </div>
               <Button
@@ -1110,14 +1119,16 @@ const RoomSubForm = ({
             />
           </div>
         ))}
-
-        <AddSlabDialog
-          show={showAddSlabDialog}
-          setShow={setShowAddSlabDialog}
-          roomIndex={index}
-          form={form}
-          stoneId={stoneId}
-        />
+        {stoneId && (
+          <AddSlabDialog
+            show={showAddSlabDialog}
+            setShow={setShowAddSlabDialog}
+            roomIndex={index}
+            form={form}
+            stoneId={stoneId}
+            setSlabMap={setSlabMap}
+          />
+        )}
       </div>
     </>
   );
@@ -1146,118 +1157,14 @@ export default function SlabSell() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
-  // Add state for add slab dialog and available slabs
+  const [slabMap, setSlabMap] = useState<Record<number, string | null>>({
+    [slabId]: bundle,
+  });
 
-  const [additionalRooms, setAdditionalRooms] = useState<Room[]>([]);
-  const [stoneSearchResults, setStoneSearchResults] = useState<
-    Array<{ id: number; name: string }>
-  >([]);
-  const [roomSlabs, setRoomSlabs] = useState<Record<string, RoomSlab[]>>({});
-
-  const [stoneTypes, setStoneTypes] = useState<Record<string, string>>({});
-
-  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
-  const [showRoomSlabDialog, setShowRoomSlabDialog] = useState(false);
-  const [currentRoomStoneId, setCurrentRoomStoneId] = useState<string | null>(
-    null
-  );
-
-  // Add state for added slabs per room (separate from available slabs)
-  const [addedRoomSlabs, setAddedRoomSlabs] = useState<
-    Record<string, RoomSlab[]>
-  >({});
-
-  // Add state for selected main slab per room (from Slab Number dropdown)
-  const [selectedRoomSlab, setSelectedRoomSlab] = useState<
-    Record<string, RoomSlab | null>
-  >({});
-
-  // Function to fetch available stones (those with unsold slabs)
-
-  // Modified search stones function to use the fetchAvailableStones
-
-  // Function to fetch slabs for a specific stone
-  const fetchSlabsForStone = async (stoneName: string, roomId: string) => {
-    try {
-      // First, find the stone ID by name
-      const stoneResponse = await fetch(
-        `/api/stones/search?name=${encodeURIComponent(
-          stoneName
-        )}&show_sold_out=true`
-      );
-      if (stoneResponse.ok) {
-        const stoneData = await stoneResponse.json();
-        if (stoneData.stones && stoneData.stones.length > 0) {
-          const stoneId = stoneData.stones[0].id;
-
-          // Then fetch slabs for this stone ID - use proper endpoint
-          const slabsResponse = await fetch(
-            `/api/stones/${stoneId}/slabs?available=true`
-          );
-          if (slabsResponse.ok) {
-            const slabsData = await slabsResponse.json();
-            setRoomSlabs((prev) => ({
-              ...prev,
-              [roomId]: slabsData.slabs || [],
-            }));
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching slabs for stone:", error);
-    }
-  };
-
-  // Handler for adding a new room
   const handleAddRoom = () => {
-    // Get current values from the first room to use as defaults
-    const firstRoomValues = {
-      room: "Bathroom", // Default to Bathroom
-      sink_type_id: "", // Empty sink by default
-      color: stoneName || "",
-      edge: form.getValues("edge") || "Flat",
-      backsplash: form.getValues("backsplash") || "No",
-      tear_out: form.getValues("tear_out") || "No",
-      stove: undefined, // Undefined for bathroom
-      waterfall: form.getValues("waterfall") || "No",
-      corbels: form.getValues("corbels") || 0,
-      seam: form.getValues("seam") || "Standard",
-      ten_year_sealer: form.getValues("ten_year_sealer") || false,
-    };
-
-    const newRoom: Room = {
-      id: `room_${Date.now()}`,
-      room: firstRoomValues.room,
-      sink_type_id: firstRoomValues.sink_type_id,
-      color: firstRoomValues.color,
-      slab_number: "",
-      edge: firstRoomValues.edge,
-      backsplash: firstRoomValues.backsplash,
-      total_square_feet: null, // Allow null for square feet
-      tear_out: firstRoomValues.tear_out,
-      stove: undefined, // Undefined for bathroom
-      waterfall: firstRoomValues.waterfall,
-      corbels: firstRoomValues.corbels,
-      seam: firstRoomValues.seam,
-      ten_year_sealer: firstRoomValues.ten_year_sealer,
-      is_full_slab: false,
-    };
-    setAdditionalRooms([...additionalRooms, newRoom]);
+    form.setValue("rooms", [...form.getValues("rooms"), roomSchema.parse({})]);
   };
 
-  // Handler for removing a room
-  const handleRemoveRoom = (roomId: string) => {
-    setAdditionalRooms(additionalRooms.filter((room) => room.id !== roomId));
-  };
-
-  // Handler for selecting a slab in the add slab dialog
-
-  // Handler for removing an additional slab
-  const handleRemoveAdditionalSlab = (slabId: number) => {
-    setAdditionalSlabs(additionalSlabs.filter((slab) => slab.id !== slabId));
-  };
-
-  // Определяем значение по умолчанию для ten_year_sealer
   const defaultTenYearSealer =
     stoneType?.toLowerCase() === "quartz" ? false : true;
 
@@ -1269,9 +1176,6 @@ export default function SlabSell() {
     },
   });
 
-  // Handler for adding a slab to a room
-
-  // Устанавливаем значение ten_year_sealer при изменении stoneType
   useEffect(() => {
     if (stoneType) {
       form.setValue(
@@ -1443,7 +1347,6 @@ export default function SlabSell() {
             setDisabledFields((prev) => ({ ...prev, phone: false }));
           }
 
-          // Set email and track if it should be disabled (only if it has a value)
           if (data.customer.email) {
             form.setValue("email", data.customer.email);
             setDisabledFields((prev) => ({ ...prev, email: true }));
@@ -1461,53 +1364,6 @@ export default function SlabSell() {
   const filteredSales = allSales.filter((sale) =>
     sale.customer_name.toLowerCase().includes(saleSearch.toLowerCase())
   );
-
-  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    setTimeout(() => {
-      if (!suggestionsRef.current?.contains(document.activeElement)) {
-        setShowSuggestions(false);
-      }
-    }, 150);
-  };
-
-  // Watch for color changes in additional rooms to update stone type label
-  useEffect(() => {
-    additionalRooms.forEach((room) => {
-      if (room.color && stoneTypes[room.color]) {
-        // The room has a color that matches a known stone type
-        // We can use this later to show the stone type label
-      }
-    });
-  }, [additionalRooms, stoneTypes]);
-
-  // Determine default room ten_year_sealer value based on stone type
-
-  // Fix form.watch by using a direct approach
-
-  // Helper for getting stone type display for additional rooms
-  const getRoomStoneTypeDisplay = (roomColor: string) => {
-    if (!roomColor || !stoneTypes[roomColor]) return null;
-
-    const roomStoneType = stoneTypes[roomColor];
-    return (
-      <>
-        <span
-          className={`ml-2 text-xs px-2 py-1 rounded ${
-            roomStoneType.toLowerCase() === "quartz"
-              ? "bg-red-100 text-red-800"
-              : "bg-green-100 text-green-800"
-          }`}
-        >
-          {roomStoneType.charAt(0).toUpperCase() + roomStoneType.slice(1)}
-        </span>
-        <p className="text-xs text-gray-500 mt-1 ml-10">
-          {roomStoneType.toLowerCase() === "quartz"
-            ? "Quartz doesn't require a 10-year sealer"
-            : "Natural stones require a 10-year sealer"}
-        </p>
-      </>
-    );
-  };
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -1650,6 +1506,8 @@ export default function SlabSell() {
 
               {form.watch("rooms").map((room, index) => (
                 <RoomSubForm
+                  slabMap={slabMap}
+                  setSlabMap={setSlabMap}
                   form={form}
                   index={index}
                   sinks={sinks}
@@ -1657,9 +1515,6 @@ export default function SlabSell() {
                 />
               ))}
 
-              {/* Additional Rooms */}
-
-              {/* Move Add Room button after all rooms */}
               <div className="flex mt-4">
                 <Button
                   type="button"

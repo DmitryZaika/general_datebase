@@ -19,7 +19,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const url = new URL(request.url);
-  const excludeSlabId = url.searchParams.get("exclude");
+  const excludeSlabIds = JSON.parse(
+    decodeURIComponent(url.searchParams.get("exclude") || "[]")
+  );
 
   try {
     let query = `
@@ -31,9 +33,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     const queryParams = [stoneId];
 
-    if (excludeSlabId) {
-      query += " AND id != ?";
-      queryParams.push(parseInt(excludeSlabId, 10));
+    if (excludeSlabIds.length > 0) {
+      query += " AND id NOT IN (?)";
+      queryParams.push(excludeSlabIds);
     }
 
     const slabs = await selectMany<{ id: number; bundle: string }>(
