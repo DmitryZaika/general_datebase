@@ -116,7 +116,7 @@ const roomSchema = z.object({
   backsplash: z.string().default("No"),
   total_square_feet: z.number().default(0),
   tear_out: z.string().default("No"),
-  stove: z.string().optional(),
+  stove: z.string().default("F/S"),
   waterfall: z.string().default("No"),
   corbels: z.number().default(0),
   seam: z.string().default("Standard"),
@@ -614,53 +614,69 @@ const AddSlabDialog = ({
   form,
   stoneId,
   roomIndex,
-  slabIndex,
 }: {
   show: boolean;
   setShow: (show: boolean) => void;
   form: UseFormReturn<FormData>;
-  stoneId: number | undefined;
+  stoneId: number;
   roomIndex: number;
-  slabIndex: number;
 }) => {
-  const slabId = 5;
+  const params = useParams();
+  const currentSlabId = Number(params.slab);
+  const [selectedSlabId, setSelectedSlabId] = useState<string>("");
 
   const { data: availableSlabs = [] } = useQuery({
-    queryKey: ["slabs", stoneId, slabId],
-    queryFn: () => getSlabs(stoneId, slabId),
-    enabled: !!stoneId && !!slabId && show,
+    queryKey: ["slabs", stoneId, currentSlabId],
+    queryFn: () => getSlabs(stoneId, currentSlabId),
+    enabled: !!stoneId && !!currentSlabId && show,
   });
 
-  const handleAddSlab = () => {
-    const selectedSlabIds = form.watch(`rooms.${roomIndex}.slab_ids`);
+  const currentSlabs = form.watch(`rooms.${roomIndex}.slabs`) || [];
+  const addedSlabIds = currentSlabs.map((slab) => slab.id);
 
-    if (selectedSlabIds) {
-      const selectedSlab = availableSlabs.find(
-        (slab) => slab.id === selectedSlabIds[0]
-      );
+  const filteredSlabs = availableSlabs.filter(
+    (slab) => !addedSlabIds.includes(slab.id)
+  );
 
-      // Check if this slab is already added
-      const isDuplicate = additionalSlabs.some(
-        (slab) => slab.id === Number(selectedSlabId)
-      );
-
-      if (selectedSlab && !isDuplicate) {
-        setAdditionalSlabs([
-          ...additionalSlabs,
-          {
-            id: Number(selectedSlabId),
-            bundle: selectedSlab.bundle,
-            is_full_slab: false,
-          },
-        ]);
-        setShow(false);
-        form.setValue("slab_ids", "");
-      } else if (isDuplicate) {
-        alert("This slab has already been added");
-      }
-    } else {
-      alert("Please select a slab first");
+  useEffect(() => {
+    if (filteredSlabs.length > 0 && show) {
+      form.setValue("selectedSlabId", String(filteredSlabs[0].id));
     }
+  }, [filteredSlabs, show, form]);
+
+  useEffect(() => {
+    if (!show) {
+      form.setValue("selectedSlabId", "");
+    }
+  }, [show, form]);
+
+  const handleAddSlab = () => {
+    const selectedValue = form.getValues("selectedSlabId");
+    if (!selectedValue) {
+      alert("Please select a slab first");
+      return;
+    }
+
+    const currentSlabsPath = `rooms.${roomIndex}.slabs`;
+    const currentSlabs = form.getValues(currentSlabsPath) || [];
+    const alreadyExists = currentSlabs.some(
+      (slab) => slab.id === Number(selectedValue)
+    );
+
+    if (alreadyExists) {
+      alert("This slab is already added to this room");
+      return;
+    }
+
+    const newSlab = {
+      id: Number(selectedValue),
+      is_full: false,
+    };
+
+    form.setValue(currentSlabsPath, [...currentSlabs, newSlab]);
+
+    form.setValue("selectedSlabId", "");
+    setShow(false);
   };
 
   return (
@@ -671,7 +687,7 @@ const AddSlabDialog = ({
         </DialogHeader>
         <FormProvider {...form}>
           <div className="space-y-4">
-            {availableSlabs.length === 0 ? (
+            {filteredSlabs.length === 0 ? (
               <div className="text-center py-4 text-gray-500">
                 No available slabs found for this stone
               </div>
@@ -679,14 +695,19 @@ const AddSlabDialog = ({
               <>
                 <FormField
                   control={form.control}
-                  name={`rooms.${roomIndex}.slabs.${slabIndex}.id`}
+                  name={`selectedSlabId`}
+                  defaultValue={
+                    availableSlabs.length > 0
+                      ? String(availableSlabs[0].id)
+                      : ""
+                  }
                   render={({ field }) => (
                     <SelectInput
                       field={field}
                       placeholder="Select a slab"
                       name="Additional Slab"
                       className="mb-0"
-                      options={availableSlabs.map((slab) => ({
+                      options={filteredSlabs.map((slab) => ({
                         key: String(slab.id),
                         value: `Bundle ${slab.bundle}`,
                       }))}
@@ -697,15 +718,12 @@ const AddSlabDialog = ({
             )}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowAddSlabDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShow(false)}>
               Cancel
             </Button>
             <Button
               onClick={handleAddSlab}
-              disabled={availableSlabs.length === 0}
+              disabled={filteredSlabs.length === 0}
             >
               Add Slab
             </Button>
@@ -716,7 +734,7 @@ const AddSlabDialog = ({
   );
 };
 
-const StoneTypeDisplay = ({ stoneType }: { stoneType: string }) => {
+const StoneTypeDisplay = ({ stoneType }: { stoneType: string | null }) => {
   if (!stoneType) return null;
 
   return (
@@ -757,13 +775,18 @@ const StoneSearch = ({
 }: {
   setStoneId: (stoneId: number) => void;
 }) => {
-  const [query, setQuery] = useState("");
+  const [searchValue, setSearchValue] = useState("");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["availableStones", query],
-    queryFn: () => fetchAvailableStones(query),
-    enabled: !!query,
+    queryKey: ["availableStones", searchValue],
+    queryFn: () => fetchAvailableStones(searchValue),
+    enabled: !!searchValue,
   });
+
+  const handleStoneSelect = (stone: { id: number; name: string }) => {
+    setStoneId(stone.id);
+    setSearchValue("");
+  };
 
   return (
     <div className="space-y-2">
@@ -771,26 +794,26 @@ const StoneSearch = ({
       <div className="relative">
         <Input
           placeholder="Search stone colors..."
-          value={"Stone Name"}
-          onChange={(e) => setQuery(e.target.value)}
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
           className="w-full"
         />
         {isLoading && (
-          <div className="absolute right-2 top-2">
+          <div className="absolute right-8 top-2">
             <div className="animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent"></div>
           </div>
         )}
       </div>
 
       {/* Stone search results dropdown */}
-      {data?.stoneSearchResults?.length > 0 && (
-        <div className="absolute z-10 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg w-1/2">
+      {(data?.stoneSearchResults?.length ?? 0) > 0 && (
+        <div className=" -mt-2 absolute z-10 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg w-3/7">
           <ul className="py-1 divide-y divide-gray-200">
             {data?.stoneSearchResults?.map((stone) => (
               <li
                 key={stone.id}
                 className="px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                onClick={() => setStoneId(stone.id)}
+                onClick={() => handleStoneSelect(stone)}
               >
                 {stone.name}
               </li>
@@ -806,14 +829,54 @@ const RoomSubForm = ({
   form,
   index,
   sinks,
+  stoneType,
 }: {
   form: UseFormReturn<FormData>;
   index: number;
   sinks: Sink[];
+  stoneType: string | null;
 }) => {
   const [showAddSlabDialog, setShowAddSlabDialog] = useState(false);
   const [stoneId, setStoneId] = useState<number | null>(null);
-  const stoneType = "Hello";
+  const { slabId, bundle } = useLoaderData<typeof loader>();
+
+  useEffect(() => {
+    if (slabId && bundle && index === 0) {
+      const currentSlabs = form.getValues(`rooms.${index}.slabs`) || [];
+      const slabExists = currentSlabs.some(
+        (slab) => slab.id === Number(slabId)
+      );
+
+      if (!slabExists) {
+        const newSlab = {
+          id: Number(slabId),
+          is_full: false,
+        };
+        form.setValue(`rooms.${index}.slabs`, [...currentSlabs, newSlab]);
+      }
+    }
+  }, [slabId, bundle, index, form]);
+
+  const handleSwitchSlab = (slabId: number, isFull: boolean) => {
+    form.setValue(
+      `rooms.${index}.slabs`,
+      form
+        .getValues(`rooms.${index}.slabs`)
+        .map((slab) =>
+          slab.id === slabId ? { ...slab, is_full: isFull } : slab
+        )
+    );
+  };
+
+  const handleRemoveSlab = (slabId: number) => {
+    form.setValue(
+      `rooms.${index}.slabs`,
+      form
+        .getValues(`rooms.${index}.slabs`)
+        .filter((slab) => slab.id !== slabId)
+    );
+  };
+
   return (
     <>
       <div className="mt-6 mb-2 font-semibold text-sm">First Room</div>
@@ -906,7 +969,7 @@ const RoomSubForm = ({
           )}
         />
 
-        {form.watch(`rooms.${index}.room`) !== "Bathroom" && (
+        {form.watch(`rooms.${index}.room`) !== "bathroom" && (
           <>
             <FormField
               control={form.control}
@@ -917,6 +980,7 @@ const RoomSubForm = ({
                   name="Stove"
                   className="mb-0"
                   options={stoveOptions}
+                  defaultValue="F/S"
                 />
               )}
             />
@@ -1002,13 +1066,9 @@ const RoomSubForm = ({
             <div className="flex items-center space-x-2">
               <Switch
                 checked={slab.is_full}
-                onCheckedChange={(checked) => {
-                  setAdditionalSlabs((prev) =>
-                    prev.map((s) =>
-                      s.id === slab.id ? { ...s, is_full: checked } : s
-                    )
-                  );
-                }}
+                onCheckedChange={(checked) =>
+                  handleSwitchSlab(slab.id, checked)
+                }
                 id={`additional_slab_${slab.id}`}
                 label="Full Slab Sold"
               />
@@ -1029,7 +1089,7 @@ const RoomSubForm = ({
                 variant="ghost"
                 size="sm"
                 className="h-6 w-6 p-0"
-                onClick={() => handleRemoveAdditionalSlab(slab.id)}
+                onClick={() => handleRemoveSlab(slab.id)}
               >
                 <X className="h-3 w-3" />
               </Button>
@@ -1048,7 +1108,7 @@ const RoomSubForm = ({
           setShow={setShowAddSlabDialog}
           roomIndex={index}
           form={form}
-          stoneId={stoneId || undefined}
+          stoneId={stoneId}
         />
       </div>
     </>
@@ -1064,7 +1124,6 @@ export default function SlabSell() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [saleSearch, setSaleSearch] = useState("");
   const [isExistingCustomer, setIsExistingCustomer] = useState(false);
-  const params = useParams();
   const location = useLocation();
   const customerInputRef = useRef<HTMLInputElement>(null);
   const [customerSuggestions, setCustomerSuggestions] = useState<
@@ -1291,10 +1350,10 @@ export default function SlabSell() {
   };
 
   const handleAddToExistingSale = (saleId: number) => {
-    if (!params.slab) return;
+    if (!slabId) return;
 
     navigate(
-      `/employee/stones/slabs/${params.stone}/add-to-sale/${params.slab}/${saleId}${location.search}`
+      `/employee/stones/slabs/${slabId}/add-to-sale/${saleId}${location.search}`
     );
   };
 
@@ -1586,7 +1645,7 @@ export default function SlabSell() {
                   form={form}
                   index={index}
                   sinks={sinks}
-                  stoneType={stoneName}
+                  stoneType={stoneType}
                 />
               ))}
 
