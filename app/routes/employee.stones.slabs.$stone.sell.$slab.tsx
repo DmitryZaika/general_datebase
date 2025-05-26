@@ -749,10 +749,10 @@ const fetchAvailableStones = async (query: string = "") => {
 
 const StoneSearch = ({
   stoneName,
-  setStoneId,
+  setStone,
 }: {
   stoneName: string | null;
-  setStoneId: (stoneId: number) => void;
+  setStone: (value: { id: number; type: string }) => void;
 }) => {
   const [searchValue, setSearchValue] = useState(stoneName || undefined);
   const [show, setShow] = useState(!stoneName);
@@ -763,7 +763,7 @@ const StoneSearch = ({
   });
 
   const handleStoneSelect = (stone: { id: number; name: string }) => {
-    setStoneId(stone.id);
+    setStone({ id: stone.id, type: data?.stoneType[stone.name] || "" });
     setSearchValue(stone.name);
     setShow(false);
   };
@@ -817,8 +817,8 @@ const RoomSubForm = ({
   form,
   index,
   sinks,
-  stoneType,
   slabMap,
+  stoneType,
   setSlabMap,
 }: {
   form: UseFormReturn<FormData>;
@@ -826,7 +826,11 @@ const RoomSubForm = ({
   sinks: Sink[];
   stoneType: string | null;
   slabMap: Record<number, string | null>;
-  setSlabMap: (slabMap: Record<number, string | null>) => void;
+  setSlabMap: (
+    slabMap: (
+      prev: Record<number, string | null>
+    ) => Record<number, string | null>
+  ) => void;
 }) => {
   const [showAddSlabDialog, setShowAddSlabDialog] = useState(false);
 
@@ -836,8 +840,11 @@ const RoomSubForm = ({
     bundle,
     stoneName,
   } = useLoaderData<typeof loader>();
-  const [stoneId, setStoneId] = useState<number | null>(
-    index === 0 ? tempStoneId : null
+  const [stone, setStone] = useState<{
+    id: number;
+    type: string | null;
+  } | null>(
+    tempStoneId && index === 0 ? { id: tempStoneId, type: stoneType } : null
   );
 
   useEffect(() => {
@@ -856,6 +863,15 @@ const RoomSubForm = ({
       }
     }
   }, [slabId, bundle, index, form]);
+
+  useEffect(() => {
+    if (stoneType) {
+      form.setValue(
+        `rooms.${index}.ten_year_sealer`,
+        stone?.type?.toLowerCase() === "quartz" ? false : true
+      );
+    }
+  }, [stoneType, index, stone?.type]);
 
   const handleSwitchSlab = (slabId: number, isFull: boolean) => {
     form.setValue(
@@ -913,7 +929,7 @@ const RoomSubForm = ({
         />
         <StoneSearch
           stoneName={index === 0 ? stoneName : null}
-          setStoneId={setStoneId}
+          setStone={setStone}
         />
 
         {/* <FormField
@@ -1055,10 +1071,10 @@ const RoomSubForm = ({
                 checked={field.value}
                 onCheckedChange={field.onChange}
                 id="ten_year_sealer"
-                disabled={Boolean(stoneType?.toLowerCase() === "quartz")}
+                disabled={Boolean(stone?.type?.toLowerCase() === "quartz")}
                 label="10-Year Sealer"
               />
-              <StoneTypeDisplay stoneType={stoneType} />
+              {stone?.type && <StoneTypeDisplay stoneType={stone?.type} />}
             </>
           )}
         />
@@ -1119,13 +1135,13 @@ const RoomSubForm = ({
             />
           </div>
         ))}
-        {stoneId && (
+        {stone?.id && (
           <AddSlabDialog
             show={showAddSlabDialog}
             setShow={setShowAddSlabDialog}
             roomIndex={index}
             form={form}
-            stoneId={stoneId}
+            stoneId={stone?.id}
             setSlabMap={setSlabMap}
           />
         )}
@@ -1165,9 +1181,6 @@ export default function SlabSell() {
     form.setValue("rooms", [...form.getValues("rooms"), roomSchema.parse({})]);
   };
 
-  const defaultTenYearSealer =
-    stoneType?.toLowerCase() === "quartz" ? false : true;
-
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
@@ -1176,25 +1189,12 @@ export default function SlabSell() {
     },
   });
 
-  useEffect(() => {
-    if (stoneType) {
-      form.setValue(
-        "ten_year_sealer",
-        stoneType.toLowerCase() === "quartz" ? false : true
-      );
-    }
-  }, [stoneType, form]);
-
-  const fullSubmit = useFullSubmit(form);
-
-  // Add state to track disabled fields
   const [disabledFields, setDisabledFields] = useState({
     phone: false,
     email: false,
     billing_address: false,
   });
 
-  // Focus the customer name input when the component mounts
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (customerInputRef.current) {
@@ -1205,7 +1205,6 @@ export default function SlabSell() {
     return () => clearTimeout(timeout);
   }, []);
 
-  // Watch for customer name changes to provide real-time suggestions
   useEffect(() => {
     const customerName = form.watch("name");
 
@@ -1217,7 +1216,6 @@ export default function SlabSell() {
           );
           if (response.ok) {
             const data = await response.json();
-            // Limit to only the top 1 customer
             const limitedCustomers = (data.customers || []).slice(0, 1);
             setCustomerSuggestions(limitedCustomers);
             setShowSuggestions(limitedCustomers.length > 0);
@@ -1236,7 +1234,6 @@ export default function SlabSell() {
     }
   }, [form.watch("name"), isExistingCustomer]);
 
-  // Add useEffect to handle same_address changes
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       if (name === "same_address" || name === "billing_address") {
@@ -1314,7 +1311,6 @@ export default function SlabSell() {
     fetchCustomerDetails(customer.id);
   };
 
-  // Function to load full customer details when selecting a customer
   const fetchCustomerDetails = async (customerId: number) => {
     try {
       const response = await fetch(`/api/customers/${customerId}`);
