@@ -776,7 +776,7 @@ const StoneSearch = ({
   setStoneId: (stoneId: number) => void;
 }) => {
   const [searchValue, setSearchValue] = useState("");
-
+  const [show, setShow] = useState(true);
   const { data, isLoading } = useQuery({
     queryKey: ["availableStones", searchValue],
     queryFn: () => fetchAvailableStones(searchValue),
@@ -785,7 +785,15 @@ const StoneSearch = ({
 
   const handleStoneSelect = (stone: { id: number; name: string }) => {
     setStoneId(stone.id);
-    setSearchValue("");
+    setSearchValue(stone.name);
+    setShow(false);
+  };
+
+  const handleValueChange = (value: string) => {
+    setSearchValue(value);
+    if (show === false) {
+      setShow(true);
+    } 
   };
 
   return (
@@ -795,7 +803,7 @@ const StoneSearch = ({
         <Input
           placeholder="Search stone colors..."
           value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
+          onChange={(e) => handleValueChange(e.target.value)}
           className="w-full"
         />
         {isLoading && (
@@ -806,7 +814,7 @@ const StoneSearch = ({
       </div>
 
       {/* Stone search results dropdown */}
-      {(data?.stoneSearchResults?.length ?? 0) > 0 && (
+      {show && (data?.stoneSearchResults?.length ?? 0) > 0 && (
         <div className=" -mt-2 absolute z-10 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg w-3/7">
           <ul className="py-1 divide-y divide-gray-200">
             {data?.stoneSearchResults?.map((stone) => (
