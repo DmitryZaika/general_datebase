@@ -65,9 +65,9 @@ interface Slab {
 const TransactionSchema = z.object({
   slab_id: z.number(),
   sale_id: z.number(),
-  sale_date: z.union([z.string(), z.date()]).transform(val => 
-    typeof val === 'string' ? val : val.toISOString()
-  ),
+  sale_date: z
+    .union([z.string(), z.date()])
+    .transform((val) => (typeof val === "string" ? val : val.toISOString())),
   customer_name: z.string(),
   seller_name: z.string(),
   sale_notes: z.string().nullable().optional(),
@@ -89,20 +89,20 @@ function formatDate(dateString: string) {
 }
 
 function formatSinkList(sinkString: string): string {
-  if (!sinkString) return '';
-  
-  const sinks = sinkString.split(', ');
-  const sinkCounts: {[key: string]: number} = {};
-  
-  sinks.forEach(sink => {
+  if (!sinkString) return "";
+
+  const sinks = sinkString.split(", ");
+  const sinkCounts: { [key: string]: number } = {};
+
+  sinks.forEach((sink) => {
     if (sink) {
       sinkCounts[sink] = (sinkCounts[sink] || 0) + 1;
     }
   });
 
   return Object.entries(sinkCounts)
-    .map(([sink, count]) => count > 1 ? `${sink} x ${count}` : sink)
-    .join(', ');
+    .map(([sink, count]) => (count > 1 ? `${sink} x ${count}` : sink))
+    .join(", ");
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -405,6 +405,9 @@ export default function SlabsModal() {
     const isEditing = editingSlab === slab.id;
     const isHighlighted = highlightedSlab === slab.id;
     const hasParent = slab.parent_id !== null;
+    const hasChildren = allSlabs.some(
+      (otherSlab) => otherSlab.parent_id === slab.id
+    );
 
     return (
       <TooltipProvider key={slab.id}>
@@ -416,6 +419,8 @@ export default function SlabsModal() {
                   ? "bg-red-300 "
                   : hasParent
                   ? "bg-yellow-200 "
+                  : hasChildren && !slab.sale_id
+                  ? "bg-yellow-200 "
                   : "bg-white "
               }${
                 isHighlighted
@@ -423,6 +428,8 @@ export default function SlabsModal() {
                   : slab.sale_id
                   ? "border border-red-400"
                   : hasParent
+                  ? "border border-yellow-400"
+                  : hasChildren && !slab.sale_id
                   ? "border border-yellow-400"
                   : "border border-gray-200"
               }`}
@@ -617,7 +624,6 @@ export default function SlabsModal() {
     );
   };
 
-  // Group slabs by their bundle name first
   const allSlabs = [...linkedSlabs, ...slabs];
 
   // Create a map of bundle names to slabs
