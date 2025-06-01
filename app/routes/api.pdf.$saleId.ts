@@ -3,7 +3,7 @@ import { getEmployeeUser } from "~/utils/session.server";
 import { db } from "~/db.server";
 import { downloadPDF, downloadPDFAsBuffer } from "~/utils/s3.server";
 import { PDFDocument } from "pdf-lib";
-import { selectId } from "~/utils/queryHelpers";
+import { selectMany } from "~/utils/queryHelpers";
 import { customerSchema, TCustomerSchema } from "~/schemas/sales";
 
 interface IQuery {
@@ -13,18 +13,13 @@ interface IQuery {
   project_address: string | null;
   phone: string | null;
   email: string | null;
+  room: string | null;
+  edge: string | null;
+  backsplash: string | null;
+  stone_name: string | null;
 }
 
-const QUERY_FORM_MAPPING: Record<keyof IQuery, string> = {
-  sale_date: "Text84",
-  seller_name: "Text85",
-  customer_name: "Text86",
-  project_address: "Text87",
-  phone: "Text88",
-  email: "Text89",
-};
-
-async function getData(saleId: number): Promise<TCustomerSchema> {
+async function getData(saleId: number) {
   const query = `
         select
             main.sales.sale_date,
@@ -32,14 +27,19 @@ async function getData(saleId: number): Promise<TCustomerSchema> {
             main.customers.name as customer_name,
             main.customers.phone,
             main.customers.email,
-            main.users.name as seller_name
+            main.users.name as seller_name,
+            main.slab_inventory.room,
+            main.slab_inventory.edge,
+            main.slab_inventory.backsplash,
+            main.stones.name as stone_name
         from main.sales
         join main.customers on main.customers.id = main.sales.customer_id
         join main.users on main.users.id = main.sales.seller_id
+        join main.slab_inventory on main.slab_inventory.sale_id = main.sales.id
+        join main.stones on main.stones.id = main.slab_inventory.stone_id
         where main.sales.id = ?
-        limit 1
     `;
-  const queryData = await selectId<IQuery>(db, query, saleId);
+  return await selectMany<IQuery>(db, query, [saleId]);
 }
 
 async function getPdf() {
@@ -64,24 +64,38 @@ export async function loader({ request, params }: ActionFunctionArgs) {
   }
   const saleId = parseInt(params.saleId);
   const queryData = await getData(saleId);
+  console.log(queryData)
   const { pdfDoc, pdfData, pdfForm } = await getPdf();
   console.log(pdfForm.getFields().map((f) => f.getName()));
 
-  for (const [key, raw] of Object.entries(queryData) as [
-    keyof IQuery,
-    unknown
-  ][]) {
-    if (raw == null) continue;
-
-    const text =
-      raw instanceof Date
-        ? raw.toLocaleDateString("en-US") // 05/18/2025 — выберите нужный формат
-        : String(raw);
-
-    const fieldName = QUERY_FORM_MAPPING[key];
-    const field = pdfForm.getTextField(fieldName);
-    field.setText(text); // pdf-lib принимает только string
+  if (queryData.length < 1) {
+    return new Response("No data found for this sale", { status: 404 });
   }
+  if (queryData.length > 3) {
+    return new Response("Current limit is three items", { status: 400 });
+  }
+  pdfForm.getTextField("Text84").setText(queryData[0].sale_date?.toLocaleDateString("en-US") || undefined);
+  pdfForm.getTextField("Text85").setText(queryData[0].seller_name || undefined);
+  pdfForm.getTextField("Text86").setText(queryData[0].customer_name || undefined);
+  pdfForm.getTextField("Text87").setText(queryData[0].project_address || undefined);
+  pdfForm.getTextField("Text88").setText(queryData[0].phone || undefined);
+  pdfForm.getTextField("Text89").setText(queryData[0].email || undefined);
+  const roomIds = [90, 95, 100];
+
+  function getRoomId(loop: number, index: number): string {
+    return `Text${90 + (loop * 5 + index)}`;
+
+  }
+  for (let i = 0; i < queryData.length && i < roomIds.length; i++) {
+      const roomId = roomIds[i];
+      const row    = queryData[i];
+      pdfForm.getTextField(getRoomId(i, 0)).setText(row.room || undefined);
+      pdfForm.getTextField(getRoomId(i, 1)).setText(row.stone_name || undefined);
+      pdfForm.getTextField(getRoomId(i, 3)).setText(row.edge || undefined);
+      pdfForm.getTextField(getRoomId(i, 4)).setText(row.backsplash || undefined);
+    }
+
+
 
   const pdfBytes = await pdfDoc.save();
 
