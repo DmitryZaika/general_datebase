@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 export interface Todo {
   id: number;
   rich_text: string;
@@ -33,6 +31,14 @@ export interface TokenSet {
   access_token: string;
   refresh_token: string;
   x_refresh_token_expires_in: number;
+}
+
+export interface Customer {
+  id: number;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
 }
 
 export interface StoneSearchResult {
