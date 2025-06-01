@@ -40,7 +40,7 @@ import { selectMany } from "~/utils/queryHelpers";
 import { useState, useEffect, useRef } from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "~/components/ui/input";
-import { coerceNumberRequired, StringOrNumber } from "~/schemas/general";
+import { customerSchema, roomSchema, TCustomerSchema } from "~/schemas/sales";
 import { Switch } from "~/components/ui/switch";
 import { SelectInputOther } from "~/components/molecules/SelectInputOther";
 import { AddressInput } from "~/components/organisms/AddressInput";
@@ -107,48 +107,6 @@ const seamOptions = [
   { key: "N/A", value: "N/A" },
 ];
 
-const slabOptionsSchema = z.object({
-  id: z.coerce.number(),
-  is_full: z.boolean(),
-});
-
-const sinkOptionsSchema = z.object({
-  id: z.coerce.number(),
-});
-
-const roomSchema = z.object({
-  room: z.string().default("Kitchen"),
-  sink_type: z.array(sinkOptionsSchema).default([]),
-  edge: z.string().default("Flat"),
-  backsplash: z.string().default("No"),
-  square_feet: z.coerce.number().default(0),
-  tear_out: z.string().default("No"),
-  stove: z.string().default("F/S"),
-  waterfall: z.string().default("No"),
-  corbels: z.number().default(0),
-  seam: z.string().default("Standard"),
-  ten_year_sealer: z.boolean().default(false),
-  slabs: z.array(slabOptionsSchema).default([]),
-});
-
-const customerSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  customer_id: z.coerce.number().optional(),
-  billing_address: z.string().min(10, "Billing address is required"),
-  project_address: z.string().min(10, "Project address is required"),
-  same_address: z.boolean().default(true),
-  phone: z
-    .string()
-    .regex(/^\d{3}-\d{3}-\d{4}$/, "Required format: 317-316-1456"),
-  email: z.string().email("Please enter a valid email"),
-  price: coerceNumberRequired("Please Enter Price"),
-  notes_to_sale: StringOrNumber,
-
-  rooms: z.array(roomSchema).default([]),
-});
-
-type FormData = z.infer<typeof customerSchema>;
-
 const resolver = zodResolver(customerSchema);
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -163,10 +121,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch (error) {
     return { error: "Invalid CSRF token" };
   }
-  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
-    request,
-    resolver
-  );
+  const { errors, data, receivedValues } =
+    await getValidatedFormData<TCustomerSchema>(request, resolver);
   if (errors) {
     return { errors, receivedValues };
   }
@@ -501,7 +457,7 @@ const AddSlabDialog = ({
 }: {
   show: boolean;
   setShow: (show: boolean) => void;
-  form: UseFormReturn<FormData>;
+  form: UseFormReturn<TCustomerSchema>;
   stoneId: number;
   roomIndex: number;
   setSlabMap: (
@@ -595,7 +551,7 @@ const AddSinkDialog = ({
 }: {
   show: boolean;
   setShow: (show: boolean) => void;
-  form: UseFormReturn<FormData>;
+  form: UseFormReturn<TCustomerSchema>;
   roomIndex: number;
 }) => {
   const { sink_type } = useLoaderData<typeof loader>();
@@ -766,7 +722,7 @@ const RoomSubForm = ({
   stoneType,
   setSlabMap,
 }: {
-  form: UseFormReturn<FormData>;
+  form: UseFormReturn<TCustomerSchema>;
   index: number;
   sink_type: Sink[];
   stoneType: string | null;
@@ -1162,7 +1118,7 @@ export default function SlabSell() {
     [slabId]: bundle,
   });
 
-  const form = useForm<FormData>({
+  const form = useForm<TCustomerSchema>({
     resolver,
     defaultValues: {
       same_address: true,
