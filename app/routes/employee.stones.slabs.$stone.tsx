@@ -193,7 +193,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           SELECT GROUP_CONCAT(sink_type.name SEPARATOR ', ')
           FROM sinks
           JOIN sink_type ON sinks.sink_type_id = sink_type.id
-          WHERE sinks.sale_id = sales.id
+          JOIN slab_inventory si ON sinks.slab_id = si.id
+          WHERE si.sale_id = sales.id
         ) as sink_names
       FROM 
         sales
