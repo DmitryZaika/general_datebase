@@ -129,9 +129,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const sinkId = availableSinks[0].id;
         const sinkPrice = parseFloat(availableSinks[0].retail_price) || null;
 
+        // Find a slab in this sale to attach the sink to
+        const [slabInSale] = await db.execute<RowDataPacket[]>(
+          `SELECT id FROM slab_inventory WHERE sale_id = ? LIMIT 1`,
+          [saleId]
+        );
+
+        if (slabInSale.length === 0) {
+          throw new Error("No slabs found in this sale to attach sink to");
+        }
+
+        const slabId = slabInSale[0].id;
+
         await db.execute(
-          `UPDATE sinks SET sale_id = ?, price = ?, is_deleted = 1 WHERE id = ?`,
-          [saleId, sinkPrice, sinkId]
+          `UPDATE sinks SET slab_id = ?, price = ?, is_deleted = 1 WHERE id = ?`,
+          [slabId, sinkPrice, sinkId]
         );
       } else {
         console.warn("No available sinks found for type ID:", data.sink);
@@ -241,7 +253,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       `SELECT sink_type.name
        FROM sinks
        JOIN sink_type ON sinks.sink_type_id = sink_type.id
-       WHERE sinks.sale_id = ?`,
+       JOIN slab_inventory ON sinks.slab_id = slab_inventory.id
+       WHERE slab_inventory.sale_id = ?`,
       [saleId]
     );
 
@@ -270,7 +283,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
          SELECT 1 
          FROM sinks s 
          WHERE s.sink_type_id = st.id
-         AND s.sale_id IS NULL 
+         AND s.slab_id IS NULL 
          AND s.is_deleted = 0
        )
        ORDER BY st.name ASC`,

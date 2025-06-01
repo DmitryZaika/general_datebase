@@ -53,6 +53,7 @@ import { useFullSubmit } from "~/hooks/useFullSubmit";
 interface Sink {
   id: number;
   name: string;
+  type: string;
   retail_price: number;
   sink_count: number;
 }
@@ -243,35 +244,35 @@ export async function action({ request, params }: ActionFunctionArgs) {
         for (const slab of room.slabs) {
           if (slab.is_full) {
             await db.execute(
-              `UPDATE slab_inventory SET sale_id = ?, seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, 
+              `UPDATE slab_inventory SET sale_id = ?, seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
               stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ? WHERE id = ?`,
               [
                 saleId,
-                room.seam || "Standard",
-                room.edge || "Flat",
-                room.room || "Kitchen",
-                room.backsplash || "No",
-                room.tear_out || "No",
-                room.room !== "Bathroom" ? room.stove || "F/S" : null,
-                room.ten_year_sealer || false,
-                room.waterfall || "No",
-                room.corbels || 0,
+                room.seam,
+                room.edge,
+                room.room,
+                room.backsplash,
+                room.tear_out,
+                room.square_feet,
+                room.stove,
+                room.ten_year_sealer,
+                room.waterfall,
+                room.corbels,
                 slab.id,
               ]
             );
           } else {
-            console.log("HELLO");
             const [slabDimensionsForRoom] = await db.execute<RowDataPacket[]>(
               `SELECT length, width, stone_id, bundle, url FROM slab_inventory WHERE id = ?`,
               [slab.id]
             );
 
             if (slabDimensionsForRoom && slabDimensionsForRoom.length > 0) {
-              await db.execute<ResultSetHeader>(
+              const [newSlabResult] = await db.execute<ResultSetHeader>(
                 `INSERT INTO slab_inventory 
-                 (stone_id, bundle, length, width, url, parent_id, sale_id, seam, edge, room, backsplash, tear_out, 
+                 (stone_id, bundle, length, width, url, parent_id, sale_id, seam, edge, room, backsplash, tear_out, square_feet,
                   stove, ten_year_sealer, waterfall, corbels) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                   slabDimensionsForRoom[0].stone_id,
                   slabDimensionsForRoom[0].bundle,
@@ -280,26 +281,37 @@ export async function action({ request, params }: ActionFunctionArgs) {
                   slabDimensionsForRoom[0].url,
                   slab.id,
                   saleId,
-                  room.seam || "Standard",
-                  room.edge || "Flat",
-                  room.room || "Kitchen",
-                  room.backsplash || "No",
-                  room.tear_out || "No",
-                  room.room !== "Bathroom" ? room.stove || "F/S" : null,
-                  room.ten_year_sealer || false,
-                  room.waterfall || "No",
-                  room.corbels || 0,
+                  room.seam,
+                  room.edge,
+                  room.room,
+                  room.backsplash,
+                  room.tear_out,
+                  room.square_feet,
+                  room.stove,
+                  room.ten_year_sealer,
+                  room.waterfall,
+                  room.corbels,
                 ]
+              );
+
+              const newSlabId = newSlabResult.insertId;
+              for (const sinkType of room.sink_type) {
+                await db.execute(
+                  `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+                  [newSlabId, sinkType.id]
+                );
+              }
+            }
+          }
+
+          if (slab.is_full) {
+            for (const sinkType of room.sink_type) {
+              await db.execute(
+                `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+                [slab.id, sinkType.id]
               );
             }
           }
-        }
-
-        for (const sinkType of room.sink_type) {
-          await db.execute(
-            `UPDATE sinks SET sale_id = ? WHERE sink_type_id = ? AND sale_id IS NULL AND is_deleted = 0 LIMIT 1`,
-            [saleId, sinkType.id]
-          );
         }
       }
     }
@@ -361,24 +373,26 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const sink_type = await selectMany<Sink>(
       db,
       `SELECT
-        st.id,
-        st.name,
-        st.retail_price,
-        COUNT(s.id) AS sink_count
+        sink_type.id,
+        sink_type.name,
+        sink_type.retail_price,
+        sink_type.type,
+        COUNT(sinks.id) AS sink_count
       FROM
-        main.sink_type AS st
-        JOIN main.sinks AS s
-          ON st.id = s.sink_type_id
+        main.sink_type 
+        JOIN main.sinks
+          ON sink_type.id = sinks.sink_type_id
       WHERE
-        st.company_id = ?
-          AND s.is_deleted != 1
-          AND s.sale_id IS NULL
+        sink_type.company_id = ?
+          AND sinks.is_deleted != 1
+          AND sinks.slab_id IS NULL
       GROUP BY
-        st.id,
-        st.name,
-        st.retail_price
+        sink_type.id,
+        sink_type.name,
+        sink_type.retail_price,
+        sink_type.type
       ORDER BY
-        st.name ASC;
+        sink_type.name ASC;
       `,
       [user.company_id]
     );
@@ -583,7 +597,7 @@ const AddSinkDialog = ({
             </div>
           ) : (
             <Select
-              value={sink_type.find((sink) => sink.id === selectedSink)?.name}
+              value={selectedSink?.toString()}
               onValueChange={(val) => setSelectedSink(parseInt(val))}
             >
               <SelectTrigger className="min-w-[150px]">
@@ -591,7 +605,7 @@ const AddSinkDialog = ({
               </SelectTrigger>
               <SelectContent>
                 {sink_type.map((sink) => (
-                  <SelectItem key={sink.id} value={sink.name}>
+                  <SelectItem key={sink.id} value={sink.id.toString()}>
                     {sink.name} - ${sink.retail_price}
                   </SelectItem>
                 ))}
@@ -807,6 +821,12 @@ const RoomSubForm = ({
     form.setValue("rooms", rooms);
   };
 
+  useEffect(() => {
+    if (form.getValues(`rooms.${index}.room`) === "bathroom") {
+      form.setValue(`rooms.${index}.stove`, "N/A");
+    }
+  }, [form.getValues(`rooms.${index}.room`)]);
+
   return (
     <>
       <div className="h-[1px] bg-gray-200 w-full my-2"></div>
@@ -905,7 +925,6 @@ const RoomSubForm = ({
                   name="Stove"
                   className="mb-0"
                   options={stoveOptions}
-                  defaultValue="F/S"
                 />
               )}
             />
@@ -1049,12 +1068,13 @@ const RoomSubForm = ({
               >
                 <div className="flex items-center space-x-2">
                   <div className="text-sm font-medium">
-                    {sink_type[sink.id]?.name || `Sink ${sink.id}`}
+                    {sink_type.find((s) => s.id === sink.id)?.type} -{" "}
+                    {sink_type.find((s) => s.id === sink.id)?.name}
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="px-2 py-1 rounded-md text-sm bg-blue-100 text-blue-800">
-                    ${sink_type[sink.id]?.retail_price}
+                    ${sink_type.find((s) => s.id === sink.id)?.retail_price}
                   </div>
                   <Button
                     type="button"

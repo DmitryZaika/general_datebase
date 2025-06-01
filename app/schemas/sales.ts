@@ -19,7 +19,7 @@ export const roomSchema = z.object({
   tear_out: z.string().default("No"),
   stove: z.string().default("F/S"),
   waterfall: z.string().default("No"),
-  corbels: z.number().default(0),
+  corbels: z.coerce.number().default(0),
   seam: z.string().default("Standard"),
   ten_year_sealer: z.boolean().default(false),
   slabs: z.array(slabOptionsSchema).default([]),
