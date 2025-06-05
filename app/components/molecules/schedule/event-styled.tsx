@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
-import { TrashIcon ClockIcon } from "lucide-react";
+import { TrashIcon, ClockIcon } from "lucide-react";
 import { useScheduler } from "~/providers/scheduler-provider";
 import { cn } from "@/lib/utils";
 
