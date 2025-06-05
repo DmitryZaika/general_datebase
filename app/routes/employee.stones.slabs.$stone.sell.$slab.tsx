@@ -12,6 +12,8 @@ import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
+import { PhoneInput } from "~/components/molecules/PhoneInput";
+import { EmailInput } from "~/components/molecules/EmailInput";
 import { Button } from "~/components/ui/button";
 import { useForm, UseFormReturn } from "react-hook-form";
 import {
@@ -56,6 +58,14 @@ interface Sink {
   type: string;
   retail_price: number;
   sink_count: number;
+}
+
+interface Faucet {
+  id: number;
+  name: string;
+  type: string;
+  retail_price: number;
+  faucet_count: number;
 }
 
 const roomOptions = [
@@ -243,6 +253,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       for (const room of data.rooms) {
         for (const slab of room.slabs) {
           if (slab.is_full) {
+            // Full slab sale: update the main slab with sale information
             await db.execute(
               `UPDATE slab_inventory SET sale_id = ?, seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
               stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ? WHERE id = ?`,
@@ -261,18 +272,66 @@ export async function action({ request, params }: ActionFunctionArgs) {
                 slab.id,
               ]
             );
+
+            // Assign sinks and faucets to the main slab
+            for (const sinkType of room.sink_type) {
+              await db.execute(
+                `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+                [slab.id, sinkType.id]
+              );
+            }
+            for (const faucetType of room.faucet_type) {
+              await db.execute(
+                `UPDATE faucets SET slab_id = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+                [slab.id, faucetType.id]
+              );
+            }
           } else {
+            // Partial slab sale: update main slab with sale info AND create a copy
+            await db.execute(
+              `UPDATE slab_inventory SET sale_id = ?, seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
+              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ? WHERE id = ?`,
+              [
+                saleId,
+                room.seam,
+                room.edge,
+                room.room,
+                room.backsplash,
+                room.tear_out,
+                room.square_feet,
+                room.stove,
+                room.ten_year_sealer,
+                room.waterfall,
+                room.corbels,
+                slab.id,
+              ]
+            );
+
+            // Assign sinks and faucets to the main slab
+            for (const sinkType of room.sink_type) {
+              await db.execute(
+                `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+                [slab.id, sinkType.id]
+              );
+            }
+            for (const faucetType of room.faucet_type) {
+              await db.execute(
+                `UPDATE faucets SET slab_id = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+                [slab.id, faucetType.id]
+              );
+            }
+
+            // Create a copy of the slab (remaining portion) with parent_id
             const [slabDimensionsForRoom] = await db.execute<RowDataPacket[]>(
               `SELECT length, width, stone_id, bundle, url FROM slab_inventory WHERE id = ?`,
               [slab.id]
             );
 
             if (slabDimensionsForRoom && slabDimensionsForRoom.length > 0) {
-              const [newSlabResult] = await db.execute<ResultSetHeader>(
+              await db.execute<ResultSetHeader>(
                 `INSERT INTO slab_inventory 
-                 (stone_id, bundle, length, width, url, parent_id, sale_id, seam, edge, room, backsplash, tear_out, square_feet,
-                  stove, ten_year_sealer, waterfall, corbels) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                 (stone_id, bundle, length, width, url, parent_id) 
+                 VALUES (?, ?, ?, ?, ?, ?)`,
                 [
                   slabDimensionsForRoom[0].stone_id,
                   slabDimensionsForRoom[0].bundle,
@@ -280,35 +339,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
                   slabDimensionsForRoom[0].width,
                   slabDimensionsForRoom[0].url,
                   slab.id,
-                  saleId,
-                  room.seam,
-                  room.edge,
-                  room.room,
-                  room.backsplash,
-                  room.tear_out,
-                  room.square_feet,
-                  room.stove,
-                  room.ten_year_sealer,
-                  room.waterfall,
-                  room.corbels,
                 ]
-              );
-
-              const newSlabId = newSlabResult.insertId;
-              for (const sinkType of room.sink_type) {
-                await db.execute(
-                  `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
-                  [newSlabId, sinkType.id]
-                );
-              }
-            }
-          }
-
-          if (slab.is_full) {
-            for (const sinkType of room.sink_type) {
-              await db.execute(
-                `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
-                [slab.id, sinkType.id]
               );
             }
           }
@@ -397,6 +428,33 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       [user.company_id]
     );
 
+    const faucet_type = await selectMany<Faucet>(
+      db,
+      `SELECT
+        faucet_type.id,
+        faucet_type.name,
+        faucet_type.retail_price,
+        faucet_type.type,
+        COUNT(faucets.id) AS faucet_count
+      FROM
+        main.faucet_type 
+        JOIN main.faucets
+          ON faucet_type.id = faucets.faucet_type_id
+      WHERE
+        faucet_type.company_id = ?
+          AND faucets.is_deleted != 1
+          AND faucets.slab_id IS NULL
+      GROUP BY
+        faucet_type.id,
+        faucet_type.name,
+        faucet_type.retail_price,
+        faucet_type.type
+      ORDER BY
+        faucet_type.name ASC;
+      `,
+      [user.company_id]
+    );
+
     const allSales = await selectMany<{
       id: number;
       customer_name: string;
@@ -428,6 +486,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return {
       user,
       sink_type,
+      faucet_type,
       allSales,
       customers,
       stoneType,
@@ -494,10 +553,6 @@ const AddSlabDialog = ({
     enabled: !!stoneId && show,
   });
 
-  useEffect(() => {
-    setSelectedSlab(data[0]);
-  }, [data, addedSlabIds]);
-
   const handleAddSlab = () => {
     if (!selectedSlab) {
       return;
@@ -526,7 +581,7 @@ const AddSlabDialog = ({
             </div>
           ) : (
             <Select
-              value={selectedSlab?.bundle}
+              value={selectedSlab?.bundle || ""}
               onValueChange={(val) =>
                 setSelectedSlab(data.find((slab) => slab.bundle === val))
               }
@@ -597,7 +652,7 @@ const AddSinkDialog = ({
             </div>
           ) : (
             <Select
-              value={selectedSink?.toString()}
+              value={selectedSink?.toString() || ""}
               onValueChange={(val) => setSelectedSink(parseInt(val))}
             >
               <SelectTrigger className="min-w-[150px]">
@@ -619,6 +674,78 @@ const AddSinkDialog = ({
           </Button>
           <Button onClick={handleAddSink} disabled={!selectedSink}>
             Add Sink
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const AddFaucetDialog = ({
+  show,
+  setShow,
+  form,
+  roomIndex,
+}: {
+  show: boolean;
+  setShow: (show: boolean) => void;
+  form: UseFormReturn<TCustomerSchema>;
+  roomIndex: number;
+}) => {
+  const { faucet_type } = useLoaderData<typeof loader>();
+  const [selectedFaucet, setSelectedFaucet] = useState<number>();
+
+  const handleAddFaucet = () => {
+    if (!selectedFaucet) {
+      return;
+    }
+    const currentFaucets = (form.getValues(
+      `rooms.${roomIndex}.faucet_type` as any
+    ) || []) as any[];
+    (form.setValue as any)(`rooms.${roomIndex}.faucet_type`, [
+      ...currentFaucets,
+      {
+        id: selectedFaucet,
+      },
+    ]);
+    setShow(false);
+  };
+
+  return (
+    <Dialog open={show} onOpenChange={setShow}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Add Faucet</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {faucet_type.length === 0 ? (
+            <div className="text-center py-4 text-gray-500">
+              No available faucets found
+            </div>
+          ) : (
+            <Select
+              value={selectedFaucet?.toString() || ""}
+              onValueChange={(val) => setSelectedFaucet(parseInt(val))}
+            >
+              <SelectTrigger className="min-w-[150px]">
+                <SelectValue placeholder="Select a faucet" />
+              </SelectTrigger>
+              <SelectContent>
+                {faucet_type.map((faucet) => (
+                  <SelectItem key={faucet.id} value={faucet.id.toString()}>
+                    {faucet.name} - ${faucet.retail_price}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShow(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleAddFaucet} disabled={!selectedFaucet}>
+            Add Faucet
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -732,6 +859,7 @@ const RoomSubForm = ({
   form,
   index,
   sink_type,
+  faucet_type,
   slabMap,
   stoneType,
   setSlabMap,
@@ -739,6 +867,7 @@ const RoomSubForm = ({
   form: UseFormReturn<TCustomerSchema>;
   index: number;
   sink_type: Sink[];
+  faucet_type: Faucet[];
   stoneType: string | null;
   slabMap: Record<number, string | null>;
   setSlabMap: (
@@ -749,6 +878,7 @@ const RoomSubForm = ({
 }) => {
   const [showAddSlabDialog, setShowAddSlabDialog] = useState(false);
   const [showAddSinkDialog, setShowAddSinkDialog] = useState(false);
+  const [showAddFaucetDialog, setShowAddFaucetDialog] = useState(false);
 
   const {
     slabId,
@@ -813,6 +943,14 @@ const RoomSubForm = ({
     const currentSink = form.getValues(`rooms.${index}.sink_type`);
     currentSink.splice(sinkIndex, 1);
     form.setValue(`rooms.${index}.sink_type`, currentSink);
+  };
+
+  const handleRemoveFaucet = (faucetIndex: number) => {
+    const currentFaucet = (form.getValues(
+      `rooms.${index}.faucet_type` as any
+    ) || []) as any[];
+    currentFaucet.splice(faucetIndex, 1);
+    (form.setValue as any)(`rooms.${index}.faucet_type`, currentFaucet);
   };
 
   const handleRemoveRoom = () => {
@@ -989,9 +1127,10 @@ const RoomSubForm = ({
       </div>
 
       <Tabs defaultValue="slabs" className="mt-4">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="slabs">Slabs</TabsTrigger>
           <TabsTrigger value="sinks">Sinks</TabsTrigger>
+          <TabsTrigger value="faucets">Faucets</TabsTrigger>
         </TabsList>
 
         <TabsContent value="slabs" className="space-y-2">
@@ -1033,15 +1172,17 @@ const RoomSubForm = ({
                     Bundle {slabMap[slab.id]}
                     {slab.is_full ? "(Full)" : "(Partial)"}
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={() => handleRemoveSlab(slab.id)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
+                  {form.watch(`rooms.${index}.slabs`).length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => handleRemoveSlab(slab.id)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -1091,6 +1232,56 @@ const RoomSubForm = ({
             ))}
           </div>
         </TabsContent>
+
+        <TabsContent value="faucets" className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddFaucetDialog(true)}
+            >
+              Add Faucet
+            </Button>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xs text-gray-600">Faucets:</h2>
+            {(form.watch(`rooms.${index}.faucet_type` as any) || []).map(
+              (faucet: any, faucetIndex: number) => (
+                <div
+                  key={`${index}-${faucetIndex}-${faucet.id}`}
+                  className="flex items-center justify-between bg-gray-50 p-2 rounded-md"
+                >
+                  <div className="flex items-center space-x-2">
+                    <div className="text-sm font-medium">
+                      {faucet_type.find((f) => f.id === faucet.id)?.type} -{" "}
+                      {faucet_type.find((f) => f.id === faucet.id)?.name}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="px-2 py-1 rounded-md text-sm bg-green-100 text-green-800">
+                      $
+                      {
+                        faucet_type.find((f) => f.id === faucet.id)
+                          ?.retail_price
+                      }
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => handleRemoveFaucet(faucetIndex)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <input type="hidden" name="faucet_ids[]" value={faucet.id} />
+                </div>
+              )
+            )}
+          </div>
+        </TabsContent>
       </Tabs>
 
       {stone?.id && (
@@ -1109,6 +1300,12 @@ const RoomSubForm = ({
             roomIndex={index}
             form={form}
           />
+          <AddFaucetDialog
+            show={showAddFaucetDialog}
+            setShow={setShowAddFaucetDialog}
+            roomIndex={index}
+            form={form}
+          />
         </>
       )}
     </>
@@ -1118,6 +1315,7 @@ const RoomSubForm = ({
 export default function SlabSell() {
   const {
     sink_type,
+    faucet_type,
     allSales,
     customers,
     stoneType,
@@ -1431,14 +1629,10 @@ export default function SlabSell() {
                   control={form.control}
                   name="phone"
                   render={({ field }) => (
-                    <InputItem
-                      name={"Phone Number"}
-                      placeholder={"317-316-1456"}
-                      field={{
-                        ...field,
-                        disabled: disabledFields.phone,
-                      }}
+                    <PhoneInput
+                      field={field}
                       formClassName="mb-0 w-1/2"
+                      disabled={disabledFields.phone}
                     />
                   )}
                 />
@@ -1446,14 +1640,12 @@ export default function SlabSell() {
                   control={form.control}
                   name="email"
                   render={({ field }) => (
-                    <InputItem
-                      name={"Email"}
-                      placeholder={"Colin@gmail.com"}
+                    <EmailInput
                       field={{
                         ...field,
                         disabled: disabledFields.email,
                       }}
-                      formClassName="mb-0 w-1/2"
+                      formClassName="mb-0"
                     />
                   )}
                 />
@@ -1467,6 +1659,7 @@ export default function SlabSell() {
                   form={form}
                   index={index}
                   sink_type={sink_type}
+                  faucet_type={faucet_type}
                   stoneType={stoneType}
                 />
               ))}

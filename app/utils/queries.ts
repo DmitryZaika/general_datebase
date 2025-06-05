@@ -3,6 +3,7 @@ import { STONE_TYPES } from "~/utils/constants";
 import { selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
 import { SinkFilter } from "~/schemas/sinks";
+import { FaucetFilter } from "~/schemas/faucets";
 
 export interface Stone {
   id: number;
@@ -170,4 +171,73 @@ export async function sinkQueryBuilder(
   const sinks = await selectMany<Sink>(db, query, params);
 
   return show_sold_out ? sinks : sinks.filter((sink) => (sink.amount || 0) > 0);
+}
+
+export interface Faucet {
+  id: number;
+  name: string;
+  type: string;
+  url: string | null;
+  is_display: boolean | number;
+  amount: number | null;
+  supplier_id: number | null;
+  retail_price: number | null;
+  cost: number | null;
+}
+
+export async function faucetQueryBuilder(
+  filters: FaucetFilter,
+  companyId: number | string
+): Promise<Faucet[]> {
+  const { type, show_sold_out, supplier } = filters;
+  const numericCompanyId =
+    typeof companyId === "string" ? Number(companyId) : companyId;
+
+  let whereClause =
+    "WHERE faucet_type.company_id = ? AND faucet_type.is_deleted = 0";
+  let params: any[] = [numericCompanyId];
+
+  if (type && type.length > 0 && type.length < 7) {
+    whereClause += ` AND faucet_type.type IN (${type
+      .map(() => "?")
+      .join(",")})`;
+    params.push(...type);
+  }
+
+  if (supplier > 0) {
+    whereClause += " AND faucet_type.supplier_id = ?";
+    params.push(supplier);
+  }
+
+  const query = `
+    SELECT 
+      faucet_type.id, 
+      faucet_type.name, 
+      faucet_type.type, 
+      faucet_type.url, 
+      faucet_type.is_display, 
+      COUNT(faucets.id) AS amount, 
+      faucet_type.supplier_id, 
+      faucet_type.retail_price, 
+      faucet_type.cost
+    FROM faucet_type
+    LEFT JOIN faucets ON faucets.faucet_type_id = faucet_type.id AND faucets.is_deleted = 0
+    ${whereClause}
+    GROUP BY
+      faucet_type.id,
+      faucet_type.name,
+      faucet_type.type,
+      faucet_type.url,
+      faucet_type.is_display,
+      faucet_type.supplier_id,
+      faucet_type.retail_price,
+      faucet_type.cost
+    ORDER BY faucet_type.name ASC
+  `;
+
+  const faucets = await selectMany<Faucet>(db, query, params);
+
+  return show_sold_out
+    ? faucets
+    : faucets.filter((faucet) => (faucet.amount || 0) > 0);
 }

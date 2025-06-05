@@ -18,13 +18,18 @@ import { Button } from "~/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { LoadingButton } from "../molecules/LoadingButton";
 import clsx from "clsx";
-import { LinkButton } from "../molecules/LinkButton"; 
-function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkProps) {
+import { LinkButton } from "../molecules/LinkButton";
+function BurgerLink({
+  setOpen,
+  to,
+  children,
+  className,
+  onClick,
+}: BurgerLinkProps) {
   const handleClick = () => {
     setOpen(false);
     if (onClick) onClick();
   };
-
 
   return (
     <Link
@@ -38,26 +43,39 @@ function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkPro
 }
 
 function getMirroredUrl(path: string, search: string) {
-  const segments = path.split('/').filter(Boolean);
-  
-  if (segments.length >= 2 && segments[0] === "customer" && segments[2] === "stones") {
+  const segments = path.split("/").filter(Boolean);
+
+  if (
+    segments.length >= 2 &&
+    segments[0] === "customer" &&
+    segments[2] === "stones"
+  ) {
     return `/admin/stones${search}`;
   }
-  
+
   if (segments.length < 1) return `/employee${search}`;
-  
-  const currentRole = segments[0]; 
+
+  const currentRole = segments[0];
   const targetRole = currentRole === "admin" ? "employee" : "admin";
-  
+
   if (segments.length < 2) return `/${targetRole}${search}`;
-  
+
   const currentSection = segments[1];
-  
-  const supportedSections = ["stones", "instructions", "sinks", "suppliers", "supports", "documents", "images"];
+
+  const supportedSections = [
+    "stones",
+    "instructions",
+    "sinks",
+    "faucets",
+    "suppliers",
+    "supports",
+    "documents",
+    "images",
+  ];
   if (supportedSections.includes(currentSection)) {
     return `/${targetRole}/${currentSection}${search}`;
   }
-  
+
   return `/${targetRole}${search}`;
 }
 
@@ -75,7 +93,6 @@ export function BurgerMenu({
   const [isCustomerSwitching, setIsCustomerSwitching] = useState(false);
   const data = useLoaderData<{ user: { company_id: number } | null }>();
   const companyId = data?.user?.company_id || 1;
-  
 
   useEffect(() => {
     if (navigation.state === "idle") {
@@ -83,27 +100,24 @@ export function BurgerMenu({
       if (isCustomerSwitching) setIsCustomerSwitching(false);
     }
   }, [navigation.state]);
-  
- 
+
   const targetPath = getMirroredUrl(location.pathname, location.search);
-  
- 
+
   const getCustomerUrl = () => {
     // Если переходим из admin/stones в customer/:company/stones, сохраняем фильтры
     if (!isCustomerPage && location.pathname.startsWith("/admin/stones")) {
       return `/customer/${companyId}/stones${location.search}`;
     }
-    
-    return isCustomerPage 
-      ? `/employee/stones${location.search}` 
+
+    return isCustomerPage
+      ? `/employee/stones${location.search}`
       : `/customer/${companyId}/stones${location.search}`;
   };
-  
 
   const handleRoleSwitchClick = () => {
     setIsRoleSwitching(true);
   };
-  
+
   const handleCustomerSwitchClick = () => {
     setIsCustomerSwitching(true);
   };
@@ -158,9 +172,9 @@ export function BurgerMenu({
                     <LinkButton className="select-none">Employee</LinkButton>
                   </BurgerLink>
                 ) : (
-                  <BurgerLink 
-                    to={targetPath} 
-                    className="pb-2" 
+                  <BurgerLink
+                    to={targetPath}
+                    className="pb-2"
                     setOpen={setOpen}
                     onClick={handleRoleSwitchClick}
                   >

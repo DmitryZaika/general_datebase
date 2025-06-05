@@ -10,9 +10,14 @@ const sinkOptionsSchema = z.object({
   id: z.coerce.number(),
 });
 
+const faucetOptionsSchema = z.object({
+  id: z.coerce.number(),
+});
+
 export const roomSchema = z.object({
-  room: z.string().default("Kitchen"),
+  room: z.string().default("kitchen"),
   sink_type: z.array(sinkOptionsSchema).default([]),
+  faucet_type: z.array(faucetOptionsSchema).default([]),
   edge: z.string().default("Flat"),
   backsplash: z.string().default("No"),
   square_feet: z.coerce.number().default(0),

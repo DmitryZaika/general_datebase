@@ -341,7 +341,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         [saleId]
       );
 
-      // Unsell sinks from slabs in this sale
+      // Unsell sinks and faucets from slabs in this sale
       const [slabIdsForSinks] = await db.execute<RowDataPacket[]>(
         "SELECT id FROM slab_inventory WHERE sale_id = ?",
         [saleId]
@@ -352,6 +352,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
         for (const slabId of slabIdList) {
           await db.execute(
             `UPDATE sinks 
+             SET slab_id = NULL, price = NULL, is_deleted = 0 
+             WHERE slab_id = ?`,
+            [slabId]
+          );
+          await db.execute(
+            `UPDATE faucets 
              SET slab_id = NULL, price = NULL, is_deleted = 0 
              WHERE slab_id = ?`,
             [slabId]

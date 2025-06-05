@@ -16,7 +16,7 @@ import {
   Calculator,
   Receipt,
   User,
-  Users
+  Users,
 } from "lucide-react";
 import { SinkIcon } from "~/components/icons/SinkIcon";
 import { CorbelIcon } from "~/components/icons/CorbelIcon";
@@ -24,6 +24,7 @@ import { redirect, useLocation } from "react-router";
 import { getBase } from "~/utils/urlHelpers";
 import { StonesFilters } from "./StonesFilters";
 import { SinksFilters } from "./SinksFilters";
+import { FaucetsFilters } from "./FaucetsFilters";
 import { ISupplier } from "~/schemas/suppliers";
 import { useLoaderData } from "react-router";
 
@@ -47,28 +48,32 @@ interface ISidebarItem {
   component?: ({}) => React.ReactNode;
 }
 
-
-
 interface IProps {
   suppliers: ISupplier[] | undefined;
   sinkSuppliers?: ISupplier[] | undefined;
+  faucetSuppliers?: ISupplier[] | undefined;
   colors?: { id: number; name: string; hex_code: string }[] | undefined;
 }
 
 const getItems = (
-  base: string, 
-  suppliers: ISupplier[] | undefined, 
+  base: string,
+  suppliers: ISupplier[] | undefined,
   colors?: { id: number; name: string; hex_code: string }[] | undefined,
   sinkSuppliers?: ISupplier[] | undefined,
+  faucetSuppliers?: ISupplier[] | undefined,
   companyId: number | string = 1
 ) => {
   const isCustomerRoute = base === "customer";
   const finalList: ISidebarItem[] = [
     {
       title: "Stones",
-      url: isCustomerRoute ? `/customer/${companyId}/stones` : `/${base}/stones`,
+      url: isCustomerRoute
+        ? `/customer/${companyId}/stones`
+        : `/${base}/stones`,
       icon: Layers,
-      component: () => <StonesFilters suppliers={suppliers} base={base} colors={colors}/>,
+      component: () => (
+        <StonesFilters suppliers={suppliers} base={base} colors={colors} />
+      ),
     },
   ];
   if (["admin", "employee"].includes(base)) {
@@ -77,7 +82,15 @@ const getItems = (
         title: "Sinks",
         url: `/${base}/sinks`,
         icon: SinkIcon,
-        component: () => <SinksFilters base={base} suppliers={sinkSuppliers}/>,
+        component: () => <SinksFilters base={base} suppliers={sinkSuppliers} />,
+      },
+      {
+        title: "Faucets",
+        url: `/${base}/faucets`,
+        icon: ShowerHead,
+        component: () => (
+          <FaucetsFilters base={base} suppliers={faucetSuppliers} />
+        ),
       },
       {
         title: "Suppliers",
@@ -103,7 +116,7 @@ const getItems = (
         title: "Instructions",
         url: `/${base}/instructions`,
         icon: Lightbulb,
-      },
+      }
     );
   }
   if (base === "employee") {
@@ -147,18 +160,33 @@ const getItems = (
   return finalList;
 };
 
-export function EmployeeSidebar({ suppliers, sinkSuppliers, colors }: IProps) {
+export function EmployeeSidebar({
+  suppliers,
+  sinkSuppliers,
+  faucetSuppliers,
+  colors,
+}: IProps) {
   const location = useLocation();
   const base = getBase(location.pathname);
   const data = useLoaderData<{ user: { company_id: number } | null }>();
   const companyId = data?.user?.company_id || 1;
-  
-  const isCustomerRoute = typeof base === 'string' && base.startsWith('customer/');
-  
-  const itemsBase = isCustomerRoute ? "customer" : base as "employee" | "admin" | "customer";
-  
-  const items = getItems(itemsBase, suppliers, colors, sinkSuppliers, companyId);
-  
+
+  const isCustomerRoute =
+    typeof base === "string" && base.startsWith("customer/");
+
+  const itemsBase = isCustomerRoute
+    ? "customer"
+    : (base as "employee" | "admin" | "customer");
+
+  const items = getItems(
+    itemsBase,
+    suppliers,
+    colors,
+    sinkSuppliers,
+    faucetSuppliers,
+    companyId
+  );
+
   return (
     <Sidebar>
       <SidebarContent>
@@ -167,10 +195,11 @@ export function EmployeeSidebar({ suppliers, sinkSuppliers, colors }: IProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => {
-                const isActive = isCustomerRoute && item.title === "Stones" 
-                  ? location.pathname.includes("/stones") 
-                  : location.pathname.startsWith(item.url);
-                
+                const isActive =
+                  isCustomerRoute && item.title === "Stones"
+                    ? location.pathname.includes("/stones")
+                    : location.pathname.startsWith(item.url);
+
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>

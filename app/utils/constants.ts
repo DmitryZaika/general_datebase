@@ -1,5 +1,4 @@
-import { Buffer } from 'buffer'
-
+import { Buffer } from "buffer";
 
 export const DONE_KEY = "[DONE]035d8eba-9f8c-44c5-a1e0-290d1da033f7[/DONE]";
 
@@ -18,3 +17,5 @@ export const SINK_TYPES = [
   "ceramic",
   "farm house",
 ] as const;
+
+export const FAUCET_TYPES = ["single handle", "double handle"] as const;
