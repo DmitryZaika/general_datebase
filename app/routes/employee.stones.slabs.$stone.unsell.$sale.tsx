@@ -19,95 +19,52 @@ export async function action({ params, request }: ActionFunctionArgs) {
   const searchString = searchParams ? `?${searchParams}` : "";
 
   try {
-    // Find all slabs linked to this sale
-    const [slabsToUnsell] = await db.execute<RowDataPacket[]>(
-      "SELECT id FROM slab_inventory WHERE sale_id = ?",
-      [params.sale]
-    );
-
-    // Process all slabs that are being unsold
-    if (slabsToUnsell && slabsToUnsell.length > 0) {
-      for (const slabRow of slabsToUnsell) {
-        const parentId = slabRow.id;
-
-        // Check if this slab has any sold child slabs
-        const [soldChildSlabs] = await db.execute<RowDataPacket[]>(
-          "SELECT id FROM slab_inventory WHERE parent_id = ? AND sale_id IS NOT NULL",
-          [parentId]
-        );
-
-        if (soldChildSlabs && soldChildSlabs.length > 0) {
-          // If parent and child are both sold, remove parent_id from children and delete parent
-          await db.execute(
-            "UPDATE slab_inventory SET parent_id = NULL WHERE parent_id = ?",
-            [parentId]
-          );
-
-          // Delete the parent slab (this is the new behavior we want)
-          await db.execute("DELETE FROM slab_inventory WHERE id = ?", [
-            parentId,
-          ]);
-        } else {
-          // Check for unsold child slabs
-          const [unsoldChildSlabs] = await db.execute<RowDataPacket[]>(
-            "SELECT id FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '')",
-            [parentId]
-          );
-
-          if (unsoldChildSlabs && unsoldChildSlabs.length > 0) {
-            // Delete all unsold child slabs of this parent
-            await db.execute(
-              "DELETE FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '')",
-              [parentId]
-            );
-          }
-        }
-      }
-    }
-
-    // Additional cleanup step - delete all unsold slabs with the same bundle
-    const [bundleInfo] = await db.execute<RowDataPacket[]>(
-      "SELECT DISTINCT bundle, stone_id FROM slab_inventory WHERE sale_id = ?",
-      [params.sale]
-    );
-
-    if (bundleInfo && bundleInfo.length > 0) {
-      for (const info of bundleInfo) {
-        const bundle = info.bundle;
-        const stoneId = info.stone_id;
-
-        // Delete all unsold slabs with the same bundle in the same stone
-        await db.execute(
-          `DELETE FROM slab_inventory 
-           WHERE bundle = ? 
-           AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '') 
-           AND stone_id = ?`,
-          [bundle, stoneId]
-        );
-      }
-    }
-
-    // Mark remaining slabs as unsold
+    // STEP 1: Unsell sinks and faucets - remove slab_id to make them available again
     await db.execute(
-      "UPDATE slab_inventory SET sale_id = NULL, notes = NULL, square_feet = NULL WHERE sale_id = ?",
+      "UPDATE sinks SET slab_id = NULL, is_deleted = 0, price = NULL WHERE slab_id IN (SELECT id FROM slab_inventory WHERE sale_id = ?)",
+      [params.sale]
+    );
+    await db.execute(
+      "UPDATE faucets SET slab_id = NULL, is_deleted = 0, price = NULL WHERE slab_id IN (SELECT id FROM slab_inventory WHERE sale_id = ?)",
       [params.sale]
     );
 
-    // Unsell sinks from slabs in this sale
-    const [slabIds] = await db.execute<RowDataPacket[]>(
+    // STEP 2: Get all slabs that are being unsold (parents)
+    const [parentSlabs] = await db.execute<RowDataPacket[]>(
       "SELECT id FROM slab_inventory WHERE sale_id = ?",
       [params.sale]
     );
 
-    if (slabIds && slabIds.length > 0) {
-      const slabIdList = slabIds.map((row) => row.id);
-      for (const slabId of slabIdList) {
+    // STEP 3: Delete unsold children for each parent being unsold
+    if (parentSlabs && parentSlabs.length > 0) {
+      for (const parent of parentSlabs) {
+        // Delete child slabs that are NOT sold (sale_id IS NULL)
         await db.execute(
-          "UPDATE sinks SET slab_id = NULL, is_deleted = 0, price = NULL WHERE slab_id = ?",
-          [slabId]
+          "DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL",
+          [parent.id]
         );
       }
     }
+
+    // STEP 4: Clear all sale information from slabs - remove sale_id and all room/sale data
+    await db.execute(
+      `UPDATE slab_inventory SET 
+        sale_id = NULL, 
+        notes = NULL, 
+        price = NULL,
+        square_feet = NULL,
+        edge = NULL,
+        room = NULL,
+        backsplash = NULL,
+        tear_out = NULL,
+        ten_year_sealer = NULL,
+        waterfall = NULL,
+        corbels = NULL,
+        seam = NULL,
+        stove = NULL
+      WHERE sale_id = ?`,
+      [params.sale]
+    );
 
     // Mark the sale as cancelled
     await db.execute("UPDATE sales SET cancelled_date = NOW() WHERE id = ?", [

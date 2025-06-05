@@ -26,11 +26,8 @@ import { db } from "~/db.server";
 import { EmployeeSidebar } from "~/components/molecules/Sidebars/EmployeeSidebar";
 import { getBase } from "~/utils/urlHelpers";
 import { ISupplier } from "~/schemas/suppliers";
-import {
-  QueryClient,
-  QueryClientProvider,
-} from '@tanstack/react-query'
-import { posthog } from 'posthog-js'
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { posthog } from "posthog-js";
 import { ScrollToTopButton } from "~/components/ui/ScrollToTopButton";
 
 export const links: LinksFunction = () => [
@@ -78,9 +75,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   let stoneSuppliers: ISupplier[] | undefined = undefined;
   let sinkSuppliers: ISupplier[] | undefined = undefined;
-  let colors: { id: number; name: string; hex_code: string }[] | undefined = undefined;
-  
-  // Always load colors for the filters
+  let faucetSuppliers: ISupplier[] | undefined = undefined;
+  let colors: { id: number; name: string; hex_code: string }[] | undefined =
+    undefined;
+
   colors = await selectMany<{ id: number; name: string; hex_code: string }>(
     db,
     `SELECT c.id, c.name, c.hex_code 
@@ -88,7 +86,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       ORDER BY c.name ASC`,
     []
   );
-  
+
   if (user) {
     stoneSuppliers = await selectMany<ISupplier>(
       db,
@@ -99,7 +97,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
        GROUP BY s.id, s.supplier_name`,
       [user.company_id]
     );
-    
+
     sinkSuppliers = await selectMany<ISupplier>(
       db,
       `SELECT s.id, s.supplier_name 
@@ -109,10 +107,28 @@ export async function loader({ request }: LoaderFunctionArgs) {
        GROUP BY s.id, s.supplier_name`,
       [user.company_id]
     );
+
+    faucetSuppliers = await selectMany<ISupplier>(
+      db,
+      `SELECT s.id, s.supplier_name 
+       FROM suppliers s
+       INNER JOIN faucet_type ft ON s.id = ft.supplier_id
+       WHERE s.company_id = ?
+       GROUP BY s.id, s.supplier_name`,
+      [user.company_id]
+    );
   }
 
   return data(
-    { message, token, user, stoneSuppliers, sinkSuppliers, colors },
+    {
+      message,
+      token,
+      user,
+      stoneSuppliers,
+      sinkSuppliers,
+      faucetSuppliers,
+      colors,
+    },
 
     {
       headers: [
@@ -126,7 +142,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
 const queryClient = new QueryClient();
 
 export default function App() {
-  const { message, token, user, stoneSuppliers, sinkSuppliers, colors } = useLoaderData<typeof loader>();
+  const {
+    message,
+    token,
+    user,
+    stoneSuppliers,
+    sinkSuppliers,
+    faucetSuppliers,
+    colors,
+  } = useLoaderData<typeof loader>();
   const { pathname } = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -160,29 +184,34 @@ export default function App() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-            <SidebarProvider open={!!basePath}>
-              <EmployeeSidebar suppliers={stoneSuppliers} sinkSuppliers={sinkSuppliers} colors={colors} />
-              <main className="h-screen overflow-y-auto bg-gray-100 w-full">
-                <AuthenticityTokenProvider token={token}>
-                  <Header
-                    isEmployee={user?.is_employee ?? false}
-                    user={user}
-                    isAdmin={user?.is_admin ?? false}
-                    isSuperUser={user?.is_superuser ?? false}
-                  />
-                  <div className="relative">
-                    {isMobile && <SidebarTrigger />}
-                    <Outlet />
-                  </div>
-                </AuthenticityTokenProvider>
-                <Toaster />
-                <ScrollRestoration />
-                <Scripts />
-                <Posthog />
-                {user && <Chat />}
-                <ScrollToTopButton />
-              </main>
-            </SidebarProvider>
+          <SidebarProvider open={!!basePath}>
+            <EmployeeSidebar
+              suppliers={stoneSuppliers}
+              sinkSuppliers={sinkSuppliers}
+              faucetSuppliers={faucetSuppliers}
+              colors={colors}
+            />
+            <main className="h-screen overflow-y-auto bg-gray-100 w-full">
+              <AuthenticityTokenProvider token={token}>
+                <Header
+                  isEmployee={user?.is_employee ?? false}
+                  user={user}
+                  isAdmin={user?.is_admin ?? false}
+                  isSuperUser={user?.is_superuser ?? false}
+                />
+                <div className="relative">
+                  {isMobile && <SidebarTrigger />}
+                  <Outlet />
+                </div>
+              </AuthenticityTokenProvider>
+              <Toaster />
+              <ScrollRestoration />
+              <Scripts />
+              <Posthog />
+              {user && <Chat />}
+              <ScrollToTopButton />
+            </main>
+          </SidebarProvider>
         </QueryClientProvider>
       </body>
     </html>

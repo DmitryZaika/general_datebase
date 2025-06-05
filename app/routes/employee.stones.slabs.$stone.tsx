@@ -420,8 +420,6 @@ export default function SlabsModal() {
                   ? "bg-red-300 "
                   : hasParent
                   ? "bg-yellow-200 "
-                  : hasChildren && !slab.sale_id
-                  ? "bg-yellow-200 "
                   : "bg-white "
               }${
                 isHighlighted
@@ -429,8 +427,6 @@ export default function SlabsModal() {
                   : slab.sale_id
                   ? "border border-red-400"
                   : hasParent
-                  ? "border border-yellow-400"
-                  : hasChildren && !slab.sale_id
                   ? "border border-yellow-400"
                   : "border border-gray-200"
               }`}
@@ -663,15 +659,20 @@ export default function SlabsModal() {
   orderedBundles.forEach((bundle) => {
     const bundleSlabs = slabsByBundle[bundle];
 
-    // Within a bundle group, place parents first, then children
+    // Get all parent slabs (no parent_id)
     const parents = bundleSlabs.filter((slab) => slab.parent_id === null);
-    const children = bundleSlabs.filter((slab) => slab.parent_id !== null);
 
-    // Add parents first
-    sortedSlabs.push(...parents);
+    // For each parent, add the parent first, then its children immediately after
+    parents.forEach((parent) => {
+      // Add the parent
+      sortedSlabs.push(parent);
 
-    // Then add children
-    sortedSlabs.push(...children);
+      // Find and add all children of this parent
+      const children = bundleSlabs.filter(
+        (slab) => slab.parent_id === parent.id
+      );
+      sortedSlabs.push(...children);
+    });
   });
 
   const uniqueSlabs = sortedSlabs;
