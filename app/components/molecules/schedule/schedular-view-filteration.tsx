@@ -57,9 +57,8 @@ export default function SchedulerViewFilteration({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 px-1 gap-4">
         <div className="flex flex-wrap gap-2 order-2 sm:order-1">
           {views.map((view) => (
-            <Button variant={period === view ? "default" : "outline"} asChild>
+            <Button variant={period === view ? "default" : "outline"} key={view} asChild>
             <Link
-              key={view}
               to={`/employee/schedule/${view}`}
               className="capitalize touch-target"
             >

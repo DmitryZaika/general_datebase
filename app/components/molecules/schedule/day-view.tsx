@@ -301,7 +301,7 @@ export default function DailyView() {
                 }
               </h3>
               
-              {dayEvents.length > 0 ? (
+              {dayEvents.length > 0 && (
                 <div className="space-y-2">
                   <AnimatePresence initial={false}>
                     {dayEvents.slice(0, 3).map((event: Event, eventIndex) => (
@@ -329,15 +329,6 @@ export default function DailyView() {
                     </div>
                   )}
                 </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleAddEvent()}
-                  className="w-full sm:w-auto touch-target"
-                >
-                  Add Event
-                </Button>
               )}
             </div>
 
