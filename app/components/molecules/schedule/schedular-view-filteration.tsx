@@ -10,6 +10,8 @@ import MonthView from "@/components/molecules/schedule/month-view";
 
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
 
+type Period = "day" | "week" | "month";
+
 export default function SchedulerViewFilteration({
   views = {
     views: ["day", "week", "month"],
@@ -18,14 +20,18 @@ export default function SchedulerViewFilteration({
   stopDayEventSummary = false,
   CustomComponents,
   classNames,
+  period,
+  onViewChange,
 }: {
   views?: Views;
   stopDayEventSummary?: boolean;
   CustomComponents?: CustomComponents;
   classNames?: ClassNames;
+  period?: Period;
+  onViewChange?: (period: Period) => void;
 }) {
   const [activeView, setActiveView] = useState<string>(
-    views?.views?.[0] || "day"
+    period || views?.views?.[0] || "day"
   );
   const [showAddEventModal, setShowAddEventModal] = useState(false);
   const [eventModalDefaults, setEventModalDefaults] = useState<{
@@ -61,23 +67,35 @@ export default function SchedulerViewFilteration({
 
   const viewsSelector = views?.views;
 
-  // Set initial active view
+  // Update active view when period prop changes
   useEffect(() => {
-    if (viewsSelector?.length) {
+    if (period) {
+      setActiveView(period);
+    } else if (viewsSelector?.length) {
       setActiveView(viewsSelector[0]);
     }
-  }, []);
+  }, [period, viewsSelector]);
+
+  // Handle view change with URL navigation if callback is provided
+  const handleViewChange = (view: string) => {
+    if (onViewChange && (view === "day" || view === "week" || view === "month")) {
+      onViewChange(view as Period);
+    } else {
+      setActiveView(view);
+    }
+  };
 
   return (
     <div className="overflow-auto">
-      <div className="flex justify-between items-center mb-4 px-1">
-        <div className="flex space-x-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 px-1 gap-4">
+        <div className="flex flex-wrap gap-2 order-2 sm:order-1">
           {viewsSelector?.map((view) => (
             <Button
               key={view}
-              onClick={() => setActiveView(view)}
+              onClick={() => handleViewChange(view)}
               variant={activeView === view ? "default" : "outline"}
-              className="capitalize"
+              className="capitalize touch-target"
+              size="sm"
             >
               {CustomComponents?.customTabs?.[
                 `Custom${view.charAt(0).toUpperCase() + view.slice(1)}Tab` as keyof typeof CustomComponents.customTabs
@@ -87,6 +105,8 @@ export default function SchedulerViewFilteration({
         </div>
         <Button
           onClick={() => handleAddEvent()}
+          className="touch-target order-1 sm:order-2"
+          size="sm"
         >
           {CustomComponents?.customButtons?.CustomAddEventButton || (
             <span>Add Event</span>
@@ -94,33 +114,38 @@ export default function SchedulerViewFilteration({
         </Button>
       </div>
 
-             {activeView === "day" && (
-         <DailyView
-           prevButton={CustomComponents?.customButtons?.CustomPrevButton}
-           nextButton={CustomComponents?.customButtons?.CustomNextButton}
-           CustomEventComponent={CustomComponents?.CustomEventComponent}
-           CustomEventModal={CustomComponents?.CustomEventModal}
-           stopDayEventSummary={stopDayEventSummary}
-         />
-       )}
+      <div className="min-h-[600px]">
+        {activeView === "day" && (
+          <DailyView
+            prevButton={CustomComponents?.customButtons?.CustomPrevButton}
+            nextButton={CustomComponents?.customButtons?.CustomNextButton}
+            CustomEventComponent={CustomComponents?.CustomEventComponent as any}
+            CustomEventModal={CustomComponents?.CustomEventModal}
+            stopDayEventSummary={stopDayEventSummary}
+            classNames={classNames?.buttons}
+          />
+        )}
 
-       {activeView === "week" && (
-         <WeeklyView
-           prevButton={CustomComponents?.customButtons?.CustomPrevButton}
-           nextButton={CustomComponents?.customButtons?.CustomNextButton}
-           CustomEventComponent={CustomComponents?.CustomEventComponent}
-           CustomEventModal={CustomComponents?.CustomEventModal}
-         />
-       )}
+        {activeView === "week" && (
+          <WeeklyView
+            prevButton={CustomComponents?.customButtons?.CustomPrevButton}
+            nextButton={CustomComponents?.customButtons?.CustomNextButton}
+            CustomEventComponent={CustomComponents?.CustomEventComponent as any}
+            CustomEventModal={CustomComponents?.CustomEventModal}
+            classNames={classNames?.buttons}
+          />
+        )}
 
-       {activeView === "month" && (
-         <MonthView
-           prevButton={CustomComponents?.customButtons?.CustomPrevButton}
-           nextButton={CustomComponents?.customButtons?.CustomNextButton}
-           CustomEventComponent={CustomComponents?.CustomEventComponent}
-           CustomEventModal={CustomComponents?.CustomEventModal}
-         />
-       )}
+        {activeView === "month" && (
+          <MonthView
+            prevButton={CustomComponents?.customButtons?.CustomPrevButton}
+            nextButton={CustomComponents?.customButtons?.CustomNextButton}
+            CustomEventComponent={CustomComponents?.CustomEventComponent as any}
+            CustomEventModal={CustomComponents?.CustomEventModal}
+            classNames={classNames?.buttons}
+          />
+        )}
+      </div>
 
       <AddEventModal
         open={showAddEventModal}
