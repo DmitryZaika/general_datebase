@@ -36,7 +36,7 @@ export function AddressInput({ form, field }: Props) {
   const { data = [], isFetching } = useQuery({
     queryKey: ["google", "address", debounced],
     queryFn: () => completeAddress(debounced),
-    enabled: debounced?.length >= 5,
+    enabled: debounced?.length >= 6,
     staleTime: 60_000,
   });
 
