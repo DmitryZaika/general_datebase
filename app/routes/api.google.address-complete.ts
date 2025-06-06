@@ -20,6 +20,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     body: JSON.stringify({
       input: q,
       languageCode: "en",
+      includedRegionCodes: ["US"],
     }),
   });
   if (!gRes.ok) {
@@ -32,10 +33,57 @@ export async function loader({ request }: LoaderFunctionArgs) {
     suggestions: { placePrediction: { text: string; placeId: string } }[];
   };
 
+  // Optionally fetch zip codes for each suggestion
+  const suggestionsWithZipCodes = await Promise.all(
+    gJson.suggestions.map(async (s) => {
+      try {
+        // Fetch place details to get zip code
+        const detailsUrl = new URL(
+          `https://places.googleapis.com/v1/places/${s.placePrediction.placeId}`
+        );
+        const detailsRes = await fetch(detailsUrl, {
+          method: "get",
+          signal: request.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": GOOGLE_KEY,
+            "X-Goog-FieldMask": "addressComponents",
+          },
+        });
+
+        if (detailsRes.ok) {
+          const detailsJson = (await detailsRes.json()) as {
+            addressComponents: Array<{
+              longText: string;
+              shortText: string;
+              types: string[];
+            }>;
+          };
+
+          const zipCode = detailsJson.addressComponents?.find((component) =>
+            component.types.includes("postal_code")
+          )?.longText;
+
+          return {
+            description: s.placePrediction.text,
+            place_id: s.placePrediction.placeId,
+            zip_code: zipCode,
+          };
+        }
+      } catch (error) {
+        console.error("Error fetching place details:", error);
+      }
+
+      // Fallback if details fetch fails
+      return {
+        description: s.placePrediction.text,
+        place_id: s.placePrediction.placeId,
+        zip_code: null,
+      };
+    })
+  );
+
   return data({
-    suggestions: gJson.suggestions.map((s) => ({
-      description: s.placePrediction.text,
-      place_id: s.placePrediction.placeId,
-    })),
+    suggestions: suggestionsWithZipCodes,
   });
 }
