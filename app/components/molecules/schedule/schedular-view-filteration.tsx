@@ -51,23 +51,35 @@ export default function SchedulerViewFilteration({
   // Handle view change with URL navigation if callback is provided
   const handleViewChange = (view: Period) => {
       console.log(view);
-      navigate(`/employee/schedule/${view}`, { replace: true });
+      const searchParams = new URLSearchParams();
+      if (currentDate) {
+        searchParams.set("date", currentDate);
+      }
+      navigate(`/employee/schedule/${view}?${searchParams.toString()}`, { replace: true });
   };
 
   return (
     <div className="overflow-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 px-1 gap-4">
         <div className="flex flex-wrap gap-2 order-2 sm:order-1">
-          {views.map((view) => (
-            <Button variant={period === view ? "default" : "outline"} key={view} asChild>
-            <Link
-              to={`/employee/schedule/${view}`}
-              className="capitalize touch-target"
-            >
-              {view}
-            </Link>
-            </Button>
-          ))}
+          {views.map((view) => {
+            const searchParams = new URLSearchParams();
+            if (currentDate) {
+              searchParams.set("date", currentDate);
+            }
+            const linkTo = `/employee/schedule/${view}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+            
+            return (
+              <Button variant={period === view ? "default" : "outline"} key={view} asChild>
+                <Link
+                  to={linkTo}
+                  className="capitalize touch-target"
+                >
+                  {view}
+                </Link>
+              </Button>
+            );
+          })}
         </div>
         <Button
           onClick={() => handleAddEvent()}

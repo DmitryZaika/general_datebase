@@ -8,6 +8,7 @@ import clsx from "clsx";
 import { useScheduler } from "~/providers/scheduler-provider";
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
 import EventStyled from "@/components/molecules/schedule/event-styled";
+import { useNavigate } from "react-router";
 
 // Define Event interface locally since it's not exported from types
 interface Event {
@@ -34,12 +35,21 @@ const pageTransitionVariants = {
   }),
 };
 
+// Helper function to format date as dd-mm-yyyy
+function formatDateStr(date: Date): string {
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 export default function MonthView() {
   const { getters, weekStartsOn } = useScheduler();
   const [open, setOpen] = useState<{startDate: Date, endDate: Date} | null>(null);
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [direction, setDirection] = useState<number>(0);
+  const navigate = useNavigate();
 
   const daysInMonth = getters.getDaysInMonth(
     currentDate.getMonth(),
@@ -54,7 +64,8 @@ export default function MonthView() {
       1
     );
     setCurrentDate(newDate);
-  }, [currentDate]);
+    navigate(`/employee/schedule/month?date=${formatDateStr(newDate)}`, { replace: true });
+  }, [currentDate, navigate]);
 
   const handleNextMonth = useCallback(() => {
     setDirection(1);
@@ -64,7 +75,8 @@ export default function MonthView() {
       1
     );
     setCurrentDate(newDate);
-  }, [currentDate]);
+    navigate(`/employee/schedule/month?date=${formatDateStr(newDate)}`, { replace: true });
+  }, [currentDate, navigate]);
 
   function handleAddEvent(selectedDay: number) {
     // Create start date at 12:00 AM on the selected day

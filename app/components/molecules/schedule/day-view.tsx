@@ -9,6 +9,7 @@ import EventStyled from "@/components/molecules/schedule/event-styled";
 import { CustomEventModal } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router";
 
 // Define Event interface locally since it's not exported from types
 interface Event {
@@ -151,11 +152,20 @@ const groupEventsByTimePeriod = (events: Event[] | undefined) => {
   );
 };
 
+// Helper function to format date as dd-mm-yyyy
+function formatDateStr(date: Date): string {
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 export default function DailyView() {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [direction, setDirection] = useState<number>(0);
   const { getters, handlers } = useScheduler();
   const [open, setOpen] = useState<{startDate: Date, endDate: Date} | null>(null);
+  const navigate = useNavigate();
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -239,14 +249,16 @@ export default function DailyView() {
     const nextDay = new Date(currentDate);
     nextDay.setDate(currentDate.getDate() + 1);
     setCurrentDate(nextDay);
-  }, [currentDate]);
+    navigate(`/employee/schedule/day?date=${formatDateStr(nextDay)}`, { replace: true });
+  }, [currentDate, navigate]);
 
   const handlePrevDay = useCallback(() => {
     setDirection(-1);
     const prevDay = new Date(currentDate);
     prevDay.setDate(currentDate.getDate() - 1);
     setCurrentDate(prevDay);
-  }, [currentDate]);
+    navigate(`/employee/schedule/day?date=${formatDateStr(prevDay)}`, { replace: true });
+  }, [currentDate, navigate]);
 
   return (
     <div className="w-full px-2 sm:px-4">
