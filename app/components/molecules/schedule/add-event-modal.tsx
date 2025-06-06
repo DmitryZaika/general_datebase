@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +17,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { FormProvider, FormField } from "@/components/ui/form";
 import { Form } from "react-router";
@@ -141,11 +140,16 @@ export default function AddEventModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
+
           <DialogTitle>
             {defaultValues?.id ? "Edit Event" : "Add Event"}
           </DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            {defaultValues?.id ? "Edit an existing event" : "Add a new event"}
+          </DialogDescription>
         </DialogHeader>
         
         <FormProvider {...form}>

@@ -29,9 +29,7 @@ export default function EmployeesSchedule() {
     <SchedulerProvider>
       <div className="m-4 sm:m-8 lg:m-16 bg-gray-50 dark:bg-gray-900 min-h-screen">
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-          <SchedulerViewFilteration
-            period={period}
-          />
+          <SchedulerViewFilteration period={period} />
         </div>
       </div>
     </SchedulerProvider>
