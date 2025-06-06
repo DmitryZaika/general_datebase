@@ -25,47 +25,6 @@ const hours = Array.from({ length: 24 }, (_, i) => {
   return `${hour}:00 ${ampm}`;
 });
 
-interface ChipData {
-  id: number;
-  color: "primary" | "warning" | "danger";
-  title: string;
-  description: string;
-}
-
-const chipData: ChipData[] = [
-  {
-    id: 1,
-    color: "primary",
-    title: "Ads Campaign Nr1",
-    description: "Day 1 of 5: Google Ads, Target Audience: SMB-Alpha",
-  },
-  {
-    id: 2,
-    color: "warning",
-    title: "Ads Campaign Nr2",
-    description:
-      "All Day: Day 2 of 5: AdSense + FB, Target Audience: SMB2-Delta3",
-  },
-  {
-    id: 3,
-    color: "danger",
-    title: "Critical Campaign Nr3",
-    description: "Day 3 of 5: High-Impact Ads, Target: E-Commerce Gamma",
-  },
-  {
-    id: 4,
-    color: "primary",
-    title: "Ads Campaign Nr4",
-    description: "Day 4 of 5: FB Ads, Audience: Retailers-Zeta",
-  },
-  {
-    id: 5,
-    color: "warning",
-    title: "Campaign Ending Soon",
-    description: "Final Day: Monitor closely, Audience: Delta2-Beta",
-  },
-];
-
 // Animation Variants
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -97,19 +56,7 @@ const pageTransitionVariants = {
   }),
 };
 
-export default function WeeklyView({
-  prevButton,
-  nextButton,
-  CustomEventComponent,
-  CustomEventModal,
-  classNames,
-}: {
-  prevButton?: React.ReactNode;
-  nextButton?: React.ReactNode;
-  CustomEventComponent?: React.FC<Event>;
-  CustomEventModal?: CustomEventModal;
-  classNames?: { prev?: string; next?: string; addEvent?: string };
-}) {
+export default function WeeklyView() {
   const { getters, handlers } = useScheduler();
   const hoursColumnRef = useRef<HTMLDivElement>(null);
   const [detailedHour, setDetailedHour] = useState<string | null>(null);
@@ -296,36 +243,24 @@ export default function WeeklyView({
         </h1>
 
         <div className="flex gap-2 justify-center sm:justify-end">
-          {prevButton ? (
-            <div onClick={handlePrevWeek} className="cursor-pointer">
-              {prevButton}
-            </div>
-          ) : (
             <Button
               variant="outline"
               size="sm"
               onClick={handlePrevWeek}
-              className={clsx("min-w-[80px] touch-target", classNames?.prev)}
+              className={"min-w-[80px] touch-target"}
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
               <span className="hidden sm:inline">Prev</span>
             </Button>
-          )}
-          {nextButton ? (
-            <div onClick={handleNextWeek} className="cursor-pointer">
-              {nextButton}
-            </div>
-          ) : (
             <Button
               variant="outline"
               size="sm"
               onClick={handleNextWeek}
-              className={clsx("min-w-[80px] touch-target", classNames?.next)}
+              className={"min-w-[80px] touch-target"}
             >
               <span className="hidden sm:inline">Next</span>
               <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
-          )}
         </div>
       </div>
 
@@ -501,7 +436,6 @@ export default function WeeklyView({
                                 <EventStyled
                                   event={{
                                     ...event,
-                                    CustomEventComponent,
                                     minmized: true,
                                   }}
                                 />

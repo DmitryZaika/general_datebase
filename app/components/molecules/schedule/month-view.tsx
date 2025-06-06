@@ -39,19 +39,7 @@ const pageTransitionVariants = {
   }),
 };
 
-export default function MonthView({
-  prevButton,
-  nextButton,
-  CustomEventComponent,
-  CustomEventModal,
-  classNames,
-}: {
-  prevButton?: React.ReactNode;
-  nextButton?: React.ReactNode;
-  CustomEventComponent?: React.FC<Event>;
-  CustomEventModal?: CustomEventModal;
-  classNames?: { prev?: string; next?: string; addEvent?: string };
-}) {
+export default function MonthView() {
   const { getters, weekStartsOn } = useScheduler();
   const [open, setOpen] = useState<{startDate: Date, endDate: Date} | null>(null);
 
@@ -172,36 +160,24 @@ export default function MonthView({
         
         {/* Mobile-optimized navigation */}
         <div className="flex gap-2 justify-center sm:justify-end">
-          {prevButton ? (
-            <div onClick={handlePrevMonth} className="cursor-pointer">
-              {prevButton}
-            </div>
-          ) : (
             <Button
               variant="outline"
               size="sm"
               onClick={handlePrevMonth}
-              className={clsx("min-w-[80px] touch-target", classNames?.prev)}
+              className={"min-w-[80px] touch-target"}
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
               <span className="hidden sm:inline">Prev</span>
             </Button>
-          )}
-          {nextButton ? (
-            <div onClick={handleNextMonth} className="cursor-pointer">
-              {nextButton}
-            </div>
-          ) : (
             <Button
               variant="outline"
               size="sm"
               onClick={handleNextMonth}
-              className={clsx("min-w-[80px] touch-target", classNames?.next)}
+              className={"min-w-[80px] touch-target"}
             >
               <span className="hidden sm:inline">Next</span>
               <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
-          )}
         </div>
       </div>
 
@@ -325,7 +301,6 @@ export default function MonthView({
                                  <EventStyled
                                    event={{
                                      ...dayEvents[0],
-                                     CustomEventComponent,
                                      minmized: true,
                                    }}
                                  />
