@@ -1,4 +1,3 @@
-import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,13 +19,12 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { FormProvider, FormField } from "@/components/ui/form";
-import { Form, useFetcher } from "react-router";
+import { Form } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EventFormData, eventSchema } from "~/schemas/events";
 import { Variant } from "@/types";
-import { useScheduler } from "~/providers/scheduler-provider";
-import { v4 as uuidv4 } from "uuid";
+import { useFullFetcher } from "~/hooks/useFullFetcher";
 import { useEffect } from "react";
 
 interface AddEventModalProps {
@@ -47,8 +45,6 @@ export default function AddEventModal({
   onOpenChange, 
   defaultValues 
 }: AddEventModalProps) {
-  const { handlers } = useScheduler();
-  const fetcher = useFetcher();
   
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
@@ -62,8 +58,9 @@ export default function AddEventModal({
       status: "scheduled",
     },
   });
+  const { fullSubmit } = useFullFetcher(form, "/api/events");
 
-  const { watch, setValue, handleSubmit, reset } = form;
+  const { watch, setValue, reset } = form;
   const selectedColor = watch("color");
 
   // Reset form when modal opens/closes or defaultValues change
@@ -103,44 +100,6 @@ export default function AddEventModal({
     }
   }
 
-  function getEventStatus(color: string): Variant {
-    switch (color) {
-      case "blue":
-        return "primary";
-      case "red":
-        return "danger";
-      case "green":
-        return "success";
-      case "yellow":
-        return "warning";
-      default:
-        return "primary";
-    }
-  }
-
-  const onSubmit = (formData: EventFormData) => {
-    const submitData = new FormData();
-    submitData.append("intent", defaultValues?.id ? "update" : "create");
-    if (defaultValues?.id) {
-      submitData.append("id", defaultValues.id);
-    }
-    submitData.append("title", formData.title);
-    submitData.append("description", formData.description || "");
-    submitData.append("start_date", formData.start_date.toISOString());
-    submitData.append("end_date", formData.end_date.toISOString());
-    submitData.append("all_day", formData.all_day.toString());
-    submitData.append("color", formData.color);
-    submitData.append("status", formData.status);
-    submitData.append("notes", formData.notes || "");
-
-    fetcher.submit(submitData, {
-      method: "POST",
-      action: "/api/events",
-    });
-    
-    onOpenChange(false);
-  };
-
   const handleDateChange = (field: "start_date" | "end_date", date: Date) => {
     setValue(field, date);
   };
@@ -160,7 +119,7 @@ export default function AddEventModal({
         </DialogHeader>
         
         <FormProvider {...form}>
-          <Form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <Form onSubmit={fullSubmit} className="space-y-4">
             <FormField
               control={form.control}
               name="title"

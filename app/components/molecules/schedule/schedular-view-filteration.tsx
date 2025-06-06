@@ -48,16 +48,6 @@ export default function SchedulerViewFilteration({
     setEventModalDefaults({ startDate, endDate });
   }
 
-  // Handle view change with URL navigation if callback is provided
-  const handleViewChange = (view: Period) => {
-      console.log(view);
-      const searchParams = new URLSearchParams();
-      if (currentDate) {
-        searchParams.set("date", currentDate);
-      }
-      navigate(`/employee/schedule/${view}?${searchParams.toString()}`, { replace: true });
-  };
-
   return (
     <div className="overflow-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 px-1 gap-4">
