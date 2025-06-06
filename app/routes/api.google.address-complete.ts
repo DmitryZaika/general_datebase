@@ -10,21 +10,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const url = new URL("https://places.googleapis.com/v1/places:autocomplete");
 
-  const gRes = await fetch(url, { method: 'post', signal: request.signal, headers: {
-    "Content-Type": "application/json",
-    "X-Goog-Api-Key": GOOGLE_KEY,
-  }, body: JSON.stringify({
-    input: q,
-    languageCode: "en",
-    includedRegionCodes: ["US"]
-  }) });
+  const gRes = await fetch(url, {
+    method: "post",
+    signal: request.signal,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": GOOGLE_KEY,
+    },
+    body: JSON.stringify({
+      input: q,
+      languageCode: "en",
+      includedRegionCodes: ["US"],
+    }),
+  });
   if (!gRes.ok) {
     const txt = await gRes.text();
     console.error("Places API error:", gRes.status, txt);
     return data({ error: "Google Places error" }, { status: 502 });
   }
 
-  const gJson = await gRes.json() as {
+  const gJson = (await gRes.json()) as {
     suggestions: { placePrediction: { text: string; placeId: string } }[];
   };
 
@@ -33,19 +38,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
     gJson.suggestions.map(async (s) => {
       try {
         // Fetch place details to get zip code
-        const detailsUrl = new URL(`https://places.googleapis.com/v1/places/${s.placePrediction.placeId}`);
+        const detailsUrl = new URL(
+          `https://places.googleapis.com/v1/places/${s.placePrediction.placeId}`
+        );
         const detailsRes = await fetch(detailsUrl, {
-          method: 'get',
+          method: "get",
           signal: request.signal,
           headers: {
             "Content-Type": "application/json",
             "X-Goog-Api-Key": GOOGLE_KEY,
-            "X-Goog-FieldMask": "addressComponents"
-          }
+            "X-Goog-FieldMask": "addressComponents",
+          },
         });
 
         if (detailsRes.ok) {
-          const detailsJson = await detailsRes.json() as {
+          const detailsJson = (await detailsRes.json()) as {
             addressComponents: Array<{
               longText: string;
               shortText: string;
@@ -53,8 +60,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
             }>;
           };
 
-          const zipCode = detailsJson.addressComponents?.find(component => 
-            component.types.includes('postal_code')
+          const zipCode = detailsJson.addressComponents?.find((component) =>
+            component.types.includes("postal_code")
           )?.longText;
 
           return {
@@ -80,4 +87,3 @@ export async function loader({ request }: LoaderFunctionArgs) {
     suggestions: suggestionsWithZipCodes,
   });
 }
-

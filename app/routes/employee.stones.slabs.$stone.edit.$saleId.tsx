@@ -1645,7 +1645,7 @@ export default function SlabEdit() {
                   control={form.control}
                   name="email"
                   render={({ field }) => (
-                    <EmailInput field={field} formClassName="mb-0 w-1/2" />
+                    <EmailInput field={field} formClassName="mb-0" />
                   )}
                 />
               </div>

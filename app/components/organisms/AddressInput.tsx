@@ -36,7 +36,7 @@ export function AddressInput({ form, field }: Props) {
   const { data = [], isFetching } = useQuery({
     queryKey: ["google", "address", debounced],
     queryFn: () => completeAddress(debounced),
-    enabled: debounced?.length >= 8,
+    enabled: debounced?.length >= 5,
     staleTime: 60_000,
   });
 
@@ -65,6 +65,16 @@ export function AddressInput({ form, field }: Props) {
               onBlur={() => {
                 rhf.onBlur();
                 setTimeout(() => setOpen(false), 200);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Tab" && open && data.length > 0) {
+                  e.preventDefault();
+                  form.setValue(field, data[0].description.text, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
+                  setOpen(false);
+                }
               }}
             />
           </FormControl>

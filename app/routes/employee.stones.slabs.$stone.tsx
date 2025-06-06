@@ -116,6 +116,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return forceRedirectError(request.headers, "Invalid stone ID format");
   }
 
+  const url = new URL(request.url);
+  const saleId = url.searchParams.get("saleId");
+
   const stone = await selectId<{ id: number; name: string; url: string }>(
     db,
     "SELECT id, name, url FROM stones WHERE id = ?",
@@ -314,7 +317,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     });
   }
 
-  return { slabs, linkedSlabs, stone };
+  return { slabs, linkedSlabs, stone, saleId };
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -361,13 +364,25 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function SlabsModal() {
-  const { slabs, linkedSlabs, stone } = useLoaderData<typeof loader>();
+  const { slabs, linkedSlabs, stone, saleId } = useLoaderData<typeof loader>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [editingSlab, setEditingSlab] = useState<number | null>(null);
   const [highlightedSlab, setHighlightedSlab] = useState<number | null>(null);
   const navigation = useNavigation();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    if (saleId && saleId !== "null" && saleId !== "") {
+      window.open(`/api/pdf/${saleId}`, "_blank");
+      const searchParams = new URLSearchParams(location.search);
+      searchParams.delete("saleId");
+      const newSearch = searchParams.toString();
+      navigate(`${location.pathname}${newSearch ? `?${newSearch}` : ""}`, {
+        replace: true,
+      });
+    }
+  }, [saleId, navigate, location]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -377,7 +392,6 @@ export default function SlabsModal() {
       const id = parseInt(slabId);
       setHighlightedSlab(id);
 
-      // Удаляем подсветку через 5 секунд
       const timer = setTimeout(() => {
         setHighlightedSlab(null);
       }, 5000);
