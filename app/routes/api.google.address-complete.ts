@@ -33,7 +33,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const gJson = (await gRes.json()) as {
     suggestions: { placePrediction: { text: string; placeId: string } }[];
   };
-  console.log(gJson.suggestions.map((item) => JSON.stringify(item)));
 
   // Optionally fetch zip codes for each suggestion
   const suggestionsWithZipCodes = await Promise.all(
