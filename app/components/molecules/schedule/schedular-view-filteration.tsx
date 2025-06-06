@@ -1,11 +1,9 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import DailyView from "@/components/molecules/schedule/day-view";
 import WeeklyView from "@/components/molecules/schedule/week-view";
 import MonthView from "@/components/molecules/schedule/month-view";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Period } from "~/types";
 
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
@@ -17,11 +15,10 @@ export default function SchedulerViewFilteration({
 }: {
   period?: Period;
 }) {
-  const [showAddEventModal, setShowAddEventModal] = useState(false);
   const [eventModalDefaults, setEventModalDefaults] = useState<{
-    startDate?: Date;
-    endDate?: Date;
-  }>({});
+    startDate: Date;
+    endDate: Date;
+  } | undefined>(undefined);
   const navigate = useNavigate();
 
   function handleAddEvent(selectedDay?: number) {
@@ -47,7 +44,6 @@ export default function SchedulerViewFilteration({
     );
 
     setEventModalDefaults({ startDate, endDate });
-    setShowAddEventModal(true);
   }
 
   // Handle view change with URL navigation if callback is provided
@@ -60,15 +56,15 @@ export default function SchedulerViewFilteration({
     <div className="overflow-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 px-1 gap-4">
         <div className="flex flex-wrap gap-2 order-2 sm:order-1">
-          {views?.map((view) => (
-            <Button
+          {views.map((view) => (
+            <Button variant={period === view ? "default" : "outline"} asChild>
+            <Link
               key={view}
-              onClick={() => handleViewChange(view)}
-              variant={period === view ? "default" : "outline"}
+              to={`/employee/schedule/${view}`}
               className="capitalize touch-target"
-              size="sm"
             >
               {view}
+            </Link>
             </Button>
           ))}
         </div>
@@ -77,7 +73,7 @@ export default function SchedulerViewFilteration({
           className="touch-target order-1 sm:order-2"
           size="sm"
         >
-          <span>Add Event</span>
+          Add Event
         </Button>
       </div>
 
@@ -96,8 +92,8 @@ export default function SchedulerViewFilteration({
       </div>
 
       <AddEventModal
-        open={showAddEventModal}
-        onOpenChange={setShowAddEventModal}
+        open={!!eventModalDefaults}
+        onOpenChange={() => setEventModalDefaults(undefined)}
         defaultValues={eventModalDefaults}
       />
     </div>

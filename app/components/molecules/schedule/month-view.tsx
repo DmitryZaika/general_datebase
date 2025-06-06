@@ -1,18 +1,13 @@
-"use client";
-
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import clsx from "clsx";
 
 import { useScheduler } from "~/providers/scheduler-provider";
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
-import ShowMoreEventsModal from "@/components/molecules/schedule/show-more-events-modal";
 import EventStyled from "@/components/molecules/schedule/event-styled";
-import { CustomEventModal } from "@/types";
 
 // Define Event interface locally since it's not exported from types
 interface Event {
@@ -98,17 +93,6 @@ export default function MonthView() {
   function handleShowMoreEvents(dayEvents: Event[]) {
     // TODO: Implement this
   }
-
-  const containerVariants = {
-    enter: { opacity: 0 },
-    center: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.02,
-      },
-    },
-    exit: { opacity: 0 },
-  };
 
   const itemVariants = {
     enter: { opacity: 0, y: 20 },
@@ -239,7 +223,7 @@ export default function MonthView() {
 
                 return (
                   <motion.div
-                    className="h-20 sm:h-24 md:h-32 lg:h-36 border-r border-b border-border last:border-r-0 group cursor-pointer hover:bg-muted/20 transition-colors touch-target"
+                    className="h-20 sm:h-24 md:h-32 lg:h-36 border-r border-b border-border last:border-r-0 group cursor-pointer hover:bg-muted/20 transition-colors touch-target relative"
                     key={dayObj.day}
                     variants={itemVariants}
                     initial="enter"
@@ -247,7 +231,7 @@ export default function MonthView() {
                     exit="exit"
                     onClick={() => handleAddEvent(dayObj.day)}
                   >
-                    <div className="p-1 sm:p-2 h-full flex flex-col">
+                    <div className="p-1 sm:p-2 h-full flex flex-col relative">
                       {/* Day number */}
                       <div className="flex justify-between items-start mb-1">
                         <span

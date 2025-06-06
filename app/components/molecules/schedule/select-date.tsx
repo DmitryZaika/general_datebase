@@ -1,9 +1,7 @@
-"use client";
-
 import { EventFormData } from "@/types";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { UseFormSetValue } from "react-hook-form";
-import { format, setHours, setMinutes, isBefore, addHours } from "date-fns";
+import { format, setHours, setMinutes, isBefore } from "date-fns";
 
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
