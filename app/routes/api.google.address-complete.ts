@@ -10,28 +10,32 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const url = new URL("https://places.googleapis.com/v1/places:autocomplete");
 
-  const gRes = await fetch(url, { method: 'post', signal: request.signal, headers: {
-    "Content-Type": "application/json",
-    "X-Goog-Api-Key": GOOGLE_KEY,
-  }, body: JSON.stringify({
-    input: q,
-    languageCode: "en",
-  }) });
+  const gRes = await fetch(url, {
+    method: "post",
+    signal: request.signal,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": GOOGLE_KEY,
+    },
+    body: JSON.stringify({
+      input: q,
+      languageCode: "en",
+    }),
+  });
   if (!gRes.ok) {
     const txt = await gRes.text();
     console.error("Places API error:", gRes.status, txt);
     return data({ error: "Google Places error" }, { status: 502 });
   }
 
-  const gJson = await gRes.json() as {
+  const gJson = (await gRes.json()) as {
     suggestions: { placePrediction: { text: string; placeId: string } }[];
   };
 
   return data({
     suggestions: gJson.suggestions.map((s) => ({
       description: s.placePrediction.text,
-      place_id:    s.placePrediction.placeId,
+      place_id: s.placePrediction.placeId,
     })),
   });
 }
-

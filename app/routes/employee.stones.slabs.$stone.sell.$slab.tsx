@@ -10,7 +10,6 @@ import {
 import { Form, useNavigate } from "react-router";
 import { FormProvider, FormField } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
-import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
 import { PhoneInput } from "~/components/molecules/PhoneInput";
 import { EmailInput } from "~/components/molecules/EmailInput";
@@ -146,6 +145,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const url = new URL(request.url);
   const searchParams = url.searchParams.toString();
   const searchString = searchParams ? `?${searchParams}` : "";
+  let saleId: number;
 
   try {
     const [slabDimensions] = await db.execute<RowDataPacket[]>(
@@ -247,7 +247,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       ]
     );
 
-    const saleId = salesResult.insertId;
+    saleId = salesResult.insertId;
 
     if (data.rooms && data.rooms.length > 0) {
       for (const room of data.rooms) {
@@ -357,7 +357,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Sale completed successfully"));
-  return redirect(`..${searchString}`, {
+
+  const separator = searchString ? "&" : "?";
+  return redirect(`..${searchString}${separator}saleId=${saleId}`, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
@@ -1360,13 +1362,17 @@ export default function SlabSell() {
       newRoom = {
         ...newRoom,
         edge: firstRoom.edge,
-        backsplash: firstRoom.backsplash,
         tear_out: firstRoom.tear_out,
         stove: firstRoom.stove,
-        waterfall: firstRoom.waterfall,
+        waterfall: "No",
         seam: firstRoom.seam,
         ten_year_sealer: firstRoom.ten_year_sealer,
       };
+    }
+
+    if (currentRooms.length > 0) {
+      newRoom.room = "bathroom";
+      newRoom.backsplash = "4 inch";
     }
 
     form.setValue("rooms", [...currentRooms, newRoom]);

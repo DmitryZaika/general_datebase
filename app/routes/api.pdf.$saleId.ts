@@ -69,17 +69,10 @@ async function getData(saleId: number) {
 }
 
 function groupSinksAndFaucets(queryData: IQuery[]): IQuery[] {
-  console.log("=== GROUPING DEBUG START ===");
-  console.log("Raw data length:", queryData.length);
-
-  // Группируем по комнатам
   const roomGroups: { [key: string]: IQuery[] } = {};
 
   queryData.forEach((row) => {
     const roomKey = `${row.room}-${row.edge}-${row.backsplash}-${row.square_feet}-${row.stone_name}`;
-    console.log("Room key:", roomKey);
-    console.log("Sink name:", row.sink_name);
-    console.log("Faucet name:", row.faucet_name);
 
     if (!roomGroups[roomKey]) {
       roomGroups[roomKey] = [];
@@ -87,14 +80,9 @@ function groupSinksAndFaucets(queryData: IQuery[]): IQuery[] {
     roomGroups[roomKey].push(row);
   });
 
-  console.log("Room groups:", Object.keys(roomGroups));
-
   const result: IQuery[] = [];
 
   Object.entries(roomGroups).forEach(([roomKey, roomRows]) => {
-    console.log(`Processing room: ${roomKey}, rows count: ${roomRows.length}`);
-
-    // Подсчитываем раковины по типам
     const sinkCounts: { [key: string]: number } = {};
     const faucetCounts: { [key: string]: number } = {};
 
@@ -108,10 +96,6 @@ function groupSinksAndFaucets(queryData: IQuery[]): IQuery[] {
       }
     });
 
-    console.log("Sink counts:", sinkCounts);
-    console.log("Faucet counts:", faucetCounts);
-
-    // Форматируем названия с количеством
     const sinkNames = Object.entries(sinkCounts)
       .map(([name, count]) => (count > 1 ? `${name} X ${count}` : name))
       .join(", ");
@@ -120,19 +104,12 @@ function groupSinksAndFaucets(queryData: IQuery[]): IQuery[] {
       .map(([name, count]) => (count > 1 ? `${name} X ${count}` : name))
       .join(", ");
 
-    console.log("Final sink names:", sinkNames);
-    console.log("Final faucet names:", faucetNames);
-
-    // Берем первую строку как базу и обновляем названия
     const baseRow = { ...roomRows[0] };
     baseRow.sink_name = sinkNames || null;
     baseRow.faucet_name = faucetNames || null;
 
     result.push(baseRow);
   });
-
-  console.log("=== GROUPING DEBUG END ===");
-  console.log("Final result length:", result.length);
 
   return result;
 }
@@ -144,6 +121,13 @@ async function getPdf() {
   const pdfDoc = await PDFDocument.load(pdfData.buffer);
   const pdfForm = pdfDoc.getForm();
   return { pdfDoc, pdfData, pdfForm };
+}
+
+function sanitizeFilename(name: string): string {
+  return name
+    .replace(/[^a-zA-Z0-9\s-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export async function loader({ request, params }: ActionFunctionArgs) {
@@ -161,24 +145,6 @@ export async function loader({ request, params }: ActionFunctionArgs) {
   const rawData = await getData(saleId);
   const queryData = groupSinksAndFaucets(rawData);
   const { pdfDoc, pdfData, pdfForm } = await getPdf();
-
-  console.log("=== DATABASE DATA DEBUG ===");
-  console.log("Query data length:", queryData.length);
-  queryData.forEach((row, index) => {
-    console.log(`Row ${index}:`, {
-      room: row.room,
-      tear_out: row.tear_out,
-      stove: row.stove,
-      ten_year_sealer: row.ten_year_sealer,
-      waterfall: row.waterfall,
-      corbels: row.corbels,
-      stone_name: row.stone_name,
-      sink_name: row.sink_name,
-      faucet_name: row.faucet_name,
-      seam: row.seam,
-    });
-  });
-  console.log("=== END DEBUG ===");
 
   if (queryData.length < 1) {
     return new Response("No data found for this sale", { status: 404 });
@@ -217,8 +183,8 @@ export async function loader({ request, params }: ActionFunctionArgs) {
           : undefined
       );
     pdfForm.getTextField(colorField).setText(row.stone_name || undefined);
-    pdfForm.getTextField(sinkField).setText(row.sink_name || undefined);
-    pdfForm.getTextField(faucetField).setText(row.faucet_name || undefined);
+    pdfForm.getTextField(sinkField).setText(row.sink_name || "N/A");
+    pdfForm.getTextField(faucetField).setText(row.faucet_name || "N/A");
     pdfForm.getTextField(edgeField).setText(row.edge || undefined);
     pdfForm.getTextField(backsplashField).setText(row.backsplash || undefined);
 
@@ -311,16 +277,20 @@ export async function loader({ request, params }: ActionFunctionArgs) {
   const fullPrice = queryData[0].total_price || 0;
   const halfPrice = fullPrice * 0.5;
   pdfForm.getTextField("Text37").setText(fullPrice.toString());
-  pdfForm.getTextField("Text38").setText(halfPrice.toString());
+  pdfForm
+    .getTextField("Text38")
+    .setText(fullPrice > 1000 ? halfPrice.toString() : fullPrice.toString());
 
   const pdfBytes = await pdfDoc.save();
+
+  const customerName = queryData[0].customer_name || "Customer";
+  const safeCustomerName = sanitizeFilename(customerName);
+  const filename = `${safeCustomerName}.pdf`;
 
   return new Response(pdfBytes, {
     headers: {
       "Content-Type": pdfData.contentType || "application/pdf",
-      "Content-Disposition": `attachment; filename="${
-        pdfData.filename || "contract.pdf"
-      }"`,
+      "Content-Disposition": `inline; filename="${filename}"`,
     },
   });
 }
