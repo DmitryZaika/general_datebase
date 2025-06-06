@@ -153,21 +153,7 @@ const groupEventsByTimePeriod = (events: Event[] | undefined) => {
   );
 };
 
-export default function DailyView({
-  prevButton,
-  nextButton,
-  CustomEventComponent,
-  CustomEventModal,
-  classNames,
-  stopDayEventSummary,
-}: {
-  prevButton?: React.ReactNode;
-  nextButton?: React.ReactNode;
-  CustomEventComponent?: React.FC<Event>;
-  CustomEventModal?: CustomEventModal;
-  classNames?: { prev?: string; next?: string; addEvent?: string };
-  stopDayEventSummary?: boolean;
-}) {
+export default function DailyView() {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [direction, setDirection] = useState<number>(0);
   const { getters, handlers } = useScheduler();
@@ -273,36 +259,24 @@ export default function DailyView({
         </h1>
 
         <div className="flex gap-2 justify-center sm:justify-end">
-          {prevButton ? (
-            <div onClick={handlePrevDay} className="cursor-pointer">
-              {prevButton}
-            </div>
-          ) : (
             <Button
               variant="outline"
               size="sm"
               onClick={handlePrevDay}
-              className={`min-w-[80px] touch-target ${classNames?.prev || ""}`}
+              className={`min-w-[80px] touch-target`}
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
               <span className="hidden sm:inline">Prev</span>
             </Button>
-          )}
-          {nextButton ? (
-            <div onClick={handleNextDay} className="cursor-pointer">
-              {nextButton}
-            </div>
-          ) : (
             <Button
               variant="outline"
               size="sm"
               onClick={handleNextDay}
-              className={`min-w-[80px] touch-target ${classNames?.next || ""}`}
+              className={`min-w-[80px] touch-target`}
             >
               <span className="hidden sm:inline">Next</span>
               <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
-          )}
         </div>
       </div>
 
@@ -321,7 +295,6 @@ export default function DailyView({
           className="space-y-4"
         >
           {/* Events Summary - Mobile optimized */}
-          {!stopDayEventSummary && (
             <div className="bg-muted/30 rounded-lg p-3 sm:p-4">
               <h3 className="text-sm font-medium mb-2 text-muted-foreground">
                 {dayEvents.length > 0 
@@ -345,7 +318,6 @@ export default function DailyView({
                         <EventStyled
                           event={{
                             ...event,
-                            CustomEventComponent,
                             minmized: false,
                           }}
                         />
@@ -370,7 +342,6 @@ export default function DailyView({
                 </Button>
               )}
             </div>
-          )}
 
           {/* Daily Schedule Grid - Mobile responsive */}
           <div className="bg-background border border-border rounded-lg overflow-hidden">
@@ -469,7 +440,6 @@ export default function DailyView({
                         <EventStyled
                           event={{
                             ...event,
-                            CustomEventComponent,
                             minmized: true,
                           }}
                         />

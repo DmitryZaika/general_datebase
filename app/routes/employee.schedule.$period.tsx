@@ -1,9 +1,9 @@
 import { LoaderFunctionArgs, redirect } from "react-router";
-import { useLoaderData, useNavigate, useParams } from "react-router";
+import { useLoaderData } from "react-router";
 import SchedulerViewFilteration from "@/components/molecules/schedule/schedular-view-filteration";
 import { SchedulerProvider } from "~/providers/scheduler-provider";
+import { Period } from "~/types";
 
-type Period = "day" | "week" | "month";
 
 const validPeriods: Period[] = ["day", "week", "month"];
 
@@ -23,11 +23,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
 
 export default function EmployeesSchedule() {
   const { period } = useLoaderData<typeof loader>();
-  const navigate = useNavigate();
   
-  const handleViewChange = (newPeriod: Period) => {
-    navigate(`/employee/schedule/${newPeriod}`, { replace: true });
-  };
 
   return (
     <SchedulerProvider>
@@ -35,7 +31,6 @@ export default function EmployeesSchedule() {
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
           <SchedulerViewFilteration
             period={period}
-            onViewChange={handleViewChange}
           />
         </div>
       </div>

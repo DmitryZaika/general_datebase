@@ -160,15 +160,5 @@ export interface TabsClassNames {
   wrapper?: string;
 }
 
-export interface ViewClassNames {
-  dayView?: string;
-  weekView?: string;
-  monthView?: string;
-}
 
-export interface ClassNames {
-  event?: string;
-  buttons?: ButtonClassNames;
-  tabs?: TabsClassNames;
-  views?: ViewClassNames;
-}
+export type Period = "day" | "week" | "month";
