@@ -8,9 +8,19 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useScheduler } from "~/providers/scheduler-provider";
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
 import EventStyled from "@/components/molecules/schedule/event-styled";
-import { CustomEventModal, Event } from "@/types";
+import { CustomEventModal } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
+// Define Event interface locally since it's not exported from types
+interface Event {
+  id: string;
+  title: string;
+  startDate: Date;
+  endDate: Date;
+  description?: string;
+  variant?: string;
+}
 
 // Generate hours in 12-hour format
 const hours = Array.from({ length: 24 }, (_, i) => {
@@ -148,104 +158,87 @@ export default function DailyView({
   nextButton,
   CustomEventComponent,
   CustomEventModal,
-  stopDayEventSummary,
   classNames,
+  stopDayEventSummary,
 }: {
   prevButton?: React.ReactNode;
   nextButton?: React.ReactNode;
   CustomEventComponent?: React.FC<Event>;
   CustomEventModal?: CustomEventModal;
-  stopDayEventSummary?: boolean;
   classNames?: { prev?: string; next?: string; addEvent?: string };
+  stopDayEventSummary?: boolean;
 }) {
-  const hoursColumnRef = useRef<HTMLDivElement>(null);
-  const [detailedHour, setDetailedHour] = useState<string | null>(null);
-  const [timelinePosition, setTimelinePosition] = useState<number>(0);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [direction, setDirection] = useState<number>(0);
   const { getters, handlers } = useScheduler();
   const [open, setOpen] = useState<{startDate: Date, endDate: Date} | null>(null);
 
   const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-      if (!hoursColumnRef.current) return;
-      const rect = hoursColumnRef.current.getBoundingClientRect();
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
       const y = e.clientY - rect.top;
       const hourHeight = rect.height / 24;
-      const hour = Math.max(0, Math.min(23, Math.floor(y / hourHeight)));
-      const minuteFraction = (y % hourHeight) / hourHeight;
-      const minutes = Math.floor(minuteFraction * 60);
+      const hourFloat = y / hourHeight;
+      const hour = Math.floor(hourFloat);
+      const minutes = Math.floor((hourFloat - hour) * 60);
 
-      // Format in 12-hour format
-      const hour12 = hour % 12 || 12;
+      // Format the time
+      const displayHour = hour % 12 || 12;
       const ampm = hour < 12 ? "AM" : "PM";
-      setDetailedHour(
-        `${hour12}:${Math.max(0, minutes).toString().padStart(2, "0")} ${ampm}`
-      );
-
-      // Ensure timelinePosition is never negative and is within bounds
-      const position = Math.max(0, Math.min(rect.height, Math.round(y)));
-      setTimelinePosition(position);
+      const formattedMinutes = minutes.toString().padStart(2, '0');
+      
+      setDetailedHour(`${displayHour}:${formattedMinutes} ${ampm}`);
+      setTimelinePosition(y);
     },
     []
   );
 
-  const getFormattedDayTitle = useCallback(
-    () => currentDate.toDateString(),
-    [currentDate]
-  );
+  const [detailedHour, setDetailedHour] = useState<string | null>(null);
+  const [timelinePosition, setTimelinePosition] = useState<number>(0);
+  const hoursColumnRef = useRef<HTMLDivElement>(null);
 
-  const dayEvents = getters.getEventsForDay(
-    currentDate?.getDate() || 0,
+  const dayEvents: Event[] = getters.getEventsForDay(
+    currentDate.getDate(),
     currentDate
-  );
-  
-  // Calculate time groups once for all events
-  const timeGroups = groupEventsByTimePeriod(dayEvents);
+  ) || [];
 
-  function handleAddEvent(event?: Event) {
+  function handleAddEvent(event?: Partial<Event>) {
     // Create the modal content with the provided event data or defaults
     const startDate = event?.startDate || new Date();
-    const endDate = event?.endDate || new Date();
-
-    // Open the modal with the content
+    const endDate = event?.endDate || new Date(startDate.getTime() + 60 * 60 * 1000);
 
     setOpen({startDate, endDate});
   }
 
+  function getFormattedDayTitle() {
+    return currentDate.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }
+
   function handleAddEventDay(detailedHour: string) {
-    if (!detailedHour) {
-      console.error("Detailed hour not provided.");
-      return;
-    }
+    // Parse the time from detailedHour (e.g., "2:30 PM")
+    const [time, period] = detailedHour.split(" ");
+    const [hourStr, minuteStr] = time.split(":");
+    let hour = parseInt(hourStr);
+    const minute = parseInt(minuteStr);
 
-    // Parse the 12-hour format time
-    const [timePart, ampm] = detailedHour.split(" ");
-    const [hourStr, minuteStr] = timePart.split(":");
-    let hours = parseInt(hourStr);
-    const minutes = parseInt(minuteStr);
-
-    // Convert to 24-hour format for Date object
-    if (ampm === "PM" && hours < 12) {
-      hours += 12;
-    } else if (ampm === "AM" && hours === 12) {
-      hours = 0;
-    }
-
-    const chosenDay = currentDate.getDate();
-
-    // Ensure day is valid
-    if (chosenDay < 1 || chosenDay > 31) {
-      console.error("Invalid day selected:", chosenDay);
-      return;
+    // Convert to 24-hour format
+    if (period === "PM" && hour !== 12) {
+      hour += 12;
+    } else if (period === "AM" && hour === 12) {
+      hour = 0;
     }
 
     const date = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth(),
-      chosenDay,
-      hours,
-      minutes
+      currentDate.getDate(),
+      hour,
+      minute
     );
 
     handleAddEvent({
@@ -272,39 +265,47 @@ export default function DailyView({
   }, [currentDate]);
 
   return (
-    <div className="">
-      <div className="flex justify-between gap-3 flex-wrap mb-5">
-        <h1 className="text-3xl font-semibold mb-4">
+    <div className="w-full px-2 sm:px-4">
+      {/* Mobile-responsive header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-2">
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-center sm:text-left leading-tight">
           {getFormattedDayTitle()}
         </h1>
 
-        <div className="flex ml-auto  gap-3">
+        <div className="flex gap-2 justify-center sm:justify-end">
           {prevButton ? (
-            <div onClick={handlePrevDay}>{prevButton}</div>
+            <div onClick={handlePrevDay} className="cursor-pointer">
+              {prevButton}
+            </div>
           ) : (
             <Button
-              variant={"outline"}
-              className={classNames?.prev}
+              variant="outline"
+              size="sm"
               onClick={handlePrevDay}
+              className={`min-w-[80px] touch-target ${classNames?.prev || ""}`}
             >
-              <ArrowLeft />
-              Prev
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              <span className="hidden sm:inline">Prev</span>
             </Button>
           )}
           {nextButton ? (
-            <div onClick={handleNextDay}>{nextButton}</div>
+            <div onClick={handleNextDay} className="cursor-pointer">
+              {nextButton}
+            </div>
           ) : (
             <Button
-              variant={"outline"}
-              className={classNames?.next}
+              variant="outline"
+              size="sm"
               onClick={handleNextDay}
+              className={`min-w-[80px] touch-target ${classNames?.next || ""}`}
             >
-              Next
-              <ArrowRight />
+              <span className="hidden sm:inline">Next</span>
+              <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
           )}
         </div>
       </div>
+
       <AnimatePresence initial={false} custom={direction} mode="wait">
         <motion.div
           key={currentDate.toISOString()}
@@ -317,163 +318,195 @@ export default function DailyView({
             x: { type: "spring", stiffness: 300, damping: 30 },
             opacity: { duration: 0.2 },
           }}
-          className="flex flex-col gap-4"
+          className="space-y-4"
         >
+          {/* Events Summary - Mobile optimized */}
           {!stopDayEventSummary && (
-            <div className="all-day-events">
-              <AnimatePresence initial={false}>
-                {dayEvents && dayEvents?.length
-                  ? dayEvents?.map((event, eventIndex) => {
-                      return (
-                        <motion.div
-                          key={event.id}
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ duration: 0.2 }}
-                          className="mb-2"
-                        >
-                          <EventStyled
-                            event={{
-                              ...event,
-                              CustomEventComponent,
-                              minmized: false,
-                            }}
-                            CustomEventModal={CustomEventModal}
-                          />
-                        </motion.div>
-                      );
-                    })
-                  : "No events for today"}
-              </AnimatePresence>
+            <div className="bg-muted/30 rounded-lg p-3 sm:p-4">
+              <h3 className="text-sm font-medium mb-2 text-muted-foreground">
+                {dayEvents.length > 0 
+                  ? `${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""} today`
+                  : "No events today"
+                }
+              </h3>
+              
+              {dayEvents.length > 0 ? (
+                <div className="space-y-2">
+                  <AnimatePresence initial={false}>
+                    {dayEvents.slice(0, 3).map((event: Event, eventIndex) => (
+                      <motion.div
+                        key={event.id}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="w-full"
+                      >
+                        <EventStyled
+                          event={{
+                            ...event,
+                            CustomEventComponent,
+                            minmized: false,
+                          }}
+                        />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  
+                  {dayEvents.length > 3 && (
+                    <div className="text-xs text-muted-foreground text-center pt-2">
+                      +{dayEvents.length - 3} more events below
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAddEvent()}
+                  className="w-full sm:w-auto touch-target"
+                >
+                  Add Event
+                </Button>
+              )}
             </div>
           )}
 
-          <div className="relative rounded-md bg-default-50 hover:bg-default-100 transition duration-400">
+          {/* Daily Schedule Grid - Mobile responsive */}
+          <div className="bg-background border border-border rounded-lg overflow-hidden">
             <motion.div
-              className="relative rounded-xl flex ease-in-out"
+              className="relative flex"
               ref={hoursColumnRef}
               variants={containerVariants}
-              initial="hidden" // Ensure initial state is hidden
-              animate="visible" // Trigger animation to visible state
+              initial="hidden"
+              animate="visible"
               onMouseMove={handleMouseMove}
               onMouseLeave={() => setDetailedHour(null)}
             >
-              <div className="flex  flex-col">
+              {/* Hours Column - Responsive width */}
+              <div className="w-12 sm:w-16 border-r border-border bg-muted/20 flex-shrink-0">
                 {hours.map((hour, index) => (
                   <motion.div
                     key={`hour-${index}`}
                     variants={itemVariants}
-                    className="cursor-pointer   transition duration-300  p-4 h-[64px] text-left text-sm text-muted-foreground border-default-200"
+                    className="h-12 sm:h-16 border-b border-border/50 flex items-start justify-center pt-1 text-xs text-muted-foreground"
                   >
-                    {hour}
+                    <span className="hidden sm:inline">{hour}</span>
+                    <span className="sm:hidden text-xs">
+                      {hour.split(':')[0]}{hour.includes('AM') ? 'A' : 'P'}
+                    </span>
                   </motion.div>
                 ))}
               </div>
-              <div className="flex relative flex-grow flex-col ">
+
+              {/* Events Column - Responsive */}
+              <div className="flex-1 relative">
+                {/* Hour Grid Lines */}
                 {Array.from({ length: 24 }).map((_, index) => (
                   <div
                     onClick={() => {
                       handleAddEventDay(detailedHour as string);
                     }}
                     key={`hour-${index}`}
-                    className="cursor-pointer w-full relative border-b  hover:bg-default-200/50  transition duration-300  p-4 h-[64px] text-left text-sm text-muted-foreground border-default-200"
+                    className={"cursor-pointer w-full relative border-b border-border/30 hover:bg-muted/20 transition-colors duration-300 h-12 sm:h-16 group"}
                   >
-                    <div className="absolute bg-accent flex items-center justify-center text-xs opacity-0 transition left-0 top-0 duration-250 hover:opacity-100 w-full h-full">
-                      Add Event
+                    {/* Add Event Overlay - Touch friendly */}
+                    <div className="absolute inset-0 bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 touch-target">
+                      <span className="text-primary text-xs sm:text-sm font-medium">
+                        <span className="hidden sm:inline">Add Event</span>
+                        <span className="sm:hidden">+</span>
+                      </span>
                     </div>
                   </div>
                 ))}
+
+                {/* Events - Mobile optimized positioning */}
                 <AnimatePresence initial={false}>
-                  {dayEvents && dayEvents?.length
-                    ? dayEvents?.map((event, eventIndex) => {
-                        // Find which time group this event belongs to
-                        let eventsInSamePeriod = 1;
-                        let periodIndex = 0;
-                        
-                        for (let i = 0; i < timeGroups.length; i++) {
-                          const groupIndex = timeGroups[i].findIndex(e => e.id === event.id);
-                          if (groupIndex !== -1) {
-                            eventsInSamePeriod = timeGroups[i].length;
-                            periodIndex = groupIndex;
-                            break;
-                          }
+                  {dayEvents.map((event: Event, eventIndex) => {
+                    const {
+                      height,
+                      left,
+                      maxWidth,
+                      minWidth,
+                      top,
+                      zIndex,
+                    } = handlers.handleEventStyling ? 
+                      handlers.handleEventStyling(
+                        event, 
+                        dayEvents,
+                        {
+                          eventsInSamePeriod: 1,
+                          periodIndex: 0,
+                          adjustForPeriod: true
                         }
-                        
-                        const {
-                          height,
-                          left,
-                          maxWidth,
-                          minWidth,
-                          top,
-                          zIndex,
-                        } = handlers.handleEventStyling(
-                          event, 
-                          dayEvents,
-                          {
-                            eventsInSamePeriod,
-                            periodIndex,
-                            adjustForPeriod: true
-                          }
-                        );
-                        return (
-                          <motion.div
-                            key={event.id}
-                            style={{
-                              minHeight: height,
-                              top: top,
-                              left: left,
-                              maxWidth: maxWidth,
-                              minWidth: minWidth,
-                              padding: "0 2px",
-                              boxSizing: "border-box",
-                            }}
-                            className="flex transition-all duration-1000 flex-grow flex-col z-50 absolute"
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            <EventStyled
-                              event={{
-                                ...event,
-                                CustomEventComponent,
-                                minmized: true,
-                              }}
-                              CustomEventModal={CustomEventModal}
-                            />
-                          </motion.div>
-                        );
-                      })
-                    : ""}
+                      ) : {
+                        height: "48px",
+                        left: "0px", 
+                        maxWidth: "100%",
+                        minWidth: "100%",
+                        top: "0px",
+                        zIndex: 1
+                      };
+
+                    return (
+                      <motion.div
+                        key={event.id}
+                        style={{
+                          minHeight: height,
+                          top: top,
+                          left: left,
+                          maxWidth: maxWidth,
+                          minWidth: minWidth,
+                          padding: "0 4px",
+                          boxSizing: "border-box",
+                        }}
+                        className="flex flex-col absolute"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <EventStyled
+                          event={{
+                            ...event,
+                            CustomEventComponent,
+                            minmized: true,
+                          }}
+                        />
+                      </motion.div>
+                    );
+                  })}
                 </AnimatePresence>
+
+                {/* Timeline indicator - Mobile optimized */}
+                {detailedHour && (
+                  <div
+                    className="absolute left-0 w-full h-0.5 bg-primary/60 pointer-events-none z-50"
+                    style={{ top: `${timelinePosition}px` }}
+                  >
+                    <Badge
+                      variant="outline"
+                      className="absolute -translate-y-1/2 bg-background border-primary/60 left-2 text-xs px-2 py-0.5"
+                    >
+                      {detailedHour}
+                    </Badge>
+                  </div>
+                )}
               </div>
             </motion.div>
-
-            {detailedHour && (
-              <div
-                className="absolute left-[50px] w-[calc(100%-53px)] h-[2px] bg-primary/40 rounded-full pointer-events-none"
-                style={{ top: `${timelinePosition}px` }}
-              >
-                <Badge
-                  variant="outline"
-                  className="absolute -translate-y-1/2 bg-white z-50 left-[-20px] text-xs"
-                >
-                  {detailedHour}
-                </Badge>
-              </div>
-            )}
           </div>
         </motion.div>
       </AnimatePresence>
+
+      {/* Add Event Modal */}
       <AddEventModal
-          open={!!open}
-          onOpenChange={(open) => !open && setOpen(null)}
-          defaultValues={{
-            startDate: open?.startDate,
-            endDate: open?.endDate,
-          }}
-        />
+        open={!!open}
+        onOpenChange={(isOpen) => !isOpen && setOpen(null)}
+        defaultValues={{
+          startDate: open?.startDate,
+          endDate: open?.endDate,
+        }}
+      />
     </div>
   );
 }
