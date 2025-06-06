@@ -43,6 +43,7 @@ import { Input } from "~/components/ui/input";
 import { customerSchema, roomSchema, TCustomerSchema } from "~/schemas/sales";
 import { Switch } from "~/components/ui/switch";
 import { SelectInputOther } from "~/components/molecules/SelectInputOther";
+import { SelectInput } from "~/components/molecules/SelectItem";
 import { AddressInput } from "~/components/organisms/AddressInput";
 import { useQuery } from "@tanstack/react-query";
 import { Customer, StoneSearchResult } from "~/types";
@@ -65,6 +66,7 @@ interface SaleData {
   id: number;
   customer_id: number;
   customer_name: string;
+  seller_id: number;
   billing_address: string;
   project_address: string;
   phone: string;
@@ -266,12 +268,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     await db.execute(
-      `UPDATE sales SET customer_id = ?, project_address = ?, price = ?, notes = ? WHERE id = ? AND company_id = ?`,
+      `UPDATE sales SET customer_id = ?, project_address = ?, price = ?, notes = ?, seller_id = ? WHERE id = ? AND company_id = ?`,
       [
         customerId,
         data.project_address,
         data.price,
         data.notes_to_sale || null,
+        data.seller_id,
         saleId,
         user.company_id,
       ]
@@ -492,7 +495,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const [saleData] = await db.execute<RowDataPacket[]>(
     `SELECT 
       s.id, s.customer_id, c.name as customer_name, c.address as billing_address, 
-      s.project_address, c.phone, c.email, s.price, s.notes as notes_to_sale, s.sale_date
+      s.project_address, c.phone, c.email, s.price, s.notes as notes_to_sale, s.sale_date, s.seller_id
      FROM sales s
      JOIN customers c ON s.customer_id = c.id
      WHERE s.id = ? AND s.company_id = ?`,
@@ -665,10 +668,21 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [stoneId]
   );
 
+  // Get sales reps (sellers) - only Sales Rep (1) and Sales Manager (2)
+  const salesReps = await selectMany<{
+    id: number;
+    name: string;
+  }>(
+    db,
+    `SELECT id, name FROM users WHERE company_id = ? AND position_id IN (1, 2) ORDER BY name ASC`,
+    [user.company_id]
+  );
+
   const saleDataFormatted: SaleData = {
     id: sale.id,
     customer_id: sale.customer_id,
     customer_name: sale.customer_name,
+    seller_id: sale.seller_id,
     billing_address: sale.billing_address || "",
     project_address: sale.project_address || "",
     phone: sale.phone || "",
@@ -714,6 +728,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     sale: saleDataFormatted,
     sink_type,
     faucet_type,
+    salesReps,
     stoneType: stoneInfo?.[0]?.type || null,
     stoneName: stoneInfo?.[0]?.name || null,
   };
@@ -1490,7 +1505,7 @@ const RoomSubForm = ({
 
 // Main component - exactly like sell page but with pre-loaded data and "Update Sale" button
 export default function SlabEdit() {
-  const { sale, sink_type, faucet_type, stoneType } =
+  const { sale, sink_type, faucet_type, salesReps, stoneType } =
     useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const isSubmitting = useNavigation().state === "submitting";
@@ -1507,6 +1522,7 @@ export default function SlabEdit() {
     defaultValues: {
       name: sale.customer_name,
       customer_id: sale.customer_id,
+      seller_id: sale.seller_id,
       billing_address: sale.billing_address,
       project_address: sale.project_address,
       same_address: sale.billing_address === sale.project_address,
@@ -1595,17 +1611,36 @@ export default function SlabEdit() {
           <Form id="customerForm" onSubmit={fullSubmit}>
             <AuthenticityTokenInput />
             <div className="">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <InputItem
-                    name={"Customer Name"}
-                    placeholder={"Enter customer name"}
-                    field={field}
-                  />
-                )}
-              />
+              <div className="flex flex-row gap-2">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <InputItem
+                      name={"Customer Name"}
+                      placeholder={"Enter customer name"}
+                      field={field}
+                      formClassName="mb-0 w-1/2"
+                    />
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="seller_id"
+                  render={({ field }) => (
+                    <SelectInput
+                      name={"Sales Rep"}
+                      field={field}
+                      options={salesReps.map((rep) => ({
+                        key: rep.id,
+                        value: rep.name,
+                      }))}
+                      placeholder="Select sales rep"
+                      className="mb-0 w-1/2"
+                    />
+                  )}
+                />
+              </div>
 
               <FormField
                 control={form.control}

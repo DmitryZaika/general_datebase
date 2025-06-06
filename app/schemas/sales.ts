@@ -33,7 +33,9 @@ export const roomSchema = z.object({
 export const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   customer_id: z.coerce.number().optional(),
+  seller_id: z.coerce.number().min(1, "Sales rep is required").optional(),
   billing_address: z.string().min(10, "Billing address is required"),
+  billing_zip_code: z.coerce.string().optional(),
   project_address: z.string().min(10, "Project address is required"),
   same_address: z.boolean().default(true),
   phone: z

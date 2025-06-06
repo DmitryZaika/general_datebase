@@ -27,6 +27,7 @@ interface IQuery {
   waterfall: string | null;
   corbels: number | null;
   seam: string | null;
+  zip_code: string | null;
 }
 
 async function getData(saleId: number) {
@@ -38,6 +39,7 @@ async function getData(saleId: number) {
             main.customers.name as customer_name,
             main.customers.phone,
             main.customers.email,
+            main.customers.postal_code as zip_code,
             main.users.name as seller_name,
             main.slab_inventory.room,
             main.slab_inventory.edge,
@@ -161,7 +163,12 @@ export async function loader({ request, params }: ActionFunctionArgs) {
     .setText(queryData[0].customer_name || undefined);
   pdfForm
     .getTextField("Text4")
-    .setText(queryData[0].project_address || undefined);
+    .setText(
+      queryData[0].project_address?.replace(
+        "USA",
+        queryData[0].zip_code || ""
+      ) || undefined
+    );
   pdfForm.getTextField("Text5").setText(queryData[0].phone || undefined);
   pdfForm.getTextField("Text6").setText(queryData[0].email || undefined);
 
