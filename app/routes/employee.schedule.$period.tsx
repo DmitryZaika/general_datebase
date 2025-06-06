@@ -24,8 +24,15 @@ interface Event {
 
 const validPeriods: Period[] = ["day", "week", "month"];
 
-function getPeriodDates(period: Period, date?: string) {
-  const currentDate = date ? new Date(date) : new Date();
+function getPeriodDates(period: Period, dateStr?: string) {
+  // Parse dd-mm-yyyy format or use current date
+  let currentDate = new Date();
+  if (dateStr) {
+    const [day, month, year] = dateStr.split('-').map(Number);
+    if (day && month && year) {
+      currentDate = new Date(year, month - 1, day); // month is 0-indexed
+    }
+  }
   
   switch (period) {
     case "day":
@@ -33,7 +40,7 @@ function getPeriodDates(period: Period, date?: string) {
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(currentDate);
       dayEnd.setHours(23, 59, 59, 999);
-      return { start: dayStart, end: dayEnd };
+      return { start: dayStart, end: dayEnd, currentDateStr: formatDateStr(currentDate) };
       
     case "week":
       const weekStart = new Date(currentDate);
@@ -42,17 +49,24 @@ function getPeriodDates(period: Period, date?: string) {
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
-      return { start: weekStart, end: weekEnd };
+      return { start: weekStart, end: weekEnd, currentDateStr: formatDateStr(weekStart) };
       
     case "month":
       const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
       monthEnd.setHours(23, 59, 59, 999);
-      return { start: monthStart, end: monthEnd };
+      return { start: monthStart, end: monthEnd, currentDateStr: formatDateStr(monthStart) };
       
     default:
       throw new Error("Invalid period");
   }
+}
+
+function formatDateStr(date: Date): string {
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
 }
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
@@ -70,7 +84,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   // Get the current date from query params or use current date
   const url = new URL(request.url);
   const dateParam = url.searchParams.get("date");
-  const { start, end } = getPeriodDates(period as Period, dateParam || undefined);
+  const { start, end, currentDateStr } = getPeriodDates(period as Period, dateParam || undefined);
   
   // Fetch events for the user's company in the current timeframe
   const events = await selectMany<Event>(
@@ -88,7 +102,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   
   return {
     period: period as Period,
-    currentDate: start.toISOString(),
+    currentDate: currentDateStr,
     events: events.map(event => ({
       id: event.id.toString(),
       title: event.title,

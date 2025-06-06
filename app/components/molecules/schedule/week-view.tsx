@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Maximize } from "lucide-react";
 import clsx from "clsx";
 import { CustomEventModal } from "@/types";
+import { useNavigate } from "react-router";
 
 // Define Event interface locally since it's not exported from types
 interface Event {
@@ -56,6 +57,14 @@ const pageTransitionVariants = {
   }),
 };
 
+// Helper function to format date as dd-mm-yyyy
+function formatDateStr(date: Date): string {
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 export default function WeeklyView() {
   const { getters, handlers } = useScheduler();
   const hoursColumnRef = useRef<HTMLDivElement>(null);
@@ -66,6 +75,7 @@ export default function WeeklyView() {
   const [isResizing, setIsResizing] = useState<boolean>(false);
   const [direction, setDirection] = useState<number>(0);
   const [open, setOpen] = useState<{startDate: Date, endDate: Date} | null>(null);
+  const navigate = useNavigate();
 
   const daysOfWeek = getters?.getDaysInWeek(
     getters?.getWeekNumber(currentDate),
@@ -105,14 +115,16 @@ export default function WeeklyView() {
     const nextWeek = new Date(currentDate);
     nextWeek.setDate(currentDate.getDate() + 7);
     setCurrentDate(nextWeek);
-  }, [currentDate]);
+    navigate(`/employee/schedule/week?date=${formatDateStr(nextWeek)}`, { replace: true });
+  }, [currentDate, navigate]);
 
   const handlePrevWeek = useCallback(() => {
     setDirection(-1);
     const prevWeek = new Date(currentDate);
     prevWeek.setDate(currentDate.getDate() - 7);
     setCurrentDate(prevWeek);
-  }, [currentDate]);
+    navigate(`/employee/schedule/week?date=${formatDateStr(prevWeek)}`, { replace: true });
+  }, [currentDate, navigate]);
 
   function handleAddEventWeek(dayIndex: number, detailedHour: string) {
     if (!detailedHour) return;
