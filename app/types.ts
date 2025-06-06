@@ -1,3 +1,11 @@
+import { Dispatch } from "react";
+import { z } from "zod";
+
+// Define scheduler state interface
+export interface SchedulerState {
+  events: Event[];
+}
+
 export interface Todo {
   id: number;
   rich_text: string;
@@ -118,17 +126,22 @@ export const variants = [
 
 export type Variant = (typeof variants)[number];
 
-// Define Zod schema for form validation
-export const eventSchema = z.object({
-  title: z.string().nonempty("Event name is required"),
-  description: z.string().optional(),
-  startDate: z.date(),
-  endDate: z.date(),
-  variant: z.enum(["primary", "danger", "success", "warning", "default"]),
-  color: z.string().nonempty("Color selection is required"),
-});
-
-export type EventFormData = z.infer<typeof eventSchema>;
+// Event interface matching database schema
+export interface Event {
+  id: string;
+  title: string;
+  description?: string;
+  startDate: Date;
+  endDate: Date;
+  variant?: Variant;
+  allDay?: boolean;
+  color?: string;
+  status?: string;
+  notes?: string;
+  createdUserId?: number;
+  assignedUserId?: number;
+  saleId?: number;
+}
 
 export type Views = {
   mobileViews?: string[];

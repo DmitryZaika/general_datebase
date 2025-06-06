@@ -12,8 +12,10 @@ const views: Period[] = ["day", "week", "month"]
 
 export default function SchedulerViewFilteration({
   period,
+  currentDate,
 }: {
   period?: Period;
+  currentDate?: string;
 }) {
   const [eventModalDefaults, setEventModalDefaults] = useState<{
     startDate: Date;

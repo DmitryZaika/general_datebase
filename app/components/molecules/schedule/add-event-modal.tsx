@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,12 +20,14 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { FormProvider, FormField } from "@/components/ui/form";
-import { Form } from "react-router";
+import { Form, useFetcher } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { EventFormData, eventSchema, Variant } from "@/types";
+import { EventFormData, eventSchema } from "~/schemas/events";
+import { Variant } from "@/types";
 import { useScheduler } from "~/providers/scheduler-provider";
 import { v4 as uuidv4 } from "uuid";
+import { useEffect } from "react";
 
 interface AddEventModalProps {
   open: boolean;
@@ -46,16 +48,18 @@ export default function AddEventModal({
   defaultValues 
 }: AddEventModalProps) {
   const { handlers } = useScheduler();
+  const fetcher = useFetcher();
   
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
       title: defaultValues?.title || "",
       description: defaultValues?.description || "",
-      startDate: defaultValues?.startDate || new Date(),
-      endDate: defaultValues?.endDate || new Date(),
-      variant: defaultValues?.variant || "primary",
+      start_date: defaultValues?.startDate || new Date(),
+      end_date: defaultValues?.endDate || new Date(),
       color: getEventColor(defaultValues?.variant || "primary"),
+      all_day: false,
+      status: "scheduled",
     },
   });
 
@@ -68,10 +72,11 @@ export default function AddEventModal({
       reset({
         title: defaultValues.title || "",
         description: defaultValues.description || "",
-        startDate: defaultValues.startDate || new Date(),
-        endDate: defaultValues.endDate || new Date(),
-        variant: defaultValues.variant || "primary",
+        start_date: defaultValues.startDate || new Date(),
+        end_date: defaultValues.endDate || new Date(),
         color: getEventColor(defaultValues.variant || "primary"),
+        all_day: false,
+        status: "scheduled",
       });
     }
   }, [open, defaultValues, reset]);
@@ -114,27 +119,29 @@ export default function AddEventModal({
   }
 
   const onSubmit = (formData: EventFormData) => {
-    const eventData = {
-      id: defaultValues?.id || uuidv4(),
-      title: formData.title,
-      startDate: formData.startDate,
-      endDate: formData.endDate,
-      variant: formData.variant,
-      description: formData.description,
-    };
-
+    const submitData = new FormData();
+    submitData.append("intent", defaultValues?.id ? "update" : "create");
     if (defaultValues?.id) {
-      // Update existing event
-      handlers.handleUpdateEvent(eventData, defaultValues.id);
-    } else {
-      // Add new event
-      handlers.handleAddEvent(eventData);
+      submitData.append("id", defaultValues.id);
     }
+    submitData.append("title", formData.title);
+    submitData.append("description", formData.description || "");
+    submitData.append("start_date", formData.start_date.toISOString());
+    submitData.append("end_date", formData.end_date.toISOString());
+    submitData.append("all_day", formData.all_day.toString());
+    submitData.append("color", formData.color);
+    submitData.append("status", formData.status);
+    submitData.append("notes", formData.notes || "");
+
+    fetcher.submit(submitData, {
+      method: "POST",
+      action: "/api/events",
+    });
     
     onOpenChange(false);
   };
 
-  const handleDateChange = (field: "startDate" | "endDate", date: Date) => {
+  const handleDateChange = (field: "start_date" | "end_date", date: Date) => {
     setValue(field, date);
   };
 
@@ -193,15 +200,15 @@ export default function AddEventModal({
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="startDate"
+                name="start_date"
                 render={({ field }) => (
                   <div>
-                    <Label htmlFor="startDate">Start Date</Label>
+                    <Label htmlFor="start_date">Start Date</Label>
                     <Input
-                      id="startDate"
+                      id="start_date"
                       type="datetime-local"
-                      value={field.value ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
-                      onChange={(e) => handleDateChange("startDate", new Date(e.target.value))}
+                      value={field.value instanceof Date ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
+                      onChange={(e) => handleDateChange("start_date", new Date(e.target.value))}
                     />
                   </div>
                 )}
@@ -209,20 +216,52 @@ export default function AddEventModal({
 
               <FormField
                 control={form.control}
-                name="endDate"
+                name="end_date"
                 render={({ field }) => (
                   <div>
-                    <Label htmlFor="endDate">End Date</Label>
+                    <Label htmlFor="end_date">End Date</Label>
                     <Input
-                      id="endDate"
+                      id="end_date"
                       type="datetime-local"
-                      value={field.value ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
-                      onChange={(e) => handleDateChange("endDate", new Date(e.target.value))}
+                      value={field.value instanceof Date ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
+                      onChange={(e) => handleDateChange("end_date", new Date(e.target.value))}
                     />
                   </div>
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="all_day"
+              render={({ field }) => (
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="all_day"
+                    checked={field.value}
+                    onChange={(e) => setValue("all_day", e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <Label htmlFor="all_day">All Day Event</Label>
+                </div>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <div>
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    {...field}
+                    placeholder="Additional notes"
+                  />
+                </div>
+              )}
+            />
 
             <div>
               <Label>Color</Label>
@@ -250,7 +289,6 @@ export default function AddEventModal({
                       key={color.key}
                       onClick={() => {
                         setValue("color", color.key);
-                        setValue("variant", getEventStatus(color.key));
                       }}
                     >
                       <div className="flex items-center">
