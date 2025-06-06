@@ -11,9 +11,13 @@ import {
 } from "~/components/ui/form";
 import { useState } from "react";
 
-async function completeAddress(
-  q: string
-): Promise<{ description: { text: string }; place_id: string }[]> {
+async function completeAddress(q: string): Promise<
+  {
+    description: { text: string };
+    place_id: string;
+    zip_code: string | null;
+  }[]
+> {
   const res = await fetch(
     `/api/google/address-complete?q=${encodeURIComponent(q)}`
   );
@@ -25,9 +29,10 @@ async function completeAddress(
 type Props = {
   form: any;
   field: string;
+  zipField?: string;
 };
 
-export function AddressInput({ form, field }: Props) {
+export function AddressInput({ form, field, zipField }: Props) {
   const [open, setOpen] = useState(false);
 
   const value = form.watch(field) as string;
@@ -56,10 +61,14 @@ export function AddressInput({ form, field }: Props) {
               placeholder={`Enter ${
                 field === "billing_address" ? "billing" : "project"
               } address (min 10 characters)`}
-              value={rhf.value}
+              value={
+                zipField
+                  ? rhf.value?.replace("USA", form.watch(zipField) ?? "")
+                  : rhf.value
+              }
               onChange={(e) => {
                 rhf.onChange(e);
-                setOpen(true); // показываем список при вводе
+                setOpen(true);
               }}
               onFocus={() => rhf.value && setOpen(true)}
               onBlur={() => {
@@ -91,10 +100,16 @@ export function AddressInput({ form, field }: Props) {
                         shouldValidate: true,
                         shouldDirty: true,
                       });
+                      if (zipField) {
+                        form.setValue(zipField, s.zip_code ?? "", {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      }
                       requestAnimationFrame(() => setOpen(false));
                     }}
                   >
-                    {s.description.text}
+                    {s.description.text.replace("USA", s.zip_code ?? "")}
                   </CommandItem>
                 ))}
               </CommandGroup>

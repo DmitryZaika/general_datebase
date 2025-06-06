@@ -216,13 +216,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
     } else {
       const [customerResult] = await db.execute<ResultSetHeader>(
-        `INSERT INTO customers (name, company_id, phone, email, address) VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO customers (name, company_id, phone, email, address, postal_code) VALUES (?, ?, ?, ?, ?, ?)`,
         [
           data.name,
           user.company_id,
           data.phone || null,
           data.email || null,
           data.billing_address || null,
+          data.billing_zip_code || null,
         ]
       );
       customerId = customerResult.insertId;
@@ -1608,7 +1609,11 @@ export default function SlabSell() {
                 render={({ field }) => <input type="hidden" {...field} />}
               />
 
-              <AddressInput form={form} field="billing_address" />
+              <AddressInput
+                form={form}
+                field="billing_address"
+                zipField="billing_zip_code"
+              />
               <div className="flex items-center space-x-2 my-2">
                 <FormField
                   control={form.control}

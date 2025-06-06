@@ -6,7 +6,8 @@ const qs = z.object({ q: z.string().min(3).max(100) });
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY!;
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { q } = qs.parse(Object.fromEntries(new URL(request.url).searchParams));
+  const searchParams = new URL(request.url).searchParams;
+  const q = searchParams.get("q");
 
   const url = new URL("https://places.googleapis.com/v1/places:autocomplete");
 
