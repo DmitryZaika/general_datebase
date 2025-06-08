@@ -200,23 +200,6 @@ export default function AddEventModal({
 
             <FormField
               control={form.control}
-              name="all_day"
-              render={({ field }) => (
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="all_day"
-                    checked={field.value}
-                    onChange={(e) => setValue("all_day", e.target.checked)}
-                    className="rounded border-gray-300"
-                  />
-                  <Label htmlFor="all_day">All Day Event</Label>
-                </div>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="notes"
               render={({ field }) => (
                 <div>
