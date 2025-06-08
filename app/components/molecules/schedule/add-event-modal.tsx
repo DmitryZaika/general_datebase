@@ -19,8 +19,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { FormProvider, FormField } from "@/components/ui/form";
-import { Form } from "react-router";
-import { useForm } from "react-hook-form";
+import { useForm, Form } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EventFormData, eventSchema } from "~/schemas/events";
 import { Variant } from "@/types";
@@ -58,7 +57,7 @@ export default function AddEventModal({
       status: "scheduled",
     },
   });
-  const { fullSubmit } = useFullFetcher(form, "/api/events");
+  const { fullSubmit } = useFullFetcher(form, "/api/events", "POST");
 
   const { watch, setValue, reset } = form;
   const selectedColor = watch("color");
