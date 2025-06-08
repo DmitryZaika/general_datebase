@@ -35,7 +35,7 @@ interface AddEventModalProps {
     startDate?: Date;
     endDate?: Date;
     variant?: Variant;
-    id?: string;
+    id?: number;
   };
 }
 
@@ -44,10 +44,10 @@ export default function AddEventModal({
   onOpenChange, 
   defaultValues 
 }: AddEventModalProps) {
-  
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
+      id: defaultValues?.id || undefined,
       title: defaultValues?.title || "",
       description: defaultValues?.description || "",
       start_date: defaultValues?.startDate || new Date(),
@@ -57,25 +57,11 @@ export default function AddEventModal({
       status: "scheduled",
     },
   });
-  const { fullSubmit } = useFullFetcher(form, "/api/events", "POST");
+
+  const { fullSubmit } = useFullFetcher(form, "/api/events", defaultValues?.id ? "PUT" : "POST");
 
   const { watch, setValue, reset } = form;
   const selectedColor = watch("color");
-
-  // Reset form when modal opens/closes or defaultValues change
-  useEffect(() => {
-    if (open && defaultValues) {
-      reset({
-        title: defaultValues.title || "",
-        description: defaultValues.description || "",
-        start_date: defaultValues.startDate || new Date(),
-        end_date: defaultValues.endDate || new Date(),
-        color: getEventColor(defaultValues.variant || "primary"),
-        all_day: false,
-        status: "scheduled",
-      });
-    }
-  }, [open, defaultValues, reset]);
 
   const colorOptions = [
     { key: "blue", name: "Blue" },

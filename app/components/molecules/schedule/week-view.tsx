@@ -481,14 +481,16 @@ export default function WeeklyView() {
       </AnimatePresence>
 
       {/* Add Event Modal */}
-      <AddEventModal
-        open={!!open}
+      {open && (
+        <AddEventModal
+          open={true}
         onOpenChange={(isOpen) => !isOpen && setOpen(null)}
         defaultValues={{
           startDate: open?.startDate,
           endDate: open?.endDate,
         }}
       />
+      )}
     </div>
   );
 }

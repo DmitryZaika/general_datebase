@@ -79,6 +79,11 @@ export default function MonthView() {
   }, [currentDate, navigate]);
 
   function handleAddEvent(selectedDay: number) {
+    // Don't open add modal if there's already a modal open (like edit modal)
+    if (document.querySelector('[role="dialog"]')) {
+      return;
+    }
+
     // Create start date at 12:00 AM on the selected day
     const startDate = new Date(
       currentDate.getFullYear(),
@@ -98,7 +103,6 @@ export default function MonthView() {
       59,
       59
     );
-
     setOpen({startDate, endDate});
   }
 
@@ -241,7 +245,14 @@ export default function MonthView() {
                     initial="enter"
                     animate="center"
                     exit="exit"
-                    onClick={() => handleAddEvent(dayObj.day)}
+                    onClick={(e) => {
+                      // Don't open add modal if clicking on an event element
+                      const target = e.target as HTMLElement;
+                      if (target.closest('[data-event-element]')) {
+                        return;
+                      }
+                      handleAddEvent(dayObj.day);
+                    }}
                   >
                     <div className="p-1 sm:p-2 h-full flex flex-col relative">
                       {/* Day number */}
@@ -349,14 +360,16 @@ export default function MonthView() {
       </AnimatePresence>
 
       {/* Modal */}
+      {open && (
       <AddEventModal
-        open={!!open}
+        open={true}
         onOpenChange={(isOpen) => !isOpen && setOpen(null)}
         defaultValues={{
           startDate: open?.startDate,
           endDate: open?.endDate,
         }}
       />
+      )}
     </div>
   );
 }

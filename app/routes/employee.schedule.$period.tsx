@@ -99,8 +99,6 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
      ORDER BY e.start_date ASC`,
     [user.company_id, start.toISOString(), end.toISOString(), start.toISOString(), end.toISOString(), start.toISOString(), end.toISOString()]
   );
-
-  console.log(events);
   
   return {
     period: period as Period,
