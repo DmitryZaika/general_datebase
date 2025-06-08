@@ -92,6 +92,16 @@ export default function AddEventModal({
     setValue(field, date);
   };
 
+  // Helper function to format date for datetime-local input
+  const formatDateTimeLocal = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   const onSubmit = async (data: EventFormData) => {
     try {
       await fullSubmit();
@@ -164,7 +174,7 @@ export default function AddEventModal({
                     <Input
                       id="start_date"
                       type="datetime-local"
-                      value={field.value instanceof Date ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
+                      value={formatDateTimeLocal(field.value)}
                       onChange={(e) => handleDateChange("start_date", new Date(e.target.value))}
                     />
                   </div>
@@ -180,7 +190,7 @@ export default function AddEventModal({
                     <Input
                       id="end_date"
                       type="datetime-local"
-                      value={field.value instanceof Date ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
+                      value={formatDateTimeLocal(field.value)}
                       onChange={(e) => handleDateChange("end_date", new Date(e.target.value))}
                     />
                   </div>

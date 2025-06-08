@@ -19,6 +19,17 @@ interface DatabaseEvent {
   sale_id?: number;
 }
 
+// Helper function to format date for MySQL without timezone conversion
+function formatDateForMySQL(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
 async function createEvent(formData: FormData, userId: number) {
   const data = {
     title: formData.get("title") as string,
@@ -41,8 +52,8 @@ async function createEvent(formData: FormData, userId: number) {
     [
       validatedData.title,
       validatedData.description || null,
-      validatedData.start_date.toISOString().slice(0, 19).replace('T', ' '),
-      validatedData.end_date.toISOString().slice(0, 19).replace('T', ' '),
+      formatDateForMySQL(validatedData.start_date),
+      formatDateForMySQL(validatedData.end_date),
       validatedData.all_day,
       validatedData.color,
       validatedData.status,
@@ -95,8 +106,8 @@ async function updateEvent(formData: FormData, userId: number, companyId: number
     [
       validatedData.title,
       validatedData.description || null,
-      validatedData.start_date.toISOString().slice(0, 19).replace('T', ' '),
-      validatedData.end_date.toISOString().slice(0, 19).replace('T', ' '),
+      formatDateForMySQL(validatedData.start_date),
+      formatDateForMySQL(validatedData.end_date),
       validatedData.all_day,
       validatedData.color,
       validatedData.status,
