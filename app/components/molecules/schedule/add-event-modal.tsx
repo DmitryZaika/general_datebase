@@ -60,7 +60,7 @@ export default function AddEventModal({
 
   const { fullSubmit } = useFullFetcher(form, "/api/events", defaultValues?.id ? "PUT" : "POST");
 
-  const { watch, setValue, reset } = form;
+  const { watch, setValue, reset, handleSubmit } = form;
   const selectedColor = watch("color");
 
   const colorOptions = [
@@ -89,6 +89,16 @@ export default function AddEventModal({
     setValue(field, date);
   };
 
+  const onSubmit = async (data: EventFormData) => {
+    try {
+      await fullSubmit();
+      onOpenChange(false); // Close modal after successful submission
+    } catch (error) {
+      // Handle error if needed - modal stays open on error
+      console.error("Failed to submit event:", error);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
 
@@ -104,7 +114,7 @@ export default function AddEventModal({
         </DialogHeader>
         
         <FormProvider {...form}>
-          <Form onSubmit={fullSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="title"
@@ -267,7 +277,7 @@ export default function AddEventModal({
                 {defaultValues?.id ? "Update Event" : "Save Event"}
               </Button>
             </DialogFooter>
-          </Form>
+          </form>
         </FormProvider>
       </DialogContent>
     </Dialog>
