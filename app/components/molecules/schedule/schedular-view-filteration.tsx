@@ -28,7 +28,7 @@ export default function SchedulerViewFilteration({
       new Date().getFullYear(),
       new Date().getMonth(),
       selectedDay ?? new Date().getDate(),
-      0,
+      12,
       0,
       0,
       0
@@ -38,10 +38,10 @@ export default function SchedulerViewFilteration({
       new Date().getFullYear(),
       new Date().getMonth(),
       selectedDay ?? new Date().getDate(),
-      23,
-      59,
-      59,
-      999
+      13,
+      0,
+      0,
+      0
     );
 
     setEventModalDefaults({ startDate, endDate });
@@ -93,11 +93,13 @@ export default function SchedulerViewFilteration({
         )}
       </div>
 
-      <AddEventModal
-        open={!!eventModalDefaults}
+      {eventModalDefaults && (
+        <AddEventModal
+          open={true}
         onOpenChange={() => setEventModalDefaults(undefined)}
         defaultValues={eventModalDefaults}
       />
+      )}
     </div>
   );
 }

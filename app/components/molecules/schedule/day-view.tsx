@@ -6,7 +6,6 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useScheduler } from "~/providers/scheduler-provider";
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
 import EventStyled from "@/components/molecules/schedule/event-styled";
-import { CustomEventModal } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router";
@@ -470,14 +469,16 @@ export default function DailyView() {
       </AnimatePresence>
 
       {/* Add Event Modal */}
+      {open && (
       <AddEventModal
-        open={!!open}
+        open={true}
         onOpenChange={(isOpen) => !isOpen && setOpen(null)}
         defaultValues={{
           startDate: open?.startDate,
           endDate: open?.endDate,
         }}
       />
+      )}
     </div>
   );
 }
