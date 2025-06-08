@@ -3,12 +3,12 @@ import { Button } from "@/components/ui/button";
 import DailyView from "@/components/molecules/schedule/day-view";
 import WeeklyView from "@/components/molecules/schedule/week-view";
 import MonthView from "@/components/molecules/schedule/month-view";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { Period } from "~/types";
 
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
 
-const views: Period[] = ["day", "week", "month"]
+const views: Period[] = ["month"]
 
 export default function SchedulerViewFilteration({
   period,
@@ -21,7 +21,6 @@ export default function SchedulerViewFilteration({
     startDate: Date;
     endDate: Date;
   } | undefined>(undefined);
-  const navigate = useNavigate();
 
   function handleAddEvent(selectedDay?: number) {
     // Create the start and end dates for the event
