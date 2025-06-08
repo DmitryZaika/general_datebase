@@ -1,7 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import clsx from "clsx";
 
@@ -9,7 +8,7 @@ import { useScheduler } from "~/providers/scheduler-provider";
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
 import EventStyled from "@/components/molecules/schedule/event-styled";
 import DayEventsModal from "@/components/molecules/schedule/day-events-modal";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
 // Define Event interface locally since it's not exported from types
 interface Event {
@@ -19,6 +18,7 @@ interface Event {
   endDate: Date;
   description?: string;
   variant?: string;
+  notes?: string;
 }
 
 const pageTransitionVariants = {
@@ -53,6 +53,23 @@ export default function MonthView() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [direction, setDirection] = useState<number>(0);
   const navigate = useNavigate();
+
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const dateParam = searchParams.get("date");
+    if (dateParam) {
+      const regex = /^(\d{2})-(\d{2})-(\d{4})$/;
+      const match = dateParam.match(regex);
+      const [, dd, mm, yyyy] = match;
+      const day = parseInt(dd, 10);
+      const month = parseInt(mm, 10) - 1; // месяцы в JS от 0 до 11
+      const year = parseInt(yyyy, 10);
+    
+      const date = new Date(year, month, day);
+      setCurrentDate(date);
+    }
+  }, [searchParams]);
 
   const daysInMonth = getters.getDaysInMonth(
     currentDate.getMonth(),
@@ -412,6 +429,7 @@ export default function MonthView() {
             startDate: editEvent.startDate,
             endDate: editEvent.endDate,
             variant: editEvent.variant as any,
+            notes: editEvent.notes,
           }}
         />
       )}

@@ -18,6 +18,7 @@ interface Event {
   endDate: Date;
   description?: string;
   variant?: string;
+  notes?: string;
 }
 
 // Generate hours in 12-hour format

@@ -36,6 +36,7 @@ interface AddEventModalProps {
     endDate?: Date;
     variant?: Variant;
     id?: number;
+    notes?: string;
   };
 }
 
@@ -44,6 +45,7 @@ export default function AddEventModal({
   onOpenChange, 
   defaultValues 
 }: AddEventModalProps) {
+  console.log("defaultValues", defaultValues);
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
@@ -55,6 +57,7 @@ export default function AddEventModal({
       color: getEventColor(defaultValues?.variant || "primary"),
       all_day: false,
       status: "scheduled",
+      notes: defaultValues?.notes || "",
     },
   });
 
