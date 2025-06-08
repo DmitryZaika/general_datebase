@@ -18,7 +18,7 @@ import {
   Handlers,
   SchedulerContextType,
   startOfWeek,
-} from "@/types/index";
+} from "@/types";
 // Define event and state types
 
 interface SchedulerState {

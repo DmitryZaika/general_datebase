@@ -55,6 +55,7 @@ interface Event {
   endDate: Date;
   description?: string;
   variant?: string;
+  notes?: string;
 }
 
 interface EventStyledProps extends Event {
@@ -103,8 +104,8 @@ export default function EventStyled({
         <Button
           onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
-            handlers.handleDeleteEvent(event?.id);
-            onDelete?.(event?.id);
+            handlers.handleDeleteEvent(event?.id.toString());
+            onDelete?.(event?.id.toString());
           }}
           variant="destructive"
           size="icon"
@@ -199,6 +200,7 @@ export default function EventStyled({
           startDate: event.startDate,
           endDate: event.endDate,
           variant: event.variant as any,
+          notes: event.notes,
         }}
       />
       )}

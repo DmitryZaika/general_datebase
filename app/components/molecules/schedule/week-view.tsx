@@ -18,6 +18,7 @@ interface Event {
   endDate: Date;
   description?: string;
   variant?: string;
+  notes?: string;
 }
 
 const hours = Array.from({ length: 24 }, (_, i) => {
