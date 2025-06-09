@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router";
 
-// Define Event interface locally since it's not exported from types
 interface Event {
   id: string;
   title: string;

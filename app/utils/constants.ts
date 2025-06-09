@@ -19,3 +19,12 @@ export const SINK_TYPES = [
 ] as const;
 
 export const FAUCET_TYPES = ["single handle", "double handle"] as const;
+
+// const BASE_PRICES = {
+//   corbels: 100,
+//   edge: {
+//     flat: 0,
+//     east: 100,
+//     ogee: (linearFeet: number) => linearFeet * 100,
+//   },
+// };

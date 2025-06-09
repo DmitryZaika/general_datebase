@@ -1648,7 +1648,11 @@ export default function SlabEdit() {
                 render={({ field }) => <input type="hidden" {...field} />}
               />
 
-              <AddressInput form={form} field="billing_address" />
+              <AddressInput
+                form={form}
+                field="billing_address"
+                zipField="billing_zip_code"
+              />
               <div className="flex items-center space-x-2 my-2">
                 <FormField
                   control={form.control}
