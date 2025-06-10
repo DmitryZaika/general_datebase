@@ -29,7 +29,6 @@ export default function SelectDate({
   setValue: UseFormSetValue<EventFormData>;
 }) {
 
-  console.log("data", data);
   const [startDate, setStartDate] = useState<Date>(
     data?.startDate instanceof Date ? data.startDate : new Date()
   );

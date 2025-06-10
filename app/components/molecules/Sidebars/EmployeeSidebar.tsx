@@ -1,15 +1,10 @@
 import {
   LucideProps,
   Calendar,
-  Home,
-  Inbox,
-  Search,
-  Settings,
   DollarSign,
   Layers,
   ShowerHead,
   Building2,
-  Hammer,
   FileIcon,
   ImageIcon,
   Lightbulb,
@@ -116,7 +111,7 @@ const getItems = (
         title: "Instructions",
         url: `/${base}/instructions`,
         icon: Lightbulb,
-      }
+      },
     );
   }
   if (base === "employee") {
@@ -135,6 +130,11 @@ const getItems = (
         title: "My Account",
         url: `/employee/user`,
         icon: User,
+      },
+      {
+        title: "Schedule",
+        url: `/employee/schedule`,
+        icon: Calendar,
       }
     );
   }

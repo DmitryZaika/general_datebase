@@ -5,7 +5,7 @@ import { useAuthenticityToken } from "remix-utils/csrf/react";
 export function useFullFetcher<TFieldValues extends FieldValues = FieldValues>(
   form: UseFormReturn<TFieldValues>,
   action: undefined | string = undefined,
-  method: "POST" | "DELETE" = "POST",
+  method: "POST" | "DELETE" | "PUT" = "POST",
 ) {
   const fetcher = useFetcher();
   const token = useAuthenticityToken();

@@ -108,8 +108,6 @@ export default function AddToSale() {
     queryFn: () => getCustomers(transaction.email), 
   })
 
-  console.log(data)
-
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate(`/admin/invoices${location.search}`);
