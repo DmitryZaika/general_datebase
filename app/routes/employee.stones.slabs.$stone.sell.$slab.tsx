@@ -8,7 +8,7 @@ import {
   useLocation,
 } from "react-router";
 import { Form, useNavigate } from "react-router";
-import { FormProvider, FormField } from "../components/ui/form";
+import { FormProvider, FormField, FormLabel } from "../components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
 import { InputItem } from "~/components/molecules/InputItem";
 import { PhoneInput } from "~/components/molecules/PhoneInput";
@@ -26,7 +26,7 @@ import { db } from "~/db.server";
 import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
-
+import { BASE_PRICES, CUSTOMER_ITEMS } from "~/utils/constants";
 import { csrf } from "~/utils/csrf.server";
 import { getEmployeeUser } from "~/utils/session.server";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
@@ -39,7 +39,7 @@ import {
 } from "~/components/ui/select";
 import { selectMany } from "~/utils/queryHelpers";
 import { useState, useEffect, useRef } from "react";
-import { Search, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { Input } from "~/components/ui/input";
 import { customerSchema, roomSchema, TCustomerSchema } from "~/schemas/sales";
 import { Switch } from "~/components/ui/switch";
@@ -50,6 +50,9 @@ import { Customer, StoneSearchResult } from "~/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
+import clsx from "clsx";
+import { SelectInput } from "~/components/molecules/SelectItem";
+import { DynamicAdditions } from "~/components/molecules/DynamicAdditions";
 
 interface Sink {
   id: number;
@@ -93,6 +96,7 @@ const tearOutOptions = [
   { key: "No", value: "No" },
   { key: "Laminate", value: "Laminate" },
   { key: "Stone", value: "Stone" },
+  { key: "Vanity Laminate T/O", value: "Vanity Laminate T/O" },
 ];
 
 const stoveOptions = [
@@ -523,6 +527,79 @@ async function getSlabs(
   return data.slabs;
 }
 
+const AddExtraDialog = ({
+  show,
+  setShow,
+  form,
+  roomIndex,
+  selectedItems,
+  setSelectedItems,
+}: {
+  show: boolean;
+  setShow: (show: boolean) => void;
+  form: UseFormReturn<TCustomerSchema>;
+  roomIndex: number;
+  selectedItems: string[];
+  setSelectedItems: React.Dispatch<React.SetStateAction<string[]>>;
+}) => {
+  const handleAddExtra = () => {
+    if (selectedItems.length > 0) {
+      // Add logic to save extra items to form if needed
+      console.log("Adding extra items:", selectedItems);
+      setShow(false);
+    }
+  };
+
+  const handleItemToggle = (item: string) => {
+    setSelectedItems((prev) =>
+      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
+    );
+  };
+
+  const availableItems = Object.keys(CUSTOMER_ITEMS);
+
+  return (
+    <Dialog open={show} onOpenChange={setShow}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Add Extra Items</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium mb-2">Select Items:</h3>
+            <div className="space-y-2">
+              {availableItems.map((item) => (
+                <label key={item} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedItems.includes(item)}
+                    onChange={() => handleItemToggle(item)}
+                    className="rounded"
+                  />
+                  <span className="text-sm">{item}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShow(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAddExtra}
+            disabled={selectedItems.length === 0}
+          >
+            Add Items
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const AddSlabDialog = ({
   show,
   setShow,
@@ -866,6 +943,8 @@ const RoomSubForm = ({
   slabMap,
   stoneType,
   setSlabMap,
+  linearFeet,
+  setLinearFeet,
 }: {
   form: UseFormReturn<TCustomerSchema>;
   index: number;
@@ -878,10 +957,15 @@ const RoomSubForm = ({
       prev: Record<number, string | null>
     ) => Record<number, string | null>
   ) => void;
+  linearFeet: Record<number, string>;
+  setLinearFeet: React.Dispatch<React.SetStateAction<Record<number, string>>>;
 }) => {
+  const inputWidth = "w-[50%]";
   const [showAddSlabDialog, setShowAddSlabDialog] = useState(false);
   const [showAddSinkDialog, setShowAddSinkDialog] = useState(false);
   const [showAddFaucetDialog, setShowAddFaucetDialog] = useState(false);
+  const [showAddExtraDialog, setShowAddExtraDialog] = useState(false);
+  const [selectedExtraItems, setSelectedExtraItems] = useState<string[]>([]);
 
   const {
     slabId,
@@ -968,6 +1052,144 @@ const RoomSubForm = ({
     }
   }, [form.getValues(`rooms.${index}.room`)]);
 
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (!name || !name.startsWith(`rooms.${index}.`)) return;
+
+      const fieldName = name.split(".").pop();
+
+      switch (fieldName) {
+        case "edge": {
+          const edgeValue = form.getValues(`rooms.${index}.edge`);
+
+          let price = 0;
+
+          if (edgeValue === "eased") {
+            price = BASE_PRICES.edge_price.eased;
+          } else if (edgeValue === "1/4 bevel") {
+            price = BASE_PRICES.edge_price["1/4_bevel"];
+          } else if (edgeValue === "1/2 bevel") {
+            price = BASE_PRICES.edge_price["1/2_bevel"];
+          } else if (edgeValue === "ogee") {
+            price = BASE_PRICES.edge_price.ogee(Number(linearFeet[index]) || 0);
+          } else if (edgeValue === "bullnose") {
+            price = BASE_PRICES.edge_price.bull_nose(
+              Number(linearFeet[index]) || 0
+            );
+          }
+
+          if (!["ogee", "bullnose"].includes(edgeValue?.toLowerCase())) {
+            setLinearFeet((prev) => ({ ...prev, [index]: "" }));
+          }
+
+          // Always set the price, even if it's 0
+          form.setValue(`rooms.${index}.edge_price`, price);
+          break;
+        }
+
+        case "tear_out": {
+          const tearOutValue = form.getValues(`rooms.${index}.tear_out`);
+          const squareFeet = form.getValues(`rooms.${index}.square_feet`);
+          let price = 0;
+
+          if (tearOutValue === "stone") {
+            price = BASE_PRICES["stone_t/o"](squareFeet);
+          } else if (tearOutValue === "laminate") {
+            price = BASE_PRICES["laminate_t/o"](squareFeet);
+          }
+
+          // Always set the price, even if it's 0
+          form.setValue(`rooms.${index}.tear_out_price`, price);
+          break;
+        }
+
+        case "stove": {
+          const stoveValue = form.getValues(`rooms.${index}.stove`);
+          let price = 0;
+
+          if (stoveValue === "c/t") {
+            price = BASE_PRICES.stove_price["c/t"];
+          } else if (stoveValue === "grill") {
+            price = BASE_PRICES.stove_price.grill;
+          } else if (stoveValue === "n/a") {
+            price = BASE_PRICES.stove_price["n/a"];
+          }
+          console.log("All form values:", form.getValues());
+          // Always set the price, even if it's 0
+          form.setValue(`rooms.${index}.stove_price`, price);
+          break;
+        }
+
+        case "waterfall": {
+          const waterfallValue = form.getValues(`rooms.${index}.waterfall`);
+
+          if (waterfallValue === "yes") {
+            form.setValue(
+              `rooms.${index}.waterfall_price`,
+              BASE_PRICES.waterfall_price
+            );
+          } else {
+            form.setValue(`rooms.${index}.waterfall_price`, 0);
+          }
+          break;
+        }
+
+        case "corbels": {
+          const corbelsCount = form.getValues(`rooms.${index}.corbels`) || 0;
+          const totalPrice = corbelsCount * BASE_PRICES.corbels_price;
+          form.setValue(`rooms.${index}.corbels_price`, totalPrice);
+          break;
+        }
+
+        case "seam": {
+          const seamValue = form.getValues(`rooms.${index}.seam`);
+          let price = 0;
+
+          if (seamValue === "phantom") {
+            price = BASE_PRICES.seam_price.phantom_seam;
+          }
+
+          form.setValue(`rooms.${index}.seam_price`, price);
+          break;
+        }
+
+        case "square_feet": {
+          // Recalculate tear-out price when square feet changes
+          const tearOutValue = form.getValues(`rooms.${index}.tear_out`);
+          const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0;
+          let price = 0;
+
+          if (tearOutValue === "stone") {
+            price = BASE_PRICES["stone_t/o"](squareFeet);
+          } else if (tearOutValue === "laminate") {
+            price = BASE_PRICES["laminate_t/o"](squareFeet);
+          }
+
+          // Always set the price, even if it's 0
+          form.setValue(`rooms.${index}.tear_out_price`, price);
+          break;
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, index]);
+
+  useEffect(() => {
+    const edgeValue = form.getValues(`rooms.${index}.edge`);
+    let price = 0;
+
+    if (edgeValue === "ogee") {
+      price = BASE_PRICES.edge_price.ogee(Number(linearFeet[index]) || 0);
+    } else if (edgeValue === "bullnose") {
+      price = BASE_PRICES.edge_price.bull_nose(Number(linearFeet[index]) || 0);
+    }
+
+    if (edgeValue === "ogee" || edgeValue === "bullnose") {
+      form.setValue(`rooms.${index}.edge_price`, price);
+    }
+  }, [linearFeet[index], form, index]);
+
   return (
     <>
       <div className="h-[1px] bg-gray-200 w-full my-2"></div>
@@ -1005,25 +1227,12 @@ const RoomSubForm = ({
 
         <FormField
           control={form.control}
-          name={`rooms.${index}.edge`}
-          render={({ field }) => (
-            <SelectInputOther
-              field={field}
-              name="Edge"
-              className="mb-0"
-              options={edgeOptions}
-            />
-          )}
-        />
-
-        <FormField
-          control={form.control}
           name={`rooms.${index}.backsplash`}
           render={({ field }) => (
             <SelectInputOther
               field={field}
               name="Backsplash"
-              className="mb-0"
+              className={`mb-0`}
               options={backsplashOptions}
             />
           )}
@@ -1041,93 +1250,233 @@ const RoomSubForm = ({
             />
           )}
         />
+      </div>
 
-        <FormField
-          control={form.control}
-          name={`rooms.${index}.tear_out`}
-          render={({ field }) => (
-            <SelectInputOther
-              field={field}
-              name="Tear-Out"
-              className="mb-0"
-              options={tearOutOptions}
+      <div className="flex flex-col gap-2 mt-2">
+        <div className="border border-gray-200 rounded-md p-2 flex gap-2">
+          <FormField
+            control={form.control}
+            name={`rooms.${index}.edge`}
+            render={({ field }) => (
+              <SelectInputOther
+                field={field}
+                name="Edge"
+                className={`mb-0 ${inputWidth}`}
+                options={edgeOptions}
+              />
+            )}
+          />
+          <div
+            className={clsx(`mb-0 ${inputWidth}`, {
+              hidden: [
+                "eased",
+                "1/4 bevel",
+                "1/2 bevel",
+                "flat",
+                "Flat",
+              ].includes(form.watch(`rooms.${index}.edge`)),
+            })}
+          >
+            <FormLabel>Linear Feet</FormLabel>
+            <Input
+              id={`linear-feet-${index}`}
+              placeholder="Enter Linear Feet"
+              value={linearFeet[index] || ""}
+              onChange={(e) =>
+                setLinearFeet((prev) => ({
+                  ...prev,
+                  [index]: e.target.value,
+                }))
+              }
             />
-          )}
-        />
+          </div>
+
+          <FormField
+            control={form.control}
+            name={`rooms.${index}.edge_price`}
+            render={({ field }) => (
+              <InputItem
+                name={"Edge Price"}
+                placeholder={"Enter Edge Price"}
+                field={field}
+                formClassName="mb-0"
+              />
+            )}
+          />
+        </div>
+
+        <div className="border border-gray-200 rounded-md p-2 flex gap-2">
+          <FormField
+            control={form.control}
+            name={`rooms.${index}.tear_out`}
+            render={({ field }) => (
+              <SelectInputOther
+                field={field}
+                name="Tear-Out"
+                className={`mb-0 ${inputWidth}`}
+                options={tearOutOptions}
+              />
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name={`rooms.${index}.tear_out_price`}
+            render={({ field }) => (
+              <InputItem
+                name={"Tear-Out Price"}
+                placeholder={"Enter Tear-Out Price"}
+                field={field}
+                formClassName="mb-0"
+              />
+            )}
+          />
+        </div>
 
         {form.watch(`rooms.${index}.room`) !== "bathroom" && (
           <>
-            <FormField
-              control={form.control}
-              name={`rooms.${index}.stove`}
-              render={({ field }) => (
-                <SelectInputOther
-                  field={field}
-                  name="Stove"
-                  className="mb-0"
-                  options={stoveOptions}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name={`rooms.${index}.waterfall`}
-              render={({ field }) => (
-                <SelectInputOther
-                  field={field}
-                  name="Waterfall"
-                  className="mb-0"
-                  options={waterfallOptions}
-                />
-              )}
-            />
+            <div className="border border-gray-200 rounded-md p-2 flex gap-2">
+              <FormField
+                control={form.control}
+                name={`rooms.${index}.stove`}
+                render={({ field }) => (
+                  <SelectInputOther
+                    field={field}
+                    name="Stove"
+                    className={`mb-0 ${inputWidth}`}
+                    options={stoveOptions}
+                  />
+                )}
+              />
+              <FormField
+                control={form.control}
+                name={`rooms.${index}.stove_price`}
+                render={({ field }) => (
+                  <InputItem
+                    name={"Stove Price"}
+                    placeholder={"Enter Stove Price"}
+                    field={field}
+                    formClassName="mb-0"
+                  />
+                )}
+              />
+            </div>
+            <div className="border border-gray-200 rounded-md p-2 flex gap-2">
+              <FormField
+                control={form.control}
+                name={`rooms.${index}.waterfall`}
+                render={({ field }) => (
+                  <SelectInputOther
+                    field={field}
+                    name="Waterfall"
+                    className={`mb-0 ${inputWidth}`}
+                    options={waterfallOptions}
+                  />
+                )}
+              />
+              <FormField
+                control={form.control}
+                name={`rooms.${index}.waterfall_price`}
+                render={({ field }) => (
+                  <InputItem
+                    name={"Waterfall Price"}
+                    placeholder={"Enter Waterfall Price"}
+                    field={field}
+                    formClassName="mb-0"
+                  />
+                )}
+              />
+            </div>
           </>
         )}
 
-        <FormField
-          control={form.control}
-          name={`rooms.${index}.corbels`}
-          render={({ field }) => (
-            <InputItem
-              name={"Corbels"}
-              placeholder={"Number of corbels"}
-              field={field}
-              formClassName="mb-0"
-            />
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name={`rooms.${index}.seam`}
-          render={({ field }) => (
-            <SelectInputOther
-              field={field}
-              name="Seam"
-              className="mb-0"
-              options={seamOptions}
-            />
-          )}
-        />
-      </div>
-      <div className="flex items-center space-x-2 mt-4">
-        <FormField
-          control={form.control}
-          name={`rooms.${index}.ten_year_sealer`}
-          render={({ field }) => (
-            <>
-              <Switch
-                checked={field.value}
-                onCheckedChange={field.onChange}
-                id="ten_year_sealer"
-                disabled={Boolean(stone?.type?.toLowerCase() === "quartz")}
-                label="10-Year Sealer"
+        <div className="border border-gray-200 rounded-md p-2 flex gap-2">
+          <FormField
+            control={form.control}
+            name={`rooms.${index}.corbels`}
+            render={({ field }) => (
+              <InputItem
+                name={"Corbels"}
+                placeholder={"Number of corbels"}
+                field={field}
+                formClassName={`mb-0 ${inputWidth}`}
               />
-              {stone?.type && <StoneTypeDisplay stoneType={stone?.type} />}
-            </>
-          )}
-        />
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name={`rooms.${index}.corbels_price`}
+            render={({ field }) => (
+              <InputItem
+                name={"Corbels Price"}
+                placeholder={"Enter Corbels Price"}
+                field={field}
+                formClassName="mb-0"
+              />
+            )}
+          />
+        </div>
+
+        <div className="border border-gray-200 rounded-md p-2 flex gap-2">
+          <FormField
+            control={form.control}
+            name={`rooms.${index}.seam`}
+            render={({ field }) => (
+              <SelectInputOther
+                field={field}
+                name="Seam"
+                className={`mb-0 ${inputWidth}`}
+                options={seamOptions}
+              />
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name={`rooms.${index}.seam_price`}
+            render={({ field }) => (
+              <InputItem
+                name={"Seam Price"}
+                placeholder={"Enter Seam Price"}
+                field={field}
+                formClassName="mb-0"
+              />
+            )}
+          />
+        </div>
       </div>
+      <div className="flex items-center justify-between space-x-2">
+        <div className="flex items-center space-x-2 mt-4">
+          <FormField
+            control={form.control}
+            name={`rooms.${index}.ten_year_sealer`}
+            render={({ field }) => (
+              <>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  id="ten_year_sealer"
+                  disabled={Boolean(stone?.type?.toLowerCase() === "quartz")}
+                  label="10-Year Sealer"
+                />
+                {stone?.type && <StoneTypeDisplay stoneType={stone?.type} />}
+              </>
+            )}
+          />
+        </div>
+        <div className="flex items-center space-x-2 mt-4">
+          <Button
+            type="button"
+            variant="blue"
+            size="sm"
+            onClick={() => setShowAddExtraDialog(true)}
+          >
+            <Plus className="h-3 w-3" /> Add Extra Item
+          </Button>
+        </div>
+      </div>
+      <DynamicAdditions selectedItems={selectedExtraItems} />
 
       <Tabs defaultValue="slabs" className="mt-4">
         <TabsList className="grid w-full grid-cols-3">
@@ -1309,6 +1658,14 @@ const RoomSubForm = ({
             roomIndex={index}
             form={form}
           />
+          <AddExtraDialog
+            show={showAddExtraDialog}
+            setShow={setShowAddExtraDialog}
+            roomIndex={index}
+            form={form}
+            selectedItems={selectedExtraItems}
+            setSelectedItems={setSelectedExtraItems}
+          />
         </>
       )}
     </>
@@ -1338,6 +1695,7 @@ export default function SlabSell() {
   const [slabMap, setSlabMap] = useState<Record<number, string | null>>({
     [slabId]: bundle,
   });
+  const [linearFeet, setLinearFeet] = useState<Record<number, string>>({});
 
   const form = useForm<TCustomerSchema>({
     resolver,
@@ -1672,6 +2030,8 @@ export default function SlabSell() {
                   sink_type={sink_type}
                   faucet_type={faucet_type}
                   stoneType={stoneType}
+                  linearFeet={linearFeet}
+                  setLinearFeet={setLinearFeet}
                 />
               ))}
 
