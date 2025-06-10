@@ -18,7 +18,7 @@ import {
   Handlers,
   SchedulerContextType,
   startOfWeek,
-} from "@/types/index";
+} from "@/types";
 // Define event and state types
 
 interface SchedulerState {
@@ -156,26 +156,9 @@ export const SchedulerProvider = ({
   const getEventsForDay = (day: number, currentDate: Date) => {
     return state?.events.filter((event) => {
       const eventStart = new Date(event.startDate);
-      const eventEnd = new Date(event.endDate);
-
-      // Create new Date objects to avoid mutating `currentDate`
-      const startOfDay = new Date(currentDate);
-      startOfDay.setDate(day);
-      startOfDay.setHours(0, 0, 0, 0);
-
-      const endOfDay = new Date(currentDate);
-      endOfDay.setDate(day + 1);
-      endOfDay.setHours(0, 0, 0, 0);
-
-      // Check if the event starts or spans across the given day
-      const isSameDay =
-        eventStart.getDate() === day &&
+      return eventStart.getDate() === day &&
         eventStart.getMonth() === currentDate.getMonth() &&
         eventStart.getFullYear() === currentDate.getFullYear();
-
-      const isSpanningDay = eventStart < endOfDay && eventEnd >= startOfDay;
-
-      return isSameDay || isSpanningDay;
     });
   };
 

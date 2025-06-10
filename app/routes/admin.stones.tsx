@@ -62,7 +62,6 @@ function StoneTable({ stones }: { stones: Stone[] }) {
   const handleRowClick = (stoneId: number) => {
     // Use a relative path for Remix navigation
     const navigationPath = `${stoneId}${location.search}`;
-    console.log(`Table view navigating to: ${navigationPath}`);
     navigate(navigationPath);
   };
   
