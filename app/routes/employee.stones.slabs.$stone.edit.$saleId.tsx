@@ -50,10 +50,8 @@ import { Customer, StoneSearchResult } from "~/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
-import React from "react";
 import { EmailInput } from "~/components/molecules/EmailInput";
 
-// Copy all the same interfaces and options from sell page
 interface Sink {
   id: number;
   name: string;
