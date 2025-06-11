@@ -43,6 +43,7 @@ export const BASE_PRICES = {
     if (sqft >= 55 && sqft < 70) return 300;
     return 350;
   },
+  "vanity_t/o": 100,
   stove_price: {
     "f/s": 0,
     "s/i": 0,
