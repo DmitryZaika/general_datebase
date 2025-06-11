@@ -11,33 +11,41 @@ interface InputItemProps {
   formClassName?: string;
   inputAutoFocus?: boolean;
   ref?: React.Ref<HTMLInputElement>;
+  disabled?: boolean;
 }
 
-export const InputItem = forwardRef<HTMLInputElement, InputItemProps>(({
-  name,
-  placeholder,
-  field,
-  type,
-  className,
-  formClassName,
-  inputAutoFocus,
-}: InputItemProps, ref) => {
-  return (
-    <FormItem className={formClassName}>
-      {name && <FormLabel>{name}</FormLabel>}
-      <FormControl>
-        <Input
-          className={className}
-          type={type}
-          placeholder={placeholder}
-          autoFocus={inputAutoFocus}
-          ref={ref}
-          {...field}
-        />
-      </FormControl>
-      <FormMessage />
-    </FormItem>
-  );
-});
+export const InputItem = forwardRef<HTMLInputElement, InputItemProps>(
+  (
+    {
+      name,
+      placeholder,
+      field,
+      type,
+      className,
+      formClassName,
+      inputAutoFocus,
+      disabled,
+    }: InputItemProps,
+    ref
+  ) => {
+    return (
+      <FormItem className={formClassName}>
+        {name && <FormLabel>{name}</FormLabel>}
+        <FormControl>
+          <Input
+            className={className}
+            type={type}
+            placeholder={placeholder}
+            autoFocus={inputAutoFocus}
+            ref={ref}
+            disabled={disabled}
+            {...field}
+          />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    );
+  }
+);
 
 InputItem.displayName = "InputItem";

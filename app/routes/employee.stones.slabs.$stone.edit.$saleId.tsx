@@ -359,7 +359,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           if (slab.is_full) {
             await db.execute(
               `UPDATE slab_inventory SET seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
-              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ? WHERE id = ?`,
+              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ? WHERE id = ?`,
               [
                 room.seam,
                 room.edge,
@@ -371,6 +371,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
                 room.ten_year_sealer,
                 room.waterfall,
                 room.corbels,
+                room.retail_price || 0,
                 slab.id,
               ]
             );
@@ -390,7 +391,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           } else {
             await db.execute(
               `UPDATE slab_inventory SET seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
-              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ? WHERE id = ?`,
+              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ? WHERE id = ?`,
               [
                 room.seam,
                 room.edge,
@@ -402,6 +403,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
                 room.ten_year_sealer,
                 room.waterfall,
                 room.corbels,
+                room.retail_price || 0,
                 slab.id,
               ]
             );

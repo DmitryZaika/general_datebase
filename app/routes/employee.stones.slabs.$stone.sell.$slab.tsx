@@ -261,7 +261,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             // Full slab sale: update the main slab with sale information
             await db.execute(
               `UPDATE slab_inventory SET sale_id = ?, seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
-              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ? WHERE id = ?`,
+              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ? WHERE id = ?`,
               [
                 saleId,
                 room.seam,
@@ -274,6 +274,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
                 room.ten_year_sealer,
                 room.waterfall,
                 room.corbels,
+                room.retail_price || 0,
                 slab.id,
               ]
             );
@@ -295,7 +296,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             // Partial slab sale: update main slab with sale info AND create a copy
             await db.execute(
               `UPDATE slab_inventory SET sale_id = ?, seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
-              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ? WHERE id = ?`,
+              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ? WHERE id = ?`,
               [
                 saleId,
                 room.seam,
@@ -308,6 +309,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
                 room.ten_year_sealer,
                 room.waterfall,
                 room.corbels,
+                room.retail_price || 0,
                 slab.id,
               ]
             );
@@ -872,9 +874,11 @@ const fetchAvailableStones = async (query: string = "") => {
 const StoneSearch = ({
   stoneName,
   setStone,
+  onRetailPriceChange,
 }: {
   stoneName: string | null;
   setStone: (value: { id: number; type: string }) => void;
+  onRetailPriceChange?: (price: number) => void;
 }) => {
   const [searchValue, setSearchValue] = useState(stoneName || undefined);
   const [show, setShow] = useState(!stoneName);
@@ -886,6 +890,15 @@ const StoneSearch = ({
 
   const handleStoneSelect = (stone: { id: number; name: string }) => {
     setStone({ id: stone.id, type: data?.stoneType[stone.name] || "" });
+
+    // Find the selected stone and get its retail price
+    const selectedStone = data?.stoneSearchResults?.find(
+      (s) => s.id === stone.id
+    );
+    if (selectedStone && onRetailPriceChange) {
+      onRetailPriceChange(selectedStone.retail_price || 0);
+    }
+
     setSearchValue(stone.name);
     setShow(false);
   };
@@ -1006,6 +1019,35 @@ const RoomSubForm = ({
     }
   }, [stoneType, index, stone?.type]);
 
+  // Auto-load retail price for first room if stone is already selected
+  useEffect(() => {
+    if (index === 0 && tempStoneId && stoneName) {
+      // Fetch stone details to get retail price
+      fetch(`/api/stones/search?name=${encodeURIComponent(stoneName)}`)
+        .then((response) => response.json())
+        .then((data) => {
+          const foundStone = data.stones?.find(
+            (s: any) => s.id === tempStoneId
+          );
+          if (foundStone && foundStone.retail_price) {
+            form.setValue(
+              `rooms.${index}.retail_price`,
+              foundStone.retail_price
+            );
+
+            // Recalculate total price if square feet exists
+            const squareFeet =
+              form.getValues(`rooms.${index}.square_feet`) || 0;
+            if (squareFeet > 0) {
+              const totalPrice = squareFeet * foundStone.retail_price;
+              form.setValue(`rooms.${index}.total_price`, totalPrice);
+            }
+          }
+        })
+        .catch(console.error);
+    }
+  }, [index, tempStoneId, stoneName, form]);
+
   const handleSwitchSlab = (slabId: number, isFull: boolean) => {
     form.setValue(
       `rooms.${index}.slabs`,
@@ -1096,9 +1138,10 @@ const RoomSubForm = ({
             price = BASE_PRICES["stone_t/o"](squareFeet);
           } else if (tearOutValue === "laminate") {
             price = BASE_PRICES["laminate_t/o"](squareFeet);
+          } else if (tearOutValue === "vanity laminate t/o") {
+            price = BASE_PRICES["vanity_t/o"];
           }
 
-          // Always set the price, even if it's 0
           form.setValue(`rooms.${index}.tear_out_price`, price);
           break;
         }
@@ -1163,10 +1206,28 @@ const RoomSubForm = ({
             price = BASE_PRICES["stone_t/o"](squareFeet);
           } else if (tearOutValue === "laminate") {
             price = BASE_PRICES["laminate_t/o"](squareFeet);
+          } else if (tearOutValue === "vanity laminate t/o") {
+            price = BASE_PRICES["vanity_t/o"];
           }
 
           // Always set the price, even if it's 0
           form.setValue(`rooms.${index}.tear_out_price`, price);
+
+          // Calculate total price = square_feet * retail_price
+          const retailPrice =
+            form.getValues(`rooms.${index}.retail_price`) || 0;
+          const totalPrice = squareFeet * retailPrice;
+          form.setValue(`rooms.${index}.total_price`, totalPrice);
+          break;
+        }
+
+        case "retail_price": {
+          // Calculate total price when retail price changes
+          const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0;
+          const retailPrice =
+            form.getValues(`rooms.${index}.retail_price`) || 0;
+          const totalPrice = squareFeet * retailPrice;
+          form.setValue(`rooms.${index}.total_price`, totalPrice);
           break;
         }
       }
@@ -1223,6 +1284,15 @@ const RoomSubForm = ({
         <StoneSearch
           stoneName={index === 0 ? stoneName : null}
           setStone={setStone}
+          onRetailPriceChange={(price) => {
+            form.setValue(`rooms.${index}.retail_price`, price);
+
+            // Recalculate total price
+            const squareFeet =
+              form.getValues(`rooms.${index}.square_feet`) || 0;
+            const totalPrice = squareFeet * price;
+            form.setValue(`rooms.${index}.total_price`, totalPrice);
+          }}
         />
 
         <FormField
@@ -1237,7 +1307,9 @@ const RoomSubForm = ({
             />
           )}
         />
+      </div>
 
+      <div className="border border-gray-200 rounded-md p-2 flex gap-2 mt-2">
         <FormField
           control={form.control}
           name={`rooms.${index}.square_feet`}
@@ -1246,7 +1318,34 @@ const RoomSubForm = ({
               name={"Square Feet"}
               placeholder={"Enter Sqft"}
               field={field}
+              formClassName={`mb-0 ${inputWidth}`}
+            />
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name={`rooms.${index}.retail_price`}
+          render={({ field }) => (
+            <InputItem
+              name={"Retail Price"}
+              placeholder={"Price per sqft"}
+              field={field}
+              formClassName={`mb-0 ${inputWidth}`}
+            />
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name={`rooms.${index}.total_price`}
+          render={({ field }) => (
+            <InputItem
+              name={"Total"}
+              placeholder={"Total Price"}
+              field={field}
               formClassName="mb-0"
+              disabled={true}
             />
           )}
         />

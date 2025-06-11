@@ -52,7 +52,7 @@ async function getData(saleId: number) {
             main.slab_inventory.corbels,
             main.slab_inventory.seam,
             main.stones.name as stone_name,
-            main.stones.retail_price,
+            main.slab_inventory.price as retail_price,
             main.sink_type.name as sink_name,
             main.faucet_type.name as faucet_name
         from main.sales
@@ -202,7 +202,11 @@ export async function loader({ request, params }: ActionFunctionArgs) {
       .setText(row.square_feet?.toString() || undefined);
     pdfForm
       .getTextField(priceField)
-      .setText(row.retail_price?.toString() || undefined);
+      .setText(
+        row.retail_price
+          ? parseFloat(row.retail_price.toString()).toString()
+          : undefined
+      );
   }
 
   const totalCorbels = queryData.reduce((sum, row) => {
@@ -283,10 +287,16 @@ export async function loader({ request, params }: ActionFunctionArgs) {
 
   const fullPrice = queryData[0].total_price || 0;
   const halfPrice = fullPrice * 0.5;
-  pdfForm.getTextField("Text37").setText(fullPrice.toString());
+  pdfForm
+    .getTextField("Text37")
+    .setText(parseFloat(fullPrice.toString()).toString());
   pdfForm
     .getTextField("Text38")
-    .setText(fullPrice > 1000 ? halfPrice.toString() : fullPrice.toString());
+    .setText(
+      fullPrice > 1000
+        ? parseFloat(halfPrice.toString()).toString()
+        : parseFloat(fullPrice.toString()).toString()
+    );
 
   const pdfBytes = await pdfDoc.save();
 

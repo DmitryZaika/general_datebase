@@ -22,6 +22,8 @@ export const roomSchema = z.object({
   edge_price: z.coerce.number().optional(),
   backsplash: z.string().default("No"),
   square_feet: z.coerce.number().default(0),
+  retail_price: z.coerce.number().optional(),
+  total_price: z.coerce.number().optional(),
   tear_out: z.string().default("No"),
   tear_out_price: z.coerce.number().optional(),
   stove: z.string().default("F/S"),
