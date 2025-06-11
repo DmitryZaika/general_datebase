@@ -109,39 +109,43 @@ function SlabItem({
 
   return (
     <div className="flex gap-1 justify-between items-center">
-      <img
-        src={
-          slab.url === "undefined" || slab.url === null
-            ? stoneUrl || ""
-            : slab.url
-        }
-        alt="Slab"
-        className={`size-9 ${onImageClick ? "cursor-pointer" : ""}`}
-        onClick={() => slab.url && onImageClick?.(slab.url)}
-      />
-      <div className="p-1.5 border w-full flex justify-between items-center border-gray-300">
-        <div className="">
-          {isEditing ? (
-            <Input
-              value={newBundle}
-              onChange={(e) => setNewBundle(e.target.value)}
-              className="w-full"
-            />
-          ) : (
-            <>
-              <p className="w-full">Slab number: {slab.bundle}</p>
-              <p>
-                Size {slab.length} x {slab.width}
-              </p>
-            </>
-          )}
+      <div className="p-1.5 border w-full rounded-md flex justify-between items-center border-gray-300">
+        <div className="flex items-center gap-2">
+          <img
+            src={
+              slab.url === "undefined" || slab.url === null
+                ? stoneUrl || ""
+                : slab.url
+            }
+            alt="Slab"
+            className={`size-14 rounded-md ${
+              onImageClick ? "cursor-pointer" : ""
+            }`}
+            onClick={() => slab.url && onImageClick?.(slab.url)}
+          />
+          <div className="">
+            {isEditing ? (
+              <Input
+                value={newBundle}
+                onChange={(e) => setNewBundle(e.target.value)}
+                className="w-full"
+              />
+            ) : (
+              <>
+                <p className="w-full">Number: {slab.bundle}</p>
+                <p>
+                  Size {slab.length} x {slab.width}
+                </p>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-2">
           {isEditing ? (
             <Button
               onClick={handleBundleUpdate}
-              className="size-9 flex items-center gap-2"
+              className="size-9 flex items-center ml-auto gap-2"
               variant="blue"
               disabled={!newBundle.trim()}
             >
@@ -156,7 +160,7 @@ function SlabItem({
               >
                 <FaPencilAlt style={{ height: "1.2rem", width: "1.2rem" }} />
               </Button>
-              <Button
+              {/* <Button
                 onClick={(e) => {
                   e.preventDefault();
                   onPrintQRCode && onPrintQRCode(slab);
@@ -165,23 +169,21 @@ function SlabItem({
                 variant="blue"
               >
                 <FaQrcode style={{ height: "1.2rem", width: "1.2rem" }} />
-              </Button>
+              </Button> */}
             </>
+          )}
+          {showDeleteButton && (
+            <Button
+              type="button"
+              onClick={() => onDeleteClick && onDeleteClick(slab)}
+              disabled={isSubmitting}
+              className="size-9 flex items-center gap-2"
+            >
+              <FaTimes />
+            </Button>
           )}
         </div>
       </div>
-
-      {showDeleteButton && (
-        <div>
-          <Button
-            type="button"
-            onClick={() => onDeleteClick && onDeleteClick(slab)}
-            disabled={isSubmitting}
-          >
-            <FaTimes />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
@@ -998,7 +1000,7 @@ export default function EditStoneSlabs() {
           <Button
             onClick={() => setShowLinkDialog(true)}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 rounded-md"
           >
             <FaLink size={14} />
             Link Slabs from Different Stone

@@ -192,8 +192,21 @@ export async function loader({ request, params }: ActionFunctionArgs) {
     pdfForm.getTextField(colorField).setText(row.stone_name || undefined);
     pdfForm.getTextField(sinkField).setText(row.sink_name || "N/A");
     pdfForm.getTextField(faucetField).setText(row.faucet_name || "N/A");
-    pdfForm.getTextField(edgeField).setText(row.edge || undefined);
-    pdfForm.getTextField(backsplashField).setText(row.backsplash || undefined);
+    pdfForm
+      .getTextField(edgeField)
+      .setText(
+        row.edge
+          ? row.edge.charAt(0).toUpperCase() + row.edge.slice(1).toLowerCase()
+          : undefined
+      );
+    pdfForm
+      .getTextField(backsplashField)
+      .setText(
+        row.backsplash
+          ? row.backsplash.charAt(0).toUpperCase() +
+              row.backsplash.slice(1).toLowerCase()
+          : undefined
+      );
 
     const sqftField = `Text${25 + i * 2}`;
     const priceField = `Text${26 + i * 2}`;
