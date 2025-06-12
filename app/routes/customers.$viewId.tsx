@@ -5,6 +5,8 @@ import { db } from "~/db.server";
 import { DataTable } from "~/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
+import { Button } from "~/components/ui/button";
+import { useFetcher } from "react-router";
 
 const paramsSchema = z.object({
     viewId: z.string().uuid("View ID must be a valid UUID")
@@ -15,15 +17,12 @@ interface Sale {
     sale_date: string;
     price: number;
     seller_name: string;
+    customer_name: string;
+    paid_date: string | null;
 }
 
 export async function loader({ params }: LoaderFunctionArgs) {
     const { viewId } = paramsSchema.parse(params);
-    const customer = await selectId<{ name: string }>(
-        db,
-        "SELECT name FROM customers WHERE view_id = UUID_TO_BIN(?)",
-        [viewId],
-    );
 
     const sales = await selectMany<Sale>(
         db,
@@ -31,7 +30,9 @@ export async function loader({ params }: LoaderFunctionArgs) {
             s.id,
             s.sale_date,
             s.price,
-            u.name as seller_name
+            s.paid_date,
+            u.name as seller_name,
+            c.name as customer_name
         FROM sales s
         JOIN users u ON s.seller_id = u.id
         JOIN customers c ON s.customer_id = c.id
@@ -40,7 +41,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
         [viewId]
     );
 
-    return { customer, sales };
+    return { customer: { name: sales[0].customer_name }, sales };
 }
 
 const columns: ColumnDef<Sale>[] = [
@@ -70,6 +71,37 @@ const columns: ColumnDef<Sale>[] = [
     {
         accessorKey: "seller_name",
         header: ({ column }) => <SortableHeader column={column} title="Sold By" />,
+    },
+    {
+        id: "payment",
+        header: "Payment",
+        cell: ({ row }) => {
+            const fetcher = useFetcher();
+            const isPaid = row.original.paid_date !== null;
+            const isSubmitting = fetcher.state === "submitting";
+
+            if (isPaid) {
+                return (
+                    <span className="text-green-600 font-medium">
+                        Paid on {new Date(row.original.paid_date!).toLocaleDateString()}
+                    </span>
+                );
+            }
+
+            return (
+                <fetcher.Form method="post" action="/api/stripe/create-checkout">
+                    <input type="hidden" name="saleId" value={row.original.id} />
+                    <input type="hidden" name="amount" value={row.original.price} />
+                    <Button 
+                        type="submit" 
+                        disabled={isSubmitting}
+                        className="bg-blue-600 hover:bg-blue-700"
+                    >
+                        {isSubmitting ? "Processing..." : "Pay Now"}
+                    </Button>
+                </fetcher.Form>
+            );
+        },
     },
 ];
 
