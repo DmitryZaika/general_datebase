@@ -1,4 +1,4 @@
-import { LoaderFunctionArgs, useLoaderData } from "react-router";
+import { LoaderFunctionArgs, useLoaderData, useSearchParams, redirect, useParams } from "react-router";
 import { z } from "zod";
 import { selectId, selectMany } from "~/utils/queryHelpers";
 import { db } from "~/db.server";
@@ -7,6 +7,10 @@ import { ColumnDef } from "@tanstack/react-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
 import { Button } from "~/components/ui/button";
 import { useFetcher } from "react-router";
+import { useEffect } from "react";
+import { getSession, commitSession } from "~/sessions";
+import { toastData } from "~/utils/toastHelpers";
+import { getStripe } from "~/utils/getStripe";
 
 const paramsSchema = z.object({
     viewId: z.string().uuid("View ID must be a valid UUID")
@@ -21,8 +25,11 @@ interface Sale {
     paid_date: string | null;
 }
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {
     const { viewId } = paramsSchema.parse(params);
+    const url = new URL(request.url);
+    const paymentStatus = url.searchParams.get("payment_status");
+    const sessionId = url.searchParams.get("session_id");
 
     const sales = await selectMany<Sale>(
         db,
@@ -40,6 +47,31 @@ export async function loader({ params }: LoaderFunctionArgs) {
         ORDER BY s.sale_date DESC`,
         [viewId]
     );
+
+    // Handle payment status
+    if (paymentStatus === "success" && sessionId) {
+        try {
+            const session = await getStripe().checkout.sessions.retrieve(sessionId);
+            
+            if (session.payment_status === "paid" && session.metadata?.saleId) {
+                const flashSession = await getSession(request.headers.get("Cookie"));
+                flashSession.flash("message", toastData("Success", "Payment successful!", "success"));
+                
+                return redirect(`/customers/${viewId}`, {
+                    headers: { "Set-Cookie": await commitSession(flashSession) }
+                });
+            }
+        } catch (error) {
+            console.error("Error processing payment success:", error);
+        }
+    } else if (paymentStatus === "cancelled") {
+        const flashSession = await getSession(request.headers.get("Cookie"));
+        flashSession.flash("message", toastData("Error", "Payment was cancelled", "destructive"));
+        
+        return redirect(`/customers/${viewId}`, {
+            headers: { "Set-Cookie": await commitSession(flashSession) }
+        });
+    }
 
     return { customer: { name: sales[0].customer_name }, sales };
 }
@@ -77,6 +109,7 @@ const columns: ColumnDef<Sale>[] = [
         header: "Payment",
         cell: ({ row }) => {
             const fetcher = useFetcher();
+            const params = useParams();
             const isPaid = row.original.paid_date !== null;
             const isSubmitting = fetcher.state === "submitting";
 
@@ -92,6 +125,7 @@ const columns: ColumnDef<Sale>[] = [
                 <fetcher.Form method="post" action="/api/stripe/create-checkout">
                     <input type="hidden" name="saleId" value={row.original.id} />
                     <input type="hidden" name="amount" value={row.original.price} />
+                    <input type="hidden" name="viewId" value={params.viewId} />
                     <Button 
                         type="submit" 
                         disabled={isSubmitting}
@@ -107,6 +141,20 @@ const columns: ColumnDef<Sale>[] = [
 
 export default function CustomersView() {
     const { customer, sales } = useLoaderData<typeof loader>();
+    const [searchParams] = useSearchParams();
+    const paymentStatus = searchParams.get("payment_status");
+    const params = useParams();
+
+    useEffect(() => {
+        // Clear the URL parameters after processing
+        if (paymentStatus) {
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.delete("payment_status");
+            newUrl.searchParams.delete("session_id");
+            window.history.replaceState({}, "", newUrl);
+        }
+    }, [paymentStatus]);
+
     return (
         <div className="space-y-4">
             <h1 className="text-2xl font-bold">{customer?.name}</h1>

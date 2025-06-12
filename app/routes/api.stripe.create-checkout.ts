@@ -8,11 +8,12 @@ export async function action({ request }: ActionFunctionArgs) {
     const formData = await request.formData();
     const saleId = formData.get("saleId");
     const amount = formData.get("amount");
+    const viewId = formData.get("viewId");
 
-    if (!saleId || !amount) {
+    if (!saleId || !amount || !viewId) {
         const session = await getSession(request.headers.get("Cookie"));
         session.flash("message", toastData("Error", "Missing required fields", "destructive"));
-        return redirect("/", {
+        return redirect(`/customers/${viewId}`, {
             headers: { "Set-Cookie": await commitSession(session) }
         });
     }
@@ -54,11 +55,12 @@ export async function action({ request }: ActionFunctionArgs) {
                 },
             ],
             mode: "payment",
-            success_url: `${request.headers.get("origin")}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${request.headers.get("origin")}/payment/cancelled`,
+            success_url: `${request.headers.get("origin")}/customers/${viewId}?payment_status=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${request.headers.get("origin")}/customers/${viewId}?payment_status=cancelled`,
             customer_email: customer_email || undefined,
             metadata: {
                 saleId: saleId.toString(),
+                viewId: viewId.toString(),
             },
         });
 
@@ -71,7 +73,7 @@ export async function action({ request }: ActionFunctionArgs) {
         console.error("Stripe checkout error:", error);
         const session = await getSession(request.headers.get("Cookie"));
         session.flash("message", toastData("Error", "Failed to create checkout session", "destructive"));
-        return redirect("/", {
+        return redirect(`/customers/${viewId}`, {
             headers: { "Set-Cookie": await commitSession(session) }
         });
     }
