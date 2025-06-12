@@ -63,4 +63,5 @@ export const CUSTOMER_ITEMS = {
     },
     price: (prices: number) => prices,
   },
+  mitter_edge_price: 200,
 };
