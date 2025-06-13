@@ -1,5 +1,5 @@
 create table stripe_payments (
-    id binary(16) primary key default (uuid()),
+    id binary(16) primary key default (UUID_TO_BIN(uuid())),
     sale_id INT not null,
     stripe_payment_intent_id varchar(255) not null,
     amount_total int not null,

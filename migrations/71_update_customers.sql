@@ -1,1 +1,1 @@
-ALTER TABLE customers MODIFY view_id binary(16) NOT NULL DEFAULT (uuid());
+ALTER TABLE customers MODIFY view_id binary(16) NOT NULL DEFAULT (UUID_TO_BIN(uuid()));
