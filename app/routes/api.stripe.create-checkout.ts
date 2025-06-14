@@ -58,10 +58,12 @@ export async function action({ request }: ActionFunctionArgs) {
             success_url: `${request.headers.get("origin")}/customers/${viewId}?payment_status=success&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${request.headers.get("origin")}/customers/${viewId}?payment_status=cancelled`,
             customer_email: customer_email || undefined,
-            metadata: {
-                saleId: saleId.toString(),
-                viewId: viewId.toString(),
-            },
+            payment_intent_data: {
+                metadata: {
+                    saleId: saleId.toString(),
+                    viewId: viewId.toString(),
+                }
+            }
         });
 
         if (!session.url) {
