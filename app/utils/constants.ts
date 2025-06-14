@@ -1,6 +1,3 @@
-import { Buffer } from "buffer";
-import { asPDFName } from "pdf-lib";
-
 export const DONE_KEY = "[DONE]035d8eba-9f8c-44c5-a1e0-290d1da033f7[/DONE]";
 
 export const STONE_TYPES = [
@@ -54,14 +51,20 @@ export const BASE_PRICES = {
 };
 
 export const CUSTOMER_ITEMS = {
-  tripFee: { miles: "number", price: (miles: number) => miles * 4 },
-  oversize_piece_handling_price: {
-    prices: {
+  tripFee: {
+    miles: "number",
+    priceFn: ({ miles }: { miles: number }) => miles * 4,
+  },
+  oversize_piece: {
+    sqft: {
       "20+ sqft": 200,
       "40+ sqft": 400,
       "50+ sqft": 500,
     },
-    price: (prices: number) => prices,
+    priceFn: ({ sqft }: { sqft: number }) => sqft,
   },
-  mitter_edge_price: 200,
+  mitter_edge_price: {
+    amount: "number",
+    priceFn: ({ amount }: { amount: number }) => amount * 200,
+  },
 };
