@@ -14,7 +14,7 @@ import { InputItem } from "~/components/molecules/InputItem";
 import { PhoneInput } from "~/components/molecules/PhoneInput";
 import { EmailInput } from "~/components/molecules/EmailInput";
 import { Button } from "~/components/ui/button";
-import { useForm, UseFormReturn } from "react-hook-form";
+import { useForm, UseFormReturn, useWatch } from "react-hook-form";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +38,7 @@ import {
   SelectItem,
 } from "~/components/ui/select";
 import { selectMany } from "~/utils/queryHelpers";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { Input } from "~/components/ui/input";
 import { customerSchema, roomSchema, TCustomerSchema } from "~/schemas/sales";
@@ -532,70 +532,66 @@ async function getSlabs(
 const AddExtraDialog = ({
   show,
   setShow,
-  form,
-  roomIndex,
-  selectedItems,
-  setSelectedItems,
+  currentItems,
+  onSave,
 }: {
   show: boolean;
   setShow: (show: boolean) => void;
-  form: UseFormReturn<TCustomerSchema>;
-  roomIndex: number;
-  selectedItems: string[];
-  setSelectedItems: React.Dispatch<React.SetStateAction<string[]>>;
+  currentItems: string[];
+  onSave: (items: string[]) => void;
 }) => {
-  const handleAddExtra = () => {
-    if (selectedItems.length > 0) {
-      // Add logic to save extra items to form if needed
-      console.log("Adding extra items:", selectedItems);
-      setShow(false);
+  const [dialogSelection, setDialogSelection] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (show) {
+      setDialogSelection(currentItems);
     }
-  };
+  }, [show, currentItems]);
 
   const handleItemToggle = (item: string) => {
-    setSelectedItems((prev) =>
+    setDialogSelection((prev) =>
       prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
     );
+  };
+
+  const handleSave = () => {
+    onSave(dialogSelection);
+    setShow(false);
   };
 
   const availableItems = Object.keys(CUSTOMER_ITEMS);
 
   return (
     <Dialog open={show} onOpenChange={setShow}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>Add Extra Items</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-medium mb-2">Select Items:</h3>
-            <div className="space-y-2">
-              {availableItems.map((item) => (
-                <label key={item} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedItems.includes(item)}
-                    onChange={() => handleItemToggle(item)}
-                    className="rounded"
-                  />
-                  <span className="text-sm">{item}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+        <div className="space-y-3 py-2">
+          {availableItems.map((item) => (
+            <label
+              key={item}
+              className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50 cursor-pointer"
+            >
+              <span className="text-sm font-medium capitalize">
+                {item.replaceAll("_", " ")}
+              </span>
+              <input
+                type="checkbox"
+                checked={dialogSelection.includes(item)}
+                onChange={() => handleItemToggle(item)}
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+            </label>
+          ))}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setShow(false)}>
             Cancel
           </Button>
-          <Button
-            onClick={handleAddExtra}
-            disabled={selectedItems.length === 0}
-          >
-            Add Items
-          </Button>
+          <Button onClick={handleSave}>Save ({dialogSelection.length})</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -973,12 +969,55 @@ const RoomSubForm = ({
   linearFeet: Record<number, string>;
   setLinearFeet: React.Dispatch<React.SetStateAction<Record<number, string>>>;
 }) => {
+  const roomValues = useWatch({
+    control: form.control,
+    name: `rooms.${index}`,
+  });
+
+  const totalRoomPrice = useMemo(() => {
+    const room = roomValues;
+    if (!room) return 0;
+
+    let total = 0;
+
+    total += (room.square_feet || 0) * (room.retail_price || 0);
+
+    total += Number(room.extras?.edge_price || 0);
+    total += Number(room.extras?.tear_out_price || 0);
+    total += Number(room.extras?.stove_price || 0);
+    total += Number(room.extras?.waterfall_price || 0);
+    total += Number(room.extras?.corbels_price || 0);
+    total += Number(room.extras?.seam_price || 0);
+
+    room.sink_type?.forEach((sink) => {
+      const data = sink_type.find((s) => s.id === sink.id);
+      if (data) total += Number(data.retail_price || 0);
+    });
+
+    room.faucet_type?.forEach((faucet) => {
+      const data = faucet_type.find((f) => f.id === faucet.id);
+      if (data) total += Number(data.retail_price || 0);
+    });
+
+    room.extra_items?.forEach((item) => {
+      if (item.total && item.total > 0) {
+        total += Number(item.total);
+      } else {
+        total += Number(item.price || 0);
+      }
+    });
+
+    return total;
+  }, [roomValues, sink_type, faucet_type]);
+
   const inputWidth = "w-[50%]";
   const [showAddSlabDialog, setShowAddSlabDialog] = useState(false);
   const [showAddSinkDialog, setShowAddSinkDialog] = useState(false);
   const [showAddFaucetDialog, setShowAddFaucetDialog] = useState(false);
   const [showAddExtraDialog, setShowAddExtraDialog] = useState(false);
-  const [selectedExtraItems, setSelectedExtraItems] = useState<string[]>([]);
+  const [selectedExtraItems, setSelectedExtraItems] = useState<
+    (keyof typeof CUSTOMER_ITEMS)[]
+  >([]);
 
   const {
     slabId,
@@ -1125,7 +1164,7 @@ const RoomSubForm = ({
           }
 
           // Always set the price, even if it's 0
-          form.setValue(`rooms.${index}.edge_price`, price);
+          form.setValue(`rooms.${index}.extras.edge_price`, price);
           break;
         }
 
@@ -1142,7 +1181,7 @@ const RoomSubForm = ({
             price = BASE_PRICES["vanity_t/o"];
           }
 
-          form.setValue(`rooms.${index}.tear_out_price`, price);
+          form.setValue(`rooms.${index}.extras.tear_out_price`, price);
           break;
         }
 
@@ -1159,7 +1198,7 @@ const RoomSubForm = ({
           }
           console.log("All form values:", form.getValues());
           // Always set the price, even if it's 0
-          form.setValue(`rooms.${index}.stove_price`, price);
+          form.setValue(`rooms.${index}.extras.stove_price`, price);
           break;
         }
 
@@ -1168,11 +1207,11 @@ const RoomSubForm = ({
 
           if (waterfallValue === "yes") {
             form.setValue(
-              `rooms.${index}.waterfall_price`,
+              `rooms.${index}.extras.waterfall_price`,
               BASE_PRICES.waterfall_price
             );
           } else {
-            form.setValue(`rooms.${index}.waterfall_price`, 0);
+            form.setValue(`rooms.${index}.extras.waterfall_price`, 0);
           }
           break;
         }
@@ -1180,7 +1219,7 @@ const RoomSubForm = ({
         case "corbels": {
           const corbelsCount = form.getValues(`rooms.${index}.corbels`) || 0;
           const totalPrice = corbelsCount * BASE_PRICES.corbels_price;
-          form.setValue(`rooms.${index}.corbels_price`, totalPrice);
+          form.setValue(`rooms.${index}.extras.corbels_price`, totalPrice);
           break;
         }
 
@@ -1192,7 +1231,7 @@ const RoomSubForm = ({
             price = BASE_PRICES.seam_price.phantom_seam;
           }
 
-          form.setValue(`rooms.${index}.seam_price`, price);
+          form.setValue(`rooms.${index}.extras.seam_price`, price);
           break;
         }
 
@@ -1211,7 +1250,7 @@ const RoomSubForm = ({
           }
 
           // Always set the price, even if it's 0
-          form.setValue(`rooms.${index}.tear_out_price`, price);
+          form.setValue(`rooms.${index}.extras.tear_out_price`, price);
 
           // Calculate total price = square_feet * retail_price
           const retailPrice =
@@ -1247,9 +1286,55 @@ const RoomSubForm = ({
     }
 
     if (edgeValue === "ogee" || edgeValue === "bullnose") {
-      form.setValue(`rooms.${index}.edge_price`, price);
+      form.setValue(`rooms.${index}.extras.edge_price`, price);
     }
   }, [linearFeet[index], form, index]);
+
+  type ExtraItemsState = Record<
+    keyof typeof CUSTOMER_ITEMS,
+    { value: string; price: number }
+  >;
+
+  const [extraItems, setExtraItems] = useState<ExtraItemsState>({} as any);
+
+  useEffect(() => {
+    setExtraItems((prev) => {
+      const updated: ExtraItemsState = { ...prev } as any;
+
+      // Add new keys
+      selectedExtraItems.forEach((key) => {
+        if (!updated[key]) {
+          updated[key] = { value: "", price: 0 } as any;
+        }
+      });
+
+      // Remove deselected keys
+      (Object.keys(updated) as (keyof typeof CUSTOMER_ITEMS)[]).forEach((k) => {
+        if (!selectedExtraItems.includes(k)) {
+          delete updated[k];
+        }
+      });
+
+      return updated;
+    });
+  }, [selectedExtraItems]);
+
+  const handleExtraItemsUpdate = (items: ExtraItemsState) => {
+    setExtraItems(items);
+
+    const itemsArray = (
+      Object.entries(items) as [
+        keyof typeof CUSTOMER_ITEMS,
+        { value: string; price: number }
+      ][]
+    ).map(([name, { value, price }]) => ({
+      name,
+      value,
+      price,
+    }));
+
+    form.setValue(`rooms.${index}.extra_items`, itemsArray as any);
+  };
 
   return (
     <>
@@ -1392,7 +1477,7 @@ const RoomSubForm = ({
 
           <FormField
             control={form.control}
-            name={`rooms.${index}.edge_price`}
+            name={`rooms.${index}.extras.edge_price`}
             render={({ field }) => (
               <InputItem
                 name={"Edge Price"}
@@ -1420,7 +1505,7 @@ const RoomSubForm = ({
 
           <FormField
             control={form.control}
-            name={`rooms.${index}.tear_out_price`}
+            name={`rooms.${index}.extras.tear_out_price`}
             render={({ field }) => (
               <InputItem
                 name={"Tear-Out Price"}
@@ -1449,7 +1534,7 @@ const RoomSubForm = ({
               />
               <FormField
                 control={form.control}
-                name={`rooms.${index}.stove_price`}
+                name={`rooms.${index}.extras.stove_price`}
                 render={({ field }) => (
                   <InputItem
                     name={"Stove Price"}
@@ -1475,7 +1560,7 @@ const RoomSubForm = ({
               />
               <FormField
                 control={form.control}
-                name={`rooms.${index}.waterfall_price`}
+                name={`rooms.${index}.extras.waterfall_price`}
                 render={({ field }) => (
                   <InputItem
                     name={"Waterfall Price"}
@@ -1505,7 +1590,7 @@ const RoomSubForm = ({
 
           <FormField
             control={form.control}
-            name={`rooms.${index}.corbels_price`}
+            name={`rooms.${index}.extras.corbels_price`}
             render={({ field }) => (
               <InputItem
                 name={"Corbels Price"}
@@ -1533,7 +1618,7 @@ const RoomSubForm = ({
 
           <FormField
             control={form.control}
-            name={`rooms.${index}.seam_price`}
+            name={`rooms.${index}.extras.seam_price`}
             render={({ field }) => (
               <InputItem
                 name={"Seam Price"}
@@ -1575,7 +1660,18 @@ const RoomSubForm = ({
           </Button>
         </div>
       </div>
-      <DynamicAdditions selectedItems={selectedExtraItems} />
+
+      <DynamicAdditions
+        selectedItems={selectedExtraItems}
+        items={extraItems}
+        onUpdate={handleExtraItemsUpdate}
+        onRemove={(key) => {
+          setSelectedExtraItems((prev) => prev.filter((i) => i !== key));
+          const updatedItems = { ...extraItems };
+          delete updatedItems[key as keyof typeof extraItems];
+          handleExtraItemsUpdate(updatedItems);
+        }}
+      />
 
       <Tabs defaultValue="slabs" className="mt-4">
         <TabsList className="grid w-full grid-cols-3">
@@ -1757,16 +1853,19 @@ const RoomSubForm = ({
             roomIndex={index}
             form={form}
           />
-          <AddExtraDialog
-            show={showAddExtraDialog}
-            setShow={setShowAddExtraDialog}
-            roomIndex={index}
-            form={form}
-            selectedItems={selectedExtraItems}
-            setSelectedItems={setSelectedExtraItems}
-          />
         </>
       )}
+      <AddExtraDialog
+        show={showAddExtraDialog}
+        setShow={setShowAddExtraDialog}
+        currentItems={selectedExtraItems}
+        onSave={(items) =>
+          setSelectedExtraItems(items as (keyof typeof CUSTOMER_ITEMS)[])
+        }
+      />
+      <div className="text-right font-semibold text-lg my-4">
+        Total Room Price: ${totalRoomPrice.toFixed(2)}
+      </div>
     </>
   );
 };
@@ -1989,6 +2088,58 @@ export default function SlabSell() {
       form.setValue("customer_id", undefined);
     }
   };
+
+  // Auto-sum total price across all rooms, including extra items
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      // Skip if the manual price field itself is being edited
+      if (name === "price") return;
+
+      const rooms = form.getValues("rooms");
+      let total = 0;
+
+      rooms.forEach((room) => {
+        // Square feet * retail
+        total += (room.square_feet || 0) * (room.retail_price || 0);
+
+        // Direct price fields that might exist
+        total += Number(room.extras.edge_price || 0);
+        total += Number(room.extras.tear_out_price || 0);
+        total += Number(room.extras.stove_price || 0);
+        total += Number(room.extras.waterfall_price || 0);
+        total += Number(room.extras.corbels_price || 0);
+        total += Number(room.extras.seam_price || 0);
+
+        // Sinks
+        room.sink_type?.forEach((sink) => {
+          const data = sink_type.find((s) => s.id === sink.id);
+          if (data) total += Number(data.retail_price || 0);
+        });
+
+        // Faucets
+        room.faucet_type?.forEach((faucet) => {
+          const data = faucet_type.find((f) => f.id === faucet.id);
+          if (data) total += Number(data.retail_price || 0);
+        });
+
+        // Extra items
+        room.extra_items?.forEach((item) => {
+          if (item.total && item.total > 0) {
+            total += Number(item.total);
+          } else {
+            total += Number(item.price || 0);
+          }
+        });
+      });
+
+      // Update price if changed
+      if (form.getValues("price") !== total) {
+        form.setValue("price", total, { shouldValidate: total > 0 });
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, sink_type, faucet_type]);
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>

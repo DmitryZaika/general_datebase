@@ -1,6 +1,16 @@
 import { z } from "zod";
 import { coerceNumberRequired, StringOrNumber } from "~/schemas/general";
 
+export const extraItemSchema = z.object({
+  name: z.string(),
+  value: z.any().optional(), // Can be number or string from select
+  price: z.coerce.number().default(0),
+  quantity: z.coerce.number().default(1),
+  total: z.coerce.number().default(0),
+});
+
+export type ExtraItem = z.infer<typeof extraItemSchema>;
+
 const slabOptionsSchema = z.object({
   id: z.coerce.number(),
   is_full: z.boolean(),
@@ -19,23 +29,24 @@ export const roomSchema = z.object({
   sink_type: z.array(sinkOptionsSchema).default([]),
   faucet_type: z.array(faucetOptionsSchema).default([]),
   edge: z.string().default("Flat"),
-  edge_price: z.coerce.number().optional(),
   backsplash: z.string().default("No"),
   square_feet: z.coerce.number().default(0),
   retail_price: z.coerce.number().optional(),
   total_price: z.coerce.number().optional(),
   tear_out: z.string().default("No"),
-  tear_out_price: z.coerce.number().optional(),
   stove: z.string().default("F/S"),
-  stove_price: z.coerce.number().optional(),
   waterfall: z.string().default("No"),
-  waterfall_price: z.coerce.number().optional(),
   corbels: z.coerce.number().default(0),
-  corbels_price: z.coerce.number().optional(),
   seam: z.string().default("Standard"),
-  seam_price: z.coerce.number().optional(),
   ten_year_sealer: z.boolean().default(false),
   slabs: z.array(slabOptionsSchema).default([]),
+  extra_items: z.array(extraItemSchema).default([]),
+  extras: z
+    .record(
+      z.string(),
+      z.union([z.record(z.string(), z.coerce.number()), z.coerce.number()])
+    )
+    .default({}),
 });
 
 export const customerSchema = z.object({

@@ -1,6 +1,13 @@
 //// filepath: c:\Users\sarah\general_datebase\app\routes\admin.stones.tsx
 import { LoaderFunctionArgs, Outlet } from "react-router";
-import { useLoaderData, Link, useSearchParams, useNavigation, useLocation, useNavigate } from "react-router";
+import {
+  useLoaderData,
+  Link,
+  useSearchParams,
+  useNavigation,
+  useLocation,
+  useNavigate,
+} from "react-router";
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { getAdminUser } from "~/utils/session.server";
 import { stoneQueryBuilder } from "~/utils/queries";
@@ -37,8 +44,6 @@ interface Stone {
   cost_per_sqft: number;
 }
 
-
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request);
   const [, searchParams] = request.url.split("?");
@@ -53,19 +58,18 @@ function StoneTable({ stones }: { stones: Stone[] }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  
+
   const getEditUrl = (stoneId: number) => {
     const currentParams = new URLSearchParams(searchParams);
     return `edit/${stoneId}/information?${currentParams.toString()}`;
   };
-  
+
   const handleRowClick = (stoneId: number) => {
     // Use a relative path for Remix navigation
     const navigationPath = `${stoneId}${location.search}`;
-    console.log(`Table view navigating to: ${navigationPath}`);
     navigate(navigationPath);
   };
-  
+
   const columns: ColumnDef<Stone>[] = [
     {
       id: "image",
@@ -73,12 +77,12 @@ function StoneTable({ stones }: { stones: Stone[] }) {
       cell: ({ row }) => {
         const stone = row.original;
         const isOutOfStock = stone.available === 0;
-        
+
         return (
           <div className="w-12 h-12 overflow-hidden relative cursor-pointer">
-            <img 
-              src={stone.url || "/placeholder.png"} 
-              alt={stone.name} 
+            <img
+              src={stone.url || "/placeholder.png"}
+              alt={stone.name}
               className="object-cover w-full h-full"
             />
             {isOutOfStock && (
@@ -90,25 +94,17 @@ function StoneTable({ stones }: { stones: Stone[] }) {
             )}
           </div>
         );
-      }
+      },
     },
     {
       accessorKey: "name",
       header: ({ column }) => <SortableHeader column={column} title="Name" />,
-      cell: ({ row }) => (
-        <div className="font-medium">
-          {row.original.name}
-        </div>
-      )
+      cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
     },
     {
       accessorKey: "type",
       header: ({ column }) => <SortableHeader column={column} title="Type" />,
-      cell: ({ row }) => (
-        <div>
-          {capitalizeFirstLetter(row.original.type)}
-        </div>
-      )
+      cell: ({ row }) => <div>{capitalizeFirstLetter(row.original.type)}</div>,
     },
     {
       accessorFn: (row) => {
@@ -120,57 +116,53 @@ function StoneTable({ stones }: { stones: Stone[] }) {
       header: ({ column }) => <SortableHeader column={column} title="Size" />,
       cell: ({ row }) => {
         const stone = row.original;
-        const displayedWidth = stone.width && stone.width > 0 ? stone.width : "—";
-        const displayedLength = stone.length && stone.length > 0 ? stone.length : "—";
-        return (
-          <div>
-            {`${displayedLength} × ${displayedWidth}`}
-          </div>
-        );
-      }
+        const displayedWidth =
+          stone.width && stone.width > 0 ? stone.width : "—";
+        const displayedLength =
+          stone.length && stone.length > 0 ? stone.length : "—";
+        return <div>{`${displayedLength} × ${displayedWidth}`}</div>;
+      },
     },
     {
       accessorKey: "available",
-      header: ({ column }) => <SortableHeader column={column} title="Available" />,
-      cell: ({ row }) => (
-        <div>
-          {row.original.available}
-        </div>
-      )
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Available" />
+      ),
+      cell: ({ row }) => <div>{row.original.available}</div>,
     },
     {
       accessorKey: "amount",
       header: ({ column }) => <SortableHeader column={column} title="Amount" />,
-      cell: ({ row }) => (
-        <div>
-          {row.original.amount || "—"}
-        </div>
-      )
+      cell: ({ row }) => <div>{row.original.amount || "—"}</div>,
     },
     {
       accessorFn: (row) => row.retail_price || 0,
       id: "retailPrice",
-      header: ({ column }) => <SortableHeader column={column} title="Retail Price" />,
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Retail Price" />
+      ),
       cell: ({ row }) => (
         <div>
           {row.original.retail_price ? `$${row.original.retail_price}` : "—"}
         </div>
-      )
+      ),
     },
     {
       accessorFn: (row) => row.cost_per_sqft || 0,
       id: "costPerSqft",
-      header: ({ column }) => <SortableHeader column={column} title="Cost per Sqft" />,
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Cost per Sqft" />
+      ),
       cell: ({ row }) => (
         <div>
           {row.original.cost_per_sqft ? `$${row.original.cost_per_sqft}` : "—"}
         </div>
-      )
+      ),
     },
     {
       id: "actions",
       meta: {
-        className: "w-[50px]"
+        className: "w-[50px]",
       },
       cell: ({ row }) => {
         return (
@@ -184,16 +176,16 @@ function StoneTable({ stones }: { stones: Stone[] }) {
       },
     },
   ];
-  
+
   return (
-    <DataTable 
-      columns={columns} 
-      data={stones.map(stone => ({
+    <DataTable
+      columns={columns}
+      data={stones.map((stone) => ({
         ...stone,
         className: `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200 
-                   hover:shadow-md ${stone.is_display ? '' : 'opacity-60'}`,
-        onClick: () => handleRowClick(stone.id)
-      }))} 
+                   hover:shadow-md ${stone.is_display ? "" : "opacity-60"}`,
+        onClick: () => handleRowClick(stone.id),
+      }))}
     />
   );
 }
@@ -206,21 +198,35 @@ export default function AdminStones() {
   const [isAddingStone, setIsAddingStone] = useState(false);
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones);
   const location = useLocation();
-  
+
   // Получаем viewMode из URL или используем "grid" по умолчанию
-  const initialViewMode = searchParams.get("viewMode") as ViewMode || "grid";
+  const initialViewMode = (searchParams.get("viewMode") as ViewMode) || "grid";
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
 
   useEffect(() => {
-    const inStock = stones.filter(stone => Number(stone.available) > 0 && Boolean(stone.is_display));
-    const outOfStock = stones.filter(stone => Number(stone.available) <= 0 && Boolean(stone.is_display));
-    const notDisplayed = stones.filter(stone => !Boolean(stone.is_display));
-    
-    const sortedInStock = [...inStock].sort((a, b) => a.name.localeCompare(b.name));
-    const sortedOutOfStock = [...outOfStock].sort((a, b) => a.name.localeCompare(b.name));
-    const sortedNotDisplayed = [...notDisplayed].sort((a, b) => a.name.localeCompare(b.name));
-    
-    setSortedStones([...sortedInStock, ...sortedOutOfStock, ...sortedNotDisplayed]);
+    const inStock = stones.filter(
+      (stone) => Number(stone.available) > 0 && Boolean(stone.is_display)
+    );
+    const outOfStock = stones.filter(
+      (stone) => Number(stone.available) <= 0 && Boolean(stone.is_display)
+    );
+    const notDisplayed = stones.filter((stone) => !Boolean(stone.is_display));
+
+    const sortedInStock = [...inStock].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+    const sortedOutOfStock = [...outOfStock].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+    const sortedNotDisplayed = [...notDisplayed].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+
+    setSortedStones([
+      ...sortedInStock,
+      ...sortedOutOfStock,
+      ...sortedNotDisplayed,
+    ]);
   }, [stones]);
 
   useEffect(() => {
@@ -241,13 +247,13 @@ export default function AdminStones() {
     const currentParams = new URLSearchParams(searchParams);
     return `edit/${stoneId}/information?${currentParams.toString()}`;
   };
-  
+
   const toggleViewMode = () => {
     const newViewMode = viewMode === "grid" ? "table" : "grid";
-    
+
     // Обновить состояние
     setViewMode(newViewMode);
-    
+
     // Обновить URL параметры
     const newParams = new URLSearchParams(searchParams);
     newParams.set("viewMode", newViewMode);
@@ -258,19 +264,29 @@ export default function AdminStones() {
     <>
       <div className="flex justify-between flex-wrap items-center items-end mb-2">
         <div className="flex items-center gap-4">
-         
-          
-            <Button 
+          <Button
             variant="outline"
             onClick={toggleViewMode}
             className="ml-2"
-            title={viewMode === "grid" ? "Switch to Table View" : "Switch to Grid View"}
+            title={
+              viewMode === "grid"
+                ? "Switch to Table View"
+                : "Switch to Grid View"
+            }
           >
-            {viewMode === "grid" ? <TableIcon className="mr-1" /> : <GridIcon className="mr-1" />}
+            {viewMode === "grid" ? (
+              <TableIcon className="mr-1" />
+            ) : (
+              <GridIcon className="mr-1" />
+            )}
             {viewMode === "grid" ? "Table View" : "Grid View"}
           </Button>
-          
-          <Link to={`add${location.search}`} onClick={handleAddStoneClick} className="mr-auto">
+
+          <Link
+            to={`add${location.search}`}
+            onClick={handleAddStoneClick}
+            className="mr-auto"
+          >
             <LoadingButton loading={isAddingStone}>
               <Plus className="w-4 h-4 mr-1" />
               Add Stone
@@ -278,7 +294,7 @@ export default function AdminStones() {
           </Link>
         </div>
         <div className="flex-1 flex justify-center md:justify-end ">
-            <StoneSearch userRole="admin" />
+          <StoneSearch userRole="admin" />
         </div>
       </div>
 
@@ -292,13 +308,17 @@ export default function AdminStones() {
                 stone.width && stone.width > 0 ? stone.width : "—";
               const displayedLength =
                 stone.length && stone.length > 0 ? stone.length : "—";
-              
+
               const handleGridItemClick = () => {
                 navigate(`${stone.id}${location.search}`);
               };
 
               return (
-                <div id={`stone-${stone.id}`} key={stone.id} className="relative w-full module-item">
+                <div
+                  id={`stone-${stone.id}`}
+                  key={stone.id}
+                  className="relative w-full module-item"
+                >
                   <div
                     className={`border-2 border-blue-500 rounded cursor-pointer hover:shadow-lg transition-all duration-200 ${
                       !stone.is_display ? "opacity-30" : ""
@@ -330,7 +350,6 @@ export default function AdminStones() {
                     <p className="text-center text-sm">
                       Price: ${stone.retail_price}/${stone.cost_per_sqft}
                     </p>
-                  
                   </div>
 
                   <div className="absolute inset-0 flex justify-between items-start p-2 opacity-50 transition-opacity duration-300">
@@ -358,7 +377,7 @@ export default function AdminStones() {
         ) : (
           <StoneTable stones={sortedStones} />
         )}
-        
+
         <Outlet />
       </div>
     </>
