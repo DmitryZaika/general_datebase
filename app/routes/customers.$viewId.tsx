@@ -23,6 +23,7 @@ interface Sale {
     seller_name: string;
     customer_name: string;
     paid_date: string | null;
+    total_paid: number;
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -39,11 +40,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
             s.price,
             s.paid_date,
             u.name as seller_name,
-            c.name as customer_name
+            c.name as customer_name,
+            COALESCE(SUM(sp.amount_total), 0) / 100 as total_paid
         FROM sales s
         JOIN users u ON s.seller_id = u.id
         JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN stripe_payments sp ON s.id = sp.sale_id
         WHERE c.view_id = UUID_TO_BIN(?)
+        GROUP BY s.id, s.sale_date, s.price, s.paid_date, u.name, c.name
         ORDER BY s.sale_date DESC`,
         [viewId]
     );
@@ -92,12 +96,33 @@ const columns: ColumnDef<Sale>[] = [
     },
     {
         accessorKey: "price",
-        header: ({ column }) => <SortableHeader column={column} title="Amount" />,
+        header: ({ column }) => <SortableHeader column={column} title="Total Amount" />,
         cell: ({ row }) => {
             return new Intl.NumberFormat("en-US", {
                 style: "currency",
                 currency: "USD"
             }).format(row.original.price);
+        },
+    },
+    {
+        id: "total_paid",
+        header: ({ column }) => <SortableHeader column={column} title="Amount Paid" />,
+        cell: ({ row }) => {
+            return new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD"
+            }).format(row.original.total_paid);
+        },
+    },
+    {
+        id: "remaining",
+        header: ({ column }) => <SortableHeader column={column} title="Amount Remaining" />,
+        cell: ({ row }) => {
+            const remaining = row.original.price - row.original.total_paid;
+            return new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD"
+            }).format(remaining);
         },
     },
     {
@@ -110,13 +135,14 @@ const columns: ColumnDef<Sale>[] = [
         cell: ({ row }) => {
             const fetcher = useFetcher();
             const params = useParams();
-            const isPaid = row.original.paid_date !== null;
+            const isPaid = row.original.total_paid >= row.original.price;
             const isSubmitting = fetcher.state === "submitting";
+            const remaining = row.original.price - row.original.total_paid;
 
             if (isPaid) {
                 return (
                     <span className="text-green-600 font-medium">
-                        Paid on {new Date(row.original.paid_date!).toLocaleDateString()}
+                        Paid in full
                     </span>
                 );
             }
@@ -124,14 +150,14 @@ const columns: ColumnDef<Sale>[] = [
             return (
                 <fetcher.Form method="post" action="/api/stripe/create-checkout">
                     <input type="hidden" name="saleId" value={row.original.id} />
-                    <input type="hidden" name="amount" value={row.original.price} />
+                    <input type="hidden" name="amount" value={remaining} />
                     <input type="hidden" name="viewId" value={params.viewId} />
                     <Button 
                         type="submit" 
                         disabled={isSubmitting}
                         className="bg-blue-600 hover:bg-blue-700"
                     >
-                        {isSubmitting ? "Processing..." : "Pay Now"}
+                        {isSubmitting ? "Processing..." : "Pay Remaining"}
                     </Button>
                 </fetcher.Form>
             );
