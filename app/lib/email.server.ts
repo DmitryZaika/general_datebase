@@ -30,3 +30,13 @@ export async function sendEmail({ to, subject, html, text }: SendEmail) {
     })
   );
 }
+
+export async function sendPaymentEmail(to: string, uuid: string) {
+    const url = `${process.env.APP_URL}/customers/${uuid}`;
+    const html = `
+    <p>
+         Thank you for your purchase. You can <a href="${url}">pay for your order here</a>.
+    </p>
+    `
+    await sendEmail({ to, subject: "Payment Confirmation", html });
+}
