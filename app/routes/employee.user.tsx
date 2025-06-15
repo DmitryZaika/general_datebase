@@ -39,10 +39,13 @@ interface UserData extends RowDataPacket {
 
 async function getCompanyInfo(): Promise<object> {
   const result = await fetch('/api/quickbooks/company-info')
-  const data = await result.json()
-  if (data.success === false) {
-    throw new Error("Failed to fetch company information");
+  console.log("FIRST", result);
+  if (!result.ok) {
+    throw new Error(await result.text());
   }
+  const data = await result.json()
+  console.log(`Final data: ${JSON.stringify(data)}`);
+
   return data
 }
 
@@ -98,9 +101,6 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const cookieHeader = request.headers.get('Cookie');
-  const session = await getSession(cookieHeader);
-
   let user, rows
   try {
     user = await getEmployeeUser(request);
@@ -132,10 +132,12 @@ export default function UserProfile() {
   const isSubmitting = navigation.state !== "idle";
   const token = useAuthenticityToken();
 
-  const { data } = useQuery({ 
+  const { data, error } = useQuery({ 
     queryKey: ['qbo', 'companyInfo'], 
     queryFn: getCompanyInfo, 
   })
+
+  console.log("error", error);
   
   const form = useForm<FormData>({
     resolver,
