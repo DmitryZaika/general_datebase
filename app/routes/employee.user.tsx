@@ -117,7 +117,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
-  const quickBooksUrl = await getQboUrl(request, user.company_id);
+  let quickBooksUrl = null;
+  try {
+    quickBooksUrl = await getQboUrl(request, user.company_id);
+  } catch (error) {
+    quickBooksUrl = null;
+  }
   return { userData: rows[0], quickBooksUrl };
 }
 
@@ -127,7 +132,7 @@ export default function UserProfile() {
   const isSubmitting = navigation.state !== "idle";
   const token = useAuthenticityToken();
 
-  const { data, isLoading} = useQuery({ 
+  const { data } = useQuery({ 
     queryKey: ['qbo', 'companyInfo'], 
     queryFn: getCompanyInfo, 
   })
@@ -150,7 +155,7 @@ export default function UserProfile() {
       <div className="bg-card  rounded-lg shadow p-6 w-full">
         <h2 className="text-xl font-semibold mb-4">Personal Information</h2>
 
-        {data ? <p>Logged into: {data.CompanyInfo.CompanyName}</p> : (
+        {data ? <p>Logged into: {data?.CompanyInfo?.CompanyName}</p> : (
           <Button asChild><a href={quickBooksUrl}>Authorize Quickbooks</a></Button>
         )}
         <FormProvider {...form}>

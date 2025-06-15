@@ -6,12 +6,10 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useScheduler } from "~/providers/scheduler-provider";
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
 import EventStyled from "@/components/molecules/schedule/event-styled";
-import { CustomEventModal } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router";
 
-// Define Event interface locally since it's not exported from types
 interface Event {
   id: string;
   title: string;
@@ -19,6 +17,7 @@ interface Event {
   endDate: Date;
   description?: string;
   variant?: string;
+  notes?: string;
 }
 
 // Generate hours in 12-hour format
@@ -470,14 +469,16 @@ export default function DailyView() {
       </AnimatePresence>
 
       {/* Add Event Modal */}
+      {open && (
       <AddEventModal
-        open={!!open}
+        open={true}
         onOpenChange={(isOpen) => !isOpen && setOpen(null)}
         defaultValues={{
           startDate: open?.startDate,
           endDate: open?.endDate,
         }}
       />
+      )}
     </div>
   );
 }

@@ -123,7 +123,6 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
 export default function EmployeesSchedule() {
   const { period, events, currentDate } = useLoaderData<typeof loader>();
-  
 
   return (
     <SchedulerProvider initialState={events}>

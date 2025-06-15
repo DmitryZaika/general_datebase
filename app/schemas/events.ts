@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const eventSchema = z.object({
+  id: z.coerce.number().optional(),
   title: z.string().min(1, "Title is required").max(255, "Title must be 255 characters or less"),
   description: z.string().optional(),
   start_date: z.date(),

@@ -19,8 +19,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { FormProvider, FormField } from "@/components/ui/form";
-import { Form } from "react-router";
-import { useForm } from "react-hook-form";
+import { useForm, Form } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EventFormData, eventSchema } from "~/schemas/events";
 import { Variant } from "@/types";
@@ -36,7 +35,8 @@ interface AddEventModalProps {
     startDate?: Date;
     endDate?: Date;
     variant?: Variant;
-    id?: string;
+    id?: number;
+    notes?: string;
   };
 }
 
@@ -45,10 +45,11 @@ export default function AddEventModal({
   onOpenChange, 
   defaultValues 
 }: AddEventModalProps) {
-  
+  console.log("defaultValues", defaultValues);
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
+      id: defaultValues?.id || undefined,
       title: defaultValues?.title || "",
       description: defaultValues?.description || "",
       start_date: defaultValues?.startDate || new Date(),
@@ -56,27 +57,14 @@ export default function AddEventModal({
       color: getEventColor(defaultValues?.variant || "primary"),
       all_day: false,
       status: "scheduled",
+      notes: defaultValues?.notes || "",
     },
   });
-  const { fullSubmit } = useFullFetcher(form, "/api/events");
 
-  const { watch, setValue, reset } = form;
+  const { fullSubmit } = useFullFetcher(form, "/api/events", defaultValues?.id ? "PUT" : "POST");
+
+  const { watch, setValue, reset, handleSubmit } = form;
   const selectedColor = watch("color");
-
-  // Reset form when modal opens/closes or defaultValues change
-  useEffect(() => {
-    if (open && defaultValues) {
-      reset({
-        title: defaultValues.title || "",
-        description: defaultValues.description || "",
-        start_date: defaultValues.startDate || new Date(),
-        end_date: defaultValues.endDate || new Date(),
-        color: getEventColor(defaultValues.variant || "primary"),
-        all_day: false,
-        status: "scheduled",
-      });
-    }
-  }, [open, defaultValues, reset]);
 
   const colorOptions = [
     { key: "blue", name: "Blue" },
@@ -104,6 +92,26 @@ export default function AddEventModal({
     setValue(field, date);
   };
 
+  // Helper function to format date for datetime-local input
+  const formatDateTimeLocal = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const onSubmit = async (data: EventFormData) => {
+    try {
+      await fullSubmit();
+      onOpenChange(false); // Close modal after successful submission
+    } catch (error) {
+      // Handle error if needed - modal stays open on error
+      console.error("Failed to submit event:", error);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
 
@@ -119,7 +127,7 @@ export default function AddEventModal({
         </DialogHeader>
         
         <FormProvider {...form}>
-          <Form onSubmit={fullSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="title"
@@ -166,7 +174,7 @@ export default function AddEventModal({
                     <Input
                       id="start_date"
                       type="datetime-local"
-                      value={field.value instanceof Date ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
+                      value={formatDateTimeLocal(field.value)}
                       onChange={(e) => handleDateChange("start_date", new Date(e.target.value))}
                     />
                   </div>
@@ -182,30 +190,13 @@ export default function AddEventModal({
                     <Input
                       id="end_date"
                       type="datetime-local"
-                      value={field.value instanceof Date ? new Date(field.value.getTime() - field.value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}
+                      value={formatDateTimeLocal(field.value)}
                       onChange={(e) => handleDateChange("end_date", new Date(e.target.value))}
                     />
                   </div>
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="all_day"
-              render={({ field }) => (
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="all_day"
-                    checked={field.value}
-                    onChange={(e) => setValue("all_day", e.target.checked)}
-                    className="rounded border-gray-300"
-                  />
-                  <Label htmlFor="all_day">All Day Event</Label>
-                </div>
-              )}
-            />
 
             <FormField
               control={form.control}
@@ -282,7 +273,7 @@ export default function AddEventModal({
                 {defaultValues?.id ? "Update Event" : "Save Event"}
               </Button>
             </DialogFooter>
-          </Form>
+          </form>
         </FormProvider>
       </DialogContent>
     </Dialog>
