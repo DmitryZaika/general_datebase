@@ -1,16 +1,6 @@
 import { z } from "zod";
 import { coerceNumberRequired, StringOrNumber } from "~/schemas/general";
 
-export const extraItemSchema = z.object({
-  name: z.string(),
-  value: z.any().optional(), // Can be number or string from select
-  price: z.coerce.number().default(0),
-  quantity: z.coerce.number().default(1),
-  total: z.coerce.number().default(0),
-});
-
-export type ExtraItem = z.infer<typeof extraItemSchema>;
-
 const slabOptionsSchema = z.object({
   id: z.coerce.number(),
   is_full: z.boolean(),
@@ -40,11 +30,10 @@ export const roomSchema = z.object({
   seam: z.string().default("Standard"),
   ten_year_sealer: z.boolean().default(false),
   slabs: z.array(slabOptionsSchema).default([]),
-  extra_items: z.array(extraItemSchema).default([]),
   extras: z
     .record(
       z.string(),
-      z.union([z.record(z.string(), z.coerce.number()), z.coerce.number()])
+      z.union([z.record(z.string(), z.any()), z.coerce.number()])
     )
     .default({}),
 });

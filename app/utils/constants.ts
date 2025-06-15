@@ -67,4 +67,9 @@ export const CUSTOMER_ITEMS = {
     amount: "number",
     priceFn: ({ amount }: { amount: number }) => amount * 200,
   },
+
+  ten_year_sealer: {
+    amount: "number",
+    priceFn: ({ amount }: { amount: number }) => amount * 6,
+  },
 };

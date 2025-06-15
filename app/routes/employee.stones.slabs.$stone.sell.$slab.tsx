@@ -999,7 +999,7 @@ const RoomSubForm = ({
       if (data) total += Number(data.retail_price || 0);
     });
 
-    room.extra_items?.forEach((item) => {
+    room.extras?.forEach?.((item) => {
       if (item.total && item.total > 0) {
         total += Number(item.total);
       } else {
@@ -1333,7 +1333,7 @@ const RoomSubForm = ({
       price,
     }));
 
-    form.setValue(`rooms.${index}.extra_items`, itemsArray as any);
+    form.setValue(`rooms.${index}.extras`, itemsArray as any);
   };
 
   return (
@@ -1631,24 +1631,7 @@ const RoomSubForm = ({
         </div>
       </div>
       <div className="flex items-center justify-between space-x-2">
-        <div className="flex items-center space-x-2 mt-4">
-          <FormField
-            control={form.control}
-            name={`rooms.${index}.ten_year_sealer`}
-            render={({ field }) => (
-              <>
-                <Switch
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  id="ten_year_sealer"
-                  disabled={Boolean(stone?.type?.toLowerCase() === "quartz")}
-                  label="10-Year Sealer"
-                />
-                {stone?.type && <StoneTypeDisplay stoneType={stone?.type} />}
-              </>
-            )}
-          />
-        </div>
+        <div className="flex items-center space-x-2 mt-4"></div>
         <div className="flex items-center space-x-2 mt-4">
           <Button
             type="button"
@@ -2123,7 +2106,7 @@ export default function SlabSell() {
         });
 
         // Extra items
-        room.extra_items?.forEach((item) => {
+        room.extras?.forEach?.((item) => {
           if (item.total && item.total > 0) {
             total += Number(item.total);
           } else {
