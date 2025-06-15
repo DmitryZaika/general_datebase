@@ -71,7 +71,7 @@ const DynamicAddition = ({
     if (itemKey === "oversize_piece") {
       const options = context.sqft as Record<string, number>;
       return (
-        <div className={`${inputwidth}`}>
+        <div className="min-w-[100px]">
           <Label className="text-xs">Sqft</Label>
           <Select value={value} onValueChange={handleValueChange}>
             <SelectTrigger>
@@ -90,6 +90,16 @@ const DynamicAddition = ({
     }
 
     const label = itemKey === "tripFee" ? "Miles" : "Amount";
+
+    if (itemKey === "ten_year_sealer") {
+      return (
+        <div className={inputwidth}>
+          <Label className="text-xs">Square Feet</Label>
+          <Input value={value} disabled={true} />
+        </div>
+      );
+    }
+
     return (
       <div className={inputwidth}>
         <Label className="text-xs">{label}</Label>
