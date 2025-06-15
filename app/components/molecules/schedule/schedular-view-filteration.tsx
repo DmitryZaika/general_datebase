@@ -3,12 +3,12 @@ import { Button } from "@/components/ui/button";
 import DailyView from "@/components/molecules/schedule/day-view";
 import WeeklyView from "@/components/molecules/schedule/week-view";
 import MonthView from "@/components/molecules/schedule/month-view";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { Period } from "~/types";
 
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
 
-const views: Period[] = ["day", "week", "month"]
+const views: Period[] = ["month"]
 
 export default function SchedulerViewFilteration({
   period,
@@ -21,7 +21,6 @@ export default function SchedulerViewFilteration({
     startDate: Date;
     endDate: Date;
   } | undefined>(undefined);
-  const navigate = useNavigate();
 
   function handleAddEvent(selectedDay?: number) {
     // Create the start and end dates for the event
@@ -29,7 +28,7 @@ export default function SchedulerViewFilteration({
       new Date().getFullYear(),
       new Date().getMonth(),
       selectedDay ?? new Date().getDate(),
-      0,
+      12,
       0,
       0,
       0
@@ -39,10 +38,10 @@ export default function SchedulerViewFilteration({
       new Date().getFullYear(),
       new Date().getMonth(),
       selectedDay ?? new Date().getDate(),
-      23,
-      59,
-      59,
-      999
+      13,
+      0,
+      0,
+      0
     );
 
     setEventModalDefaults({ startDate, endDate });
@@ -94,11 +93,13 @@ export default function SchedulerViewFilteration({
         )}
       </div>
 
-      <AddEventModal
-        open={!!eventModalDefaults}
+      {eventModalDefaults && (
+        <AddEventModal
+          open={true}
         onOpenChange={() => setEventModalDefaults(undefined)}
         defaultValues={eventModalDefaults}
       />
+      )}
     </div>
   );
 }

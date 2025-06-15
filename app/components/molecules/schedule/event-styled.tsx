@@ -49,12 +49,13 @@ const variantColors = {
 
 // Define the proper Event interface
 interface Event {
-  id: string;
+  id: number;
   title: string;
   startDate: Date;
   endDate: Date;
   description?: string;
   variant?: string;
+  notes?: string;
 }
 
 interface EventStyledProps extends Event {
@@ -77,7 +78,9 @@ export default function EventStyled({
   const shouldShowDeleteButton = !event?.minmized;
 
   // Handler function to open edit modal
-  function handleEditEvent() {
+  function handleEditEvent(e?: React.MouseEvent) {
+    e?.stopPropagation(); // Prevent event bubbling to parent
+    e?.preventDefault(); // Also prevent default behavior
     setShowEditModal(true);
   }
 
@@ -87,11 +90,11 @@ export default function EventStyled({
     const colors = variantColors[variantKey] || variantColors.primary;
     return `${colors.bg} ${colors.text} ${colors.border}`;
   };
-
   return (
     <>
       <div
         key={event?.id}
+        data-event-element
         className={cn(
           "w-full z-50 relative cursor-pointer border group rounded-lg flex flex-col flex-grow shadow-sm hover:shadow-md transition-shadow duration-200",
           event?.minmized ? "border-transparent" : "border-default-400/60"
@@ -101,8 +104,8 @@ export default function EventStyled({
         <Button
           onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
-            handlers.handleDeleteEvent(event?.id);
-            onDelete?.(event?.id);
+            handlers.handleDeleteEvent(event?.id.toString());
+            onDelete?.(event?.id.toString());
           }}
           variant="destructive"
           size="icon"
@@ -186,8 +189,9 @@ export default function EventStyled({
       </div>
 
       {/* Edit Event Modal */}
+      {showEditModal && (
       <AddEventModal
-        open={showEditModal}
+        open={true}
         onOpenChange={setShowEditModal}
         defaultValues={{
           id: event.id,
@@ -196,8 +200,10 @@ export default function EventStyled({
           startDate: event.startDate,
           endDate: event.endDate,
           variant: event.variant as any,
+          notes: event.notes,
         }}
       />
+      )}
     </>
   );
 }

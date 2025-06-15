@@ -18,6 +18,7 @@ interface Event {
   endDate: Date;
   description?: string;
   variant?: string;
+  notes?: string;
 }
 
 const hours = Array.from({ length: 24 }, (_, i) => {
@@ -481,14 +482,16 @@ export default function WeeklyView() {
       </AnimatePresence>
 
       {/* Add Event Modal */}
-      <AddEventModal
-        open={!!open}
+      {open && (
+        <AddEventModal
+          open={true}
         onOpenChange={(isOpen) => !isOpen && setOpen(null)}
         defaultValues={{
           startDate: open?.startDate,
           endDate: open?.endDate,
         }}
       />
+      )}
     </div>
   );
 }

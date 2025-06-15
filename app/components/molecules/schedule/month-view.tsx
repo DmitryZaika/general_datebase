@@ -1,23 +1,24 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import clsx from "clsx";
 
 import { useScheduler } from "~/providers/scheduler-provider";
 import AddEventModal from "@/components/molecules/schedule/add-event-modal";
 import EventStyled from "@/components/molecules/schedule/event-styled";
-import { useNavigate } from "react-router";
+import DayEventsModal from "@/components/molecules/schedule/day-events-modal";
+import { useNavigate, useSearchParams } from "react-router";
 
 // Define Event interface locally since it's not exported from types
 interface Event {
-  id: string;
+  id: number;
   title: string;
   startDate: Date;
   endDate: Date;
   description?: string;
   variant?: string;
+  notes?: string;
 }
 
 const pageTransitionVariants = {
@@ -46,10 +47,29 @@ function formatDateStr(date: Date): string {
 export default function MonthView() {
   const { getters, weekStartsOn } = useScheduler();
   const [open, setOpen] = useState<{startDate: Date, endDate: Date} | null>(null);
+  const [dayEventsModal, setDayEventsModal] = useState<{date: Date, events: Event[]} | null>(null);
+  const [editEvent, setEditEvent] = useState<Event | null>(null);
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [direction, setDirection] = useState<number>(0);
   const navigate = useNavigate();
+
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const dateParam = searchParams.get("date");
+    if (dateParam) {
+      const regex = /^(\d{2})-(\d{2})-(\d{4})$/;
+      const match = dateParam.match(regex);
+      const [, dd, mm, yyyy] = match;
+      const day = parseInt(dd, 10);
+      const month = parseInt(mm, 10) - 1; // месяцы в JS от 0 до 11
+      const year = parseInt(yyyy, 10);
+    
+      const date = new Date(year, month, day);
+      setCurrentDate(date);
+    }
+  }, [searchParams]);
 
   const daysInMonth = getters.getDaysInMonth(
     currentDate.getMonth(),
@@ -79,6 +99,11 @@ export default function MonthView() {
   }, [currentDate, navigate]);
 
   function handleAddEvent(selectedDay: number) {
+    // Don't open add modal if there's already a modal open (like edit modal)
+    if (document.querySelector('[role="dialog"]')) {
+      return;
+    }
+
     // Create start date at 12:00 AM on the selected day
     const startDate = new Date(
       currentDate.getFullYear(),
@@ -98,12 +123,31 @@ export default function MonthView() {
       59,
       59
     );
-
     setOpen({startDate, endDate});
   }
 
-  function handleShowMoreEvents(dayEvents: Event[]) {
-    // TODO: Implement this
+  function handleShowMoreEvents(dayEvents: Event[], dayNumber: number) {
+    const selectedDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      dayNumber
+    );
+    setDayEventsModal({ date: selectedDate, events: dayEvents });
+  }
+
+  function handleEditEventFromModal(event: Event) {
+    setEditEvent(event);
+    setDayEventsModal(null); // Close the day events modal
+  }
+
+  function handleAddEventFromModal(date: Date) {
+    const startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+    
+    setOpen({ startDate, endDate });
+    setDayEventsModal(null); // Close the day events modal
   }
 
   const itemVariants = {
@@ -241,7 +285,14 @@ export default function MonthView() {
                     initial="enter"
                     animate="center"
                     exit="exit"
-                    onClick={() => handleAddEvent(dayObj.day)}
+                    onClick={(e) => {
+                      // Don't open add modal if clicking on an event element
+                      const target = e.target as HTMLElement;
+                      if (target.closest('[data-event-element]')) {
+                        return;
+                      }
+                      handleAddEvent(dayObj.day);
+                    }}
                   >
                     <div className="p-1 sm:p-2 h-full flex flex-col relative">
                       {/* Day number */}
@@ -263,72 +314,78 @@ export default function MonthView() {
                         <AnimatePresence mode="wait">
                           {dayEvents?.length > 0 && (
                             <motion.div
-                              key={dayEvents[0].id}
+                              key={`day-${dayObj.day}-events`}
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -10 }}
                               transition={{ duration: 0.3 }}
                               className="h-full"
                             >
-                                                             {/* Mobile: Show only dots/indicators for small screens */}
-                               <div className="sm:hidden">
-                                 <div className="flex gap-1 flex-wrap">
-                                   {dayEvents.slice(0, 3).map((event: Event) => (
-                                     <div
-                                       key={event.id}
-                                       className={clsx(
-                                         "w-2 h-2 rounded-full",
-                                         event.variant === "primary" && "bg-blue-500",
-                                         event.variant === "danger" && "bg-red-500",
-                                         event.variant === "success" && "bg-green-500",
-                                         event.variant === "warning" && "bg-yellow-500",
-                                         !event.variant && "bg-gray-500"
-                                       )}
-                                     />
-                                   ))}
-                                   {dayEvents.length > 3 && (
-                                     <span className="text-xs text-muted-foreground">+</span>
-                                   )}
-                                 </div>
-                               </div>
+                              {/* Mobile: Show dots and count with click to open modal */}
+                              <div 
+                                className="sm:hidden cursor-pointer p-1 rounded hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleShowMoreEvents(dayEvents, dayObj.day);
+                                }}
+                                title={`View all ${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""}`}
+                              >
+                                <div className="flex gap-1 flex-wrap mb-1">
+                                  {dayEvents.slice(0, 4).map((event: Event) => (
+                                    <div
+                                      key={event.id}
+                                      className={clsx(
+                                        "w-2 h-2 rounded-full",
+                                        event.variant === "primary" && "bg-blue-500",
+                                        event.variant === "danger" && "bg-red-500",
+                                        event.variant === "success" && "bg-green-500",
+                                        event.variant === "warning" && "bg-yellow-500",
+                                        !event.variant && "bg-gray-500"
+                                      )}
+                                    />
+                                  ))}
+                                  {dayEvents.length > 4 && (
+                                    <div className="w-2 h-2 rounded-full bg-gray-400 flex items-center justify-center">
+                                      <span className="text-xs text-white">+</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-xs text-primary font-medium">
+                                  {dayEvents.length} event{dayEvents.length > 1 ? "s" : ""} →
+                                </div>
+                              </div>
 
-                                                             {/* Desktop: Show full event styling */}
-                               <div className="hidden sm:block">
-                                 <EventStyled
-                                   event={{
-                                     ...dayEvents[0],
-                                     minmized: true,
-                                   }}
-                                 />
-                               </div>
+                              {/* Desktop: Show first event and +X more button */}
+                              <div className="hidden sm:block space-y-1">
+                                {dayEvents.slice(0, 1).map((event: Event) => (
+                                  <EventStyled
+                                    key={event.id}
+                                    event={{
+                                      ...event,
+                                      minmized: true,
+                                    }}
+                                  />
+                                ))}
+                                
+                                {dayEvents.length > 1 && (
+                                  <div 
+                                    className="text-xs bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 transition-colors p-1 rounded border border-primary/20 hover:border-primary/40 font-medium text-center"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleShowMoreEvents(dayEvents, dayObj.day);
+                                    }}
+                                    title={`View all ${dayEvents.length} events`}
+                                  >
+                                    +{dayEvents.length - 1} more →
+                                  </div>
+                                )}
+                              </div>
                             </motion.div>
                           )}
                         </AnimatePresence>
-
-                        {/* More events indicator */}
-                        {dayEvents.length > 1 && (
-                          <Badge
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleShowMoreEvents(dayEvents);
-                            }}
-                            variant="outline"
-                            className={clsx(
-                              "absolute bottom-1 right-1 text-xs px-1 py-0 h-auto cursor-pointer hover:bg-accent transition-colors touch-target",
-                              "hidden sm:inline-flex" // Hide on mobile, show on larger screens
-                            )}
-                          >
-                            +{dayEvents.length - 1}
-                          </Badge>
-                        )}
                       </div>
 
-                      {/* Mobile: Show event count */}
-                      {dayEvents.length > 0 && (
-                        <div className="sm:hidden text-xs text-muted-foreground mt-1">
-                          {dayEvents.length} event{dayEvents.length > 1 ? "s" : ""}
-                        </div>
-                      )}
+
 
                       {/* Hover text for empty days */}
                       {dayEvents.length === 0 && (
@@ -348,15 +405,46 @@ export default function MonthView() {
         </motion.div>
       </AnimatePresence>
 
-      {/* Modal */}
-      <AddEventModal
-        open={!!open}
-        onOpenChange={(isOpen) => !isOpen && setOpen(null)}
-        defaultValues={{
-          startDate: open?.startDate,
-          endDate: open?.endDate,
-        }}
-      />
+      {/* Add Event Modal */}
+      {open && (
+        <AddEventModal
+          open={true}
+          onOpenChange={(isOpen) => !isOpen && setOpen(null)}
+          defaultValues={{
+            startDate: open?.startDate,
+            endDate: open?.endDate,
+          }}
+        />
+      )}
+
+      {/* Edit Event Modal */}
+      {editEvent && (
+        <AddEventModal
+          open={true}
+          onOpenChange={(isOpen) => !isOpen && setEditEvent(null)}
+          defaultValues={{
+            id: editEvent.id,
+            title: editEvent.title,
+            description: editEvent.description,
+            startDate: editEvent.startDate,
+            endDate: editEvent.endDate,
+            variant: editEvent.variant as any,
+            notes: editEvent.notes,
+          }}
+        />
+      )}
+
+      {/* Day Events Modal */}
+      {dayEventsModal && (
+        <DayEventsModal
+          open={true}
+          onOpenChange={(isOpen) => !isOpen && setDayEventsModal(null)}
+          date={dayEventsModal.date}
+          events={dayEventsModal.events}
+          onEditEvent={handleEditEventFromModal}
+          onAddEvent={handleAddEventFromModal}
+        />
+      )}
     </div>
   );
 }
