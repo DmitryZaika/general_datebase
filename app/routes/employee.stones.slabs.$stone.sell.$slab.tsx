@@ -260,10 +260,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
           if (slab.is_full) {
             // Full slab sale: update the main slab with sale information
             await db.execute(
-              `UPDATE slab_inventory SET sale_id = ?, seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
-              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ? WHERE id = ?`,
+              `UPDATE slab_inventory SET sale_id = ?, room_uuid = UUID_TO_BIN(?), seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
+              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ? WHERE id = ?`,
               [
                 saleId,
+                room.room_id,
                 room.seam,
                 room.edge,
                 room.room,
@@ -276,6 +277,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
                 room.corbels,
                 room.retail_price || 0,
                 slab.id,
+                room.extras,
               ]
             );
 
@@ -295,10 +297,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
           } else {
             // Partial slab sale: update main slab with sale info AND create a copy
             await db.execute(
-              `UPDATE slab_inventory SET sale_id = ?, seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
-              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ? WHERE id = ?`,
+              `UPDATE slab_inventory SET sale_id = ?, room_uuid = UUID_TO_BIN(?), seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
+              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ? WHERE id = ?`,
               [
                 saleId,
+                room.room_id,
                 room.seam,
                 room.edge,
                 room.room,
@@ -311,6 +314,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
                 room.corbels,
                 room.retail_price || 0,
                 slab.id,
+                room.extras,
               ]
             );
 
@@ -621,6 +625,7 @@ const AddSlabDialog = ({
   const [selectedSlab, setSelectedSlab] = useState<SlabState>();
 
   const allRooms = form.watch("rooms");
+  console.log(allRooms.map((room) => room.slabs));
   const addedSlabIds = allRooms.flatMap((room) =>
     room.slabs.map((slab) => slab.id)
   );
@@ -831,23 +836,7 @@ const AddFaucetDialog = ({
   );
 };
 
-const StoneTypeDisplay = ({ stoneType }: { stoneType: string | null }) => {
-  if (!stoneType) return null;
 
-  return (
-    <>
-      <span
-        className={`ml-2 text-xs px-2 py-1 rounded ${
-          stoneType.toLowerCase() === "quartz"
-            ? "bg-red-100 text-red-800"
-            : "bg-green-100 text-green-800"
-        }`}
-      >
-        {stoneType.charAt(0).toUpperCase() + stoneType.slice(1)}
-      </span>
-    </>
-  );
-};
 
 const fetchAvailableStones = async (query: string = "") => {
   const response = await fetch(
@@ -887,7 +876,6 @@ const StoneSearch = ({
   const handleStoneSelect = (stone: { id: number; name: string }) => {
     setStone({ id: stone.id, type: data?.stoneType[stone.name] || "" });
 
-    // Find the selected stone and get its retail price
     const selectedStone = data?.stoneSearchResults?.find(
       (s) => s.id === stone.id
     );
@@ -999,7 +987,7 @@ const RoomSubForm = ({
       if (data) total += Number(data.retail_price || 0);
     });
 
-    room.extras?.forEach?.((item) => {
+    room.extras?.forEach?.((item: any) => {
       if (item.total && item.total > 0) {
         total += Number(item.total);
       } else {
@@ -1290,10 +1278,7 @@ const RoomSubForm = ({
     }
   }, [linearFeet[index], form, index]);
 
-  type ExtraItemsState = Record<
-    keyof typeof CUSTOMER_ITEMS,
-    { value: string; price: number }
-  >;
+  type ExtraItemsState = Record<keyof typeof CUSTOMER_ITEMS, any>;
 
   const [extraItems, setExtraItems] = useState<ExtraItemsState>({} as any);
 
@@ -1304,7 +1289,23 @@ const RoomSubForm = ({
       // Add new keys
       selectedExtraItems.forEach((key) => {
         if (!updated[key]) {
-          updated[key] = { value: "", price: 0 } as any;
+          // determine valueKey for defaults
+          const getValueKey = (itemKey: keyof typeof CUSTOMER_ITEMS) => {
+            switch (itemKey) {
+              case "tripFee":
+                return "miles";
+              case "mitter_edge_price":
+                return "amount";
+              case "oversize_piece":
+                return "sqft";
+              case "ten_year_sealer":
+                return "amount";
+              default:
+                return "value";
+            }
+          };
+          const valKey = getValueKey(key);
+          updated[key] = { [valKey]: "", price: 0 } as any;
         }
       });
 
@@ -1318,23 +1319,6 @@ const RoomSubForm = ({
       return updated;
     });
   }, [selectedExtraItems]);
-
-  const handleExtraItemsUpdate = (items: ExtraItemsState) => {
-    setExtraItems(items);
-
-    const itemsArray = (
-      Object.entries(items) as [
-        keyof typeof CUSTOMER_ITEMS,
-        { value: string; price: number }
-      ][]
-    ).map(([name, { value, price }]) => ({
-      name,
-      value,
-      price,
-    }));
-
-    form.setValue(`rooms.${index}.extras`, itemsArray as any);
-  };
 
   return (
     <>
@@ -1645,14 +1629,32 @@ const RoomSubForm = ({
       </div>
 
       <DynamicAdditions
-        selectedItems={selectedExtraItems}
         items={extraItems}
-        onUpdate={handleExtraItemsUpdate}
+        onUpdate={(updated) => {
+          setExtraItems(updated as any);
+          const currentExtras = form.getValues(`rooms.${index}.extras`) || {};
+          form.setValue(
+            `rooms.${index}.extras`,
+            { ...currentExtras, ...updated } as any,
+            {
+              shouldDirty: true,
+              shouldValidate: true,
+            }
+          );
+        }}
         onRemove={(key) => {
-          setSelectedExtraItems((prev) => prev.filter((i) => i !== key));
-          const updatedItems = { ...extraItems };
-          delete updatedItems[key as keyof typeof extraItems];
-          handleExtraItemsUpdate(updatedItems);
+          setExtraItems((prev) => {
+            const copy = { ...prev } as any;
+            delete copy[key];
+            return copy;
+          });
+          const currentExtras = form.getValues(`rooms.${index}.extras`) || {};
+          delete currentExtras[key];
+          form.setValue(`rooms.${index}.extras`, currentExtras, {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
+          setSelectedExtraItems((prev) => prev.filter((k) => k !== key));
         }}
       />
 
@@ -1883,8 +1885,11 @@ export default function SlabSell() {
     defaultValues: {
       same_address: true,
       rooms: [roomSchema.parse({})],
+
     },
   });
+
+  console.log(form.getValues("rooms"));
 
   const fullSubmit = useFullSubmit(form, undefined, "POST", (value) => {
     if (typeof value === "object") {
@@ -2106,7 +2111,7 @@ export default function SlabSell() {
         });
 
         // Extra items
-        room.extras?.forEach?.((item) => {
+        room.extras?.forEach?.((item: any) => {
           if (item.total && item.total > 0) {
             total += Number(item.total);
           } else {
