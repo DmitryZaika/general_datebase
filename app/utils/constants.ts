@@ -20,6 +20,12 @@ export const SINK_TYPES = [
 
 export const FAUCET_TYPES = ["single handle", "double handle"] as const;
 
+export const STONE_FINISHES = [
+  "polished",
+  "leathered",
+  "honed",
+] as const;
+
 // const BASE_PRICES = {
 //   corbels: 100,
 //   edge: {
