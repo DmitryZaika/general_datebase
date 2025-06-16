@@ -1,1 +1,1 @@
-ALTER TABLE stones ADD COLUMN finish VARCHAR(20);
+ALTER TABLE stones ADD COLUMN finishing VARCHAR(20);

@@ -193,21 +193,7 @@ export default function StonesAdd() {
                 />
               )}
             />
-            <FormField
-              control={form.control}
-              name="finishing"
-              render={({ field }) => (
-                <SelectInput
-                  field={field}
-                  placeholder="Finishing"
-                  name="Finishing"
-                  options={STONE_FINISHES.map((item) => ({
-                    key: item.toLowerCase(),
-                    value: item.charAt(0).toUpperCase() + item.slice(1),
-                  }))}
-                />
-              )}
-            />
+          
             <FormField
               control={form.control}
               name="file"
@@ -310,6 +296,7 @@ export default function StonesAdd() {
             />
      
           </div>
+          <div className="flex gap-2">
           <FormField
               control={form.control}
               name="level"
@@ -326,6 +313,23 @@ export default function StonesAdd() {
                 />
               )}
             />
+              <FormField
+              control={form.control}
+              name="finishing"
+              render={({ field }) => (
+                <SelectInput
+                className="w-1/2"
+                  field={field}
+                  placeholder="Finishing"
+                  name="Finishing"
+                  options={STONE_FINISHES.map((item) => ({
+                    key: item.toLowerCase(),
+                    value: item.charAt(0).toUpperCase() + item.slice(1),
+                  }))}
+                />
+              )}
+            />
+            </div>
           <FormField
             control={form.control}
             name="colors"
