@@ -11,6 +11,11 @@ import {
 } from "~/components/ui/form";
 import { useState } from "react";
 
+function replaceZipCode(address: string, zipCode: string) {
+  if (address.includes(zipCode)) return address;
+  return address.replace("USA", zipCode);
+}
+
 async function completeAddress(q: string): Promise<
   {
     description: { text: string };
@@ -45,6 +50,20 @@ export function AddressInput({ form, field, zipField }: Props) {
     staleTime: 60_000,
   });
 
+  function handleSelect(address: string, zipCode: string) {
+    form.setValue(field, address, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+    if (zipField) {
+      form.setValue(zipField, zipCode ?? "", {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+    // requestAnimationFrame(() => setOpen(false));
+  }
+
   return (
     <FormField
       control={form.control}
@@ -63,7 +82,7 @@ export function AddressInput({ form, field, zipField }: Props) {
               } address (min 10 characters)`}
               value={
                 zipField
-                  ? rhf.value?.replace("USA", form.watch(zipField) ?? "")
+                  ? replaceZipCode(rhf.value ?? "", form.watch(zipField) ?? "")
                   : rhf.value
               }
               onChange={(e) => {
@@ -78,10 +97,7 @@ export function AddressInput({ form, field, zipField }: Props) {
               onKeyDown={(e) => {
                 if (e.key === "Tab" && open && data.length > 0) {
                   e.preventDefault();
-                  form.setValue(field, data[0].description.text, {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  });
+                  handleSelect(data[0].description.text, data[0].zip_code ?? "");
                   setOpen(false);
                 }
               }}
@@ -95,21 +111,9 @@ export function AddressInput({ form, field, zipField }: Props) {
                 {data.map((s) => (
                   <CommandItem
                     key={s.place_id}
-                    onSelect={() => {
-                      form.setValue(field, s.description.text, {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      });
-                      if (zipField) {
-                        form.setValue(zipField, s.zip_code ?? "", {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        });
-                      }
-                      requestAnimationFrame(() => setOpen(false));
-                    }}
+                    onSelect={() => handleSelect(s.description.text, s.zip_code ?? "")}
                   >
-                    {s.description.text.replace("USA", s.zip_code ?? "")}
+                    {replaceZipCode(s.description.text, s.zip_code ?? "")}
                   </CommandItem>
                 ))}
               </CommandGroup>

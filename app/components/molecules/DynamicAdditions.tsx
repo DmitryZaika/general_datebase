@@ -14,26 +14,41 @@ import { Label } from "@radix-ui/react-label";
 
 type ExtraItemKey = keyof typeof CUSTOMER_ITEMS;
 
+const getValueKey = (itemKey: string) => {
+  switch (itemKey) {
+    case "tripFee":
+      return "miles";
+    case "mitter_edge_price":
+      return "amount";
+    case "oversize_piece":
+      return "sqft";
+    case "ten_year_sealer":
+      return "amount";
+    default:
+      return "value";
+  }
+};
+
 interface DynamicAdditionProps {
   itemKey: ExtraItemKey;
+  itemData: any;
   onRemove: (key: ExtraItemKey) => void;
-  onPriceChange: (key: ExtraItemKey, price: number) => void;
-  onValueChange: (key: ExtraItemKey, value: string) => void;
-  price: number;
-  value: string;
+  onUpdate: (key: ExtraItemKey, data: any) => void;
 }
 
 const DynamicAddition = ({
   itemKey,
+  itemData,
   onRemove,
-  onPriceChange,
-  onValueChange,
-  price,
-  value,
+  onUpdate,
 }: DynamicAdditionProps) => {
   const context = CUSTOMER_ITEMS[itemKey] as any;
   const inputwidth = "min-w-[115px]";
   const [isPriceManuallySet, setIsPriceManuallySet] = useState(false);
+
+  const valueKey = getValueKey(itemKey);
+  const value = typeof itemData === "object" ? itemData[valueKey] ?? "" : "";
+  const price = typeof itemData === "object" ? itemData.price ?? 0 : itemData ?? 0;
 
   useEffect(() => {
     if (isPriceManuallySet) return;
@@ -50,21 +65,25 @@ const DynamicAddition = ({
     } else if (itemKey === "mitter_edge_price") {
       const amount = parseFloat(value) || 0;
       newPrice = context.priceFn({ amount });
+    } else if (itemKey === "ten_year_sealer") {
+      const amount = parseFloat(value) || 0;
+      newPrice = context.priceFn({ amount });
     }
 
     if (newPrice !== price) {
-      onPriceChange(itemKey, newPrice);
+      onUpdate(itemKey, { ...itemData, [valueKey]: value, price: newPrice });
     }
-  }, [value, itemKey, context, price, onPriceChange, isPriceManuallySet]);
+  }, [value, itemKey, context, price, isPriceManuallySet]);
 
   const handleValueChange = (newValue: string) => {
-    setIsPriceManuallySet(false); // Re-enable auto-calculation
-    onValueChange(itemKey, newValue);
+    setIsPriceManuallySet(false);
+    const newData = { ...itemData, [valueKey]: newValue, price };
+    onUpdate(itemKey, newData);
   };
 
   const handlePriceChange = (newPrice: number) => {
-    setIsPriceManuallySet(true); // Disable auto-calculation
-    onPriceChange(itemKey, newPrice);
+    setIsPriceManuallySet(true);
+    onUpdate(itemKey, { ...itemData, [valueKey]: value, price: newPrice });
   };
 
   const renderControl = () => {
@@ -146,32 +165,17 @@ const DynamicAddition = ({
 };
 
 interface DynamicAdditionsProps {
-  selectedItems: ExtraItemKey[];
+  items: Record<ExtraItemKey, any>;
+  onUpdate: (items: Record<ExtraItemKey, any>) => void;
   onRemove: (key: ExtraItemKey) => void;
-  onUpdate: (
-    items: Record<ExtraItemKey, { value: string; price: number }>
-  ) => void;
-  items: Record<ExtraItemKey, { value: string; price: number }>;
 }
 
-export const DynamicAdditions = ({
-  selectedItems,
-  onRemove,
-  onUpdate,
-  items,
-}: DynamicAdditionsProps) => {
-  if (!selectedItems || selectedItems.length === 0) return null;
+export const DynamicAdditions = ({ items, onUpdate, onRemove }: DynamicAdditionsProps) => {
+  const selectedItems = Object.keys(items) as ExtraItemKey[];
+  if (selectedItems.length === 0) return null;
 
-  const handlePriceChange = (key: ExtraItemKey, price: number) => {
-    onUpdate({ ...items, [key]: { ...items[key], price } });
-  };
-
-  const handleValueChange = (key: ExtraItemKey, value: string) => {
-    onUpdate({ ...items, [key]: { ...items[key], value } });
-  };
-
-  const handleRemove = (key: ExtraItemKey) => {
-    onRemove(key); // This will trigger re-render and items will be updated from parent
+  const updateItem = (key: ExtraItemKey, data: any) => {
+    onUpdate({ ...items, [key]: data });
   };
 
   return (
@@ -181,11 +185,9 @@ export const DynamicAdditions = ({
         <DynamicAddition
           key={itemKey}
           itemKey={itemKey}
-          onRemove={handleRemove}
-          onPriceChange={handlePriceChange}
-          onValueChange={handleValueChange}
-          price={items[itemKey]?.price || 0}
-          value={items[itemKey]?.value || ""}
+          itemData={items[itemKey]}
+          onRemove={onRemove}
+          onUpdate={updateItem}
         />
       ))}
     </div>
