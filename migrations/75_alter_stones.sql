@@ -1,0 +1,1 @@
+ALTER TABLE stones ADD COLUMN finish VARCHAR(20);
