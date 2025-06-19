@@ -70,6 +70,11 @@ interface Faucet {
   faucet_count: number;
 }
 
+const cleanValue = (key: string) => {
+  const text = key.charAt(0).toUpperCase() + key.slice(1);
+  return text.replace("_", " ");
+}
+
 const roomOptions = [
   { key: "Kitchen", value: "Kitchen" },
   { key: "Bathroom", value: "Bathroom" },
@@ -77,14 +82,10 @@ const roomOptions = [
   { key: "Island", value: "Island" },
 ];
 
-const edgeOptions = [
-  { key: "Flat", value: "Flat" },
-  { key: "Eased", value: "Eased" },
-  { key: "1/4 Bevel", value: "1/4 Bevel" },
-  { key: "1/2 Bevel", value: "1/2 Bevel" },
-  { key: "Bullnose", value: "Bullnose" },
-  { key: "Ogee", value: "Ogee" },
-];
+const edgeOptions = Object.keys(BASE_PRICES.edge_price).map((key) => ({
+  key,
+  value: cleanValue(key),
+}));
 
 const backsplashOptions = [
   { key: "No", value: "No" },
@@ -92,12 +93,10 @@ const backsplashOptions = [
   { key: "Full Height", value: "Full Height" },
 ];
 
-const tearOutOptions = [
-  { key: "No", value: "No" },
-  { key: "Laminate", value: "Laminate" },
-  { key: "Stone", value: "Stone" },
-  { key: "Vanity Laminate T/O", value: "Vanity Laminate T/O" },
-];
+const tearOutOptions = Object.keys(BASE_PRICES.tear_out_price).map((key) => ({
+  key,
+  value: cleanValue(key),
+}));
 
 const stoveOptions = [
   { key: "F/S", value: "F/S" },
@@ -275,9 +274,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
                 room.ten_year_sealer,
                 room.waterfall,
                 room.corbels,
-                room.retail_price || 0,
-                slab.id,
+                room.retail_price,
                 room.extras,
+                slab.id,
               ]
             );
 
@@ -312,13 +311,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
                 room.ten_year_sealer,
                 room.waterfall,
                 room.corbels,
-                room.retail_price || 0,
-                slab.id,
+                room.retail_price,
                 room.extras,
+                slab.id,
               ]
             );
 
-            // Assign sinks and faucets to the main slab
             for (const sinkType of room.sink_type) {
               await db.execute(
                 `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
@@ -625,7 +623,6 @@ const AddSlabDialog = ({
   const [selectedSlab, setSelectedSlab] = useState<SlabState>();
 
   const allRooms = form.watch("rooms");
-  console.log(allRooms.map((room) => room.slabs));
   const addedSlabIds = allRooms.flatMap((room) =>
     room.slabs.map((slab) => slab.id)
   );
@@ -1046,10 +1043,8 @@ const RoomSubForm = ({
     }
   }, [stoneType, index, stone?.type]);
 
-  // Auto-load retail price for first room if stone is already selected
   useEffect(() => {
     if (index === 0 && tempStoneId && stoneName) {
-      // Fetch stone details to get retail price
       fetch(`/api/stones/search?name=${encodeURIComponent(stoneName)}`)
         .then((response) => response.json())
         .then((data) => {
@@ -1062,7 +1057,6 @@ const RoomSubForm = ({
               foundStone.retail_price
             );
 
-            // Recalculate total price if square feet exists
             const squareFeet =
               form.getValues(`rooms.${index}.square_feet`) || 0;
             if (squareFeet > 0) {
@@ -1115,6 +1109,17 @@ const RoomSubForm = ({
     form.setValue("rooms", rooms);
   };
 
+  const handleEdgeChange = (edge: string) => {
+    let price = BASE_PRICES.edge_price[edge as keyof typeof BASE_PRICES.edge_price];
+    if (typeof price === "function") {
+      const amount: number = Number(linearFeet[index]) || 0;
+      price = price(amount);
+    }
+    form.setValue(`rooms.${index}.extras.edge_price`, price);
+  };
+
+  
+ 
   useEffect(() => {
     if (form.getValues(`rooms.${index}.room`) === "bathroom") {
       form.setValue(`rooms.${index}.stove`, "N/A");
@@ -1128,34 +1133,6 @@ const RoomSubForm = ({
       const fieldName = name.split(".").pop();
 
       switch (fieldName) {
-        case "edge": {
-          const edgeValue = form.getValues(`rooms.${index}.edge`);
-
-          let price = 0;
-
-          if (edgeValue === "eased") {
-            price = BASE_PRICES.edge_price.eased;
-          } else if (edgeValue === "1/4 bevel") {
-            price = BASE_PRICES.edge_price["1/4_bevel"];
-          } else if (edgeValue === "1/2 bevel") {
-            price = BASE_PRICES.edge_price["1/2_bevel"];
-          } else if (edgeValue === "ogee") {
-            price = BASE_PRICES.edge_price.ogee(Number(linearFeet[index]) || 0);
-          } else if (edgeValue === "bullnose") {
-            price = BASE_PRICES.edge_price.bull_nose(
-              Number(linearFeet[index]) || 0
-            );
-          }
-
-          if (!["ogee", "bullnose"].includes(edgeValue?.toLowerCase())) {
-            setLinearFeet((prev) => ({ ...prev, [index]: "" }));
-          }
-
-          // Always set the price, even if it's 0
-          form.setValue(`rooms.${index}.extras.edge_price`, price);
-          break;
-        }
-
         case "tear_out": {
           const tearOutValue = form.getValues(`rooms.${index}.tear_out`);
           const squareFeet = form.getValues(`rooms.${index}.square_feet`);
@@ -1184,8 +1161,7 @@ const RoomSubForm = ({
           } else if (stoveValue === "n/a") {
             price = BASE_PRICES.stove_price["n/a"];
           }
-          console.log("All form values:", form.getValues());
-          // Always set the price, even if it's 0
+
           form.setValue(`rooms.${index}.extras.stove_price`, price);
           break;
         }
@@ -1224,7 +1200,6 @@ const RoomSubForm = ({
         }
 
         case "square_feet": {
-          // Recalculate tear-out price when square feet changes
           const tearOutValue = form.getValues(`rooms.${index}.tear_out`);
           const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0;
           let price = 0;
@@ -1237,10 +1212,8 @@ const RoomSubForm = ({
             price = BASE_PRICES["vanity_t/o"];
           }
 
-          // Always set the price, even if it's 0
           form.setValue(`rooms.${index}.extras.tear_out_price`, price);
 
-          // Calculate total price = square_feet * retail_price
           const retailPrice =
             form.getValues(`rooms.${index}.retail_price`) || 0;
           const totalPrice = squareFeet * retailPrice;
@@ -1249,7 +1222,6 @@ const RoomSubForm = ({
         }
 
         case "retail_price": {
-          // Calculate total price when retail price changes
           const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0;
           const retailPrice =
             form.getValues(`rooms.${index}.retail_price`) || 0;
@@ -1270,7 +1242,7 @@ const RoomSubForm = ({
     if (edgeValue === "ogee") {
       price = BASE_PRICES.edge_price.ogee(Number(linearFeet[index]) || 0);
     } else if (edgeValue === "bullnose") {
-      price = BASE_PRICES.edge_price.bull_nose(Number(linearFeet[index]) || 0);
+      price = BASE_PRICES.edge_price.bullnose(Number(linearFeet[index]) || 0);
     }
 
     if (edgeValue === "ogee" || edgeValue === "bullnose") {
@@ -1305,11 +1277,16 @@ const RoomSubForm = ({
             }
           };
           const valKey = getValueKey(key);
-          updated[key] = { [valKey]: "", price: 0 } as any;
+
+          if (key === "ten_year_sealer") {
+            const sqft = form.getValues(`rooms.${index}.square_feet`) || 0;
+            updated[key] = { [valKey]: sqft.toString(), price: 0 } as any;
+          } else {
+            updated[key] = { [valKey]: "", price: 0 } as any;
+          }
         }
       });
 
-      // Remove deselected keys
       (Object.keys(updated) as (keyof typeof CUSTOMER_ITEMS)[]).forEach((k) => {
         if (!selectedExtraItems.includes(k)) {
           delete updated[k];
@@ -1423,23 +1400,29 @@ const RoomSubForm = ({
       <div className="flex flex-col gap-2 mt-2">
         <div className="border border-gray-200 rounded-md p-2 flex gap-2">
           <FormField
-            control={form.control}
-            name={`rooms.${index}.edge`}
-            render={({ field }) => (
-              <SelectInputOther
-                field={field}
-                name="Edge"
-                className={`mb-0 ${inputWidth}`}
-                options={edgeOptions}
-              />
-            )}
-          />
+          control={form.control}
+          name={`rooms.${index}.edge`}
+          render={({ field }) => (
+            <SelectInputOther
+              field={{
+                ...field,
+                onChange: (value) => {
+                  handleEdgeChange(value);
+                  field.onChange(value);
+                }
+              }}
+              name="Edge"
+              className={`mb-0 ${inputWidth}`}
+              options={edgeOptions}
+            />
+          )}
+        />
           <div
             className={clsx(`mb-0 ${inputWidth}`, {
               hidden: [
                 "eased",
-                "1/4 bevel",
-                "1/2 bevel",
+                "1/4_bevel",
+                "1/2_bevel",
                 "flat",
                 "Flat",
               ].includes(form.watch(`rooms.${index}.edge`)),
@@ -1889,7 +1872,6 @@ export default function SlabSell() {
     },
   });
 
-  console.log(form.getValues("rooms"));
 
   const fullSubmit = useFullSubmit(form, undefined, "POST", (value) => {
     if (typeof value === "object") {

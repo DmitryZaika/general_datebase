@@ -200,14 +200,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
       );
       
       // Log for debugging purposes
-      console.log(`Found ${childSlabs.length} child slabs with sales that need to be preserved`);
       
       // Ensure we don't clear sale_id for sold child slabs
-      if (childSlabs && childSlabs.length > 0) {
-        for (const childSlab of childSlabs) {
-          console.log(`Preserving sale_id ${childSlab.sale_id} for child slab ${childSlab.id}`);
-        }
-      }
+     
     }
     
     const [remainingSlabsResult] = await db.execute<RowDataPacket[]>(
