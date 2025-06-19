@@ -18,29 +18,34 @@ export const SINK_TYPES = [
 
 export const FAUCET_TYPES = ["single handle", "double handle"] as const;
 
+type BasePriceProps = {linearFeet: number, squareFeet: number}
+
 export const BASE_PRICES = {
   mitered_edge_price: 200,
-  corbels_price: 100,
+  corbels_price: (corbels: number) => corbels * 100,
   edge_price: {
     flat: 0,
     eased: 100,
     "1/4_bevel": 200,
     "1/2_bevel": 200,
-    ogee: (linearFeet: number) => linearFeet * 25,
-    bullnose: (linearFeet: number) => linearFeet * 18,
+    ogee: ({linearFeet }: BasePriceProps) => linearFeet * 25,
+    bullnose: ({linearFeet}: BasePriceProps) => linearFeet * 18,
   },
   seam_price: {
-    phantom_seam: 250,
+    standard: 0,
+    extended: 0,
+    "no_seam": 0,
+    european: 0,
+    phantom: 250,
   },
-  waterfall_price: 400,
+  waterfall_price: {
+    yes: 400,
+    no: 0,
+  },
   tear_out_price: {
-    "stone_t/o": (sqft: number) => sqft * 10,
-    "laminate_t/o": (sqft: number) => {
-      if (sqft < 40) return 200;
-      if (sqft >= 40 && sqft < 55) return 250;
-      if (sqft >= 55 && sqft < 70) return 300;
-      return 350;
-    },
+    no: 0,
+    "stone_t/o": ({squareFeet}: BasePriceProps) => squareFeet * 10,
+    "laminate_t/o": ({squareFeet}: BasePriceProps) => squareFeet < 40 ? 200 : squareFeet < 55 ? 250 : squareFeet < 70 ? 300 : 350,
     "vanity_t/o": 100,
   },
   stove_price: {

@@ -82,10 +82,7 @@ const roomOptions = [
   { key: "Island", value: "Island" },
 ];
 
-const edgeOptions = Object.keys(BASE_PRICES.edge_price).map((key) => ({
-  key,
-  value: cleanValue(key),
-}));
+
 
 const backsplashOptions = [
   { key: "No", value: "No" },
@@ -93,32 +90,13 @@ const backsplashOptions = [
   { key: "Full Height", value: "Full Height" },
 ];
 
-const tearOutOptions = Object.keys(BASE_PRICES.tear_out_price).map((key) => ({
-  key,
-  value: cleanValue(key),
-}));
+const getOptions = (value: keyof typeof BASE_PRICES) => {
+  return Object.keys(BASE_PRICES[value]).map((key) => ({
+    key,
+    value: cleanValue(key),
+  }))
+}
 
-const stoveOptions = [
-  { key: "F/S", value: "F/S" },
-  { key: "S/I", value: "S/I" },
-  { key: "C/T", value: "C/T" },
-  { key: "Grill", value: "Grill" },
-  { key: "N/A", value: "N/A" },
-];
-
-const waterfallOptions = [
-  { key: "No", value: "No" },
-  { key: "Yes", value: "Yes" },
-];
-
-const seamOptions = [
-  { key: "Standard", value: "Standard" },
-  { key: "Phantom", value: "Phantom" },
-  { key: "Extended", value: "Extended" },
-  { key: "No seam", value: "No seam" },
-  { key: "European", value: "European" },
-  { key: "N/A", value: "N/A" },
-];
 
 const resolver = zodResolver(customerSchema);
 
@@ -1109,16 +1087,34 @@ const RoomSubForm = ({
     form.setValue("rooms", rooms);
   };
 
-  const handleEdgeChange = (edge: string) => {
-    let price = BASE_PRICES.edge_price[edge as keyof typeof BASE_PRICES.edge_price];
+  const handleExtraChange = (value: string | number, target: keyof typeof BASE_PRICES) => {
+    let price = BASE_PRICES[target]
     if (typeof price === "function") {
-      const amount: number = Number(linearFeet[index]) || 0;
-      price = price(amount);
+      price = price(value as unknown as number)
+      form.setValue(`rooms.${index}.extras.${target}`, price);
+      return
     }
-    form.setValue(`rooms.${index}.extras.edge_price`, price);
-  };
+    price = price[value]
+    if (typeof price === "function") {
+      const linearValue: number = Number(linearFeet[index]) || 0;
+      const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0;
+      price = price({ linearValue, squareFeet });
+    }
+    form.setValue(`rooms.${index}.extras.${target}`, price);
+  }
 
-  
+  const handleRetailPriceChange = (price: number) => {
+    const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0;
+    const totalPrice = squareFeet * price;
+    form.setValue(`rooms.${index}.total_price`, totalPrice);
+  }
+
+  const handleSquareFeetChange = (squareFeet: number) => {
+    const tearOutValue = form.getValues(`rooms.${index}.tear_out`);
+    handleExtraChange(tearOutValue, "tear_out_price");
+    const retailPrice = form.getValues(`rooms.${index}.retail_price`) || 0;
+    form.setValue(`rooms.${index}.total_price`, squareFeet * retailPrice);
+  }
  
   useEffect(() => {
     if (form.getValues(`rooms.${index}.room`) === "bathroom") {
@@ -1126,123 +1122,15 @@ const RoomSubForm = ({
     }
   }, [form.getValues(`rooms.${index}.room`)]);
 
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (!name || !name.startsWith(`rooms.${index}.`)) return;
-
-      const fieldName = name.split(".").pop();
-
-      switch (fieldName) {
-        case "tear_out": {
-          const tearOutValue = form.getValues(`rooms.${index}.tear_out`);
-          const squareFeet = form.getValues(`rooms.${index}.square_feet`);
-          let price = 0;
-
-          if (tearOutValue === "stone") {
-            price = BASE_PRICES["stone_t/o"](squareFeet);
-          } else if (tearOutValue === "laminate") {
-            price = BASE_PRICES["laminate_t/o"](squareFeet);
-          } else if (tearOutValue === "vanity laminate t/o") {
-            price = BASE_PRICES["vanity_t/o"];
-          }
-
-          form.setValue(`rooms.${index}.extras.tear_out_price`, price);
-          break;
-        }
-
-        case "stove": {
-          const stoveValue = form.getValues(`rooms.${index}.stove`);
-          let price = 0;
-
-          if (stoveValue === "c/t") {
-            price = BASE_PRICES.stove_price["c/t"];
-          } else if (stoveValue === "grill") {
-            price = BASE_PRICES.stove_price.grill;
-          } else if (stoveValue === "n/a") {
-            price = BASE_PRICES.stove_price["n/a"];
-          }
-
-          form.setValue(`rooms.${index}.extras.stove_price`, price);
-          break;
-        }
-
-        case "waterfall": {
-          const waterfallValue = form.getValues(`rooms.${index}.waterfall`);
-
-          if (waterfallValue === "yes") {
-            form.setValue(
-              `rooms.${index}.extras.waterfall_price`,
-              BASE_PRICES.waterfall_price
-            );
-          } else {
-            form.setValue(`rooms.${index}.extras.waterfall_price`, 0);
-          }
-          break;
-        }
-
-        case "corbels": {
-          const corbelsCount = form.getValues(`rooms.${index}.corbels`) || 0;
-          const totalPrice = corbelsCount * BASE_PRICES.corbels_price;
-          form.setValue(`rooms.${index}.extras.corbels_price`, totalPrice);
-          break;
-        }
-
-        case "seam": {
-          const seamValue = form.getValues(`rooms.${index}.seam`);
-          let price = 0;
-
-          if (seamValue === "phantom") {
-            price = BASE_PRICES.seam_price.phantom_seam;
-          }
-
-          form.setValue(`rooms.${index}.extras.seam_price`, price);
-          break;
-        }
-
-        case "square_feet": {
-          const tearOutValue = form.getValues(`rooms.${index}.tear_out`);
-          const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0;
-          let price = 0;
-
-          if (tearOutValue === "stone") {
-            price = BASE_PRICES["stone_t/o"](squareFeet);
-          } else if (tearOutValue === "laminate") {
-            price = BASE_PRICES["laminate_t/o"](squareFeet);
-          } else if (tearOutValue === "vanity laminate t/o") {
-            price = BASE_PRICES["vanity_t/o"];
-          }
-
-          form.setValue(`rooms.${index}.extras.tear_out_price`, price);
-
-          const retailPrice =
-            form.getValues(`rooms.${index}.retail_price`) || 0;
-          const totalPrice = squareFeet * retailPrice;
-          form.setValue(`rooms.${index}.total_price`, totalPrice);
-          break;
-        }
-
-        case "retail_price": {
-          const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0;
-          const retailPrice =
-            form.getValues(`rooms.${index}.retail_price`) || 0;
-          const totalPrice = squareFeet * retailPrice;
-          form.setValue(`rooms.${index}.total_price`, totalPrice);
-          break;
-        }
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [form, index]);
 
   useEffect(() => {
     const edgeValue = form.getValues(`rooms.${index}.edge`);
     let price = 0;
 
     if (edgeValue === "ogee") {
-      price = BASE_PRICES.edge_price.ogee(Number(linearFeet[index]) || 0);
+      price = BASE_PRICES.edge_price.ogee({linearFeet: Number(linearFeet[index]) || 0, squareFeet: form.getValues(`rooms.${index}.square_feet`) || 0});
     } else if (edgeValue === "bullnose") {
-      price = BASE_PRICES.edge_price.bullnose(Number(linearFeet[index]) || 0);
+      price = BASE_PRICES.edge_price.bullnose({linearFeet: Number(linearFeet[index]) || 0, squareFeet: form.getValues(`rooms.${index}.square_feet`) || 0});
     }
 
     if (edgeValue === "ogee" || edgeValue === "bullnose") {
@@ -1363,7 +1251,14 @@ const RoomSubForm = ({
             <InputItem
               name={"Square Feet"}
               placeholder={"Enter Sqft"}
-              field={field}
+              field={{
+                ...field,
+                onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                  field.onChange(event);
+                  handleSquareFeetChange(parseInt(event.target.value) || 0);
+             
+                }
+              }}
               formClassName={`mb-0 ${inputWidth}`}
             />
           )}
@@ -1376,7 +1271,13 @@ const RoomSubForm = ({
             <InputItem
               name={"Retail Price"}
               placeholder={"Price per sqft"}
-              field={field}
+              field={{
+                ...field,
+                onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                  field.onChange(event);
+                  handleRetailPriceChange(parseInt(event.target.value) || 0);
+                }
+              }}
               formClassName={`mb-0 ${inputWidth}`}
             />
           )}
@@ -1407,13 +1308,14 @@ const RoomSubForm = ({
               field={{
                 ...field,
                 onChange: (value) => {
-                  handleEdgeChange(value);
                   field.onChange(value);
+                  handleExtraChange(value, "edge_price");
+                  
                 }
               }}
               name="Edge"
               className={`mb-0 ${inputWidth}`}
-              options={edgeOptions}
+              options={getOptions("edge_price")}
             />
           )}
         />
@@ -1462,10 +1364,17 @@ const RoomSubForm = ({
             name={`rooms.${index}.tear_out`}
             render={({ field }) => (
               <SelectInputOther
-                field={field}
+                field={{
+                  ...field,
+                  onChange: (value) => {
+                    field.onChange(value);
+                    handleExtraChange(value, "tear_out_price");
+                    
+                  }
+                }}
                 name="Tear-Out"
                 className={`mb-0 ${inputWidth}`}
-                options={tearOutOptions}
+                options={getOptions("tear_out_price")}
               />
             )}
           />
@@ -1492,10 +1401,17 @@ const RoomSubForm = ({
                 name={`rooms.${index}.stove`}
                 render={({ field }) => (
                   <SelectInputOther
-                    field={field}
+                    field={{
+                      ...field,
+                      onChange: (value) => {
+                        field.onChange(value);
+                        handleExtraChange(value, "stove_price");
+                       
+                      }
+                    }}
                     name="Stove"
                     className={`mb-0 ${inputWidth}`}
-                    options={stoveOptions}
+                    options={getOptions("stove_price")}
                   />
                 )}
               />
@@ -1518,10 +1434,17 @@ const RoomSubForm = ({
                 name={`rooms.${index}.waterfall`}
                 render={({ field }) => (
                   <SelectInputOther
-                    field={field}
+                    field={{
+                      ...field,
+                      onChange: (value) => {
+                        field.onChange(value);
+                        handleExtraChange(value, "waterfall_price");
+                        
+                      }
+                    }}
                     name="Waterfall"
                     className={`mb-0 ${inputWidth}`}
-                    options={waterfallOptions}
+                    options={getOptions("waterfall_price")}
                   />
                 )}
               />
@@ -1549,7 +1472,14 @@ const RoomSubForm = ({
               <InputItem
                 name={"Corbels"}
                 placeholder={"Number of corbels"}
-                field={field}
+                field={{
+                  ...field,
+                  onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                    field.onChange(event);
+                    handleExtraChange(parseInt(event.target.value) || 0, "corbels_price");
+                    
+                  }
+                }}
                 formClassName={`mb-0 ${inputWidth}`}
               />
             )}
@@ -1575,10 +1505,17 @@ const RoomSubForm = ({
             name={`rooms.${index}.seam`}
             render={({ field }) => (
               <SelectInputOther
-                field={field}
+                field={{
+                  ...field,
+                  onChange: (value) => {
+                    field.onChange(value);
+                    handleExtraChange(value, "seam_price");
+                    
+                  }
+                }}
                 name="Seam"
                 className={`mb-0 ${inputWidth}`}
-                options={seamOptions}
+                options={getOptions("seam_price")}
               />
             )}
           />
