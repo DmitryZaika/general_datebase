@@ -74,38 +74,39 @@ export function SelectInputOther<
 
   // Initialize or update based on field.value changes
   useEffect(() => {
-    if (field.value) {
-      const valueStr = String(field.value).toLowerCase();
-      const foundOption = cleanOptions.find(
-        (opt) => opt.key.toLowerCase() === valueStr
-      );
+    if (!field.value) return;
+    
+    const valueStr = String(field.value).toLowerCase();
+    const foundOption = cleanOptions.find(
+      (opt) => opt.key.toLowerCase() === valueStr
+    );
 
-      if (foundOption) {
-        setSelectedValue(foundOption.key);
-        setIsOtherSelected(false);
-      } else if (valueStr !== "other") {
-        setIsOtherSelected(true);
-        setOtherValue(field.value as string);
-        setSelectedValue("other");
-      }
-    } else if (defaultValue && !selectedValue) {
-      // Only set from defaultValue if we don't already have a value
-      const defaultValueLower = defaultValue.toLowerCase();
-      const foundOption = cleanOptions.find(
-        (opt) =>
-          opt.key.toLowerCase() === defaultValueLower ||
-          opt.value.toLowerCase() === defaultValueLower
-      );
+    if (foundOption) {
+      setSelectedValue(foundOption.key);
+      setIsOtherSelected(false);
+    } else if (valueStr !== "other") {
+      setIsOtherSelected(true);
+      setOtherValue(field.value as string);
+      setSelectedValue("other");
+    }
+   if (defaultValue && !selectedValue) {
+    // Only set from defaultValue if we don't already have a value
+    const defaultValueLower = defaultValue.toLowerCase();
+    const foundOption = cleanOptions.find(
+      (opt) =>
+        opt.key.toLowerCase() === defaultValueLower ||
+        opt.value.toLowerCase() === defaultValueLower
+    );
 
-      if (foundOption) {
-        setSelectedValue(foundOption.key);
-        setIsOtherSelected(false);
-        field.onChange(foundOption.key); // Update form value
-      } else {
-        setIsOtherSelected(true);
-        setOtherValue(defaultValue);
-        setSelectedValue("other");
-        field.onChange(defaultValue); // Update form value
+    if (foundOption) {
+      setSelectedValue(foundOption.key);
+      setIsOtherSelected(false);
+      field.onChange(foundOption.key); // Update form value
+    } else {
+      setIsOtherSelected(true);
+      setOtherValue(defaultValue);
+      setSelectedValue("other");
+      field.onChange(defaultValue); // Update form value
       }
     }
   }, [field.value, cleanOptions, defaultValue, field, selectedValue]);
