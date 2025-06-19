@@ -114,7 +114,7 @@ const DynamicAddition = ({
       return (
         <div className={inputwidth}>
           <Label className="text-xs">Square Feet</Label>
-          <Input value={value} disabled={true} />
+          <Input value={value} onChange={(e) => handleValueChange(e.target.value)} />
         </div>
       );
     }

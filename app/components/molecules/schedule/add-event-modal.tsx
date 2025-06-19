@@ -45,7 +45,6 @@ export default function AddEventModal({
   onOpenChange, 
   defaultValues 
 }: AddEventModalProps) {
-  console.log("defaultValues", defaultValues);
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
     defaultValues: {

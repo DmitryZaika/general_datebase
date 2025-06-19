@@ -32,12 +32,20 @@ export const roomSchema = z.object({
   seam: z.string().default("Standard"),
   ten_year_sealer: z.boolean().default(false),
   slabs: z.array(slabOptionsSchema).default([]),
+
   extras: z
     .record(
       z.string(),
       z.union([z.record(z.string(), z.any()), z.coerce.number()])
     )
-    .default({}),
+    .default({
+      edge_price: 0,
+      tear_out_price: 0,
+      stove_price: 0,
+      waterfall_price: 0,
+      corbels_price: 0,
+      seam_price: 0,
+    }),
 });
 
 export const customerSchema = z.object({

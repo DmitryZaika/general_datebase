@@ -27,20 +27,22 @@ export const BASE_PRICES = {
     "1/4_bevel": 200,
     "1/2_bevel": 200,
     ogee: (linearFeet: number) => linearFeet * 25,
-    bull_nose: (linearFeet: number) => linearFeet * 18,
+    bullnose: (linearFeet: number) => linearFeet * 18,
   },
   seam_price: {
     phantom_seam: 250,
   },
   waterfall_price: 400,
-  "stone_t/o": (sqft: number) => sqft * 10,
-  "laminate_t/o": (sqft: number) => {
-    if (sqft < 40) return 200;
-    if (sqft >= 40 && sqft < 55) return 250;
-    if (sqft >= 55 && sqft < 70) return 300;
-    return 350;
+  tear_out_price: {
+    "stone_t/o": (sqft: number) => sqft * 10,
+    "laminate_t/o": (sqft: number) => {
+      if (sqft < 40) return 200;
+      if (sqft >= 40 && sqft < 55) return 250;
+      if (sqft >= 55 && sqft < 70) return 300;
+      return 350;
+    },
+    "vanity_t/o": 100,
   },
-  "vanity_t/o": 100,
   stove_price: {
     "f/s": 0,
     "s/i": 0,
