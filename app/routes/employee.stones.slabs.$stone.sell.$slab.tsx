@@ -915,8 +915,6 @@ const RoomSubForm = ({
   slabMap,
   stoneType,
   setSlabMap,
-  linearFeet,
-  setLinearFeet,
 }: {
   form: UseFormReturn<TCustomerSchema>;
   index: number;
@@ -929,46 +927,26 @@ const RoomSubForm = ({
       prev: Record<number, string | null>
     ) => Record<number, string | null>
   ) => void;
-  linearFeet: Record<number, string>;
-  setLinearFeet: React.Dispatch<React.SetStateAction<Record<number, string>>>;
 }) => {
+  const [linearFeet, setLinearFeet] = useState<number | null>(null);
   const roomValues = useWatch({
     control: form.control,
     name: `rooms.${index}`,
   });
 
   const totalRoomPrice = useMemo(() => {
-    const room = roomValues;
-    if (!room) return 0;
+    let total = (roomValues.square_feet || 0) * (roomValues.retail_price || 0);
+    for (const extra of Object.values(roomValues.extras)) {
+      total += typeof extra === "number" ? extra : extra?.price || 0;
+    }
 
-    let total = 0;
+    for (const sink of roomValues.sink_type) {
+      total += sink_type.find((s) => s.id === sink.id)?.retail_price || 0;
+    }
 
-    total += (room.square_feet || 0) * (room.retail_price || 0);
-
-    total += Number(room.extras?.edge_price || 0);
-    total += Number(room.extras?.tear_out_price || 0);
-    total += Number(room.extras?.stove_price || 0);
-    total += Number(room.extras?.waterfall_price || 0);
-    total += Number(room.extras?.corbels_price || 0);
-    total += Number(room.extras?.seam_price || 0);
-
-    room.sink_type?.forEach((sink) => {
-      const data = sink_type.find((s) => s.id === sink.id);
-      if (data) total += Number(data.retail_price || 0);
-    });
-
-    room.faucet_type?.forEach((faucet) => {
-      const data = faucet_type.find((f) => f.id === faucet.id);
-      if (data) total += Number(data.retail_price || 0);
-    });
-
-    room.extras?.forEach?.((item: any) => {
-      if (item.total && item.total > 0) {
-        total += Number(item.total);
-      } else {
-        total += Number(item.price || 0);
-      }
-    });
+    for (const faucet of roomValues.faucet_type) {
+      total += faucet_type.find((f) => f.id === faucet.id)?.retail_price || 0;
+    }
 
     return total;
   }, [roomValues, sink_type, faucet_type]);
@@ -1088,6 +1066,7 @@ const RoomSubForm = ({
   };
 
   const handleExtraChange = (value: string | number, target: keyof typeof BASE_PRICES) => {
+    console.log(value, target)
     let price = BASE_PRICES[target]
     if (typeof price === "function") {
       price = price(value as unknown as number)
@@ -1096,9 +1075,8 @@ const RoomSubForm = ({
     }
     price = price[value]
     if (typeof price === "function") {
-      const linearValue: number = Number(linearFeet[index]) || 0;
       const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0;
-      price = price({ linearValue, squareFeet });
+      price = price({ linearFeet: linearFeet || 0, squareFeet });
     }
     form.setValue(`rooms.${index}.extras.${target}`, price);
   }
@@ -1122,21 +1100,9 @@ const RoomSubForm = ({
     }
   }, [form.getValues(`rooms.${index}.room`)]);
 
-
   useEffect(() => {
-    const edgeValue = form.getValues(`rooms.${index}.edge`);
-    let price = 0;
-
-    if (edgeValue === "ogee") {
-      price = BASE_PRICES.edge_price.ogee({linearFeet: Number(linearFeet[index]) || 0, squareFeet: form.getValues(`rooms.${index}.square_feet`) || 0});
-    } else if (edgeValue === "bullnose") {
-      price = BASE_PRICES.edge_price.bullnose({linearFeet: Number(linearFeet[index]) || 0, squareFeet: form.getValues(`rooms.${index}.square_feet`) || 0});
-    }
-
-    if (edgeValue === "ogee" || edgeValue === "bullnose") {
-      form.setValue(`rooms.${index}.extras.edge_price`, price);
-    }
-  }, [linearFeet[index], form, index]);
+    handleExtraChange(form.watch(`rooms.${index}.edge`), "edge_price")
+  }, [linearFeet])
 
   type ExtraItemsState = Record<keyof typeof CUSTOMER_ITEMS, any>;
 
@@ -1184,6 +1150,8 @@ const RoomSubForm = ({
       return updated;
     });
   }, [selectedExtraItems]);
+
+
 
   return (
     <>
@@ -1334,13 +1302,11 @@ const RoomSubForm = ({
             <Input
               id={`linear-feet-${index}`}
               placeholder="Enter Linear Feet"
-              value={linearFeet[index] || ""}
-              onChange={(e) =>
-                setLinearFeet((prev) => ({
-                  ...prev,
-                  [index]: e.target.value,
-                }))
-              }
+              value={linearFeet?.toString() || ""}
+              onChange={(e) => {
+                setLinearFeet(Number(e.target.value))
+               
+              }}
             />
           </div>
 
@@ -1798,7 +1764,7 @@ export default function SlabSell() {
   const [slabMap, setSlabMap] = useState<Record<number, string | null>>({
     [slabId]: bundle,
   });
-  const [linearFeet, setLinearFeet] = useState<Record<number, string>>({});
+  
 
   const form = useForm<TCustomerSchema>({
     resolver,
@@ -2187,8 +2153,6 @@ export default function SlabSell() {
                   sink_type={sink_type}
                   faucet_type={faucet_type}
                   stoneType={stoneType}
-                  linearFeet={linearFeet}
-                  setLinearFeet={setLinearFeet}
                 />
               ))}
 
