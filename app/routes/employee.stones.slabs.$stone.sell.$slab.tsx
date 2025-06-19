@@ -1066,7 +1066,6 @@ const RoomSubForm = ({
   };
 
   const handleExtraChange = (value: string | number, target: keyof typeof BASE_PRICES) => {
-    console.log(value, target)
     let price = BASE_PRICES[target]
     if (typeof price === "function") {
       price = price(value as unknown as number)
