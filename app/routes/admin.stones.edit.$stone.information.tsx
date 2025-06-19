@@ -233,7 +233,7 @@ export default function Information() {
       cost_per_sqft,
       retail_price,
       level,
-      finishing: finishing || "polished",
+      finishing,
       colors: selectedColorIds,
     };
     const form = useCustomOptionalForm(stoneSchema, defaultValues);
@@ -371,7 +371,7 @@ export default function Information() {
               <SelectInput
                 className="w-1/2"
                 name="Finishing"
-                placeholder="Finishing"
+                placeholder="Select Finishing"
                 field={field}
                 options={STONE_FINISHES.map((finish) => ({
                   key: finish,
