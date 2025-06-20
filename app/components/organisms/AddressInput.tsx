@@ -32,6 +32,18 @@ type Props = {
   zipField?: string;
 };
 
+function formatAddress(address: string, zip?: string | null) {
+  if (!address) return address;
+
+  const cleanZip = zip ?? "";
+
+  if (cleanZip && address.includes(cleanZip)) {
+    return address.replace("USA", "").replace(/\s+,/g, "").trim();
+  }
+
+  return address.replace("USA", cleanZip);
+}
+
 export function AddressInput({ form, field, zipField }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -63,7 +75,7 @@ export function AddressInput({ form, field, zipField }: Props) {
               } address (min 10 characters)`}
               value={
                 zipField
-                  ? rhf.value?.replace("USA", form.watch(zipField) ?? "")
+                  ? formatAddress(rhf.value, form.watch(zipField))
                   : rhf.value
               }
               onChange={(e) => {
@@ -109,7 +121,7 @@ export function AddressInput({ form, field, zipField }: Props) {
                       requestAnimationFrame(() => setOpen(false));
                     }}
                   >
-                    {s.description.text.replace("USA", s.zip_code ?? "")}
+                    {formatAddress(s.description.text, s.zip_code)}
                   </CommandItem>
                 ))}
               </CommandGroup>
