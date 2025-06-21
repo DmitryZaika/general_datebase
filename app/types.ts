@@ -13,6 +13,21 @@ export interface Todo {
   position: number;
   created_date: string;
 }
+export interface Sink {
+  id: number;
+  name: string;
+  type: string;
+  retail_price: number;
+  sink_count: number;
+}
+
+export interface Faucet {
+  id: number;
+  name: string;
+  type: string;
+  retail_price: number;
+  faucet_count: number;
+}
 
 export interface InstructionSlim {
   id: number;
