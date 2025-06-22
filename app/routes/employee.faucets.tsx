@@ -14,7 +14,7 @@ import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState, useEffect } from "react";
 import { faucetFilterSchema } from "~/schemas/faucets";
 import { cleanParams } from "~/hooks/use-safe-search-params";
-import { Faucet, faucetQueryBuilder } from "~/utils/queries";
+import { Faucet, faucetQueryBuilder } from "~/utils/queries.server";
 import { FAUCET_TYPES } from "~/utils/constants";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

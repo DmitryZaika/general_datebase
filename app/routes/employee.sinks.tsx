@@ -9,7 +9,7 @@ import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState, useEffect } from "react";
 import { sinkFilterSchema } from "~/schemas/sinks";
 import { cleanParams } from "~/hooks/use-safe-search-params";
-import { Sink, sinkQueryBuilder } from "~/utils/queries";
+import { Sink, sinkQueryBuilder } from "~/utils/queries.server";
 import { SINK_TYPES } from "~/utils/constants";
 
 
