@@ -32,18 +32,12 @@ export const AddSlabDialog = ({
     form,
     stoneId,
     roomIndex,
-    setSlabMap,
   }: {
     show: boolean;
     setShow: (show: boolean) => void;
     form: UseFormReturn<TCustomerSchema>;
     stoneId: number;
     roomIndex: number;
-    setSlabMap: (
-      slabMap: (
-        prev: Record<number, string | null>
-      ) => Record<number, string | null>
-    ) => void;
   }) => {
     type SlabState = { id: number; bundle: string } | undefined;
     const [selectedSlab, setSelectedSlab] = useState<SlabState>();
@@ -71,7 +65,6 @@ export const AddSlabDialog = ({
         },
       ]);
       setShow(false);
-      setSlabMap((prev) => ({ ...prev, [selectedSlab.id]: selectedSlab.bundle }));
     };
   
     return (

@@ -22,6 +22,7 @@ import { AddSlabDialog } from "./AddSlabDialog";
 import { AddSinkDialog } from "./AddSinkDialog";
 import { AddFaucetDialog } from "./AddFaucetDialog";
 import { AddExtraDialog } from "./AddExtraDialog";
+import { useQuery } from "@tanstack/react-query";
 
 
 
@@ -53,18 +54,31 @@ const roomOptions = [
     return text.replace("_", " ");
   }
   
+  async function getSlabMap(
+    slabIds: number[]
+  ): Promise<
+    Record<number, string>
+  > {
+    const response = await fetch(
+      `/api/slabNames?ids=${slabIds.join(",")}`
+    );
+    if (!response.ok) {
+      throw new Error("Failed to fetch slabs");
+    }
+    const data = await response.json();
+    return data.slabNames.reduce((acc: Record<number, string>, slab: { id: number; bundle: string }) => {
+      acc[slab.id] = slab.bundle;
+      return acc;
+    }, {});
+  } 
 
  export const RoomSubForm = ({
     form,
     index,
     sink_type,
     faucet_type,
-    slabMap,
     stoneType,
-    setSlabMap,
-    slabId,
     stoneId: tempStoneId,
-    bundle,
     stoneName,
   }: {
     form: UseFormReturn<TCustomerSchema>;
@@ -72,15 +86,7 @@ const roomOptions = [
     sink_type: Sink[];
     faucet_type: Faucet[];
     stoneType: string | null;
-    slabMap: Record<number, string | null>;
-    setSlabMap: (
-      slabMap: (
-        prev: Record<number, string | null>
-      ) => Record<number, string | null>
-    ) => void;
-    slabId: number;
     stoneId: number | null;
-    bundle: string | null;
     stoneName: string | null;
   }) => {
     const [linearFeet, setLinearFeet] = useState<number | null>(null);
@@ -102,7 +108,12 @@ const roomOptions = [
       (keyof typeof CUSTOMER_ITEMS)[]
     >([]);
   
-   
+    const slabIds = form.getValues(`rooms.${index}.slabs`).map((slab) => slab.id)
+
+   const { data: slabMap } = useQuery({
+    queryKey: ["slabMap", slabIds],
+    queryFn: () => getSlabMap(slabIds),
+   })
     const [stone, setStone] = useState<{
       id: number;
       type: string | null;
@@ -110,22 +121,25 @@ const roomOptions = [
       tempStoneId && index === 0 ? { id: tempStoneId, type: stoneType } : null
     );
   
-    useEffect(() => {
-      if (slabId && bundle && index === 0) {
-        const currentSlabs = form.getValues(`rooms.${index}.slabs`) || [];
-        const slabExists = currentSlabs.some(
-          (slab) => slab.id === Number(slabId)
-        );
   
-        if (!slabExists) {
-          const newSlab = {
-            id: Number(slabId),
-            is_full: false,
-          };
-          form.setValue(`rooms.${index}.slabs`, [...currentSlabs, newSlab]);
-        }
+    /*fect(() => {
+      if (index !== 0) {
+        return
       }
-    }, [slabId, bundle, index, form]);
+      const currentSlabs = form.getValues(`rooms.${index}.slabs`) || [];
+      const slabExists = currentSlabs.some(
+        (slab) => slab.id === Number(slabId)
+      );
+
+      if (!slabExists) {
+        const newSlab = {
+          id: Number(slabId),
+          is_full: false,
+        };
+        form.setValue(`rooms.${index}.slabs`, [...currentSlabs, newSlab]);
+      }
+    }, [index, form]);
+    */
   
     useEffect(() => {
       if (stoneType) {
@@ -723,7 +737,7 @@ const roomOptions = [
                           : "bg-yellow-100 text-yellow-800"
                       }`}
                     >
-                      Bundle {slabMap[slab.id]}
+                      Bundle {slabMap?.[slab.id]}
                       {slab.is_full ? "(Full)" : "(Partial)"}
                     </div>
                     {form.watch(`rooms.${index}.slabs`).length > 1 && (
@@ -840,14 +854,16 @@ const roomOptions = [
   
         {stone?.id && (
           <>
+          {showAddSlabDialog && (
             <AddSlabDialog
-              show={showAddSlabDialog}
+              show={true}
               setShow={setShowAddSlabDialog}
               roomIndex={index}
               form={form}
               stoneId={stone?.id}
-              setSlabMap={setSlabMap}
+              
             />
+            )}
             <AddSinkDialog
               show={showAddSinkDialog}
               setShow={setShowAddSinkDialog}

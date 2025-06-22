@@ -13,7 +13,7 @@ import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { csrf } from "~/utils/csrf.server";
 import { getEmployeeUser } from "~/utils/session.server";
 import { selectMany } from "~/utils/queryHelpers";
-import { customerSchema, TCustomerSchema } from "~/schemas/sales";
+import { customerSchema, roomSchema, slabOptionsSchema, TCustomerSchema } from "~/schemas/sales";
 import { Sink, Faucet } from "~/types";
 import { ContractForm } from "~/components/pages/ContractForm";
 
@@ -296,20 +296,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const stoneType = stoneInfo.length > 0 ? stoneInfo[0].type : null;
     const stoneName = stoneInfo.length > 0 ? stoneInfo[0].name : null;
 
-    const slabDetails = await selectMany<{
-      id: number;
-      bundle: string;
-      stone_id: number;
-    }>(
-      db,
-      `SELECT id, bundle, stone_id 
-       FROM slab_inventory 
-       WHERE id = ?`,
-      [slabId]
-    );
-
-    const bundle = slabDetails.length > 0 ? slabDetails[0].bundle : null;
-
     const sink_type = await selectMany<Sink>(
       db,
       `SELECT
@@ -364,43 +350,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       [user.company_id]
     );
 
-    const allSales = await selectMany<{
-      id: number;
-      customer_name: string;
-      sale_date: string;
-      notes: string | null;
-      square_feet: number;
-    }>(
-      db,
-      `SELECT s.id, c.name as customer_name, s.sale_date, s.notes, s.square_feet
-       FROM sales s
-       JOIN customers c ON s.customer_id = c.id
-       WHERE s.company_id = ? AND s.cancelled_date IS NULL
-       ORDER BY s.sale_date DESC`,
-      [user.company_id]
-    );
-
-    const customers = await selectMany<{
-      id: number;
-      name: string;
-    }>(
-      db,
-      `SELECT id, name FROM customers 
-       WHERE company_id = ? 
-       ORDER BY id DESC
-       LIMIT 100`,
-      [user.company_id]
-    );
-
     return {
-      user,
       sink_type,
       faucet_type,
-      allSales,
-      customers,
       stoneType,
       stoneName,
-      bundle,
       stoneId,
       slabId,
     };
@@ -411,5 +365,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export default function SlabSell() {
   const data = useLoaderData<typeof loader>();
-  return <ContractForm data={data}/>
+  const starting = {
+    same_address: true,
+    rooms: [roomSchema.parse({
+      slabs: [slabOptionsSchema.parse({
+        id: data.slabId,
+        is_full: false
+      })]
+    })],
+  };
+  return <ContractForm data={data} starting={starting}/>
 }

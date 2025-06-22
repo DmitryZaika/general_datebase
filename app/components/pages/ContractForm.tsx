@@ -23,44 +23,30 @@ import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { Form } from "react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { customerSchema } from "~/schemas/sales";
-import { Input } from "~/components/ui/input";
-import { Search } from "lucide-react";
+
 
 const resolver = zodResolver(customerSchema);
 
 
- export function ContractForm({data, existing}: {data: any, existing?: TCustomerSchema}) {
+ export function ContractForm({data, starting}: {data: any, starting: Partial<TCustomerSchema>}) {
     const {
       sink_type,
       faucet_type,
-      allSales,
       stoneType,
       stoneName,
-      bundle,
-      slabId,
       stoneId
     } = data;
     const navigate = useNavigate();
     const isSubmitting = useNavigation().state === "submitting";
-    const [showExistingSales, setShowExistingSales] = useState(false);
-    const [saleSearch, setSaleSearch] = useState("");
     const [isExistingCustomer, setIsExistingCustomer] = useState(false);
     const location = useLocation();
     const [showSuggestions, setShowSuggestions] = useState(false);
     const suggestionsRef = useRef<HTMLDivElement>(null);
   
-    const [slabMap, setSlabMap] = useState<Record<number, string | null>>({
-      [slabId]: bundle,
-    });
-    
-  
-    const emptyDefault = {
-      same_address: true,
-      rooms: [roomSchema.parse({})],
-    }
+
     const form = useForm<TCustomerSchema>({
       resolver,
-      defaultValues: existing ? existing : emptyDefault,
+      defaultValues: starting,
     });
   
     const fullSubmit = useFullSubmit(form, undefined, "POST", (value) => {
@@ -143,13 +129,8 @@ const resolver = zodResolver(customerSchema);
       }
     };
   
-    const handleAddToExistingSale = (saleId: number) => {
-      if (!slabId) return;
   
-      navigate(
-        `/employee/stones/slabs/${slabId}/add-to-sale/${saleId}${location.search}`
-      );
-    };
+
   
     const handleSelectSuggestion = (customer: {
       id: number;
@@ -233,10 +214,6 @@ const resolver = zodResolver(customerSchema);
         console.error("Error fetching customer details:", error);
       }
     };
-  
-    const filteredSales = allSales.filter((sale) =>
-      sale.customer_name.toLowerCase().includes(saleSearch.toLowerCase())
-    );
   
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       form.setValue("name", e.target.value);
@@ -403,16 +380,13 @@ const resolver = zodResolver(customerSchema);
                 {form.watch("rooms").map((room, index) => (
                   <RoomSubForm
                     key={index}
-                    slabMap={slabMap}
-                    setSlabMap={setSlabMap}
                     form={form}
                     index={index}
                     sink_type={sink_type}
                     faucet_type={faucet_type}
                     stoneType={stoneType}
-                    slabId={slabId}
                     stoneId={stoneId}
-                    bundle={bundle}
+                
                     stoneName={stoneName}
                   />
                 ))}
@@ -476,58 +450,7 @@ const resolver = zodResolver(customerSchema);
             </Form>
           </FormProvider>
   
-          {showExistingSales && (
-            <Dialog open={showExistingSales} onOpenChange={setShowExistingSales}>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Select Existing Sale</DialogTitle>
-                </DialogHeader>
-                <div className="relative mb-4">
-                  <Input
-                    placeholder="Search sales by customer..."
-                    value={saleSearch}
-                    onChange={(e) => setSaleSearch(e.target.value)}
-                    className="pl-9"
-                  />
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-                </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {filteredSales.length === 0 ? (
-                    <p className="text-center py-4">No sales found</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {filteredSales.map((sale) => (
-                        <div
-                          key={sale.id}
-                          className="p-3 border rounded hover:bg-gray-50 cursor-pointer"
-                          onClick={() => handleAddToExistingSale(sale.id)}
-                        >
-                          <div className="font-medium">{sale.customer_name}</div>
-                          <div className="text-sm text-gray-500">
-                            {new Date(sale.sale_date).toLocaleDateString()}
-                            {sale.notes && (
-                              <div className="text-xs text-gray-600 mt-1">
-                                <span className="font-semibold">Notes:</span>{" "}
-                                {sale.notes}
-                              </div>
-                            )}
-                            {sale.square_feet > 0 && (
-                              <div className="text-xs text-gray-600">
-                                <span className="font-semibold">
-                                  Total Square Feet:
-                                </span>{" "}
-                                {sale.square_feet}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
+         
         </DialogContent>
       </Dialog>
     );
