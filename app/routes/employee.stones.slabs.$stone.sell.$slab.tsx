@@ -272,8 +272,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  let user;
   try {
-    const user = await getEmployeeUser(request);
+    user = await getEmployeeUser(request);
+    } catch (error) {
+      return redirect(`/login?error=${error}`);
+    }
 
     if (!params.slab) {
       throw new Error("Slab ID is missing");
@@ -339,9 +343,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       faucet_type,
       slabId,
     };
-  } catch (error) {
-    return redirect(`/login?error=${error}`);
-  }
+  
 };
 
 export default function SlabSell() {
