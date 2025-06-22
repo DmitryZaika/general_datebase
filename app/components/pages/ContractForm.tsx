@@ -29,15 +29,10 @@ import { Sink, Faucet } from "~/types";
 const resolver = zodResolver(customerSchema);
 
 interface IContractFormProps {
-  data: {sink_type: Sink[], faucet_type: Faucet[]},
  starting: Partial<TCustomerSchema>
 }
 
- export function ContractForm({data, starting}: IContractFormProps) {
-    const {
-      sink_type,
-      faucet_type,
-    } = data;
+ export function ContractForm({starting}: IContractFormProps) {
     const navigate = useNavigate();
     const isSubmitting = useNavigation().state === "submitting";
     const [isExistingCustomer, setIsExistingCustomer] = useState(false);
@@ -45,6 +40,14 @@ interface IContractFormProps {
     const [showSuggestions, setShowSuggestions] = useState(false);
     const suggestionsRef = useRef<HTMLDivElement>(null);
   
+    const { data: sink_type = [] } = useQuery({
+      queryKey: ["sink_type"],
+      queryFn: () => fetch("/api/sinkType").then((res) => res.json()),
+    });
+    const { data: faucet_type = [] } = useQuery({
+      queryKey: ["faucet_type"],
+      queryFn: () => fetch("/api/allFaucets").then((res) => res.json()),
+    });
 
     const form = useForm<TCustomerSchema>({
       resolver,
@@ -130,9 +133,6 @@ interface IContractFormProps {
         navigate(`..${location.search}`);
       }
     };
-  
-  
-
   
     const handleSelectSuggestion = (customer: {
       id: number;
