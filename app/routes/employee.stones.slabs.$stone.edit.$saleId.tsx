@@ -235,74 +235,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
     const saleId = parseInt(params.saleId, 10);
 
-    const sink_type = await selectMany<Sink>(
-      db,
-      `SELECT
-        sink_type.id,
-        sink_type.name,
-        sink_type.retail_price,
-        sink_type.type,
-        COUNT(sinks.id) AS sink_count
-      FROM
-        main.sink_type 
-        JOIN main.sinks
-          ON sink_type.id = sinks.sink_type_id
-      WHERE
-        sink_type.company_id = ?
-          AND sinks.is_deleted != 1
-          AND sinks.slab_id IS NULL
-      GROUP BY
-        sink_type.id,
-        sink_type.name,
-        sink_type.retail_price,
-        sink_type.type
-      ORDER BY
-        sink_type.name ASC;
-      `,
-      [user.company_id]
-    );
 
-    const faucet_type = await selectMany<Faucet>(
-      db,
-      `SELECT
-        faucet_type.id,
-        faucet_type.name,
-        faucet_type.retail_price,
-        faucet_type.type,
-        COUNT(faucets.id) AS faucet_count
-      FROM
-        main.faucet_type 
-        JOIN main.faucets
-          ON faucet_type.id = faucets.faucet_type_id
-      WHERE
-        faucet_type.company_id = ?
-          AND faucets.is_deleted != 1
-          AND faucets.slab_id IS NULL
-      GROUP BY
-        faucet_type.id,
-        faucet_type.name,
-        faucet_type.retail_price,
-        faucet_type.type
-      ORDER BY
-        faucet_type.name ASC;
-      `,
-      [user.company_id]
-    );
+
+
     const starting = await getCustomerSchemaFromSaleId(saleId);
     if (!starting) {
       return redirect(`/employee/stones/slabs`);
     }
 
-    return {
-      sink_type,
-      faucet_type,
-      saleId,
-      starting,
-    };
+    return { saleId, starting };
 };
 
-export default async function SlabSell() {
+export default function SlabSell() {
   const data = useLoaderData<typeof loader>();
   const starting = customerSchema.parse(data.starting);
-  return <ContractForm data={data} starting={starting}/>
+  return <ContractForm starting={starting}/>
 }
