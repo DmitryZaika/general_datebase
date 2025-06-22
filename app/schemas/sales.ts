@@ -2,7 +2,7 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { coerceNumberRequired, StringOrNumber } from "~/schemas/general";
 
-const slabOptionsSchema = z.object({
+export const slabOptionsSchema = z.object({
   id: z.coerce.number(),
   is_full: z.boolean(),
 });
