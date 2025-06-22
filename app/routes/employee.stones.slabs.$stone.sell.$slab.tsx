@@ -18,10 +18,6 @@ import { Sink, Faucet } from "~/types";
 import { ContractForm } from "~/components/pages/ContractForm";
 
 
-
-
-
-
 const resolver = zodResolver(customerSchema);
 
 export async function action({ request, params }: ActionFunctionArgs) {

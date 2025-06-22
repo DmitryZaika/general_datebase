@@ -29,7 +29,7 @@ import { Search } from "lucide-react";
 const resolver = zodResolver(customerSchema);
 
 
- export function ContractForm({data}: {data: any}) {
+ export function ContractForm({data, existing}: {data: any, existing?: TCustomerSchema}) {
     const {
       sink_type,
       faucet_type,
@@ -54,15 +54,14 @@ const resolver = zodResolver(customerSchema);
     });
     
   
+    const emptyDefault = {
+      same_address: true,
+      rooms: [roomSchema.parse({})],
+    }
     const form = useForm<TCustomerSchema>({
       resolver,
-      defaultValues: {
-        same_address: true,
-        rooms: [roomSchema.parse({})],
-  
-      },
+      defaultValues: existing ? existing : emptyDefault,
     });
-  
   
     const fullSubmit = useFullSubmit(form, undefined, "POST", (value) => {
       if (typeof value === "object") {

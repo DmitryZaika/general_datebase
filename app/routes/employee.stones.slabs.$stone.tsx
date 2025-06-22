@@ -69,7 +69,10 @@ const TransactionSchema = z.object({
     .union([z.string(), z.date()])
     .transform((val) => (typeof val === "string" ? val : val.toISOString())),
   customer_name: z.string(),
-  seller_name: z.string(),
+  seller_name: z
+    .string()
+    .nullable()
+    .transform((val) => (val ?? "Unknown Seller")),
   sale_notes: z.string().nullable().optional(),
   slab_notes: z.string().nullable().optional(),
   square_feet: z.coerce.number().default(0),
@@ -218,7 +221,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       sqlQuery,
       soldSlabIds
     );
-
     const transactionResults = rawTransactions
       .map((raw) => {
         try {
