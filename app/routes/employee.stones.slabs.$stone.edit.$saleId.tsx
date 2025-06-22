@@ -16,55 +16,60 @@ import { selectMany } from "~/utils/queryHelpers";
 import { customerSchema, TCustomerSchema } from "~/schemas/sales";
 import { Sink, Faucet } from "~/types";
 import { ContractForm } from "~/components/pages/ContractForm";
-
+import { getCustomerSchemaFromSaleId } from "~/utils/contractsBackend.server";
 
 const resolver = zodResolver(customerSchema);
 
 export async function action({ request, params }: ActionFunctionArgs) {
+  // ------------------------------------------------------------
+  // Edit existing sale logic (replaces old create-sale action)
+  // ------------------------------------------------------------
+
+  // 1. Auth & CSRF
   let user;
   try {
     user = await getEmployeeUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
+
   try {
     await csrf.validate(request);
   } catch (error) {
     return { error: "Invalid CSRF token" };
   }
+
+  // 2. Parse & validate form data
   const { errors, data, receivedValues } =
     await getValidatedFormData<TCustomerSchema>(request, resolver);
   if (errors) {
     return { errors, receivedValues };
   }
 
-  const slabId = params.slab;
-  if (!slabId) {
-    return { error: "Slab ID is missing" };
+  if (!params.saleId) {
+    return { error: "Sale ID is missing" };
+  }
+
+  const saleId = Number(params.saleId);
+  if (isNaN(saleId)) {
+    return { error: "Invalid Sale ID" };
   }
 
   const url = new URL(request.url);
   const searchParams = url.searchParams.toString();
   const searchString = searchParams ? `?${searchParams}` : "";
-  let saleId: number;
 
   try {
-    const [slabDimensions] = await db.execute<RowDataPacket[]>(
-      `SELECT length, width, stone_id, bundle, url FROM slab_inventory WHERE id = ?`,
-      [slabId]
-    );
-
-    if (!slabDimensions || slabDimensions.length === 0) {
-      throw new Error("Slab not found");
-    }
-
+    // ----------------------
+    // Customer handling
+    // ----------------------
     let customerId: number;
-
     if (data.customer_id) {
       customerId = data.customer_id;
 
+      // Update basic customer fields if provided (and only if blank before)
       const [customerVerify] = await db.execute<RowDataPacket[]>(
-        `SELECT id, name, address, phone, email FROM customers WHERE id = ? AND company_id = ?`,
+        `SELECT id, address, phone, email FROM customers WHERE id = ? AND company_id = ?`,
         [customerId, user.company_id]
       );
 
@@ -72,44 +77,27 @@ export async function action({ request, params }: ActionFunctionArgs) {
         throw new Error("Customer not found");
       }
 
-      const updateFields = [];
-      const updateValues = [];
+      const updateFields: string[] = [];
+      const updateValues: (string | number | null)[] = [];
 
-      if (
-        data.billing_address &&
-        (!customerVerify[0].address || customerVerify[0].address === "")
-      ) {
+      if (data.billing_address && (!customerVerify[0].address || customerVerify[0].address === "")) {
         updateFields.push("address = ?");
         updateValues.push(data.billing_address);
       }
-
-      if (
-        data.phone &&
-        (!customerVerify[0].phone || customerVerify[0].phone === "")
-      ) {
+      if (data.phone && (!customerVerify[0].phone || customerVerify[0].phone === "")) {
         updateFields.push("phone = ?");
         updateValues.push(data.phone);
       }
-
-      if (
-        data.email &&
-        (!customerVerify[0].email || customerVerify[0].email === "")
-      ) {
+      if (data.email && (!customerVerify[0].email || customerVerify[0].email === "")) {
         updateFields.push("email = ?");
         updateValues.push(data.email);
       }
 
       if (updateFields.length > 0) {
         await db.execute(
-          `UPDATE customers SET ${updateFields.join(
-            ", "
-          )} WHERE id = ? AND company_id = ?`,
+          `UPDATE customers SET ${updateFields.join(", ")} WHERE id = ? AND company_id = ?`,
           [...updateValues, customerId, user.company_id]
         );
-      }
-
-      if (!data.billing_address && customerVerify[0].address) {
-        data.billing_address = customerVerify[0].address;
       }
 
       if (data.same_address && data.billing_address) {
@@ -130,143 +118,107 @@ export async function action({ request, params }: ActionFunctionArgs) {
       customerId = customerResult.insertId;
     }
 
+    // ----------------------
+    // Update sales table
+    // ----------------------
     const totalSquareFeet = data.rooms.reduce(
       (sum, room) => sum + (room.square_feet || 0),
       0
     );
 
-    const [salesResult] = await db.execute<ResultSetHeader>(
-      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price, project_address) 
-       VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL, ?, ?)`,
+    await db.execute(
+      `UPDATE sales SET customer_id = ?, seller_id = ?, notes = ?, square_feet = ?, price = ?, project_address = ? WHERE id = ? AND company_id = ?`,
       [
         customerId,
         user.id,
-        user.company_id,
         data.notes_to_sale || null,
         totalSquareFeet,
         data.price || 0,
         data.project_address || null,
+        saleId,
+        user.company_id,
       ]
     );
 
-    saleId = salesResult.insertId;
+    // ----------------------
+    // Handle slabs and accessories
+    // ----------------------
 
-    if (data.rooms && data.rooms.length > 0) {
-      for (const room of data.rooms) {
-        for (const slab of room.slabs) {
-          if (slab.is_full) {
-            // Full slab sale: update the main slab with sale information
-            await db.execute(
-              `UPDATE slab_inventory SET sale_id = ?, room_uuid = UUID_TO_BIN(?), seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
-              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ? WHERE id = ?`,
-              [
-                saleId,
-                room.room_id,
-                room.seam,
-                room.edge,
-                room.room,
-                room.backsplash,
-                room.tear_out,
-                room.square_feet,
-                room.stove,
-                room.ten_year_sealer,
-                room.waterfall,
-                room.corbels,
-                room.retail_price,
-                room.extras,
-                slab.id,
-              ]
-            );
+    // Get all slab ids currently associated with the sale
+    const [allSlabsRows] = await db.execute<RowDataPacket[]>(
+      `SELECT id FROM slab_inventory WHERE sale_id = ?`,
+      [saleId]
+    );
+    const allSlabIds: number[] = allSlabsRows.map((r: any) => r.id);
 
-            // Assign sinks and faucets to the main slab
-            for (const sinkType of room.sink_type) {
-              await db.execute(
-                `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
-                [slab.id, sinkType.id]
-              );
-            }
-            for (const faucetType of room.faucet_type) {
-              await db.execute(
-                `UPDATE faucets SET slab_id = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
-                [slab.id, faucetType.id]
-              );
-            }
-          } else {
-            // Partial slab sale: update main slab with sale info AND create a copy
-            await db.execute(
-              `UPDATE slab_inventory SET sale_id = ?, room_uuid = UUID_TO_BIN(?), seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
-              stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ? WHERE id = ?`,
-              [
-                saleId,
-                room.room_id,
-                room.seam,
-                room.edge,
-                room.room,
-                room.backsplash,
-                room.tear_out,
-                room.square_feet,
-                room.stove,
-                room.ten_year_sealer,
-                room.waterfall,
-                room.corbels,
-                room.retail_price,
-                room.extras,
-                slab.id,
-              ]
-            );
+    if (allSlabIds.length) {
+      const placeholders = allSlabIds.map(() => "?").join(",");
 
-            for (const sinkType of room.sink_type) {
-              await db.execute(
-                `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
-                [slab.id, sinkType.id]
-              );
-            }
-            for (const faucetType of room.faucet_type) {
-              await db.execute(
-                `UPDATE faucets SET slab_id = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
-                [slab.id, faucetType.id]
-              );
-            }
+      // Clear current sink / faucet assignments so we can re-apply
+      await db.execute(
+        `UPDATE sinks SET slab_id = NULL WHERE slab_id IN (${placeholders}) AND is_deleted = 0`,
+        allSlabIds
+      );
+      await db.execute(
+        `UPDATE faucets SET slab_id = NULL WHERE slab_id IN (${placeholders}) AND is_deleted = 0`,
+        allSlabIds
+      );
+    }
 
-            // Create a copy of the slab (remaining portion) with parent_id
-            const [slabDimensionsForRoom] = await db.execute<RowDataPacket[]>(
-              `SELECT length, width, stone_id, bundle, url FROM slab_inventory WHERE id = ?`,
-              [slab.id]
-            );
+    // Update each slab record and reassign sinks/faucets according to form
+    for (const room of data.rooms) {
+      for (const slab of room.slabs) {
+        await db.execute(
+          `UPDATE slab_inventory SET room_uuid = UUID_TO_BIN(?), seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?, stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ? WHERE id = ?`,
+          [
+            room.room_id,
+            room.seam,
+            room.edge,
+            room.room,
+            room.backsplash,
+            room.tear_out,
+            room.square_feet,
+            room.stove,
+            room.ten_year_sealer,
+            room.waterfall,
+            room.corbels,
+            room.retail_price,
+            room.extras,
+            slab.id,
+          ]
+        );
 
-            if (slabDimensionsForRoom && slabDimensionsForRoom.length > 0) {
-              await db.execute<ResultSetHeader>(
-                `INSERT INTO slab_inventory 
-                 (stone_id, bundle, length, width, url, parent_id) 
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [
-                  slabDimensionsForRoom[0].stone_id,
-                  slabDimensionsForRoom[0].bundle,
-                  slabDimensionsForRoom[0].length,
-                  slabDimensionsForRoom[0].width,
-                  slabDimensionsForRoom[0].url,
-                  slab.id,
-                ]
-              );
-            }
-          }
+        // Reassign sinks
+        for (const sinkType of room.sink_type) {
+          await db.execute(
+            `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+            [slab.id, sinkType.id]
+          );
+        }
+
+        // Reassign faucets
+        for (const faucetType of room.faucet_type) {
+          await db.execute(
+            `UPDATE faucets SET slab_id = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+            [slab.id, faucetType.id]
+          );
         }
       }
     }
   } catch (error) {
-    console.error("Error during sale process: ", error);
+    console.error("Error updating sale: ", error);
     const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Error", "Failed to process sale"));
+    session.flash("message", toastData("Error", "Failed to update sale"));
     return redirect(`..${searchString}`, {
       headers: { "Set-Cookie": await commitSession(session) },
     });
   }
 
+  // Success toast & redirect
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Sale completed successfully"));
+  session.flash("message", toastData("Success", "Sale updated successfully"));
 
-  const separator = searchString ? "&" : "?";
-  return redirect(`..${searchString}${separator}saleId=${saleId}`, {
+  return redirect(`..${searchString}`, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
@@ -336,14 +288,21 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       `,
       [user.company_id]
     );
+    const starting = await getCustomerSchemaFromSaleId(saleId);
+    if (!starting) {
+      return redirect(`/employee/stones/slabs`);
+    }
 
     return {
       sink_type,
       faucet_type,
+      saleId,
+      starting,
     };
 };
 
-export default function SlabSell() {
+export default async function SlabSell() {
   const data = useLoaderData<typeof loader>();
-  return <ContractForm data={data} starting={{}}/>
+  const starting = customerSchema.parse(data.starting);
+  return <ContractForm data={data} starting={starting}/>
 }

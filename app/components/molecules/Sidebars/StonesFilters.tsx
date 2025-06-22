@@ -6,7 +6,7 @@ import { CheckOption } from "~/components/molecules/CheckOption";
 import { ISupplier } from "~/schemas/suppliers";
 import { LinkSpan } from "~/components/atoms/LinkSpan";
 import { useState, useEffect, useRef, useMemo, useCallback, ReactNode } from "react";
-import { Stone } from "~/utils/queries";
+import { Stone } from "~/utils/queries.server";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 
 import { SidebarGroupLabel, SidebarMenuSub } from "~/components/ui/sidebar";

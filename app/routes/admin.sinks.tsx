@@ -11,7 +11,7 @@ import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
 import { sinkFilterSchema } from "~/schemas/sinks";
 import { cleanParams } from "~/hooks/use-safe-search-params";
-import { Sink, sinkQueryBuilder } from "~/utils/queries";
+import { Sink, sinkQueryBuilder } from "~/utils/queries.server";
 import { SINK_TYPES } from "~/utils/constants";
 import { Plus } from "lucide-react";
 

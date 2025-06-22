@@ -442,7 +442,7 @@ interface IContractFormProps {
                   className="sm:order-2 order-1 sm:ml-auto ml-0"
                   type="submit"
                 >
-                  Create Sale
+                  Submit
                 </LoadingButton>
               </DialogFooter>
             </Form>

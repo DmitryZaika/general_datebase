@@ -9,7 +9,7 @@ import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
 import { faucetFilterSchema } from "~/schemas/faucets";
 import { cleanParams } from "~/hooks/use-safe-search-params";
-import { Faucet, faucetQueryBuilder } from "~/utils/queries";
+import { Faucet, faucetQueryBuilder } from "~/utils/queries.server";
 import { FAUCET_TYPES } from "~/utils/constants";
 import { Plus } from "lucide-react";
 

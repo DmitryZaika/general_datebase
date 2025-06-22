@@ -10,7 +10,7 @@ import {
 } from "react-router";
 import { FaPencilAlt, FaTimes } from "react-icons/fa";
 import { getAdminUser } from "~/utils/session.server";
-import { stoneQueryBuilder } from "~/utils/queries";
+import { stoneQueryBuilder } from "~/utils/queries.server";
 import { stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { STONE_TYPES } from "~/utils/constants";

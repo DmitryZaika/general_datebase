@@ -8,7 +8,7 @@ import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState, useEffect } from "react";
 import { stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
-import { Stone, stoneQueryBuilder } from "~/utils/queries";
+import { Stone, stoneQueryBuilder } from "~/utils/queries.server";
 import { StoneSearch } from "~/components/molecules/StoneSearch";
 import { Button } from "~/components/ui/button";
 import { TableIcon, GridIcon } from "@radix-ui/react-icons";

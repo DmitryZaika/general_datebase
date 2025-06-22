@@ -13,7 +13,7 @@ import ModuleList from "~/components/ModuleList";
 import { ImageCard } from "~/components/organisms/ImageCard";
 import { SuperCarousel } from "~/components/organisms/SuperCarousel";
 import { useState } from "react";
-import { stoneQueryBuilder } from "~/utils/queries";
+import { stoneQueryBuilder } from "~/utils/queries.server";
 import { StoneFilter, stoneFilterSchema } from "~/schemas/stones";
 import { cleanParams } from "~/hooks/use-safe-search-params";
 import { StoneSearch } from "~/components/molecules/StoneSearch";
