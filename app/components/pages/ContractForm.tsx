@@ -23,12 +23,17 @@ import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { Form } from "react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { customerSchema } from "~/schemas/sales";
+import { Sink, Faucet } from "~/types";
 
 
 const resolver = zodResolver(customerSchema);
 
+interface IContractFormProps {
+  data: {sink_type: Sink[], faucet_type: Faucet[]},
+ starting: Partial<TCustomerSchema>
+}
 
- export function ContractForm({data, starting}: {data: any, starting: Partial<TCustomerSchema>}) {
+ export function ContractForm({data, starting}: IContractFormProps) {
     const {
       sink_type,
       faucet_type,
