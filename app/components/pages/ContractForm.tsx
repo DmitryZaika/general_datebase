@@ -32,9 +32,6 @@ const resolver = zodResolver(customerSchema);
     const {
       sink_type,
       faucet_type,
-      stoneType,
-      stoneName,
-      stoneId
     } = data;
     const navigate = useNavigate();
     const isSubmitting = useNavigation().state === "submitting";
@@ -384,10 +381,6 @@ const resolver = zodResolver(customerSchema);
                     index={index}
                     sink_type={sink_type}
                     faucet_type={faucet_type}
-                    stoneType={stoneType}
-                    stoneId={stoneId}
-                
-                    stoneName={stoneName}
                   />
                 ))}
   

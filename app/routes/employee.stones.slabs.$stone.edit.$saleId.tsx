@@ -283,22 +283,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
     const saleId = parseInt(params.saleId, 10);
 
-    const stoneInfo = await selectMany<{
-      id: number;
-      type: string;
-      name: string;
-    }>(
-      db,
-      `SELECT stones.id, stones.type, stones.name
-       FROM stones 
-       JOIN slab_inventory ON slab_inventory.stone_id = stones.id 
-       WHERE slab_inventory.sale_id = ?`,
-      [saleId]
-    );
-    const stoneId = stoneInfo.length > 0 ? stoneInfo[0].id : null;
-    const stoneType = stoneInfo.length > 0 ? stoneInfo[0].type : null;
-    const stoneName = stoneInfo.length > 0 ? stoneInfo[0].name : null;
-
     const sink_type = await selectMany<Sink>(
       db,
       `SELECT
@@ -356,14 +340,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return {
       sink_type,
       faucet_type,
-      stoneType,
-      stoneName,
-      stoneId,
-      slabId,
     };
 };
 
 export default function SlabSell() {
   const data = useLoaderData<typeof loader>();
-  return <ContractForm data={data}/>
+  return <ContractForm data={data} starting={{}}/>
 }

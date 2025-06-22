@@ -21,6 +21,12 @@ export interface Sink {
   sink_count: number;
 }
 
+export interface Stone {
+  id: number;
+  type: string;
+  name: string;
+}
+
 export interface Faucet {
   id: number;
   name: string;

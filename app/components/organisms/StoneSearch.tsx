@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "../ui/input";
 import { StoneSearchResult } from "~/types";
+import { Stone } from "~/types";
 
 const fetchAvailableStones = async (query: string = "") => {
     const response = await fetch(
@@ -22,16 +23,16 @@ const fetchAvailableStones = async (query: string = "") => {
   };
 
 export const StoneSearch = ({
-    stoneName,
+    stone,
     setStone,
     onRetailPriceChange,
   }: {
-    stoneName: string | null;
-    setStone: (value: { id: number; type: string }) => void;
+    stone: Stone | undefined;
+    setStone: (value: Stone) => void;
     onRetailPriceChange?: (price: number) => void;
   }) => {
-    const [searchValue, setSearchValue] = useState(stoneName || undefined);
-    const [show, setShow] = useState(!stoneName);
+    const [searchValue, setSearchValue] = useState(stone?.name || undefined);
+    const [show, setShow] = useState(!stone?.name);
     const { data, isLoading } = useQuery({
       queryKey: ["availableStones", searchValue],
       queryFn: () => fetchAvailableStones(searchValue),
@@ -39,7 +40,7 @@ export const StoneSearch = ({
     });
   
     const handleStoneSelect = (stone: { id: number; name: string }) => {
-      setStone({ id: stone.id, type: data?.stoneType[stone.name] || "" });
+      setStone({ id: stone.id, type: data?.stoneType[stone.name] || "", name: stone.name });
   
       const selectedStone = data?.stoneSearchResults?.find(
         (s) => s.id === stone.id
@@ -66,7 +67,7 @@ export const StoneSearch = ({
           <Input
             placeholder="Search stone colors..."
             value={searchValue}
-            disabled={!!stoneName}
+            disabled={!!stone?.name}
             onChange={(e) => handleValueChange(e.target.value)}
             className="w-full"
           />

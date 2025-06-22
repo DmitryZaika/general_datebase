@@ -23,9 +23,7 @@ import { AddSinkDialog } from "./AddSinkDialog";
 import { AddFaucetDialog } from "./AddFaucetDialog";
 import { AddExtraDialog } from "./AddExtraDialog";
 import { useQuery } from "@tanstack/react-query";
-
-
-
+import { Stone } from "~/types";
 
 const roomOptions = [
     { key: "Kitchen", value: "Kitchen" },
@@ -33,8 +31,6 @@ const roomOptions = [
     { key: "Outdoor", value: "Outdoor" },
     { key: "Island", value: "Island" },
   ];
-  
-  
   
   const backsplashOptions = [
     { key: "No", value: "No" },
@@ -72,22 +68,37 @@ const roomOptions = [
     }, {});
   } 
 
+  async function getStone(
+    slabId: number
+  ): Promise<
+    {
+      id: number;
+      type: string;
+      name: string;
+    }
+  > {
+    const response = await fetch(
+      `/api/stoneInfo/${slabId}`
+    );
+    if (!response.ok) {
+      throw new Error("Failed to fetch stone");
+    }
+    const data = await response.json();
+    return data
+  } 
+
+
+
  export const RoomSubForm = ({
     form,
     index,
     sink_type,
     faucet_type,
-    stoneType,
-    stoneId: tempStoneId,
-    stoneName,
   }: {
     form: UseFormReturn<TCustomerSchema>;
     index: number;
     sink_type: Sink[];
     faucet_type: Faucet[];
-    stoneType: string | null;
-    stoneId: number | null;
-    stoneName: string | null;
   }) => {
     const [linearFeet, setLinearFeet] = useState<number | null>(null);
     const roomValues = useWatch({
@@ -107,6 +118,7 @@ const roomOptions = [
     const [selectedExtraItems, setSelectedExtraItems] = useState<
       (keyof typeof CUSTOMER_ITEMS)[]
     >([]);
+    const [stone, setStone] = useState<Stone | undefined>(undefined)
   
     const slabIds = form.getValues(`rooms.${index}.slabs`).map((slab) => slab.id)
 
@@ -114,12 +126,16 @@ const roomOptions = [
     queryKey: ["slabMap", slabIds],
     queryFn: () => getSlabMap(slabIds),
    })
-    const [stone, setStone] = useState<{
-      id: number;
-      type: string | null;
-    } | null>(
-      tempStoneId && index === 0 ? { id: tempStoneId, type: stoneType } : null
-    );
+   const { data: stoneData } = useQuery({
+    queryKey: ["stone", slabIds[0]],
+    queryFn: () => getStone(slabIds[0]),
+   })
+
+   useEffect(() => {
+    if (stoneData) {
+      setStone(stoneData)
+    }
+   }, [stoneData])
   
   
     /*fect(() => {
@@ -142,21 +158,21 @@ const roomOptions = [
     */
   
     useEffect(() => {
-      if (stoneType) {
+      if (stone?.type) {
         form.setValue(
           `rooms.${index}.ten_year_sealer`,
           stone?.type?.toLowerCase() === "quartz" ? false : true
         );
       }
-    }, [stoneType, index, stone?.type]);
+    }, [stone?.type, index]);
   
     useEffect(() => {
-      if (index === 0 && tempStoneId && stoneName) {
-        fetch(`/api/stones/search?name=${encodeURIComponent(stoneName)}`)
+      if (stone?.name) {
+        fetch(`/api/stones/search?name=${encodeURIComponent(stone?.name)}`)
           .then((response) => response.json())
           .then((data) => {
             const foundStone = data.stones?.find(
-              (s: any) => s.id === tempStoneId
+              (s: any) => s.id === stone?.id
             );
             if (foundStone && foundStone.retail_price) {
               form.setValue(
@@ -174,7 +190,7 @@ const roomOptions = [
           })
           .catch(console.error);
       }
-    }, [index, tempStoneId, stoneName, form]);
+    }, [index, stone?.id, stone?.name, form]);
   
     const handleSwitchSlab = (slabId: number, isFull: boolean) => {
       form.setValue(
@@ -334,7 +350,7 @@ const roomOptions = [
           />
   
           <StoneSearch
-            stoneName={index === 0 ? stoneName : null}
+            stone={stone}
             setStone={setStone}
             onRetailPriceChange={(price) => {
               form.setValue(`rooms.${index}.retail_price`, price);
