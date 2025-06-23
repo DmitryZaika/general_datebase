@@ -235,9 +235,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
     const saleId = parseInt(params.saleId, 10);
 
-
-
-
     const starting = await getCustomerSchemaFromSaleId(saleId);
     if (!starting) {
       return redirect(`/employee/stones/slabs`);
