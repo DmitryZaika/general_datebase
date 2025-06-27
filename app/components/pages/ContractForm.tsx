@@ -144,6 +144,15 @@ interface IContractFormProps {
       form.setValue("name", customer.name);
       form.setValue("customer_id", customer.id);
   
+      const custAny: any = customer;
+      if (custAny.company_name) {
+        form.setValue("builder", true);
+        form.setValue("company_name", custAny.company_name);
+      } else {
+        form.setValue("builder", false);
+        form.setValue("company_name", "");
+      }
+
       if (customer.address) {
         form.setValue("billing_address", customer.address);
         setDisabledFields((prev) => ({ ...prev, billing_address: true }));
@@ -183,6 +192,15 @@ interface IContractFormProps {
           if (data.customer) {
             form.setValue("name", data.customer.name);
   
+            const custAny: any = data.customer;
+            if (custAny.company_name) {
+              form.setValue("builder", true);
+              form.setValue("company_name", custAny.company_name);
+            } else {
+              form.setValue("builder", false);
+              form.setValue("company_name", "");
+            }
+
             if (data.customer.address) {
               form.setValue("billing_address", data.customer.address);
               setDisabledFields((prev) => ({ ...prev, billing_address: true }));
@@ -326,58 +344,90 @@ interface IContractFormProps {
                   render={({ field }) => <input type="hidden" {...field} />}
                 />
   
-                <AddressInput
-                  form={form}
-                  field="billing_address"
-                  zipField="billing_zip_code"
+  <AddressInput
+                form={form}
+                field="billing_address"
+                zipField="billing_zip_code"
+              />
+              <div className="flex items-center space-x-2 my-2">
+                <FormField
+                  control={form.control}
+                  name="same_address"
+                  render={({ field }) => (
+                    <>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        id="same_address"
+                        label="Project address same as billing address"
+                      />
+                    </>
+                  )}
                 />
-                <div className="flex items-center space-x-2 my-2">
-                  <FormField
-                    control={form.control}
-                    name="same_address"
-                    render={({ field }) => (
-                      <>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          id="same_address"
-                          label="Project address same as billing address"
-                        />
-                      </>
-                    )}
-                  />
-                </div>
-  
-                {!form.watch("same_address") && (
-                  <AddressInput form={form} field="project_address" />
-                )}
-  
-                <div className="flex flex-row gap-2">
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <PhoneInput
-                        field={field}
-                        formClassName="mb-0 w-1/2"
-                        disabled={disabledFields.phone}
-                      />
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <EmailInput
-                        field={{
-                          ...field,
-                          disabled: disabledFields.email,
-                        }}
-                        formClassName="mb-0"
-                      />
-                    )}
-                  />
-                </div>
+              </div>
+
+              {!form.watch("same_address") && (
+                <AddressInput form={form} field="project_address" />
+              )}
+
+              <div className="flex flex-row gap-2">
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <PhoneInput
+                      field={field}
+                      formClassName="mb-0 w-1/2"
+                      disabled={disabledFields.phone}
+                    />
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <EmailInput
+                      field={{
+                        ...field,
+                        disabled: disabledFields.email,
+                      }}
+                      formClassName="mb-0"
+                    />
+                  )}
+                />
+              </div>
+
+              {/* Builder checkbox */}
+              <div className="flex items-center space-x-2 my-2">
+                <FormField
+                  control={form.control}
+                  name="builder"
+                  render={({ field }) => (
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      id="builder_checkbox"
+                      label="Builder"
+                    />
+                  )}
+                />
+              </div>
+
+              {/* Company Name input - shown only if builder selected */}
+              {form.watch("builder") && (
+                <FormField
+                  control={form.control}
+                  name="company_name"
+                  render={({ field }) => (
+                    <InputItem
+                      name={"Company Name"}
+                      placeholder={"Enter company name"}
+                      field={field}
+                      formClassName="mb-2"
+                    />
+                  )}
+                />
+              )}
   
                 {form.watch("rooms").map((room, index) => (
                   <RoomSubForm

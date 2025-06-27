@@ -32,6 +32,8 @@ const safeJsonParse = (value: any, fallback: Record<string, any> = {}) => {
         postal_code: string | null;
         phone: string | null;
         email: string | null;
+        builder: boolean | null;
+        company_name: string | null;
       }
     >(
       db,
@@ -46,7 +48,8 @@ const safeJsonParse = (value: any, fallback: Record<string, any> = {}) => {
           c.address,
           c.postal_code,
           c.phone,
-          c.email
+          c.email,
+          c.company_name
        FROM sales s
        JOIN customers c ON s.customer_id = c.id
        WHERE s.id = ?`,
@@ -214,6 +217,8 @@ const safeJsonParse = (value: any, fallback: Record<string, any> = {}) => {
       price: sale.price || 0,
       notes_to_sale: sale.notes || "",
       rooms: Object.values(roomsMap),
+      builder: Boolean(sale.builder),
+      company_name: sale.company_name || "",
     };
   
     return customerSchema;
