@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { v4 as uuidv4 } from "uuid";
+import { v7 as uuidv7 } from "uuid";
 import { coerceNumberRequired, StringOrNumber } from "~/schemas/general";
 
 export const slabOptionsSchema = z.object({
@@ -17,7 +17,7 @@ const faucetOptionsSchema = z.object({
 
 export const roomSchema = z.object({
   room: z.string().default("kitchen"),
-  room_id: z.string().default(uuidv4),
+  room_id: z.string().default(uuidv7),
   sink_type: z.array(sinkOptionsSchema).default([]),
   faucet_type: z.array(faucetOptionsSchema).default([]),
   edge: z.string().default("Flat"),
