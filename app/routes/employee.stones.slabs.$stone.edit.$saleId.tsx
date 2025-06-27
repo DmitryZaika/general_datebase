@@ -89,6 +89,7 @@ interface SaleData {
     sink_type: Array<{ id: number; name: string }>;
     faucet_type: Array<{ id: number; name: string }>;
   }[];
+  company_name?: string | null;
 }
 
 const roomOptions = [
@@ -288,6 +289,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
       `UPDATE faucets SET slab_id = NULL, is_deleted = 0, price = NULL WHERE slab_id IN (SELECT id FROM slab_inventory WHERE sale_id = ?)`,
       [saleId]
     );
+
+    // Update builder/company name
+    if (data.builder && data.company_name) {
+      await db.execute(
+        `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
+        [data.company_name, customerId || data.customer_id, user.company_id]
+      );
+      await db.execute(`UPDATE slab_inventory SET company_name = ? WHERE sale_id = ?`, [data.company_name, saleId]);
+    } else {
+      await db.execute(`UPDATE customers SET company_name = NULL WHERE id = ? AND company_id = ?`, [customerId || data.customer_id, user.company_id]);
+      await db.execute(`UPDATE slab_inventory SET company_name = NULL WHERE sale_id = ?`, [saleId]);
+    }
 
     // Get all current slabs in the sale to compare with the form data
     const [currentSlabs] = await db.execute<RowDataPacket[]>(
@@ -495,7 +508,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const [saleData] = await db.execute<RowDataPacket[]>(
     `SELECT 
       s.id, s.customer_id, c.name as customer_name, c.address as billing_address, 
-      s.project_address, c.phone, c.email, s.price, s.notes as notes_to_sale, s.sale_date, s.seller_id
+      s.project_address, c.phone, c.email, c.company_name, s.price, s.notes as notes_to_sale, s.sale_date, s.seller_id
      FROM sales s
      JOIN customers c ON s.customer_id = c.id
      WHERE s.id = ? AND s.company_id = ?`,
@@ -506,7 +519,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw new Response("Sale not found", { status: 404 });
   }
 
-  const sale = saleData[0];
+  const sale = saleData[0] as typeof saleData[0] & { company_name?: string | null };
 
   // Get room details from slab_inventory
   const slabInventory = await selectMany<{
@@ -690,6 +703,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     price: sale.price || 0,
     notes_to_sale: sale.notes_to_sale || "",
     sale_date: sale.sale_date,
+    company_name: sale.company_name || null,
     rooms:
       rooms.length > 0
         ? rooms.map((room) => ({
@@ -1531,6 +1545,8 @@ export default function SlabEdit() {
       price: sale.price,
       notes_to_sale: sale.notes_to_sale,
       rooms: sale.rooms.length > 0 ? sale.rooms : [roomSchema.parse({})],
+      builder: Boolean(sale.company_name),
+      company_name: sale.company_name || "",
     },
   });
 
@@ -1688,6 +1704,37 @@ export default function SlabEdit() {
                   )}
                 />
               </div>
+
+              {/* Builder checkbox */}
+              <div className="flex items-center space-x-2 my-2">
+                <FormField
+                  control={form.control}
+                  name="builder"
+                  render={({ field }) => (
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      id="builder_checkbox"
+                      label="Builder"
+                    />
+                  )}
+                />
+              </div>
+
+              {form.watch("builder") && (
+                <FormField
+                  control={form.control}
+                  name="company_name"
+                  render={({ field }) => (
+                    <InputItem
+                      name={"Company Name"}
+                      placeholder={"Enter company name"}
+                      field={field}
+                      formClassName="mb-2"
+                    />
+                  )}
+                />
+              )}
 
               {form.watch("rooms").map((room, index) => (
                 <RoomSubForm
