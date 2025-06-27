@@ -37,6 +37,18 @@ type Props = {
   zipField?: string;
 };
 
+function formatAddress(address: string, zip?: string | null) {
+  if (!address) return address;
+
+  const cleanZip = zip ?? "";
+
+  if (cleanZip && address.includes(cleanZip)) {
+    return address.replace("USA", "").replace(/\s+,/g, "").trim();
+  }
+
+  return address.replace("USA", cleanZip);
+}
+
 export function AddressInput({ form, field, zipField }: Props) {
   const [open, setOpen] = useState(false);
 

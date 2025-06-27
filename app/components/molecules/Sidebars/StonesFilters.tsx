@@ -1,5 +1,5 @@
 import { useNavigation } from "react-router";
-import { STONE_TYPES } from "~/utils/constants";
+import { STONE_TYPES, STONE_FINISHES } from "~/utils/constants";
 import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
 import { stoneFilterSchema, StoneFilter } from "~/schemas/stones";
 import { CheckOption } from "~/components/molecules/CheckOption";
@@ -246,7 +246,12 @@ export function StonesFilters({ suppliers, colors, base, stones = [] }: IProps) 
     
     return searchParams.level.length > 0;
   }, [searchParams.level]);
- 
+
+  const hasFinishingFilters = useMemo(() => 
+    searchParams?.finishing && searchParams.finishing.length > 0,
+    [searchParams.finishing]
+  );
+
   useEffect(() => {
     const storedColorsExpanded = safeLocalStorage.getItem('colorsExpanded');
     if (storedColorsExpanded) {
@@ -306,6 +311,14 @@ export function StonesFilters({ suppliers, colors, base, stones = [] }: IProps) 
     setSearchParams({ ...searchParams, show_sold_out: !show_sold_out });
   }, [isSubmitting, searchParams, setSearchParams]);
 
+  const toggleFinishing = createToggleFilterHandler({
+    searchParams,
+    setSearchParams,
+    isSubmitting,
+    defaultValue: [],
+    filterKey: 'finishing'
+  });
+
   const clearTypeFilters = createClearFilterHandler(
     searchParams, setSearchParams, isSubmitting, 'type', []
   );
@@ -320,6 +333,10 @@ export function StonesFilters({ suppliers, colors, base, stones = [] }: IProps) 
   
   const clearSupplierFilter = createClearFilterHandler(
     searchParams, setSearchParams, isSubmitting, 'supplier', 0
+  );
+
+  const clearFinishingFilters = createClearFilterHandler(
+    searchParams, setSearchParams, isSubmitting, 'finishing', []
   );
 
   const isLevelSelected = useCallback((level: number) => {
@@ -357,6 +374,24 @@ export function StonesFilters({ suppliers, colors, base, stones = [] }: IProps) 
         noShowAll={true}
       />
 
+      <FilterGroup
+        title="Finishing"
+        items={[...STONE_FINISHES]}
+        renderItem={(item: typeof STONE_FINISHES[number]) => (
+          <CheckOption
+            value={item.charAt(0).toUpperCase() + item.slice(1)}
+            key={item}
+            selected={searchParams.finishing ? searchParams.finishing.includes(item) : false}
+            toggleValue={() => toggleFinishing(item)}
+            isLoading={isSubmitting}
+          />
+        )}
+        hasFilter={hasFinishingFilters}
+        onClear={clearFinishingFilters}
+        isSubmitting={isSubmitting}
+        id="finishing"
+        noShowAll={true}
+      />
 
       {Array.isArray(colors) && colors.length > 0 && (
         <FilterGroup

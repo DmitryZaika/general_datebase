@@ -80,3 +80,17 @@ export const CUSTOMER_ITEMS = {
     priceFn: ({ amount }: { amount: number }) => amount * 6,
   },
 };
+export const STONE_FINISHES = [
+  "polished",
+  "leathered",
+  "honed",
+] as const;
+
+// const BASE_PRICES = {
+//   corbels: 100,
+//   edge: {
+//     flat: 0,
+//     east: 100,
+//     ogee: (linearFeet: number) => linearFeet * 100,
+//   },
+// };

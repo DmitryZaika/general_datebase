@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { coerceNumber, NullableId, StringBoolean } from "./general";
-import { STONE_TYPES } from "~/utils/constants";
+import { STONE_TYPES, STONE_FINISHES } from "~/utils/constants";
 
 export const stoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -15,6 +15,7 @@ export const stoneSchema = z.object({
   retail_price: coerceNumber,
   level: NullableId,
   colors: z.any().optional(),
+  finishing: z.enum(STONE_FINISHES),
 });
 
 export const stoneFilterSchema = z.object({
@@ -26,6 +27,7 @@ export const stoneFilterSchema = z.object({
   supplier: z.number().gte(0).default(0),
   colors: z.any().optional(),
   level: z.array(z.number()).default([]),
+  finishing: z.array(z.enum(STONE_FINISHES)).default([]),
   viewMode: z.enum(["grid", "table"]).optional().default("grid")
 });
 export type StoneFilter = z.infer<typeof stoneFilterSchema>;

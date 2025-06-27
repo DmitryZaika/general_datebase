@@ -10,6 +10,7 @@ interface Customer {
   address: string | null;
   phone: string | null;
   email: string | null;
+  company_name: string | null;
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -23,7 +24,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     // Get customer details
     const [customer] = await db.query<(Customer & RowDataPacket)[]>(
-      `SELECT id, name, address, phone, email 
+      `SELECT id, name, address, phone, email, company_name 
        FROM customers 
        WHERE id = ? AND company_id = ?`,
       [customerId, user.company_id]

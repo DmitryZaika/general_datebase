@@ -144,7 +144,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
     // Handle slabs and accessories
     // ----------------------
 
-    // Get all slab ids currently associated with the sale
+   
+    if (data.builder && data.company_name) {
+      await db.execute(
+        `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
+        [data.company_name, customerId || data.customer_id, user.company_id]
+      );
+      await db.execute(`UPDATE slab_inventory SET company_name = ? WHERE sale_id = ?`, [data.company_name, saleId]);
+    } else {
+      await db.execute(`UPDATE customers SET company_name = NULL WHERE id = ? AND company_id = ?`, [customerId || data.customer_id, user.company_id]);
+      await db.execute(`UPDATE slab_inventory SET company_name = NULL WHERE sale_id = ?`, [saleId]);
+    }
+
+    // Get all current slabs in the sale to compare with the form data
     const [allSlabsRows] = await db.execute<RowDataPacket[]>(
       `SELECT id FROM slab_inventory WHERE sale_id = ?`,
       [saleId]
