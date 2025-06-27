@@ -253,6 +253,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
       }
     }
+
+    // If this is a builder sale, set company_name on all slabs in the sale
+    if (data.builder && data.company_name) {
+      await db.execute(
+        `UPDATE customers SET company_name = ? WHERE id = ?`,
+        [data.company_name, customerId]
+      );
+    }
+
   } catch (error) {
     console.error("Error during sale process: ", error);
     const session = await getSession(request.headers.get("Cookie"));
@@ -292,6 +301,7 @@ export default function SlabSell() {
   const { slabId } = useLoaderData<typeof loader>();
   const starting = {
     same_address: true,
+    builder:false,
     rooms: [roomSchema.parse({
       slabs: [slabOptionsSchema.parse({
         id: slabId,

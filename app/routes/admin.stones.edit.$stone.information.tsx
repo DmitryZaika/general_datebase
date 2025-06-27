@@ -1,4 +1,4 @@
-import { STONE_TYPES } from "~/utils/constants";
+import { STONE_TYPES, STONE_FINISHES } from "~/utils/constants";
 import {
     ActionFunctionArgs,
     LoaderFunctionArgs,
@@ -58,11 +58,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (newFile) {
         await db.execute(
           `UPDATE stones
-           SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
+           SET name = ?, type = ?, finishing = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
            WHERE id = ?`,
           [
             data.name,
             data.type,
+            data.finishing,
             data.file,
             data.is_display,
             data.supplier_id,
@@ -78,11 +79,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
       } else {
         await db.execute(
           `UPDATE stones
-           SET name = ?, type = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
+           SET name = ?, type = ?, finishing = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
            WHERE id = ?`,
           [
             data.name,
             data.type,
+            data.finishing,
             data.is_display,
             data.supplier_id,
             data.length,
@@ -164,9 +166,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
       cost_per_sqft: number;
       retail_price: number;
       level: number | null;
+      finishing: string | null;
     }>(
       db,
-      "SELECT name, type, url, is_display, supplier_id, length, width, on_sale, cost_per_sqft, retail_price, level FROM stones WHERE id = ?",
+      "SELECT name, type, url, is_display, supplier_id, length, width, on_sale, cost_per_sqft, retail_price, level, finishing FROM stones WHERE id = ?",
       stoneId
     );
     if (!stone) {
@@ -216,6 +219,7 @@ export default function Information() {
       cost_per_sqft,
       retail_price,
       level,
+      finishing,
     } = stone;
     const defaultValues = {
       name,
@@ -229,6 +233,7 @@ export default function Information() {
       cost_per_sqft,
       retail_price,
       level,
+      finishing,
       colors: selectedColorIds,
     };
     const form = useCustomOptionalForm(stoneSchema, defaultValues);
@@ -257,6 +262,7 @@ export default function Information() {
               />
             )}
           />
+        
           <FormField
             control={form.control}
             name="file"
@@ -341,6 +347,7 @@ export default function Information() {
             )}
           />
         </div>
+        <div className="flex gap-2">
         <FormField
           control={form.control}
           name="level"
@@ -357,7 +364,23 @@ export default function Information() {
             />
           )}
         />
-        
+          <FormField
+            control={form.control}
+            name="finishing"
+            render={({ field }) => (
+              <SelectInput
+                className="w-1/2"
+                name="Finishing"
+                placeholder="Select Finishing"
+                field={field}
+                options={STONE_FINISHES.map((finish) => ({
+                  key: finish,
+                  value: finish.charAt(0).toUpperCase() + finish.slice(1),
+                }))}
+              />
+            )}
+          />
+        </div>
         <FormField
           control={form.control}
           name="colors"

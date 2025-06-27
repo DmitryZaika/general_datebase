@@ -1,5 +1,5 @@
 import { LoadingButton } from "~/components/molecules/LoadingButton";
-import { STONE_TYPES } from "~/utils/constants";
+import { STONE_TYPES, STONE_FINISHES } from "~/utils/constants";
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import {
   useNavigate,
@@ -52,11 +52,12 @@ export async function action({ request }: ActionFunctionArgs) {
   const user = await getAdminUser(request);
   const [result]: any = await db.execute(
     `INSERT INTO stones
-     (name, type, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price, level)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+     (name, type, finishing, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price, level)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
     [
       data.name,
       data.type,
+      data.finishing,
       data.file,
       user.company_id,
       data.is_display,
@@ -147,6 +148,7 @@ export default function StonesAdd() {
     defaultValues: {
       is_display: true,
       colors: [],
+      finishing: "polished",
     },
   });
 
@@ -191,6 +193,7 @@ export default function StonesAdd() {
                 />
               )}
             />
+          
             <FormField
               control={form.control}
               name="file"
@@ -293,6 +296,7 @@ export default function StonesAdd() {
             />
      
           </div>
+          <div className="flex gap-2">
           <FormField
               control={form.control}
               name="level"
@@ -309,6 +313,23 @@ export default function StonesAdd() {
                 />
               )}
             />
+              <FormField
+              control={form.control}
+              name="finishing"
+              render={({ field }) => (
+                <SelectInput
+                className="w-1/2"
+                  field={field}
+                  placeholder="Finishing"
+                  name="Finishing"
+                  options={STONE_FINISHES.map((item) => ({
+                    key: item.toLowerCase(),
+                    value: item.charAt(0).toUpperCase() + item.slice(1),
+                  }))}
+                />
+              )}
+            />
+            </div>
           <FormField
             control={form.control}
             name="colors"
