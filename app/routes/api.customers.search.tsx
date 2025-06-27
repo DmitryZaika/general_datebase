@@ -12,7 +12,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   try {
     const customers = await selectMany<Customer>(
       db,
-      `SELECT id, name, address, phone, email 
+      `SELECT id, name, address, phone, email, company_name 
        FROM customers 
        WHERE company_id = ? AND name LIKE ? 
        ORDER BY name DESC

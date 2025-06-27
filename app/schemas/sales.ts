@@ -44,6 +44,8 @@ export const customerSchema = z.object({
   email: z.string().email("Please enter a valid email"),
   price: coerceNumberRequired("Please Enter Price"),
   notes_to_sale: StringOrNumber,
+  builder: z.boolean().default(false),
+  company_name: z.string().optional(),
 
   rooms: z.array(roomSchema).default([]),
 });

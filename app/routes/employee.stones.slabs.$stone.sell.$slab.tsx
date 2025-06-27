@@ -347,6 +347,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
       }
     }
+
+    // If this is a builder sale, set company_name on all slabs in the sale
+    if (data.builder && data.company_name) {
+      await db.execute(
+        `UPDATE customers SET company_name = ? WHERE id = ?`,
+        [data.company_name, customerId]
+      );
+    }
+
   } catch (error) {
     console.error("Error during sale process: ", error);
     const session = await getSession(request.headers.get("Cookie"));
@@ -1342,6 +1351,8 @@ export default function SlabSell() {
   const form = useForm<TCustomerSchema>({
     resolver,
     defaultValues: {
+      builder: false,
+      company_name: "",
       same_address: true,
       rooms: [roomSchema.parse({})],
     },
@@ -1445,6 +1456,15 @@ export default function SlabSell() {
     form.setValue("name", customer.name);
     form.setValue("customer_id", customer.id);
 
+    const custAny: any = customer;
+    if (custAny.company_name) {
+      form.setValue("builder", true);
+      form.setValue("company_name", custAny.company_name);
+    } else {
+      form.setValue("builder", false);
+      form.setValue("company_name", "");
+    }
+
     if (customer.address) {
       form.setValue("billing_address", customer.address);
       setDisabledFields((prev) => ({ ...prev, billing_address: true }));
@@ -1483,6 +1503,15 @@ export default function SlabSell() {
         const data = await response.json();
         if (data.customer) {
           form.setValue("name", data.customer.name);
+
+          const custAny: any = data.customer;
+          if (custAny.company_name) {
+            form.setValue("builder", true);
+            form.setValue("company_name", custAny.company_name);
+          } else {
+            form.setValue("builder", false);
+            form.setValue("company_name", "");
+          }
 
           if (data.customer.address) {
             form.setValue("billing_address", data.customer.address);
@@ -1661,6 +1690,38 @@ export default function SlabSell() {
                   )}
                 />
               </div>
+
+              {/* Builder checkbox */}
+              <div className="flex items-center space-x-2 my-2">
+                <FormField
+                  control={form.control}
+                  name="builder"
+                  render={({ field }) => (
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      id="builder_checkbox"
+                      label="Builder"
+                    />
+                  )}
+                />
+              </div>
+
+              {/* Company Name input - shown only if builder selected */}
+              {form.watch("builder") && (
+                <FormField
+                  control={form.control}
+                  name="company_name"
+                  render={({ field }) => (
+                    <InputItem
+                      name={"Company Name"}
+                      placeholder={"Enter company name"}
+                      field={field}
+                      formClassName="mb-2"
+                    />
+                  )}
+                />
+              )}
 
               {form.watch("rooms").map((room, index) => (
                 <RoomSubForm
