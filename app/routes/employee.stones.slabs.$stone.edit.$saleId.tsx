@@ -255,7 +255,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         );
       }
 
-      // Update builder/company name (only customers table)
       if (data.builder && data.company_name) {
         await db.execute(
           `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
