@@ -23,7 +23,6 @@ import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { Form } from "react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { customerSchema } from "~/schemas/sales";
-import { Sink, Faucet } from "~/types";
 
 
 const resolver = zodResolver(customerSchema);
@@ -264,9 +263,11 @@ interface IContractFormProps {
           form.setValue("price", total, { shouldValidate: total > 0 });
         }
       });
+
   
       return () => subscription.unsubscribe();
     }, [form, sink_type, faucet_type]);
+    console.log(form.getValues());
   
     return (
       <Dialog open={true} onOpenChange={handleChange}>
