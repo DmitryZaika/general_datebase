@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "~/components/ui/input";
 import { FaSearch, FaChevronRight, FaEdit, FaImage, FaTrash } from "react-icons/fa";
+import { MinusIcon, CheckIcon } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -11,6 +12,8 @@ type UserRole = "employee" | "admin" | "customer";
 interface StoneSearchProps {
   userRole: UserRole;
   className?: string;
+  mode?: "default" | "samples";
+  onMinus?: (stoneId: number) => void;
 }
 
 const highlightStyles = `
@@ -43,13 +46,14 @@ const getStones = async (name: string, userRole: UserRole): Promise<{
 };
 
 
-export function StoneSearch({ userRole, className  }: StoneSearchProps) {
+export function StoneSearch({ userRole, className, mode = "default", onMinus }: StoneSearchProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isInputFocused, setIsInputFocused] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
+  const [doneStoneId, setDoneStoneId] = useState<number | null>(null);
   const { data, isLoading} = useQuery({ 
     queryKey: ['stones', 'search', searchTerm, userRole], 
     queryFn: () => getStones(searchTerm, userRole), 
@@ -166,7 +170,7 @@ export function StoneSearch({ userRole, className  }: StoneSearchProps) {
               </div>
               </div>
 
-                  {userRole === "employee" && (
+                  {userRole === "employee" && mode === "default" && (
                 <div className="flex items-center space-x-2">
                 
                   <Button 
@@ -176,6 +180,30 @@ export function StoneSearch({ userRole, className  }: StoneSearchProps) {
                     className="h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
                   >
                     Slabs
+                  </Button>
+                </div>
+              )}
+              
+              {userRole === "employee" && mode === "samples" && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onMinus) {
+                        onMinus(stone.id);
+                        setDoneStoneId(stone.id);
+                        setTimeout(() => setDoneStoneId(null), 1000);
+                      }
+                    }}
+                    className="h-11 w-11 text-red-500 hover:text-red-700 hover:bg-red-100"
+                  >
+                    {doneStoneId === stone.id ? (
+                      <CheckIcon className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <MinusIcon className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               )}

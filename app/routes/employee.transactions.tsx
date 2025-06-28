@@ -510,24 +510,15 @@ export default function EmployeeTransactions() {
       accessorKey: "stone_name",
       header: ({ column }) => <SortableHeader column={column} title="Stone" />,
       cell: ({ row }) => {
-        const stones = (row.original.stone_name || "")
-          .split(", ")
+        const stonesArr = (row.original.stone_name || "")
+          .split(/,\s*/)
           .filter(Boolean);
-        if (!stones.length) return <span>N/A</span>;
-
-        const stoneCounts: { [key: string]: number } = {};
-        stones.forEach((stone) => {
-          stoneCounts[stone] = (stoneCounts[stone] || 0) + 1;
-        });
-
-        const formattedStones = Object.entries(stoneCounts).map(
-          ([stone, count]) => (count > 1 ? `${stone} x ${count}` : stone)
-        );
+        if (!stonesArr.length) return <span>N/A</span>;
 
         return (
           <div className="flex flex-col">
-            {formattedStones.map((stone, index) => (
-              <span key={index}>{stone}</span>
+            {stonesArr.map((s, idx) => (
+              <span key={idx}>{s}</span>
             ))}
           </div>
         );
