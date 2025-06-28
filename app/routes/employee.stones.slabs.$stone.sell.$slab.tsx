@@ -348,7 +348,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
     }
 
-    // If this is a builder sale, set company_name on all slabs in the sale
+    // If this is a builder sale, update company_name only on customer record
     if (data.builder && data.company_name) {
       await db.execute(
         `UPDATE customers SET company_name = ? WHERE id = ?`,
