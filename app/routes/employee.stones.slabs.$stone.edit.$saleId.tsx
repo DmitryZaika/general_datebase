@@ -254,6 +254,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
           [...updateValues, customerId, user.company_id]
         );
       }
+
+      // Update builder/company name (only customers table)
+      if (data.builder && data.company_name) {
+        await db.execute(
+          `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
+          [data.company_name, customerId || data.customer_id, user.company_id]
+        );
+      } else {
+        await db.execute(
+          `UPDATE customers SET company_name = NULL WHERE id = ? AND company_id = ?`,
+          [customerId || data.customer_id, user.company_id]
+        );
+      }
     } else {
       const [customerResult] = await db.execute<ResultSetHeader>(
         `INSERT INTO customers (name, address, phone, email, company_id) VALUES (?, ?, ?, ?, ?)`,
@@ -289,18 +302,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
       `UPDATE faucets SET slab_id = NULL, is_deleted = 0, price = NULL WHERE slab_id IN (SELECT id FROM slab_inventory WHERE sale_id = ?)`,
       [saleId]
     );
-
-    // Update builder/company name
-    if (data.builder && data.company_name) {
-      await db.execute(
-        `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
-        [data.company_name, customerId || data.customer_id, user.company_id]
-      );
-      await db.execute(`UPDATE slab_inventory SET company_name = ? WHERE sale_id = ?`, [data.company_name, saleId]);
-    } else {
-      await db.execute(`UPDATE customers SET company_name = NULL WHERE id = ? AND company_id = ?`, [customerId || data.customer_id, user.company_id]);
-      await db.execute(`UPDATE slab_inventory SET company_name = NULL WHERE sale_id = ?`, [saleId]);
-    }
 
     // Get all current slabs in the sale to compare with the form data
     const [currentSlabs] = await db.execute<RowDataPacket[]>(
