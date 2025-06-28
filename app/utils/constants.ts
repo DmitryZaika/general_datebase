@@ -24,7 +24,7 @@ export const BASE_PRICES = {
   mitered_edge_price: 200,
   corbels_price: (corbels: number) => corbels * 100,
   edge_price: {
-    flat: 0,
+    Flat: 0,
     eased: 100,
     "1/4_bevel": 200,
     "1/2_bevel": 200,
