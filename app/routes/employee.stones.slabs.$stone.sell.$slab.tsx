@@ -50,6 +50,7 @@ import { Customer, StoneSearchResult } from "~/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { useFullSubmit } from "~/hooks/useFullSubmit";
+import { useToast } from "~/hooks/use-toast";
 
 interface Sink {
   id: number;
@@ -1343,6 +1344,7 @@ export default function SlabSell() {
   const location = useLocation();
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const [slabMap, setSlabMap] = useState<Record<number, string | null>>({
     [slabId]: bundle,
@@ -1358,12 +1360,29 @@ export default function SlabSell() {
     },
   });
 
-  const fullSubmit = useFullSubmit(form, undefined, "POST", (value) => {
+  const internalSubmit = useFullSubmit(form, undefined, "POST", (value) => {
     if (typeof value === "object") {
       return JSON.stringify(value);
     }
     return value;
   });
+
+  const fullSubmit: React.FormEventHandler<HTMLFormElement> = (e) => {
+    // custom validation: each room must have at least one slab
+    const rooms = form.getValues("rooms") as any[];
+    const invalidIndex = rooms.findIndex((r) => (r.slabs ?? []).length === 0);
+    if (invalidIndex !== -1) {
+      e.preventDefault();
+      toast({
+        title: "Missing slab",
+        description: `Please add a slab to room ${invalidIndex + 1}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    internalSubmit(e);
+  };
 
   const handleAddRoom = () => {
     const currentRooms = form.getValues("rooms");
