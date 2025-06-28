@@ -12,6 +12,7 @@ import {
   Receipt,
   User,
   Users,
+  Package,
 } from "lucide-react";
 import { SinkIcon } from "~/components/icons/SinkIcon";
 import { CorbelIcon } from "~/components/icons/CorbelIcon";
@@ -79,6 +80,7 @@ const getItems = (
         icon: SinkIcon,
         component: () => <SinksFilters base={base} suppliers={sinkSuppliers} />,
       },
+     
       {
         title: "Faucets",
         url: `/${base}/faucets`,
@@ -135,6 +137,11 @@ const getItems = (
         title: "Schedule",
         url: `/employee/schedule`,
         icon: Calendar,
+      },
+      {
+        title: "Samples",
+        url: `/${base}/samples`,
+        icon: Package,
       }
     );
   }
