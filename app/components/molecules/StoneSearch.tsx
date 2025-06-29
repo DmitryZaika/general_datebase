@@ -142,7 +142,16 @@ export function StoneSearch({ userRole, className, mode = "default", onMinus }: 
           {data?.map(stone => (
             <div
               key={stone.id}
-              onClick={() => handleResultClick(stone.id)}
+              onClick={(e) => {
+                if (mode === "samples" && onMinus) {
+                  e.stopPropagation();
+                  onMinus(stone.id);
+                  setDoneStoneId(stone.id);
+                  setTimeout(() => setDoneStoneId(null), 1000);
+                } else {
+                  handleResultClick(stone.id);
+                }
+              }}
               className="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center"
             >
               <div className="flex-1 flex-row ">

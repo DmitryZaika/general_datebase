@@ -12,10 +12,9 @@ import { toastData } from "~/utils/toastHelpers";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { csrf } from "~/utils/csrf.server";
 import { getEmployeeUser } from "~/utils/session.server";
-import { selectMany } from "~/utils/queryHelpers";
 import { customerSchema, roomSchema, slabOptionsSchema, TCustomerSchema } from "~/schemas/sales";
-import { Sink, Faucet } from "~/types";
 import { ContractForm } from "~/components/pages/ContractForm";
+
 
 
 const resolver = zodResolver(customerSchema);
@@ -254,7 +253,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
     }
 
-    // If this is a builder sale, set company_name on all slabs in the sale
+    // If this is a builder sale, update company_name only on customer record
     if (data.builder && data.company_name) {
       await db.execute(
         `UPDATE customers SET company_name = ? WHERE id = ?`,

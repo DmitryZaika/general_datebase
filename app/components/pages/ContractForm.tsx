@@ -464,19 +464,41 @@ interface IContractFormProps {
                       />
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="price"
-                    render={({ field }) => (
+                 <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => {
+                    const [display, setDisplay] = useState<string>(
+                      field.value ? Number(field.value).toLocaleString() : "",
+                    );
+                    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                      const cleaned = e.target.value.replace(/[^0-9.]/g, "");
+                      const num = parseFloat(cleaned);
+                      if (isNaN(num)) {
+                        setDisplay("");
+                        field.onChange("");
+                      } else {
+                        setDisplay(num.toLocaleString());
+                        field.onChange(String(num));
+                      }
+                    };
+
+                    return (
                       <InputItem
                         name={"Price"}
                         placeholder={"Enter price"}
-                        field={field}
                         formClassName="mb-0 w-1/4"
+                        field={{
+                          ...field,
+                          value: display,
+                          onChange: handleChange,
+                        }}
                       />
-                    )}
-                  />
-                </div>
+                    );
+                  }}
+                />
+              </div>
+            
               </div>
   
               <DialogFooter className="flex flex-col sm:flex-row gap-2  mt-4">

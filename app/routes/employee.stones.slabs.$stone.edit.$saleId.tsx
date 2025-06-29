@@ -100,8 +100,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
         );
       }
 
-      if (data.same_address && data.billing_address) {
-        data.project_address = data.billing_address;
+      if (data.builder && data.company_name) {
+        await db.execute(
+          `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
+          [data.company_name, customerId || data.customer_id, user.company_id]
+        );
+      } else {
+        await db.execute(
+          `UPDATE customers SET company_name = NULL WHERE id = ? AND company_id = ?`,
+          [customerId || data.customer_id, user.company_id]
+        );
       }
     } else {
       const [customerResult] = await db.execute<ResultSetHeader>(
@@ -134,7 +142,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.notes_to_sale || null,
         totalSquareFeet,
         data.price || 0,
-        data.project_address || null,
+        data.project_address || data.billing_address,
         saleId,
         user.company_id,
       ]
@@ -155,7 +163,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
       await db.execute(`UPDATE customers SET company_name = NULL WHERE id = ? AND company_id = ?`, [customerId || data.customer_id, user.company_id]);
       await db.execute(`UPDATE slab_inventory SET company_name = NULL WHERE sale_id = ?`, [saleId]);
     }
-
     // Get all current slabs in the sale to compare with the form data
     const [allSlabsRows] = await db.execute<RowDataPacket[]>(
       `SELECT id FROM slab_inventory WHERE sale_id = ?`,

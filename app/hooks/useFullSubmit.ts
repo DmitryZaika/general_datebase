@@ -38,7 +38,6 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
     },
     (errors) => {
       console.error("Form validation errors:", errors);
-      // Для проверки всех полей и отображения ошибок в UI
       form.trigger();
     }
   );

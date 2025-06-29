@@ -33,6 +33,7 @@ export default function Samples() {
   const { stones } = useLoaderData<typeof loader>();
   const [currentId, setCurrentId] = useState<number | undefined>(undefined);
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones);
+  const [colorSort, setColorSort] = useState<boolean>(false);
   const token = useAuthenticityToken();
 
   useEffect(() => {
@@ -44,8 +45,59 @@ export default function Samples() {
     const sortedOutOfStock = [...outOfStock].sort((a, b) => a.name.localeCompare(b.name));
     const sortedNotDisplayed = [...notDisplayed].sort((a, b) => a.name.localeCompare(b.name));
     
-    setSortedStones([...sortedInStock, ...sortedOutOfStock, ...sortedNotDisplayed]);
+    const baseSorted = [...sortedInStock, ...sortedOutOfStock, ...sortedNotDisplayed];
+    if (!colorSort) {
+      setSortedStones(baseSorted);
+    } else {
+      setSortedStones(sortByHighlight(baseSorted));
+    }
   }, [stones]);
+
+  // helper to determine severity: 2 red,1 yellow,0 none
+  const getSeverity = (stone: Stone): number => {
+    const imp = stone.samples_importance ?? 1;
+    const amt = stone.samples_amount ?? 0;
+    if (imp === 1) {
+      if (amt < 2) return 2;
+      if (amt < 4) return 1;
+    }
+    if (imp === 2) {
+      if (amt < 3) return 2;
+      if (amt < 6) return 1;
+    }
+    if (imp === 3) {
+      if (amt < 5) return 2;
+      if (amt < 7) return 1;
+    }
+    return 0;
+  };
+
+  const sortByHighlight = (list: Stone[]) => {
+    return [...list].sort((a, b) => {
+      const diff = getSeverity(b) - getSeverity(a);
+      if (diff !== 0) return diff;
+      return a.name.localeCompare(b.name);
+    });
+  };
+
+  const toggleColorSort = () => {
+    setColorSort((prev) => {
+      const next = !prev;
+      if (next) {
+        setSortedStones((prevList) => sortByHighlight(prevList));
+      } else {
+        // revert to base alphabetical/in stock order computed from stones
+        const inStock = stones.filter(stone => Number(stone.available) > 0 && Boolean(stone.is_display));
+        const outOfStock = stones.filter(stone => Number(stone.available) <= 0 && Boolean(stone.is_display));
+        const notDisplayed = stones.filter(stone => !Boolean(stone.is_display));
+        const sortedInStock = [...inStock].sort((a, b) => a.name.localeCompare(b.name));
+        const sortedOutOfStock = [...outOfStock].sort((a, b) => a.name.localeCompare(b.name));
+        const sortedNotDisplayed = [...notDisplayed].sort((a, b) => a.name.localeCompare(b.name));
+        setSortedStones([...sortedInStock, ...sortedOutOfStock, ...sortedNotDisplayed]);
+      }
+      return next;
+    });
+  };
 
   async function updateSamplesAmount(stoneId: number, amount: number) {
     const formData = new FormData();
@@ -236,7 +288,7 @@ export default function Samples() {
 
   return (
     <>
-     <div className="flex justify-between flex-wrap items-center items-end mb-2">
+     <div className="flex justify-between flex-wrap items-center items-end mb-2 gap-2">
         <div className="flex-1 flex justify-center md:justify-end md:ml-auto">
           <StoneSearch 
             userRole="employee" 
@@ -252,6 +304,9 @@ export default function Samples() {
             }}
           />
         </div>
+        <Button variant={colorSort ? "secondary" : "outline"} onClick={toggleColorSort} className="whitespace-nowrap">
+          Out of stock
+        </Button>
       </div>
    
         <StoneTable 
