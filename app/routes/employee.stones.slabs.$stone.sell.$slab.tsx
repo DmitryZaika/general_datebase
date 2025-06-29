@@ -17,13 +17,13 @@ import {
 } from '~/schemas/sales'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 const resolver = zodResolver(customerSchema)
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  let user
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
@@ -146,7 +146,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   )
 
   saleId = salesResult.insertId
-
+  console.log(data.rooms)
   if (data.rooms && data.rooms.length > 0) {
     for (const room of data.rooms) {
       for (const slab of room.slabs) {

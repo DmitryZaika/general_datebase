@@ -1,7 +1,7 @@
 import type React from 'react'
-import { useState, useEffect, useRef } from 'react'
-import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
-import type { FieldValues, ControllerRenderProps } from 'react-hook-form'
+import { useEffect, useRef, useState } from 'react'
+import type { ControllerRenderProps, FieldValues } from 'react-hook-form'
+import { Input } from '~/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import { Input } from '~/components/ui/input'
+import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 
 type Option = { key: string; value: string }
 
@@ -162,8 +162,10 @@ export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>
             disabled={disabled}
           >
             <SelectTrigger className='min-w-[150px]'>
-              <SelectValue placeholder={placeholder}>
-                {selectDisplayValue ? getDisplayValue(selectDisplayValue) : placeholder}
+              <SelectValue placeholder={placeholder || 'Select Item'}>
+                {selectDisplayValue
+                  ? getDisplayValue(selectDisplayValue)
+                  : placeholder || 'Select Item'}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>

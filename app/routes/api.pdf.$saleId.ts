@@ -9,6 +9,7 @@ interface IQuery {
   customer_name: string | null
   seller_name: string | null
   sale_date: Date | null
+  billing_address: string | null
   project_address: string | null
   phone: string | null
   email: string | null
@@ -115,8 +116,10 @@ function homeownerGdIndyText(pdfForm: PDFForm, queryData: IQuery[]) {
     return sum + (row.corbels || 0)
   }, 0)
 
-  const hasLaminateTearOut = queryData.some(row => row.tear_out === 'laminate')
-  const hasStoneTearOut = queryData.some(row => row.tear_out === 'stone')
+  const hasLaminateTearOut = queryData.some(
+    row => row.tear_out === 'laminate_t/o' || row.tear_out === 'vanity_t/o',
+  )
+  const hasStoneTearOut = queryData.some(row => row.tear_out === 'stone_t/o')
   const hasTenYearSealer = queryData.some(row => row.ten_year_sealer === 1)
   const hasWaterfall = queryData.some(row => row.waterfall === 'yes')
 
@@ -159,7 +162,7 @@ function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[]) {
   pdfForm.getTextField('Text126').setText(queryData[0].company_name || undefined)
 
   pdfForm.getTextField('Text127').setText(queryData[0].project_address || undefined)
-  pdfForm.getTextField('Text128').setText(queryData[0].project_address || undefined) // Billing address – оставляем то же или пусто
+  pdfForm.getTextField('Text128').setText(queryData[0].billing_address || undefined)
 
   pdfForm.getTextField('Text129').setText(queryData[0].phone || undefined)
   pdfForm.getTextField('Text130').setText(queryData[0].email || undefined)
@@ -287,7 +290,8 @@ async function getData(saleId: number) {
             main.stones.retail_price,
             main.sink_type.name as sink_name,
             main.faucet_type.name as faucet_name,
-            main.customers.company_name
+            main.customers.company_name,
+            main.customers.address as billing_address
         from main.sales
         join main.customers on main.customers.id = main.sales.customer_id
         join main.users on main.users.id = main.sales.seller_id
@@ -363,9 +367,8 @@ function sanitizeFilename(name: string): string {
 }
 
 export async function loader({ request, params }: ActionFunctionArgs) {
-  let user
   try {
-    user = await getEmployeeUser(request)
+    await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }

@@ -193,10 +193,9 @@ export const RoomSubForm = ({
   }
 
   const handleRemoveFaucet = (faucetIndex: number) => {
-    const currentFaucet = (form.getValues(`rooms.${index}.faucet_type` as any) ||
-      []) as any[]
+    const currentFaucet = form.getValues(`rooms.${index}.faucet_type`) || []
     currentFaucet.splice(faucetIndex, 1)
-    ;(form.setValue as any)(`rooms.${index}.faucet_type`, currentFaucet)
+    form.setValue(`rooms.${index}.faucet_type`, currentFaucet)
   }
 
   const handleRemoveRoom = () => {
@@ -245,6 +244,16 @@ export const RoomSubForm = ({
   useEffect(() => {
     handleExtraChange(form.watch(`rooms.${index}.edge`), 'edge_price')
   }, [linearFeet])
+
+  useEffect(() => {
+    if (!stone) {
+      form.setValue(`rooms.${index}.retail_price`, 0)
+      form.setValue(`rooms.${index}.slabs`, [])
+      form.setValue(`rooms.${index}.total_price`, 0)
+    } else {
+      form.setValue(`rooms.${index}.retail_price`, stone.retail_price)
+    }
+  }, [stone])
 
   /*
   useEffect(() => {
@@ -319,8 +328,6 @@ export const RoomSubForm = ({
           setStone={setStone}
           onRetailPriceChange={price => {
             form.setValue(`rooms.${index}.retail_price`, price)
-
-            // Recalculate total price
             const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
             const totalPrice = squareFeet * price
             form.setValue(`rooms.${index}.total_price`, totalPrice)
