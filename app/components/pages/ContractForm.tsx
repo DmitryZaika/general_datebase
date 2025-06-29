@@ -78,11 +78,6 @@ interface IContractFormProps {
         };
       }
   
-      if (currentRooms.length > 0) {
-        newRoom.room = "bathroom";
-        newRoom.backsplash = "4 inch";
-      }
-  
       form.setValue("rooms", [...currentRooms, newRoom]);
     };
   
@@ -465,10 +460,13 @@ interface IContractFormProps {
                     />
                   )}
                 />
-                <Input
-                  disabled={true}
-                  value={47}
-                      />
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <InputItem name={"Price"} placeholder={"Price"} field={field} formClassName="mb-0 w-3/4"  />
+                )}
+              />
               </div>
             </div>
 
