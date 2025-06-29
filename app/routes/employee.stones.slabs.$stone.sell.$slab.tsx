@@ -1870,7 +1870,7 @@ export default function SlabSell() {
                               {sale.notes}
                             </div>
                           )}
-                          {sale.square_feet > 0 && (
+                          {sale.square_feet && sale.square_feet > 0 && (
                             <div className="text-xs text-gray-600">
                               <span className="font-semibold">
                                 Total Square Feet:
