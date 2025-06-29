@@ -23,6 +23,7 @@ import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { Form } from "react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { customerSchema } from "~/schemas/sales";
+import { Input } from "~/components/ui/input";
 
 
 const resolver = zodResolver(customerSchema);
@@ -452,56 +453,26 @@ interface IContractFormProps {
                 </div>
   
                 <div className="flex flex-row gap-2 mt-6">
-                  <FormField
-                    control={form.control}
-                    name="notes_to_sale"
-                    render={({ field }) => (
-                      <InputItem
-                        name={"Notes"}
-                        placeholder={"Notes to Sale"}
-                        field={field}
-                        formClassName="mb-0 w-3/4"
-                      />
-                    )}
-                  />
-                 <FormField
+                <FormField
                   control={form.control}
-                  name="price"
-                  render={({ field }) => {
-                    const [display, setDisplay] = useState<string>(
-                      field.value ? Number(field.value).toLocaleString() : "",
-                    );
-                    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-                      const cleaned = e.target.value.replace(/[^0-9.]/g, "");
-                      const num = parseFloat(cleaned);
-                      if (isNaN(num)) {
-                        setDisplay("");
-                        field.onChange("");
-                      } else {
-                        setDisplay(num.toLocaleString());
-                        field.onChange(String(num));
-                      }
-                    };
-
-                    return (
-                      <InputItem
-                        name={"Price"}
-                        placeholder={"Enter price"}
-                        formClassName="mb-0 w-1/4"
-                        field={{
-                          ...field,
-                          value: display,
-                          onChange: handleChange,
-                        }}
-                      />
-                    );
-                  }}
+                  name="notes_to_sale"
+                  render={({ field }) => (
+                    <InputItem
+                      name={"Notes"}
+                      placeholder={"Notes to Sale"}
+                      field={field}
+                      formClassName="mb-0 w-3/4"
+                    />
+                  )}
                 />
+                <Input
+                  disabled={true}
+                  value={47}
+                      />
               </div>
-            
-              </div>
-  
-              <DialogFooter className="flex flex-col sm:flex-row gap-2  mt-4">
+            </div>
+
+            <DialogFooter className="flex flex-col sm:flex-row gap-2  mt-4">
                 {/* <Button
                   type="button"
                   variant="blue"

@@ -60,7 +60,6 @@ export const customerSchema = z.object({
     .string()
     .regex(/^\d{3}-\d{3}-\d{4}$/, "Required format: 317-316-1456"),
   email: z.string().email("Please enter a valid email"),
-  price: coerceNumberRequired("Please Enter Price"),
   notes_to_sale: StringOrNumber,
   builder: z.boolean().default(false),
   company_name: z.string().optional(),
