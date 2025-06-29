@@ -22,31 +22,40 @@ if (!DB_DATABASE || !DB_USER || !DB_PASSWORD || !DB_HOST) {
 const sequelize = new Sequelize(DB_DATABASE, DB_USER, DB_PASSWORD, {
   host: DB_HOST,
   dialect: "mysql",
+  multipleStatements: true,
 });
 
 const umzug = new Umzug({
   migrations: {
     glob: ["migrations/*.sql", { cwd: __dirname }],
-    params: [sequelize.getQueryInterface(), Sequelize],
-    resolve: ({ name, path }) => ({
-      name,
-      up: async () => {
-        try {
-          const sql = fs.readFileSync(path, "utf-8");
-          await sequelize.query(sql);
-        } catch (error) {
-          console.error(`Ошибка выполнения SQL миграции ${name}:`, error);
-          throw error;
+    resolve: ({ name, path, context: queryInterface }) => {
+      const down = () => {
+        throw new Error("Down migrations are not supported");
+      };
+      const up = async () => {
+        const sql = fs.readFileSync(path, "utf8");
+        const queries = sql.split(';').filter(q => q.trim());
+        for (const query of queries) {
+          await queryInterface.sequelize.query(query);
         }
-      },
-      down: async () => {
-        console.log(`Откат миграции: ${name}`);
-      },
-    }),
+      };
+      return { name, up, down };
+    },
   },
   context: sequelize.getQueryInterface(),
   storage: new SequelizeStorage({ sequelize }),
   logger: console,
+  create: {
+    folder: "migrations",
+    template: (filepath) => [[filepath, ""]],
+  },
+  sorter: (migrations) => {
+    const collator = new Intl.Collator(undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+    return migrations.sort((a, b) => collator.compare(a.name, b.name));
+  },
 });
 
 const runMigrations = async () => {
