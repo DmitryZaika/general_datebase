@@ -54,7 +54,7 @@ export const customerSchema = z.object({
   seller_id: z.coerce.number().min(1, "Sales rep is required").optional(),
   billing_address: z.string().min(10, "Billing address is required"),
   billing_zip_code: z.coerce.string().optional(),
-  project_address: z.string().min(10, "Project address is required"),
+  project_address: z.string().min(10, "Project address is required").nullable(),
   same_address: z.boolean().default(true),
   phone: z
     .string()

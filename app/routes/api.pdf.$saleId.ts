@@ -142,7 +142,8 @@ const hasLaminateTearOut = queryData.some(
   pdfForm.getTextField("Text36").setText(totalCorbels.toString());
 
 
-  pdfForm.getDropdown("Dropdown42").select(seamText[queryData[0].seam as keyof typeof seamText] || "N/A");
+  const seamKeyHome = (queryData[0].seam || "").toLowerCase();
+  pdfForm.getDropdown("Dropdown42").select(seamText[seamKeyHome as keyof typeof seamText] || "N/A");
 
   const fullPrice = queryData[0].total_price || 0;
   const halfPrice = fullPrice * 0.5;
