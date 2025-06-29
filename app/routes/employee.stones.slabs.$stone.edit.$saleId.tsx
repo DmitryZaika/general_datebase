@@ -1,22 +1,22 @@
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from '@hookform/resolvers/zod'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import {
-  ActionFunctionArgs,
-  LoaderFunctionArgs,
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
   redirect,
   useLoaderData,
-} from "react-router";
-import { getValidatedFormData } from "remix-hook-form";
-import { db } from "~/db.server";
-import { commitSession, getSession } from "~/sessions";
-import { toastData } from "~/utils/toastHelpers";
-import { ResultSetHeader, RowDataPacket } from "mysql2";
-import { csrf } from "~/utils/csrf.server";
-import { getEmployeeUser, User } from "~/utils/session.server";
-import { customerSchema, TCustomerSchema } from "~/schemas/sales";
-import { ContractForm } from "~/components/pages/ContractForm";
-import { getCustomerSchemaFromSaleId } from "~/utils/contractsBackend.server";
+} from 'react-router'
+import { getValidatedFormData } from 'remix-hook-form'
+import { ContractForm } from '~/components/pages/ContractForm'
+import { db } from '~/db.server'
+import { customerSchema, type TCustomerSchema } from '~/schemas/sales'
+import { commitSession, getSession } from '~/sessions'
+import { getCustomerSchemaFromSaleId } from '~/utils/contractsBackend.server'
+import { csrf } from '~/utils/csrf.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
 
-const resolver = zodResolver(customerSchema);
+const resolver = zodResolver(customerSchema)
 
 export async function action({ request, params }: ActionFunctionArgs) {
   // ------------------------------------------------------------
@@ -24,90 +24,95 @@ export async function action({ request, params }: ActionFunctionArgs) {
   // ------------------------------------------------------------
 
   // 1. Auth & CSRF
-  let user: User;
+  let user: User
   try {
-    user = await getEmployeeUser(request);
+    user = await getEmployeeUser(request)
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
 
   try {
-    await csrf.validate(request);
+    await csrf.validate(request)
   } catch (error) {
-    return { error: "Invalid CSRF token" };
+    return { error: 'Invalid CSRF token' }
   }
 
   // 2. Parse & validate form data
-  const { errors, data, receivedValues } =
-    await getValidatedFormData<TCustomerSchema>(request, resolver);
+  const { errors, data, receivedValues } = await getValidatedFormData<TCustomerSchema>(
+    request,
+    resolver,
+  )
   if (errors) {
-    return { errors, receivedValues };
+    return { errors, receivedValues }
   }
 
   if (!params.saleId) {
-    return { error: "Sale ID is missing" };
+    return { error: 'Sale ID is missing' }
   }
 
-  const saleId = Number(params.saleId);
+  const saleId = Number(params.saleId)
   if (Number.isNaN(saleId)) {
-    return { error: "Invalid Sale ID" };
+    return { error: 'Invalid Sale ID' }
   }
 
-  const url = new URL(request.url);
-  const searchParams = url.searchParams.toString();
-  const searchString = searchParams ? `?${searchParams}` : "";
+  const url = new URL(request.url)
+  const searchParams = url.searchParams.toString()
+  const searchString = searchParams ? `?${searchParams}` : ''
 
   try {
     // ----------------------
     // Customer handling
     // ----------------------
-    let customerId: number;
+    let customerId: number
     if (data.customer_id) {
-      customerId = data.customer_id;
+      customerId = data.customer_id
 
       // Update basic customer fields if provided (and only if blank before)
       const [customerVerify] = await db.execute<RowDataPacket[]>(
         `SELECT id, address, phone, email FROM customers WHERE id = ? AND company_id = ?`,
-        [customerId, user.company_id]
-      );
+        [customerId, user.company_id],
+      )
 
       if (!customerVerify || customerVerify.length === 0) {
-        throw new Error("Customer not found");
+        throw new Error('Customer not found')
       }
 
-      const updateFields: string[] = [];
-      const updateValues: (string | number | null)[] = [];
+      const updateFields: string[] = []
+      const updateValues: (string | number | null)[] = []
 
-      if (data.billing_address && (!customerVerify[0].address || customerVerify[0].address === "")) {
-        updateFields.push("address = ?");
-        updateValues.push(data.billing_address);
+      if (
+        data.billing_address &&
+        (!customerVerify[0].address || customerVerify[0].address === '')
+      ) {
+        updateFields.push('address = ?')
+        updateValues.push(data.billing_address)
       }
-      if (data.phone && (!customerVerify[0].phone || customerVerify[0].phone === "")) {
-        updateFields.push("phone = ?");
-        updateValues.push(data.phone);
+      if (data.phone && (!customerVerify[0].phone || customerVerify[0].phone === '')) {
+        updateFields.push('phone = ?')
+        updateValues.push(data.phone)
       }
-      if (data.email && (!customerVerify[0].email || customerVerify[0].email === "")) {
-        updateFields.push("email = ?");
-        updateValues.push(data.email);
+      if (data.email && (!customerVerify[0].email || customerVerify[0].email === '')) {
+        updateFields.push('email = ?')
+        updateValues.push(data.email)
       }
 
       if (updateFields.length > 0) {
         await db.execute(
-          `UPDATE customers SET ${updateFields.join(", ")} WHERE id = ? AND company_id = ?`,
-          [...updateValues, customerId, user.company_id]
-        );
+          `UPDATE customers SET ${updateFields.join(', ')} WHERE id = ? AND company_id = ?`,
+          [...updateValues, customerId, user.company_id],
+        )
       }
 
       if (data.builder && data.company_name) {
         await db.execute(
           `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
-          [data.company_name, customerId || data.customer_id, user.company_id]
-        );
+          [data.company_name, customerId || data.customer_id, user.company_id],
+        )
       } else {
         await db.execute(
           `UPDATE customers SET company_name = NULL WHERE id = ? AND company_id = ?`,
-          [customerId || data.customer_id, user.company_id]
-        );
+          [customerId || data.customer_id, user.company_id],
+        )
       }
     } else {
       const [customerResult] = await db.execute<ResultSetHeader>(
@@ -119,9 +124,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.email || null,
           data.billing_address || null,
           data.billing_zip_code || null,
-        ]
-      );
-      customerId = customerResult.insertId;
+        ],
+      )
+      customerId = customerResult.insertId
     }
 
     // ----------------------
@@ -129,8 +134,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     // ----------------------
     const totalSquareFeet = data.rooms.reduce(
       (sum, room) => sum + (room.square_feet || 0),
-      0
-    );
+      0,
+    )
 
     await db.execute(
       `UPDATE sales SET customer_id = ?, seller_id = ?, notes = ?, square_feet = ?, price = ?, project_address = ? WHERE id = ? AND company_id = ?`,
@@ -143,43 +148,51 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.project_address || data.billing_address,
         saleId,
         user.company_id,
-      ]
-    );
+      ],
+    )
 
     // ----------------------
     // Handle slabs and accessories
     // ----------------------
 
-   
     if (data.builder && data.company_name) {
       await db.execute(
         `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
-        [data.company_name, customerId || data.customer_id, user.company_id]
-      );
-      await db.execute(`UPDATE slab_inventory SET company_name = ? WHERE sale_id = ?`, [data.company_name, saleId]);
+        [data.company_name, customerId || data.customer_id, user.company_id],
+      )
+      await db.execute(`UPDATE slab_inventory SET company_name = ? WHERE sale_id = ?`, [
+        data.company_name,
+        saleId,
+      ])
     } else {
-      await db.execute(`UPDATE customers SET company_name = NULL WHERE id = ? AND company_id = ?`, [customerId || data.customer_id, user.company_id]);
-      await db.execute(`UPDATE slab_inventory SET company_name = NULL WHERE sale_id = ?`, [saleId]);
+      await db.execute(
+        `UPDATE customers SET company_name = NULL WHERE id = ? AND company_id = ?`,
+        [customerId || data.customer_id, user.company_id],
+      )
+      await db.execute(
+        `UPDATE slab_inventory SET company_name = NULL WHERE sale_id = ?`,
+        [saleId],
+      )
     }
     // Get all current slabs in the sale to compare with the form data
     const [allSlabsRows] = await db.execute<RowDataPacket[]>(
       `SELECT id FROM slab_inventory WHERE sale_id = ?`,
-      [saleId]
-    );
-    const allSlabIds: number[] = allSlabsRows.map((r: any) => r.id);
+      [saleId],
+    )
+    const allSlabIds: number[] = allSlabsRows.map((r: any) => r.id)
 
     if (allSlabIds.length) {
-      const placeholders = allSlabIds.map(() => "?").join(",");
+      const placeholders = allSlabIds.map(() => '?').join(',')
 
       // Clear current sink / faucet assignments so we can re-apply
       await db.execute(
         `UPDATE sinks SET slab_id = NULL WHERE slab_id IN (${placeholders}) AND is_deleted = 0`,
-        allSlabIds
-      );
+        allSlabIds,
+      )
       await db.execute(
         `UPDATE faucets SET slab_id = NULL WHERE slab_id IN (${placeholders}) AND is_deleted = 0`,
-        allSlabIds
-      );
+        allSlabIds,
+      )
     }
 
     // Update each slab record and reassign sinks/faucets according to form
@@ -202,66 +215,65 @@ export async function action({ request, params }: ActionFunctionArgs) {
             room.retail_price,
             room.extras,
             slab.id,
-          ]
-        );
+          ],
+        )
 
         // Reassign sinks
         for (const sinkType of room.sink_type) {
           await db.execute(
             `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
-            [slab.id, sinkType.id]
-          );
+            [slab.id, sinkType.id],
+          )
         }
 
         // Reassign faucets
         for (const faucetType of room.faucet_type) {
           await db.execute(
             `UPDATE faucets SET slab_id = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
-            [slab.id, faucetType.id]
-          );
+            [slab.id, faucetType.id],
+          )
         }
       }
     }
   } catch (error) {
-    console.error("Error updating sale: ", error);
-    const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Error", "Failed to update sale"));
+    console.error('Error updating sale: ', error)
+    const session = await getSession(request.headers.get('Cookie'))
+    session.flash('message', toastData('Error', 'Failed to update sale', 'destructive'))
     return redirect(`..${searchString}`, {
-      headers: { "Set-Cookie": await commitSession(session) },
-    });
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
   }
 
   // Success toast & redirect
-  const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Sale updated successfully"));
+  const session = await getSession(request.headers.get('Cookie'))
+  session.flash('message', toastData('Success', 'Sale updated successfully'))
 
   return redirect(`..${searchString}`, {
-    headers: { "Set-Cookie": await commitSession(session) },
-  });
+    headers: { 'Set-Cookie': await commitSession(session) },
+  })
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  
   try {
-    await getEmployeeUser(request);
+    await getEmployeeUser(request)
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
-    if (!params.saleId) {
-      throw new Error("Sale ID is missing");
-    }
-    const saleId = parseInt(params.saleId, 10);
+  if (!params.saleId) {
+    throw new Error('Sale ID is missing')
+  }
+  const saleId = parseInt(params.saleId, 10)
 
-    const starting = await getCustomerSchemaFromSaleId(saleId);
-    if (!starting) {
-      return redirect(`/employee/stones/slabs`);
-    }
+  const starting = await getCustomerSchemaFromSaleId(saleId)
+  if (!starting) {
+    return redirect(`/employee/stones/slabs`)
+  }
 
-    return { saleId, starting };
-};
+  return { saleId, starting }
+}
 
 export default function SlabSell() {
-  const data = useLoaderData<typeof loader>();
-  const starting = customerSchema.parse(data.starting);
-  return <ContractForm starting={starting}/>
+  const data = useLoaderData<typeof loader>()
+  const starting = customerSchema.parse(data.starting)
+  return <ContractForm starting={starting} />
 }
