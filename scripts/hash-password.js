@@ -12,6 +12,7 @@ const password = args[0];
 (async () => {
   try {
     const passwordHash = await bcrypt.hash(password, 10);
+    console.log(passwordHash);
   } catch (error) {
     console.error("Error hashing password:", error);
     process.exit(1);
