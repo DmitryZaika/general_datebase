@@ -1,14 +1,14 @@
-import { useFetcher } from "react-router";
-import { UseFormReturn, FieldValues } from "react-hook-form";
-import { useAuthenticityToken } from "remix-utils/csrf/react";
+import { useFetcher } from 'react-router'
+import type { UseFormReturn, FieldValues } from 'react-hook-form'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 
 export function useFullFetcher<TFieldValues extends FieldValues = FieldValues>(
   form: UseFormReturn<TFieldValues>,
   action: undefined | string = undefined,
-  method: "POST" | "DELETE" | "PUT" = "POST",
+  method: 'POST' | 'DELETE' | 'PUT' = 'POST',
 ) {
-  const fetcher = useFetcher();
-  const token = useAuthenticityToken();
+  const fetcher = useFetcher()
+  const token = useAuthenticityToken()
 
   const cleanData = (data: object) => {
     return Object.fromEntries(
@@ -16,22 +16,22 @@ export function useFullFetcher<TFieldValues extends FieldValues = FieldValues>(
         key,
         value === undefined ? null : value,
       ]),
-    );
-  };
+    )
+  }
 
   const fullSubmit = form.handleSubmit(
-    (data) => {
-      const sanitizedData = cleanData(data);
-      sanitizedData["csrf"] = token;
+    data => {
+      const sanitizedData = cleanData(data)
+      sanitizedData['csrf'] = token
 
       fetcher.submit(sanitizedData, {
         method: method,
         action: action,
-        encType: "application/x-www-form-urlencoded",
-      });
+        encType: 'application/x-www-form-urlencoded',
+      })
     },
-    (errors) => {},
-  );
+    errors => {},
+  )
 
-  return { fullSubmit, fetcher };
+  return { fullSubmit, fetcher }
 }

@@ -1,89 +1,93 @@
-import { LoadingButton } from "~/components/molecules/LoadingButton";
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { useNavigate, useNavigation } from "react-router";
-import { FormField } from "../components/ui/form";
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import {
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+  redirect,
+} from 'react-router'
+import { useNavigate, useNavigation } from 'react-router'
+import { FormField } from '../components/ui/form'
 
-import { z } from "zod";
-import { InputItem } from "~/components/molecules/InputItem";
+import { z } from 'zod'
+import { InputItem } from '~/components/molecules/InputItem'
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog";
-import { db } from "~/db.server";
-import { commitSession, getSession } from "~/sessions";
-import { toastData } from "~/utils/toastHelpers";
-import { FileInput } from "~/components/molecules/FileInput";
-import { parseMutliForm } from "~/utils/parseMultiForm";
-import { MultiPartForm } from "~/components/molecules/MultiPartForm";
-import { useCustomForm } from "~/utils/useCustomForm";
-import { getAdminUser } from "~/utils/session.server";
-import { csrf } from "~/utils/csrf.server";
+} from '~/components/ui/dialog'
+import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions'
+import { toastData } from '~/utils/toastHelpers'
+import { FileInput } from '~/components/molecules/FileInput'
+import { parseMutliForm } from '~/utils/parseMultiForm'
+import { MultiPartForm } from '~/components/molecules/MultiPartForm'
+import { useCustomForm } from '~/utils/useCustomForm'
+import { getAdminUser } from '~/utils/session.server'
+import { csrf } from '~/utils/csrf.server'
 
 const imageSchema = z.object({
   name: z.string().min(1),
-});
+})
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    await getAdminUser(request);
+    await getAdminUser(request)
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
   try {
-    await csrf.validate(request);
+    await csrf.validate(request)
   } catch (error) {
-    return { error: "Invalid CSRF token" };
+    return { error: 'Invalid CSRF token' }
   }
-  const { errors, data } = await parseMutliForm(request, imageSchema, "images");
+  const { errors, data } = await parseMutliForm(request, imageSchema, 'images')
   if (errors || !data) {
-    return { errors };
+    return { errors }
   }
 
-  let user = await getAdminUser(request);
+  const user = await getAdminUser(request)
   try {
     await db.execute(
       `INSERT INTO main.images (name, url, company_id) VALUES (?,  ?, ?);`,
       [data.name, data.file, user.company_id],
-    );
+    )
   } catch (error) {
-    console.error("Error connecting to the database: ", error);
+    console.error('Error connecting to the database: ', error)
   }
-  const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Image added"));
+  const session = await getSession(request.headers.get('Cookie'))
+  session.flash('message', toastData('Success', 'Image added'))
 
-  return redirect("..", {
-    headers: { "Set-Cookie": await commitSession(session) },
-  });
+  return redirect('..', {
+    headers: { 'Set-Cookie': await commitSession(session) },
+  })
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request);
-    return { user };
+    const user = await getAdminUser(request)
+    return { user }
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
-};
+}
 
 export default function ImagesAdd() {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
   // const actionData = useActionData<typeof action>();
-  const isSubmitting = useNavigation().state !== "idle";
+  const isSubmitting = useNavigation().state !== 'idle'
 
-  const form = useCustomForm(imageSchema);
+  const form = useCustomForm(imageSchema)
 
   const handleChange = (open: boolean) => {
     if (open === false) {
-      navigate("..");
+      navigate('..')
     }
-  };
+  }
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className='sm:max-w-[425px]'>
         <DialogHeader>
           <DialogTitle>Add Image</DialogTitle>
         </DialogHeader>
@@ -91,25 +95,25 @@ export default function ImagesAdd() {
         <MultiPartForm form={form}>
           <FormField
             control={form.control}
-            name="name"
+            name='name'
             render={({ field }) => (
               <InputItem
                 inputAutoFocus={true}
-                name={"Name"}
-                placeholder={"Name of the image"}
+                name={'Name'}
+                placeholder={'Name of the image'}
                 field={field}
               />
             )}
           />
           <FormField
             control={form.control}
-            name="file"
+            name='file'
             render={({ field }) => (
               <FileInput
-                inputName="images"
-                id="image"
+                inputName='images'
+                id='image'
                 onChange={field.onChange}
-                type="image"
+                type='image'
               />
             )}
           />
@@ -119,5 +123,5 @@ export default function ImagesAdd() {
         </MultiPartForm>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

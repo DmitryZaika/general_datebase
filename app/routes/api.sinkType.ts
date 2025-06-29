@@ -1,20 +1,20 @@
-import { data, LoaderFunctionArgs, redirect } from "react-router";
-import { db } from "~/db.server";
-import { selectMany } from "~/utils/queryHelpers";
-import { Sink } from "~/types";
-import { getEmployeeUser } from "~/utils/session.server";
+import { data, type LoaderFunctionArgs, redirect } from 'react-router'
+import { db } from '~/db.server'
+import { selectMany } from '~/utils/queryHelpers'
+import type { Sink } from '~/types'
+import { getEmployeeUser } from '~/utils/session.server'
 
 export async function loader({ request }: LoaderFunctionArgs) {
-    let user;
-    try {
-        user = await getEmployeeUser(request);
-    } catch (error) {
-        return redirect(`/login?error=${error}`);
-    }
+  let user
+  try {
+    user = await getEmployeeUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
 
-    const sink_type = await selectMany<Sink>(
-        db,
-        `SELECT
+  const sink_type = await selectMany<Sink>(
+    db,
+    `SELECT
           sink_type.id,
           sink_type.name,
           sink_type.retail_price,
@@ -36,8 +36,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
         ORDER BY
           sink_type.name ASC;
         `,
-        [user.company_id]
-      );
+    [user.company_id],
+  )
 
-  return data(sink_type);
+  return data(sink_type)
 }

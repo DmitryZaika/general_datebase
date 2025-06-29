@@ -1,13 +1,13 @@
-import React from "react";
+import type React from 'react'
 
 interface ImageListProps {
-  children: React.ReactNode;
+  children: React.ReactNode
 }
 
 export function ImageList({ children }: ImageListProps) {
   return (
     <div
-      className="
+      className='
         grid 
         grid-cols-2
         gap-2.5 
@@ -23,9 +23,9 @@ export function ImageList({ children }: ImageListProps) {
         overflow-x-auto
         sm:grid-cols-3
         md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]
-      "
+      '
     >
       {children}
     </div>
-  );
+  )
 }

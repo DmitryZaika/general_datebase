@@ -1,21 +1,21 @@
-import React from "react";
+import type React from 'react'
 
 interface CollapsibleProps {
-  isOpen: boolean;
-  openDuration?: string;
-  closeDuration?: string;
-  maxHeight?: string;
-  children: React.ReactNode;
-  className?: string;
+  isOpen: boolean
+  openDuration?: string
+  closeDuration?: string
+  maxHeight?: string
+  children: React.ReactNode
+  className?: string
 }
 
 export function Collapsible({
   isOpen,
-  openDuration = "duration-[1500ms]",
-  closeDuration = "duration-[1000ms]",
-  maxHeight = "max-h-[5000px]",
+  openDuration = 'duration-[1500ms]',
+  closeDuration = 'duration-[1000ms]',
+  maxHeight = 'max-h-[5000px]',
   children,
-  className = " sm:pl-4",
+  className = ' sm:pl-4',
 }: CollapsibleProps) {
   return (
     <div
@@ -25,5 +25,5 @@ export function Collapsible({
     >
       {children}
     </div>
-  );
+  )
 }

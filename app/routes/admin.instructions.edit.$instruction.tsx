@@ -1,65 +1,69 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { useSubmit, Form, useNavigate, useLoaderData } from "react-router";
-import { FormProvider, FormField } from "../components/ui/form";
-import { getValidatedFormData } from "remix-hook-form";
-import { z } from "zod";
-import { InputItem } from "~/components/molecules/InputItem";
-import { Button } from "~/components/ui/button";
-import { useForm } from "react-hook-form";
+import { zodResolver } from '@hookform/resolvers/zod'
+import {
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+  redirect,
+} from 'react-router'
+import { useSubmit, Form, useNavigate, useLoaderData } from 'react-router'
+import { FormProvider, FormField } from '../components/ui/form'
+import { getValidatedFormData } from 'remix-hook-form'
+import { z } from 'zod'
+import { InputItem } from '~/components/molecules/InputItem'
+import { Button } from '~/components/ui/button'
+import { useForm } from 'react-hook-form'
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog";
-import { db } from "~/db.server";
-import { commitSession, getSession } from "~/sessions";
-import { forceRedirectError, toastData } from "~/utils/toastHelpers";
-import { useAuthenticityToken } from "remix-utils/csrf/react";
-import { csrf } from "~/utils/csrf.server";
-import { selectId, selectMany } from "~/utils/queryHelpers";
-import { getAdminUser } from "~/utils/session.server";
-import { useFullSubmit } from "~/hooks/useFullSubmit";
-import { SelectInput } from "~/components/molecules/SelectItem";
-import { afterOptions, parentOptions } from "~/utils/instructionsHelpers";
-import { QuillInput } from "~/components/molecules/QuillInput";
+} from '~/components/ui/dialog'
+import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
+import { csrf } from '~/utils/csrf.server'
+import { selectId, selectMany } from '~/utils/queryHelpers'
+import { getAdminUser } from '~/utils/session.server'
+import { useFullSubmit } from '~/hooks/useFullSubmit'
+import { SelectInput } from '~/components/molecules/SelectItem'
+import { afterOptions, parentOptions } from '~/utils/instructionsHelpers'
+import { QuillInput } from '~/components/molecules/QuillInput'
 
 const instructionSchema = z.object({
   title: z.string().min(1),
   parent_id: z.coerce.number(),
   after_id: z.coerce.number(),
   rich_text: z.string().min(1),
-});
+})
 
-type FormData = z.infer<typeof instructionSchema>;
+type FormData = z.infer<typeof instructionSchema>
 
-const resolver = zodResolver(instructionSchema);
+const resolver = zodResolver(instructionSchema)
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
-    await getAdminUser(request);
+    await getAdminUser(request)
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
   try {
-    await csrf.validate(request);
+    await csrf.validate(request)
   } catch (error) {
-    return { error: "Invalid CSRF token" };
+    return { error: 'Invalid CSRF token' }
   }
 
   if (!params.instruction) {
-    return forceRedirectError(request.headers, "No Instruction id provided");
+    return forceRedirectError(request.headers, 'No Instruction id provided')
   }
-  const instructionId = parseInt(params.instruction);
+  const instructionId = parseInt(params.instruction)
 
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
     resolver,
-  );
+  )
   if (errors) {
-    return { errors, receivedValues };
+    return { errors, receivedValues }
   }
 
   try {
@@ -72,72 +76,71 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.rich_text,
         instructionId,
       ],
-    );
+    )
   } catch (error) {
-    console.error("Error updating the database: ", error);
+    console.error('Error updating the database: ', error)
   }
 
-  const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Instruction updated"));
-  return redirect("..", {
-    headers: { "Set-Cookie": await commitSession(session) },
-  });
+  const session = await getSession(request.headers.get('Cookie'))
+  session.flash('message', toastData('Success', 'Instruction updated'))
+  return redirect('..', {
+    headers: { 'Set-Cookie': await commitSession(session) },
+  })
 }
 
 interface Instruction {
-  id: number;
-  title: string;
-  parent_id: number;
-  after_id: number;
-  rich_text: string;
+  id: number
+  title: string
+  parent_id: number
+  after_id: number
+  rich_text: string
 }
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   try {
-    await getAdminUser(request);
+    await getAdminUser(request)
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
 
   if (!params.instruction) {
-    return forceRedirectError(request.headers, "No instruction id provided");
+    return forceRedirectError(request.headers, 'No instruction id provided')
   }
-  const instructionId = parseInt(params.instruction);
+  const instructionId = parseInt(params.instruction)
 
   if (isNaN(instructionId)) {
-    return forceRedirectError(request.headers, "Invalid instruction id");
+    return forceRedirectError(request.headers, 'Invalid instruction id')
   }
 
   const instruction = await selectId<Instruction>(
     db,
-    "SELECT title, parent_id, after_id, rich_text FROM instructions WHERE id = ?",
+    'SELECT title, parent_id, after_id, rich_text FROM instructions WHERE id = ?',
     instructionId,
-  );
+  )
 
   const instructions = await selectMany<{
-    title: string;
-    id: number;
-    parent_id: number;
-  }>(db, "SELECT id, parent_id, title FROM instructions");
+    title: string
+    id: number
+    parent_id: number
+  }>(db, 'SELECT id, parent_id, title FROM instructions')
 
   if (!instruction) {
-    return forceRedirectError(request.headers, "Invalid supplier id");
+    return forceRedirectError(request.headers, 'Invalid supplier id')
   }
-  const { title, parent_id, after_id, rich_text } = instruction;
+  const { title, parent_id, after_id, rich_text } = instruction
   return {
     title,
     parent_id,
     after_id,
     rich_text,
     instructions,
-  };
-};
+  }
+}
 
 export default function InstructionsEdit() {
-  const navigate = useNavigate();
-  const { title, parent_id, after_id, rich_text } =
-    useLoaderData<typeof loader>();
-  const { instructions } = useLoaderData<typeof loader>();
+  const navigate = useNavigate()
+  const { title, parent_id, after_id, rich_text } = useLoaderData<typeof loader>()
+  const { instructions } = useLoaderData<typeof loader>()
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
@@ -146,60 +149,60 @@ export default function InstructionsEdit() {
       after_id: after_id || 0,
       rich_text,
     },
-  });
+  })
 
-  const parentValues = parentOptions(instructions);
-  const afterValues = afterOptions(parent_id, instructions);
-  const fullSubmit = useFullSubmit(form);
+  const parentValues = parentOptions(instructions)
+  const afterValues = afterOptions(parent_id, instructions)
+  const fullSubmit = useFullSubmit(form)
 
   const handleChange = (open: boolean) => {
     if (open === false) {
-      navigate("..");
+      navigate('..')
     }
-  };
+  }
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent
-        className="
+        className='
     !max-w-[calc(100vw*0.90)]
     !max-h-[calc(100vh*0.90)]
     overflow-y-auto
-  "
+  '
       >
         <DialogHeader>
           <DialogTitle>Edit Instruction</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form id="customerForm" method="post" onSubmit={fullSubmit}>
+          <Form id='customerForm' method='post' onSubmit={fullSubmit}>
             <FormField
               control={form.control}
-              name="title"
+              name='title'
               render={({ field }) => (
-                <InputItem name={"Title"} placeholder={"Title"} field={field} />
+                <InputItem name={'Title'} placeholder={'Title'} field={field} />
               )}
             />
-            <div className="flex">
+            <div className='flex'>
               <FormField
                 control={form.control}
-                name="parent_id"
+                name='parent_id'
                 render={({ field }) => (
                   <SelectInput
                     field={field}
                     disabled={true}
-                    name="Parent"
+                    name='Parent'
                     options={parentValues}
                   />
                 )}
               />
               <FormField
                 control={form.control}
-                name="after_id"
+                name='after_id'
                 render={({ field }) => (
                   <SelectInput
-                    className="ml-2"
+                    className='ml-2'
                     field={field}
-                    name="After"
+                    name='After'
                     disabled={true}
                     options={afterValues}
                   />
@@ -208,14 +211,14 @@ export default function InstructionsEdit() {
             </div>
             <FormField
               control={form.control}
-              name="rich_text"
+              name='rich_text'
               render={({ field }) => (
-                <QuillInput className="min-h-28" name="Text" field={field} />
+                <QuillInput className='min-h-28' name='Text' field={field} />
               )}
             />
 
             <DialogFooter>
-              <Button className="mt-6" type="submit">
+              <Button className='mt-6' type='submit'>
                 Save changes
               </Button>
             </DialogFooter>
@@ -223,5 +226,5 @@ export default function InstructionsEdit() {
         </FormProvider>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

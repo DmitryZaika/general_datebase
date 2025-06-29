@@ -1,58 +1,77 @@
-import { getSession, commitSession } from '~/sessions';
-import { LoaderFunctionArgs, redirect, data, ActionFunctionArgs } from "react-router";
-import { db } from "~/db.server";
-import { selectMany } from "~/utils/queryHelpers";
-import { getEmployeeUser } from "~/utils/session.server";
-import { getQboToken, setQboSession, getQboTokenState, QboTokenState, clearQboSession, queryQboCustomersByContact, refreshQboToken, createQboCustomer } from "~/utils/quickbooks.server";
-import { toastData } from "~/utils/toastHelpers";
+import { getSession, commitSession } from '~/sessions'
+import {
+  type LoaderFunctionArgs,
+  redirect,
+  data,
+  type ActionFunctionArgs,
+} from 'react-router'
+import { db } from '~/db.server'
+import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
+import {
+  getQboToken,
+  setQboSession,
+  getQboTokenState,
+  QboTokenState,
+  clearQboSession,
+  queryQboCustomersByContact,
+  refreshQboToken,
+  createQboCustomer,
+} from '~/utils/quickbooks.server'
+import { toastData } from '~/utils/toastHelpers'
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { searchParams } = new URL(request.url);
-  const email = searchParams.get("email") ?? undefined;
-  const cookieHeader = request.headers.get('Cookie');
-  const session = await getSession(cookieHeader);
-  const accessToken = session.get('qboAccessToken');
-  const realmId = session.get('qboRealmId');
-  const refreshToken = session.get('qboRefreshToken');
+  const { searchParams } = new URL(request.url)
+  const email = searchParams.get('email') ?? undefined
+  const cookieHeader = request.headers.get('Cookie')
+  const session = await getSession(cookieHeader)
+  const accessToken = session.get('qboAccessToken')
+  const realmId = session.get('qboRealmId')
+  const refreshToken = session.get('qboRefreshToken')
 
   if (!realmId || !accessToken || !refreshToken) {
     return data({ success: false })
   }
 
-  let user;
+  let user
   try {
-    user = await getEmployeeUser(request);
+    user = await getEmployeeUser(request)
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
 
   const tokenState = getQboTokenState(session)
   if (tokenState === QboTokenState.ACCESS_VALID) {
-    const result = await queryQboCustomersByContact(accessToken, realmId, email);
+    const result = await queryQboCustomersByContact(accessToken, realmId, email)
     return result
   }
   if (tokenState === QboTokenState.INVALID) {
-    clearQboSession(session);
-    return data({ success: false }, {
-      headers: {
-        'Set-Cookie': await commitSession(session),
+    clearQboSession(session)
+    return data(
+      { success: false },
+      {
+        headers: {
+          'Set-Cookie': await commitSession(session),
+        },
       },
-    });
+    )
   }
   let refresh
   try {
-    refresh = await refreshQboToken(request, user.company_id, refreshToken); 
+    refresh = await refreshQboToken(request, user.company_id, refreshToken)
   } catch (error) {
-    clearQboSession(session);
-    return data({ success: false }, {
-      headers: {
-        'Set-Cookie': await commitSession(session),
+    clearQboSession(session)
+    return data(
+      { success: false },
+      {
+        headers: {
+          'Set-Cookie': await commitSession(session),
+        },
       },
-    });
-    
+    )
   }
-  setQboSession(session, refresh);
-  const result = await queryQboCustomersByContact(refresh.access_token, realmId, email);
+  setQboSession(session, refresh)
+  const result = await queryQboCustomersByContact(refresh.access_token, realmId, email)
   if (typeof result === 'number') {
     return data({ success: false })
   }
@@ -63,66 +82,71 @@ export async function loader({ request }: LoaderFunctionArgs) {
   })
 }
 
-
 export async function action({ request }: ActionFunctionArgs) {
   // ---------- 1. достаём токены из cookie ----------
-  const cookieHeader = request.headers.get("Cookie");
-  const session = await getSession(cookieHeader);
-  const accessToken = session.get("qboAccessToken");
-  const realmId = session.get("qboRealmId");
-  const refreshToken = session.get("qboRefreshToken");
+  const cookieHeader = request.headers.get('Cookie')
+  const session = await getSession(cookieHeader)
+  const accessToken = session.get('qboAccessToken')
+  const realmId = session.get('qboRealmId')
+  const refreshToken = session.get('qboRefreshToken')
 
   if (!realmId || !accessToken || !refreshToken) {
-    return data({ success: false });
+    return data({ success: false })
   }
 
   // ---------- 2. авторизованный сотрудник ----------
-  let user;
+  let user
   try {
-    user = await getEmployeeUser(request);
+    user = await getEmployeeUser(request)
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
 
   let payload: {
-    name: string;
-    email: string;
-    phone: string;
-    address: Record<string, unknown>;
-  };
+    name: string
+    email: string
+    phone: string
+    address: Record<string, unknown>
+  }
   try {
-    payload = await request.json();
+    payload = await request.json()
   } catch {
-    return data({ success: false, message: "Неверный JSON" }, { status: 400 });
+    return data({ success: false, message: 'Неверный JSON' }, { status: 400 })
   }
 
-  const { name, email, phone, address } = payload;
+  const { name, email, phone, address } = payload
   if (!name) {
-    return data({ success: false, message: "Поле name обязательно" }, { status: 400 });
+    return data({ success: false, message: 'Поле name обязательно' }, { status: 400 })
   }
 
   // ---------- 4. проверяем / обновляем токен ----------
-  const tokenState = getQboTokenState(session);
+  const tokenState = getQboTokenState(session)
 
-  let at = accessToken;      // актуальный access‑token
+  let at = accessToken // актуальный access‑token
   if (tokenState === QboTokenState.INVALID) {
-    clearQboSession(session);
-    return data({ success: false }, {
-      headers: { "Set-Cookie": await commitSession(session) },
-    });
+    clearQboSession(session)
+    return data(
+      { success: false },
+      {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      },
+    )
   } else if (tokenState === QboTokenState.REFRESH_VALID) {
-    const refresh = await refreshQboToken(request, user.company_id, refreshToken);
-    setQboSession(session, refresh);
-    at = refresh.access_token;
+    const refresh = await refreshQboToken(request, user.company_id, refreshToken)
+    setQboSession(session, refresh)
+    at = refresh.access_token
   }
 
   // ---------- 5. создаём клиента ----------
   try {
-    const customer = await createQboCustomer(at, realmId, name, email, phone, address);
-    return data({ success: true, customer }, {
-      headers: { "Set-Cookie": await commitSession(session) },
-    });
+    const customer = await createQboCustomer(at, realmId, name, email, phone, address)
+    return data(
+      { success: true, customer },
+      {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      },
+    )
   } catch (err: any) {
-    return data({ success: false, message: String(err) }, { status: 500 });
+    return data({ success: false, message: String(err) }, { status: 500 })
   }
 }

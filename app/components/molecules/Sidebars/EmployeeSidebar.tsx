@@ -1,5 +1,5 @@
 import {
-  LucideProps,
+  type LucideProps,
   Calendar,
   DollarSign,
   Layers,
@@ -13,16 +13,16 @@ import {
   User,
   Users,
   Package,
-} from "lucide-react";
-import { SinkIcon } from "~/components/icons/SinkIcon";
-import { CorbelIcon } from "~/components/icons/CorbelIcon";
-import { redirect, useLocation } from "react-router";
-import { getBase } from "~/utils/urlHelpers";
-import { StonesFilters } from "./StonesFilters";
-import { SinksFilters } from "./SinksFilters";
-import { FaucetsFilters } from "./FaucetsFilters";
-import { ISupplier } from "~/schemas/suppliers";
-import { useLoaderData } from "react-router";
+} from 'lucide-react'
+import { SinkIcon } from '~/components/icons/SinkIcon'
+import { CorbelIcon } from '~/components/icons/CorbelIcon'
+import { redirect, useLocation } from 'react-router'
+import { getBase } from '~/utils/urlHelpers'
+import { StonesFilters } from './StonesFilters'
+import { SinksFilters } from './SinksFilters'
+import { FaucetsFilters } from './FaucetsFilters'
+import type { ISupplier } from '~/schemas/suppliers'
+import { useLoaderData } from 'react-router'
 
 import {
   Sidebar,
@@ -33,22 +33,22 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "~/components/ui/sidebar";
+} from '~/components/ui/sidebar'
 
 interface ISidebarItem {
-  title: string;
-  url: string;
+  title: string
+  url: string
   icon: React.ForwardRefExoticComponent<
-    Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>
-  >;
-  component?: ({}) => React.ReactNode;
+    Omit<LucideProps, 'ref'> & React.RefAttributes<SVGSVGElement>
+  >
+  component?: ({}) => React.ReactNode
 }
 
 interface IProps {
-  suppliers: ISupplier[] | undefined;
-  sinkSuppliers?: ISupplier[] | undefined;
-  faucetSuppliers?: ISupplier[] | undefined;
-  colors?: { id: number; name: string; hex_code: string }[] | undefined;
+  suppliers: ISupplier[] | undefined
+  sinkSuppliers?: ISupplier[] | undefined
+  faucetSuppliers?: ISupplier[] | undefined
+  colors?: { id: number; name: string; hex_code: string }[] | undefined
 }
 
 const getItems = (
@@ -57,115 +57,111 @@ const getItems = (
   colors?: { id: number; name: string; hex_code: string }[] | undefined,
   sinkSuppliers?: ISupplier[] | undefined,
   faucetSuppliers?: ISupplier[] | undefined,
-  companyId: number | string = 1
+  companyId: number | string = 1,
 ) => {
-  const isCustomerRoute = base === "customer";
+  const isCustomerRoute = base === 'customer'
   const finalList: ISidebarItem[] = [
     {
-      title: "Stones",
-      url: isCustomerRoute
-        ? `/customer/${companyId}/stones`
-        : `/${base}/stones`,
+      title: 'Stones',
+      url: isCustomerRoute ? `/customer/${companyId}/stones` : `/${base}/stones`,
       icon: Layers,
       component: () => (
         <StonesFilters suppliers={suppliers} base={base} colors={colors} />
       ),
     },
-  ];
-  if (["admin", "employee"].includes(base)) {
+  ]
+  if (['admin', 'employee'].includes(base)) {
     finalList.push(
       {
-        title: "Sinks",
+        title: 'Sinks',
         url: `/${base}/sinks`,
         icon: SinkIcon,
         component: () => <SinksFilters base={base} suppliers={sinkSuppliers} />,
       },
-     
+
       {
-        title: "Faucets",
+        title: 'Faucets',
         url: `/${base}/faucets`,
         icon: ShowerHead,
-        component: () => (
-          <FaucetsFilters base={base} suppliers={faucetSuppliers} />
-        ),
+        component: () => <FaucetsFilters base={base} suppliers={faucetSuppliers} />,
       },
       {
-        title: "Suppliers",
+        title: 'Suppliers',
         url: `/${base}/suppliers`,
         icon: Building2,
       },
       {
-        title: "Supports",
+        title: 'Supports',
         url: `/${base}/supports`,
         icon: CorbelIcon,
       },
       {
-        title: "Documents",
+        title: 'Documents',
         url: `/${base}/documents`,
         icon: FileIcon,
       },
       {
-        title: "Images",
+        title: 'Images',
         url: `/${base}/images`,
         icon: ImageIcon,
       },
       {
-        title: "Instructions",
+        title: 'Instructions',
         url: `/${base}/instructions`,
         icon: Lightbulb,
       },
-    );
+    )
   }
-  if (base === "employee") {
+  if (base === 'employee') {
     finalList.push(
       {
-        title: "Transactions",
+        title: 'Transactions',
         url: `/employee/transactions`,
         icon: DollarSign,
       },
       {
-        title: "Special Order",
+        title: 'Special Order',
         url: `/employee/special-order`,
         icon: Calculator,
       },
       {
-        title: "My Account",
+        title: 'My Account',
         url: `/employee/user`,
         icon: User,
       },
       {
-        title: "Schedule",
+        title: 'Schedule',
         url: `/employee/schedule`,
         icon: Calendar,
       },
       {
-        title: "Samples",
+        title: 'Samples',
         url: `/${base}/samples`,
         icon: Package,
-      }
-    );
+      },
+    )
   }
-  if (base === "admin") {
+  if (base === 'admin') {
     finalList.push(
       {
-        title: "Transactions",
+        title: 'Transactions',
         url: `/admin/transactions`,
         icon: DollarSign,
       },
       {
-        title: "Invoices",
+        title: 'Invoices',
         url: `/admin/invoices`,
         icon: Receipt,
       },
       {
-        title: "User Panel",
+        title: 'User Panel',
         url: `/admin/users`,
         icon: Users,
-      }
-    );
+      },
+    )
   }
-  return finalList;
-};
+  return finalList
+}
 
 export function EmployeeSidebar({
   suppliers,
@@ -173,17 +169,16 @@ export function EmployeeSidebar({
   faucetSuppliers,
   colors,
 }: IProps) {
-  const location = useLocation();
-  const base = getBase(location.pathname);
-  const data = useLoaderData<{ user: { company_id: number } | null }>();
-  const companyId = data?.user?.company_id || 1;
+  const location = useLocation()
+  const base = getBase(location.pathname)
+  const data = useLoaderData<{ user: { company_id: number } | null }>()
+  const companyId = data?.user?.company_id || 1
 
-  const isCustomerRoute =
-    typeof base === "string" && base.startsWith("customer/");
+  const isCustomerRoute = typeof base === 'string' && base.startsWith('customer/')
 
   const itemsBase = isCustomerRoute
-    ? "customer"
-    : (base as "employee" | "admin" | "customer");
+    ? 'customer'
+    : (base as 'employee' | 'admin' | 'customer')
 
   const items = getItems(
     itemsBase,
@@ -191,8 +186,8 @@ export function EmployeeSidebar({
     colors,
     sinkSuppliers,
     faucetSuppliers,
-    companyId
-  );
+    companyId,
+  )
 
   return (
     <Sidebar>
@@ -201,11 +196,11 @@ export function EmployeeSidebar({
           <SidebarGroupLabel>Granite Depot</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => {
+              {items.map(item => {
                 const isActive =
-                  isCustomerRoute && item.title === "Stones"
-                    ? location.pathname.includes("/stones")
-                    : location.pathname.startsWith(item.url);
+                  isCustomerRoute && item.title === 'Stones'
+                    ? location.pathname.includes('/stones')
+                    : location.pathname.startsWith(item.url)
 
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -217,12 +212,12 @@ export function EmployeeSidebar({
                     </SidebarMenuButton>
                     {item.component && isActive && <item.component />}
                   </SidebarMenuItem>
-                );
+                )
               })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
-  );
+  )
 }
