@@ -1,16 +1,16 @@
-import { data, LoaderFunctionArgs, redirect } from "react-router";
-import { db } from "~/db.server";
-import { selectMany } from "~/utils/queryHelpers";
-import { Faucet } from "~/types";
-import { getEmployeeUser } from "~/utils/session.server";
+import { data, type LoaderFunctionArgs, redirect } from 'react-router'
+import { db } from '~/db.server'
+import { selectMany } from '~/utils/queryHelpers'
+import type { Faucet } from '~/types'
+import { getEmployeeUser } from '~/utils/session.server'
 
 export async function loader({ request }: LoaderFunctionArgs) {
-    let user;
-    try {
-        user = await getEmployeeUser(request);
-    } catch (error) {
-        return redirect(`/login?error=${error}`);
-    }
+  let user
+  try {
+    user = await getEmployeeUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
 
   const faucet_type = await selectMany<Faucet>(
     db,
@@ -36,8 +36,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     ORDER BY
       faucet_type.name ASC;
     `,
-    [user.company_id]
-  );
+    [user.company_id],
+  )
 
-  return data(faucet_type);
+  return data(faucet_type)
 }

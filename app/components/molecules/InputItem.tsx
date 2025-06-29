@@ -1,17 +1,18 @@
-import React, { forwardRef } from "react";
-import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
-import { Input } from "../ui/input";
+import type React from 'react'
+import { forwardRef } from 'react'
+import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
+import { Input } from '../ui/input'
 
 interface InputItemProps {
-  name?: string;
-  placeholder?: string;
-  field?: object;
-  type?: string;
-  className?: string;
-  formClassName?: string;
-  inputAutoFocus?: boolean;
-  ref?: React.Ref<HTMLInputElement>;
-  disabled?: boolean;
+  name?: string
+  placeholder?: string
+  field?: object
+  type?: string
+  className?: string
+  formClassName?: string
+  inputAutoFocus?: boolean
+  ref?: React.Ref<HTMLInputElement>
+  disabled?: boolean
 }
 
 export const InputItem = forwardRef<HTMLInputElement, InputItemProps>(
@@ -26,7 +27,7 @@ export const InputItem = forwardRef<HTMLInputElement, InputItemProps>(
       inputAutoFocus,
       disabled,
     }: InputItemProps,
-    ref
+    ref,
   ) => {
     return (
       <FormItem className={formClassName}>
@@ -44,8 +45,8 @@ export const InputItem = forwardRef<HTMLInputElement, InputItemProps>(
         </FormControl>
         <FormMessage />
       </FormItem>
-    );
-  }
-);
+    )
+  },
+)
 
-InputItem.displayName = "InputItem";
+InputItem.displayName = 'InputItem'

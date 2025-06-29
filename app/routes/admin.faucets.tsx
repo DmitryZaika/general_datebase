@@ -1,116 +1,109 @@
-import { LoaderFunctionArgs, redirect, Outlet } from "react-router";
-import { useLoaderData, Link, useNavigation, useLocation } from "react-router";
-import { getAdminUser } from "~/utils/session.server";
-import { LoadingButton } from "~/components/molecules/LoadingButton";
-import { useEffect, useState } from "react";
-import ModuleList from "~/components/ModuleList";
-import { SuperCarousel } from "~/components/organisms/SuperCarousel";
-import { FaPencilAlt, FaTimes } from "react-icons/fa";
-import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
-import { faucetFilterSchema } from "~/schemas/faucets";
-import { cleanParams } from "~/hooks/use-safe-search-params";
-import { Faucet, faucetQueryBuilder } from "~/utils/queries.server";
-import { FAUCET_TYPES } from "~/utils/constants";
-import { Plus } from "lucide-react";
+import { type LoaderFunctionArgs, redirect, Outlet } from 'react-router'
+import { useLoaderData, Link, useNavigation, useLocation } from 'react-router'
+import { getAdminUser } from '~/utils/session.server'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { useEffect, useState } from 'react'
+import ModuleList from '~/components/ModuleList'
+import { SuperCarousel } from '~/components/organisms/SuperCarousel'
+import { FaPencilAlt, FaTimes } from 'react-icons/fa'
+import { useSafeSearchParams } from '~/hooks/use-safe-search-params'
+import { faucetFilterSchema } from '~/schemas/faucets'
+import { cleanParams } from '~/hooks/use-safe-search-params'
+import { type Faucet, faucetQueryBuilder } from '~/utils/queries.server'
+import { FAUCET_TYPES } from '~/utils/constants'
+import { Plus } from 'lucide-react'
 
 const formatPrice = (price: number | null | undefined): string => {
-  if (price == null) return "-";
+  if (price == null) return '-'
 
-  return String(price).replace(/\.0+$/, "");
-};
+  return String(price).replace(/\.0+$/, '')
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    await getAdminUser(request);
+    await getAdminUser(request)
   } catch (error) {
-    return redirect(`/login?error=${encodeURIComponent(String(error))}`);
+    return redirect(`/login?error=${encodeURIComponent(String(error))}`)
   }
 
-  const user = await getAdminUser(request);
-  const [, searchParams] = request.url.split("?");
-  const queryParams = new URLSearchParams(searchParams);
+  const user = await getAdminUser(request)
+  const [, searchParams] = request.url.split('?')
+  const queryParams = new URLSearchParams(searchParams)
 
-  if (!queryParams.has("show_sold_out")) {
-    queryParams.set("show_sold_out", "true");
+  if (!queryParams.has('show_sold_out')) {
+    queryParams.set('show_sold_out', 'true')
   }
 
-  const filters = faucetFilterSchema.parse(cleanParams(queryParams));
+  const filters = faucetFilterSchema.parse(cleanParams(queryParams))
 
-  const faucets = await faucetQueryBuilder(filters, user.company_id);
+  const faucets = await faucetQueryBuilder(filters, user.company_id)
 
-  return { faucets };
-};
+  return { faucets }
+}
 
 export default function AdminFaucets() {
-  const { faucets } = useLoaderData<typeof loader>();
-  const navigation = useNavigation();
-  const [isAddingFaucet, setIsAddingFaucet] = useState(false);
-  const [sortedFaucets, setSortedFaucets] = useState<Faucet[]>(faucets);
-  const location = useLocation();
-  const [currentId, setCurrentId] = useState<number | undefined>(undefined);
-  const [searchParams] = useSafeSearchParams(faucetFilterSchema);
+  const { faucets } = useLoaderData<typeof loader>()
+  const navigation = useNavigation()
+  const [isAddingFaucet, setIsAddingFaucet] = useState(false)
+  const [sortedFaucets, setSortedFaucets] = useState<Faucet[]>(faucets)
+  const location = useLocation()
+  const [currentId, setCurrentId] = useState<number | undefined>(undefined)
+  const [searchParams] = useSafeSearchParams(faucetFilterSchema)
 
   const getTypePriority = (type: string) => {
-    const index = FAUCET_TYPES.indexOf(type as any);
-    return index === -1 ? FAUCET_TYPES.length : index;
-  };
+    const index = FAUCET_TYPES.indexOf(type as any)
+    return index === -1 ? FAUCET_TYPES.length : index
+  }
 
   useEffect(() => {
     // Make sure faucets with 0 or null amount still appear
     const inStock = faucets.filter(
-      (faucet) => Number(faucet.amount) > 0 && Boolean(faucet.is_display)
-    );
+      faucet => Number(faucet.amount) > 0 && Boolean(faucet.is_display),
+    )
     const outOfStock = faucets.filter(
-      (faucet) =>
-        (!faucet.amount || Number(faucet.amount) <= 0) &&
-        Boolean(faucet.is_display)
-    );
-    const notDisplayed = faucets.filter(
-      (faucet) => !Boolean(faucet.is_display)
-    );
+      faucet =>
+        (!faucet.amount || Number(faucet.amount) <= 0) && Boolean(faucet.is_display),
+    )
+    const notDisplayed = faucets.filter(faucet => !faucet.is_display)
 
     const sortByFaucetType = (a: Faucet, b: Faucet) => {
-      const typePriorityA = getTypePriority(a.type);
-      const typePriorityB = getTypePriority(b.type);
+      const typePriorityA = getTypePriority(a.type)
+      const typePriorityB = getTypePriority(b.type)
 
       if (typePriorityA !== typePriorityB) {
-        return typePriorityA - typePriorityB;
+        return typePriorityA - typePriorityB
       }
 
-      return a.name.localeCompare(b.name);
-    };
+      return a.name.localeCompare(b.name)
+    }
 
-    const sortedInStock = [...inStock].sort(sortByFaucetType);
-    const sortedOutOfStock = [...outOfStock].sort(sortByFaucetType);
-    const sortedNotDisplayed = [...notDisplayed].sort(sortByFaucetType);
+    const sortedInStock = [...inStock].sort(sortByFaucetType)
+    const sortedOutOfStock = [...outOfStock].sort(sortByFaucetType)
+    const sortedNotDisplayed = [...notDisplayed].sort(sortByFaucetType)
 
-    setSortedFaucets([
-      ...sortedInStock,
-      ...sortedOutOfStock,
-      ...sortedNotDisplayed,
-    ]);
-  }, [faucets]);
+    setSortedFaucets([...sortedInStock, ...sortedOutOfStock, ...sortedNotDisplayed])
+  }, [faucets])
 
   useEffect(() => {
-    if (navigation.state === "idle") {
-      if (isAddingFaucet) setIsAddingFaucet(false);
+    if (navigation.state === 'idle') {
+      if (isAddingFaucet) setIsAddingFaucet(false)
     }
-  }, [navigation.state]);
+  }, [navigation.state])
 
   const handleAddFaucetClick = () => {
-    setIsAddingFaucet(true);
-  };
+    setIsAddingFaucet(true)
+  }
 
   const handleSetCurrentId = (id: number | undefined) => {
-    setCurrentId(id);
-  };
+    setCurrentId(id)
+  }
 
   return (
     <>
-      <div className="flex justify-start mb-2">
-        <Link to="add" onClick={handleAddFaucetClick}>
-          <LoadingButton className="mt-2 ml-2 -mb-3" loading={isAddingFaucet}>
-            <Plus className="w-4 h-4 mr-1" />
+      <div className='flex justify-start mb-2'>
+        <Link to='add' onClick={handleAddFaucetClick}>
+          <LoadingButton className='mt-2 ml-2 -mb-3' loading={isAddingFaucet}>
+            <Plus className='w-4 h-4 mr-1' />
             Add Faucet
           </LoadingButton>
         </Link>
@@ -118,77 +111,75 @@ export default function AdminFaucets() {
 
       <div>
         <ModuleList>
-          <div className="w-full col-span-full">
+          <div className='w-full col-span-full'>
             <SuperCarousel
-              type="faucets"
+              type='faucets'
               currentId={currentId}
               setCurrentId={handleSetCurrentId}
               images={sortedFaucets}
             />
           </div>
-          {sortedFaucets.map((faucet) => {
+          {sortedFaucets.map(faucet => {
             const displayedAmount =
-              faucet.amount && faucet.amount > 0 ? faucet.amount : "—";
-            const retailPrice = formatPrice(faucet.retail_price);
-            const cost = formatPrice(faucet.cost);
+              faucet.amount && faucet.amount > 0 ? faucet.amount : '—'
+            const retailPrice = formatPrice(faucet.retail_price)
+            const cost = formatPrice(faucet.cost)
 
             return (
-              <div key={faucet.id} className="relative w-full module-item">
+              <div key={faucet.id} className='relative w-full module-item'>
                 <div
                   className={`border-2 border-blue-500 rounded ${
-                    !faucet.is_display ? "opacity-30" : ""
+                    !faucet.is_display ? 'opacity-30' : ''
                   }`}
                 >
-                  <div className="relative">
+                  <div className='relative'>
                     <img
-                      src={faucet.url || "/placeholder.png"}
-                      alt={faucet.name || "Faucet Image"}
-                      className="object-cover w-full h-40 rounded select-none cursor-pointer"
-                      loading="lazy"
+                      src={faucet.url || '/placeholder.png'}
+                      alt={faucet.name || 'Faucet Image'}
+                      className='object-cover w-full h-40 rounded select-none cursor-pointer'
+                      loading='lazy'
                       onClick={() => handleSetCurrentId(faucet.id)}
                     />
-                    {displayedAmount === "—" && (
-                      <div className="absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap">
-                        <div className="bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none">
+                    {displayedAmount === '—' && (
+                      <div className='absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
+                        <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
                           Out of Stock
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <p className="text-center font-bold mt-2">{faucet.name}</p>
-                  <p className="text-center text-sm">
-                    Amount: {displayedAmount}
-                  </p>
-                  <p className="text-center text-sm">
+                  <p className='text-center font-bold mt-2'>{faucet.name}</p>
+                  <p className='text-center text-sm'>Amount: {displayedAmount}</p>
+                  <p className='text-center text-sm'>
                     Price: ${retailPrice}/${cost}
                   </p>
                 </div>
 
-                <div className="absolute inset-0 flex justify-between items-start p-2 opacity-50">
+                <div className='absolute inset-0 flex justify-between items-start p-2 opacity-50'>
                   <Link
                     to={`edit/${faucet.id}`}
-                    className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
-                    title="Edit Faucet"
+                    className='text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition'
+                    title='Edit Faucet'
                     aria-label={`Edit ${faucet.name}`}
                   >
                     <FaPencilAlt />
                   </Link>
                   <Link
                     to={`delete/${faucet.id}`}
-                    className="text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition"
-                    title="Delete Faucet"
+                    className='text-white bg-gray-800 bg-opacity-60 rounded-full p-2 hover:bg-opacity-80 transition'
+                    title='Delete Faucet'
                     aria-label={`Delete ${faucet.name}`}
                   >
                     <FaTimes />
                   </Link>
                 </div>
               </div>
-            );
+            )
           })}
         </ModuleList>
         <Outlet />
       </div>
     </>
-  );
+  )
 }

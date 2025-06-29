@@ -1,22 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
 
 interface ModuleListProps {
-  children: React.ReactNode;
-  className?: string;
+  children: React.ReactNode
+  className?: string
 }
 
 export default function ModuleList({ children, className }: ModuleListProps) {
-  const [mounted, setMounted] = useState(false);
-  
+  const [mounted, setMounted] = useState(false)
+
   // Базовая анимация при монтировании
   useEffect(() => {
     const timer = setTimeout(() => {
-      setMounted(true);
-    }, 200);
-    
-    return () => clearTimeout(timer);
-  }, []);
-  
+      setMounted(true)
+    }, 200)
+
+    return () => clearTimeout(timer)
+  }, [])
+
   return (
     <div
       className={`
@@ -56,5 +56,5 @@ export default function ModuleList({ children, className }: ModuleListProps) {
       `}</style>
       {children}
     </div>
-  );
+  )
 }

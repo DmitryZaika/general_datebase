@@ -1,12 +1,12 @@
 // app/routes/todoList.ts
-import { ActionFunctionArgs } from "react-router";
-import { db } from "~/db.server";
-import { getValidatedFormData } from "remix-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import type { ActionFunctionArgs } from 'react-router'
+import { db } from '~/db.server'
+import { getValidatedFormData } from 'remix-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 
-import { getEmployeeUser } from "~/utils/session.server";
-import { todoListSchema, TTodoListSchema } from "~/schemas/general";
-import { forceRedirectError } from "~/utils/toastHelpers";
+import { getEmployeeUser } from '~/utils/session.server'
+import { todoListSchema, type TTodoListSchema } from '~/schemas/general'
+import { forceRedirectError } from '~/utils/toastHelpers'
 
 const editAction = async (
   rich_text: string,
@@ -19,8 +19,8 @@ const editAction = async (
      WHERE id = ?
      AND user_id = ?;`,
     [rich_text, todoId, userId],
-  );
-};
+  )
+}
 
 const updateDoneAction = async (
   todoId: number,
@@ -33,8 +33,8 @@ const updateDoneAction = async (
      WHERE id = ?
      AND user_id = ?;`,
     [isDone, todoId, userId],
-  );
-};
+  )
+}
 
 const deleteAction = async (todoId: number, userId: number): Promise<void> => {
   await db.execute(
@@ -42,22 +42,22 @@ const deleteAction = async (todoId: number, userId: number): Promise<void> => {
      WHERE id = ?
      AND user_id = ?;`,
     [todoId, userId],
-  );
-};
+  )
+}
 
 export async function action({ params, request }: ActionFunctionArgs) {
-  const user = await getEmployeeUser(request);
+  const user = await getEmployeeUser(request)
 
   if (!params.todo) {
-    return forceRedirectError(request.headers, "No user id provided");
+    return forceRedirectError(request.headers, 'No user id provided')
   }
 
-  const todoId = parseInt(params.todo, 10);
+  const todoId = parseInt(params.todo, 10)
   if (!todoId) {
-    return Response.json({ name: undefined });
+    return Response.json({ name: undefined })
   }
 
-  if (request.method === "POST") {
+  if (request.method === 'POST') {
     const {
       errors,
       data,
@@ -65,26 +65,26 @@ export async function action({ params, request }: ActionFunctionArgs) {
     } = await getValidatedFormData<TTodoListSchema>(
       request,
       zodResolver(todoListSchema),
-    );
+    )
     if (errors) {
-      return Response.json({ errors, defaultValues });
+      return Response.json({ errors, defaultValues })
     }
 
-    await editAction(data.rich_text, todoId, user.id);
-    return Response.json({ success: true });
+    await editAction(data.rich_text, todoId, user.id)
+    return Response.json({ success: true })
   }
 
-  if (request.method === "DELETE") {
-    await deleteAction(todoId, user.id);
-    return Response.json({ success: true });
+  if (request.method === 'DELETE') {
+    await deleteAction(todoId, user.id)
+    return Response.json({ success: true })
   }
-  if (request.method === "PATCH") {
-    const formData = await request.formData();
-    const isDone = formData.get("isDone") === "true";
-    await updateDoneAction(todoId, isDone, user.id);
-    return Response.json({ success: true });
+  if (request.method === 'PATCH') {
+    const formData = await request.formData()
+    const isDone = formData.get('isDone') === 'true'
+    await updateDoneAction(todoId, isDone, user.id)
+    return Response.json({ success: true })
   }
-  6;
+  6
 
-  return Response.json({ success: false });
+  return Response.json({ success: false })
 }
