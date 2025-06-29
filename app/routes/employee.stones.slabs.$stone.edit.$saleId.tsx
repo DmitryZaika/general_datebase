@@ -11,10 +11,8 @@ import { commitSession, getSession } from "~/sessions";
 import { toastData } from "~/utils/toastHelpers";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { csrf } from "~/utils/csrf.server";
-import { getEmployeeUser } from "~/utils/session.server";
-import { selectMany } from "~/utils/queryHelpers";
+import { getEmployeeUser, User } from "~/utils/session.server";
 import { customerSchema, TCustomerSchema } from "~/schemas/sales";
-import { Sink, Faucet } from "~/types";
 import { ContractForm } from "~/components/pages/ContractForm";
 import { getCustomerSchemaFromSaleId } from "~/utils/contractsBackend.server";
 
@@ -26,7 +24,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   // ------------------------------------------------------------
 
   // 1. Auth & CSRF
-  let user;
+  let user: User;
   try {
     user = await getEmployeeUser(request);
   } catch (error) {
@@ -51,7 +49,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   const saleId = Number(params.saleId);
-  if (isNaN(saleId)) {
+  if (Number.isNaN(saleId)) {
     return { error: "Invalid Sale ID" };
   }
 
@@ -243,9 +241,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  let user;
+  
   try {
-    user = await getEmployeeUser(request);
+    await getEmployeeUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
