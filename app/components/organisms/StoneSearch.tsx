@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
+import { X } from 'lucide-react'
 import { useState } from 'react'
 import type { Stone, StoneSearchResult } from '~/types'
+import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 
 const fetchAvailableStones = async (query: string = '') => {
@@ -27,7 +29,7 @@ export const StoneSearch = ({
   onRetailPriceChange,
 }: {
   stone: Stone | undefined
-  setStone: (value: Stone) => void
+  setStone: (value: Stone | undefined) => void
   onRetailPriceChange?: (price: number) => void
 }) => {
   const [searchValue, setSearchValue] = useState(stone?.name || undefined)
@@ -61,10 +63,27 @@ export const StoneSearch = ({
     }
   }
 
+  const handleRemoveStone = () => {
+    setStone(undefined)
+    setSearchValue('')
+    setShow(false)
+  }
+
   return (
     <div className='space-y-2'>
       <label className='text-sm font-medium'>Stone</label>
+
       <div className='relative'>
+        {stone && (
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={handleRemoveStone}
+            className='absolute -top-4 right-0 z-10 text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 '
+          >
+            <X className='h-3 w-3' />
+          </Button>
+        )}
         <Input
           placeholder='Search stone colors...'
           value={searchValue || stone?.name || ''}

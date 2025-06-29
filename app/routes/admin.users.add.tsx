@@ -1,16 +1,21 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import bcrypt from 'bcryptjs'
+import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
+  Form,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
+  useNavigate,
 } from 'react-router'
-import { Form, useLoaderData, useNavigate } from 'react-router'
-import { FormProvider, FormField } from '../components/ui/form'
 import { getValidatedFormData } from 'remix-hook-form'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
+import { SelectInput } from '~/components/molecules/SelectItem'
+import { SwitchItem } from '~/components/molecules/SwitchItem'
 import { Button } from '~/components/ui/button'
-import { useForm } from 'react-hook-form'
 import {
   Dialog,
   DialogContent,
@@ -19,18 +24,14 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
-import { toastData } from '~/utils/toastHelpers'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
-
-import { csrf } from '~/utils/csrf.server'
-import { getSuperUser } from '~/utils/session.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { SelectInput } from '~/components/molecules/SelectItem'
+import { commitSession, getSession } from '~/sessions'
+import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
-import bcrypt from 'bcryptjs'
-import { SwitchItem } from '~/components/molecules/SwitchItem'
+import { getSuperUser } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
 import { replaceUnderscoresWithSpaces } from '~/utils/words'
+import { FormField, FormProvider } from '../components/ui/form'
 
 interface Company {
   id: number
@@ -128,8 +129,8 @@ export default function UsersAdd() {
       phone_number: '',
       email: '',
       password: '',
-      company_id: 0,
-      position_id: 0,
+      company_id: undefined,
+      position_id: undefined,
       is_employee: false,
       is_admin: false,
     },
@@ -139,6 +140,7 @@ export default function UsersAdd() {
     if (open === false) {
       navigate('..')
     }
+    console.log(form.getValues())
   }
   return (
     <Dialog open={true} onOpenChange={handleChange}>
