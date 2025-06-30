@@ -1,27 +1,14 @@
-import { Label } from '@radix-ui/react-label'
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
 import type { TCustomerSchema } from '~/schemas/sales'
 import { CUSTOMER_ITEMS } from '~/utils/constants'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select'
+import { FormField } from '../ui/form'
+import { InputItem } from './InputItem'
+import { SelectInput } from './SelectItem'
 
 type ExtraItemKey = keyof typeof CUSTOMER_ITEMS
-
-const valueKeys = {
-  tripFee: 'miles',
-  mitter_edge_price: 'amount',
-  oversize_piece: 'sqft',
-  ten_year_sealer: 'amount',
-}
 
 const HARDCODED_IGNORES = [
   'edge_price',
@@ -32,75 +19,76 @@ const HARDCODED_IGNORES = [
   'seam_price',
 ]
 
-interface DynamicAdditionProps {
-  itemKey: ExtraItemKey
-  itemData: any
-  onRemove: (key: ExtraItemKey) => void
-  onUpdate: (key: ExtraItemKey, data: any) => void
-}
-
 interface DynamicControlProps {
-  itemKey: ExtraItemKey
-  itemData: any
-  onUpdate: (data: any) => void
-  setIsPriceManuallySet: (isPriceManuallySet: boolean) => void
+  target: ExtraItemKey
+  itemKey: keyof (typeof CUSTOMER_ITEMS)[ExtraItemKey]
+  form: UseFormReturn<TCustomerSchema>
+  index: number
 }
 
-const DynamicControl = ({
-  itemKey,
-  itemData,
-  itemType,
-  onUpdate,
-  setIsPriceManuallySet,
-}: DynamicControlProps) => {
+const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) => {
+  const itemType = CUSTOMER_ITEMS[target][itemKey]
   if (typeof itemType === 'object') {
     return (
-      <Select value={itemData} onValueChange={onUpdate}>
-        <SelectTrigger className='min-w-[150px]'>
-          <SelectValue placeholder='Select a slab' />
-        </SelectTrigger>
-        <SelectContent>
-          {Object.entries(itemType).map(([key, value]) => (
-            <SelectItem key={key} value={value?.toString() || ''}>
-              {key}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <FormField
+        control={form.control}
+        name={`rooms.${index}.extras.${target}.${itemKey}`}
+        render={({ field }) => (
+          <SelectInput
+            field={field}
+            placeholder='Type of the Faucet'
+            name='Type'
+            options={Object.entries(itemType).map(([key, value]) => ({
+              key: value,
+              value: key,
+            }))}
+          />
+        )}
+      />
     )
   }
   return (
-    <div className='min-w-[115px]'>
-      <Label className='text-xs'>{itemKey.replaceAll('_', ' ')}</Label>
-      <Input value={itemData} onChange={e => onUpdate(e.target.value)} />
-    </div>
+    <FormField
+      control={form.control}
+      name={`rooms.${index}.extras.${target}.${itemKey}`}
+      render={({ field }) => (
+        <InputItem name={itemKey} placeholder={`Enter ${itemKey}`} field={field} />
+      )}
+    />
   )
 }
 
-const DynamicAddition = ({ itemKey, itemData, form, index }: DynamicAdditionProps) => {
-  const context = CUSTOMER_ITEMS[itemKey]
-  const inputwidth = 'min-w-[115px]'
+interface DynamicAdditionProps {
+  target: ExtraItemKey
+  form: UseFormReturn<TCustomerSchema>
+  index: number
+}
+
+const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) => {
+  const context = CUSTOMER_ITEMS[target]
   const [isPriceManuallySet, setIsPriceManuallySet] = useState(false)
-  const current = form.watch(`rooms.${index}.extras.${itemKey}`)
+
+  const current = form.watch(`rooms.${index}.extras.${target}`) as Record<
+    string,
+    number
+  >
 
   useEffect(() => {
-    console.log('RUNNING', itemData)
     if (isPriceManuallySet) return
-    console.log('CURRENT', current)
     let newPrice = context.priceFn(current)
-    console.log('NEW PRICE', newPrice)
     if (Number.isNaN(newPrice)) {
       newPrice = 0
     }
 
-    if (newPrice !== itemData.price) {
-      form.setValue(`rooms.${index}.extras.${itemKey}.price`, newPrice)
+    if (newPrice !== current.price) {
+      form.setValue(`rooms.${index}.extras.${target}.price`, newPrice)
     }
-  }, [current, context, isPriceManuallySet])
+  }, [JSON.stringify(current), context, isPriceManuallySet])
 
-  const handlePriceChange = (newPrice: number) => {
-    setIsPriceManuallySet(true)
-    form.setValue(`rooms.${index}.extras.${itemKey}.price`, newPrice)
+  const handleRemove = () => {
+    const extras = form.getValues(`rooms.${index}.extras`)
+    const { [target]: _, ...rest } = extras
+    form.setValue(`rooms.${index}.extras`, rest)
   }
 
   return (
@@ -109,32 +97,39 @@ const DynamicAddition = ({ itemKey, itemData, form, index }: DynamicAdditionProp
         <div className='min-w-[120px] flex-shrink-0'>
           <div className='h-6'></div>
           <span className='font-medium text-sm capitalize'>
-            {itemKey.replaceAll('_', ' ')}
+            {target?.replaceAll('_', ' ')}
           </span>
         </div>
-        {Object.entries(CUSTOMER_ITEMS[itemKey])
-          .filter(([key]) => key !== 'priceFn')
-          .map(([key, value]) => (
+        {Object.keys(context)
+          .filter(item => item !== 'priceFn')
+          .map(item => (
             <DynamicControl
-              key={key}
-              itemKey={key}
-              itemType={value}
-              itemData={form.getValues(`rooms.${index}.extras.${itemKey}.${key}`)}
-              onUpdate={data => {
-                console.log('UPDATING', data)
-                form.setValue(`rooms.${index}.extras.${itemKey}.${key}`, data)
-              }}
-              setIsPriceManuallySet={setIsPriceManuallySet}
+              key={item}
+              target={target}
+              itemKey={item}
+              form={form}
+              index={index}
             />
           ))}
 
-        <div className={inputwidth}>
-          <Label className='text-xs'>Price</Label>
-          <Input
-            value={itemData.price}
-            onChange={e => handlePriceChange(parseFloat(e.target.value) || 0)}
-          />
-        </div>
+        <FormField
+          control={form.control}
+          name={`rooms.${index}.extras.${target}.price`}
+          render={({ field }) => (
+            <InputItem
+              name={'Price'}
+              placeholder={`Enter Price`}
+              field={{
+                ...field,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                  field.onChange(e)
+                  setIsPriceManuallySet(true)
+                },
+              }}
+              className='min-w-[115px]'
+            />
+          )}
+        />
         <div className='flex flex-col'>
           <div className='h-6'></div>
           <Button
@@ -142,7 +137,7 @@ const DynamicAddition = ({ itemKey, itemData, form, index }: DynamicAdditionProp
             variant='ghost'
             size='icon'
             className='h-10 w-10 p-0'
-            onClick={() => onRemove(itemKey)}
+            onClick={handleRemove}
           >
             <X className='h-4 w-4' />
           </Button>
@@ -153,29 +148,23 @@ const DynamicAddition = ({ itemKey, itemData, form, index }: DynamicAdditionProp
 }
 
 interface DynamicAdditionsProps {
-  items: Record<ExtraItemKey, any>
   form: UseFormReturn<TCustomerSchema>
   index: number
 }
 
-export const DynamicAdditions = ({ items, form, index }: DynamicAdditionsProps) => {
-  const selectedItems = Object.keys(items) as ExtraItemKey[]
+export const DynamicAdditions = ({ form, index }: DynamicAdditionsProps) => {
+  // Filter is a quick fix because it wants to include all price fields
+  const selectedItems: ExtraItemKey[] = Object.keys(
+    form.getValues(`rooms.${index}.extras`),
+  ).filter(itemKey => !HARDCODED_IGNORES.includes(itemKey)) as ExtraItemKey[]
   if (selectedItems.length === 0) return null
 
   return (
     <div className='mt-4 space-y-2'>
       <h3 className='text-sm font-semibold text-gray-600'>Extra Items</h3>
-      {selectedItems
-        .filter(itemKey => !HARDCODED_IGNORES.includes(itemKey))
-        .map(itemKey => (
-          <DynamicAddition
-            key={itemKey}
-            itemKey={itemKey}
-            itemData={items[itemKey]}
-            form={form}
-            index={index}
-          />
-        ))}
+      {selectedItems.map(itemKey => (
+        <DynamicAddition key={itemKey} target={itemKey} form={form} index={index} />
+      ))}
     </div>
   )
 }

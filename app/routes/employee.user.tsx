@@ -135,12 +135,10 @@ export default function UserProfile() {
   const isSubmitting = navigation.state !== 'idle'
   const token = useAuthenticityToken()
 
-  const { data, error } = useQuery({
+  const { data } = useQuery({
     queryKey: ['qbo', 'companyInfo'],
     queryFn: getCompanyInfo,
   })
-
-  console.log('error', error)
 
   const form = useForm<FormData>({
     resolver,

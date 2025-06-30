@@ -1,10 +1,8 @@
-import { Sequelize } from 'sequelize'
-import { Umzug, SequelizeStorage } from 'umzug'
-import { fileURLToPath } from 'url'
-import path from 'path'
-import fs from 'fs'
 import dotenv from 'dotenv'
-import os from 'os'
+import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { Sequelize } from 'sequelize'
+import { SequelizeStorage, Umzug } from 'umzug'
 
 const __dirname = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '')
 

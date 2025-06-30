@@ -602,11 +602,7 @@ export const RoomSubForm = ({
           <AddExtraDialog form={form} index={index} />
         </div>
       </div>
-      <DynamicAdditions
-        items={form.watch(`rooms.${index}.extras`)}
-        form={form}
-        index={index}
-      />
+      <DynamicAdditions form={form} index={index} />
 
       <Tabs defaultValue='slabs' className='mt-4'>
         <TabsList className='grid w-full grid-cols-3'>
@@ -789,7 +785,7 @@ export const RoomSubForm = ({
       )}
 
       <div className='text-right font-semibold text-lg my-4'>
-        Total Room Price: ${totalRoomPrice?.toFixed(2)}
+        Total Room Price: ${parseFloat(totalRoomPrice || '0').toFixed(2)}
       </div>
     </>
   )
