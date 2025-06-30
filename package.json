@@ -79,6 +79,7 @@
     "react-qr-code": "^2.0.15",
     "react-quilljs": "^2.0.5",
     "react-router": "^7.0.0",
+    "react-signature-canvas": "^1.0.7",
     "react-transition-group": "^4.4.5",
     "remix-hook-form": "^6.1.0",
     "remix-utils": "^8.1.0",
