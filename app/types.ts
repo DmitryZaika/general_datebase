@@ -1,5 +1,4 @@
 import type { Dispatch } from 'react'
-import { z } from 'zod'
 
 // Define scheduler state interface
 export interface SchedulerState {
@@ -25,6 +24,7 @@ export interface Stone {
   id: number
   type: string
   name: string
+  retail_price: number
 }
 
 export interface Faucet {

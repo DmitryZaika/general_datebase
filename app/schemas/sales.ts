@@ -30,7 +30,7 @@ export const roomSchema = z.object({
   edge: z.string().default('Flat'),
   backsplash: z.string().default('No'),
   square_feet: z.coerce.number().default(0),
-  retail_price: z.coerce.number().optional(),
+  retail_price: z.coerce.number().default(0),
   total_price: z.coerce.number().optional(),
   tear_out: z.string().default('No'),
   stove: z.string().default('F/S'),
@@ -61,9 +61,9 @@ export const customerSchema = z.object({
   phone: z.string().regex(/^\d{3}-\d{3}-\d{4}$/, 'Required format: 317-316-1456'),
   email: z.string().email('Please enter a valid email'),
   notes_to_sale: StringOrNumber,
+  price: z.coerce.number().default(0),
   builder: z.boolean().default(false),
   company_name: z.string().optional(),
-  price: z.coerce.number().optional(),
   rooms: z.array(roomSchema).default([]),
 })
 

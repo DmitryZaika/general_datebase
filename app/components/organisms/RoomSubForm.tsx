@@ -213,6 +213,54 @@ export const RoomSubForm = ({
     handleExtraChange(form.watch(`rooms.${index}.edge`), 'edge_price')
   }, [linearFeet])
 
+  useEffect(() => {
+    if (!stone) {
+      form.setValue(`rooms.${index}.retail_price`, 0)
+      form.setValue(`rooms.${index}.slabs`, [])
+      form.setValue(`rooms.${index}.total_price`, 0)
+    } else {
+      form.setValue(`rooms.${index}.retail_price`, stone.retail_price)
+    }
+  }, [stone])
+
+  /*
+  useEffect(() => {
+    setExtraItems(prev => {
+      const updated = { ...prev }
+
+      // Add new keys
+      selectedExtraItems.forEach(key => {
+        if (!updated[key]) {
+          // determine valueKey for defaults
+          const valueKey = {
+            tripFee: 'miles',
+            mitter_edge_price: 'amount',
+            oversize_piece: 'sqft',
+            ten_year_sealer: 'amount',
+          }
+
+          const valKey = valueKey[key] || 'value'
+
+          if (key === 'ten_year_sealer') {
+            const sqft = form.getValues(`rooms.${index}.square_feet`) || 0
+            updated[key] = { [valKey]: sqft.toString(), price: 0 }
+          } else {
+            updated[key] = { [valKey]: '', price: 0 }
+          }
+        }
+      })
+
+      ;(Object.keys(updated) as (keyof typeof CUSTOMER_ITEMS)[]).forEach(k => {
+        if (!selectedExtraItems.includes(k)) {
+          delete updated[k]
+        }
+      })
+
+      return updated
+    })
+  }, [selectedExtraItems])
+  */
+
   return (
     <>
       <div className='h-[1px] bg-gray-200 w-full my-2'></div>
@@ -248,8 +296,6 @@ export const RoomSubForm = ({
           setStone={setStone}
           onRetailPriceChange={price => {
             form.setValue(`rooms.${index}.retail_price`, price)
-
-            // Recalculate total price
             const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
             const totalPrice = squareFeet * price
             form.setValue(`rooms.${index}.total_price`, totalPrice)
