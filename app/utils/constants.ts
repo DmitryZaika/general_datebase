@@ -82,12 +82,3 @@ export const CUSTOMER_ITEMS = {
   },
 }
 export const STONE_FINISHES = ['polished', 'leathered', 'honed'] as const
-
-// const BASE_PRICES = {
-//   corbels: 100,
-//   edge: {
-//     flat: 0,
-//     east: 100,
-//     ogee: (linearFeet: number) => linearFeet * 100,
-//   },
-// };
