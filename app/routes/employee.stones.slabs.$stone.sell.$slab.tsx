@@ -146,7 +146,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   )
 
   saleId = salesResult.insertId
-  console.log(data.rooms)
   if (data.rooms && data.rooms.length > 0) {
     for (const room of data.rooms) {
       for (const slab of room.slabs) {
