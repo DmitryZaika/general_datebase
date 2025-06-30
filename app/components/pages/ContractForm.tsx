@@ -103,24 +103,6 @@ export function ContractForm({ starting }: IContractFormProps) {
     enabled: !!form.watch('name'),
   })
 
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === 'same_address' || name === 'billing_address') {
-        const sameAddress = form.getValues('same_address')
-        const billingAddress = form.getValues('billing_address')
-
-        if (sameAddress && billingAddress) {
-          form.setValue('project_address', billingAddress, {
-            shouldValidate: true,
-            shouldDirty: true,
-          })
-        }
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [form])
-
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate(`..${location.search}`)
@@ -259,7 +241,7 @@ export function ContractForm({ starting }: IContractFormProps) {
     })
 
     return () => subscription.unsubscribe()
-  }, [form, sink_type, faucet_type])
+  }, [sink_type, faucet_type])
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>

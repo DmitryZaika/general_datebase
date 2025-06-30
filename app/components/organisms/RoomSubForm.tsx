@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Plus, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { type UseFormReturn, useWatch } from 'react-hook-form'
 import { DynamicAdditions } from '~/components/molecules/DynamicAdditions'
@@ -13,7 +13,7 @@ import { Switch } from '~/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import type { TCustomerSchema } from '~/schemas/sales'
 import type { Faucet, Sink, Stone } from '~/types'
-import { BASE_PRICES, type CUSTOMER_ITEMS } from '~/utils/constants'
+import { BASE_PRICES } from '~/utils/constants'
 import { roomPrice } from '~/utils/contracts'
 import { AddExtraDialog } from './AddExtraDialog'
 import { AddFaucetDialog } from './AddFaucetDialog'
@@ -99,10 +99,6 @@ export const RoomSubForm = ({
   const [showAddSlabDialog, setShowAddSlabDialog] = useState(false)
   const [showAddSinkDialog, setShowAddSinkDialog] = useState(false)
   const [showAddFaucetDialog, setShowAddFaucetDialog] = useState(false)
-  const [showAddExtraDialog, setShowAddExtraDialog] = useState(false)
-  const [selectedExtraItems, setSelectedExtraItems] = useState<
-    (keyof typeof CUSTOMER_ITEMS)[]
-  >([])
   const [stone, setStone] = useState<Stone | undefined>(undefined)
 
   const slabIds = form.getValues(`rooms.${index}.slabs`).map(slab => slab.id)
@@ -122,41 +118,13 @@ export const RoomSubForm = ({
     }
   }, [stoneData])
 
-  /*fect(() => {
-      if (index !== 0) {
-        return
-      }
-      const currentSlabs = form.getValues(`rooms.${index}.slabs`) || [];
-      const slabExists = currentSlabs.some(
-        (slab) => slab.id === Number(slabId)
-      );
-
-      if (!slabExists) {
-        const newSlab = {
-          id: Number(slabId),
-          is_full: false,
-        };
-        form.setValue(`rooms.${index}.slabs`, [...currentSlabs, newSlab]);
-      }
-    }, [index, form]);
-    */
-
-  useEffect(() => {
-    if (stone?.type) {
-      form.setValue(
-        `rooms.${index}.ten_year_sealer`,
-        stone?.type?.toLowerCase() === 'quartz' ? false : true,
-      )
-    }
-  }, [stone?.type, index])
-
   useEffect(() => {
     if (stone?.name) {
       fetch(`/api/stones/search?name=${encodeURIComponent(stone?.name)}`)
         .then(response => response.json())
         .then(data => {
-          const foundStone = data.stones?.find((s: any) => s.id === stone?.id)
-          if (foundStone && foundStone.retail_price) {
+          const foundStone = data.stones?.find((s: Stone) => s.id === stone?.id)
+          if (foundStone?.retail_price) {
             form.setValue(`rooms.${index}.retail_price`, foundStone.retail_price)
 
             const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
@@ -168,7 +136,7 @@ export const RoomSubForm = ({
         })
         .catch(console.error)
     }
-  }, [index, stone?.id, stone?.name, form])
+  }, [index, stone?.id, stone?.name])
 
   const handleSwitchSlab = (slabId: number, isFull: boolean) => {
     form.setValue(
@@ -193,10 +161,9 @@ export const RoomSubForm = ({
   }
 
   const handleRemoveFaucet = (faucetIndex: number) => {
-    const currentFaucet = (form.getValues(`rooms.${index}.faucet_type` as any) ||
-      []) as any[]
+    const currentFaucet = form.getValues(`rooms.${index}.faucet_type`) || []
     currentFaucet.splice(faucetIndex, 1)
-    ;(form.setValue as any)(`rooms.${index}.faucet_type`, currentFaucet)
+    form.setValue(`rooms.${index}.faucet_type`, currentFaucet)
   }
 
   const handleRemoveRoom = () => {
@@ -245,44 +212,6 @@ export const RoomSubForm = ({
   useEffect(() => {
     handleExtraChange(form.watch(`rooms.${index}.edge`), 'edge_price')
   }, [linearFeet])
-
-  /*
-  useEffect(() => {
-    setExtraItems(prev => {
-      const updated = { ...prev }
-
-      // Add new keys
-      selectedExtraItems.forEach(key => {
-        if (!updated[key]) {
-          // determine valueKey for defaults
-          const valueKey = {
-            tripFee: 'miles',
-            mitter_edge_price: 'amount',
-            oversize_piece: 'sqft',
-            ten_year_sealer: 'amount',
-          }
-
-          const valKey = valueKey[key] || 'value'
-
-          if (key === 'ten_year_sealer') {
-            const sqft = form.getValues(`rooms.${index}.square_feet`) || 0
-            updated[key] = { [valKey]: sqft.toString(), price: 0 }
-          } else {
-            updated[key] = { [valKey]: '', price: 0 }
-          }
-        }
-      })
-
-      ;(Object.keys(updated) as (keyof typeof CUSTOMER_ITEMS)[]).forEach(k => {
-        if (!selectedExtraItems.includes(k)) {
-          delete updated[k]
-        }
-      })
-
-      return updated
-    })
-  }, [selectedExtraItems])
-  */
 
   return (
     <>
@@ -624,39 +553,13 @@ export const RoomSubForm = ({
       <div className='flex items-center justify-between space-x-2'>
         <div className='flex items-center space-x-2 mt-4'></div>
         <div className='flex items-center space-x-2 mt-4'>
-          <Button
-            type='button'
-            variant='blue'
-            size='sm'
-            onClick={() => setShowAddExtraDialog(true)}
-          >
-            <Plus className='h-3 w-3' /> Add Extra Item
-          </Button>
+          <AddExtraDialog form={form} index={index} />
         </div>
       </div>
-
       <DynamicAdditions
         items={form.watch(`rooms.${index}.extras`)}
-        onUpdate={updated => {
-          const currentExtras = form.getValues(`rooms.${index}.extras`) || {}
-          form.setValue(
-            `rooms.${index}.extras`,
-            { ...currentExtras, ...updated },
-            {
-              shouldDirty: true,
-              shouldValidate: true,
-            },
-          )
-        }}
-        onRemove={key => {
-          const currentExtras = form.getValues(`rooms.${index}.extras`) || {}
-          delete currentExtras[key]
-          form.setValue(`rooms.${index}.extras`, currentExtras, {
-            shouldDirty: true,
-            shouldValidate: true,
-          })
-          setSelectedExtraItems(prev => prev.filter(k => k !== key))
-        }}
+        form={form}
+        index={index}
       />
 
       <Tabs defaultValue='slabs' className='mt-4'>
@@ -838,16 +741,9 @@ export const RoomSubForm = ({
           />
         </>
       )}
-      <AddExtraDialog
-        show={showAddExtraDialog}
-        setShow={setShowAddExtraDialog}
-        currentItems={selectedExtraItems}
-        onSave={items =>
-          setSelectedExtraItems(items as (keyof typeof CUSTOMER_ITEMS)[])
-        }
-      />
+
       <div className='text-right font-semibold text-lg my-4'>
-        Total Room Price: ${totalRoomPrice.toFixed(2)}
+        Total Room Price: ${totalRoomPrice?.toFixed(2)}
       </div>
     </>
   )

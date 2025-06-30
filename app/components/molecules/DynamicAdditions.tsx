@@ -1,16 +1,18 @@
 import { Label } from '@radix-ui/react-label'
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import type { UseFormReturn } from 'react-hook-form'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import type { TCustomerSchema } from '~/schemas/sales'
+import { CUSTOMER_ITEMS } from '~/utils/constants'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '~/components/ui/select'
-import { CUSTOMER_ITEMS } from '~/utils/constants'
+} from '../ui/select'
 
 type ExtraItemKey = keyof typeof CUSTOMER_ITEMS
 
@@ -37,75 +39,68 @@ interface DynamicAdditionProps {
   onUpdate: (key: ExtraItemKey, data: any) => void
 }
 
-const DynamicAddition = ({
+interface DynamicControlProps {
+  itemKey: ExtraItemKey
+  itemData: any
+  onUpdate: (data: any) => void
+  setIsPriceManuallySet: (isPriceManuallySet: boolean) => void
+}
+
+const DynamicControl = ({
   itemKey,
   itemData,
-  onRemove,
+  itemType,
   onUpdate,
-}: DynamicAdditionProps) => {
+  setIsPriceManuallySet,
+}: DynamicControlProps) => {
+  if (typeof itemType === 'object') {
+    return (
+      <Select value={itemData} onValueChange={onUpdate}>
+        <SelectTrigger className='min-w-[150px]'>
+          <SelectValue placeholder='Select a slab' />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(itemType).map(([key, value]) => (
+            <SelectItem key={key} value={value?.toString() || ''}>
+              {key}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    )
+  }
+  return (
+    <div className='min-w-[115px]'>
+      <Label className='text-xs'>{itemKey.replaceAll('_', ' ')}</Label>
+      <Input value={itemData} onChange={e => onUpdate(e.target.value)} />
+    </div>
+  )
+}
+
+const DynamicAddition = ({ itemKey, itemData, form, index }: DynamicAdditionProps) => {
   const context = CUSTOMER_ITEMS[itemKey]
   const inputwidth = 'min-w-[115px]'
   const [isPriceManuallySet, setIsPriceManuallySet] = useState(false)
+  const current = form.watch(`rooms.${index}.extras.${itemKey}`)
 
   useEffect(() => {
+    console.log('RUNNING', itemData)
     if (isPriceManuallySet) return
-    const newPrice = context.priceFn({ amount, miles })
-
-    if (newPrice !== price) {
-      onUpdate(itemKey, { ...itemData, [valueKey]: value, price: newPrice })
+    console.log('CURRENT', current)
+    let newPrice = context.priceFn(current)
+    console.log('NEW PRICE', newPrice)
+    if (Number.isNaN(newPrice)) {
+      newPrice = 0
     }
-  }, [value, itemKey, context, price, isPriceManuallySet])
 
-  const handleValueChange = (newValue: string) => {
-    setIsPriceManuallySet(false)
-    const newData = { ...itemData, [valueKey]: newValue, price }
-    onUpdate(itemKey, newData)
-  }
+    if (newPrice !== itemData.price) {
+      form.setValue(`rooms.${index}.extras.${itemKey}.price`, newPrice)
+    }
+  }, [current, context, isPriceManuallySet])
 
   const handlePriceChange = (newPrice: number) => {
     setIsPriceManuallySet(true)
-    onUpdate(itemKey, { ...itemData, [valueKey]: value, price: newPrice })
-  }
-
-  const renderControl = () => {
-    if (itemKey === 'oversize_piece') {
-      const options = context.sqft
-      return (
-        <div className='min-w-[100px]'>
-          <Label className='text-xs'>Sqft</Label>
-          <Select value={value} onValueChange={handleValueChange}>
-            <SelectTrigger>
-              <SelectValue placeholder='Select' />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(options).map(opt => (
-                <SelectItem key={opt} value={opt}>
-                  {opt}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )
-    }
-
-    const label = itemKey === 'tripFee' ? 'Miles' : 'Amount'
-
-    if (itemKey === 'ten_year_sealer') {
-      return (
-        <div className={inputwidth}>
-          <Label className='text-xs'>Square Feet</Label>
-          <Input value={value} onChange={e => handleValueChange(e.target.value)} />
-        </div>
-      )
-    }
-
-    return (
-      <div className={inputwidth}>
-        <Label className='text-xs'>{label}</Label>
-        <Input value={value} onChange={e => handleValueChange(e.target.value)} />
-      </div>
-    )
+    form.setValue(`rooms.${index}.extras.${itemKey}.price`, newPrice)
   }
 
   return (
@@ -117,11 +112,26 @@ const DynamicAddition = ({
             {itemKey.replaceAll('_', ' ')}
           </span>
         </div>
-        {renderControl()}
+        {Object.entries(CUSTOMER_ITEMS[itemKey])
+          .filter(([key]) => key !== 'priceFn')
+          .map(([key, value]) => (
+            <DynamicControl
+              key={key}
+              itemKey={key}
+              itemType={value}
+              itemData={form.getValues(`rooms.${index}.extras.${itemKey}.${key}`)}
+              onUpdate={data => {
+                console.log('UPDATING', data)
+                form.setValue(`rooms.${index}.extras.${itemKey}.${key}`, data)
+              }}
+              setIsPriceManuallySet={setIsPriceManuallySet}
+            />
+          ))}
+
         <div className={inputwidth}>
           <Label className='text-xs'>Price</Label>
           <Input
-            value={price !== 0 ? price : ''}
+            value={itemData.price}
             onChange={e => handlePriceChange(parseFloat(e.target.value) || 0)}
           />
         </div>
@@ -144,23 +154,13 @@ const DynamicAddition = ({
 
 interface DynamicAdditionsProps {
   items: Record<ExtraItemKey, any>
-  onUpdate: (items: Record<ExtraItemKey, any>) => void
-  onRemove: (key: ExtraItemKey) => void
+  form: UseFormReturn<TCustomerSchema>
+  index: number
 }
 
-export const DynamicAdditions = ({
-  items,
-  onUpdate,
-  onRemove,
-}: DynamicAdditionsProps) => {
+export const DynamicAdditions = ({ items, form, index }: DynamicAdditionsProps) => {
   const selectedItems = Object.keys(items) as ExtraItemKey[]
   if (selectedItems.length === 0) return null
-
-  const updateItem = (key: ExtraItemKey, data: any) => {
-    onUpdate({ ...items, [key]: data })
-  }
-
-  console.log(items)
 
   return (
     <div className='mt-4 space-y-2'>
@@ -172,8 +172,8 @@ export const DynamicAdditions = ({
             key={itemKey}
             itemKey={itemKey}
             itemData={items[itemKey]}
-            onRemove={onRemove}
-            onUpdate={updateItem}
+            form={form}
+            index={index}
           />
         ))}
     </div>

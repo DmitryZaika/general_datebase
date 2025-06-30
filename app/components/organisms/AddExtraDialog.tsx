@@ -1,48 +1,45 @@
+import { Plus } from 'lucide-react'
+import type { UseFormReturn } from 'react-hook-form'
+import type { TCustomerSchema } from '~/schemas/sales'
 import { CUSTOMER_ITEMS } from '~/utils/constants'
 import { Button } from '../ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '../ui/dialog'
-import { useState, useEffect } from 'react'
 
 export const AddExtraDialog = ({
-  show,
-  setShow,
-  currentItems,
-  onSave,
+  form,
+  index,
 }: {
-  show: boolean
-  setShow: (show: boolean) => void
-  currentItems: string[]
-  onSave: (items: string[]) => void
+  form: UseFormReturn<TCustomerSchema>
+  index: number
 }) => {
-  const [dialogSelection, setDialogSelection] = useState<string[]>([])
-
-  useEffect(() => {
-    if (show) {
-      setDialogSelection(currentItems)
-    }
-  }, [show, currentItems])
+  const availableItems = Object.keys(CUSTOMER_ITEMS)
+  const selectedItems = Object.keys(form.getValues(`rooms.${index}.extras`))
 
   const handleItemToggle = (item: string) => {
-    setDialogSelection(prev =>
-      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item],
-    )
+    const current = form.getValues(`rooms.${index}.extras`)
+    if (selectedItems.includes(item)) {
+      delete current[item]
+    } else {
+      current[item] = {}
+    }
+    form.setValue(`rooms.${index}.extras`, current)
   }
-
-  const handleSave = () => {
-    onSave(dialogSelection)
-    setShow(false)
-  }
-
-  const availableItems = Object.keys(CUSTOMER_ITEMS)
 
   return (
-    <Dialog open={show} onOpenChange={setShow}>
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button type='button' variant='blue' size='sm'>
+          <Plus className='h-3 w-3' /> Add Extra Item
+        </Button>
+      </DialogTrigger>
       <DialogContent className='sm:max-w-[400px]'>
         <DialogHeader>
           <DialogTitle>Add Extra Items</DialogTitle>
@@ -59,7 +56,7 @@ export const AddExtraDialog = ({
               </span>
               <input
                 type='checkbox'
-                checked={dialogSelection.includes(item)}
+                checked={selectedItems.includes(item)}
                 onChange={() => handleItemToggle(item)}
                 className='h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500'
               />
@@ -68,10 +65,9 @@ export const AddExtraDialog = ({
         </div>
 
         <DialogFooter>
-          <Button variant='outline' onClick={() => setShow(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>Save ({dialogSelection.length})</Button>
+          <DialogClose asChild>
+            <Button>Save</Button>
+          </DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
