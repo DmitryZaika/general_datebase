@@ -18,17 +18,16 @@ import { commitSession, getSession } from "~/sessions";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
 import { getAdminUser } from "~/utils/session.server";
-import { uploadStreamToS3 } from "~/utils/s3.server";
-import { PDFDocument, StandardFonts } from "pdf-lib";
+
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { toastData } from "~/utils/toastHelpers";
-import { v4 as uuidv4 } from "uuid";
 import { AddressInput } from "~/components/organisms/AddressInput";
 import { SignatureInput } from "~/components/molecules/SignatureInput";
 import fetch from "node-fetch";
 import { CustomerSearch } from "~/components/organisms/CustomerSearch";
 import { useFullFetcher } from "~/hooks/useFullFetcher";
 import { useEffect, useRef } from "react";
+import { db } from "~/db.server";
 
 // ----------------------
 // Form validation schema
@@ -66,133 +65,20 @@ const checklistItems: Array<[keyof FormData, string]> = [
 // -----------------
 // Helper functions
 // -----------------
-function sanitizeFilename(name: string): string {
-  return name
-    .replace(/[^a-zA-Z0-9\s-]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
-async function generatePdf(data: FormData): Promise<Uint8Array> {
-  const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage();
-  const { width, height } = page.getSize();
 
-  // Fonts
-  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-  let cursorY = height - 60;
-
-  // Draw logo if exists
-  let logoBytes: Uint8Array | undefined;
-  try {
-    const logoUrl = "https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo.png.png";
-    const response = await fetch(logoUrl);
-    if (!response.ok) throw new Error("logo fetch failed");
-    const arrBuf = await response.arrayBuffer();
-    logoBytes = new Uint8Array(arrBuf);
-    const logoImage = await pdfDoc.embedPng(logoBytes);
-    const logoDims = logoImage.scale(0.075);
-    page.drawImage(logoImage, {
-      x: (width - logoDims.width) / 2,
-      y: height - logoDims.height - 20,
-      width: logoDims.width,
-      height: logoDims.height,
-    });
-    cursorY -= logoDims.height + 20;
-  } catch (_) {
-    // If remote logo fails, skip drawing any logo.
-  }
-
-  const drawText = (
-    text: string,
-    opts: { bold?: boolean; size?: number; indent?: number } = {},
-  ) => {
-    const { bold = false, size = 12, indent = 0 } = opts;
-    page.drawText(text, {
-      x: 50 + indent,
-      y: cursorY,
-      size,
-      font: bold ? fontBold : fontRegular,
-    });
-    cursorY -= size + 6; // line spacing
-  };
-
-  // Header
-  drawText("Post-installation check list", { bold: true, size: 16, indent: 0 });
-
-  drawText(`Customer Name: ${data.customer_name}`);
-  drawText(`Installation Address: ${data.installation_address}`);
-
-  drawText("Check all that apply:", { bold: true });
-
-  const checkboxLine = (label: string, checked?: string) => {
-    // Draw square box 10x10
-    const boxX = 60;
-    const boxY = cursorY + 2;
-    page.drawRectangle({ x: boxX, y: boxY, width: 10, height: 10, borderColor: undefined, borderWidth: 1 });
-    if (checked) {
-      // Draw X mark inside the box
-      page.drawLine({ start: { x: boxX + 1, y: boxY + 1 }, end: { x: boxX + 9, y: boxY + 9 }, thickness: 1 });
-      page.drawLine({ start: { x: boxX + 9, y: boxY + 1 }, end: { x: boxX + 1, y: boxY + 9 }, thickness: 1 });
-    }
-    page.drawText(label, {
-      x: boxX + 15,
-      y: cursorY,
-      size: 12,
-      font: fontRegular,
-    });
-    cursorY -= 18;
-  };
-
-  checkboxLine("Material is correct", data.material_correct);
-  checkboxLine("Seams meet my satisfaction", data.seams_satisfaction);
-  checkboxLine("Appliances fit properly", data.appliances_fit);
-  checkboxLine("Backsplashes placed correctly", data.backsplashes_correct);
-  checkboxLine("Edges and corners are correct", data.edges_correct);
-  checkboxLine("Holes for fixtures are drilled", data.holes_drilled);
-  checkboxLine("Clean up completed", data.cleanup_completed);
-
-  drawText("Comments:", { bold: true });
-  const commentLines = (data.comments || "").split(/\n|\r/);
-  commentLines.forEach((c) => drawText(c, { indent: 10 }));
-
-  cursorY -= 10;
-  // Signature line
-  drawText("Signature:", { bold: true });
-  if (typeof data.signature === "string" && data.signature.startsWith("data:image")) {
-    try {
-      const imageBytes = Buffer.from(data.signature.split(",")[1], "base64");
-      const pngImage = await pdfDoc.embedPng(imageBytes);
-      const imgDims = pngImage.scale(1);
-      page.drawImage(pngImage, {
-        x: 60,
-        y: cursorY - imgDims.height + 12,
-        width: imgDims.width,
-        height: imgDims.height,
-      });
-      cursorY -= imgDims.height + 6;
-    } catch {
-      drawText("(signature unreadable)", { indent: 10 });
-    }
-  } else {
-    drawText(data.signature || "N/A", { indent: 10 });
-  }
-
-  return pdfDoc.save();
-}
-
-async function* bufferToAsyncIterable(buffer: Buffer) {
-  yield buffer;
+// Convert checkbox values ("on" or empty string) to boolean
+function convertCheckboxToBoolean(value: string | undefined): boolean {
+  return value === "on";
 }
 
 // -------------
 // Action
 // -------------
 export async function action({ request }: ActionFunctionArgs) {
+  let adminUser: { id: number };
   try {
-    await getAdminUser(request);
+    adminUser = await getAdminUser(request);
   } catch (_error) {
     return redirect(`/login?error=${_error}`);
   }
@@ -211,25 +97,37 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors) {
     return { errors, receivedValues };
   }
-
-  // Generate PDF
-  const pdfBytes = await generatePdf(formData);
-  const buffer = Buffer.from(pdfBytes);
-
-  const safeName = sanitizeFilename(formData.customer_name);
-  const filename = `checklists/${safeName}-${Date.now()}-${uuidv4()}.pdf`;
-
-  // Upload to S3
   try {
-    await uploadStreamToS3(bufferToAsyncIterable(buffer), filename);
+    await db.execute(
+      `INSERT INTO checklists (
+        customer_id, installer_id, customer_name, installation_address,
+        material_correct, seams_satisfaction, appliances_fit, backsplashes_correct,
+        edges_correct, holes_drilled, cleanup_completed, comments, signature
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        formData.customer_id || null,
+        adminUser.id, // installer_id (the admin user creating the checklist)
+        formData.customer_name,
+        formData.installation_address,
+        convertCheckboxToBoolean(formData.material_correct),
+        convertCheckboxToBoolean(formData.seams_satisfaction),
+        convertCheckboxToBoolean(formData.appliances_fit),
+        convertCheckboxToBoolean(formData.backsplashes_correct),
+        convertCheckboxToBoolean(formData.edges_correct),
+        convertCheckboxToBoolean(formData.holes_drilled),
+        convertCheckboxToBoolean(formData.cleanup_completed),
+        formData.comments || null,
+        formData.signature
+      ]
+    );
   } catch (err) {
-    console.error("Failed to upload checklist PDF", err);
-    return { error: "Upload failed" };
+    console.error("Failed to save checklist to database", err);
+    return { error: "Database save failed" };
   }
 
   // Flash success
   const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Checklist saved"));
+  session.flash("message", toastData("Success", "Checklist saved to database"));
 
   return data({ success: true }, {
     headers: { "Set-Cookie": await commitSession(session) },
@@ -308,7 +206,7 @@ export default function AdminChecklists() {
                 <FormField
                   key={name}
                   control={form.control}
-                  name={name as any}
+                  name={name}
                   render={({ field }) => (
                     <div className="flex items-center space-x-2">
                       <Checkbox
