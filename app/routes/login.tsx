@@ -24,6 +24,7 @@ import { InputItem } from "~/components/molecules/InputItem";
 import { PasswordInput } from "~/components/molecules/PasswordInput";
 import { DialogFooter } from "~/components/ui/dialog";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
+import { db } from "~/db.server";
 
 const userSchema = z.object({
   email: z.string().email(),
@@ -72,8 +73,20 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   const session = await getSession(request.headers.get("Cookie"));
   session.set("sessionId", sessionId);
+
+  const [[row]]: any = await db.query(
+    `SELECT p.name AS position
+       FROM users u
+       LEFT JOIN positions p ON p.id = u.position_id
+     WHERE u.email = ? LIMIT 1`,
+    [data.email],
+  );
+  const position: string | null = row?.position ?? null;
+
   session.flash("message", toastData("Success", "Logged in"));
-  return redirect("..", {
+
+  const redirectPath = position === "installer" ? "/admin/checklists" : "..";
+  return redirect(redirectPath, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
