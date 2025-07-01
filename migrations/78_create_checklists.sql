@@ -12,7 +12,7 @@ CREATE TABLE checklists (
     holes_drilled BOOLEAN NOT NULL DEFAULT FALSE,
     cleanup_completed BOOLEAN NOT NULL DEFAULT FALSE,
     comments TEXT NULL,
-    pdf_url VARCHAR(512) NOT NULL,
+    signature TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_checklists_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
     CONSTRAINT fk_checklists_installer FOREIGN KEY (installer_id) REFERENCES users(id) ON DELETE SET NULL
