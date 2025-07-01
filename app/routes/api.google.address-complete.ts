@@ -34,6 +34,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     suggestions: { placePrediction: { text: string; placeId: string } }[];
   };
 
+  if (gJson.suggestions === undefined || gJson.suggestions.length === 0) {
+    return data({ suggestions: [] });
+  }
+
   // Optionally fetch zip codes for each suggestion
   const suggestionsWithZipCodes = await Promise.all(
     gJson.suggestions.map(async (s) => {

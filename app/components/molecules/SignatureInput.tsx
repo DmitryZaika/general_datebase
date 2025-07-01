@@ -2,7 +2,6 @@
 import React, { useRef, Suspense } from "react";
 import { Button } from "~/components/ui/button";
 import { FormItem, FormLabel, FormMessage } from "~/components/ui/form";
-
 interface RHFField {
   onChange: (value: unknown) => void;
   value: unknown;
@@ -11,6 +10,7 @@ interface RHFField {
 interface Props {
   field: RHFField;
   name?: string;
+  sigRef: React.RefObject<any>;
 }
 
 const SigCanvasLazy = React.lazy(() =>
@@ -25,8 +25,8 @@ const SigCanvasLazy = React.lazy(() =>
   }),
 );
 
-export const SignatureInput: React.FC<Props> = ({ field, name = "Signature" }) => {
-  const sigRef = useRef<any>(null);
+export const SignatureInput = ({ field, name = "Signature", sigRef }: Props) => {
+  
 
   const handleEnd = () => {
     const url = sigRef.current?.isEmpty() ? "" : sigRef.current?.getTrimmedCanvas().toDataURL("image/png");
@@ -48,9 +48,8 @@ export const SignatureInput: React.FC<Props> = ({ field, name = "Signature" }) =
               /* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */
             }
             {(() => {
-              const CanvasComp: any = SigCanvasLazy;
               return (
-                <CanvasComp
+                <SigCanvasLazy
                   ref={sigRef}
                   penColor="black"
                   backgroundColor="transparent"
