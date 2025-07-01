@@ -4,52 +4,26 @@ import {
   useLoaderData,
 } from "react-router";
 import { getEmployeeUser } from "~/utils/session.server";
-import { S3 } from "@aws-sdk/client-s3";
 import { cn } from "~/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { useIsMobile } from "~/hooks/use-mobile";
+import { db } from "~/db.server";
+import { selectMany } from "~/utils/queryHelpers";
 
 interface ChecklistItem {
-  key: string;
-  url: string;
-  filename: string;
-  lastModified?: string;
-}
-
-const { STORAGE_ACCESS_KEY, STORAGE_SECRET, STORAGE_REGION, STORAGE_BUCKET } =
-  process.env;
-
-if (!(STORAGE_ACCESS_KEY && STORAGE_SECRET && STORAGE_REGION && STORAGE_BUCKET)) {
-  throw new Error("S3 storage env vars are missing");
-}
-
-async function listChecklists(): Promise<ChecklistItem[]> {
-  const s3 = new S3({
-    credentials: {
-      accessKeyId: STORAGE_ACCESS_KEY || "",
-      secretAccessKey: STORAGE_SECRET || "",
-    },
-    region: STORAGE_REGION,
-  });
-  const Prefix = "dynamic-images/checklists/";
-  const resp = await s3.listObjectsV2({ Bucket: STORAGE_BUCKET, Prefix });
-
-  return (
-    resp.Contents || []
-  )
-    .filter((obj) => obj.Key && obj.Key.endsWith(".pdf"))
-    .map((obj) => {
-      const key = obj.Key ?? "";
-      const filename = key.split("/").pop() || key;
-      const url = `https://${STORAGE_BUCKET}.s3.${STORAGE_REGION}.amazonaws.com/${key}`;
-      return {
-        key,
-        url,
-        filename,
-        lastModified: obj.LastModified?.toISOString(),
-      } as ChecklistItem;
-    })
-    .sort((a, b) => (a.lastModified && b.lastModified ? b.lastModified.localeCompare(a.lastModified) : 0));
+  id: number;
+  customer_name: string;
+  installation_address: string;
+  material_correct: boolean;
+  seams_satisfaction: boolean;
+  appliances_fit: boolean;
+  backsplashes_correct: boolean;
+  edges_correct: boolean;
+  holes_drilled: boolean;
+  cleanup_completed: boolean;
+  comments: string | null;
+  created_at: string;
+  installer_name: string | null;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -59,7 +33,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`);
   }
 
-  const items = await listChecklists();
+  const query = `
+    SELECT 
+      c.id,
+      c.customer_name,
+      c.installation_address,
+      c.material_correct,
+      c.seams_satisfaction,
+      c.appliances_fit,
+      c.backsplashes_correct,
+      c.edges_correct,
+      c.holes_drilled,
+      c.cleanup_completed,
+      c.comments,
+      c.created_at,
+      u.name as installer_name
+    FROM checklists c
+    LEFT JOIN users u ON c.installer_id = u.id
+    ORDER BY c.created_at DESC
+  `;
+
+  const items = await selectMany<ChecklistItem>(db, query);
   return { items };
 };
 
@@ -80,20 +74,54 @@ export default function EmployeeChecklists() {
           )}
         >
           {items.map((item) => (
-            <Card key={item.key} className="hover:shadow-lg transition-shadow">
+            <Card key={item.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
-                <CardTitle className="text-sm break-all">
-                  {item.filename}
+                <CardTitle className="text-sm">
+                  {item.customer_name}
                 </CardTitle>
+                <p className="text-xs text-gray-600">
+                  {new Date(item.created_at).toLocaleDateString()}
+                </p>
+                {item.installer_name && (
+                  <p className="text-xs text-gray-500">
+                    Installer: {item.installer_name}
+                  </p>
+                )}
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-2">
+                <p className="text-sm">
+                  <strong>Address:</strong> {item.installation_address}
+                </p>
+                
+                <div className="text-xs space-y-1">
+                  <p><span className={item.material_correct ? "text-green-600" : "text-red-600"}>
+                    {item.material_correct ? "✓" : "✗"}
+                  </span> Material correct</p>
+                  <p><span className={item.seams_satisfaction ? "text-green-600" : "text-red-600"}>
+                    {item.seams_satisfaction ? "✓" : "✗"}
+                  </span> Seams satisfaction</p>
+                  <p><span className={item.appliances_fit ? "text-green-600" : "text-red-600"}>
+                    {item.appliances_fit ? "✓" : "✗"}
+                  </span> Appliances fit</p>
+                  <p><span className={item.cleanup_completed ? "text-green-600" : "text-red-600"}>
+                    {item.cleanup_completed ? "✓" : "✗"}
+                  </span> Cleanup completed</p>
+                </div>
+
+                {item.comments && (
+                  <div className="mt-2">
+                    <p className="text-xs font-medium">Comments:</p>
+                    <p className="text-xs text-gray-700">{item.comments}</p>
+                  </div>
+                )}
+
                 <a
-                  href={item.url}
+                  href={`/api/checklist-pdf/${item.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
+                  className="inline-block text-blue-600 hover:underline text-sm mt-2"
                 >
-                  Open PDF
+                  View PDF
                 </a>
               </CardContent>
             </Card>
