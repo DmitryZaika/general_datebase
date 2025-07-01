@@ -78,6 +78,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let faucetSuppliers: ISupplier[] | undefined = undefined;
   let colors: { id: number; name: string; hex_code: string }[] | undefined =
     undefined;
+  let position: string | null = null;
 
   colors = await selectMany<{ id: number; name: string; hex_code: string }>(
     db,
@@ -117,6 +118,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
        GROUP BY s.id, s.supplier_name`,
       [user.company_id]
     );
+
+    const [[row]]: any = await db.query(
+      `SELECT p.name AS position FROM users u LEFT JOIN positions p ON p.id = u.position_id WHERE u.id = ? LIMIT 1`,
+      [user.id],
+    );
+    position = row?.position ?? null;
   }
 
   return data(
@@ -128,6 +135,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       sinkSuppliers,
       faucetSuppliers,
       colors,
+      position,
     },
 
     {
@@ -150,6 +158,7 @@ export default function App() {
     sinkSuppliers,
     faucetSuppliers,
     colors,
+    position,
   } = useLoaderData<typeof loader>();
   const { pathname } = useLocation();
   const { toast } = useToast();
@@ -172,7 +181,8 @@ export default function App() {
   }, [message?.nonce]);
 
   const basePath = getBase(pathname);
-  const showSidebar = !!basePath && !isLogin;
+  const isInstaller = position === "installer";
+  const showSidebar = !!basePath && !isLogin && !isInstaller;
 
   return (
     <html lang="en">
@@ -184,21 +194,25 @@ export default function App() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <SidebarProvider open={!!basePath}>
-            <EmployeeSidebar
-              suppliers={stoneSuppliers}
-              sinkSuppliers={sinkSuppliers}
-              faucetSuppliers={faucetSuppliers}
-              colors={colors}
-            />
+          <SidebarProvider open={showSidebar}>
+            {showSidebar && (
+              <EmployeeSidebar
+                suppliers={stoneSuppliers}
+                sinkSuppliers={sinkSuppliers}
+                faucetSuppliers={faucetSuppliers}
+                colors={colors}
+              />
+            )}
             <main className="h-screen overflow-y-auto bg-gray-100 w-full">
               <AuthenticityTokenProvider token={token}>
-                <Header
-                  isEmployee={user?.is_employee ?? false}
-                  user={user}
-                  isAdmin={user?.is_admin ?? false}
-                  isSuperUser={user?.is_superuser ?? false}
-                />
+                {!isInstaller && (
+                  <Header
+                    isEmployee={user?.is_employee ?? false}
+                    user={user}
+                    isAdmin={user?.is_admin ?? false}
+                    isSuperUser={user?.is_superuser ?? false}
+                  />
+                )}
                 <div className="relative">
                   {isMobile && <SidebarTrigger />}
                   <Outlet />
@@ -208,7 +222,7 @@ export default function App() {
               <ScrollRestoration />
               <Scripts />
               <Posthog />
-              {user && <Chat />}
+              {!isInstaller && user && <Chat />}
               <ScrollToTopButton />
             </main>
           </SidebarProvider>
