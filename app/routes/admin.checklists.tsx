@@ -5,6 +5,7 @@ import {
   redirect,
   useNavigation,
   Form,
+  data,
 } from "react-router";
 import { FormProvider, FormField } from "~/components/ui/form";
 import { getValidatedFormData } from "remix-hook-form";
@@ -19,15 +20,15 @@ import { csrf } from "~/utils/csrf.server";
 import { getAdminUser } from "~/utils/session.server";
 import { uploadStreamToS3 } from "~/utils/s3.server";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { useFullSubmit } from "~/hooks/useFullSubmit";
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { toastData } from "~/utils/toastHelpers";
 import { v4 as uuidv4 } from "uuid";
-import fs from "fs";
-import path from "path";
 import { AddressInput } from "~/components/organisms/AddressInput";
 import { SignatureInput } from "~/components/molecules/SignatureInput";
 import fetch from "node-fetch";
+import { CustomerSearch } from "~/components/organisms/CustomerSearch";
+import { useFullFetcher } from "~/hooks/useFullFetcher";
+import { useEffect, useRef } from "react";
 
 // ----------------------
 // Form validation schema
@@ -43,7 +44,8 @@ const checklistSchema = z.object({
   holes_drilled: z.union([z.literal("on"), z.literal("")]).optional(),
   cleanup_completed: z.union([z.literal("on"), z.literal("")]).optional(),
   comments: z.string().optional(),
-  signature: z.string().optional(), // typed signature
+  signature: z.string().min(1, "Signature is required"),
+  customer_id: z.number().nullable().default(null),
 });
 
 type FormData = z.infer<typeof checklistSchema>;
@@ -201,7 +203,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return { error: "Invalid CSRF token" };
   }
 
-  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
+  const { errors, data: formData, receivedValues } = await getValidatedFormData<FormData>(
     request,
     resolver,
   );
@@ -211,10 +213,10 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   // Generate PDF
-  const pdfBytes = await generatePdf(data);
+  const pdfBytes = await generatePdf(formData);
   const buffer = Buffer.from(pdfBytes);
 
-  const safeName = sanitizeFilename(data.customer_name);
+  const safeName = sanitizeFilename(formData.customer_name);
   const filename = `checklists/${safeName}-${Date.now()}-${uuidv4()}.pdf`;
 
   // Upload to S3
@@ -229,7 +231,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const session = await getSession(request.headers.get("Cookie"));
   session.flash("message", toastData("Success", "Checklist saved"));
 
-  return redirect(".", {
+  return data({ success: true }, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
 }
@@ -250,14 +252,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 // Component
 // -------------
 export default function AdminChecklists() {
-  const navigation = useNavigation();
-  const isSubmitting = navigation.state !== "idle";
   const token = useAuthenticityToken();
+  const sigRef = useRef<any>(null); 
 
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
       customer_name: "",
+      customer_id: null,
       installation_address: "",
       material_correct: "",
       seams_satisfaction: "",
@@ -271,7 +273,16 @@ export default function AdminChecklists() {
     },
   });
 
-  const fullSubmit = useFullSubmit(form);
+  const { fullSubmit, fetcher } = useFullFetcher(form);
+  const isSubmitting = fetcher.state !== "idle";
+
+  // reset form after successful submit
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data?.success) {
+      form.reset();
+      sigRef.current?.clear();
+    }
+  }, [fetcher.state, fetcher.data, form]);
 
   return (
     <div className="flex justify-center py-10">
@@ -287,17 +298,7 @@ export default function AdminChecklists() {
         <FormProvider {...form}>
           <Form method="post" onSubmit={fullSubmit}>
             <input type="hidden" name="csrf" value={token} />
-            <FormField
-              control={form.control}
-              name="customer_name"
-              render={({ field }) => (
-                <InputItem
-                  name="Customer Name"
-                  placeholder="Enter customer name"
-                  field={field}
-                />
-              )}
-            />
+            <CustomerSearch form={form} nameField="customer_name" idField="customer_id" />
             <AddressInput form={form} field="installation_address" />
 
             {/* Checklist items */}
@@ -340,8 +341,7 @@ export default function AdminChecklists() {
             <FormField
               control={form.control}
               name="signature"
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-              render={({ field }) => <SignatureInput field={field as unknown as any} />}
+              render={({ field }) => <SignatureInput field={field} sigRef={sigRef} />}
             />
 
             <p className="my-4 text-xs text-gray-600">
@@ -351,7 +351,7 @@ export default function AdminChecklists() {
             </p>
 
             <div className="mt-6 flex justify-center">
-              <LoadingButton loading={isSubmitting}>Continue</LoadingButton>
+            <LoadingButton loading={isSubmitting}>Submit</LoadingButton>
             </div>
           </Form>
         </FormProvider>
