@@ -75,7 +75,7 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
   const checkboxLine = (label: string, checked: boolean) => {
     // Draw square box 10x10
     const boxX = 60;
-    const boxY = cursorY + 2;
+    const boxY = cursorY - 1;
     page.drawRectangle({ x: boxX, y: boxY, width: 10, height: 10, borderWidth: 1, borderColor: rgb(0, 0, 0) });
     if (checked) {
       // Draw X mark inside the box

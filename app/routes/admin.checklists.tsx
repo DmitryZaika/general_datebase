@@ -208,7 +208,7 @@ export default function AdminChecklists() {
                   control={form.control}
                   name={name}
                   render={({ field }) => (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center justify-between space-x-2">
                       <Checkbox
                         className="cursor-pointer"
                         checked={!!field.value}
@@ -217,7 +217,7 @@ export default function AdminChecklists() {
                         }
                         id={name}
                       />
-                      <label htmlFor={name} className="text-sm cursor-pointer">
+                      <label htmlFor={name} className="text-sm cursor-pointer flex-1">
                         {label}
                       </label>
                     </div>
