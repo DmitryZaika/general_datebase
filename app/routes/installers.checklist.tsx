@@ -17,7 +17,7 @@ import { useForm } from "react-hook-form";
 import { commitSession, getSession } from "~/sessions";
 import { useAuthenticityToken } from "remix-utils/csrf/react";
 import { csrf } from "~/utils/csrf.server";
-import { getAdminUser } from "~/utils/session.server";
+import { getAdminUser, getEmployeeUser } from "~/utils/session.server";
 
 import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { toastData } from "~/utils/toastHelpers";
@@ -76,13 +76,7 @@ function convertCheckboxToBoolean(value: string | undefined): boolean {
 // Action
 // -------------
 export async function action({ request }: ActionFunctionArgs) {
-  let adminUser: { id: number };
-  try {
-    adminUser = await getAdminUser(request);
-  } catch (_error) {
-    return redirect(`/login?error=${_error}`);
-  }
-
+  
   try {
     await csrf.validate(request);
   } catch (_error) {
@@ -97,6 +91,16 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors) {
     return { errors, receivedValues };
   }
+
+  // Ensure the current authenticated user (installer/admin) is captured for the checklist entry
+  let installerId: number;
+  try {
+    const user = await getEmployeeUser(request);
+    installerId = user.id;
+  } catch (_error) {
+    return { error: "Unauthorized" };
+  }
+
   try {
     await db.execute(
       `INSERT INTO checklists (
@@ -106,7 +110,7 @@ export async function action({ request }: ActionFunctionArgs) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         formData.customer_id || null,
-        adminUser.id, // installer_id (the admin user creating the checklist)
+        installerId,
         formData.customer_name,
         formData.installation_address,
         convertCheckboxToBoolean(formData.material_correct),
@@ -139,7 +143,7 @@ export async function action({ request }: ActionFunctionArgs) {
 // -------------
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request);
+    const user = await getEmployeeUser(request);
     return { user };
   } catch (_error) {
     return redirect(`/login?error=${_error}`);
