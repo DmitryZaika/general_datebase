@@ -1,9 +1,9 @@
-import { defineConfig } from 'vite'
-import tsconfigPaths from 'vite-tsconfig-paths'
 import { reactRouter } from '@react-router/dev/vite'
-import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
+import path from 'node:path'
+import { defineConfig } from 'vite'
 import devtoolsJson from 'vite-plugin-devtools-json'
+import tsconfigPaths from 'vite-tsconfig-paths'
 
 export default defineConfig({
   plugins: [tsconfigPaths(), tailwindcss(), reactRouter(), devtoolsJson()],
