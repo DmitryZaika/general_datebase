@@ -85,7 +85,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   session.flash("message", toastData("Success", "Logged in"));
 
-  const redirectPath = position === "installer" ? "/admin/checklists" : "..";
+  const redirectPath = position === "installer" ? "/installers/checklist" : "..";
   return redirect(redirectPath, {
     headers: { "Set-Cookie": await commitSession(session) },
   });
