@@ -50,6 +50,8 @@ export const roomSchema = z.object({
   }),
 })
 
+export type TRoomSchema = z.infer<typeof roomSchema>
+
 export const customerSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   customer_id: z.coerce.number().optional(),
