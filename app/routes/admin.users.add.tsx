@@ -140,7 +140,6 @@ export default function UsersAdd() {
     if (open === false) {
       navigate('..')
     }
-    console.log(form.getValues())
   }
   return (
     <Dialog open={true} onOpenChange={handleChange}>

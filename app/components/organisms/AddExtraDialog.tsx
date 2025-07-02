@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -43,6 +44,7 @@ export const AddExtraDialog = ({
       <DialogContent className='sm:max-w-[400px]'>
         <DialogHeader>
           <DialogTitle>Add Extra Items</DialogTitle>
+          <DialogDescription>Manage optional items for this room</DialogDescription>
         </DialogHeader>
 
         <div className='space-y-3 py-2'>

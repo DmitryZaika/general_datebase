@@ -8,7 +8,7 @@ export const roomPrice = (
 ) => {
   let total = (room.square_feet || 0) * (room.retail_price || 0)
   for (const extra of Object.values(room.extras)) {
-    total += typeof extra === 'number' ? extra : extra?.price || 0
+    total += Number(typeof extra === 'number' ? extra : extra?.price || 0)
   }
 
   for (const sink of room.sink_type) {

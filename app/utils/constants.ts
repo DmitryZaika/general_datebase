@@ -61,7 +61,7 @@ export const BASE_PRICES = {
 export const CUSTOMER_ITEMS = {
   tripFee: {
     miles: 'number',
-    priceFn: ({ miles }: { miles: number }) => miles * 4,
+    priceFn: ({ miles }: Record<string, number>) => miles * 4,
   },
   oversize_piece: {
     sqft: {
@@ -69,16 +69,16 @@ export const CUSTOMER_ITEMS = {
       '40+ sqft': 400,
       '50+ sqft': 500,
     },
-    priceFn: ({ sqft }: { sqft: number }) => sqft,
+    priceFn: ({ sqft }: Record<string, number>) => sqft,
   },
   mitter_edge_price: {
     amount: 'number',
-    priceFn: ({ amount }: { amount: number }) => amount * 200,
+    priceFn: ({ amount }: Record<string, number>) => amount * 200,
   },
 
   ten_year_sealer: {
     amount: 'number',
-    priceFn: ({ amount }: { amount: number }) => amount * 6,
+    priceFn: ({ amount }: Record<string, number>) => amount * 6,
   },
 }
 export const STONE_FINISHES = ['polished', 'leathered', 'honed'] as const
