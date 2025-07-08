@@ -6,30 +6,30 @@ import { downloadPDFAsBuffer } from '~/utils/s3.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 interface IQuery {
-  customer_name: string | null
-  seller_name: string | null
-  sale_date: Date | null
-  billing_address: string | null
-  project_address: string | null
-  phone: string | null
-  email: string | null
-  room: string | null
-  edge: string | null
-  backsplash: string | null
-  stone_name: string | null
-  total_price: number | null
-  square_feet: string | null
-  retail_price: string | null
-  sink_name: string | null
-  faucet_name: string | null
-  tear_out: string | null
-  stove: string | null
-  ten_year_sealer: number | null
-  waterfall: string | null
-  corbels: number | null
-  seam: string | null
-  zip_code: string | null
-  company_name: string | null
+  customer_name: string | null;
+  seller_name: string | null;
+  sale_date: Date | null;
+  project_address: string | null;
+  phone: string | null;
+  email: string | null;
+  room: string | null;
+  edge: string | null;
+  backsplash: string | null;
+  stone_name: string | null;
+  total_price: number | null;
+  square_feet: string | null;
+  retail_price: string | null;
+  sink_name: string | null;
+  faucet_name: string | null;
+  tear_out: string | null;
+  stove: string | null;
+  ten_year_sealer: number | null;
+  waterfall: string | null;
+  corbels: number | null;
+  seam: string | null;
+  zip_code: string | null;
+  company_name: string | null;
+  billing_address: string | null;
 }
 
 const urls = {
@@ -161,8 +161,8 @@ function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[]) {
   pdfForm.getTextField('Text125').setText(queryData[0].customer_name || undefined)
   pdfForm.getTextField('Text126').setText(queryData[0].company_name || undefined)
 
-  pdfForm.getTextField('Text127').setText(queryData[0].project_address || undefined)
-  pdfForm.getTextField('Text128').setText(queryData[0].billing_address || undefined)
+  pdfForm.getTextField("Text127").setText(queryData[0].project_address || undefined);
+  pdfForm.getTextField("Text128").setText(queryData[0].billing_address || undefined); // Billing address – оставляем то же или пусто
 
   pdfForm.getTextField('Text129').setText(queryData[0].phone || undefined)
   pdfForm.getTextField('Text130').setText(queryData[0].email || undefined)
@@ -367,8 +367,9 @@ function sanitizeFilename(name: string): string {
 }
 
 export async function loader({ request, params }: ActionFunctionArgs) {
+  
   try {
-    await getEmployeeUser(request)
+   await getEmployeeUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }

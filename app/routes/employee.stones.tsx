@@ -1,29 +1,27 @@
-import { capitalizeFirstLetter } from '~/utils/words'
+import { GridIcon, TableIcon } from '@radix-ui/react-icons'
+import type { ColumnDef } from '@tanstack/react-table'
+import { useEffect, useState } from 'react'
 import {
   type LoaderFunctionArgs,
-  redirect,
   Outlet,
+  redirect,
+  useLoaderData,
   useLocation,
-  Link,
-  useSearchParams,
+  useNavigate,
+  useSearchParams
 } from 'react-router'
-import { useLoaderData, useNavigate } from 'react-router'
 import ModuleList from '~/components/ModuleList'
-import { getEmployeeUser } from '~/utils/session.server'
-import { ImageCard } from '~/components/organisms/ImageCard'
-import { SuperCarousel } from '~/components/organisms/SuperCarousel'
-import { useState, useEffect } from 'react'
-import { stoneFilterSchema } from '~/schemas/stones'
-import { cleanParams } from '~/hooks/use-safe-search-params'
-import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
-import { StoneSearch } from '~/components/molecules/StoneSearch'
-import { Button } from '~/components/ui/button'
-import { TableIcon, GridIcon } from '@radix-ui/react-icons'
-import type { ColumnDef } from '@tanstack/react-table'
-import { DataTable } from '~/components/ui/data-table'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
-import { useSafeSearchParams } from '~/hooks/use-safe-search-params'
+import { StoneSearch } from '~/components/molecules/StoneSearch'
+import { ImageCard } from '~/components/organisms/ImageCard'
 import { StoneTable } from '~/components/organisms/StoneTable'
+import { SuperCarousel } from '~/components/organisms/SuperCarousel'
+import { Button } from '~/components/ui/button'
+import { cleanParams } from '~/hooks/use-safe-search-params'
+import { stoneFilterSchema } from '~/schemas/stones'
+import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
+import { getEmployeeUser } from '~/utils/session.server'
+import { capitalizeFirstLetter } from '~/utils/words'
 
 type ViewMode = 'grid' | 'table'
 

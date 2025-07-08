@@ -1,24 +1,28 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { FormProvider, useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
+  Form,
+  Link,
   type LoaderFunctionArgs,
   redirect,
-  Link,
+  useActionData,
+  useLoaderData,
+  useNavigation,
 } from 'react-router'
-import { z } from 'zod'
-import { Form, useLoaderData, useActionData, useNavigation } from 'react-router'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { getValidatedFormData } from 'remix-hook-form'
-import { useForm, FormProvider } from 'react-hook-form'
-import { commitSession, getSession } from '~/sessions'
-import { toastData } from '~/utils/toastHelpers'
-import { csrf } from '~/utils/csrf.server'
-import { getEmployeeUser, login } from '~/utils/session.server'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { FormField } from '~/components/ui/form'
+import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { PasswordInput } from '~/components/molecules/PasswordInput'
 import { DialogFooter } from '~/components/ui/dialog'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { FormField } from '~/components/ui/form'
+import { db } from '~/db.server'
+import { useFullSubmit } from '~/hooks/useFullSubmit'
+import { commitSession, getSession } from '~/sessions'
+import { csrf } from '~/utils/csrf.server'
+import { getEmployeeUser, login } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
 
 const userSchema = z.object({
   email: z.string().email(),
@@ -65,12 +69,24 @@ export async function action({ request }: ActionFunctionArgs) {
       defaultValues: { ...defaultValues, password: '' },
     } as ActionData
   }
-  const session = await getSession(request.headers.get('Cookie'))
-  session.set('sessionId', sessionId)
-  session.flash('message', toastData('Success', 'Logged in'))
-  return redirect('..', {
-    headers: { 'Set-Cookie': await commitSession(session) },
-  })
+  const session = await getSession(request.headers.get("Cookie"));
+  session.set("sessionId", sessionId);
+
+  const [[row]]: any = await db.query(
+    `SELECT p.name AS position
+       FROM users u
+       LEFT JOIN positions p ON p.id = u.position_id
+     WHERE u.email = ? LIMIT 1`,
+    [data.email],
+  );
+  const position: string | null = row?.position ?? null;
+
+  session.flash("message", toastData("Success", "Logged in"));
+
+  const redirectPath = position === "installer" ? "/installers/checklist" : "..";
+  return redirect(redirectPath, {
+    headers: { "Set-Cookie": await commitSession(session) },
+  });
 }
 
 export default function Login() {
