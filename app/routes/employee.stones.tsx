@@ -13,9 +13,7 @@ import { StoneSearch } from "~/components/molecules/StoneSearch";
 import { Button } from "~/components/ui/button";
 import { TableIcon, GridIcon } from "@radix-ui/react-icons";
 import { ColumnDef } from "@tanstack/react-table";
-import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
-import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
 import { StoneTable } from "~/components/organisms/StoneTable";
 
 type ViewMode = "grid" | "table";
