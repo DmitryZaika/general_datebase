@@ -1,34 +1,33 @@
-import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar'
-import { useIsMobile } from '~/hooks/use-mobile'
-import { data, useLocation } from 'react-router'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { posthog } from 'posthog-js'
+import { useEffect } from 'react'
+import type { LinksFunction, LoaderFunctionArgs } from 'react-router'
 import {
-  Links,
+  data, Links,
   Meta,
   Outlet,
   Scripts,
   ScrollRestoration,
-  useLoaderData,
+  useLoaderData, useLocation
 } from 'react-router'
-import type { LinksFunction, LoaderFunctionArgs } from 'react-router'
-import { Header } from './components/Header'
-import { Toaster } from './components/ui/toaster'
-import './tailwind.css'
-import { commitSession, getSession } from './sessions'
-import { useToast } from './hooks/use-toast'
-import { useEffect } from 'react'
-import type { ToastMessage } from './utils/toastHelpers'
-import { csrf } from '~/utils/csrf.server'
 import { AuthenticityTokenProvider } from 'remix-utils/csrf/react'
-import { Chat } from './components/organisms/Chat'
-import { getUserBySessionId } from './utils/session.server'
-import { selectMany } from './utils/queryHelpers'
-import { db } from '~/db.server'
 import { EmployeeSidebar } from '~/components/molecules/Sidebars/EmployeeSidebar'
-import { getBase } from '~/utils/urlHelpers'
-import type { ISupplier } from '~/schemas/suppliers'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { posthog } from 'posthog-js'
 import { ScrollToTopButton } from '~/components/ui/ScrollToTopButton'
+import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar'
+import { db } from '~/db.server'
+import { useIsMobile } from '~/hooks/use-mobile'
+import type { ISupplier } from '~/schemas/suppliers'
+import { csrf } from '~/utils/csrf.server'
+import { getBase } from '~/utils/urlHelpers'
+import { Header } from './components/Header'
+import { Chat } from './components/organisms/Chat'
+import { Toaster } from './components/ui/toaster'
+import { useToast } from './hooks/use-toast'
+import { commitSession, getSession } from './sessions'
+import './tailwind.css'
+import { selectMany } from './utils/queryHelpers'
+import { getUserBySessionId } from './utils/session.server'
+import type { ToastMessage } from './utils/toastHelpers'
 
 export const links: LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -73,10 +72,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = (await getUserBySessionId(activeSession)) || null
   }
 
-  let stoneSuppliers: ISupplier[] | undefined
-  let sinkSuppliers: ISupplier[] | undefined
-  let faucetSuppliers: ISupplier[] | undefined
-  let colors: { id: number; name: string; hex_code: string }[] | undefined
+  let stoneSuppliers: ISupplier[] | undefined = undefined;
+  let sinkSuppliers: ISupplier[] | undefined = undefined;
+  let faucetSuppliers: ISupplier[] | undefined = undefined;
+  let colors: { id: number; name: string; hex_code: string }[] | undefined =
+    undefined;
+  let position: string | null = null;
 
   colors = await selectMany<{ id: number; name: string; hex_code: string }>(
     db,
@@ -114,8 +115,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
        INNER JOIN faucet_type ft ON s.id = ft.supplier_id
        WHERE s.company_id = ?
        GROUP BY s.id, s.supplier_name`,
-      [user.company_id],
-    )
+      [user.company_id]
+    );
+
+    const [[row]]: any = await db.query(
+      `SELECT p.name AS position FROM users u LEFT JOIN positions p ON p.id = u.position_id WHERE u.id = ? LIMIT 1`,
+      [user.id],
+    );
+    position = row?.position ?? null;
   }
 
   return data(
@@ -127,6 +134,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       sinkSuppliers,
       faucetSuppliers,
       colors,
+      position,
     },
 
     {
@@ -149,11 +157,12 @@ export default function App() {
     sinkSuppliers,
     faucetSuppliers,
     colors,
-  } = useLoaderData<typeof loader>()
-  const { pathname } = useLocation()
-  const { toast } = useToast()
-  const isMobile = useIsMobile()
-  const isLogin = pathname === '/login'
+    position,
+  } = useLoaderData<typeof loader>();
+  const { pathname } = useLocation();
+  const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const isLogin = pathname === "/login";
 
   useEffect(() => {
     if (message !== null && message !== undefined) {
@@ -170,8 +179,9 @@ export default function App() {
     }
   }, [message?.nonce])
 
-  const basePath = getBase(pathname)
-  const showSidebar = !!basePath && !isLogin
+  const basePath = getBase(pathname);
+  const isInstaller = position === "installer";
+  const showSidebar = !!basePath && !isLogin && !isInstaller;
 
   return (
     <html lang='en'>
@@ -183,22 +193,26 @@ export default function App() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <SidebarProvider open={!!basePath}>
-            <EmployeeSidebar
-              suppliers={stoneSuppliers}
-              sinkSuppliers={sinkSuppliers}
-              faucetSuppliers={faucetSuppliers}
-              colors={colors}
-            />
-            <main className='h-screen overflow-y-auto bg-gray-100 w-full'>
+          <SidebarProvider open={showSidebar}>
+            {showSidebar && (
+              <EmployeeSidebar
+                suppliers={stoneSuppliers}
+                sinkSuppliers={sinkSuppliers}
+                faucetSuppliers={faucetSuppliers}
+                colors={colors}
+              />
+            )}
+            <main className="h-screen overflow-y-auto bg-gray-100 w-full">
               <AuthenticityTokenProvider token={token}>
-                <Header
-                  isEmployee={user?.is_employee ?? false}
-                  user={user}
-                  isAdmin={user?.is_admin ?? false}
-                  isSuperUser={user?.is_superuser ?? false}
-                />
-                <div className='relative'>
+                {!isInstaller && (
+                  <Header
+                    isEmployee={user?.is_employee ?? false}
+                    user={user}
+                    isAdmin={user?.is_admin ?? false}
+                    isSuperUser={user?.is_superuser ?? false}
+                  />
+                )}
+                <div className="relative">
                   {isMobile && <SidebarTrigger />}
                   <Outlet />
                 </div>
@@ -207,7 +221,7 @@ export default function App() {
               <ScrollRestoration />
               <Scripts />
               <Posthog />
-              {user && <Chat />}
+              {!isInstaller && user && <Chat />}
               <ScrollToTopButton />
             </main>
           </SidebarProvider>

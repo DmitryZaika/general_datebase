@@ -1,28 +1,30 @@
 import {
   type LucideProps,
-  Calendar,
-  DollarSign,
-  Layers,
-  ShowerHead,
   Building2,
+  Calculator,
+  Calendar,
+  ClipboardList,
+  DollarSign,
   FileIcon,
   ImageIcon,
+  Layers,
   Lightbulb,
-  Calculator,
+  Package,
   Receipt,
+  ShowerHead,
   User,
   Users,
-  Package,
 } from 'lucide-react'
-import { SinkIcon } from '~/components/icons/SinkIcon'
+import { useLoaderData, useLocation } from 'react-router'
 import { CorbelIcon } from '~/components/icons/CorbelIcon'
-import { redirect, useLocation } from 'react-router'
-import { getBase } from '~/utils/urlHelpers'
-import { StonesFilters } from './StonesFilters'
-import { SinksFilters } from './SinksFilters'
-import { FaucetsFilters } from './FaucetsFilters'
+import { SinkIcon } from '~/components/icons/SinkIcon'
 import type { ISupplier } from '~/schemas/suppliers'
-import { useLoaderData } from 'react-router'
+import { getBase } from '~/utils/urlHelpers'
+import { FaucetsFilters } from './FaucetsFilters'
+import { SinksFilters } from './SinksFilters'
+import { StonesFilters } from './StonesFilters'
+
+
 
 import {
   Sidebar,
@@ -119,6 +121,7 @@ const getItems = (
         url: `/employee/transactions`,
         icon: DollarSign,
       },
+    
       {
         title: 'Special Order',
         url: `/employee/special-order`,
@@ -139,7 +142,12 @@ const getItems = (
         url: `/${base}/samples`,
         icon: Package,
       },
-    )
+      {
+        title: "Checklists",
+        url: `/employee/checklists`,
+        icon: ClipboardList,
+      },
+    );
   }
   if (base === 'admin') {
     finalList.push(
