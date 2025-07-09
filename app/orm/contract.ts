@@ -110,6 +110,74 @@ export class Contract {
         )
   }
 
+  protected async updateSlab(slabId: number, room: TRoomSchema) {
+      await db.execute(
+          `UPDATE slab_inventory SET room_uuid = UUID_TO_BIN(?), seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?, stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ? WHERE id = ?`,
+          [
+              room.room_id,
+              room.seam,
+              room.edge,
+              room.room,
+              room.backsplash,
+              room.tear_out,
+              room.square_feet,
+              room.stove,
+              room.ten_year_sealer,
+              room.waterfall,
+              room.corbels,
+              room.retail_price,
+              room.extras,
+              slabId,
+          ],
+      )
+  }
+
+  protected async updateSale(user: User, customerId: number) {
+      if (this.saleId === null) {
+          throw new Error('Sale not found')
+      }
+      const totalSquareFeet = await this.calculateTotalSquareFeet()
+      await db.execute(
+          `UPDATE sales SET customer_id = ?, seller_id = ?, notes = ?, square_feet = ?, price = ?, project_address = ? WHERE id = ? AND company_id = ?`,
+          [
+              customerId,
+              user.id,
+              this.data.notes_to_sale || null,
+              totalSquareFeet,
+              this.data.price || 0,
+              this.data.project_address || this.data.billing_address,
+              this.saleId,
+              user.company_id,
+          ],
+      )
+  }
+
+  protected async updateCompanyName(customerId: number, user: User) {
+      if (this.data.builder && this.data.company_name) {
+          await db.execute(
+              `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
+              [this.data.company_name, customerId, user.company_id],
+          )
+          if (this.saleId !== null) {
+              await db.execute(
+                  `UPDATE slab_inventory SET company_name = ? WHERE sale_id = ?`,
+                  [this.data.company_name, this.saleId],
+              )
+          }
+      } else {
+          await db.execute(
+              `UPDATE customers SET company_name = NULL WHERE id = ? AND company_id = ?`,
+              [customerId, user.company_id],
+          )
+          if (this.saleId !== null) {
+              await db.execute(
+                  `UPDATE slab_inventory SET company_name = NULL WHERE sale_id = ?`,
+                  [this.saleId],
+              )
+          }
+      }
+  }
+
     protected async calculateTotalSquareFeet() {
         return this.data.rooms.reduce(
             (sum, room) => sum + (room.square_feet || 0),
@@ -257,14 +325,43 @@ export class Contract {
 
     async edit(user: User) {
         if (!this.saleId) {
-          throw new Error('Sale not found')
+            throw new Error('Sale not found')
         }
 
-        const sale = await this.getSale()
-        if (!sale) {
-          throw new Error('Sale not found')
+        let customerId: number
+        if (this.data.customer_id) {
+            await this.verifyCustomer(user)
+            await this.updateCustomer(user)
+            customerId = this.data.customer_id
+        } else {
+            customerId = await this.createCustomer(user)
         }
-        
+
+        await this.updateSale(user, customerId)
+
+        await this.updateCompanyName(customerId, user)
+
+        for (const room of this.data.rooms) {
+            for (const slab of room.slabs) {
+                this.unsellSink(slab.id)
+                this.unsellFaucet(slab.id)
+
+                await this.updateSlab(slab.id, room)
+
+                for (const sinkType of room.sink_type) {
+                    this.sellSink(slab.id, sinkType.id)
+                }
+                for (const faucetType of room.faucet_type) {
+                    this.sellFaucet(slab.id, faucetType.id)
+                }
+
+                if (!slab.is_full) {
+                    this.duplicateSlab(slab.id)
+                } else {
+                    this.deleteDuplicateSlab(slab.id)
+                }
+            }
+        }
     }
 }
 
