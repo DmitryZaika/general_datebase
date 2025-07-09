@@ -1,14 +1,24 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { db } from '~/db.server'
 import { type TCustomerSchema, type TRoomSchema } from '~/schemas/sales'
+import { getCustomerSchemaFromSaleId } from '~/utils/contractsBackend.server'
 import { type User } from '~/utils/session.server'
-
 
 export class Contract {
     data: TCustomerSchema
+    saleId: number | null = null
 
-    constructor(data: TCustomerSchema) {
+    constructor(data: TCustomerSchema, saleId: number | null = null) {
         this.data = data
+        this.saleId = saleId
+    }
+
+    static async fromSalesId(salesId: number) {
+      const data = await getCustomerSchemaFromSaleId(salesId)
+      if (!data) {
+        throw new Error('Sale not found')
+      }
+      return new Contract(data, salesId)
     }
 
     protected async verifyCustomer(user: User) {
@@ -93,6 +103,13 @@ export class Contract {
           return salesResult.insertId
     }
 
+    protected async deleteSale() {
+      await db.execute<ResultSetHeader>(
+          `UPDATE  sales SET cancelled_date = CURRENT_TIMESTAMP, status = 'cancelled' WHERE id = ?`,
+          [ this.saleId ],
+        )
+  }
+
     protected async calculateTotalSquareFeet() {
         return this.data.rooms.reduce(
             (sum, room) => sum + (room.square_feet || 0),
@@ -124,6 +141,14 @@ export class Contract {
           )
     }
 
+    protected async unsellSlab(slabId: number) {
+      await db.execute(
+          `UPDATE slab_inventory SET sale_id = NULL, room_uuid = NULL, seam = NULL, edge = NULL, room = NULL, backsplash = NULL, tear_out = NULL, square_feet = NULL,
+            stove = NULL, ten_year_sealer = NULL, waterfall = NULL, corbels = NULL, price = NULL, extras = NULL WHERE id = ?`,
+          [slabId,],
+        )
+  }
+
     protected async sellSink(slabId: number, sinkTypeId: number) {
         await db.execute(
             `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
@@ -131,11 +156,25 @@ export class Contract {
           )
     }
 
+    protected async unsellSink(slabId: number) {
+      await db.execute(
+          `UPDATE sinks SET slab_id = NULL WHERE slab_id = ?`,
+          [slabId],
+        )
+  }
+
     protected async sellFaucet(slabId: number, faucetTypeId: number) {
         await db.execute(
             `UPDATE faucets SET slab_id = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
             [slabId, faucetTypeId],
           )
+    }
+
+    protected async unsellFaucet(slabId: number) {
+      await db.execute(
+          `UPDATE faucets SET slab_id = NULL WHERE slab_id = ?`,
+          [slabId],
+        )
     }
 
     protected async duplicateSlab  (slabId: number) {
@@ -159,6 +198,13 @@ export class Contract {
             slabItem.url,
             slabId,
             ],
+        )
+    }
+
+    protected async deleteDuplicateSlab(slabId: number) {
+        await db.execute(
+            `DELETE FROM slab_inventory WHERE parent_id = ?`,
+            [slabId],
         )
     }
 
@@ -188,12 +234,37 @@ export class Contract {
             }
           }
 
-    async unsell(user: User) {
-        console.log('Unselling')
+    async unsell() {
+      if (!this.saleId) {
+        throw new Error('Sale not found')
+      }
+      await this.deleteSale()
+            for (const room of this.data.rooms) {
+              for (const slab of room.slabs) {
+                this.unsellSlab(slab.id)
+                for (const sinkType of room.sink_type) {
+                    this.unsellSink(slab.id)
+                }
+                for (const faucetType of room.faucet_type) {
+                    this.unsellFaucet(slab.id)
+                }
+                if (!slab.is_full) {
+                    this.deleteDuplicateSlab(slab.id)
+                }
+              }
+            }
     }
 
     async edit(user: User) {
-        console.log('Editing')
+        if (!this.saleId) {
+          throw new Error('Sale not found')
+        }
+
+        const sale = await this.getSale()
+        if (!sale) {
+          throw new Error('Sale not found')
+        }
+        
     }
 }
 
