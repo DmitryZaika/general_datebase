@@ -33,39 +33,41 @@ export class Contract {
     }
 
     protected async updateCustomer(user: User) {
-        const updateFields = []
-        const updateValues = []
-    
-        if (
-          this.data.billing_address &&
-          (!this.data.billing_address || this.data.billing_address === '')
-        ) {
-          updateFields.push('address = ?')
-          updateValues.push(this.data.billing_address)
-        }
-    
-        if (this.data.phone && (!this.data.phone || this.data.phone === '')) {
-          updateFields.push('phone = ?')
-          updateValues.push(this.data.phone)
-        }
-    
-        if (this.data.email && (!this.data.email || this.data.email === '')) {
-          updateFields.push('email = ?')
-          updateValues.push(this.data.email)
+        if (!this.data.customer_id) return
+
+        const [rows] = await db.execute<RowDataPacket[]>(
+            `SELECT address, phone, email FROM customers WHERE id = ? AND company_id = ?`,
+            [this.data.customer_id, user.company_id],
+        )
+
+        if (!rows || rows.length === 0) {
+            throw new Error('Customer not found')
         }
 
-        if ((this.data.builder && this.data.company_name) && (!this.data.company_name || this.data.company_name === '')) {
-            updateFields.push('company_name = ?')
-            updateValues.push(this.data.company_name)
+        const current = rows[0]
+        const updateFields: string[] = []
+        const updateValues: (string | null)[] = []
+
+        if (this.data.billing_address && (!current.address || current.address === '')) {
+            updateFields.push('address = ?')
+            updateValues.push(this.data.billing_address)
         }
-    
+
+        if (this.data.phone && (!current.phone || current.phone === '')) {
+            updateFields.push('phone = ?')
+            updateValues.push(this.data.phone)
+        }
+
+        if (this.data.email && (!current.email || current.email === '')) {
+            updateFields.push('email = ?')
+            updateValues.push(this.data.email)
+        }
+
         if (updateFields.length > 0) {
-          await db.execute(
-            `UPDATE customers SET ${updateFields.join(
-              ', ',
-            )} WHERE id = ? AND company_id = ?`,
-            [...updateValues, this.data.customer_id, user.company_id],
-          )
+            await db.execute(
+                `UPDATE customers SET ${updateFields.join(', ')} WHERE id = ? AND company_id = ?`,
+                [...updateValues, this.data.customer_id, user.company_id],
+            )
         }
     }
 
