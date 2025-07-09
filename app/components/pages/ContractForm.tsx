@@ -448,16 +448,13 @@ export function ContractForm({ starting }: IContractFormProps) {
                 />
               </div>
             </div>
+         
 
             <DialogFooter className='flex flex-col sm:flex-row gap-2  mt-4'>
-              {/* <Button
-                  type="button"
-                  variant="blue"
-                  className="sm:order-1 order-2 sm:ml-0 ml-auto"
-                  onClick={() => setShowExistingSales(true)}
-                >
-                  Add to Existing Sale
-                </Button> */}
+             {starting.email && <Button variant="destructive" 
+              >
+                Unsell
+              </Button>}
               <LoadingButton
                 loading={isSubmitting}
                 className='sm:order-2 order-1 sm:ml-auto ml-0'
