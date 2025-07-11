@@ -312,12 +312,8 @@ export class Contract {
             for (const room of this.data.rooms) {
               for (const slab of room.slabs) {
                 this.unsellSlab(slab.id)
-                for (const sinkType of room.sink_type) {
-                    this.unsellSink(slab.id)
-                }
-                for (const faucetType of room.faucet_type) {
-                    this.unsellFaucet(slab.id)
-                }
+                this.unsellSink(slab.id)
+                this.unsellFaucet(slab.id)
                 if (!slab.is_full) {
                     this.deleteDuplicateSlab(slab.id)
                 }
