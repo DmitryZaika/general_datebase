@@ -1,7 +1,7 @@
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { LoaderFunctionArgs } from "react-router";
 import { db } from "~/db.server";
 import { selectId } from "~/utils/queryHelpers";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 interface ChecklistData {
   id: number;
@@ -90,8 +90,6 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
     });
     cursorY -= 18;
   };
-
-  console.log(data.material_correct);
   checkboxLine("Material is correct", data.material_correct);
   checkboxLine("Seams meet my satisfaction", data.seams_satisfaction);
   checkboxLine("Appliances fit properly", data.appliances_fit);

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -21,6 +21,7 @@ import {
 } from '~/components/ui/dialog'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Switch } from '~/components/ui/switch'
+import { useToast } from '~/hooks/use-toast'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { customerSchema, roomSchema, type TCustomerSchema } from '~/schemas/sales'
 import type { Customer } from '~/types'
@@ -30,16 +31,31 @@ const resolver = zodResolver(customerSchema)
 
 interface IContractFormProps {
   starting: Partial<TCustomerSchema>
+  saleId?: number
 }
 
-export function ContractForm({ starting }: IContractFormProps) {
+const unsellSale = async (saleId: number) => {
+  const response = await fetch(`/api/unsell/${saleId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+  if (!response.ok) {
+    throw new Error('Failed to unsell sale')
+  }
+  return response.json()
+}
+
+export function ContractForm({ starting, saleId }: IContractFormProps) {
+  const { toast } = useToast()
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state === 'submitting'
   const [isExistingCustomer, setIsExistingCustomer] = useState(false)
   const location = useLocation()
   const [showSuggestions, setShowSuggestions] = useState(false)
   const suggestionsRef = useRef<HTMLDivElement>(null)
-
+  const [isBuilder, setIsBuilder] = useState(!!starting.company_name)
   const { data: sink_type = [] } = useQuery({
     queryKey: ['sink_type'],
     queryFn: () => fetch('/api/sinkType').then(res => res.json()),
@@ -68,11 +84,11 @@ export function ContractForm({ starting }: IContractFormProps) {
     if (currentRooms.length > 0) {
       newRoom = {
         ...newRoom,
-        edge: 'Flat',
-        tear_out: 'No',
-        stove: 'F/S',
-        waterfall: 'No',
-        seam: 'Standard',
+        edge: 'flat',
+        tear_out: 'no',
+        stove: 'f/s',
+        waterfall: 'no',
+        seam: 'standard',
       }
     }
 
@@ -103,6 +119,12 @@ export function ContractForm({ starting }: IContractFormProps) {
     enabled: !!form.watch('name'),
   })
 
+  const unsellMutation = useMutation({
+    mutationFn: (saleId: number) => {
+      return unsellSale(saleId)
+    },
+  })
+
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate(`..${location.search}`)
@@ -115,18 +137,13 @@ export function ContractForm({ starting }: IContractFormProps) {
     address: string | null
     phone: string | null
     email: string | null
+    company_name: string | null
   }) => {
     form.setValue('name', customer.name)
     form.setValue('customer_id', customer.id)
 
-    const custAny: any = customer
-    if (custAny.company_name) {
-      form.setValue('builder', true)
-      form.setValue('company_name', custAny.company_name)
-    } else {
-      form.setValue('builder', false)
-      form.setValue('company_name', '')
-    }
+    setIsBuilder(!!customer.company_name)
+    form.setValue('company_name', customer.company_name || null)
 
     if (customer.address) {
       form.setValue('billing_address', customer.address)
@@ -167,14 +184,8 @@ export function ContractForm({ starting }: IContractFormProps) {
         if (data.customer) {
           form.setValue('name', data.customer.name)
 
-          const custAny: any = data.customer
-          if (custAny.company_name) {
-            form.setValue('builder', true)
-            form.setValue('company_name', custAny.company_name)
-          } else {
-            form.setValue('builder', false)
-            form.setValue('company_name', '')
-          }
+          setIsBuilder(!!data.customer.company_name)
+          form.setValue('company_name', data.customer.company_name || null)
 
           if (data.customer.address) {
             form.setValue('billing_address', data.customer.address)
@@ -242,6 +253,28 @@ export function ContractForm({ starting }: IContractFormProps) {
 
     return () => subscription.unsubscribe()
   }, [sink_type, faucet_type])
+
+  const handleUnsell = () => {
+    if (!saleId) return
+    unsellMutation.mutate(saleId, {
+      onSuccess: () => {
+        navigate(`/employee/stones/${window.location.search}`, {
+          replace: true,
+        })
+        toast({
+          title: 'Success',
+          description: 'Sale unsold',
+          variant: 'success',
+        })
+      },
+    })
+  }
+
+  const handleBuilderChange = (checked: boolean) => {
+    setIsBuilder(checked)
+    if (checked) return
+    form.setValue('company_name', null)
+  }
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -373,23 +406,18 @@ export function ContractForm({ starting }: IContractFormProps) {
               </div>
 
               {/* Builder checkbox */}
+         
               <div className='flex items-center space-x-2 my-2'>
-                <FormField
-                  control={form.control}
-                  name='builder'
-                  render={({ field }) => (
                     <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
+                      checked={isBuilder}
+                      onCheckedChange={handleBuilderChange}
                       id='builder_checkbox'
-                      label='Builder'
-                    />
-                  )}
-                />
-              </div>
+                        label='Builder'
+                      />
+                </div>
+              
 
-              {/* Company Name input - shown only if builder selected */}
-              {form.watch('builder') && (
+              {isBuilder && (
                 <FormField
                   control={form.control}
                   name='company_name'
@@ -451,7 +479,7 @@ export function ContractForm({ starting }: IContractFormProps) {
          
 
             <DialogFooter className='flex flex-col sm:flex-row gap-2  mt-4'>
-             {starting.email && <Button variant="destructive" 
+             {saleId && <Button variant="destructive" type="button" onClick={handleUnsell}
               >
                 Unsell
               </Button>}
