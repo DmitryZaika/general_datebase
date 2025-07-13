@@ -1,2 +1,2 @@
-ALTER TABLE main.slab_inventory
+ALTER TABLE slab_inventory
 DROP COLUMN is_sold;
