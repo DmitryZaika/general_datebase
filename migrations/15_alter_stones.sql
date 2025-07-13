@@ -1,4 +1,4 @@
-ALTER TABLE main.stones
+ALTER TABLE stones
   ADD COLUMN height FLOAT NULL,
   ADD COLUMN width FLOAT NULL,
   ADD COLUMN amount INT NULL;

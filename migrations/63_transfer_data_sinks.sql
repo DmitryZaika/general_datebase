@@ -1,7 +1,7 @@
-UPDATE main.sinks
+UPDATE sinks
 SET slab_id = (
     SELECT slab_inventory.id 
-    FROM main.slab_inventory
+    FROM slab_inventory
     WHERE slab_inventory.sale_id = sinks.sale_id
     LIMIT 1
 )
