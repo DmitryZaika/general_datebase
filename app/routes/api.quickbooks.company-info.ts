@@ -1,14 +1,14 @@
-import { getSession, commitSession } from '~/sessions'
-import { type LoaderFunctionArgs, redirect, data } from 'react-router'
-import { getEmployeeUser } from '~/utils/session.server'
+import { data, type LoaderFunctionArgs, redirect } from 'react-router'
+import { commitSession, getSession } from '~/sessions'
 import {
-  setQboSession,
-  getQboTokenState,
-  QboTokenState,
   clearQboSession,
   getQboCompanyInformation,
+  getQboTokenState,
+  QboTokenState,
   refreshQboToken,
+  setQboSession,
 } from '~/utils/quickbooks.server'
+import { getEmployeeUser } from '~/utils/session.server'
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const cookieHeader = request.headers.get('Cookie')
@@ -17,12 +17,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const realmId = session.get('qboRealmId')
   const refreshToken = session.get('qboRefreshToken')
 
-  console.log(realmId, accessToken, refreshToken)
-
   if (!realmId || !accessToken || !refreshToken) {
     return data({ success: false })
   }
-  console.log('HERE')
 
   let user
   try {
@@ -30,8 +27,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
-
-  console.log('USER', user)
 
   const tokenState = getQboTokenState(session)
   if (tokenState === QboTokenState.ACCESS_VALID) {

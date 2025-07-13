@@ -27,6 +27,8 @@ export interface Stone {
   retail_price: number
 }
 
+export type StoneSlim = Omit<Stone, 'retail_price'>
+
 export interface Faucet {
   id: number
   name: string

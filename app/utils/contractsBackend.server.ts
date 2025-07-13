@@ -148,16 +148,16 @@ export async function getCustomerSchemaFromSaleId(
         room_id: roomId,
         sink_type: [],
         faucet_type: [],
-        edge: slab.edge || 'Flat',
-        backsplash: slab.backsplash || 'No',
+        edge: slab.edge || 'flat',
+        backsplash: slab.backsplash || 'no',
         square_feet: slab.square_feet || 0,
         retail_price: slab.retail_price || 0,
         total_price: undefined, // can be calculated later if needed
-        tear_out: slab.tear_out || 'No',
-        stove: slab.stove || 'F/S',
-        waterfall: slab.waterfall || 'No',
+        tear_out: slab.tear_out || 'no',
+        stove: slab.stove || 'f/s',
+        waterfall: slab.waterfall || 'no',
         corbels: slab.corbels || 0,
-        seam: slab.seam || 'Standard',
+        seam: slab.seam || 'standard',
         ten_year_sealer: Boolean(slab.ten_year_sealer),
         slabs: [],
         extras,
@@ -201,8 +201,8 @@ export async function getCustomerSchemaFromSaleId(
     price: sale.price || 0,
     notes_to_sale: sale.notes || '',
     rooms: Object.values(roomsMap),
-    builder: Boolean(sale.builder),
-    company_name: sale.company_name || '',
+ 
+    company_name: sale.company_name || null,
   }
 
   return customerSchema
