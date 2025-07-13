@@ -1,47 +1,47 @@
+import { useEffect, useRef, useState } from 'react'
+import { FaCheck, FaLink, FaPencilAlt, FaQrcode, FaTimes } from 'react-icons/fa'
 import {
-  type LoaderFunctionArgs,
   type ActionFunctionArgs,
-  redirect,
   Form,
-  useLoaderData,
-  useNavigation,
+  type LoaderFunctionArgs,
   data,
+  redirect,
   useActionData,
-  useParams,
+  useLoaderData,
   useNavigate,
+  useNavigation,
+  useParams,
 } from 'react-router'
-import { z } from 'zod'
-import { getAdminUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { commitSession, getSession } from '~/sessions'
-import { selectMany, selectId } from '~/utils/queryHelpers'
-import { db } from '~/db.server'
-import { csrf } from '~/utils/csrf.server'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
-import { Button } from '~/components/ui/button'
-import { FaTimes, FaLink, FaQrcode, FaPencilAlt, FaCheck } from 'react-icons/fa'
-import { useEffect, useState } from 'react'
-import { MultiPartForm } from '~/components/molecules/MultiPartForm'
-import { FormField } from '~/components/ui/form'
-import { InputItem } from '~/components/molecules/InputItem'
+import { z } from 'zod'
 import { FileInput } from '~/components/molecules/FileInput'
-import { useCustomOptionalForm } from '~/utils/useCustomForm'
-import { parseMutliForm } from '~/utils/parseMultiForm'
-import { deleteFile } from '~/utils/s3.server'
+import { InputItem } from '~/components/molecules/InputItem'
+import { MultiPartForm } from '~/components/molecules/MultiPartForm'
+import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  DialogDescription,
 } from '~/components/ui/dialog'
+import { FormField } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
+import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions'
+import { csrf } from '~/utils/csrf.server'
+import { parseMutliForm } from '~/utils/parseMultiForm'
+import { selectId, selectMany } from '~/utils/queryHelpers'
+import { deleteFile } from '~/utils/s3.server'
+import { getAdminUser } from '~/utils/session.server'
 import {
   type SlabData,
-  printSingleSlabQRCode,
   printAllSlabsQRCodes,
+  printSingleSlabQRCode,
 } from '~/utils/slabQRCode'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { useCustomOptionalForm } from '~/utils/useCustomForm'
 
 // Form schema
 const slabSchema = z.object({
@@ -96,9 +96,30 @@ function SlabItem({
   const [isEditing, setIsEditing] = useState(false)
   const [newBundle, setNewBundle] = useState(slab.bundle)
 
+  // Ref to manage input focus when editing
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Focus the input automatically when entering edit mode
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [isEditing])
+
   const handleBundleUpdate = () => {
+    // Prevent saving empty bundle names
+    if (!newBundle.trim()) return
     onBundleUpdate && onBundleUpdate(slab.id, newBundle)
     setIsEditing(false)
+  }
+
+  // Save changes when the user presses Enter while editing
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleBundleUpdate()
+    }
   }
 
   return (
@@ -116,8 +137,10 @@ function SlabItem({
           <div className=''>
             {isEditing ? (
               <Input
+                ref={inputRef}
                 value={newBundle}
                 onChange={e => setNewBundle(e.target.value)}
+                onKeyDown={handleKeyDown}
                 className='w-full'
               />
             ) : (
@@ -742,11 +765,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
         console.error('Error processing slab form:', error)
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error occurred'
-        return { error: `Failed to add slab: ${errorMessage}` }
+        return data({ error: `Failed to add slab: ${errorMessage}` })
       }
     }
 
-    return { error: 'Unsupported content type' }
+    return data({ error: 'Unsupported content type' })
   }
 
   return null
@@ -883,13 +906,6 @@ export default function EditStoneSlabs() {
   const actionData = useActionData()
   const isSubmitting = navigation.state === 'submitting'
 
-  // Handle navigation after action
-  useEffect(() => {
-    if (actionData?.success && navigation.state === 'idle') {
-      navigate(`/admin/stones/edit/${params.stone}/slabs`, { replace: true })
-    }
-  }, [actionData, navigation.state, navigate, params.stone])
-
   // Event handlers
   const handleUnlinkClick = (sourceId: number, name: string) => {
     setUnlinkSourceId(sourceId)
@@ -921,10 +937,11 @@ export default function EditStoneSlabs() {
         method: 'PATCH',
         body: formData,
       })
+    
 
       if (response.ok) {
         // Refresh the page to show updated data
-        navigate(`/admin/stones/edit/${params.stone}/slabs`, { replace: true })
+        navigate(`.${window.location.search}`, { replace: true })
       } else {
         console.error('Failed to update bundle')
       }

@@ -36,7 +36,7 @@ export class Contract {
         if (!this.data.customer_id) return
 
         const [rows] = await db.execute<RowDataPacket[]>(
-            `SELECT address, phone, email FROM customers WHERE id = ? AND company_id = ?`,
+            `SELECT address, phone, email, company_name FROM customers WHERE id = ? AND company_id = ?`,
             [this.data.customer_id, user.company_id],
         )
 
@@ -47,6 +47,11 @@ export class Contract {
         const current = rows[0]
         const updateFields: string[] = []
         const updateValues: (string | null)[] = []
+
+        if (this.data.company_name && (!current.company_name || current.company_name === null)) {
+            updateFields.push('company_name = ?')
+            updateValues.push(this.data.company_name)
+        }
 
         if (this.data.billing_address && (!current.address || current.address === '')) {
             updateFields.push('address = ?')
@@ -155,29 +160,10 @@ export class Contract {
   }
 
   protected async updateCompanyName(customerId: number, user: User) {
-      if (this.data.builder && this.data.company_name) {
-          await db.execute(
-              `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
-              [this.data.company_name, customerId, user.company_id],
-          )
-          if (this.saleId !== null) {
-              await db.execute(
-                  `UPDATE slab_inventory SET company_name = ? WHERE sale_id = ?`,
-                  [this.data.company_name, this.saleId],
-              )
-          }
-      } else {
-          await db.execute(
-              `UPDATE customers SET company_name = NULL WHERE id = ? AND company_id = ?`,
-              [customerId, user.company_id],
-          )
-          if (this.saleId !== null) {
-              await db.execute(
-                  `UPDATE slab_inventory SET company_name = NULL WHERE sale_id = ?`,
-                  [this.saleId],
-              )
-          }
-      }
+    await db.execute(
+        `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
+        [this.data.company_name, customerId, user.company_id],
+    )
   }
 
     protected async calculateTotalSquareFeet() {
@@ -187,12 +173,12 @@ export class Contract {
           )
     }
 
-    protected async sellSlab(saleId: number, slabId: number, room: TRoomSchema) {
+    protected async sellSlab(slabId: number, room: TRoomSchema) {
         await db.execute(
             `UPDATE slab_inventory SET sale_id = ?, room_uuid = UUID_TO_BIN(?), seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
               stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ? WHERE id = ?`,
             [
-              saleId,
+              this.saleId,
               room.room_id,
               room.seam,
               room.edge,
@@ -215,9 +201,17 @@ export class Contract {
       await db.execute(
           `UPDATE slab_inventory SET sale_id = NULL, room_uuid = NULL, seam = NULL, edge = NULL, room = NULL, backsplash = NULL, tear_out = NULL, square_feet = NULL,
             stove = NULL, ten_year_sealer = NULL, waterfall = NULL, corbels = NULL, price = NULL, extras = NULL WHERE id = ?`,
-          [slabId,],
+          [slabId],
         )
   }
+
+  protected async unsellSlabs(saleId: number) {
+    await db.execute(
+        `UPDATE slab_inventory SET sale_id = NULL, room_uuid = NULL, seam = NULL, edge = NULL, room = NULL, backsplash = NULL, tear_out = NULL, square_feet = NULL,
+          stove = NULL, ten_year_sealer = NULL, waterfall = NULL, corbels = NULL, price = NULL, extras = NULL WHERE sale_id = ?`,
+        [saleId],
+      )
+}
 
     protected async sellSink(slabId: number, sinkTypeId: number) {
         await db.execute(
@@ -286,23 +280,27 @@ export class Contract {
         } else {
             customerId = await this.createCustomer(user)
         }
+        await this.updateCompanyName(customerId, user)
 
-        const saleId = await this.createSale(user, customerId)
-            for (const room of this.data.rooms) {
-              for (const slab of room.slabs) {
-                this.sellSlab(saleId, slab.id, room)
-                for (const sinkType of room.sink_type) {
-                    this.sellSink(slab.id, sinkType.id)
-                }
-                for (const faucetType of room.faucet_type) {
-                    this.sellFaucet(slab.id, faucetType.id)
-                }
-                if (!slab.is_full) {
-                    this.duplicateSlab(slab.id)
-                }
-              }
+        this.saleId = await this.createSale(user, customerId)
+        for (const room of this.data.rooms) {
+          const firstSlab = room.slabs[0]
+          for (const slab of room.slabs) {
+            this.sellSlab(slab.id, room)
+
+         
+            if (!slab.is_full) {
+                this.duplicateSlab(slab.id)
             }
           }
+          for (const sinkType of room.sink_type) {
+            this.sellSink(firstSlab.id, sinkType.id)
+        }
+        for (const faucetType of room.faucet_type) {
+          this.sellFaucet(firstSlab.id, faucetType.id)
+        }
+      }
+    }
 
     async unsell() {
       if (!this.saleId) {
@@ -338,6 +336,8 @@ export class Contract {
         await this.updateSale(user, customerId)
 
         await this.updateCompanyName(customerId, user)
+
+        await this.unsellSlabs(this.saleId)
 
         for (const room of this.data.rooms) {
             for (const slab of room.slabs) {

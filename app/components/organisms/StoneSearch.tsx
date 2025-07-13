@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useState } from 'react'
-import type { Stone, StoneSearchResult } from '~/types'
+import type { StoneSearchResult, StoneSlim } from '~/types'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 
@@ -28,8 +28,8 @@ export const StoneSearch = ({
   setStone,
   onRetailPriceChange,
 }: {
-  stone: Stone | undefined
-  setStone: (value: Stone | undefined) => void
+  stone: StoneSlim | undefined
+  setStone: (value: StoneSlim | undefined) => void
   onRetailPriceChange?: (price: number) => void
 }) => {
   const [searchValue, setSearchValue] = useState(stone?.name || undefined)
