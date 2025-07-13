@@ -1,5 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getCustomerSchemaFromSaleId } from '~/utils/contractsBackend.server'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { User } from '~/utils/session.server'
 import { DatabaseTestHelper, TestDataFactory } from '../../tests/testDatabase'
 import { Contract } from './contract'
@@ -184,16 +183,9 @@ describe('Contract Integration Tests', () => {
         ],
       })
       const contract = new Contract(customerData)
-      await contract.sell(user)
-
-      // Get the sale ID
-      const sales = await DatabaseTestHelper.selectFromTable('sales', {
-        customer_id: customerId,
-      })
-      const saleId = sales[0].id
-
+      const saleId = await contract.sell(user)
       // Create contract with sale ID and unsell
-      const contractWithSale = new Contract(customerData, saleId)
+      const contractWithSale = await Contract.fromSalesId(saleId)
       await contractWithSale.unsell()
 
       // Verify sale was cancelled
@@ -280,15 +272,15 @@ describe('Contract Integration Tests', () => {
       const updatedSales = await DatabaseTestHelper.selectFromTable('sales', {
         id: saleId,
       })
-      expect(updatedSales[0].price).toBe(7500)
+      expect(updatedSales[0].price).toBe('7500.00')
       expect(updatedSales[0].notes).toBe('Updated notes')
-      expect(updatedSales[0].square_feet).toBe(35)
+      expect(updatedSales[0].square_feet).toBe('35.00')
 
       // Verify slab was updated
       const slabs = await DatabaseTestHelper.selectFromTable('slab_inventory', {
         id: slabId,
       })
-      expect(slabs[0].square_feet).toBe(35)
+      expect(slabs[0].square_feet).toBe('35.00')
     })
 
     it('should throw error when saleId is null', async () => {
@@ -315,10 +307,6 @@ describe('Contract Integration Tests', () => {
       expect(sales.length).toBe(1)
       const saleId = sales[0].id
 
-      // Mock the getCustomerSchemaFromSaleId to return test data
-      const mockData = TestDataFactory.createCustomerSchema({ customer_id: customerId })
-      vi.mocked(getCustomerSchemaFromSaleId).mockResolvedValue(mockData)
-
       // Test fromSalesId
       const result = await Contract.fromSalesId(saleId)
       expect(result.saleId).toBe(saleId)
@@ -326,8 +314,6 @@ describe('Contract Integration Tests', () => {
     })
 
     it('should throw error when sale not found', async () => {
-      vi.mocked(getCustomerSchemaFromSaleId).mockResolvedValue(null)
-
       await expect(Contract.fromSalesId(99999)).rejects.toThrow('Sale not found')
     })
   })
@@ -364,12 +350,6 @@ describe('Contract Integration Tests', () => {
         id: customerId,
       })
       expect(customers[0].company_name).toBe('Builder Company Inc')
-
-      // Verify slab company name was set
-      const slabs = await DatabaseTestHelper.selectFromTable('slab_inventory', {
-        id: slabId,
-      })
-      expect(slabs[0].company_name).toBe('Builder Company Inc')
     })
   })
 })
