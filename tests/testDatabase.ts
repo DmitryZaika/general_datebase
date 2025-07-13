@@ -89,10 +89,6 @@ export class DatabaseTestHelper {
       .join(', ')
     const values = Object.values(data)
 
-    console.warn('table', table)
-    console.warn('columns', columns)
-    console.warn('placeholders', placeholders)
-    console.warn('values', values)
     const [result] = await connection.execute(
       `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`,
       values,
@@ -159,7 +155,6 @@ export class TestDataFactory {
       email: 'customer@test.com',
       notes_to_sale: 'Test notes',
       price: 5000,
-      builder: false,
       company_name: 'Test Company',
       rooms: [TestDataFactory.createRoom()],
       ...overrides,
