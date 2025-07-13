@@ -13,6 +13,7 @@ import {
   User,
   Users,
   Package,
+  ClipboardList,
 } from "lucide-react";
 import { SinkIcon } from "~/components/icons/SinkIcon";
 import { CorbelIcon } from "~/components/icons/CorbelIcon";
@@ -123,6 +124,7 @@ const getItems = (
         url: `/employee/transactions`,
         icon: DollarSign,
       },
+    
       {
         title: "Special Order",
         url: `/employee/special-order`,
@@ -142,7 +144,12 @@ const getItems = (
         title: "Samples",
         url: `/${base}/samples`,
         icon: Package,
-      }
+      },
+      {
+        title: "Checklists",
+        url: `/employee/checklists`,
+        icon: ClipboardList,
+      },
     );
   }
   if (base === "admin") {

@@ -29,6 +29,7 @@ interface IQuery {
   seam: string | null;
   zip_code: string | null;
   company_name: string | null;
+  billing_address: string | null;
 }
 
 const urls = {
@@ -164,7 +165,7 @@ function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[]) {
   pdfForm.getTextField("Text126").setText(queryData[0].company_name || undefined);
 
   pdfForm.getTextField("Text127").setText(queryData[0].project_address || undefined);
-  pdfForm.getTextField("Text128").setText(queryData[0].project_address || undefined); // Billing address – оставляем то же или пусто
+  pdfForm.getTextField("Text128").setText(queryData[0].billing_address || undefined); // Billing address – оставляем то же или пусто
 
   pdfForm.getTextField("Text129").setText(queryData[0].phone || undefined);
   pdfForm.getTextField("Text130").setText(queryData[0].email || undefined);
@@ -258,7 +259,8 @@ async function getData(saleId: number) {
             main.stones.retail_price,
             main.sink_type.name as sink_name,
             main.faucet_type.name as faucet_name,
-            main.customers.company_name
+            main.customers.company_name,
+            main.customers.address as billing_address
         from main.sales
         join main.customers on main.customers.id = main.sales.customer_id
         join main.users on main.users.id = main.sales.seller_id
@@ -335,9 +337,9 @@ function sanitizeFilename(name: string): string {
 }
 
 export async function loader({ request, params }: ActionFunctionArgs) {
-  let user;
+  
   try {
-    user = await getEmployeeUser(request);
+   await getEmployeeUser(request);
   } catch (error) {
     return redirect(`/login?error=${error}`);
   }
