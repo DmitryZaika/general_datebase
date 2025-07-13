@@ -12,7 +12,7 @@ import { Input } from '~/components/ui/input'
 import { Switch } from '~/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import type { TCustomerSchema } from '~/schemas/sales'
-import type { Faucet, Sink, Stone } from '~/types'
+import type { Faucet, Sink, Stone, StoneSlim } from '~/types'
 import { BASE_PRICES } from '~/utils/constants'
 import { roomPrice } from '~/utils/contracts'
 import { AddExtraDialog } from './AddExtraDialog'
@@ -70,8 +70,7 @@ async function getStone(slabId: number): Promise<{
   if (!response.ok) {
     throw new Error('Failed to fetch stone')
   }
-  const data = await response.json()
-  return data
+  return await response.json()
 }
 
 export const RoomSubForm = ({
@@ -99,24 +98,19 @@ export const RoomSubForm = ({
   const [showAddSlabDialog, setShowAddSlabDialog] = useState(false)
   const [showAddSinkDialog, setShowAddSinkDialog] = useState(false)
   const [showAddFaucetDialog, setShowAddFaucetDialog] = useState(false)
-  const [stone, setStone] = useState<Stone | undefined>(undefined)
+  const slabIds = form.getValues(`rooms.${index}.slabs`).map(slab => slab.id) 
+  const [stone, setStone] = useState<StoneSlim | undefined>()
 
-  const slabIds = form.getValues(`rooms.${index}.slabs`).map(slab => slab.id)
+  useEffect(() => {
+    if (slabIds.length > 0) {
+      getStone(slabIds[0]).then(setStone)
+    }
+  }, [])
 
   const { data: slabMap } = useQuery({
     queryKey: ['slabMap', slabIds],
     queryFn: () => getSlabMap(slabIds),
   })
-  const { data: stoneData } = useQuery({
-    queryKey: ['stone', slabIds[0]],
-    queryFn: () => getStone(slabIds[0]),
-  })
-
-  useEffect(() => {
-    if (stoneData) {
-      setStone(stoneData)
-    }
-  }, [stoneData])
 
   useEffect(() => {
     if (stone?.name) {
@@ -182,7 +176,7 @@ export const RoomSubForm = ({
       form.setValue(`rooms.${index}.extras.${target}`, price)
       return
     }
-    price = price[value]
+    price = price[value as keyof typeof price]
     if (typeof price === 'function') {
       const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
       price = price({ linearFeet: linearFeet || 0, squareFeet })
@@ -212,16 +206,6 @@ export const RoomSubForm = ({
   useEffect(() => {
     handleExtraChange(form.watch(`rooms.${index}.edge`), 'edge_price')
   }, [linearFeet])
-
-  useEffect(() => {
-    if (!stone) {
-      form.setValue(`rooms.${index}.retail_price`, 0)
-      form.setValue(`rooms.${index}.slabs`, [])
-      form.setValue(`rooms.${index}.total_price`, 0)
-    } else {
-      form.setValue(`rooms.${index}.retail_price`, stone.retail_price)
-    }
-  }, [stone])
 
   /*
   useEffect(() => {
@@ -293,12 +277,16 @@ export const RoomSubForm = ({
 
         <StoneSearch
           stone={stone}
-          setStone={setStone}
+          setStone={val => {
+            form.setValue(`rooms.${index}.slabs`, [])
+            setStone(val)
+          }}
           onRetailPriceChange={price => {
             form.setValue(`rooms.${index}.retail_price`, price)
             const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
             const totalPrice = squareFeet * price
             form.setValue(`rooms.${index}.total_price`, totalPrice)
+            
           }}
         />
 
@@ -392,7 +380,7 @@ export const RoomSubForm = ({
           />
           <div
             className={clsx(`mb-0 ${inputWidth}`, {
-              hidden: ['eased', '1/4_bevel', '1/2_bevel', 'flat', 'Flat'].includes(
+              hidden: ['eased', '1/4_bevel', '1/2_bevel', 'flat'].includes(
                 form.watch(`rooms.${index}.edge`),
               ),
             })}

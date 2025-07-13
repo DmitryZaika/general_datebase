@@ -48,7 +48,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const url = new URL(request.url)
   const searchParams = url.searchParams.toString()
   const searchString = searchParams ? `?${searchParams}` : ''
-  let saleId: number
 
   const contract = new Contract(data)
   await contract.sell(user)
@@ -57,7 +56,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   session.flash('message', toastData('Success', 'Sale completed successfully'))
 
   const separator = searchString ? '&' : '?'
-  return redirect(`..${searchString}${separator}saleId=${saleId}`, {
+  return redirect(`..${searchString}${separator}saleId=${contract.saleId}`, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }
@@ -82,7 +81,6 @@ export default function SlabSell() {
   const { slabId } = useLoaderData<typeof loader>()
   const starting = {
     same_address: true,
-    builder: false,
     rooms: [
       roomSchema.parse({
         slabs: [
