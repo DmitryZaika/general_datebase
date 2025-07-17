@@ -16,11 +16,10 @@ interface IQuery {
   edge: string | null;
   backsplash: string | null;
   stone_name: string | null;
+  stone_id: string | null;
   total_price: number | null;
   square_feet: string | null;
   retail_price: string | null;
-  sink_name: string | null;
-  faucet_name: string | null;
   tear_out: string | null;
   stove: string | null;
   ten_year_sealer: number | null;
@@ -55,7 +54,7 @@ const seamText = {
   'none!': 'NONE',
 }
 
-function homeownerGdIndyText(pdfForm: PDFForm, queryData: IQuery[]) {
+function homeownerGdIndyText(pdfForm: PDFForm, queryData: IQuery[], sinks: ICountQuery[], faucets: ICountQuery[]) {
   pdfForm
     .getTextField('Text1')
     .setText(queryData[0].sale_date?.toLocaleDateString('en-US') || undefined)
@@ -87,9 +86,13 @@ function homeownerGdIndyText(pdfForm: PDFForm, queryData: IQuery[]) {
           ? row.room.charAt(0).toUpperCase() + row.room.slice(1).toLowerCase()
           : undefined,
       )
+    const sink = sinks.find(s => s.stone_id === row.stone_id)
+    const sinkName = sink ? `${sink.name} X ${sink.count}` : 'N/A'
+    const faucet = faucets.find(f => f.stone_id === row.stone_id)
+    const faucetName = faucet ? `${faucet.name} X ${faucet.count}` : 'N/A'
     pdfForm.getTextField(colorField).setText(row.stone_name || 'N/A')
-    pdfForm.getTextField(sinkField).setText(row.sink_name || 'N/A')
-    pdfForm.getTextField(faucetField).setText(row.faucet_name || 'N/A')
+    pdfForm.getTextField(sinkField).setText(sinkName || 'N/A')
+    pdfForm.getTextField(faucetField).setText(faucetName || 'N/A')
     pdfForm
       .getTextField(edgeField)
       .setText(
@@ -150,7 +153,7 @@ function homeownerGdIndyText(pdfForm: PDFForm, queryData: IQuery[]) {
     .setText(fullPrice > 1000 ? halfPrice.toString() : fullPrice.toString())
 }
 
-function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[]) {
+function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[], sinks: ICountQuery[], faucets: ICountQuery[]) {
   // Header fields
   pdfForm
     .getTextField('Text123')
@@ -159,7 +162,7 @@ function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[]) {
 
   // Customer / company
   pdfForm.getTextField('Text125').setText(queryData[0].customer_name || undefined)
-  pdfForm.getTextField('Text126').setText(queryData[0].company_name || null)
+  pdfForm.getTextField('Text126').setText(queryData[0].company_name || undefined)
 
   pdfForm.getTextField("Text127").setText(queryData[0].project_address || undefined);
   pdfForm.getTextField("Text128").setText(queryData[0].billing_address || undefined); // Billing address – оставляем то же или пусто
@@ -209,8 +212,10 @@ function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[]) {
           ? row.room.charAt(0).toUpperCase() + row.room.slice(1).toLowerCase()
           : undefined,
       )
+    const sink = sinks.find(s => s.stone_id === row.stone_id)
+    const sinkName = sink ? `${sink.name} X ${sink.count}` : 'N/A'
     pdfForm.getTextField(map.color).setText(row.stone_name || 'N/A')
-    pdfForm.getTextField(map.sink).setText(row.sink_name || 'N/A')
+    pdfForm.getTextField(map.sink).setText(sinkName || 'N/A')
     pdfForm
       .getTextField(map.edge)
       .setText(
@@ -265,132 +270,79 @@ const texts = {
   commercialGDIndy: commercialGdIndyText,
 }
 
+interface ICountQuery {
+  name: string
+  count: number
+  stone_id: string
+}
+
+async function getSinks(saleId: number): Promise<ICountQuery[]> {
+  const query = `
+    select
+      main.sink_type.name as name,
+      count(main.sinks.id) as count,
+      main.slab_inventory.stone_id as stone_id
+    from main.sinks
+    join main.slab_inventory on main.slab_inventory.id = main.sinks.slab_id
+    join main.sink_type on main.sink_type.id = main.sinks.sink_type_id
+    where main.slab_inventory.sale_id = ?
+    group by main.sink_type.name, main.slab_inventory.stone_id
+  `
+  return await selectMany<ICountQuery>(db, query, [saleId])
+}
+
+async function getFaucets(saleId: number): Promise<ICountQuery[]> {
+  const query = `
+    select
+      main.faucet_type.name as name,
+      count(main.faucets.id) as count,
+      main.slab_inventory.stone_id as stone_id
+    from main.faucets
+    join main.slab_inventory on main.slab_inventory.id = main.faucets.slab_id
+    join main.faucet_type on main.faucet_type.id = main.faucets.faucet_type_id
+    where main.slab_inventory.sale_id = ?
+    group by main.faucet_type.name, main.slab_inventory.stone_id
+  `
+  return await selectMany<ICountQuery>(db, query, [saleId])
+}
+
 async function getData(saleId: number) {
   const query = `
-        SELECT
-            sales.sale_date,
-            sales.project_address,
-            sales.price AS total_price,
-            customers.name AS customer_name,
-            customers.phone,
-            customers.email,
-            customers.postal_code AS zip_code,
-            users.name AS seller_name,
-            slab_inventory.room,
-            slab_inventory.edge,
-            slab_inventory.backsplash,
-            slab_inventory.square_feet,
-            slab_inventory.tear_out,
-            slab_inventory.stove,
-            slab_inventory.ten_year_sealer,
-            slab_inventory.waterfall,
-            slab_inventory.corbels,
-            slab_inventory.seam,
-            stones.name AS stone_name,
-            stones.retail_price,
-            sink_agg.sink_name,
-            faucet_agg.faucet_name,
-            customers.company_name,
-            customers.address AS billing_address
-        FROM main.sales AS sales
-        JOIN main.customers AS customers ON customers.id = sales.customer_id
-        JOIN main.users AS users ON users.id = sales.seller_id
-        JOIN main.slab_inventory AS slab_inventory ON slab_inventory.sale_id = sales.id
-        JOIN main.stones AS stones ON stones.id = slab_inventory.stone_id
-        /* Aggregate sinks per slab */
-        LEFT JOIN (
-            SELECT
-                sinks.slab_id,
-                GROUP_CONCAT(
-                    CASE
-                        WHEN cnt > 1 THEN name || ' X ' || cnt
-                        ELSE name
-                    END,
-                    ', '
-                ) AS sink_name
-            FROM (
-                SELECT
-                    sinks.slab_id,
-                    sink_type.name AS name,
-                    COUNT(*) AS cnt
-                FROM main.sinks AS sinks
-                JOIN main.sink_type AS sink_type ON sink_type.id = sinks.sink_type_id
-                GROUP BY sinks.slab_id, sink_type.name
-            ) grouped_sinks
-            GROUP BY slab_id
-        ) AS sink_agg ON sink_agg.slab_id = slab_inventory.id
-        /* Aggregate faucets per slab */
-        LEFT JOIN (
-            SELECT
-                faucets.slab_id,
-                GROUP_CONCAT(
-                    CASE
-                        WHEN cnt > 1 THEN name || ' X ' || cnt
-                        ELSE name
-                    END,
-                    ', '
-                ) AS faucet_name
-            FROM (
-                SELECT
-                    faucets.slab_id,
-                    faucet_type.name AS name,
-                    COUNT(*) AS cnt
-                FROM main.faucets AS faucets
-                JOIN main.faucet_type AS faucet_type ON faucet_type.id = faucets.faucet_type_id
-                GROUP BY faucets.slab_id, faucet_type.name
-            ) grouped_faucets
-            GROUP BY slab_id
-        ) AS faucet_agg ON faucet_agg.slab_id = slab_inventory.id
-        WHERE sales.id = ?
-        ORDER BY slab_inventory.id
+        select
+            main.sales.sale_date,
+            main.sales.project_address,
+            main.sales.price as total_price,
+            main.customers.name as customer_name,
+            main.customers.phone,
+            main.customers.email,
+            main.customers.postal_code as zip_code,
+            main.users.name as seller_name,
+            main.slab_inventory.room,
+            main.slab_inventory.edge,
+            main.slab_inventory.backsplash,
+            main.slab_inventory.square_feet,
+            main.slab_inventory.tear_out,
+            main.slab_inventory.stove,
+            main.slab_inventory.ten_year_sealer,
+            main.slab_inventory.waterfall,
+            main.slab_inventory.corbels,
+            main.slab_inventory.seam,
+            main.stones.name as stone_name,
+            main.stones.id as stone_id,
+            main.stones.retail_price,
+            main.customers.company_name,
+            main.customers.address as billing_address
+        from main.sales
+        join main.customers on main.customers.id = main.sales.customer_id
+        join main.users on main.users.id = main.sales.seller_id
+        join main.slab_inventory on main.slab_inventory.sale_id = main.sales.id
+        join main.stones on main.stones.id = main.slab_inventory.stone_id
+        where main.sales.id = ?
+        order by main.slab_inventory.id
     `
   return await selectMany<IQuery>(db, query, [saleId])
 }
 
-function groupSinksAndFaucets(queryData: IQuery[]): IQuery[] {
-  const roomGroups: { [key: string]: IQuery[] } = {}
-
-  queryData.forEach(row => {
-    const roomKey = `${row.room}-${row.edge}-${row.backsplash}-${row.square_feet}-${row.stone_name}`
-
-    if (!roomGroups[roomKey]) {
-      roomGroups[roomKey] = []
-    }
-    roomGroups[roomKey].push(row)
-  })
-
-  const result: IQuery[] = []
-
-  Object.entries(roomGroups).forEach(([roomKey, roomRows]) => {
-    const sinkCounts: { [key: string]: number } = {}
-    const faucetCounts: { [key: string]: number } = {}
-
-    roomRows.forEach(row => {
-      if (row.sink_name) {
-        sinkCounts[row.sink_name] = (sinkCounts[row.sink_name] || 0) + 1
-      }
-      if (row.faucet_name) {
-        faucetCounts[row.faucet_name] = (faucetCounts[row.faucet_name] || 0) + 1
-      }
-    })
-
-    const sinkNames = Object.entries(sinkCounts)
-      .map(([name, count]) => (count > 1 ? `${name} X ${count}` : name))
-      .join(', ')
-
-    const faucetNames = Object.entries(faucetCounts)
-      .map(([name, count]) => (count > 1 ? `${name} X ${count}` : name))
-      .join(', ')
-
-    const baseRow = { ...roomRows[0] }
-    baseRow.sink_name = sinkNames || null
-    baseRow.faucet_name = faucetNames || null
-
-    result.push(baseRow)
-  })
-
-  return result
-}
 
 async function getPdf(contractType: string) {
   const pdfData = await downloadPDFAsBuffer(urls[contractType as keyof typeof urls])
@@ -418,11 +370,9 @@ export async function loader({ request, params }: ActionFunctionArgs) {
     return new Response('Bad url', { status: 400 })
   }
   const saleId = parseInt(params.saleId)
-  if (isNaN(saleId)) {
-    return new Response('Bad url', { status: 400 })
-  }
-  const rawData = await getData(saleId)
-  const queryData = groupSinksAndFaucets(rawData)
+  const sinks = await getSinks(saleId)
+  const faucets = await getFaucets(saleId)
+  const queryData = await getData(saleId)
 
   const contractType = queryData[0].company_name
     ? 'commercialGDIndy'
@@ -436,7 +386,7 @@ export async function loader({ request, params }: ActionFunctionArgs) {
     return new Response('Current limit is three items', { status: 400 })
   }
 
-  texts[contractType as keyof typeof texts](pdfForm, queryData)
+  texts[contractType as keyof typeof texts](pdfForm, queryData, sinks, faucets)
   const pdfBytes = await pdfDoc.save()
 
   const customerName = queryData[0].customer_name || 'Customer'
