@@ -8,11 +8,13 @@ export const slabOptionsSchema = z.object({
 })
 
 const sinkOptionsSchema = z.object({
-  id: z.coerce.number(),
+  id: z.coerce.number().optional(),
+  type_id: z.coerce.number(),
 })
 
 const faucetOptionsSchema = z.object({
-  id: z.coerce.number(),
+  id: z.coerce.number().optional(),
+  type_id: z.coerce.number(),
 })
 
 export const extrasSchema = z.record(

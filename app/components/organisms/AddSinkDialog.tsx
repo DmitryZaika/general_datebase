@@ -38,9 +38,9 @@ export const AddSinkDialog = ({
       return
     }
     form.setValue(`rooms.${roomIndex}.sink_type`, [
-      ...form.getValues(`rooms.${roomIndex}.sink_type`),
+      ...(form.getValues(`rooms.${roomIndex}.sink_type`) || []),
       {
-        id: selectedSink,
+        type_id: selectedSink,
       },
     ])
     setShow(false)

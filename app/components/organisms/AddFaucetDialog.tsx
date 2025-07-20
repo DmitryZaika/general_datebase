@@ -37,12 +37,11 @@ export const AddFaucetDialog = ({
     if (!selectedFaucet) {
       return
     }
-    const currentFaucets = (form.getValues(`rooms.${roomIndex}.faucet_type` as any) ||
-      []) as any[]
-    ;(form.setValue as any)(`rooms.${roomIndex}.faucet_type`, [
+    const currentFaucets = form.getValues(`rooms.${roomIndex}.faucet_type`) || []
+    form.setValue(`rooms.${roomIndex}.faucet_type`, [
       ...currentFaucets,
       {
-        id: selectedFaucet,
+        type_id: selectedFaucet,
       },
     ])
     setShow(false)

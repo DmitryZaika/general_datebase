@@ -85,7 +85,6 @@ export const RoomSubForm = ({
   sink_type: Sink[]
   faucet_type: Faucet[]
 }) => {
-  const [linearFeet, setLinearFeet] = useState<number | null>(null)
   const roomValues = useWatch({
     control: form.control,
     name: `rooms.${index}`,
@@ -178,10 +177,7 @@ export const RoomSubForm = ({
       return
     }
     price = price[value as keyof typeof price] || 0
-    if (typeof price === 'function') {
-      const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
-      price = price({ linearFeet: linearFeet || 0, squareFeet })
-    }
+
     form.setValue(`rooms.${index}.extras.${target}`, price)
   }
 
@@ -582,13 +578,13 @@ export const RoomSubForm = ({
               >
                 <div className='flex items-center space-x-2'>
                   <div className='text-sm font-medium'>
-                    {sink_type.find(s => s.id === sink.id)?.type} -{' '}
-                    {sink_type.find(s => s.id === sink.id)?.name}
+                    {sink_type.find(s => s.id === sink.type_id)?.type} -{' '}
+                    {sink_type.find(s => s.id === sink.type_id)?.name}
                   </div>
                 </div>
                 <div className='flex items-center space-x-2'>
                   <div className='px-2 py-1 rounded-md text-sm bg-blue-100 text-blue-800'>
-                    ${sink_type.find(s => s.id === sink.id)?.retail_price}
+                    ${sink_type.find(s => s.id === sink.type_id)?.retail_price}
                   </div>
                   <Button
                     type='button'
@@ -627,13 +623,13 @@ export const RoomSubForm = ({
                 >
                   <div className='flex items-center space-x-2'>
                     <div className='text-sm font-medium'>
-                      {faucet_type.find(f => f.id === faucet.id)?.type} -{' '}
-                      {faucet_type.find(f => f.id === faucet.id)?.name}
+                      {faucet_type.find(f => f.id === faucet.type_id)?.type} -{' '}
+                      {faucet_type.find(f => f.id === faucet.type_id)?.name}
                     </div>
                   </div>
                   <div className='flex items-center space-x-2'>
                     <div className='px-2 py-1 rounded-md text-sm bg-green-100 text-green-800'>
-                      ${faucet_type.find(f => f.id === faucet.id)?.retail_price}
+                      ${faucet_type.find(f => f.id === faucet.type_id)?.retail_price}
                     </div>
                     <Button
                       type='button'
