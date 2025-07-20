@@ -164,6 +164,7 @@ export default function App() {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const isLogin = pathname === "/login";
+  const isCheckIn = pathname.includes("/check-in");
 
   useEffect(() => {
     if (message !== null && message !== undefined) {
@@ -182,7 +183,7 @@ export default function App() {
 
   const basePath = getBase(pathname);
   const isInstaller = position === "installer";
-  const showSidebar = !!basePath && !isLogin && !isInstaller;
+  const showSidebar = !!basePath && !isLogin && !isInstaller && !isCheckIn;
 
   return (
     <html lang="en">
@@ -214,7 +215,7 @@ export default function App() {
                   />
                 )}
                 <div className="relative">
-                  {isMobile && <SidebarTrigger />}
+                  {isMobile && !isCheckIn && <SidebarTrigger />}
                   <Outlet />
                 </div>
               </AuthenticityTokenProvider>

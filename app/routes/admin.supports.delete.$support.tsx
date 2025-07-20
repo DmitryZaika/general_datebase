@@ -8,7 +8,6 @@ import { commitSession, getSession } from "~/sessions";
 import { forceRedirectError, toastData } from "~/utils/toastHelpers";
 import { getAdminUser } from "~/utils/session.server";
 import { csrf } from "~/utils/csrf.server";
-import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
@@ -18,12 +17,12 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request);
-  } catch (error) {
+  } catch {
     return { error: "Invalid CSRF token" };
   }
   const supportId = params.support;
   try {
-    const result = await db.execute(`DELETE FROM main.supports WHERE id = ?`, [
+    await db.execute(`DELETE FROM main.supports WHERE id = ?`, [
       supportId,
     ]);
   } catch (error) {
