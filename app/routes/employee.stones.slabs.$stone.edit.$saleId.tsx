@@ -32,7 +32,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 

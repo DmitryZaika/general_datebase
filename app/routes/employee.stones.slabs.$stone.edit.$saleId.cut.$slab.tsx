@@ -1,21 +1,18 @@
+import type { RowDataPacket } from 'mysql2'
+import { useEffect, useRef } from 'react'
 import {
-  type LoaderFunctionArgs,
   type ActionFunctionArgs,
+  Form,
+  type LoaderFunctionArgs,
   redirect,
   useLoaderData,
-  Form,
-  useNavigation,
-  useNavigate,
   useLocation,
+  useNavigate,
+  useNavigation,
 } from 'react-router'
-import { getEmployeeUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { commitSession, getSession } from '~/sessions'
-import { db } from '~/db.server'
-import { selectId, selectMany } from '~/utils/queryHelpers'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
-import { useRef, useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -23,9 +20,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
-import type { RowDataPacket } from 'mysql2'
+import { selectId, selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
 interface SlabDetails {
   id: number

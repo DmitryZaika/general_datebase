@@ -22,16 +22,16 @@ import { AddSlabDialog } from './AddSlabDialog'
 import { StoneSearch } from './StoneSearch'
 
 const roomOptions = [
-  { key: 'Kitchen', value: 'Kitchen' },
-  { key: 'Bathroom', value: 'Bathroom' },
-  { key: 'Outdoor', value: 'Outdoor' },
-  { key: 'Island', value: 'Island' },
+  { key: 'kitchen', value: 'Kitchen' },
+  { key: 'bathroom', value: 'Bathroom' },
+  { key: 'outdoor', value: 'Outdoor' },
+  { key: 'island', value: 'Island' },
 ]
 
 const backsplashOptions = [
-  { key: 'No', value: 'No' },
+  { key: 'no', value: 'No' },
   { key: '4 inch', value: '4 inch' },
-  { key: 'Full Height', value: 'Full Height' },
+  { key: 'full height', value: 'Full Height' },
 ]
 
 const getOptions = (value: keyof typeof BASE_PRICES) => {
@@ -98,7 +98,7 @@ export const RoomSubForm = ({
   const [showAddSlabDialog, setShowAddSlabDialog] = useState(false)
   const [showAddSinkDialog, setShowAddSinkDialog] = useState(false)
   const [showAddFaucetDialog, setShowAddFaucetDialog] = useState(false)
-  const slabIds = form.getValues(`rooms.${index}.slabs`).map(slab => slab.id) 
+  const slabIds = form.getValues(`rooms.${index}.slabs`).map(slab => slab.id)
   const [stone, setStone] = useState<StoneSlim | undefined>()
 
   useEffect(() => {
@@ -176,7 +176,7 @@ export const RoomSubForm = ({
       form.setValue(`rooms.${index}.extras.${target}`, price)
       return
     }
-    price = price[value as keyof typeof price]
+    price = price[value as keyof typeof price] || 0
     if (typeof price === 'function') {
       const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
       price = price({ linearFeet: linearFeet || 0, squareFeet })
@@ -286,7 +286,6 @@ export const RoomSubForm = ({
             const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
             const totalPrice = squareFeet * price
             form.setValue(`rooms.${index}.total_price`, totalPrice)
-            
           }}
         />
 
