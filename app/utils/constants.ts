@@ -32,14 +32,6 @@ type BasePriceProps = { linearFeet: number; squareFeet: number }
 export const BASE_PRICES = {
   mitered_edge_price: 200,
   corbels_price: (corbels: number) => corbels * 100,
-  edge_price: {
-    flat: 0,
-    eased: 100,
-    '1/4_bevel': 200,
-    '1/2_bevel': 200,
-    ogee: ({ linearFeet }: { linearFeet: number }) => linearFeet * 25,
-    bullnose: ({ linearFeet }: { linearFeet: number }) => linearFeet * 18,
-  },
   seam_price: {
     standard: 0,
     extended: 0,
@@ -90,15 +82,22 @@ export const CUSTOMER_ITEMS = {
     priceFn: ({ amount }: Record<string, number>) => amount * 6,
   },
   edge_price: {
-    edge_type: 'string',
+    edge_type: {
+      flat: 0,
+      eased: 100,
+      '1/4_bevel': 200,
+      '1/2_bevel': 199,
+      ogee: ({ linearFeet }: { linearFeet: number }) => linearFeet * 25,
+      bullnose: ({ linearFeet }: { linearFeet: number }) => linearFeet * 18,
+    },
     linear_feet: 'number',
     priceFn: ({ edge_type, linear_feet }: Record<string, number | string>) => {
-      const context =
-        BASE_PRICES.edge_price[edge_type as keyof typeof BASE_PRICES.edge_price]
-      if (typeof context === 'function') {
-        return context({ linearFeet: linear_feet })
+      if (!edge_type) return 0
+      const value = eval(edge_type)
+      if (typeof value === 'function') {
+        return value({ linearFeet: linear_feet })
       }
-      return context
+      return value
     },
   },
 }

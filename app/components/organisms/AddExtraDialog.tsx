@@ -48,22 +48,24 @@ export const AddExtraDialog = ({
         </DialogHeader>
 
         <div className='space-y-3 py-2'>
-          {availableItems.map(item => (
-            <label
-              key={item}
-              className='flex items-center justify-between p-2 rounded-md hover:bg-gray-50 cursor-pointer'
-            >
-              <span className='text-sm font-medium capitalize'>
-                {item.replaceAll('_', ' ')}
-              </span>
-              <input
-                type='checkbox'
-                checked={selectedItems.includes(item)}
-                onChange={() => handleItemToggle(item)}
-                className='h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500'
-              />
-            </label>
-          ))}
+          {availableItems
+            .filter(item => item !== 'edge_price')
+            .map(item => (
+              <label
+                key={item}
+                className='flex items-center justify-between p-2 rounded-md hover:bg-gray-50 cursor-pointer'
+              >
+                <span className='text-sm font-medium capitalize'>
+                  {item.replaceAll('_', ' ')}
+                </span>
+                <input
+                  type='checkbox'
+                  checked={selectedItems.includes(item)}
+                  onChange={() => handleItemToggle(item)}
+                  className='h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500'
+                />
+              </label>
+            ))}
         </div>
 
         <DialogFooter>

@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
-import clsx from 'clsx'
 import { X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { type UseFormReturn, useWatch } from 'react-hook-form'
-import { DynamicAdditions } from '~/components/molecules/DynamicAdditions'
+import {
+  DynamicAddition,
+  DynamicAdditions,
+} from '~/components/molecules/DynamicAdditions'
 import { InputItem } from '~/components/molecules/InputItem'
 import { SelectInputOther } from '~/components/molecules/SelectInputOther'
 import { Button } from '~/components/ui/button'
-import { FormField, FormLabel } from '~/components/ui/form'
-import { Input } from '~/components/ui/input'
+import { FormField } from '~/components/ui/form'
 import { Switch } from '~/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import type { TCustomerSchema } from '~/schemas/sales'
@@ -203,48 +204,6 @@ export const RoomSubForm = ({
     }
   }, [form.getValues(`rooms.${index}.room`)])
 
-  useEffect(() => {
-    handleExtraChange(form.watch(`rooms.${index}.edge`), 'edge_price')
-  }, [linearFeet])
-
-  /*
-  useEffect(() => {
-    setExtraItems(prev => {
-      const updated = { ...prev }
-
-      // Add new keys
-      selectedExtraItems.forEach(key => {
-        if (!updated[key]) {
-          // determine valueKey for defaults
-          const valueKey = {
-            tripFee: 'miles',
-            mitter_edge_price: 'amount',
-            oversize_piece: 'sqft',
-            ten_year_sealer: 'amount',
-          }
-
-          const valKey = valueKey[key] || 'value'
-
-          if (key === 'ten_year_sealer') {
-            const sqft = form.getValues(`rooms.${index}.square_feet`) || 0
-            updated[key] = { [valKey]: sqft.toString(), price: 0 }
-          } else {
-            updated[key] = { [valKey]: '', price: 0 }
-          }
-        }
-      })
-
-      ;(Object.keys(updated) as (keyof typeof CUSTOMER_ITEMS)[]).forEach(k => {
-        if (!selectedExtraItems.includes(k)) {
-          delete updated[k]
-        }
-      })
-
-      return updated
-    })
-  }, [selectedExtraItems])
-  */
-
   return (
     <>
       <div className='h-[1px] bg-gray-200 w-full my-2'></div>
@@ -358,56 +317,7 @@ export const RoomSubForm = ({
       </div>
 
       <div className='flex flex-col gap-2 mt-2'>
-        <div className='border border-gray-200 rounded-md p-2 flex gap-2'>
-          <FormField
-            control={form.control}
-            name={`rooms.${index}.edge`}
-            render={({ field }) => (
-              <SelectInputOther
-                field={{
-                  ...field,
-                  onChange: value => {
-                    field.onChange(value)
-                    handleExtraChange(value, 'edge_price')
-                  },
-                }}
-                name='Edge'
-                className={`mb-0 ${inputWidth}`}
-                options={getOptions('edge_price')}
-              />
-            )}
-          />
-          <div
-            className={clsx(`mb-0 ${inputWidth}`, {
-              hidden: ['eased', '1/4_bevel', '1/2_bevel', 'flat'].includes(
-                form.watch(`rooms.${index}.edge`),
-              ),
-            })}
-          >
-            <FormLabel>Linear Feet</FormLabel>
-            <Input
-              id={`linear-feet-${index}`}
-              placeholder='Enter Linear Feet'
-              value={linearFeet?.toString() || ''}
-              onChange={e => {
-                setLinearFeet(Number(e.target.value))
-              }}
-            />
-          </div>
-
-          <FormField
-            control={form.control}
-            name={`rooms.${index}.extras.edge_price`}
-            render={({ field }) => (
-              <InputItem
-                name={'Edge Price'}
-                placeholder={'Enter Edge Price'}
-                field={field}
-                formClassName='mb-0'
-              />
-            )}
-          />
-        </div>
+        <DynamicAddition target='edge_price' form={form} index={index} />
 
         <div className='border border-gray-200 rounded-md p-2 flex gap-2'>
           <FormField
