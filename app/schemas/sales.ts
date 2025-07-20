@@ -58,7 +58,7 @@ export const customerSchema = z.object({
   seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
   billing_address: z.string().min(10, 'Billing address is required'),
   billing_zip_code: z.coerce.string().optional(),
-  project_address: z.string().min(10, 'Project address is required').nullable(),
+  project_address: z.string().min(10, 'Project address is required').optional(),
   same_address: z.boolean().default(true),
   phone: z.string().regex(/^\d{3}-\d{3}-\d{4}$/, 'Required format: 317-316-1456'),
   email: z.string().email('Please enter a valid email'),

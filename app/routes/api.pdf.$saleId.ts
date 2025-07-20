@@ -6,29 +6,30 @@ import { downloadPDFAsBuffer } from '~/utils/s3.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 interface IQuery {
-  customer_name: string | null;
-  seller_name: string | null;
-  sale_date: Date | null;
-  project_address: string | null;
-  phone: string | null;
-  email: string | null;
-  room: string | null;
-  edge: string | null;
-  backsplash: string | null;
-  stone_name: string | null;
-  stone_id: string | null;
-  total_price: number | null;
-  square_feet: string | null;
-  retail_price: string | null;
-  tear_out: string | null;
-  stove: string | null;
-  ten_year_sealer: number | null;
-  waterfall: string | null;
-  corbels: number | null;
-  seam: string | null;
-  zip_code: string | null;
-  company_name: string | null;
-  billing_address: string | null;
+  customer_name: string | null
+  seller_name: string | null
+  sale_date: Date | null
+  project_address: string | null
+  phone: string | null
+  email: string | null
+  room: string | null
+  edge: string | null
+  backsplash: string | null
+  stone_name: string | null
+  stone_id: string | null
+  total_price: number | null
+  square_feet: string | null
+  retail_price: string | null
+  tear_out: string | null
+  stove: string | null
+  ten_year_sealer: number | null
+  waterfall: string | null
+  corbels: number | null
+  seam: string | null
+  zip_code: string | null
+  company_name: string | null
+  billing_address: string | null
+  room_uuid: string
 }
 
 const urls = {
@@ -39,7 +40,7 @@ const urls = {
 }
 
 const stoveText = {
-  'F/S': 'F/S',
+  'f/s': 'F/S',
   's/i': 'S/I',
   'c/t': 'C/T',
   grill: 'Grill',
@@ -54,23 +55,35 @@ const seamText = {
   'none!': 'NONE',
 }
 
-function homeownerGdIndyText(pdfForm: PDFForm, queryData: IQuery[], sinks: ICountQuery[], faucets: ICountQuery[]) {
+const prettyCount = (item: { name: string; count: number } | undefined) => {
+  if (!item) return 'N/A'
+  return item.count > 1 ? `${item.name} X ${item.count}` : item.name
+}
+
+function homeownerGdIndyText(
+  pdfForm: PDFForm,
+  queryData: IQuery[],
+  sinks: ICountQuery[],
+  faucets: ICountQuery[],
+) {
   pdfForm
     .getTextField('Text1')
     .setText(queryData[0].sale_date?.toLocaleDateString('en-US') || undefined)
   pdfForm.getTextField('Text2').setText(queryData[0].seller_name || undefined)
   pdfForm.getTextField('Text3').setText(queryData[0].customer_name || undefined)
-  pdfForm
-    .getTextField('Text4')
-    .setText(
-      queryData[0].project_address?.replace('USA', queryData[0].zip_code || '') ||
-        undefined,
-    )
+  pdfForm.getTextField('Text4').setText(queryData[0].project_address || undefined)
   pdfForm.getTextField('Text5').setText(queryData[0].phone || undefined)
   pdfForm.getTextField('Text6').setText(queryData[0].email || undefined)
 
-  for (let i = 0; i < queryData.length && i < 3; i++) {
-    const row = queryData[i]
+  const analyzedRooms: string[] = []
+  let i = 0
+  for (const queryItem of queryData) {
+    if (analyzedRooms.includes(queryItem.room_uuid)) {
+      continue
+    }
+
+    analyzedRooms.push(queryItem.room_uuid)
+    const row = queryItem
 
     const roomField = `Text${7 + i * 6}`
     const colorField = `Text${8 + i * 6}`
@@ -86,13 +99,13 @@ function homeownerGdIndyText(pdfForm: PDFForm, queryData: IQuery[], sinks: ICoun
           ? row.room.charAt(0).toUpperCase() + row.room.slice(1).toLowerCase()
           : undefined,
       )
-    const sink = sinks.find(s => s.stone_id === row.stone_id)
-    const sinkName = sink ? `${sink.name} X ${sink.count}` : 'N/A'
-    const faucet = faucets.find(f => f.stone_id === row.stone_id)
-    const faucetName = faucet ? `${faucet.name} X ${faucet.count}` : 'N/A'
+    const sink = sinks.find(s => s.room_uuid === row.room_uuid)
+    const sinkName = prettyCount(sink)
+    const faucet = faucets.find(f => f.room_uuid === row.room_uuid)
+    const faucetName = prettyCount(faucet)
     pdfForm.getTextField(colorField).setText(row.stone_name || 'N/A')
-    pdfForm.getTextField(sinkField).setText(sinkName || 'N/A')
-    pdfForm.getTextField(faucetField).setText(faucetName || 'N/A')
+    pdfForm.getTextField(sinkField).setText(sinkName)
+    pdfForm.getTextField(faucetField).setText(faucetName)
     pdfForm
       .getTextField(edgeField)
       .setText(
@@ -113,9 +126,14 @@ function homeownerGdIndyText(pdfForm: PDFForm, queryData: IQuery[], sinks: ICoun
     const priceField = `Text${26 + i * 2}`
     pdfForm.getTextField(sqftField).setText(row.square_feet?.toString() || 'N/A')
     pdfForm.getTextField(priceField).setText(row.retail_price?.toString() || 'N/A')
+    i++
   }
 
-  const totalCorbels = queryData.reduce((sum, row) => {
+  const uniqueRooms = queryData.filter(
+    (value, index, self) =>
+      self.findIndex(v => v.room_uuid === value.room_uuid) === index,
+  )
+  const totalCorbels = uniqueRooms.reduce((sum, row) => {
     return sum + (row.corbels || 0)
   }, 0)
 
@@ -153,7 +171,12 @@ function homeownerGdIndyText(pdfForm: PDFForm, queryData: IQuery[], sinks: ICoun
     .setText(fullPrice > 1000 ? halfPrice.toString() : fullPrice.toString())
 }
 
-function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[], sinks: ICountQuery[], faucets: ICountQuery[]) {
+function commercialGdIndyText(
+  pdfForm: PDFForm,
+  queryData: IQuery[],
+  sinks: ICountQuery[],
+  faucets: ICountQuery[],
+) {
   // Header fields
   pdfForm
     .getTextField('Text123')
@@ -164,8 +187,8 @@ function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[], sinks: ICou
   pdfForm.getTextField('Text125').setText(queryData[0].customer_name || undefined)
   pdfForm.getTextField('Text126').setText(queryData[0].company_name || undefined)
 
-  pdfForm.getTextField("Text127").setText(queryData[0].project_address || undefined);
-  pdfForm.getTextField("Text128").setText(queryData[0].billing_address || undefined); // Billing address – оставляем то же или пусто
+  pdfForm.getTextField('Text127').setText(queryData[0].project_address || undefined)
+  pdfForm.getTextField('Text128').setText(queryData[0].billing_address || undefined) // Billing address – оставляем то же или пусто
 
   pdfForm.getTextField('Text129').setText(queryData[0].phone || undefined)
   pdfForm.getTextField('Text130').setText(queryData[0].email || undefined)
@@ -201,8 +224,18 @@ function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[], sinks: ICou
     },
   ]
 
-  for (let i = 0; i < queryData.length && i < 3; i++) {
-    const row = queryData[i]
+  const analyzedRooms: string[] = []
+  let i = 0
+  for (const queryItem of queryData) {
+    if (i >= 3) {
+      break
+    }
+    if (analyzedRooms.includes(queryItem.room_uuid)) {
+      continue
+    }
+
+    analyzedRooms.push(queryItem.room_uuid)
+    const row = queryItem
     const map = roomBase[i]
 
     pdfForm
@@ -212,8 +245,8 @@ function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[], sinks: ICou
           ? row.room.charAt(0).toUpperCase() + row.room.slice(1).toLowerCase()
           : undefined,
       )
-    const sink = sinks.find(s => s.stone_id === row.stone_id)
-    const sinkName = sink ? `${sink.name} X ${sink.count}` : 'N/A'
+    const sink = sinks.find(s => s.room_uuid === row.room_uuid)
+    const sinkName = prettyCount(sink)
     pdfForm.getTextField(map.color).setText(row.stone_name || 'N/A')
     pdfForm.getTextField(map.sink).setText(sinkName || 'N/A')
     pdfForm
@@ -234,11 +267,17 @@ function commercialGdIndyText(pdfForm: PDFForm, queryData: IQuery[], sinks: ICou
 
     pdfForm.getTextField(map.sqft).setText(row.square_feet?.toString() || 'N/A')
     pdfForm.getTextField(map.price).setText(row.retail_price?.toString() || 'N/A')
+    i++
   }
-
-  const totalCorbels = queryData.reduce((sum, row) => sum + (row.corbels || 0), 0)
-  const hasLaminateTearOut = queryData.some(r => r.tear_out === 'laminate')
-  const hasStoneTearOut = queryData.some(r => r.tear_out === 'stone')
+  const uniqueRooms = queryData.filter(
+    (value, index, self) =>
+      self.findIndex(v => v.room_uuid === value.room_uuid) === index,
+  )
+  const totalCorbels = uniqueRooms.reduce((sum, row) => sum + (row.corbels || 0), 0)
+  const hasLaminateTearOut = queryData.some(
+    r => r.tear_out === 'laminate_t/o' || r.tear_out === 'vanity_t/o',
+  )
+  const hasStoneTearOut = queryData.some(r => r.tear_out === 'stone_t/o')
   const hasTenYearSealer = queryData.some(r => r.ten_year_sealer === 1)
   const hasWaterfall = queryData.some(r => r.waterfall === 'yes')
 
@@ -273,7 +312,7 @@ const texts = {
 interface ICountQuery {
   name: string
   count: number
-  stone_id: string
+  room_uuid: string
 }
 
 async function getSinks(saleId: number): Promise<ICountQuery[]> {
@@ -281,12 +320,12 @@ async function getSinks(saleId: number): Promise<ICountQuery[]> {
     select
       main.sink_type.name as name,
       count(main.sinks.id) as count,
-      main.slab_inventory.stone_id as stone_id
+      HEX(main.slab_inventory.room_uuid) as room_uuid
     from main.sinks
     join main.slab_inventory on main.slab_inventory.id = main.sinks.slab_id
     join main.sink_type on main.sink_type.id = main.sinks.sink_type_id
     where main.slab_inventory.sale_id = ?
-    group by main.sink_type.name, main.slab_inventory.stone_id
+    group by main.sink_type.name, main.slab_inventory.room_uuid
   `
   return await selectMany<ICountQuery>(db, query, [saleId])
 }
@@ -296,12 +335,12 @@ async function getFaucets(saleId: number): Promise<ICountQuery[]> {
     select
       main.faucet_type.name as name,
       count(main.faucets.id) as count,
-      main.slab_inventory.stone_id as stone_id
+      HEX(main.slab_inventory.room_uuid) as room_uuid
     from main.faucets
     join main.slab_inventory on main.slab_inventory.id = main.faucets.slab_id
     join main.faucet_type on main.faucet_type.id = main.faucets.faucet_type_id
     where main.slab_inventory.sale_id = ?
-    group by main.faucet_type.name, main.slab_inventory.stone_id
+    group by main.faucet_type.name, main.slab_inventory.room_uuid
   `
   return await selectMany<ICountQuery>(db, query, [saleId])
 }
@@ -331,7 +370,8 @@ async function getData(saleId: number) {
             main.stones.id as stone_id,
             main.stones.retail_price,
             main.customers.company_name,
-            main.customers.address as billing_address
+            main.customers.address as billing_address,
+            HEX(main.slab_inventory.room_uuid) as room_uuid
         from main.sales
         join main.customers on main.customers.id = main.sales.customer_id
         join main.users on main.users.id = main.sales.seller_id
@@ -342,7 +382,6 @@ async function getData(saleId: number) {
     `
   return await selectMany<IQuery>(db, query, [saleId])
 }
-
 
 async function getPdf(contractType: string) {
   const pdfData = await downloadPDFAsBuffer(urls[contractType as keyof typeof urls])
@@ -359,9 +398,8 @@ function sanitizeFilename(name: string): string {
 }
 
 export async function loader({ request, params }: ActionFunctionArgs) {
-  
   try {
-   await getEmployeeUser(request);
+    await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -373,7 +411,26 @@ export async function loader({ request, params }: ActionFunctionArgs) {
   const sinks = await getSinks(saleId)
   const faucets = await getFaucets(saleId)
   const queryData = await getData(saleId)
-
+  console.log(
+    'Debug – stove, tear_out, supports, waterfall, sealer:',
+    queryData.map(q => ({
+      stove: q.stove,
+      tear_out: q.tear_out,
+      supports: q.corbels,
+      waterfall: q.waterfall,
+      sealer: q.ten_year_sealer,
+      seam: q.seam,
+      room_uuid: q.room_uuid,
+      stone_id: q.stone_id,
+      stone_name: q.stone_name,
+      square_feet: q.square_feet,
+      retail_price: q.retail_price,
+      room: q.room,
+      edge: q.edge,
+      backsplash: q.backsplash,
+    })),
+  )
+  const roomIds = new Set(queryData.map(q => q.room_uuid))
   const contractType = queryData[0].company_name
     ? 'commercialGDIndy'
     : 'homeownerGDIndy'
@@ -382,7 +439,7 @@ export async function loader({ request, params }: ActionFunctionArgs) {
   if (queryData.length < 1) {
     return new Response('No data found for this sale', { status: 404 })
   }
-  if (queryData.length > 3) {
+  if (roomIds.size > 3) {
     return new Response('Current limit is three items', { status: 400 })
   }
 

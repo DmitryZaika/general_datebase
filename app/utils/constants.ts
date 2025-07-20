@@ -16,6 +16,15 @@ export const SINK_TYPES = [
   'farm house',
 ] as const
 
+export const HARDCODED_IGNORES = [
+  'edge_price',
+  'tear_out_price',
+  'stove_price',
+  'waterfall_price',
+  'corbels_price',
+  'seam_price',
+]
+
 export const FAUCET_TYPES = ['single handle', 'double handle'] as const
 
 type BasePriceProps = { linearFeet: number; squareFeet: number }
@@ -28,8 +37,8 @@ export const BASE_PRICES = {
     eased: 100,
     '1/4_bevel': 200,
     '1/2_bevel': 200,
-    ogee: ({ linearFeet }: BasePriceProps) => linearFeet * 25,
-    bullnose: ({ linearFeet }: BasePriceProps) => linearFeet * 18,
+    ogee: ({ linearFeet }: { linearFeet: number }) => linearFeet * 25,
+    bullnose: ({ linearFeet }: { linearFeet: number }) => linearFeet * 18,
   },
   seam_price: {
     standard: 0,
@@ -79,6 +88,18 @@ export const CUSTOMER_ITEMS = {
   ten_year_sealer: {
     amount: 'number',
     priceFn: ({ amount }: Record<string, number>) => amount * 6,
+  },
+  edge_price: {
+    edge_type: 'string',
+    linear_feet: 'number',
+    priceFn: ({ edge_type, linear_feet }: Record<string, number | string>) => {
+      const context =
+        BASE_PRICES.edge_price[edge_type as keyof typeof BASE_PRICES.edge_price]
+      if (typeof context === 'function') {
+        return context({ linearFeet: linear_feet })
+      }
+      return context
+    },
   },
 }
 export const STONE_FINISHES = ['polished', 'leathered', 'honed'] as const

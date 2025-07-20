@@ -1,4 +1,6 @@
-import { Form, useLoaderData } from 'react-router'
+import { Form } from 'react-router'
+import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
+import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -7,8 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { Button } from '~/components/ui/button'
-import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 
 interface IProps {
   handleChange: (open: boolean) => void
@@ -16,9 +16,17 @@ interface IProps {
   description: string
   intent?: string
   id?: number
+  onSubmit?: (event: React.MouseEvent<HTMLButtonElement>) => void
 }
 
-export const DeleteRow = ({ handleChange, title, description, intent, id }: IProps) => {
+export const DeleteRow = ({
+  handleChange,
+  title,
+  description,
+  intent,
+  id,
+  onSubmit,
+}: IProps) => {
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className='sm:max-w-[425px]'>
@@ -31,7 +39,7 @@ export const DeleteRow = ({ handleChange, title, description, intent, id }: IPro
             <AuthenticityTokenInput />
             {intent && <input type='hidden' name='intent' value={intent} />}
             {id && <input type='hidden' name='id' value={id} />}
-            <Button autoFocus type='submit' variant='destructive'>
+            <Button autoFocus type='submit' variant='destructive' onClick={onSubmit}>
               Confirm
             </Button>
           </DialogFooter>

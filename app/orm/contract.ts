@@ -122,7 +122,7 @@ export class Contract {
 
   protected async updateSlab(slabId: number, room: TRoomSchema) {
     await db.execute(
-      `UPDATE slab_inventory SET room_uuid = UUID_TO_BIN(?), seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?, stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ? WHERE id = ?`,
+      `UPDATE slab_inventory SET room_uuid = UUID_TO_BIN(?), seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?, stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ?, sale_id = ? WHERE id = ?`,
       [
         room.room_id,
         room.seam,
@@ -137,6 +137,7 @@ export class Contract {
         room.corbels,
         room.retail_price,
         room.extras,
+        this.saleId,
         slabId,
       ],
     )
@@ -240,6 +241,9 @@ export class Contract {
       `SELECT length, width, stone_id, bundle, url FROM slab_inventory WHERE id = ?`,
       [slabId],
     )
+    if (slab.length > 1) {
+      return
+    }
     if (!slab || slab.length === 0) {
       return
     }
@@ -344,10 +348,19 @@ export class Contract {
           this.sellFaucet(slab.id, faucetType.id)
         }
 
+        const [hasChildren] = await db.execute<RowDataPacket[]>(
+          `SELECT id FROM slab_inventory WHERE parent_id = ?`,
+          [slab.id],
+        )
+
         if (!slab.is_full) {
-          this.duplicateSlab(slab.id)
+          if (hasChildren.length === 0) {
+            this.duplicateSlab(slab.id)
+          }
         } else {
-          this.deleteDuplicateSlab(slab.id)
+          if (hasChildren.length > 0) {
+            this.deleteDuplicateSlab(slab.id)
+          }
         }
       }
     }

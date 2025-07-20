@@ -1,9 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Form, useLocation, useNavigate, useNavigation } from 'react-router'
+import {
+  Form,
+  Link,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useNavigation,
+} from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { EmailInput } from '~/components/molecules/EmailInput'
 import { InputItem } from '~/components/molecules/InputItem'
@@ -21,7 +28,6 @@ import {
 } from '~/components/ui/dialog'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Switch } from '~/components/ui/switch'
-import { useToast } from '~/hooks/use-toast'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { customerSchema, roomSchema, type TCustomerSchema } from '~/schemas/sales'
 import type { Customer } from '~/types'
@@ -34,21 +40,7 @@ interface IContractFormProps {
   saleId?: number
 }
 
-const unsellSale = async (saleId: number) => {
-  const response = await fetch(`/api/unsell/${saleId}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
-  if (!response.ok) {
-    throw new Error('Failed to unsell sale')
-  }
-  return response.json()
-}
-
 export function ContractForm({ starting, saleId }: IContractFormProps) {
-  const { toast } = useToast()
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state === 'submitting'
   const [isExistingCustomer, setIsExistingCustomer] = useState(false)
@@ -117,12 +109,6 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
     queryKey: ['customers', form.watch('name')],
     queryFn: () => fetchCustomers(form.watch('name')),
     enabled: !!form.watch('name'),
-  })
-
-  const unsellMutation = useMutation({
-    mutationFn: (saleId: number) => {
-      return unsellSale(saleId)
-    },
   })
 
   const handleChange = (open: boolean) => {
@@ -253,22 +239,6 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
 
     return () => subscription.unsubscribe()
   }, [sink_type, faucet_type])
-
-  const handleUnsell = () => {
-    if (!saleId) return
-    unsellMutation.mutate(saleId, {
-      onSuccess: () => {
-        navigate(`/employee/stones/${window.location.search}`, {
-          replace: true,
-        })
-        toast({
-          title: 'Success',
-          description: 'Sale unsold',
-          variant: 'success',
-        })
-      },
-    })
-  }
 
   const handleBuilderChange = (checked: boolean) => {
     setIsBuilder(checked)
@@ -406,16 +376,15 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
               </div>
 
               {/* Builder checkbox */}
-         
+
               <div className='flex items-center space-x-2 my-2'>
-                    <Switch
-                      checked={isBuilder}
-                      onCheckedChange={handleBuilderChange}
-                      id='builder_checkbox'
-                        label='Builder'
-                      />
-                </div>
-              
+                <Switch
+                  checked={isBuilder}
+                  onCheckedChange={handleBuilderChange}
+                  id='builder_checkbox'
+                  label='Builder'
+                />
+              </div>
 
               {isBuilder && (
                 <FormField
@@ -476,13 +445,15 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
                 />
               </div>
             </div>
-         
 
             <DialogFooter className='flex flex-col sm:flex-row gap-2  mt-4'>
-             {saleId && <Button variant="destructive" type="button" onClick={handleUnsell}
-              >
-                Unsell
-              </Button>}
+              {saleId && (
+                <Link to='unsell'>
+                  <Button variant='destructive' type='button'>
+                    Unsell
+                  </Button>
+                </Link>
+              )}
               <LoadingButton
                 loading={isSubmitting}
                 className='sm:order-2 order-1 sm:ml-auto ml-0'
@@ -492,6 +463,7 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
               </LoadingButton>
             </DialogFooter>
           </Form>
+          <Outlet />
         </FormProvider>
       </DialogContent>
     </Dialog>

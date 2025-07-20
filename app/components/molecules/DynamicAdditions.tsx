@@ -3,21 +3,12 @@ import { useEffect, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { Button } from '~/components/ui/button'
 import type { TCustomerSchema } from '~/schemas/sales'
-import { CUSTOMER_ITEMS } from '~/utils/constants'
+import { CUSTOMER_ITEMS, HARDCODED_IGNORES } from '~/utils/constants'
 import { FormField } from '../ui/form'
 import { InputItem } from './InputItem'
 import { SelectInput } from './SelectItem'
 
 type ExtraItemKey = keyof typeof CUSTOMER_ITEMS
-
-const HARDCODED_IGNORES = [
-  'edge_price',
-  'tear_out_price',
-  'stove_price',
-  'waterfall_price',
-  'corbels_price',
-  'seam_price',
-]
 
 interface DynamicControlProps {
   target: ExtraItemKey
@@ -26,7 +17,12 @@ interface DynamicControlProps {
   index: number
 }
 
-const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) => {
+export const DynamicControl = ({
+  itemKey,
+  target,
+  form,
+  index,
+}: DynamicControlProps) => {
   const itemType = CUSTOMER_ITEMS[target][itemKey]
   if (typeof itemType === 'object') {
     return (
@@ -36,7 +32,7 @@ const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) =
         render={({ field }) => (
           <SelectInput
             field={field}
-            placeholder='Type of the Faucet'
+            placeholder='Select option'
             name='Type'
             options={Object.entries(itemType).map(([key, value]) => ({
               key: value,
@@ -92,7 +88,7 @@ const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) => {
   }
 
   return (
-    <div className='p-2 rounded-md mb-2 '>
+    <div className='p-0 rounded-md mb-2 '>
       <div className='flex items-start gap-2'>
         <div className='min-w-[120px] flex-shrink-0'>
           <div className='h-6'></div>
