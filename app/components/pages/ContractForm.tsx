@@ -40,6 +40,17 @@ interface IContractFormProps {
   saleId?: number
 }
 
+const fetchCustomers = async (customerName: string) => {
+  const url = `/api/customers/search?term=${encodeURIComponent(customerName)}`
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch slabs')
+  }
+  const data = await response.json()
+  const limitedCustomers: Customer[] = (data.customers || []).slice(0, 1)
+  return limitedCustomers
+}
+
 export function ContractForm({ starting, saleId }: IContractFormProps) {
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state === 'submitting'
@@ -71,18 +82,14 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
 
   const handleAddRoom = () => {
     const currentRooms = form.getValues('rooms')
-    let newRoom = roomSchema.parse({})
-
-    if (currentRooms.length > 0) {
-      newRoom = {
-        ...newRoom,
-        edge: 'flat',
-        tear_out: 'no',
-        stove: 'f/s',
-        waterfall: 'no',
-        seam: 'standard',
-      }
-    }
+    const newRoom = roomSchema.parse({
+      edge: 'flat',
+      tear_out: 'no',
+      stove: 'f/s',
+      waterfall: 'no',
+      seam: 'standard',
+    })
+    newRoom.slabs = []
 
     form.setValue('rooms', [...currentRooms, newRoom])
   }
@@ -93,19 +100,7 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
     billing_address: false,
   })
 
-  const fetchCustomers = async (customerName: string) => {
-    const response = await fetch(
-      '/api/customers/search?term=' + encodeURIComponent(customerName),
-    )
-    if (!response.ok) {
-      throw new Error('Failed to fetch slabs')
-    }
-    const data = await response.json()
-    const limitedCustomers: Customer[] = (data.customers || []).slice(0, 1)
-    return limitedCustomers
-  }
-
-  const { data: customerSuggestions = [], isLoading } = useQuery({
+  const { data: customerSuggestions = [] } = useQuery({
     queryKey: ['customers', form.watch('name')],
     queryFn: () => fetchCustomers(form.watch('name')),
     enabled: !!form.watch('name'),
@@ -220,7 +215,7 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
 
   // Auto-sum total price across all rooms, including extra items
   useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
+    const subscription = form.watch(({ name }) => {
       // Skip if the manual price field itself is being edited
       if (name === 'price') return
 
@@ -448,7 +443,12 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
 
             <DialogFooter className='flex flex-col sm:flex-row gap-2  mt-4'>
               {saleId && (
-                <Link to='unsell'>
+                <Link
+                  to={{
+                    pathname: 'unsell',
+                    search: location.search,
+                  }}
+                >
                   <Button variant='destructive' type='button'>
                     Unsell
                   </Button>

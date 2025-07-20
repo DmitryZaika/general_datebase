@@ -3,6 +3,7 @@ import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   redirect,
+  data as routerData,
   useLoaderData,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
@@ -41,6 +42,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     request,
     resolver,
   )
+
   if (errors) {
     return { errors, receivedValues }
   }
@@ -57,6 +59,28 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const url = new URL(request.url)
   const searchParams = url.searchParams.toString()
   const searchString = searchParams ? `?${searchParams}` : ''
+
+  for (const room of data.rooms) {
+    if (room.slabs.length === 0) {
+      const session = await getSession(request.headers.get('Cookie'))
+      session.flash(
+        'message',
+        toastData('Error', 'At least one slab is required in each room', 'destructive'),
+      )
+      return routerData(
+        {
+          errors: {
+            rooms: {
+              _errors: ['At least one slab is required in each room'],
+            },
+          },
+        },
+        {
+          headers: { 'Set-Cookie': await commitSession(session) },
+        },
+      )
+    }
+  }
 
   const contract = new Contract(data, saleId)
   await contract.edit(user)
