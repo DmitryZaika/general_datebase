@@ -1,6 +1,4 @@
-import { useLocation } from 'react-router'
-
-import { useNavigate, Outlet } from 'react-router'
+import { Outlet, useLocation, useNavigate } from 'react-router'
 
 import {
   Dialog,
@@ -8,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 
 export default function StonesEdit() {
   const navigate = useNavigate()
