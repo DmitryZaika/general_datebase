@@ -288,10 +288,10 @@ export class Contract {
         }
       }
       for (const sinkType of room.sink_type) {
-        this.sellSink(firstSlab.id, sinkType.id)
+        this.sellSink(firstSlab.id, sinkType.type_id)
       }
       for (const faucetType of room.faucet_type) {
-        this.sellFaucet(firstSlab.id, faucetType.id)
+        this.sellFaucet(firstSlab.id, faucetType.type_id)
       }
     }
     return this.saleId
@@ -342,10 +342,10 @@ export class Contract {
         await this.updateSlab(slab.id, room)
 
         for (const sinkType of room.sink_type) {
-          this.sellSink(slab.id, sinkType.id)
+          this.sellSink(slab.id, sinkType.type_id)
         }
         for (const faucetType of room.faucet_type) {
-          this.sellFaucet(slab.id, faucetType.id)
+          this.sellFaucet(slab.id, faucetType.type_id)
         }
 
         const [hasChildren] = await db.execute<RowDataPacket[]>(

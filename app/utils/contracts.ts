@@ -12,11 +12,11 @@ export const roomPrice = (
   }
 
   for (const sink of room.sink_type) {
-    total += Number(sink_type.find(s => s.id === sink.id)?.retail_price || 0)
+    total += Number(sink_type.find(s => s.id === sink.type_id)?.retail_price || 0)
   }
 
   for (const faucet of room.faucet_type) {
-    total += Number(faucet_type.find(f => f.id === faucet.id)?.retail_price || 0)
+    total += Number(faucet_type.find(f => f.id === faucet.type_id)?.retail_price || 0)
   }
   return total
 }

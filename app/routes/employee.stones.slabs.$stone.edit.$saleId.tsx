@@ -89,8 +89,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return { saleId, starting }
 }
 
-export default function SlabSell() {
+export default function SlabEdit() {
   const data = useLoaderData<typeof loader>()
   const starting = customerSchema.parse(data.starting)
+
   return <ContractForm starting={starting} saleId={data.saleId} />
 }

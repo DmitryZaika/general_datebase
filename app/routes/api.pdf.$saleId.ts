@@ -411,25 +411,7 @@ export async function loader({ request, params }: ActionFunctionArgs) {
   const sinks = await getSinks(saleId)
   const faucets = await getFaucets(saleId)
   const queryData = await getData(saleId)
-  console.log(
-    'Debug – stove, tear_out, supports, waterfall, sealer:',
-    queryData.map(q => ({
-      stove: q.stove,
-      tear_out: q.tear_out,
-      supports: q.corbels,
-      waterfall: q.waterfall,
-      sealer: q.ten_year_sealer,
-      seam: q.seam,
-      room_uuid: q.room_uuid,
-      stone_id: q.stone_id,
-      stone_name: q.stone_name,
-      square_feet: q.square_feet,
-      retail_price: q.retail_price,
-      room: q.room,
-      edge: q.edge,
-      backsplash: q.backsplash,
-    })),
-  )
+
   const roomIds = new Set(queryData.map(q => q.room_uuid))
   const contractType = queryData[0].company_name
     ? 'commercialGDIndy'
