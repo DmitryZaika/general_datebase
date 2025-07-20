@@ -4,6 +4,7 @@ import type { UseFormReturn } from 'react-hook-form'
 import { Button } from '~/components/ui/button'
 import type { TCustomerSchema } from '~/schemas/sales'
 import { CUSTOMER_ITEMS, HARDCODED_IGNORES } from '~/utils/constants'
+import { replaceUnderscoresWithSpaces } from '~/utils/words'
 import { FormField } from '../ui/form'
 import { InputItem } from './InputItem'
 import { SelectInput } from './SelectItem'
@@ -17,12 +18,9 @@ interface DynamicControlProps {
   index: number
 }
 
-export const DynamicControl = ({
-  itemKey,
-  target,
-  form,
-  index,
-}: DynamicControlProps) => {
+const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) => {
+  // TODO: remove hardcoded ogee and bullnose
+  const current = eval(form.watch(`rooms.${index}.extras.${target}.edge_type`))
   const itemType = CUSTOMER_ITEMS[target][itemKey]
   if (typeof itemType === 'object') {
     return (
@@ -33,22 +31,30 @@ export const DynamicControl = ({
           <SelectInput
             field={field}
             placeholder='Select option'
-            name='Type'
+            name={replaceUnderscoresWithSpaces(itemKey)}
             options={Object.entries(itemType).map(([key, value]) => ({
               key: value,
-              value: key,
+              value: replaceUnderscoresWithSpaces(key),
             }))}
           />
         )}
       />
     )
   }
+
+  if (target === 'edge_price' && typeof current !== 'function') {
+    return null
+  }
   return (
     <FormField
       control={form.control}
       name={`rooms.${index}.extras.${target}.${itemKey}`}
       render={({ field }) => (
-        <InputItem name={itemKey} placeholder={`Enter ${itemKey}`} field={field} />
+        <InputItem
+          name={replaceUnderscoresWithSpaces(itemKey)}
+          placeholder={`Enter ${itemKey}`}
+          field={field}
+        />
       )}
     />
   )
@@ -60,7 +66,7 @@ interface DynamicAdditionProps {
   index: number
 }
 
-const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) => {
+export const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) => {
   const context = CUSTOMER_ITEMS[target]
   const [isPriceManuallySet, setIsPriceManuallySet] = useState(false)
 
@@ -87,10 +93,12 @@ const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) => {
     form.setValue(`rooms.${index}.extras`, rest)
   }
 
+  const isHardcoded = HARDCODED_IGNORES.includes(target)
+
   return (
     <div className='p-0 rounded-md mb-2 '>
       <div className='flex items-start gap-2'>
-        <div className='min-w-[120px] flex-shrink-0'>
+        <div className={`flex-shrink-0 ${isHardcoded ? 'hidden' : 'min-w-[120px]'}`}>
           <div className='h-6'></div>
           <span className='font-medium text-sm capitalize'>
             {target?.replaceAll('_', ' ')}
@@ -128,15 +136,17 @@ const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) => {
         />
         <div className='flex flex-col'>
           <div className='h-6'></div>
-          <Button
-            type='button'
-            variant='ghost'
-            size='icon'
-            className='h-10 w-10 p-0'
-            onClick={handleRemove}
-          >
-            <X className='h-4 w-4' />
-          </Button>
+          {!isHardcoded && (
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              className='h-10 w-10 p-0'
+              onClick={handleRemove}
+            >
+              <X className='h-4 w-4' />
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -154,7 +164,6 @@ export const DynamicAdditions = ({ form, index }: DynamicAdditionsProps) => {
     form.getValues(`rooms.${index}.extras`),
   ).filter(itemKey => !HARDCODED_IGNORES.includes(itemKey)) as ExtraItemKey[]
   if (selectedItems.length === 0) return null
-
   return (
     <div className='mt-4 space-y-2'>
       <h3 className='text-sm font-semibold text-gray-600'>Extra Items</h3>
