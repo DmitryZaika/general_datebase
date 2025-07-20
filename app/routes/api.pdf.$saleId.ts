@@ -1,6 +1,7 @@
 import { PDFDocument, type PDFForm } from 'pdf-lib'
 import { type ActionFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
+import { extrasSchema, type TExtrasSchema } from '~/schemas/sales'
 import { selectMany } from '~/utils/queryHelpers'
 import { downloadPDFAsBuffer } from '~/utils/s3.server'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -22,11 +23,11 @@ interface IQuery {
   retail_price: string | null
   tear_out: string | null
   stove: string | null
-  ten_year_sealer: number | null
   waterfall: string | null
   corbels: number | null
   seam: string | null
   zip_code: string | null
+  extras: TExtrasSchema
   company_name: string | null
   billing_address: string | null
   room_uuid: string
@@ -140,8 +141,9 @@ function homeownerGdIndyText(
   const hasLaminateTearOut = queryData.some(
     row => row.tear_out === 'laminate_t/o' || row.tear_out === 'vanity_t/o',
   )
+
   const hasStoneTearOut = queryData.some(row => row.tear_out === 'stone_t/o')
-  const hasTenYearSealer = queryData.some(row => row.ten_year_sealer === 1)
+  const hasTenYearSealer = queryData.some(row => row.extras.ten_year_sealer)
   const hasWaterfall = queryData.some(row => row.waterfall === 'yes')
 
   pdfForm.getTextField('Text31').setText(hasLaminateTearOut ? 'Yes' : 'No')
@@ -278,7 +280,7 @@ function commercialGdIndyText(
     r => r.tear_out === 'laminate_t/o' || r.tear_out === 'vanity_t/o',
   )
   const hasStoneTearOut = queryData.some(r => r.tear_out === 'stone_t/o')
-  const hasTenYearSealer = queryData.some(r => r.ten_year_sealer === 1)
+  const hasTenYearSealer = queryData.some(r => r.extras.ten_year_sealer)
   const hasWaterfall = queryData.some(r => r.waterfall === 'yes')
 
   pdfForm.getTextField('Text152').setText(hasLaminateTearOut ? 'Yes' : 'No')
@@ -362,10 +364,10 @@ async function getData(saleId: number) {
             main.slab_inventory.square_feet,
             main.slab_inventory.tear_out,
             main.slab_inventory.stove,
-            main.slab_inventory.ten_year_sealer,
             main.slab_inventory.waterfall,
             main.slab_inventory.corbels,
             main.slab_inventory.seam,
+            main.slab_inventory.extras,
             main.stones.name as stone_name,
             main.stones.id as stone_id,
             main.stones.retail_price,
@@ -380,7 +382,11 @@ async function getData(saleId: number) {
         where main.sales.id = ?
         order by main.slab_inventory.id
     `
-  return await selectMany<IQuery>(db, query, [saleId])
+  const response = await selectMany<IQuery>(db, query, [saleId])
+  return response.map(row => ({
+    ...row,
+    extras: extrasSchema.parse(row.extras || {}),
+  }))
 }
 
 async function getPdf(contractType: string) {
