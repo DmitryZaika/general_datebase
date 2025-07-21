@@ -199,7 +199,7 @@ export default function EventStyled({
           description: event.description,
           startDate: event.startDate,
           endDate: event.endDate,
-          variant: event.variant as any,
+          variant: event.variant,
           notes: event.notes,
         }}
       />
