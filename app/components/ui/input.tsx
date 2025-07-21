@@ -2,7 +2,11 @@ import * as React from "react";
 
 import { cn } from "~/lib/utils";
 
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+export type InputProps = React.ComponentProps<"input"> & {
+  hidePasswordToggle?: boolean;
+}
+
+function Input({ className, type, hidePasswordToggle, ...props }: InputProps) {
   return (
     <input
       type={type}
