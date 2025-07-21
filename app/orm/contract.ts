@@ -216,7 +216,7 @@ export class Contract {
 
   protected async sellSink(slabId: number, sinkTypeId: number) {
     await db.execute(
-      `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+      `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 ORDER BY id LIMIT 1`,
       [slabId, sinkTypeId],
     )
   }
@@ -227,7 +227,7 @@ export class Contract {
 
   protected async sellFaucet(slabId: number, faucetTypeId: number) {
     await db.execute(
-      `UPDATE faucets SET slab_id = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+      `UPDATE faucets SET slab_id = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 ORDER BY id LIMIT 1`,
       [slabId, faucetTypeId],
     )
   }
