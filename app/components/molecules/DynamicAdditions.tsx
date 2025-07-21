@@ -98,7 +98,7 @@ export const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) =
   return (
     <div className='p-0 rounded-md mb-2 '>
       <div className='flex items-start gap-2'>
-        <div className={`flex-shrink-0 ${isHardcoded ? 'hidden' : 'min-w-[120px]'}`}>
+        <div className={`flex-shrink-0 ${isHardcoded ? 'hidden' : 'min-w-[105px]'}`}>
           <div className='h-6'></div>
           <span className='font-medium text-sm capitalize'>
             {target?.replaceAll('_', ' ')}

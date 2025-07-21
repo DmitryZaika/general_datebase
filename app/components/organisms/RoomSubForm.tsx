@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { type UseFormReturn, useWatch } from 'react-hook-form'
+import type { UseFormReturn } from 'react-hook-form'
 import {
   DynamicAddition,
   DynamicAdditions,
@@ -85,14 +85,15 @@ export const RoomSubForm = ({
   sink_type: Sink[]
   faucet_type: Faucet[]
 }) => {
-  const roomValues = useWatch({
-    control: form.control,
-    name: `rooms.${index}`,
-  })
+  const roomValues = form.watch(`rooms.${index}`)
 
   const totalRoomPrice = useMemo(() => {
     return roomPrice(roomValues, sink_type, faucet_type)
-  }, [roomValues, sink_type, faucet_type])
+  }, [
+    JSON.stringify(roomValues),
+    JSON.stringify(sink_type),
+    JSON.stringify(faucet_type),
+  ])
 
   const inputWidth = 'w-[50%]'
   const [showAddSlabDialog, setShowAddSlabDialog] = useState(false)
@@ -170,13 +171,24 @@ export const RoomSubForm = ({
     value: string | number,
     target: keyof typeof BASE_PRICES,
   ) => {
-    let price = BASE_PRICES[target]
-    if (typeof price === 'function') {
-      price = price(value as unknown as number)
+    const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
+
+    const base = BASE_PRICES[target]
+
+    if (typeof base === 'function') {
+      const price = base(value as number)
       form.setValue(`rooms.${index}.extras.${target}`, price)
       return
     }
-    price = price[value as keyof typeof price] || 0
+
+    const selected = (base as any)[value as string] ?? 0
+    let price: number
+
+    if (typeof selected === 'function') {
+      price = (selected as any)({ squareFeet })
+    } else {
+      price = Number(selected) || 0
+    }
 
     form.setValue(`rooms.${index}.extras.${target}`, price)
   }
@@ -202,9 +214,11 @@ export const RoomSubForm = ({
 
   return (
     <>
-      <div className='h-[1px] bg-gray-200 w-full my-2'></div>
+      <div className='h-[2px] bg-gray-200 w-full my-2'></div>
       <div className='flex items-center justify-between'>
-        <h2 className='mt-6 mb-2 font-semibold text-sm'>Room {index + 1}</h2>{' '}
+        <h2 className='mt-6 mb-2 font-semibold text-sm bg-green-100 p-2 rounded-md'>
+          Room {index + 1}
+        </h2>{' '}
         {index !== 0 && (
           <Button
             className=' top-0 right-0'

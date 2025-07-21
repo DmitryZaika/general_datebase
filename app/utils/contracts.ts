@@ -8,7 +8,15 @@ export const roomPrice = (
 ) => {
   let total = (room.square_feet || 0) * (room.retail_price || 0)
   for (const extra of Object.values(room.extras)) {
-    total += Number(typeof extra === 'number' ? extra : extra?.price || 0)
+    if (!['number', 'string', 'object', 'function'].includes(typeof extra)) {
+      throw new Error('Invalid extra type')
+    }
+    total +=
+      {
+        number: Number(extra),
+        string: Number(extra),
+        object: Number((extra as { price: number }).price || 0),
+      }[typeof extra as 'number' | 'string' | 'object'] || 0
   }
 
   for (const sink of room.sink_type) {
