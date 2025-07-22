@@ -281,17 +281,17 @@ export class Contract {
     for (const room of this.data.rooms) {
       const firstSlab = room.slabs[0]
       for (const slab of room.slabs) {
-        this.sellSlab(slab.id, room)
+        await this.sellSlab(slab.id, room)
 
         if (!slab.is_full) {
-          this.duplicateSlab(slab.id)
+          await this.duplicateSlab(slab.id)
         }
       }
       for (const sinkType of room.sink_type) {
-        this.sellSink(firstSlab.id, sinkType.type_id)
+        await this.sellSink(firstSlab.id, sinkType.type_id)
       }
       for (const faucetType of room.faucet_type) {
-        this.sellFaucet(firstSlab.id, faucetType.type_id)
+        await this.sellFaucet(firstSlab.id, faucetType.type_id)
       }
     }
     return this.saleId
@@ -304,11 +304,11 @@ export class Contract {
     await this.deleteSale()
     for (const room of this.data.rooms) {
       for (const slab of room.slabs) {
-        this.unsellSlab(slab.id)
-        this.unsellSink(slab.id)
-        this.unsellFaucet(slab.id)
+        await this.unsellSlab(slab.id)
+        await this.unsellSink(slab.id)
+        await this.unsellFaucet(slab.id)
         if (!slab.is_full) {
-          this.deleteDuplicateSlab(slab.id)
+          await this.deleteDuplicateSlab(slab.id)
         }
       }
     }
@@ -342,10 +342,10 @@ export class Contract {
         await this.updateSlab(slab.id, room)
 
         for (const sinkType of room.sink_type) {
-          this.sellSink(slab.id, sinkType.type_id)
+          await this.sellSink(slab.id, sinkType.type_id)
         }
         for (const faucetType of room.faucet_type) {
-          this.sellFaucet(slab.id, faucetType.type_id)
+          await this.sellFaucet(slab.id, faucetType.type_id)
         }
 
         const [hasChildren] = await db.execute<RowDataPacket[]>(
@@ -355,11 +355,11 @@ export class Contract {
 
         if (!slab.is_full) {
           if (hasChildren.length === 0) {
-            this.duplicateSlab(slab.id)
+            await this.duplicateSlab(slab.id)
           }
         } else {
           if (hasChildren.length > 0) {
-            this.deleteDuplicateSlab(slab.id)
+            await this.deleteDuplicateSlab(slab.id)
           }
         }
       }
