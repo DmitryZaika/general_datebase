@@ -1,6 +1,7 @@
-import { Link, useLocation, useNavigate, useNavigation } from "react-router";
+import { Link, useLocation } from "react-router";
 import { Button } from "~/components/ui/button";
 import { TodoList } from "../organisms/TodoList";
+import { Notification } from "../molecules/Notification";
 import clsx from "clsx";
 import { HeaderProps } from "~/types";
 import { getMirroredUrl, getCustomerUrl  } from "~/utils/headerNav";
@@ -67,7 +68,10 @@ export function HeaderDesktop({
         </ul>
       </nav>
 
-      <TodoList />
+      <div className="flex items-center gap-2">
+        <Notification className="relative z-10 mr-20" />
+        <TodoList />
+      </div>
 
       {user !== null && (
         <Link to="/logout">

@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigation } from "react-router";
 import { TodoList } from "../organisms/TodoList";
+import { Notification } from "../molecules/Notification";
 import { HeaderProps } from "~/types";
 import { useLoaderData } from "react-router";
 
@@ -9,14 +10,13 @@ interface HeaderMobileProps extends HeaderProps {
 interface BurgerLinkProps {
   setOpen: (value: boolean) => void;
   to: string;
-  children: JSX.Element | string;
+  children: React.ReactNode;
   className?: string;
   onClick?: () => void;
 }
-import React, { useState, useEffect, type JSX } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Menu, X } from "lucide-react";
-import { LoadingButton } from "../molecules/LoadingButton";
 import clsx from "clsx";
 import { LinkButton } from "../molecules/LinkButton";
 function BurgerLink({
@@ -135,8 +135,14 @@ export function BurgerMenu({
 
       {open && (
         <div
+          role="button"
+          aria-label="Close menu overlay"
+          tabIndex={0}
           onClick={() => setOpen(false)}
-          className="fixed inset-0 bg-black/50 z-40"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") setOpen(false);
+          }}
+          className="fixed inset-0 z-40 bg-black/50"
         />
       )}
       <div
@@ -159,7 +165,9 @@ export function BurgerMenu({
           </Button>
 
           <nav className="flex flex-col space-y-2 pt-1">
-            <a href="/" className="uppercase text-lg font-bold"></a>
+            <a href="/" aria-label="Home" className="uppercase text-lg font-bold sr-only">
+              Home
+            </a>
             <div className="flex gap-1">
               {isAdmin || isSuperUser ? (
                 isAdminPage ? (
@@ -229,7 +237,10 @@ export function HeaderMobile({
           />
         </a>
       </div>
-      <TodoList />
+      <div className="flex items-center gap-2">
+        <Notification />
+        <TodoList />
+      </div>
       <BurgerMenu
         user={user}
         isAdmin={isAdmin}

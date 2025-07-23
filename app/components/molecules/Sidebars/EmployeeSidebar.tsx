@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { SinkIcon } from "~/components/icons/SinkIcon";
 import { CorbelIcon } from "~/components/icons/CorbelIcon";
-import { redirect, useLocation } from "react-router";
+import { useLocation } from "react-router";
 import { getBase } from "~/utils/urlHelpers";
 import { StonesFilters } from "./StonesFilters";
 import { SinksFilters } from "./SinksFilters";
@@ -42,7 +42,7 @@ interface ISidebarItem {
   icon: React.ForwardRefExoticComponent<
     Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>
   >;
-  component?: ({}) => React.ReactNode;
+  component?: () => React.ReactNode;
 }
 
 interface IProps {
@@ -75,6 +75,11 @@ const getItems = (
   ];
   if (["admin", "employee"].includes(base)) {
     finalList.push(
+      {
+        title: "Customers",
+        url: `/${base}/customers`,
+        icon: Users,
+      },
       {
         title: "Sinks",
         url: `/${base}/sinks`,

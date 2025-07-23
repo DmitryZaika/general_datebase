@@ -44,7 +44,7 @@ export const EmailInput: React.FC<EmailInputProps> = ({
         // Typing after @, filter suggestions
         const filtered = emailDomains
           .filter((domain) =>
-            domain.toLowerCase().startsWith("@" + afterAt.toLowerCase())
+            domain.toLowerCase().startsWith(`@${afterAt.toLowerCase()}`)
           )
           .map((domain) => beforeAt + domain);
         setSuggestions(filtered);
