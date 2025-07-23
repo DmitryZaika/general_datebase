@@ -1,5 +1,4 @@
 import {
-	type LucideProps,
 	Building2,
 	Calculator,
 	Calendar,
@@ -9,25 +8,13 @@ import {
 	ImageIcon,
 	Layers,
 	Lightbulb,
+	type LucideProps,
 	Package,
 	Receipt,
 	ShowerHead,
 	User,
 	Users,
-	Package,
-	ClipboardList,
 } from "lucide-react";
-import { useLoaderData, useLocation } from "react-router";
-import { CorbelIcon } from "~/components/icons/CorbelIcon";
-import { SinkIcon } from "~/components/icons/SinkIcon";
-import { ISupplier } from "~/schemas/suppliers";
-import { getBase } from "~/utils/urlHelpers";
-import { FaucetsFilters } from "./FaucetsFilters";
-import { SinksFilters } from "./SinksFilters";
-import { StonesFilters } from "./StonesFilters";
-
-} from 'lucide-react'
-
 import { useLoaderData, useLocation } from "react-router";
 import { CorbelIcon } from "~/components/icons/CorbelIcon";
 import { SinkIcon } from "~/components/icons/SinkIcon";
