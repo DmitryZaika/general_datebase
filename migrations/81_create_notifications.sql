@@ -1,0 +1,9 @@
+CREATE TABLE notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    customer_id INT REFERENCES customers(id) ON DELETE SET NULL,
+    message VARCHAR(255) NOT NULL,
+    due_at TIMESTAMP NOT NULL,
+    is_done TINYINT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+); 

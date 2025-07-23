@@ -89,8 +89,39 @@ export default function CustomerCheckIn() {
       });
     },
   });
-  console.log(form.getValues("referral_source"))
 
+  const safetyInstructions =    
+  <section className="mt-4 rounded-lg bg-gradient-to-br from-gray-50 to-white p-6 shadow-inner">
+  <h2 className="mb-4 text-center text-lg font-semibold text-gray-800">
+    We kindly ask you to:
+  </h2>
+  <ol className="list-decimal space-y-3 pl-5 text-left text-sm text-gray-700 md:text-base">
+    <li>
+      <span className="font-medium">Refrain from moving slabs or remnants by yourself.</span>
+      &nbsp;If you require help lifting or moving heavy countertops or materials, please ask a staff member for assistance. Granite Depot is not responsible for any injuries obtained.
+    </li>
+    <li>
+      <span className="font-medium">Avoid leaning on countertops and be cautious of sharp edges.</span>
+      &nbsp;Display units may not be securely anchored. Avoid running your hands or body against these surfaces to prevent cuts or injuries.
+    </li>
+    <li>
+      <span className="font-medium">Keep children supervised.</span>
+      &nbsp;Ensure children are closely supervised while in the shop to prevent accidents or injuries. Do not allow them to climb on or play around countertops or machinery.
+    </li>
+    <li>
+      <span className="font-medium">Stay within designated areas.</span>
+      &nbsp;Customers should remain in designated customer areas and avoid entering restricted or work-only zones to ensure their safety.
+    </li>
+    <li>
+      <span className="font-medium">Use caution on slippery surfaces.</span>
+      &nbsp;Be mindful of potentially slippery surfaces, especially in wet or freshly cleaned areas. Walk slowly and carefully to avoid slips or falls.
+    </li>
+    <li>
+      <span className="font-medium">Report any concerns.</span>
+      &nbsp;If you notice any safety concerns or potential hazards, please inform a staff member immediately. Your vigilance helps maintain a safe shopping environment.
+    </li>
+  </ol>
+</section>
 
   return (
     <div className="flex justify-center py-10">
@@ -100,8 +131,8 @@ export default function CustomerCheckIn() {
           alt="Logo"
           className="mx-auto mb-4 h-16 object-contain"
         />
-        <h1 className=" text-center text-2xl font-semibold">Customer Check-In</h1>
-
+        <h1 className=" text-center text-2xl font-semibold">Safety Instructions</h1>
+       {safetyInstructions}
         <FormProvider {...form}>
           <form onSubmit={form.handleSubmit((data) => mutate(data))}>
             <div className="space-y-4 py-4">
