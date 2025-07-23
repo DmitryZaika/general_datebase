@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLoaderData } from "react-router";
-import { FormProvider, FormField } from "../components/ui/form";
+import { FormProvider, FormField, FormItem, FormLabel as FormFieldLabel, FormControl, FormMessage } from "../components/ui/form";
 import { z } from "zod";
 import { InputItem } from "~/components/molecules/InputItem";
 import { useForm } from "react-hook-form";
@@ -12,6 +12,7 @@ import { data, LoaderFunctionArgs } from "react-router";
 import { CustomerSignupSchema } from "~/schemas/customers";
 import { useMutation } from "@tanstack/react-query";
 import { AddressInput } from "~/components/organisms/AddressInput";
+import { EmailInput } from "~/components/molecules/EmailInput";
 
 const referralOptions = [
     { value: "google", label: "Google" },
@@ -26,13 +27,14 @@ const referralOptions = [
 const customerCheckInSchema = z.object({
   company_id: z.number().min(1, "Company ID is required"),
   name: z.string().min(1, "Name is required"),
-  phone: z.string().optional(),
-  email: z.string().email("Please enter a valid email"),
+  phone: z.string().min(1, "Phone number is required").optional(),
+  email: z.string().email("Please enter a valid email").optional(),
   address: z.string().min(1, "Address is required"),
   referral_source: z.enum(["google", "facebook", "referral", "flyer", "drive-thru", "instagram", "other"], {
     errorMap: () => ({ message: "Please select how you heard about us" })
   }),
   safety_instructions_acknowledged: z.boolean().refine((val) => val === true, "You must acknowledge the safety instructions"),
+
 });
 
 type FormData = z.infer<typeof customerCheckInSchema>;
@@ -64,7 +66,7 @@ export default function CustomerCheckIn() {
       phone: "",
       email: "",
       address: "",
-      referral_source: "google",
+      referral_source: undefined,
       safety_instructions_acknowledged: false,
     },
   });
@@ -87,11 +89,18 @@ export default function CustomerCheckIn() {
       });
     },
   });
+  console.log(form.getValues("referral_source"))
 
 
   return (
-    <div className="container mx-auto px-8 md:px-10">
-          <h1 className="text-2xl font-bold">Customer Check-In</h1>
+    <div className="flex justify-center py-10">
+      <div className="w-full max-w-xl border rounded-md bg-white p-8 shadow-sm">
+        <img
+          src="https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp"
+          alt="Logo"
+          className="mx-auto mb-4 h-16 object-contain"
+        />
+        <h1 className=" text-center text-2xl font-semibold">Customer Check-In</h1>
 
         <FormProvider {...form}>
           <form onSubmit={form.handleSubmit((data) => mutate(data))}>
@@ -115,6 +124,7 @@ export default function CustomerCheckIn() {
                   <InputItem
                     name="Phone"
                     field={field}
+                    placeholder="Your phone number"
                   />
                 )}
               />
@@ -123,11 +133,10 @@ export default function CustomerCheckIn() {
                 control={form.control}
                 name="email"
                 render={({ field }) => (
-                  <InputItem
-                    name="Email"
-                    placeholder="your@email.com"
-                    field={field}
-                  />
+                  <EmailInput
+                  field={field}
+                  formClassName='mb-0'
+                />
                 )}
               />
 
@@ -176,24 +185,29 @@ export default function CustomerCheckIn() {
                 control={form.control}
                 name="safety_instructions_acknowledged"
                 render={({ field }) => (
-                  <div className="flex items-start space-x-2 pt-2">
-                    <Checkbox
-                      id="safety_instructions"
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                    <Label 
-                      htmlFor="safety_instructions" 
-                      className="text-sm font-normal leading-5"
-                    >
-                      I acknowledge that I have read, understand, and agree to the safety instructions.
-                    </Label>
-                  </div>
+                  <FormItem className="pt-2">
+                    <div className="flex items-start space-x-2">
+                      <FormControl>
+                        <Checkbox
+                          id="safety_instructions"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormFieldLabel 
+                        htmlFor="safety_instructions" 
+                        className="text-sm font-normal leading-5"
+                      >
+                        I acknowledge that I have read, understand, and agree to the safety instructions.
+                      </FormFieldLabel>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
             </div>
 
-            <div className="mt-6">
+            <div className="mt-6 flex justify-center">
               <LoadingButton loading={isPending} type="submit">
                 Submit
               </LoadingButton>
@@ -201,5 +215,6 @@ export default function CustomerCheckIn() {
           </form>
         </FormProvider>
       </div>
+    </div>
   );
 } 
