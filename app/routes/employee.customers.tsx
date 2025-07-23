@@ -34,36 +34,41 @@ interface Customer {
 	from_check_in: number;
 	created_date: string;
 	className?: string;
+	company_id: number;
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+	let user: { company_id: number };
 	try {
-		await getEmployeeUser(request);
+		user = await getEmployeeUser(request);
 	} catch (error) {
 		return redirect(`/login?error=${error}`);
 	}
+
 	const url = new URL(request.url);
 	const salesRepFilter = url.searchParams.get("sales_rep");
 
 	const params: number[] = [];
-	let where = "";
+	const conditions: string[] = ["c.company_id = ?"];
+	params.push(user.company_id);
 	if (salesRepFilter) {
-		where = "WHERE c.sales_rep = ?";
+		conditions.push("c.sales_rep = ?");
 		params.push(Number(salesRepFilter));
 	}
+	const where = `WHERE ${conditions.join(" AND ")}`;
 
 	const customers = await selectMany<Customer>(
 		db,
-		`SELECT c.id, c.name, c.email, c.phone, c.address, c.sales_rep, c.from_check_in, c.created_date, u.name AS sales_rep_name
+		`SELECT c.id, c.name, c.email, c.phone, c.address, c.sales_rep, c.from_check_in, c.created_date, u.name AS sales_rep_name, c.company_id
      FROM customers c
-     LEFT JOIN users u ON c.sales_rep = u.id
+     LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
      ${where}`,
 		params,
 	);
 
 	const processed = customers.map((c) => ({
 		...c,
-		className: c.sales_rep === null ? "bg-red-50" : undefined,
+		className: c.sales_rep === null ? "bg-red-200" : undefined,
 	}));
 	return {
 		customers: processed,
