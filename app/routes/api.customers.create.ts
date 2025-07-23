@@ -20,9 +20,9 @@ export async function action({ request }: ActionFunctionArgs) {
 			[
 				validatedData.name,
 				validatedData.phone || null,
-				validatedData.email,
+				validatedData.email || null,
 				validatedData.address,
-				validatedData.referral_source,
+				validatedData.referral_source || null,
 				true,
 				validatedData.company_id,
 			],

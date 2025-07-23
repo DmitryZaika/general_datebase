@@ -60,7 +60,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 				...field,
 				onChange: handleChange,
 				inputMode: "numeric",
-				pattern: "[0-9-]*",
+				pattern: "[-0-9]*",
 				disabled: disabled,
 			}}
 			formClassName={formClassName}

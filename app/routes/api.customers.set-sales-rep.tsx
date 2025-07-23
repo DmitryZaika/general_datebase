@@ -16,17 +16,27 @@ export async function action({ request }: ActionFunctionArgs) {
 			customer_id,
 		]);
 
-		// If a sales rep was assigned, schedule a reminder for that specific rep
 		if (sales_rep) {
 			await db.query(
 				`INSERT INTO notifications (user_id, customer_id, message, due_at)
-				 SELECT ?, id, CONCAT('Please text to ', name), created_date + INTERVAL 10 SECOND /* TODO: change to 35 HOUR in production */
+				 SELECT ?, id, CONCAT('Please text to ', name), created_date + INTERVAL 24 HOUR
 				 FROM customers
 				 WHERE id = ?
 				   AND NOT EXISTS (
 				     SELECT 1
 				     FROM notifications n
 				     WHERE n.user_id = ? AND n.customer_id = ? AND n.is_done = 0
+				   )`,
+				[sales_rep, customer_id, sales_rep, customer_id],
+			);
+			await db.query(
+				`INSERT INTO notifications (user_id, customer_id, message, due_at)
+				 SELECT ?, id, CONCAT('Please check the customer ', name), created_date + INTERVAL 72 HOUR
+				 FROM customers
+				 WHERE id = ?
+				   AND NOT EXISTS (
+				     SELECT 1 FROM notifications n
+				     WHERE n.user_id = ? AND n.customer_id = ? AND n.is_done = 0 AND n.message LIKE 'Please check%'
 				   )`,
 				[sales_rep, customer_id, sales_rep, customer_id],
 			);
