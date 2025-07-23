@@ -1,7 +1,7 @@
-import { data, LoaderFunctionArgs } from "react-router";
-import { db } from "~/db.server";
-import { StoneSearchResult } from "~/types";
-import { selectMany } from "~/utils/queryHelpers";
+import { data, type LoaderFunctionArgs } from 'react-router'
+import { db } from '~/db.server'
+import type { StoneSearchResult } from '~/types'
+import { selectMany } from '~/utils/queryHelpers'
 
 /*
     const sortedResults = matchingStones.sort((a, b) => {
@@ -32,13 +32,13 @@ import { selectMany } from "~/utils/queryHelpers";
 */
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const [, searchParams] = request.url.split("?");
-  const cleanParams = new URLSearchParams(searchParams);
-  const searchTerm = cleanParams.get("name");
-  const showSoldOut = cleanParams.get("show_sold_out") === "true";
+  const [, searchParams] = request.url.split('?')
+  const cleanParams = new URLSearchParams(searchParams)
+  const searchTerm = cleanParams.get('name')
+  const showSoldOut = cleanParams.get('show_sold_out') === 'true'
 
   if (!searchTerm) {
-    return Response.json({ stones: [] });
+    return Response.json({ stones: [] })
   }
 
   let query = `SELECT s.id, s.type, s.width, s.length, s.name, s.url, s.retail_price, s.cost_per_sqft, s.is_display,
@@ -48,10 +48,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     LEFT JOIN main.slab_inventory AS si ON si.stone_id = s.id
     WHERE UPPER(s.name) LIKE UPPER(?)
     AND s.is_display = 1
-    GROUP BY s.id, s.type, s.name, s.url, s.width, s.length, s.retail_price, s.cost_per_sqft, s.is_display`;
+    GROUP BY s.id, s.type, s.name, s.url, s.width, s.length, s.retail_price, s.cost_per_sqft, s.is_display`
 
   if (!showSoldOut) {
-    query += `\nHAVING available > 0`;
+    query += `\nHAVING available > 0`
   }
 
   query += `\nORDER BY 
@@ -61,13 +61,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
         ELSE 2                                  
       END,
       s.name ASC
-    LIMIT 5`;
+    LIMIT 5`
 
   const stones = await selectMany<StoneSearchResult>(db, query, [
     `%${searchTerm}%`,
     `${searchTerm}%`,
     `% ${searchTerm} %`,
-  ]);
+  ])
 
-  return data({ stones });
+  return data({ stones })
 }

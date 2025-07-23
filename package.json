@@ -13,7 +13,8 @@
     "hash-password": "node scripts/hash-password.js",
     "prod-deploy": "react-router build && export $(grep -v '^#' .env | xargs -0) && nohup react-router-serve ./build/server/index.js > build.log 2>&1 &",
     "prod-kill": "kill -9 $(lsof -t -i:3000)",
-    "load-data": "node scripts/load-stones-csv.js"
+    "load-data": "node scripts/load-stones-csv.js",
+    "test": "vitest"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.717.0",
@@ -93,6 +94,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2",
     "@react-router/dev": "^7.6.2",
     "@tailwindcss/vite": "^4.1.7",
     "@types/bcryptjs": "^2.4.6",
@@ -118,7 +120,8 @@
     "typescript": "^5.7.3",
     "vite": "^6.2.0",
     "vite-plugin-devtools-json": "^0.2.0",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
   },
   "optionalDependencies": {
     "@esbuild/linux-x64": "0.25.0",

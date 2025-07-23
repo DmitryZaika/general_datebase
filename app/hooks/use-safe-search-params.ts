@@ -1,47 +1,43 @@
-import { useSearchParams } from "react-router";
-import { ZodSchema } from "zod";
+import { useSearchParams } from 'react-router'
+import type { ZodSchema } from 'zod'
 
-function objectToURLSearchParams(
-  obj: Record<string, unknown>,
-): URLSearchParams {
-  const sp = new URLSearchParams();
+function objectToURLSearchParams(obj: Record<string, unknown>): URLSearchParams {
+  const sp = new URLSearchParams()
   for (const [key, val] of Object.entries(obj)) {
-    sp.set(key, JSON.stringify(val));
+    sp.set(key, JSON.stringify(val))
   }
-  return sp;
+  return sp
 }
 
-export function cleanParams(
-  searchParams: URLSearchParams,
-): Record<string, unknown> {
-  const rawObj: Record<string, unknown> = {};
+export function cleanParams(searchParams: URLSearchParams): Record<string, unknown> {
+  const rawObj: Record<string, unknown> = {}
   for (const [key, val] of searchParams.entries()) {
     try {
-      rawObj[key] = JSON.parse(val);
+      rawObj[key] = JSON.parse(val)
     } catch (e) {
       // Если разбор не удается, сохраняем значение как есть
-      console.warn(`Failed to parse parameter "${key}" with value "${val}"`);
-      rawObj[key] = val;
+      console.warn(`Failed to parse parameter "${key}" with value "${val}"`)
+      rawObj[key] = val
     }
   }
-  return rawObj;
+  return rawObj
 }
 
 export function useSafeSearchParams<T>(
   schema: ZodSchema<T>,
 ): [T, (values: Partial<T>) => void] {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const rawObj = cleanParams(searchParams);
+  const rawObj = cleanParams(searchParams)
 
-  const currentValues = schema.parse(rawObj);
+  const currentValues = schema.parse(rawObj)
 
   const updateSearchParams = (newValues: Partial<T>) => {
-    const merged = { ...currentValues, ...newValues };
-    const nextParsed = schema.parse(merged);
-    const sp = objectToURLSearchParams(nextParsed as Record<string, unknown>);
-    setSearchParams(sp);
-  };
+    const merged = { ...currentValues, ...newValues }
+    const nextParsed = schema.parse(merged)
+    const sp = objectToURLSearchParams(nextParsed as Record<string, unknown>)
+    setSearchParams(sp)
+  }
 
-  return [currentValues, updateSearchParams];
+  return [currentValues, updateSearchParams]
 }

@@ -1,4 +1,4 @@
-CREATE TABLE main.users (
+CREATE TABLE users (
     id INT PRIMARY KEY AUTO_INCREMENT,
     email VARCHAR(100) UNIQUE,
     password VARCHAR(100),
