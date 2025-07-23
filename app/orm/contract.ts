@@ -164,9 +164,11 @@ export class Contract {
   }
 
   protected async updateCompanyName(customerId: number, user: User) {
+    if (typeof this.data.company_name === 'undefined') return
+
     await db.execute(
       `UPDATE customers SET company_name = ? WHERE id = ? AND company_id = ?`,
-      [this.data.company_name, customerId, user.company_id],
+      [this.data.company_name || null, customerId, user.company_id],
     )
   }
 
@@ -335,18 +337,13 @@ export class Contract {
     await this.unsellSlabs(this.saleId)
 
     for (const room of this.data.rooms) {
+      const firstSlab = room.slabs[0]
+
       for (const slab of room.slabs) {
-        this.unsellSink(slab.id)
-        this.unsellFaucet(slab.id)
+        await this.unsellSink(slab.id)
+        await this.unsellFaucet(slab.id)
 
         await this.updateSlab(slab.id, room)
-
-        for (const sinkType of room.sink_type) {
-          await this.sellSink(slab.id, sinkType.type_id)
-        }
-        for (const faucetType of room.faucet_type) {
-          await this.sellFaucet(slab.id, faucetType.type_id)
-        }
 
         const [hasChildren] = await db.execute<RowDataPacket[]>(
           `SELECT id FROM slab_inventory WHERE parent_id = ?`,
@@ -362,6 +359,14 @@ export class Contract {
             await this.deleteDuplicateSlab(slab.id)
           }
         }
+      }
+
+      // Sell sinks and faucets **once per room**, associated with the first slab
+      for (const sinkType of room.sink_type) {
+        await this.sellSink(firstSlab.id, sinkType.type_id)
+      }
+      for (const faucetType of room.faucet_type) {
+        await this.sellFaucet(firstSlab.id, faucetType.type_id)
       }
     }
   }

@@ -156,6 +156,7 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
 
     fetchCustomerDetails(customer.id)
   }
+  console.log(form.getValues('billing_address'))
 
   const fetchCustomerDetails = async (customerId: number) => {
     try {
