@@ -34,7 +34,7 @@ const customerCheckInSchema = z.object({
 	company_id: z.number().min(1, "Company ID is required"),
 	name: z.string().min(1, "Name is required"),
 	phone: z.string().min(1, "Phone number is required"),
-	email: z.string().email("Please enter a valid email").optional(),
+	email: z.string().optional(),
 	address: z.string().min(1, "Address is required"),
 	referral_source: z
 		.enum([
@@ -158,7 +158,7 @@ export default function CustomerCheckIn() {
 
 	return (
 		<div className="flex justify-center py-10">
-			<div className="w-full max-w-xl border rounded-md bg-white p-8 shadow-sm">
+			<div className="w-full max-w-2xl border rounded-md bg-white p-8 shadow-sm">
 				<img
 					src="https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp"
 					alt="Logo"
@@ -214,10 +214,10 @@ export default function CustomerCheckIn() {
 								name="referral_source"
 								render={({ field }) => (
 									<div className="space-y-3">
-										<Label className="text-base font-medium">
+										<Label className="text-base font-medium ">
 											How did you hear about us?
 										</Label>
-										<div className="grid grid-cols-2 gap-4">
+										<div className="grid grid-cols-2 gap-4 mt-3">
 											{referralOptions.map((option) => (
 												<div
 													key={option.value}
@@ -250,7 +250,7 @@ export default function CustomerCheckIn() {
 											<FormControl>
 												<Checkbox
 													id="safety_instructions"
-													className="h-8 w-8"
+													className="h-5 w-5"
 													checked={field.value}
 													onCheckedChange={field.onChange}
 												/>
@@ -269,8 +269,12 @@ export default function CustomerCheckIn() {
 							/>
 						</div>
 
-						<div className="mt-6 flex justify-center">
-							<LoadingButton loading={isPending} type="submit">
+						<div className=" flex justify-center">
+							<LoadingButton
+								loading={isPending}
+								type="submit"
+								className="w-30 h-11"
+							>
 								Submit
 							</LoadingButton>
 						</div>

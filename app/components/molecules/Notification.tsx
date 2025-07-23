@@ -50,7 +50,7 @@ export function Notification({
 				.finally(() => setIsLoading(false));
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+	}, [initialNotifications.length]);
 
 	// Poll periodically for new notifications (every 10 s)
 	useEffect(() => {
