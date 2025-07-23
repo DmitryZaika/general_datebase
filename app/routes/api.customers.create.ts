@@ -30,19 +30,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
 		const customerId = result.insertId;
 
-		// Create notifications for all employees in the same company so they can follow up
-		await db.execute(
-			`INSERT INTO notifications (user_id, customer_id, message, due_at)
-			 SELECT u.id, ?, CONCAT('Please text to ', ?), created_date + INTERVAL 10 SECOND /* TODO: change to 35 HOUR in production */
-			 FROM users u
-			 WHERE u.company_id = ? AND u.isEmployee = 1
-			   AND NOT EXISTS (
-			     SELECT 1 FROM notifications n
-			     WHERE n.user_id = u.id AND n.customer_id = ? AND n.is_done = 0
-			   )`,
-			[customerId, validatedData.name, validatedData.company_id, customerId],
-		);
-
 		return Response.json({
 			success: true,
 			message: "Customer created successfully",
