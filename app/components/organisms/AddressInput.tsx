@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "use-debounce";
 import { Command, CommandItem, CommandGroup } from "~/components/ui/command";
@@ -27,6 +28,7 @@ async function completeAddress(q: string): Promise<
 }
 
 type Props = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   form: any;
   field: string;
   zipField?: string;
@@ -62,14 +64,15 @@ export function AddressInput({ form, field, zipField }: Props) {
       control={form.control}
       name={field}
       render={({ field: rhf }) => (
-        <FormItem>
+        <FormItem className="relative">
           <FormLabel>
             {field === "billing_address"
               ? "Billing Address"
               : "Project Address"}
           </FormLabel>
           <FormControl>
-            <Input
+            <div className="relative w-full">
+            <Input 
               placeholder={`Enter ${
                 field === "billing_address" ? "billing" : "project"
               } address (min 10 characters)`}
@@ -98,11 +101,12 @@ export function AddressInput({ form, field, zipField }: Props) {
                 }
               }}
             />
+            </div>
           </FormControl>
           <FormMessage />
 
           {open && (
-            <Command className="mt-1 border rounded-md shadow-md">
+            <Command className="absolute z-10 top-full mt-1 w-full h-auto max-h-40 overflow-y-auto border rounded-md bg-white shadow-md">
               <CommandGroup heading={isFetching ? "Searching…" : "Suggestions"}>
                 {data.map((s) => (
                   <CommandItem
