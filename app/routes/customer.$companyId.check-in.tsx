@@ -11,6 +11,7 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { data, LoaderFunctionArgs } from "react-router";
 import { CustomerSignupSchema } from "~/schemas/customers";
 import { useMutation } from "@tanstack/react-query";
+import { AddressInput } from "~/components/organisms/AddressInput";
 
 const referralOptions = [
     { value: "google", label: "Google" },
@@ -134,11 +135,11 @@ export default function CustomerCheckIn() {
                 control={form.control}
                 name="address"
                 render={({ field }) => (
-                  <InputItem
-                    name="Address"
-                    placeholder="6471 Merom Ct 46268"
-                    field={field}
-                  />
+                  <AddressInput
+                  form={form}
+                  field='address'
+                  zipField='zip_code'
+                />
                 )}
               />
 
