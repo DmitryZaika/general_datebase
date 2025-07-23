@@ -3,16 +3,17 @@ import { posthog } from 'posthog-js'
 import { useEffect } from 'react'
 import type { LinksFunction, LoaderFunctionArgs } from 'react-router'
 import {
-  data, Links,
+  data,
+  Links,
   Meta,
   Outlet,
   Scripts,
   ScrollRestoration,
-  useLoaderData, useLocation
+  useLoaderData,
+  useLocation,
 } from 'react-router'
 import { AuthenticityTokenProvider } from 'remix-utils/csrf/react'
 import { EmployeeSidebar } from '~/components/molecules/Sidebars/EmployeeSidebar'
-import { ScrollToTopButton } from '~/components/ui/ScrollToTopButton'
 import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
@@ -72,12 +73,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = (await getUserBySessionId(activeSession)) || null
   }
 
-  let stoneSuppliers: ISupplier[] | undefined = undefined;
-  let sinkSuppliers: ISupplier[] | undefined = undefined;
-  let faucetSuppliers: ISupplier[] | undefined = undefined;
-  let colors: { id: number; name: string; hex_code: string }[] | undefined =
-    undefined;
-  let position: string | null = null;
+  let stoneSuppliers: ISupplier[] | undefined
+  let sinkSuppliers: ISupplier[] | undefined
+  let faucetSuppliers: ISupplier[] | undefined
+  let colors: { id: number; name: string; hex_code: string }[] | undefined
+  let position: string | null = null
 
   colors = await selectMany<{ id: number; name: string; hex_code: string }>(
     db,
@@ -115,14 +115,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
        INNER JOIN faucet_type ft ON s.id = ft.supplier_id
        WHERE s.company_id = ?
        GROUP BY s.id, s.supplier_name`,
-      [user.company_id]
-    );
+      [user.company_id],
+    )
 
     const [[row]]: any = await db.query(
       `SELECT p.name AS position FROM users u LEFT JOIN positions p ON p.id = u.position_id WHERE u.id = ? LIMIT 1`,
       [user.id],
-    );
-    position = row?.position ?? null;
+    )
+    position = row?.position ?? null
   }
 
   return data(
@@ -158,12 +158,12 @@ export default function App() {
     faucetSuppliers,
     colors,
     position,
-  } = useLoaderData<typeof loader>();
-  const { pathname } = useLocation();
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
-  const isLogin = pathname === "/login";
-  const isCheckIn = pathname.includes("/check-in");
+  } = useLoaderData<typeof loader>()
+  const { pathname } = useLocation()
+  const { toast } = useToast()
+  const isMobile = useIsMobile()
+  const isLogin = pathname === '/login'
+  const isCheckIn = pathname.includes('/check-in')
 
   useEffect(() => {
     if (message !== null && message !== undefined) {
@@ -180,9 +180,9 @@ export default function App() {
     }
   }, [message?.nonce])
 
-  const basePath = getBase(pathname);
-  const isInstaller = position === "installer";
-  const showSidebar = !!basePath && !isLogin && !isInstaller && !isCheckIn;
+  const basePath = getBase(pathname)
+  const isInstaller = position === 'installer'
+  const showSidebar = !!basePath && !isLogin && !isInstaller && !isCheckIn
 
   return (
     <html lang='en'>
@@ -203,7 +203,7 @@ export default function App() {
                 colors={colors}
               />
             )}
-            <main className="h-screen overflow-y-auto bg-gray-100 w-full">
+            <main className='h-screen overflow-y-auto bg-gray-100 w-full'>
               <AuthenticityTokenProvider token={token}>
                 {!isInstaller && (
                   <Header
@@ -213,7 +213,7 @@ export default function App() {
                     isSuperUser={user?.is_superuser ?? false}
                   />
                 )}
-                <div className="relative">
+                <div className='relative'>
                   {isMobile && !isCheckIn && <SidebarTrigger />}
                   <Outlet />
                 </div>
@@ -223,7 +223,7 @@ export default function App() {
               <Scripts />
               <Posthog />
               {!isInstaller && user && <Chat />}
-              <ScrollToTopButton />
+              {/* <ScrollToTopButton /> */}
             </main>
           </SidebarProvider>
         </QueryClientProvider>
