@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { ColumnDef, Row } from "@tanstack/react-table";
+import { Plus } from "lucide-react";
 import { FormProvider, useForm } from "react-hook-form";
 import {
 	Link,
@@ -12,9 +13,9 @@ import {
 	useSearchParams,
 } from "react-router";
 import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
+import { LoadingButton } from "~/components/molecules/LoadingButton";
 import { SelectInput } from "~/components/molecules/SelectItem";
 import { PageLayout } from "~/components/PageLayout";
-import { Button } from "~/components/ui/button";
 import { DataTable } from "~/components/ui/data-table";
 import { FormField } from "~/components/ui/form";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -60,7 +61,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 		params,
 	);
 
-	// add className for highlighting
 	const processed = customers.map((c) => ({
 		...c,
 		className: c.sales_rep === null ? "bg-red-50" : undefined,
@@ -87,6 +87,9 @@ function SalesRepCell({ customer }: { customer: Customer }) {
 			rep: customer.sales_rep ? String(customer.sales_rep) : "",
 		},
 	});
+	if (customer.sales_rep === null) {
+		console.log("[SalesRepCell] reps", reps);
+	}
 
 	const mutation = useMutation({
 		mutationFn: async (newRep: string) => {
@@ -94,6 +97,8 @@ function SalesRepCell({ customer }: { customer: Customer }) {
 				customer_id: customer.id,
 				sales_rep: newRep ? Number(newRep) : null,
 			};
+			if (customer.sales_rep === null)
+				console.log("[SalesRepCell] mutate", body);
 			await fetch("/api/customers/set-sales-rep", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -101,7 +106,6 @@ function SalesRepCell({ customer }: { customer: Customer }) {
 			});
 		},
 		onSuccess: () => {
-			// Refresh the page data so the row styling updates instantly
 			window.location.reload();
 		},
 	});
@@ -183,7 +187,7 @@ export default function AdminCustomers() {
 	const navigate = useNavigate();
 	const location = useLocation();
 
-	const tabParam = searchParams.get("tab") ?? "all";
+	const tabParam = searchParams.get("tab") ?? "walkin";
 
 	const handleTabChange = (tab: string) => {
 		const params = new URLSearchParams(searchParams);
@@ -198,26 +202,33 @@ export default function AdminCustomers() {
 	});
 
 	let displayed = filtered;
-	if (tabParam === "walkin") {
+	if (tabParam === "leads" || tabParam === "walkin") {
 		displayed = [...filtered].sort(
 			(a, b) =>
 				new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
 		);
+	} else if (tabParam === "all") {
+		displayed = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
 	}
 
 	return (
 		<PageLayout title="Customers List">
 			<Tabs value={tabParam} onValueChange={handleTabChange} className="mb-4">
 				<TabsList>
-					<TabsTrigger value="all">All Customers</TabsTrigger>
-					<TabsTrigger value="leads">Leads</TabsTrigger>
 					<TabsTrigger value="walkin">Walk-in</TabsTrigger>
+					<TabsTrigger value="leads">Leads</TabsTrigger>
+					<TabsTrigger value="all">All Customers</TabsTrigger>
 				</TabsList>
 			</Tabs>
-			<Link to={`add`} relative="path">
-				<Button>Add new customer</Button>
-			</Link>
-			<DataTable columns={customerColumns} data={displayed} />
+			<div className="w-fit">
+				<Link to={`add`} relative="path" className="inline-flex w-fit">
+					<LoadingButton loading={false} className="inline-flex items-center">
+						<Plus className="w-4 h-4 mr-1" />
+						Add Customer
+					</LoadingButton>
+				</Link>
+			</div>
+			<DataTable key={tabParam} columns={customerColumns} data={displayed} />
 			<Outlet />
 		</PageLayout>
 	);

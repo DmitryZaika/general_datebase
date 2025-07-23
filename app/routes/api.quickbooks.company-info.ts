@@ -21,9 +21,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		return data({ success: false });
 	}
 
-	let user;
 	try {
-		user = await getEmployeeUser(request);
+		await getEmployeeUser(request);
 	} catch (error) {
 		return redirect(`/login?error=${error}`);
 	}
