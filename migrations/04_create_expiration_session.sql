@@ -1,4 +1,4 @@
-create table main.sessions (
+create table sessions (
 id CHAR (36) primary key,
 user_id INT ,
 expiration_date TIMESTAMP,

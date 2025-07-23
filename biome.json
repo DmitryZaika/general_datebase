@@ -57,12 +57,7 @@
         "useValidAriaRole": "error",
         "useValidAriaValues": "error"
       },
-      "complexity": {
-        "noBannedTypes": "error",
-        "noExtraBooleanCast": "error",
-        "noUselessCatch": "error",
-        "noUselessTypeConstraint": "error"
-      },
+
       "correctness": {
         "noChildrenProp": "error",
         "noConstAssign": "error",
@@ -139,36 +134,6 @@
       }
     }
   },
-  "overrides": [
-    {
-      "linter": {
-        "rules": {
-          "correctness": {
-            "noConstAssign": "off",
-            "noGlobalObjectCalls": "off",
-            "noInvalidConstructorSuper": "off",
-            "noSetterReturn": "off",
-            "noUndeclaredVariables": "off",
-            "noUnreachable": "off",
-            "noUnreachableSuper": "off"
-          },
-          "style": {
-            "useConst": "error"
-          },
-          "suspicious": {
-            "noDuplicateClassMembers": "off",
-            "noDuplicateObjectKeys": "off",
-            "noDuplicateParameters": "off",
-            "noFunctionAssign": "off",
-            "noImportAssign": "off",
-            "noRedeclare": "off",
-            "noUnsafeNegation": "off",
-            "useGetterReturn": "off"
-          }
-        }
-      }
-    }
-  ],
   "vcs": {
     "clientKind": "git",
     "enabled": true,
