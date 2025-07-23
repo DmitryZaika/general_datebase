@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
 import { ChevronUp } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 export function ScrollToTopButton() {
   const [isVisible, setIsVisible] = useState(false)
