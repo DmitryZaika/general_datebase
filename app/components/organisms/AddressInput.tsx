@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useDebounce } from 'use-debounce'
-import { Command, CommandItem, CommandGroup } from '~/components/ui/command'
-import { Input } from '~/components/ui/input'
+import { Command, CommandGroup, CommandItem } from '~/components/ui/command'
 import {
   FormControl,
   FormField,
@@ -9,7 +9,7 @@ import {
   FormLabel,
   FormMessage,
 } from '~/components/ui/form'
-import { useState } from 'react'
+import { Input } from '~/components/ui/input'
 
 function replaceZipCode(address: string, zipCode: string) {
   if (address.includes(zipCode)) return address
@@ -61,10 +61,13 @@ export function AddressInput({ form, field, zipField }: Props) {
   })
 
   function handleSelect(address: string, zipCode: string) {
-    form.setValue(field, address, {
+    const addressWithZip = zipField ? replaceZipCode(address, zipCode ?? '') : address
+
+    form.setValue(field, addressWithZip, {
       shouldValidate: true,
       shouldDirty: true,
     })
+
     if (zipField) {
       form.setValue(zipField, zipCode ?? '', {
         shouldValidate: true,
