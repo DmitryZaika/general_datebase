@@ -8,7 +8,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
-  useSearchParams
+  useSearchParams,
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'

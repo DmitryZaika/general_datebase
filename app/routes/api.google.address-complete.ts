@@ -35,7 +35,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   if (gJson.suggestions === undefined || gJson.suggestions.length === 0) {
-    return data({ suggestions: [] });
+    return data({ suggestions: [] })
   }
 
   // Optionally fetch zip codes for each suggestion

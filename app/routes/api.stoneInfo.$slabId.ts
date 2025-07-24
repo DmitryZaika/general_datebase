@@ -9,7 +9,6 @@ const paramsParse = z.object({
 })
 
 export async function loader({ params }: LoaderFunctionArgs) {
-  
   const result = paramsParse.safeParse(params)
   if (!result.success) {
     return new Response(result.error.message, { status: 422 })
@@ -27,6 +26,6 @@ export async function loader({ params }: LoaderFunctionArgs) {
   if (stoneInfo.length === 0) {
     throw new Error('Stone not found')
   }
-  const {id, type, name} = stoneInfo[0]
+  const { id, type, name } = stoneInfo[0]
   return data({ id, type, name })
 }

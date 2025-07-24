@@ -69,8 +69,8 @@ export async function action({ request }: ActionFunctionArgs) {
       defaultValues: { ...defaultValues, password: '' },
     } as ActionData
   }
-  const session = await getSession(request.headers.get("Cookie"));
-  session.set("sessionId", sessionId);
+  const session = await getSession(request.headers.get('Cookie'))
+  session.set('sessionId', sessionId)
 
   const [[row]]: any = await db.query(
     `SELECT p.name AS position
@@ -78,15 +78,15 @@ export async function action({ request }: ActionFunctionArgs) {
        LEFT JOIN positions p ON p.id = u.position_id
      WHERE u.email = ? LIMIT 1`,
     [data.email],
-  );
-  const position: string | null = row?.position ?? null;
+  )
+  const position: string | null = row?.position ?? null
 
-  session.flash("message", toastData("Success", "Logged in"));
+  session.flash('message', toastData('Success', 'Logged in'))
 
-  const redirectPath = position === "installer" ? "/installers/checklist" : "..";
+  const redirectPath = position === 'installer' ? '/installers/checklist' : '..'
   return redirect(redirectPath, {
-    headers: { "Set-Cookie": await commitSession(session) },
-  });
+    headers: { 'Set-Cookie': await commitSession(session) },
+  })
 }
 
 export default function Login() {

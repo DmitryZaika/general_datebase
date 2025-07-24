@@ -937,7 +937,6 @@ export default function EditStoneSlabs() {
         method: 'PATCH',
         body: formData,
       })
-    
 
       if (response.ok) {
         // Refresh the page to show updated data
