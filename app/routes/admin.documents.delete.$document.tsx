@@ -2,17 +2,16 @@ import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
+  useNavigate,
 } from 'react-router'
-import { useLoaderData, useNavigate } from 'react-router'
-import { selectId } from '~/utils/queryHelpers'
-
+import { DeleteRow } from '~/components/pages/DeleteRow'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { getAdminUser } from '~/utils/session.server'
 import { csrf } from '~/utils/csrf.server'
-import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
-import { DeleteRow } from '~/components/pages/DeleteRow'
+import { selectId } from '~/utils/queryHelpers'
+import { getAdminUser } from '~/utils/session.server'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
@@ -27,7 +26,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   const documentId = params.document
   try {
-    await db.execute(`DELETE FROM main.documents WHERE id = ?`, [documentId])
+    await db.execute(`DELETE FROM documents WHERE id = ?`, [documentId])
   } catch (error) {
     console.error('Error connecting to the database: ', error)
   }

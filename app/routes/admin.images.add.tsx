@@ -1,14 +1,15 @@
-import { LoadingButton } from '~/components/molecules/LoadingButton'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   redirect,
+  useNavigate,
+  useNavigation,
 } from 'react-router'
-import { useNavigate, useNavigation } from 'react-router'
-import { FormField } from '../components/ui/form'
-
 import { z } from 'zod'
+import { FileInput } from '~/components/molecules/FileInput'
 import { InputItem } from '~/components/molecules/InputItem'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { MultiPartForm } from '~/components/molecules/MultiPartForm'
 import {
   Dialog,
   DialogContent,
@@ -18,13 +19,12 @@ import {
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
-import { toastData } from '~/utils/toastHelpers'
-import { FileInput } from '~/components/molecules/FileInput'
-import { parseMutliForm } from '~/utils/parseMultiForm'
-import { MultiPartForm } from '~/components/molecules/MultiPartForm'
-import { useCustomForm } from '~/utils/useCustomForm'
-import { getAdminUser } from '~/utils/session.server'
 import { csrf } from '~/utils/csrf.server'
+import { parseMutliForm } from '~/utils/parseMultiForm'
+import { getAdminUser } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
+import { useCustomForm } from '~/utils/useCustomForm'
+import { FormField } from '../components/ui/form'
 
 const imageSchema = z.object({
   name: z.string().min(1),
@@ -48,10 +48,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const user = await getAdminUser(request)
   try {
-    await db.execute(
-      `INSERT INTO main.images (name, url, company_id) VALUES (?,  ?, ?);`,
-      [data.name, data.file, user.company_id],
-    )
+    await db.execute(`INSERT INTO images (name, url, company_id) VALUES (?,  ?, ?);`, [
+      data.name,
+      data.file,
+      user.company_id,
+    ])
   } catch (error) {
     console.error('Error connecting to the database: ', error)
   }

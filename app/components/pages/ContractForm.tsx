@@ -53,7 +53,7 @@ const fetchCustomers = async (customerName: string) => {
 
 export function ContractForm({ starting, saleId }: IContractFormProps) {
   const navigate = useNavigate()
-  const isSubmitting = useNavigation().state === 'submitting'
+  const isSubmitting = useNavigation().state !== 'idle'
   const [isExistingCustomer, setIsExistingCustomer] = useState(false)
   const location = useLocation()
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -156,7 +156,6 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
 
     fetchCustomerDetails(customer.id)
   }
-  console.log(form.getValues('billing_address'))
 
   const fetchCustomerDetails = async (customerId: number) => {
     try {

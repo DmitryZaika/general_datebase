@@ -24,6 +24,15 @@ export const extrasSchema = z.record(
 
 export type TExtrasSchema = z.infer<typeof extrasSchema>
 
+export const EXTRA_DEFAULTS = {
+  edge_price: 0,
+  tear_out_price: 0,
+  stove_price: 0,
+  waterfall_price: 0,
+  corbels_price: 0,
+  seam_price: 0,
+}
+
 export const roomSchema = z.object({
   room: z.string().default('kitchen'),
   room_id: z.string().default(uuidv7),
@@ -42,14 +51,7 @@ export const roomSchema = z.object({
   ten_year_sealer: z.boolean().default(false),
   slabs: z.array(slabOptionsSchema).default([]),
 
-  extras: extrasSchema.default({
-    edge_price: 0,
-    tear_out_price: 0,
-    stove_price: 0,
-    waterfall_price: 0,
-    corbels_price: 0,
-    seam_price: 0,
-  }),
+  extras: extrasSchema.default(EXTRA_DEFAULTS),
 })
 
 export type TRoomSchema = z.infer<typeof roomSchema>
@@ -58,12 +60,12 @@ export const customerSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   customer_id: z.coerce.number().optional(),
   seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
-  billing_address: z.string().min(10, 'Billing address is required'),
+  billing_address: z.any(),
   billing_zip_code: z.coerce.string().optional(),
-  project_address: z.string().min(10, 'Project address is required').optional(),
+  project_address: z.any(),
   same_address: z.boolean().default(true),
-  phone: z.string().regex(/^\d{3}-\d{3}-\d{4}$/, 'Required format: 317-316-1456'),
-  email: z.string().email('Please enter a valid email'),
+  phone: z.any(),
+  email: z.any(),
   notes_to_sale: StringOrNumber,
   price: z.coerce.number().default(0),
   company_name: z.string().nullable().optional(),

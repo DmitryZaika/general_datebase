@@ -1,32 +1,28 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
+  Form,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
+  useNavigate,
 } from 'react-router'
-import { Form, useNavigate, useLoaderData } from 'react-router'
-import { FormProvider, FormField } from '../components/ui/form'
 import { getValidatedFormData } from 'remix-hook-form'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
 import { Button } from '~/components/ui/button'
-import { useForm } from 'react-hook-form'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
+import { DialogFooter } from '~/components/ui/dialog'
 
 import { db } from '~/db.server'
+import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { csrf } from '~/utils/csrf.server'
 import { selectId } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { FormField, FormProvider } from '../components/ui/form'
 
 const supplierschema = z.object({
   website: z.string().url(),
@@ -66,7 +62,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   await db.execute(
-    `UPDATE main.suppliers SET website = ?, supplier_name = ?, manager = ?, phone= ?, email = ?, notes= ? WHERE id = ?`,
+    `UPDATE suppliers SET website = ?, supplier_name = ?, manager = ?, phone= ?, email = ?, notes= ? WHERE id = ?`,
     [
       data.website,
       data.supplier_name,

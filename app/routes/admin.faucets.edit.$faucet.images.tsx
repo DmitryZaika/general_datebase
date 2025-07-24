@@ -1,12 +1,14 @@
-import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect, useState } from 'react'
+import { FaTimes } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
+  Form as RemixForm,
   redirect,
+  useLoaderData,
+  useNavigation,
 } from 'react-router'
-import { Link, useLoaderData, useNavigation, Form as RemixForm } from 'react-router'
-import { useEffect, useState } from 'react'
-import { FaTimes } from 'react-icons/fa'
+import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { FileInput } from '~/components/molecules/FileInput'
 import { MultiPartForm } from '~/components/molecules/MultiPartForm'
@@ -21,7 +23,6 @@ import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 import { useCustomForm } from '~/utils/useCustomForm'
-import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 
 export const InstalledProjectsSchema = z.object({})
 type TInstalledProjectsSchema = z.infer<typeof InstalledProjectsSchema>
@@ -54,7 +55,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       'SELECT url FROM installed_faucets WHERE id = ?',
       sid,
     )
-    await db.execute(`DELETE FROM main.installed_faucets WHERE id = ?`, [sid])
+    await db.execute(`DELETE FROM installed_faucets WHERE id = ?`, [sid])
     const session = await getSession(request.headers.get('Cookie'))
     if (result?.url) {
       deleteFile(result.url)

@@ -1,24 +1,23 @@
-import { type ActionFunctionArgs, json } from 'react-router'
-import { Form, useActionData, useSubmit } from 'react-router'
-import { PageLayout } from '~/components/PageLayout'
-import { z } from 'zod'
-import { db } from '~/db.server'
-import { Button } from '~/components/ui/button'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { getValidatedFormData } from 'remix-hook-form'
 import { useForm } from 'react-hook-form'
+import { type ActionFunctionArgs, Form, useActionData } from 'react-router'
+import { getValidatedFormData } from 'remix-hook-form'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
+import { z } from 'zod'
+import { InputItem } from '~/components/molecules/InputItem'
+import { PageLayout } from '~/components/PageLayout'
+import { Button } from '~/components/ui/button'
+import { db } from '~/db.server'
+import { useFullSubmit } from '~/hooks/useFullSubmit'
 import {
-  FormProvider,
   FormControl,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
+  FormProvider,
 } from '../components/ui/form'
 import { Input } from '../components/ui/input'
-import { InputItem } from '~/components/molecules/InputItem'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
 
 const customerSchema = z.object({
   name: z.string().min(5),
@@ -43,7 +42,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     await db.execute(
-      `INSERT INTO main.customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
       [data.name, data.email, data.phoneNumber, data.address],
     )
   } catch (error) {

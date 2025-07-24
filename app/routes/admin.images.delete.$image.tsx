@@ -29,7 +29,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
     return { error: 'Invalid image ID' }
   }
   try {
-    const result = await db.execute(`DELETE FROM main.images WHERE id = ?`, [imageId])
+    const result = await db.execute(`DELETE FROM images WHERE id = ?`, [imageId])
   } catch (error) {
     console.error('Error connecting to the database: ', error)
   }

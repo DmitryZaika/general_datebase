@@ -1,11 +1,11 @@
 // app/routes/todoList.ts
-import type { ActionFunctionArgs } from 'react-router'
-import { db } from '~/db.server'
-import { getValidatedFormData } from 'remix-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 
+import { zodResolver } from '@hookform/resolvers/zod'
+import type { ActionFunctionArgs } from 'react-router'
+import { getValidatedFormData } from 'remix-hook-form'
+import { db } from '~/db.server'
+import { type TTodoListSchema, todoListSchema } from '~/schemas/general'
 import { getEmployeeUser } from '~/utils/session.server'
-import { todoListSchema, type TTodoListSchema } from '~/schemas/general'
 import { forceRedirectError } from '~/utils/toastHelpers'
 
 const editAction = async (
@@ -14,7 +14,7 @@ const editAction = async (
   userId: number,
 ): Promise<void> => {
   await db.execute(
-    `UPDATE main.todolist 
+    `UPDATE todolist 
      SET rich_text = ?  
      WHERE id = ?
      AND user_id = ?;`,
@@ -28,7 +28,7 @@ const updateDoneAction = async (
   userId: number,
 ): Promise<void> => {
   await db.execute(
-    `UPDATE main.todolist
+    `UPDATE todolist
      SET is_done = ?
      WHERE id = ?
      AND user_id = ?;`,
@@ -38,7 +38,7 @@ const updateDoneAction = async (
 
 const deleteAction = async (todoId: number, userId: number): Promise<void> => {
   await db.execute(
-    `DELETE FROM main.todolist 
+    `DELETE FROM todolist 
      WHERE id = ?
      AND user_id = ?;`,
     [todoId, userId],
