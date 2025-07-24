@@ -1,8 +1,9 @@
 // utils/session.server.ts
-import { db } from '~/db.server'
-import type { RowDataPacket } from 'mysql2'
+
 import bcrypt from 'bcryptjs'
+import type { RowDataPacket } from 'mysql2'
 import { v4 as uuidv4 } from 'uuid'
+import { db } from '~/db.server'
 import { getSession } from '~/sessions'
 
 interface LoginUser {
@@ -46,7 +47,7 @@ export async function register(
 ) {
   const passwordHash = await bcrypt.hash(password, 10)
   await db.execute(
-    `INSERT INTO main.users (email, password, company_id, isEmployee, isAdmin) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO users (email, password, company_id, isEmployee, isAdmin) VALUES (?, ?, ?, ?, ?)`,
     [email, passwordHash, company_id, isEmployee, isAdmin],
   )
   return true
@@ -70,7 +71,7 @@ export async function login(
   }
   const id = uuidv4()
   await db.execute(
-    `INSERT INTO main.sessions (id, user_id, expiration_date) VALUES (?, ?, ?)`,
+    `INSERT INTO sessions (id, user_id, expiration_date) VALUES (?, ?, ?)`,
     [id, user.id, getExpirationDate(expiration)],
   )
 

@@ -1,17 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
+  Form,
   type LoaderFunctionArgs,
   redirect,
+  useNavigate,
   useNavigation,
 } from 'react-router'
-import { Form, useNavigate } from 'react-router'
-import { FormProvider, FormField } from '../components/ui/form'
 import { getValidatedFormData } from 'remix-hook-form'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
-import { Button } from '~/components/ui/button'
-import { useForm } from 'react-hook-form'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
 import {
   Dialog,
   DialogContent,
@@ -20,14 +21,13 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
+import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions'
-import { toastData } from '~/utils/toastHelpers'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
 
 import { csrf } from '~/utils/csrf.server'
 import { getAdminUser } from '~/utils/session.server'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { toastData } from '~/utils/toastHelpers'
+import { FormField, FormProvider } from '../components/ui/form'
 
 const supplierschema = z.object({
   website: z.union([z.string().url().optional(), z.literal('')]).optional(),
@@ -64,7 +64,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const user = getAdminUser(request)
   try {
     await db.execute(
-      `INSERT INTO main.suppliers  (website, supplier_name, manager,  phone, email, notes, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO suppliers  (website, supplier_name, manager,  phone, email, notes, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         data.website,
         data.supplier_name,

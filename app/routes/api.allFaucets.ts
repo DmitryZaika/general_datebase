@@ -1,7 +1,7 @@
 import { data, type LoaderFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
-import { selectMany } from '~/utils/queryHelpers'
 import type { Faucet } from '~/types'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -21,8 +21,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       faucet_type.type,
       COUNT(faucets.id) AS faucet_count
     FROM
-      main.faucet_type 
-      JOIN main.faucets
+      faucet_type 
+      JOIN faucets
         ON faucet_type.id = faucets.faucet_type_id
     WHERE
       faucet_type.company_id = ?

@@ -1,15 +1,22 @@
-import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { zodResolver } from '@hookform/resolvers/zod'
+import type { ResultSetHeader } from 'mysql2'
+import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
+  Form,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
+  useNavigate,
+  useNavigation,
 } from 'react-router'
-import { useNavigate, useNavigation, Form, useLoaderData } from 'react-router'
-import { FormField, FormProvider } from '../components/ui/form'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
-import type { ResultSetHeader } from 'mysql2'
+import { getValidatedFormData } from 'remix-hook-form'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { QuillInput } from '~/components/molecules/QuillInput'
+import { SelectInput } from '~/components/molecules/SelectItem'
 import {
   Dialog,
   DialogContent,
@@ -18,22 +25,18 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
+import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions'
-import { toastData } from '~/utils/toastHelpers'
-import { getAdminUser } from '~/utils/session.server'
-import { getValidatedFormData } from 'remix-hook-form'
 import { csrf } from '~/utils/csrf.server'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm } from 'react-hook-form'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
-import { SelectInput } from '~/components/molecules/SelectItem'
-import { QuillInput } from '~/components/molecules/QuillInput'
-import { selectMany } from '~/utils/queryHelpers'
 import {
+  afterOptions,
   type InstructionsBasic,
   parentOptions,
-  afterOptions,
 } from '~/utils/instructionsHelpers'
+import { selectMany } from '~/utils/queryHelpers'
+import { getAdminUser } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
+import { FormField, FormProvider } from '../components/ui/form'
 
 const instructionschema = z.object({
   title: z.string().min(1),
@@ -69,7 +72,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const user = await getAdminUser(request)
   try {
     const [result] = await db.execute<ResultSetHeader>(
-      `INSERT INTO main.instructions (title, parent_id, after_id, rich_text, company_id)
+      `INSERT INTO instructions (title, parent_id, after_id, rich_text, company_id)
        VALUES (?, ?, ?, ?, ?)`,
       [data.title, parentId, afterId, data.rich_text, user.company_id],
     )
@@ -84,7 +87,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    const query = `UPDATE main.instructions
+    const query = `UPDATE instructions
       SET after_id = ?
       WHERE 
         (after_id = ? OR (after_id IS NULL AND ? IS NULL))

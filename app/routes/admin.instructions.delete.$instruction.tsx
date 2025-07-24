@@ -1,10 +1,12 @@
 import {
   type ActionFunctionArgs,
+  Form,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
+  useNavigate,
 } from 'react-router'
-import { Form, useLoaderData, useNavigate } from 'react-router'
-import { selectId } from '~/utils/queryHelpers'
+import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { Button } from '~/components/ui/button'
 
 import {
@@ -18,10 +20,10 @@ import {
 
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { getAdminUser } from '~/utils/session.server'
 import { csrf } from '~/utils/csrf.server'
-import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
+import { selectId } from '~/utils/queryHelpers'
+import { getAdminUser } from '~/utils/session.server'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
@@ -36,7 +38,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   const instructionId = params.instruction
   try {
-    const result = await db.execute(`DELETE FROM main.instructions WHERE id = ?`, [
+    const result = await db.execute(`DELETE FROM instructions WHERE id = ?`, [
       instructionId,
     ])
   } catch (error) {

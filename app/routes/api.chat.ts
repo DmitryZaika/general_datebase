@@ -1,12 +1,12 @@
+import OpenAI from 'openai'
 import type { LoaderFunctionArgs } from 'react-router'
 import { eventStream } from 'remix-utils/sse/server'
-import { getSession } from '../sessions'
-import OpenAI from 'openai'
-import { getUserBySessionId } from '../utils/session.server'
-import { selectMany } from '../utils/queryHelpers'
-import type { InstructionSlim } from '~/types'
 import { db } from '~/db.server'
+import type { InstructionSlim } from '~/types'
 import { DONE_KEY } from '~/utils/constants'
+import { getSession } from '../sessions'
+import { selectMany } from '../utils/queryHelpers'
+import { getUserBySessionId } from '../utils/session.server'
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_SECRET_KEY,
@@ -74,7 +74,7 @@ async function newContext(
 async function insertContext(user_id: number, messages: Message[], answer: string) {
   console.time('db:insert-context')
   messages.push({ role: 'assistant', content: answer })
-  await db.execute(`INSERT INTO main.chat_history (history, user_id) VALUES (?, ?);`, [
+  await db.execute(`INSERT INTO chat_history (history, user_id) VALUES (?, ?);`, [
     JSON.stringify(messages),
     user_id,
   ])
@@ -90,7 +90,7 @@ async function updateContext(
   console.time('db:update-context')
   messages.push({ role: 'assistant', content: answer })
   await db.execute(
-    `UPDATE main.chat_history SET history = ? WHERE id = ? AND user_id = ?;`,
+    `UPDATE chat_history SET history = ? WHERE id = ? AND user_id = ?;`,
     [JSON.stringify(messages), chatHistoryId, userId],
   )
   console.timeEnd('db:update-context')

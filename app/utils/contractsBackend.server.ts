@@ -1,6 +1,14 @@
+import { v7 as uuidv7 } from 'uuid'
 import { db } from '~/db.server'
-import { extrasSchema, type TCustomerSchema, type TExtrasSchema } from '~/schemas/sales'
+import {
+  customerSchema,
+  EXTRA_DEFAULTS,
+  extrasSchema,
+  type TCustomerSchema,
+  type TExtrasSchema,
+} from '~/schemas/sales'
 import { selectId, selectMany } from '~/utils/queryHelpers'
+import { CUSTOMER_ITEMS } from './constants'
 
 interface Sale {
   customer_id: number
@@ -20,7 +28,7 @@ interface Sale {
 
 interface Slab {
   id: number
-  room_id: string // converted UUID
+  room_id: string
   room: string | null
   seam: string | null
   edge: string | null
@@ -32,7 +40,7 @@ interface Slab {
   waterfall: string | null
   corbels: number | null
   retail_price: number | null
-  extras: TExtrasSchema
+  extras: TExtrasSchema | null
 }
 
 interface Sink {
@@ -157,10 +165,24 @@ export async function getCustomerSchemaFromSaleId(
   slabs.forEach(slab => {
     const roomId = slab.room_id
 
+    const lookup = CUSTOMER_ITEMS.edge_price.edge_type
+    const key = slab.edge?.toLowerCase() || 'flat'
+    const newValue = lookup[key]
+    const extras = extrasSchema.parse(slab.extras || EXTRA_DEFAULTS)
+    if (typeof extras?.edge_price === 'number') {
+      extras.edge_price = {
+        edge_type: newValue,
+        price: extras.edge_price,
+      }
+    }
+    if (extras?.edge_price === undefined) {
+      extras.edge_price = { edge_type: newValue }
+    }
+
     if (!roomsMap[roomId]) {
       roomsMap[roomId] = {
         room: slab.room || 'kitchen',
-        room_id: roomId,
+        room_id: roomId || uuidv7(), // Backwards compatibility
         sink_type: sinkMap[slab.id] || [],
         faucet_type: faucetMap[slab.id] || [],
         edge: slab.edge || 'flat',
@@ -175,7 +197,7 @@ export async function getCustomerSchemaFromSaleId(
         seam: slab.seam || 'standard',
         ten_year_sealer: Boolean(slab.ten_year_sealer),
         slabs: [],
-        extras: extrasSchema.parse(slab.extras),
+        extras,
       }
     }
 
@@ -187,7 +209,7 @@ export async function getCustomerSchemaFromSaleId(
   })
 
   // 6. Build final schema object
-  const customerSchema: TCustomerSchema = {
+  const final: TCustomerSchema = {
     name: sale.name,
     customer_id: sale.customer_id,
     seller_id: sale.seller_id || undefined,
@@ -203,6 +225,5 @@ export async function getCustomerSchemaFromSaleId(
 
     company_name: sale.company_name || null,
   }
-
-  return customerSchema
+  return customerSchema.parse(final)
 }

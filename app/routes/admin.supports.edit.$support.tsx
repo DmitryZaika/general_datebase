@@ -2,12 +2,15 @@ import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
+  useNavigate,
+  useNavigation,
 } from 'react-router'
-import { useNavigate, useLoaderData, useNavigation } from 'react-router'
-import { FormField } from '../components/ui/form'
 import { z } from 'zod'
+import { FileInput } from '~/components/molecules/FileInput'
 import { InputItem } from '~/components/molecules/InputItem'
-
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { MultiPartForm } from '~/components/molecules/MultiPartForm'
 import {
   Dialog,
   DialogContent,
@@ -15,19 +18,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
-import { selectId } from '~/utils/queryHelpers'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { MultiPartForm } from '~/components/molecules/MultiPartForm'
-import { FileInput } from '~/components/molecules/FileInput'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
-import { useCustomOptionalForm } from '~/utils/useCustomForm'
+import { selectId } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
-import { csrf } from '~/utils/csrf.server'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { useCustomOptionalForm } from '~/utils/useCustomForm'
+import { FormField } from '../components/ui/form'
 
 const supportSchema = z.object({
   name: z.string().min(1),
@@ -63,13 +63,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   try {
     if (newFile) {
-      await db.execute(`UPDATE main.supports SET name = ?, url = ? WHERE id = ?`, [
+      await db.execute(`UPDATE supports SET name = ?, url = ? WHERE id = ?`, [
         data.name,
         data.file,
         supportId,
       ])
     } else {
-      await db.execute(`UPDATE main.supports SET name = ? WHERE id = ?`, [
+      await db.execute(`UPDATE supports SET name = ? WHERE id = ?`, [
         data.name,
         supportId,
       ])

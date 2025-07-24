@@ -67,7 +67,7 @@ function convertData(data) {
 async function saveData(data) {
   for (const item of data) {
     await db.execute(
-      `UPDATE main.stones SET retail_price = ?, cost_per_sqft = ?, length = ?, width = ?, supplier_id = ? WHERE id = ?`,
+      `UPDATE stones SET retail_price = ?, cost_per_sqft = ?, length = ?, width = ?, supplier_id = ? WHERE id = ?`,
       [
         item.retail_price,
         item.cost_per_sqft,

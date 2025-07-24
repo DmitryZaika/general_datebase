@@ -6,7 +6,7 @@ import {
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { db } from '~/db.server'
-import { todoListSchema, type TTodoListSchema } from '~/schemas/general'
+import { type TTodoListSchema, todoListSchema } from '~/schemas/general'
 import type { Todo } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -23,7 +23,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json({ errors, defaultValues })
   }
 
-  await db.execute(`INSERT INTO main.todolist (rich_text, user_id) VALUES (?, ?);`, [
+  await db.execute(`INSERT INTO todolist (rich_text, user_id) VALUES (?, ?);`, [
     data.rich_text,
     user.id,
   ])

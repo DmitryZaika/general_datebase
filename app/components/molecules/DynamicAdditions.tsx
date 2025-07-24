@@ -70,10 +70,10 @@ export const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) =
   const context = CUSTOMER_ITEMS[target]
   const [isPriceManuallySet, setIsPriceManuallySet] = useState(false)
 
-  const current = form.watch(`rooms.${index}.extras.${target}`) as Record<
+  const current = (form.watch(`rooms.${index}.extras.${target}`) || {}) as Record<
     string,
     number
-  >
+  > // Backwards compatibility
 
   useEffect(() => {
     if (isPriceManuallySet) return

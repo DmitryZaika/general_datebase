@@ -1,7 +1,7 @@
+import { useEffect } from 'react'
 import type { LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
-import { getSession, destroySession } from '~/sessions'
-import { useEffect } from 'react'
+import { destroySession, getSession } from '~/sessions'
 
 // Handle the logout server-side
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -25,9 +25,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   if (sessionId) {
     try {
-      await db.execute(`UPDATE main.sessions SET is_deleted = 1 WHERE id = ?`, [
-        sessionId,
-      ])
+      await db.execute(`UPDATE sessions SET is_deleted = 1 WHERE id = ?`, [sessionId])
     } catch (error) {
       console.error('Error marking session as deleted:', error)
     }

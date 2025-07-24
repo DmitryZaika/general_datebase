@@ -2,16 +2,16 @@ import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
+  useNavigate,
 } from 'react-router'
-import { useLoaderData, useNavigate } from 'react-router'
-import { selectId } from '~/utils/queryHelpers'
 import { DeleteRow } from '~/components/pages/DeleteRow'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { getAdminUser } from '~/utils/session.server'
 import { csrf } from '~/utils/csrf.server'
-import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
+import { selectId } from '~/utils/queryHelpers'
+import { getAdminUser } from '~/utils/session.server'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
@@ -36,7 +36,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
 
   try {
-    await db.execute(`UPDATE main.users SET is_deleted = 1 WHERE id = ?`, [userId])
+    await db.execute(`UPDATE users SET is_deleted = 1 WHERE id = ?`, [userId])
   } catch (error) {
     console.error('Error soft-deleting user: ', error)
     return { error: 'Failed to soft-delete user' }
@@ -63,7 +63,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   const user = await selectId<{ name: string }>(
     db,
-    'SELECT name FROM main.users WHERE id = ?',
+    'SELECT name FROM users WHERE id = ?',
     userId,
   )
 

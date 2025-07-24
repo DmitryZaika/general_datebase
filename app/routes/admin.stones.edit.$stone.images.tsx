@@ -1,26 +1,33 @@
-import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect, useState } from 'react'
+import { FaLink, FaTimes } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   data,
   type LoaderFunctionArgs,
   redirect,
-} from 'react-router'
-import {
-  Link,
-  useLoaderData,
-  useNavigation,
   Form as RemixForm,
   useActionData,
+  useLoaderData,
   useNavigate,
+  useNavigation,
   useParams,
 } from 'react-router'
-import { useEffect, useState } from 'react'
-import { FaTimes, FaLink } from 'react-icons/fa'
+import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { FileInput } from '~/components/molecules/FileInput'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { MultiPartForm } from '~/components/molecules/MultiPartForm'
 import { Button } from '~/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
+import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
@@ -30,17 +37,6 @@ import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 import { useCustomForm } from '~/utils/useCustomForm'
-import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from '~/components/ui/dialog'
-import { Input } from '~/components/ui/input'
 
 function LinkedImagesCarousel({ images }: { images: { url: string }[] }) {
   return (
@@ -114,7 +110,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         'SELECT url FROM installed_stones WHERE id = ?',
         sid,
       )
-      await db.execute(`DELETE FROM main.installed_stones WHERE id = ?`, [sid])
+      await db.execute(`DELETE FROM installed_stones WHERE id = ?`, [sid])
       const session = await getSession(request.headers.get('Cookie'))
       if (result?.url) {
         deleteFile(result.url)

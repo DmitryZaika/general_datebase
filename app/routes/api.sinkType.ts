@@ -1,7 +1,7 @@
 import { data, type LoaderFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
-import { selectMany } from '~/utils/queryHelpers'
 import type { Sink } from '~/types'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -21,8 +21,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
           sink_type.type,
           COUNT(sinks.id) AS sink_count
         FROM
-          main.sink_type 
-          JOIN main.sinks
+          sink_type 
+          JOIN sinks
             ON sink_type.id = sinks.sink_type_id
         WHERE
           sink_type.company_id = ?

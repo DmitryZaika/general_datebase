@@ -2,18 +2,18 @@ import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
+  useLocation,
+  useNavigate,
 } from 'react-router'
-import { useLoaderData, useNavigate, useLocation } from 'react-router'
-import { selectId } from '~/utils/queryHelpers'
-import { deleteFile } from '~/utils/s3.server'
 import { DeleteRow } from '~/components/pages/DeleteRow'
-
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { getAdminUser } from '~/utils/session.server'
 import { csrf } from '~/utils/csrf.server'
-import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
+import { selectId } from '~/utils/queryHelpers'
+import { deleteFile } from '~/utils/s3.server'
+import { getAdminUser } from '~/utils/session.server'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
@@ -40,7 +40,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
 
   try {
-    await db.execute(`DELETE FROM main.stones WHERE id = ?`, [stoneId])
+    await db.execute(`DELETE FROM stones WHERE id = ?`, [stoneId])
   } catch (error) {
     console.error('Error connecting to the database: ', error)
   }

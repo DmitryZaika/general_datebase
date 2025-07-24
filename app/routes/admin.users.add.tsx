@@ -74,7 +74,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const password = await bcrypt.hash(data.password, 10)
   try {
     await db.execute(
-      `INSERT INTO main.users (name, phone_number, email, password, company_id, is_employee, is_admin, position_id)
+      `INSERT INTO users (name, phone_number, email, password, company_id, is_employee, is_admin, position_id)
        VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
       [
         data.name,

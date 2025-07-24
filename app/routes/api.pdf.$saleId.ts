@@ -320,14 +320,14 @@ interface ICountQuery {
 async function getSinks(saleId: number): Promise<ICountQuery[]> {
   const query = `
     select
-      main.sink_type.name as name,
-      count(main.sinks.id) as count,
-      HEX(main.slab_inventory.room_uuid) as room_uuid
-    from main.sinks
-    join main.slab_inventory on main.slab_inventory.id = main.sinks.slab_id
-    join main.sink_type on main.sink_type.id = main.sinks.sink_type_id
-    where main.slab_inventory.sale_id = ?
-    group by main.sink_type.name, main.slab_inventory.room_uuid
+      sink_type.name as name,
+      count(sinks.id) as count,
+      HEX(slab_inventory.room_uuid) as room_uuid
+    from sinks
+    join slab_inventory on slab_inventory.id = sinks.slab_id
+    join sink_type on sink_type.id = sinks.sink_type_id
+    where slab_inventory.sale_id = ?
+    group by sink_type.name, slab_inventory.room_uuid
   `
   return await selectMany<ICountQuery>(db, query, [saleId])
 }
@@ -335,14 +335,14 @@ async function getSinks(saleId: number): Promise<ICountQuery[]> {
 async function getFaucets(saleId: number): Promise<ICountQuery[]> {
   const query = `
     select
-      main.faucet_type.name as name,
-      count(main.faucets.id) as count,
-      HEX(main.slab_inventory.room_uuid) as room_uuid
-    from main.faucets
-    join main.slab_inventory on main.slab_inventory.id = main.faucets.slab_id
-    join main.faucet_type on main.faucet_type.id = main.faucets.faucet_type_id
-    where main.slab_inventory.sale_id = ?
-    group by main.faucet_type.name, main.slab_inventory.room_uuid
+      faucet_type.name as name,
+      count(faucets.id) as count,
+      HEX(slab_inventory.room_uuid) as room_uuid
+    from faucets
+    join slab_inventory on slab_inventory.id = faucets.slab_id
+    join faucet_type on faucet_type.id = faucets.faucet_type_id
+    where slab_inventory.sale_id = ?
+    group by faucet_type.name, slab_inventory.room_uuid
   `
   return await selectMany<ICountQuery>(db, query, [saleId])
 }
@@ -350,37 +350,37 @@ async function getFaucets(saleId: number): Promise<ICountQuery[]> {
 async function getData(saleId: number) {
   const query = `
         select
-            main.sales.sale_date,
-            main.sales.project_address,
-            main.sales.price as total_price,
-            main.customers.name as customer_name,
-            main.customers.phone,
-            main.customers.email,
-            main.customers.postal_code as zip_code,
-            main.users.name as seller_name,
-            main.slab_inventory.room,
-            main.slab_inventory.edge,
-            main.slab_inventory.backsplash,
-            main.slab_inventory.square_feet,
-            main.slab_inventory.tear_out,
-            main.slab_inventory.stove,
-            main.slab_inventory.waterfall,
-            main.slab_inventory.corbels,
-            main.slab_inventory.seam,
-            main.slab_inventory.extras,
-            main.stones.name as stone_name,
-            main.stones.id as stone_id,
-            main.stones.retail_price,
-            main.customers.company_name,
-            main.customers.address as billing_address,
-            HEX(main.slab_inventory.room_uuid) as room_uuid
-        from main.sales
-        join main.customers on main.customers.id = main.sales.customer_id
-        join main.users on main.users.id = main.sales.seller_id
-        join main.slab_inventory on main.slab_inventory.sale_id = main.sales.id
-        join main.stones on main.stones.id = main.slab_inventory.stone_id
-        where main.sales.id = ?
-        order by main.slab_inventory.id
+            sales.sale_date,
+            sales.project_address,
+            sales.price as total_price,
+            customers.name as customer_name,
+            customers.phone,
+            customers.email,
+            customers.postal_code as zip_code,
+            users.name as seller_name,
+            slab_inventory.room,
+            slab_inventory.edge,
+            slab_inventory.backsplash,
+            slab_inventory.square_feet,
+            slab_inventory.tear_out,
+            slab_inventory.stove,
+            slab_inventory.waterfall,
+            slab_inventory.corbels,
+            slab_inventory.seam,
+            slab_inventory.extras,
+            stones.name as stone_name,
+            stones.id as stone_id,
+            stones.retail_price,
+            customers.company_name,
+            customers.address as billing_address,
+            HEX(slab_inventory.room_uuid) as room_uuid
+        from sales
+        join customers on customers.id = sales.customer_id
+        join users on users.id = sales.seller_id
+        join slab_inventory on slab_inventory.sale_id = sales.id
+        join stones on stones.id = slab_inventory.stone_id
+        where sales.id = ?
+        order by slab_inventory.id
     `
   const response = await selectMany<IQuery>(db, query, [saleId])
   return response.map(row => ({
