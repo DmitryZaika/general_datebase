@@ -76,7 +76,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     const transactionId = parseInt(params.transactionId, 10)
 
-    if (isNaN(transactionId)) {
+    if (Number.isNaN(transactionId)) {
       return redirect('/admin/transactions')
     }
 

@@ -97,7 +97,7 @@ export default function Sinks() {
   const location = useLocation()
 
   const getTypePriority = (type: string) => {
-    const index = SINK_TYPES.indexOf(type as any)
+    const index = SINK_TYPES.indexOf(type)
     return index === -1 ? SINK_TYPES.length : index
   }
 

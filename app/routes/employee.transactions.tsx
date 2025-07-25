@@ -126,7 +126,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         s.company_id = ?
     `
 
-    const queryParams: any[] = [companyId]
+    const queryParams: (string | number)[] = [companyId]
 
     if (salesRep && salesRep !== 'All') {
       query += ' AND u.name = ?'

@@ -68,7 +68,7 @@ async function createEvent(formData: FormData, userId: number) {
     ],
   )
 
-  return Response.json({ success: true, id: (result[0] as any).insertId })
+  return Response.json({ success: true, id: result[0].insertId })
 }
 
 async function updateEvent(formData: FormData, userId: number, companyId: number) {
