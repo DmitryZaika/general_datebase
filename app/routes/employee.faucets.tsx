@@ -94,7 +94,7 @@ export default function Faucets() {
   const location = useLocation()
 
   const getTypePriority = (type: string) => {
-    const index = FAUCET_TYPES.indexOf(type as any)
+    const index = FAUCET_TYPES.indexOf(type)
     return index === -1 ? FAUCET_TYPES.length : index
   }
 

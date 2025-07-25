@@ -419,7 +419,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         [customer_name, user.company_id],
       )
 
-      const customerId = (customerResult as any).insertId
+      const customerId = customerResult.insertId
 
       if (!customerId) {
         throw new Error('Failed to create customer')
@@ -442,13 +442,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
           headers: { 'Set-Cookie': await commitSession(session) },
         },
       )
-    } else if (intent == 'slab-delete') {
+    } else if (intent === 'slab-delete') {
       const slabId = formData.get('id') as string
       await db.execute(
         `UPDATE slab_inventory SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL WHERE id = ?`,
         [slabId],
       )
-    } else if (intent == 'slab-update') {
+    } else if (intent === 'slab-update') {
       const slabId = formData.get('id') as string
       const notes = formData.get('notes') as string
       const squareFeet = parseFloat(formData.get('square_feet') as string) || null
@@ -458,17 +458,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
            WHERE id = ?`,
         [notes, squareFeet, slabId],
       )
-    } else if (intent == 'sink-delete') {
+    } else if (intent === 'sink-delete') {
       const sinkId = formData.get('id') as string
       await db.execute(
         `UPDATE sinks SET slab_id = NULL, price = NULL, is_deleted = 0 WHERE id = ?`,
         [sinkId],
       )
-    } else if (intent == 'sink-update') {
+    } else if (intent === 'sink-update') {
       const sinkId = formData.get('id') as string
       const price = parseFloat(formData.get('price') as string) || null
       await db.execute(`UPDATE sinks SET price = ? WHERE id = ?`, [price, sinkId])
-    } else if (intent == 'sink-add') {
+    } else if (intent === 'sink-add') {
       const sinkTypeId = formData.get('newSinkTypeId') as string
       let price = parseFloat(formData.get('newSinkPrice') as string) || null
       if (price === null || price === 0 || price === undefined) {

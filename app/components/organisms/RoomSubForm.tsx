@@ -181,11 +181,11 @@ export const RoomSubForm = ({
       return
     }
 
-    const selected = (base as any)[value as string] ?? 0
+    const selected = base[value] ?? 0
     let price: number
 
     if (typeof selected === 'function') {
-      price = (selected as any)({ squareFeet })
+      price = selected({ squareFeet })
     } else {
       price = Number(selected) || 0
     }

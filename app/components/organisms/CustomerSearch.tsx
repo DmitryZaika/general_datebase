@@ -41,17 +41,17 @@ export function CustomerSearch<T extends Record<string, unknown>>({
   })
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    form.setValue(nameField, e.target.value as any)
+    form.setValue(nameField, e.target.value)
     if (!showSuggestions) setShowSuggestions(true)
     if (isExistingCustomer) {
       setIsExistingCustomer(false)
-      form.setValue(idField, undefined as any)
+      form.setValue(idField, undefined)
     }
   }
 
   const handleSelect = (customer: Customer) => {
-    form.setValue(nameField, customer.name as any, { shouldValidate: true })
-    form.setValue(idField, customer.id as any, { shouldValidate: true })
+    form.setValue(nameField, customer.name, { shouldValidate: true })
+    form.setValue(idField, customer.id, { shouldValidate: true })
     setIsExistingCustomer(true)
     setShowSuggestions(false)
   }
@@ -82,7 +82,7 @@ export function CustomerSearch<T extends Record<string, unknown>>({
             size='icon'
             onClick={() => {
               setIsExistingCustomer(false)
-              form.setValue(idField, undefined as any)
+              form.setValue(idField, undefined)
             }}
           >
             <X className='h-2 w-2' />

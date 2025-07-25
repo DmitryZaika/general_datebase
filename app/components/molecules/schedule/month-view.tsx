@@ -423,7 +423,7 @@ export default function MonthView() {
             description: editEvent.description,
             startDate: editEvent.startDate,
             endDate: editEvent.endDate,
-            variant: editEvent.variant as any,
+            variant: editEvent.variant,
             notes: editEvent.notes,
           }}
         />

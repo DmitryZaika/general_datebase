@@ -67,7 +67,7 @@ export default function AdminSinks() {
   const [searchParams] = useSafeSearchParams(sinkFilterSchema)
 
   const getTypePriority = (type: string) => {
-    const index = SINK_TYPES.indexOf(type as any)
+    const index = SINK_TYPES.indexOf(type)
     return index === -1 ? SINK_TYPES.length : index
   }
 

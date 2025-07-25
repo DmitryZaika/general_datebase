@@ -379,11 +379,11 @@ function DeleteConfirmDialog({
 
   useEffect(() => {
     if (showDialog) {
-      window.addEventListener('keydown', handleKeyDown as any)
+      window.addEventListener('keydown', handleKeyDown)
     }
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown as any)
+      window.removeEventListener('keydown', handleKeyDown)
     }
   }, [showDialog])
 
