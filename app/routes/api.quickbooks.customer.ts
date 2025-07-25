@@ -146,7 +146,7 @@ export async function action({ request }: ActionFunctionArgs) {
         headers: { 'Set-Cookie': await commitSession(session) },
       },
     )
-  } catch (err: any) {
+  } catch (err) {
     return data({ success: false, message: String(err) }, { status: 500 })
   }
 }

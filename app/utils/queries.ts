@@ -134,7 +134,7 @@ export async function sinkQueryBuilder(
   const numericCompanyId = typeof companyId === 'string' ? Number(companyId) : companyId
 
   let whereClause = 'WHERE sink_type.company_id = ? AND sink_type.is_deleted = 0'
-  const params: any[] = [numericCompanyId]
+  const params: (string | number)[] = [numericCompanyId]
 
   if (type && type.length > 0 && type.length < 5) {
     whereClause += ` AND sink_type.type IN (${type.map(() => '?').join(',')})`
@@ -201,7 +201,7 @@ export async function faucetQueryBuilder(
   const numericCompanyId = typeof companyId === 'string' ? Number(companyId) : companyId
 
   let whereClause = 'WHERE faucet_type.company_id = ? AND faucet_type.is_deleted = 0'
-  const params: any[] = [numericCompanyId]
+  const params: (string | number)[] = [numericCompanyId]
 
   if (type && type.length > 0 && type.length < 7) {
     whereClause += ` AND faucet_type.type IN (${type.map(() => '?').join(',')})`

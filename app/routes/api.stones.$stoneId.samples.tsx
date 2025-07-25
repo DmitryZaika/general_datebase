@@ -6,7 +6,7 @@ import { getEmployeeUser } from '~/utils/session.server'
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
@@ -23,7 +23,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   const stoneId = parseInt(params.stoneId, 10)
-  if (isNaN(stoneId)) {
+  if (Number.isNaN(stoneId)) {
     return new Response(JSON.stringify({ error: 'Invalid Stone ID' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
@@ -35,11 +35,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const importanceStr = formData.get('importance')
 
   const updates: string[] = []
-  const queryParams: any[] = []
+  const queryParams: (string | number)[] = []
 
   if (amountStr !== null) {
     const amount = Number(amountStr)
-    if (isNaN(amount) || amount < 0) {
+    if (Number.isNaN(amount) || amount < 0) {
       return new Response(JSON.stringify({ error: 'Invalid amount' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },

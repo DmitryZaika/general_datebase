@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion' // Import Framer Motion
-import { ArrowLeft, ArrowRight, Maximize } from 'lucide-react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -8,7 +8,6 @@ import AddEventModal from '@/components/molecules/schedule/add-event-modal'
 import EventStyled from '@/components/molecules/schedule/event-styled'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CustomEventModal } from '@/types'
 import { useScheduler } from '~/providers/scheduler-provider'
 
 // Define Event interface locally since it's not exported from types
@@ -45,13 +44,13 @@ const itemVariants = {
 }
 
 const pageTransitionVariants = {
-  enter: (direction: number) => ({
+  enter: (_: number) => ({
     opacity: 0,
   }),
   center: {
     opacity: 1,
   },
-  exit: (direction: number) => ({
+  exit: (_: number) => ({
     opacity: 0,
     transition: {
       opacity: { duration: 0.2, ease: 'easeInOut' },
@@ -73,8 +72,7 @@ export default function WeeklyView() {
   const [detailedHour, setDetailedHour] = useState<string | null>(null)
   const [timelinePosition, setTimelinePosition] = useState<number>(0)
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
-  const [colWidth, setColWidth] = useState<number[]>(Array(7).fill(1)) // Equal width columns by default
-  const [isResizing, setIsResizing] = useState<boolean>(false)
+  const [_, setColWidth] = useState<number[]>(Array(7).fill(1)) // Equal width columns by default
   const [direction, setDirection] = useState<number>(0)
   const [open, setOpen] = useState<{ startDate: Date; endDate: Date } | null>(null)
   const navigate = useNavigate()
@@ -167,83 +165,6 @@ export default function WeeklyView() {
   }
 
   // Group events by time period to prevent splitting spaces within same time blocks
-  const groupEventsByTimePeriod = (events: Event[] | undefined) => {
-    if (!events || events.length === 0) return []
-
-    // Sort events by start time
-    const sortedEvents = [...events].sort(
-      (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
-    )
-
-    // Precise time overlap checking function
-    const eventsOverlap = (event1: Event, event2: Event) => {
-      const start1 = new Date(event1.startDate).getTime()
-      const end1 = new Date(event1.endDate).getTime()
-      const start2 = new Date(event2.startDate).getTime()
-      const end2 = new Date(event2.endDate).getTime()
-
-      // Strict time overlap - one event starts before the other ends
-      return start1 < end2 && start2 < end1
-    }
-
-    // First, create a graph where events are vertices and edges represent overlaps
-    const graph: Record<string, Set<string>> = {}
-
-    // Initialize graph
-    for (const event of sortedEvents) {
-      graph[event.id] = new Set<string>()
-    }
-
-    // Build connections - only connect events that truly overlap in time
-    for (let i = 0; i < sortedEvents.length; i++) {
-      for (let j = i + 1; j < sortedEvents.length; j++) {
-        // Only consider events that actually overlap in time
-        if (eventsOverlap(sortedEvents[i], sortedEvents[j])) {
-          graph[sortedEvents[i].id].add(sortedEvents[j].id)
-          graph[sortedEvents[j].id].add(sortedEvents[i].id)
-        }
-      }
-    }
-
-    // Use DFS to find connected components (groups of overlapping events)
-    const visited = new Set<string>()
-    const groups: Event[][] = []
-
-    for (const event of sortedEvents) {
-      if (!visited.has(event.id)) {
-        // Start a new component/group
-        const group: Event[] = []
-        const stack: Event[] = [event]
-        visited.add(event.id)
-
-        // DFS traversal
-        while (stack.length > 0) {
-          const current = stack.pop()!
-          group.push(current)
-
-          // Visit neighbors (overlapping events)
-          for (const neighborId of graph[current.id]) {
-            if (!visited.has(neighborId)) {
-              const neighbor = sortedEvents.find(e => e.id === neighborId)
-              if (neighbor) {
-                stack.push(neighbor)
-                visited.add(neighborId)
-              }
-            }
-          }
-        }
-
-        // Sort this group by start time
-        group.sort(
-          (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
-        )
-
-        groups.push(group)
-      }
-    }
-
-    return groups
-  }
 
   const getWeekRange = () => {
     if (daysOfWeek.length === 0) return ''
@@ -416,21 +337,27 @@ export default function WeeklyView() {
                         {/* Events for this day */}
                         <div className='absolute inset-0 pointer-events-none'>
                           {dayEvents.map((event: Event, eventIndex) => {
-                            const { height, left, maxWidth, minWidth, top, zIndex } =
-                              handlers.handleEventStyling
-                                ? handlers.handleEventStyling(event, dayEvents, {
-                                    eventsInSamePeriod: 1,
-                                    periodIndex: 0,
-                                    adjustForPeriod: true,
-                                  })
-                                : {
-                                    height: '48px',
-                                    left: '0px',
-                                    maxWidth: '100%',
-                                    minWidth: '100%',
-                                    top: '0px',
-                                    zIndex: 1,
-                                  }
+                            const {
+                              height,
+                              left,
+                              maxWidth,
+                              minWidth,
+                              top,
+                              zIndex: _zIndex,
+                            } = handlers.handleEventStyling
+                              ? handlers.handleEventStyling(event, dayEvents, {
+                                  eventsInSamePeriod: 1,
+                                  periodIndex: 0,
+                                  adjustForPeriod: true,
+                                })
+                              : {
+                                  height: '48px',
+                                  left: '0px',
+                                  maxWidth: '100%',
+                                  minWidth: '100%',
+                                  top: '0px',
+                                  zIndex: 1,
+                                }
 
                             return (
                               <motion.div

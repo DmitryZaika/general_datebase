@@ -1,21 +1,13 @@
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa'
 import { useNavigation } from 'react-router'
 import { LinkSpan } from '~/components/atoms/LinkSpan'
 import { CheckOption } from '~/components/molecules/CheckOption'
 import { SidebarGroupLabel, SidebarMenuSub } from '~/components/ui/sidebar'
 import { useSafeSearchParams } from '~/hooks/use-safe-search-params'
-import { StoneFilter, stoneFilterSchema } from '~/schemas/stones'
+import { stoneFilterSchema } from '~/schemas/stones'
 import type { ISupplier } from '~/schemas/suppliers'
 import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
-import type { Stone } from '~/utils/queries.server'
 
 const isBrowser = typeof window !== 'undefined'
 
@@ -150,12 +142,12 @@ function FilterGroup<T>({
 }
 
 interface FilterHandlerOptions<T> {
-  searchParams: any
-  setSearchParams: (params: any) => void
+  searchParams: T
+  setSearchParams: (params: T) => void
   isSubmitting: boolean
-  defaultValue?: any
+  defaultValue?: object | number | string | number[]
   filterKey: string
-  itemToValue?: (item: T) => any
+  itemToValue?: (item: T) => number | string
 }
 
 function createToggleFilterHandler<T>(options: FilterHandlerOptions<T>) {
@@ -174,7 +166,7 @@ function createToggleFilterHandler<T>(options: FilterHandlerOptions<T>) {
 
       const currentValues = searchParams[filterKey] ?? defaultValue
       const itemValue = itemToValue ? itemToValue(item) : item
-      let newValues
+      let newValues: number[]
 
       if (Array.isArray(currentValues)) {
         if (currentValues.includes(itemValue)) {
@@ -200,12 +192,12 @@ function createToggleFilterHandler<T>(options: FilterHandlerOptions<T>) {
   )
 }
 
-function createClearFilterHandler(
-  searchParams: any,
-  setSearchParams: (params: any) => void,
+function createClearFilterHandler<T>(
+  searchParams: T,
+  setSearchParams: (params: T) => void,
   isSubmitting: boolean,
   filterKey: string,
-  defaultValue: any,
+  defaultValue: object | number | string,
 ) {
   return useCallback(() => {
     if (isSubmitting) return
@@ -216,11 +208,10 @@ function createClearFilterHandler(
 interface IProps {
   suppliers: ISupplier[] | undefined
   base: string
-  stones?: Stone[]
   colors?: { id: number; name: string; hex_code: string }[]
 }
 
-export function StonesFilters({ suppliers, colors, base, stones = [] }: IProps) {
+export function StonesFilters({ suppliers, colors, base }: IProps) {
   const [searchParams, setSearchParams] = useSafeSearchParams(stoneFilterSchema)
   const navigation = useNavigation()
   const isSubmitting = useMemo(() => navigation.state !== 'idle', [navigation.state])

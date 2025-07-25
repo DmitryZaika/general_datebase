@@ -69,7 +69,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         sales.paid_date IS NOT NULL
     `
 
-    const queryParams: any[] = [companyId]
+    const queryParams: (string | number)[] = [companyId]
 
     if (paymentStatus === 'paid') {
       query += ' AND sales.sales_payroll IS NOT NULL'

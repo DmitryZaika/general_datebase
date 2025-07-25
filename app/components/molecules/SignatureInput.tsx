@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { Suspense, useRef } from 'react'
+import React, { Suspense } from 'react'
 import { Button } from '~/components/ui/button'
 import { FormItem, FormLabel, FormMessage } from '~/components/ui/form'
 
@@ -11,18 +11,18 @@ interface RHFField {
 interface Props {
   field: RHFField
   name?: string
-  sigRef: React.RefObject<any>
+  sigRef: React.RefObject<unknown>
 }
 
 const SigCanvasLazy = React.lazy(() =>
-  import('react-signature-canvas').then((mod: any) => {
+  import('react-signature-canvas').then((mod: unknown) => {
     const C =
       typeof mod.default === 'function'
         ? mod.default
         : typeof mod.SignatureCanvas === 'function'
           ? mod.SignatureCanvas
           : (mod.default?.SignatureCanvas ?? mod)
-    return { default: C } as { default: any }
+    return { default: C }
   }),
 )
 

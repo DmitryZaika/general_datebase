@@ -260,7 +260,7 @@ export default function MonthView() {
               ))}
 
               {/* Current month's days */}
-              {daysInMonth.map((dayObj: any) => {
+              {daysInMonth.map((dayObj: object) => {
                 const dayEvents: Event[] = getters.getEventsForDay(
                   dayObj.day,
                   currentDate,

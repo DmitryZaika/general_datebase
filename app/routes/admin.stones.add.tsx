@@ -42,7 +42,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 
@@ -52,7 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const user = await getAdminUser(request)
-  const [result]: any = await db.execute(
+  const [result] = await db.execute(
     `INSERT INTO stones
      (name, type, finishing, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price, level)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
@@ -78,31 +78,27 @@ export async function action({ request }: ActionFunctionArgs) {
   let colorsArray: number[] = []
 
   if (typeof data.colors === 'string') {
-    try {
-      if (data.colors.startsWith('[')) {
-        colorsArray = JSON.parse(data.colors).map(Number)
-      } else {
-        colorsArray = [Number(data.colors)]
-      }
-    } catch (e) {}
+    if (data.colors.startsWith('[')) {
+      colorsArray = JSON.parse(data.colors).map(Number)
+    } else {
+      colorsArray = [Number(data.colors)]
+    }
   } else if (Array.isArray(data.colors)) {
     colorsArray = data.colors.map(Number)
   }
 
-  colorsArray = colorsArray.filter(id => !isNaN(id) && id > 0)
+  colorsArray = colorsArray.filter(id => !Number.isNaN(id) && id > 0)
 
   if (colorsArray.length > 0) {
     for (const colorId of colorsArray) {
-      if (isNaN(colorId) || colorId <= 0) {
+      if (Number.isNaN(colorId) || colorId <= 0) {
         continue
       }
 
-      try {
-        await db.execute(
-          `INSERT INTO stone_colors (stone_id, color_id) VALUES (?, ?)`,
-          [stoneId, colorId],
-        )
-      } catch (err) {}
+      await db.execute(`INSERT INTO stone_colors (stone_id, color_id) VALUES (?, ?)`, [
+        stoneId,
+        colorId,
+      ])
     }
   }
 
@@ -328,14 +324,6 @@ export default function StonesAdd() {
             render={({ field }) => {
               if (!field.value) field.value = []
               if (!Array.isArray(field.value)) field.value = [String(field.value)]
-
-              if (Array.isArray(field.value) && field.value.length > 0) {
-                const invalidIds = field.value.filter(
-                  id => !colors.some(c => c.id.toString() === id),
-                )
-                if (invalidIds.length > 0) {
-                }
-              }
 
               return (
                 <SelectManyBadge
