@@ -33,9 +33,9 @@ export const createCustomer = async (data: CustomerSignupSchema) => {
 
 export const customerDialogSchema = z.object({
   name: z.string().min(1),
-  email: z.string().email().optional(),
+  email: z.string().email(),
   phone: z.union([z.coerce.string().min(10), z.literal('')]),
-  address: z.string().min(10),
+  address: z.string().length(10),
 })
 
 export type CustomerDialogSchema = z.infer<typeof customerDialogSchema>
@@ -44,7 +44,8 @@ export const createCustomerMutation = (toast: Toast, onSuccess?: () => void) => 
   return {
     mutationFn: createCustomer,
     onSuccess: onSuccess,
-    onError: () => {
+    onError: error => {
+      console.error('Error creating customer:', error)
       toast({
         title: 'Error',
         description: 'Something went wrong. Please try again.',

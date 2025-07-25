@@ -35,8 +35,8 @@ const customerCheckInSchema = z.object({
   company_id: z.number().min(1, 'Company ID is required'),
   name: z.string().min(1, 'Name is required'),
   phone: z.string().min(1, 'Phone number is required'),
-  email: z.string().optional(),
-  address: z.string().optional(),
+  email: z.string().email(),
+  address: z.string().min(10),
   referral_source: z
     .enum([
       'google',
@@ -79,7 +79,16 @@ export default function CustomerCheckIn() {
     },
   })
 
-  const { mutate, isPending } = useMutation(createCustomerMutation(form, toast))
+  const onSuccess = () => {
+    toast({
+      title: 'Check-in successful',
+      description: 'Thank you for checking in. We look forward to assisting you!',
+      variant: 'success',
+    })
+    form.reset()
+  }
+
+  const { mutate, isPending } = useMutation(createCustomerMutation(toast, onSuccess))
 
   const safetyInstructions = (
     <section className='mt-4 rounded-lg bg-gradient-to-br from-gray-50 to-white p-6 shadow-inner'>
@@ -163,13 +172,7 @@ export default function CustomerCheckIn() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name='address'
-                render={({ field }) => (
-                  <AddressInput form={form} field='address' zipField='zip_code' />
-                )}
-              />
+              <AddressInput form={form} field='address' />
 
               <FormField
                 control={form.control}
