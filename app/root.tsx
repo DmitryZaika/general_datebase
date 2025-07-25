@@ -118,7 +118,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       [user.company_id],
     )
 
-    const [[row]]: any = await db.query(
+    const [[row]] = await db.query(
       `SELECT p.name AS position FROM users u LEFT JOIN positions p ON p.id = u.position_id WHERE u.id = ? LIMIT 1`,
       [user.id],
     )

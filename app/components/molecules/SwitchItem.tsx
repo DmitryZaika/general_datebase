@@ -1,7 +1,8 @@
+import type { Field } from 'react-hook-form'
 import { Switch } from '~/components/ui/switch'
 import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 
-export function SwitchItem({ name, field }: { name: string; field: any }) {
+export function SwitchItem({ name, field }: { name: string; field: Field }) {
   return (
     <FormItem>
       <FormControl>

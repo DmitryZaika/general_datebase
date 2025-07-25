@@ -32,12 +32,12 @@ export function SinksFilters({ base, suppliers }: IProps) {
 
   const showSoldOutToggle = useMemo(() => ['admin', 'employee'].includes(base), [base])
 
-  function createClearFilterHandler(
-    searchParams: any,
-    setSearchParams: (params: any) => void,
+  function createClearFilterHandler<T>(
+    searchParams: T,
+    setSearchParams: (params: T) => void,
     isSubmitting: boolean,
     filterKey: string,
-    defaultValue: any,
+    defaultValue: number | string | string[],
   ) {
     return useCallback(() => {
       if (isSubmitting) return
@@ -53,20 +53,12 @@ export function SinksFilters({ base, suppliers }: IProps) {
     [],
   )
 
-  const clearSupplier = createClearFilterHandler(
-    searchParams,
-    setSearchParams,
-    isSubmitting,
-    'supplier',
-    0,
-  )
-
   const toggleSinkType = useCallback(
     (typeToToggle: SinkFilter['type'][number]) => {
       if (isSubmitting) return
 
       const type = searchParams.type ?? []
-      let newTypes
+      let newTypes: SinkFilter['type']
 
       if (type.includes(typeToToggle)) {
         newTypes = type.filter(t => t !== typeToToggle)
@@ -79,15 +71,12 @@ export function SinksFilters({ base, suppliers }: IProps) {
     [isSubmitting, searchParams, setSearchParams],
   )
 
-  const toggleShowSoldOut = useCallback(
-    (val: string) => {
-      if (isSubmitting) return
+  const toggleShowSoldOut = useCallback(() => {
+    if (isSubmitting) return
 
-      const show_sold_out = searchParams.show_sold_out ?? false
-      setSearchParams({ ...searchParams, show_sold_out: !show_sold_out })
-    },
-    [isSubmitting, searchParams, setSearchParams],
-  )
+    const show_sold_out = searchParams.show_sold_out ?? false
+    setSearchParams({ ...searchParams, show_sold_out: !show_sold_out })
+  }, [isSubmitting, searchParams, setSearchParams])
 
   const toggleSupplier = useCallback(
     (supplierId: number) => {
@@ -179,15 +168,13 @@ export function SinksFilters({ base, suppliers }: IProps) {
       )}
 
       {showSoldOutToggle && (
-        <>
-          <CheckOption
-            value='Show sold out'
-            selected={!!searchParams.show_sold_out}
-            toggleValue={toggleShowSoldOut}
-            isLoading={isSubmitting}
-            defaultChecked={false}
-          />
-        </>
+        <CheckOption
+          value='Show sold out'
+          selected={!!searchParams.show_sold_out}
+          toggleValue={toggleShowSoldOut}
+          isLoading={isSubmitting}
+          defaultChecked={false}
+        />
       )}
     </SidebarMenuSub>
   )

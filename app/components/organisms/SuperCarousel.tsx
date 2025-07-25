@@ -16,6 +16,18 @@ import {
 import { useArrowCarousel } from '~/hooks/useArrowToggle'
 import { capitalizeFirstLetter } from '~/utils/words'
 
+interface IImage {
+  id: number
+  url: string
+  name?: string
+  available?: boolean
+  type?: string
+  width?: number
+  length?: number
+  retail_price?: number
+  cost_per_sqft?: number
+}
+
 interface ImageProps {
   name?: string
   src: string | null
@@ -25,7 +37,7 @@ interface ImageProps {
   id: number
   type: string
   setImage: (value: undefined | number) => void
-  image?: any
+  image?: IImage
   showInfo?: boolean
   userRole?: string
 }
@@ -37,7 +49,6 @@ function ChildrenImagesDialog({
   isOpen,
   id,
   type,
-  setImage,
   image,
   showInfo = false,
   userRole,
@@ -46,11 +57,6 @@ function ChildrenImagesDialog({
     { images: { id: number; url: string }[] } | undefined
   >()
   const [selectedImage, setSelectedImage] = useState<string | null>(src)
-  const [thumbnailApi, setThumbnailApi] = useState<CarouselApi>()
-
-  const handleClose = () => {
-    setImage(undefined)
-  }
 
   useEffect(() => {
     if (isOpen) {
@@ -173,7 +179,7 @@ export function SuperCarousel({
   type,
   userRole,
 }: {
-  images: { id: number; url: string | null; name?: string; [key: string]: any }[]
+  images: { id: number; url: string | null; name?: string; [key: string]: IImage }[]
   currentId?: number
   setCurrentId?: (value: number | undefined) => void
   type: string
@@ -190,7 +196,7 @@ export function SuperCarousel({
         api.scrollTo(index, true)
       }
     }
-    api.on('settle', index => {
+    api.on('settle', () => {
       const slidesInView = api.slidesInView()
       if (slidesInView.length > 0) {
         setCurrentId?.(images[slidesInView[0]].id)

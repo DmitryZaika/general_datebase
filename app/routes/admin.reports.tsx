@@ -1,6 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { useEffect, useState } from 'react'
-import { Form, type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { useState } from 'react'
+import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { PageLayout } from '~/components/PageLayout'
 import {
@@ -32,14 +32,14 @@ function formatDate(dateString: string | null) {
 
   try {
     const date = new Date(dateString)
-    if (isNaN(date.getTime())) return '-'
+    if (Number.isNaN(date.getTime())) return '-'
 
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
     }).format(date)
-  } catch (e) {
+  } catch {
     return '-'
   }
 }
@@ -70,7 +70,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   let slabs: SlabReport[] = []
   let query = ''
-  const queryParams: any[] = []
+  const queryParams: (string | number)[] = []
 
   switch (reportType) {
     case 'cut_slabs':
@@ -111,7 +111,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
       if (supplierId && supplierId !== 'all') {
         const supplierIdNumber = parseInt(supplierId, 10)
-        if (!isNaN(supplierIdNumber)) {
+        if (!Number.isNaN(supplierIdNumber)) {
           query += ` AND suppliers.id = ?`
           queryParams.push(supplierIdNumber)
         }
@@ -119,7 +119,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
       if (stoneId && stoneId !== 'all') {
         const stoneIdNumber = parseInt(stoneId, 10)
-        if (!isNaN(stoneIdNumber)) {
+        if (!Number.isNaN(stoneIdNumber)) {
           query += ` AND stones.id = ?`
           queryParams.push(stoneIdNumber)
         }

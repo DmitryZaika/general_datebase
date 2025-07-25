@@ -17,8 +17,13 @@ interface SendEmail {
   text?: string
 }
 
+interface Body {
+  Html?: { Data: string; Charset: string }
+  Text?: { Data: string; Charset: string }
+}
+
 export async function sendEmail({ to, subject, html, text }: SendEmail) {
-  const body: any = {}
+  const body: Body = {}
   if (html) body.Html = { Data: html, Charset: 'UTF-8' }
   if (text) body.Text = { Data: text, Charset: 'UTF-8' }
 

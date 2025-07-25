@@ -1,5 +1,4 @@
 import { type ReactNode, useEffect, useState } from 'react'
-import { Button } from '~/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -17,7 +16,6 @@ interface Stone {
   cost_per_sqft?: number
   available?: number
   is_display?: boolean | number
-  [key: string]: any
 }
 
 export interface StonesSortProps<T extends Stone> {

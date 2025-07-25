@@ -72,7 +72,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const session = await getSession(request.headers.get('Cookie'))
   session.set('sessionId', sessionId)
 
-  const [[row]]: any = await db.query(
+  const [[row]] = await db.query(
     `SELECT p.name AS position
        FROM users u
        LEFT JOIN positions p ON p.id = u.position_id

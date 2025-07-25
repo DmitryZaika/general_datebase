@@ -6,7 +6,7 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
   form: UseFormReturn<TFieldValues>,
   action: undefined | string = undefined,
   method: 'POST' | 'DELETE' = 'POST',
-  handleData?: (data: any) => any,
+  handleData?: (data: TFieldValues) => void,
 ) {
   const submit = useSubmit()
   const token = useAuthenticityToken()
