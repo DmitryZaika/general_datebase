@@ -14,6 +14,16 @@ export async function action({ params, request }: ActionFunctionArgs) {
   const contract = await Contract.fromSalesId(saleId)
   await contract.unsell()
 
+
+
+
+
+
+
+
+
+
+  
   return data({
     success: true,
   })
