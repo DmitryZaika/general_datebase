@@ -19,7 +19,7 @@ export function QuillEditor({ value, onChange }: IQuillEditorProps) {
 
   useEffect(() => {
     if (quill) {
-      quill.on('text-change', (delta, oldDelta, source) => {
+      quill.on('text-change', () => {
         onChange(quill.root.innerHTML)
       })
     }
