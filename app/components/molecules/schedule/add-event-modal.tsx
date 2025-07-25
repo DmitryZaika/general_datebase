@@ -1,30 +1,30 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import clsx from 'clsx'
+import { useEffect } from 'react'
+import { Form, useForm } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { FormField, FormProvider } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import clsx from 'clsx'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog'
-import { FormProvider, FormField } from '@/components/ui/form'
-import { useForm, Form } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { type EventFormData, eventSchema } from '~/schemas/events'
 import type { Variant } from '@/types'
 import { useFullFetcher } from '~/hooks/useFullFetcher'
-import { useEffect } from 'react'
+import { type EventFormData, eventSchema } from '~/schemas/events'
 
 interface AddEventModalProps {
   open: boolean

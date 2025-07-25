@@ -1,5 +1,5 @@
+import type { FieldValues, UseFormReturn } from 'react-hook-form'
 import { useSubmit } from 'react-router'
-import type { UseFormReturn, FieldValues } from 'react-hook-form'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 
 export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(

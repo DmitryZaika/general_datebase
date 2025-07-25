@@ -1,20 +1,23 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2'
+import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
+  Form,
   type LoaderFunctionArgs,
   redirect,
-  useNavigation,
-  useParams,
   useLoaderData,
   useLocation,
+  useNavigate,
+  useNavigation,
+  useParams,
 } from 'react-router'
-import { Form, useNavigate } from 'react-router'
-import { FormProvider, FormField } from '~/components/ui/form'
 import { getValidatedFormData } from 'remix-hook-form'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { SelectInput } from '~/components/molecules/SelectItem'
 import { Button } from '~/components/ui/button'
-import { useForm } from 'react-hook-form'
 import {
   Dialog,
   DialogContent,
@@ -22,18 +25,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
-import { toastData } from '~/utils/toastHelpers'
-import type { RowDataPacket, ResultSetHeader } from 'mysql2'
-
-import { csrf } from '~/utils/csrf.server'
-import { getEmployeeUser } from '~/utils/session.server'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { selectMany, selectId } from '~/utils/queryHelpers'
-import { SelectInput } from '~/components/molecules/SelectItem'
+import { FormField, FormProvider } from '~/components/ui/form'
 import { Switch } from '~/components/ui/switch'
+import { db } from '~/db.server'
+import { useFullSubmit } from '~/hooks/useFullSubmit'
+import { commitSession, getSession } from '~/sessions'
+import { csrf } from '~/utils/csrf.server'
+import { selectId, selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
 
 interface SaleDetails {
   id: number

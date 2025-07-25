@@ -1,11 +1,10 @@
-import { type LoaderFunctionArgs, redirect } from 'react-router'
-import { useLoaderData } from 'react-router'
+import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import SchedulerViewFilteration from '@/components/molecules/schedule/schedular-view-filteration'
+import { db } from '~/db.server'
 import { SchedulerProvider } from '~/providers/scheduler-provider'
 import type { Period } from '~/types'
-import { getEmployeeUser } from '~/utils/session.server'
-import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
 
 interface Event {
   id: number

@@ -1,25 +1,22 @@
+import { useState } from 'react'
 import {
-  type LoaderFunctionArgs,
   type ActionFunctionArgs,
-  redirect,
-  useLoaderData,
   Form,
-  useNavigate,
+  type LoaderFunctionArgs,
+  redirect,
   useActionData,
+  useLoaderData,
+  useNavigate,
 } from 'react-router'
-import { getAdminUser } from '~/utils/session.server'
-import { db } from '~/db.server'
-import { selectMany } from '~/utils/queryHelpers'
-import { toastData } from '~/utils/toastHelpers'
-import { commitSession, getSession } from '~/sessions'
+import { z } from 'zod'
+import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '~/components/ui/dialog'
-import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import {
@@ -29,8 +26,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import { useState } from 'react'
-import { z } from 'zod'
+import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions'
+import { selectMany } from '~/utils/queryHelpers'
+import { getAdminUser } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
 
 interface PayrollRule {
   id: number

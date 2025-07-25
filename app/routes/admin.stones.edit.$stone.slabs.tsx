@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { FaCheck, FaLink, FaPencilAlt, FaQrcode, FaTimes } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
+  data,
   Form,
   type LoaderFunctionArgs,
-  data,
   redirect,
   useActionData,
   useLoaderData,
@@ -36,9 +36,9 @@ import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
 import {
-  type SlabData,
   printAllSlabsQRCodes,
   printSingleSlabQRCode,
+  type SlabData,
 } from '~/utils/slabQRCode'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 import { useCustomOptionalForm } from '~/utils/useCustomForm'

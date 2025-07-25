@@ -3,11 +3,11 @@
 // SchedulerContext.tsx
 import React, {
   createContext,
-  useContext,
-  useReducer,
-  type ReactNode,
   Dispatch,
+  type ReactNode,
+  useContext,
   useEffect,
+  useReducer,
 } from 'react'
 import { z } from 'zod'
 
@@ -19,6 +19,7 @@ import type {
   SchedulerContextType,
   startOfWeek,
 } from '@/types'
+
 // Define event and state types
 
 interface SchedulerState {

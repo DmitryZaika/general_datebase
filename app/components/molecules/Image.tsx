@@ -1,7 +1,8 @@
 // Image.tsx
-import * as React from 'react'
-import { Dialog, DialogTrigger, DialogContentImage } from '~/components/ui/dialog'
+
 import { X } from 'lucide-react'
+import * as React from 'react'
+import { Dialog, DialogContentImage, DialogTrigger } from '~/components/ui/dialog'
 
 interface ImageProps {
   name?: string

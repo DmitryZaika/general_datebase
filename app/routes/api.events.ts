@@ -1,8 +1,8 @@
 import type { ActionFunctionArgs } from 'react-router'
-import { getEmployeeUser } from '~/utils/session.server'
 import { db } from '~/db.server'
-import { selectMany, selectId } from '~/utils/queryHelpers'
 import { eventSchema, eventUpdateSchema } from '~/schemas/events'
+import { selectId, selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
 
 interface DatabaseEvent {
   id: number

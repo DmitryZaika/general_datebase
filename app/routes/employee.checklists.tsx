@@ -1,10 +1,10 @@
-import { LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
-import { getEmployeeUser } from '~/utils/session.server'
-import { cn } from '~/lib/utils'
+import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
-import { useIsMobile } from '~/hooks/use-mobile'
 import { db } from '~/db.server'
+import { useIsMobile } from '~/hooks/use-mobile'
+import { cn } from '~/lib/utils'
 import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
 
 interface ChecklistItem {
   id: number

@@ -1,8 +1,8 @@
-import { type LoaderFunctionArgs, data } from 'react-router'
-import { db } from '~/db.server'
-import { getEmployeeUser } from '~/utils/session.server'
-import { selectId } from '~/utils/queryHelpers'
 import type { RowDataPacket } from 'mysql2'
+import { data, type LoaderFunctionArgs } from 'react-router'
+import { db } from '~/db.server'
+import { selectId } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
 
 interface Customer {
   id: number

@@ -1,13 +1,13 @@
-import { useNavigation } from 'react-router'
-import { FAUCET_TYPES } from '~/utils/constants'
-import { useSafeSearchParams } from '~/hooks/use-safe-search-params'
-import { faucetFilterSchema, type FaucetFilter } from '~/schemas/faucets'
-import { CheckOption } from '~/components/molecules/CheckOption'
-import { LinkSpan } from '~/components/atoms/LinkSpan'
-import { useMemo, useCallback, useState, useEffect } from 'react'
-import type { ISupplier } from '~/schemas/suppliers'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa'
+import { useNavigation } from 'react-router'
+import { LinkSpan } from '~/components/atoms/LinkSpan'
+import { CheckOption } from '~/components/molecules/CheckOption'
 import { SidebarGroupLabel, SidebarMenuSub } from '~/components/ui/sidebar'
+import { useSafeSearchParams } from '~/hooks/use-safe-search-params'
+import { type FaucetFilter, faucetFilterSchema } from '~/schemas/faucets'
+import type { ISupplier } from '~/schemas/suppliers'
+import { FAUCET_TYPES } from '~/utils/constants'
 
 interface IProps {
   base: string

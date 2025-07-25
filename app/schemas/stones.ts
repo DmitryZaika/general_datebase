@@ -1,6 +1,6 @@
 import { z } from 'zod'
+import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
 import { coerceNumber, NullableId, StringBoolean } from './general'
-import { STONE_TYPES, STONE_FINISHES } from '~/utils/constants'
 
 export const stoneSchema = z.object({
   name: z.string().min(1, 'Name is required'),

@@ -1,8 +1,8 @@
 import { type ActionFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
-import { getSession, commitSession } from '~/sessions'
-import { toastData } from '~/utils/toastHelpers'
+import { commitSession, getSession } from '~/sessions'
 import { getStripe } from '~/utils/getStripe'
+import { toastData } from '~/utils/toastHelpers'
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData()

@@ -1,10 +1,10 @@
+import { ClockIcon, TrashIcon } from 'lucide-react'
+import type React from 'react'
+import { useState } from 'react'
 import AddEventModal from '@/components/molecules/schedule/add-event-modal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { ClockIcon, TrashIcon } from 'lucide-react'
-import type React from 'react'
-import { useState } from 'react'
 import { useScheduler } from '~/providers/scheduler-provider'
 
 // Function to format date

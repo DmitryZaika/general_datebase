@@ -1,20 +1,24 @@
 import type { ColumnDef } from '@tanstack/react-table'
+import { Plus } from 'lucide-react'
 import {
-  type LoaderFunctionArgs,
   type ActionFunctionArgs,
+  Form,
+  Link,
+  type LoaderFunctionArgs,
+  Outlet,
   redirect,
+  useLoaderData,
+  useLocation,
 } from 'react-router'
-import { Outlet, useLoaderData, Form, Link, useLocation } from 'react-router'
+import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
+import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { PageLayout } from '~/components/PageLayout'
 import { DataTable } from '~/components/ui/data-table'
-import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
-import { getSession, commitSession } from '~/sessions'
-import { Plus } from 'lucide-react'
-import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 
 interface PayrollRule {
   id: number

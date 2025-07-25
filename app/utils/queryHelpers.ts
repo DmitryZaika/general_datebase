@@ -1,5 +1,5 @@
-import type mysql from 'mysql2/promise'
 import type { RowDataPacket } from 'mysql2'
+import type mysql from 'mysql2/promise'
 
 export async function selectMany<T>(
   db: mysql.Pool,

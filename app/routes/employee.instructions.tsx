@@ -1,17 +1,16 @@
-import { type LoaderFunctionArgs, redirect } from 'react-router'
-import { useLoaderData } from 'react-router'
+import { useCallback, useEffect, useState } from 'react'
+import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { PageLayout } from '~/components/PageLayout'
 import {
   Accordion,
-  AccordionItem,
   AccordionContent,
+  AccordionItem,
   AccordionTrigger,
 } from '~/components/ui/accordion'
 import { db } from '~/db.server'
+import type { Instruction } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import { PageLayout } from '~/components/PageLayout'
-import type { Instruction } from '~/types'
-import { useState, useEffect, useCallback } from 'react'
 import '~/styles/instructions.css'
 
 interface InstructionNode {

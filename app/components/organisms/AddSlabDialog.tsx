@@ -1,5 +1,7 @@
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import type { UseFormReturn } from 'react-hook-form'
+import type { TCustomerSchema } from '~/schemas/sales'
 import { Button } from '../ui/button'
 import {
   Dialog,
@@ -15,8 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select'
-import type { UseFormReturn } from 'react-hook-form'
-import type { TCustomerSchema } from '~/schemas/sales'
 
 async function getSlabs(
   stoneId: number,

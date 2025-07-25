@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
 import {
   Carousel,
+  type CarouselApi,
   CarouselContent,
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
-  type CarouselApi,
 } from '~/components/ui/carousel'
 import {
   Dialog,
   DialogContent,
-  DialogTitle,
   DialogDescription,
+  DialogTitle,
 } from '~/components/ui/dialog'
 import { useArrowCarousel } from '~/hooks/useArrowToggle'
 import { capitalizeFirstLetter } from '~/utils/words'

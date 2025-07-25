@@ -1,10 +1,10 @@
-import { validateFormData } from 'remix-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import type { FieldErrors, FieldValues } from 'react-hook-form'
-import { z } from 'zod'
 import { type FileUpload, parseFormData } from '@mjackson/form-data-parser'
-import { s3UploadHandler } from '~/utils/s3.server'
+import type { FieldErrors, FieldValues } from 'react-hook-form'
+import { validateFormData } from 'remix-hook-form'
+import { z } from 'zod'
 import { csrf } from '~/utils/csrf.server'
+import { s3UploadHandler } from '~/utils/s3.server'
 
 const fileSchema = z.object({
   file: z.string(),

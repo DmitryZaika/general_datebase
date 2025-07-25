@@ -1,5 +1,5 @@
-import { Checkbox } from '~/components/ui/checkbox'
 import type { ReactNode } from 'react'
+import { Checkbox } from '~/components/ui/checkbox'
 
 interface ICheckOptionProps<T> {
   value: T

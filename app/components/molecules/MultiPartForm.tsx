@@ -1,7 +1,7 @@
-import { FormProvider } from '~/components/ui/form'
-import { Form, useSubmit } from 'react-router'
 import type { FieldValues, UseFormReturn } from 'react-hook-form'
+import { Form, useSubmit } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
+import { FormProvider } from '~/components/ui/form'
 
 function createFromData(data: object) {
   const formData = new FormData()

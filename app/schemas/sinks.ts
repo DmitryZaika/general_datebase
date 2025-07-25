@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { NullableId, StringBoolean } from './general'
 import { SINK_TYPES } from '~/utils/constants'
+import { NullableId, StringBoolean } from './general'
 
 export const sinkSchema = z.object({
   name: z.string().min(1, 'Name is required'),

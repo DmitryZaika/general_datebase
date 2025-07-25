@@ -1,9 +1,9 @@
 import OAuthClient from 'intuit-oauth'
-import { db } from '../db.server'
 import type { RowDataPacket } from 'mysql2'
-import type { TokenSet } from '~/types'
-import { encrypt, decrypt } from '~/utils/cryptoHelpers.server'
 import type { RemixSession } from '~/sessions'
+import type { TokenSet } from '~/types'
+import { decrypt, encrypt } from '~/utils/cryptoHelpers.server'
+import { db } from '../db.server'
 
 interface QboCompanyInfo {
   qbo_client_id: string

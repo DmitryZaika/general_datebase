@@ -1,6 +1,6 @@
+import { Check } from 'lucide-react'
 import React, { useState } from 'react'
-import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
-import type { FieldValues, ControllerRenderProps } from 'react-hook-form'
+import type { ControllerRenderProps, FieldValues } from 'react-hook-form'
 import {
   Select,
   SelectContent,
@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { Badge } from '../ui/badge'
-import { Check } from 'lucide-react'
+import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 
 type Option = { key: string | number; value: string }
 

@@ -1,8 +1,8 @@
-import { type LoaderFunctionArgs, data } from 'react-router'
+import { data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
-import { getEmployeeUser } from '~/utils/session.server'
-import { selectMany } from '~/utils/queryHelpers'
 import type { Customer } from '~/types'
+import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await getEmployeeUser(request)

@@ -1,14 +1,13 @@
+import { Calendar, Clock, Edit, Plus, Trash2 } from 'lucide-react'
 import React from 'react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-
-import { Plus, Calendar, Clock, Edit, Trash2 } from 'lucide-react'
 import { useScheduler } from '~/providers/scheduler-provider'
 
 interface Event {

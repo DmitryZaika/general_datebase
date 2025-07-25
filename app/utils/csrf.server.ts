@@ -1,5 +1,5 @@
-import { CSRF } from 'remix-utils/csrf/server'
 import { createCookie } from 'react-router'
+import { CSRF } from 'remix-utils/csrf/server'
 
 export const cookie = createCookie('csrf', {
   path: '/',

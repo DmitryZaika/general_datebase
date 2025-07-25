@@ -1,22 +1,22 @@
+import type { ColumnDef } from '@tanstack/react-table'
+import { useEffect } from 'react'
 import {
   type LoaderFunctionArgs,
-  useLoaderData,
-  useSearchParams,
   redirect,
+  useFetcher,
+  useLoaderData,
   useParams,
+  useSearchParams,
 } from 'react-router'
 import { z } from 'zod'
-import { selectId, selectMany } from '~/utils/queryHelpers'
-import { db } from '~/db.server'
-import { DataTable } from '~/components/ui/data-table'
-import type { ColumnDef } from '@tanstack/react-table'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { Button } from '~/components/ui/button'
-import { useFetcher } from 'react-router'
-import { useEffect } from 'react'
-import { getSession, commitSession } from '~/sessions'
-import { toastData } from '~/utils/toastHelpers'
+import { DataTable } from '~/components/ui/data-table'
+import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions'
 import { getStripe } from '~/utils/getStripe'
+import { selectId, selectMany } from '~/utils/queryHelpers'
+import { toastData } from '~/utils/toastHelpers'
 
 const paramsSchema = z.object({
   viewId: z.string().uuid('View ID must be a valid UUID'),

@@ -1,6 +1,6 @@
-import { LoadingButton } from './LoadingButton'
 import { type ButtonHTMLAttributes, useEffect, useState } from 'react'
 import { useNavigation } from 'react-router'
+import { LoadingButton } from './LoadingButton'
 
 export function LinkButton({
   onClick,

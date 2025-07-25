@@ -1,15 +1,15 @@
-import type React from 'react'
-import { useRef, useState, useEffect, useCallback } from 'react'
-import { useScheduler } from '~/providers/scheduler-provider'
-import { Badge } from '@/components/ui/badge'
+import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion' // Import Framer Motion
+import { ArrowLeft, ArrowRight, Maximize } from 'lucide-react'
+import type React from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import AddEventModal from '@/components/molecules/schedule/add-event-modal'
 import EventStyled from '@/components/molecules/schedule/event-styled'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, ArrowRight, Maximize } from 'lucide-react'
-import clsx from 'clsx'
 import { CustomEventModal } from '@/types'
-import { useNavigate } from 'react-router'
+import { useScheduler } from '~/providers/scheduler-provider'
 
 // Define Event interface locally since it's not exported from types
 interface Event {

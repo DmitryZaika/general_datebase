@@ -1,14 +1,11 @@
-import type { EventFormData } from '@/types'
+import { format, isBefore, setHours, setMinutes } from 'date-fns'
+import { CalendarIcon, Clock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { UseFormSetValue } from 'react-hook-form'
-import { format, setHours, setMinutes, isBefore } from 'date-fns'
-
-import { cn } from '@/lib/utils'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
-import { CalendarIcon, Clock } from 'lucide-react'
+import { Calendar } from '@/components/ui/calendar'
 import { Label } from '@/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -16,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
+import type { EventFormData } from '@/types'
 
 export default function SelectDate({
   data,
