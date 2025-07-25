@@ -43,14 +43,14 @@ const itemVariants = {
 }
 
 const pageTransitionVariants = {
-  enter: (direction: number) => ({
+  enter: () => ({
     opacity: 0,
   }),
   center: {
     x: 0,
     opacity: 1,
   },
-  exit: (direction: number) => ({
+  exit: () => ({
     opacity: 0,
     transition: {
       opacity: { duration: 0.2, ease: 'easeInOut' },
@@ -58,7 +58,7 @@ const pageTransitionVariants = {
   }),
 }
 
-// Precise time-based event grouping function
+/*
 const groupEventsByTimePeriod = (events: Event[] | undefined) => {
   if (!events || events.length === 0) return []
 
@@ -150,6 +150,7 @@ const groupEventsByTimePeriod = (events: Event[] | undefined) => {
     ),
   )
 }
+  */
 
 // Helper function to format date as dd-mm-yyyy
 function formatDateStr(date: Date): string {
@@ -309,7 +310,7 @@ export default function DailyView() {
             {dayEvents.length > 0 && (
               <div className='space-y-2'>
                 <AnimatePresence initial={false}>
-                  {dayEvents.slice(0, 3).map((event: Event, eventIndex) => (
+                  {dayEvents.slice(0, 3).map((event: Event) => (
                     <motion.div
                       key={event.id}
                       initial={{ opacity: 0, y: -10 }}
@@ -390,8 +391,8 @@ export default function DailyView() {
 
                 {/* Events - Mobile optimized positioning */}
                 <AnimatePresence initial={false}>
-                  {dayEvents.map((event: Event, eventIndex) => {
-                    const { height, left, maxWidth, minWidth, top, zIndex } =
+                  {dayEvents.map((event: Event) => {
+                    const { height, left, maxWidth, minWidth, top } =
                       handlers.handleEventStyling
                         ? handlers.handleEventStyling(event, dayEvents, {
                             eventsInSamePeriod: 1,

@@ -1,5 +1,5 @@
 import type { LucideProps } from 'lucide-react'
-import React, { forwardRef } from 'react'
+import { forwardRef } from 'react'
 
 export const CorbelIcon = forwardRef<SVGSVGElement, LucideProps>((props, ref) => {
   const {

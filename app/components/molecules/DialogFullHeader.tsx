@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import { DialogClose, DialogHeader, DialogTitle } from '~/components/ui/dialog'
+import { DialogClose, DialogTitle } from '~/components/ui/dialog'
 import { Button } from '../ui/button'
 
 export const DialogFullHeader = ({ children }: { children: JSX.Element }) => {
