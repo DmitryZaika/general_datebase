@@ -1,23 +1,13 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 
+if (!process.env.AES_KEY) {
+  throw new Error('QBO_AES_KEY not stated')
+}
 export const AES_KEY = Buffer.from(process.env.AES_KEY, 'hex')
 if (AES_KEY.length !== 32) throw new Error('QBO_AES_KEY должен быть 256‑битным')
 
-function pack(
-  iv: Buffer<ArrayBufferLike>,
-  tag: Buffer<ArrayBufferLike>,
-  ciphertext: Buffer<ArrayBuffer>,
-) {
+function pack(iv: Buffer, tag: Buffer, ciphertext: Buffer) {
   return Buffer.concat([iv, tag, ciphertext]).toString('base64')
-}
-
-function unpack(b64: string) {
-  const buf = Buffer.from(b64, 'base64')
-  return {
-    iv: buf.subarray(0, 12),
-    tag: buf.subarray(12, 28),
-    ct: buf.subarray(28),
-  }
 }
 
 export function encrypt(text: string): string {
