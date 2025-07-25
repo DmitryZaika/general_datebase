@@ -11,7 +11,7 @@ import { AddressInput } from '~/components/organisms/AddressInput'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Label } from '~/components/ui/label'
 import { useToast } from '~/hooks/use-toast'
-import { customerSignupSchema } from '~/schemas/customers'
+import { createCustomerMutation } from '~/schemas/customers'
 import {
   FormControl,
   FormField,
@@ -62,15 +62,6 @@ export function loader({ params }: LoaderFunctionArgs) {
   return data({ companyId: parseInt(companyId as string) })
 }
 
-const createCustomer = async (data: FormData) => {
-  const clean = customerSignupSchema.parse(data)
-  const response = await fetch('/api/customers/create', {
-    method: 'POST',
-    body: JSON.stringify(clean),
-  })
-  return response.json()
-}
-
 export default function CustomerCheckIn() {
   const { toast } = useToast()
   const { companyId } = useLoaderData<typeof loader>()
@@ -88,24 +79,7 @@ export default function CustomerCheckIn() {
     },
   })
 
-  const { mutate, isPending } = useMutation({
-    mutationFn: createCustomer,
-    onSuccess: () => {
-      form.reset()
-      toast({
-        title: 'Success!',
-        description: "Thank you for signing up! We'll be in touch soon.",
-        variant: 'success',
-      })
-    },
-    onError: () => {
-      toast({
-        title: 'Error',
-        description: 'Something went wrong. Please try again.',
-        variant: 'destructive',
-      })
-    },
-  })
+  const { mutate, isPending } = useMutation(createCustomerMutation(form, toast))
 
   const safetyInstructions = (
     <section className='mt-4 rounded-lg bg-gradient-to-br from-gray-50 to-white p-6 shadow-inner'>

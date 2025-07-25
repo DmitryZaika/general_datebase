@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import type { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 import { useDebounce } from 'use-debounce'
 import { Command, CommandGroup, CommandItem } from '~/components/ui/command'
 import {
@@ -30,29 +31,20 @@ async function completeAddress(q: string): Promise<
   return data['suggestions']
 }
 
-type Props = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  form: any
-  field: string
-  zipField?: string
+type Props<T extends FieldValues> = {
+  form: UseFormReturn<T>
+  field: Path<T>
+  zipField?: Path<T>
 }
 
-function formatAddress(address: string, zip?: string | null) {
-  if (!address) return address
-
-  const cleanZip = zip ?? ''
-
-  if (cleanZip && address.includes(cleanZip)) {
-    return address.replace('USA', '').replace(/\s+,/g, '').trim()
-  }
-
-  return address.replace('USA', cleanZip)
-}
-
-export function AddressInput({ form, field, zipField }: Props) {
+export function AddressInput<T extends FieldValues>({
+  form,
+  field,
+  zipField,
+}: Props<T>) {
   const [open, setOpen] = useState(false)
 
-  const value = form.watch(field) as string
+  const value = form.watch(field)
   const [debounced] = useDebounce(value, 300)
 
   const { data = [], isFetching } = useQuery({
