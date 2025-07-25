@@ -1,25 +1,24 @@
+import type { ColumnDef } from '@tanstack/react-table'
+import { FaFile } from 'react-icons/fa'
+import { Link, type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import {
   Accordion,
+  AccordionContent,
   AccordionItem,
   AccordionTrigger,
-  AccordionContent,
 } from '~/components/ui/accordion'
-import { Link, useLoaderData } from 'react-router'
-import { type LoaderFunctionArgs, redirect } from 'react-router'
-import { db } from '~/db.server'
-import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
-import type { ColumnDef } from '@tanstack/react-table'
-import { DataTable } from '~/components/ui/data-table'
 import { Button } from '~/components/ui/button'
-import { FaFile } from 'react-icons/fa'
+import { DataTable } from '~/components/ui/data-table'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
-import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
+import { db } from '~/db.server'
+import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
 
 interface Supplier {
   id: number

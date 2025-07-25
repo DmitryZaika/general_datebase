@@ -1,4 +1,4 @@
-import { type LoaderFunctionArgs, data } from 'react-router'
+import { data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 

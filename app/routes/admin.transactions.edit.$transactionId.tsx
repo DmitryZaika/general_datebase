@@ -1,28 +1,29 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import type { RowDataPacket } from 'mysql2'
+import React, { useEffect, useRef, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import {
-  type LoaderFunctionArgs,
   type ActionFunctionArgs,
-  redirect,
-  useLoaderData,
-  Form,
-  useNavigation,
-  useNavigate,
-  Link,
-  useFetcher,
-  Outlet,
-  useLocation,
-  Params,
   data,
+  Form,
+  Link,
+  type LoaderFunctionArgs,
+  Outlet,
+  Params,
+  redirect,
+  useFetcher,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useNavigation,
 } from 'react-router'
-import { getAdminUser, getEmployeeUser } from '~/utils/session.server'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { commitSession, getSession } from '~/sessions'
-import { selectMany, selectId } from '~/utils/queryHelpers'
-import { db } from '~/db.server'
-import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
-import { Button } from '~/components/ui/button'
+import { AuthenticityTokenInput, useAuthenticityToken } from 'remix-utils/csrf/react'
+import { z } from 'zod'
+import { InputItem } from '~/components/molecules/InputItem'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { SelectInput } from '~/components/molecules/SelectItem'
 import { DeleteRow } from '~/components/pages/DeleteRow'
+import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -30,17 +31,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { FormProvider, FormField } from '~/components/ui/form'
-import { InputItem } from '~/components/molecules/InputItem'
-import { SelectInput } from '~/components/molecules/SelectItem'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { csrf } from '~/utils/csrf.server'
-import type { RowDataPacket } from 'mysql2'
+import { FormField, FormProvider } from '~/components/ui/form'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
-import React, { useRef, useState, useEffect } from 'react'
+import { db } from '~/db.server'
+import { useFullSubmit } from '~/hooks/useFullSubmit'
+import { commitSession, getSession } from '~/sessions'
+import { csrf } from '~/utils/csrf.server'
+import { selectId, selectMany } from '~/utils/queryHelpers'
+import { getAdminUser, getEmployeeUser } from '~/utils/session.server'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
 interface SaleDetails {
   id: number

@@ -1,15 +1,13 @@
-import type React from 'react'
-import { useRef, useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-
 import { ArrowLeft, ArrowRight } from 'lucide-react'
-
-import { useScheduler } from '~/providers/scheduler-provider'
+import type React from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import AddEventModal from '@/components/molecules/schedule/add-event-modal'
 import EventStyled from '@/components/molecules/schedule/event-styled'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useNavigate } from 'react-router'
+import { Button } from '@/components/ui/button'
+import { useScheduler } from '~/providers/scheduler-provider'
 
 interface Event {
   id: string

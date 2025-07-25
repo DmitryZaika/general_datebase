@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import DailyView from '@/components/molecules/schedule/day-view'
-import WeeklyView from '@/components/molecules/schedule/week-view'
-import MonthView from '@/components/molecules/schedule/month-view'
 import { Link } from 'react-router'
-import type { Period } from '~/types'
-
 import AddEventModal from '@/components/molecules/schedule/add-event-modal'
+import DailyView from '@/components/molecules/schedule/day-view'
+import MonthView from '@/components/molecules/schedule/month-view'
+import WeeklyView from '@/components/molecules/schedule/week-view'
+import { Button } from '@/components/ui/button'
+import type { Period } from '~/types'
 
 const views: Period[] = ['month']
 

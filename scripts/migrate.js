@@ -1,6 +1,6 @@
-import dotenv from 'dotenv'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import dotenv from 'dotenv'
 import { Sequelize } from 'sequelize'
 import { SequelizeStorage, Umzug } from 'umzug'
 

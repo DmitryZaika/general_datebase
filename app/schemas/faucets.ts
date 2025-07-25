@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { NullableId, StringBoolean } from './general'
 import { FAUCET_TYPES } from '~/utils/constants'
+import { NullableId, StringBoolean } from './general'
 
 export const faucetSchema = z.object({
   name: z.string().min(1, 'Name is required'),

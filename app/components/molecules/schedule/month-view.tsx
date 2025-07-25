@@ -1,14 +1,13 @@
-import { useState, useCallback, useEffect } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Button } from '@/components/ui/button'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
 import clsx from 'clsx'
-
-import { useScheduler } from '~/providers/scheduler-provider'
-import AddEventModal from '@/components/molecules/schedule/add-event-modal'
-import EventStyled from '@/components/molecules/schedule/event-styled'
-import DayEventsModal from '@/components/molecules/schedule/day-events-modal'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
+import AddEventModal from '@/components/molecules/schedule/add-event-modal'
+import DayEventsModal from '@/components/molecules/schedule/day-events-modal'
+import EventStyled from '@/components/molecules/schedule/event-styled'
+import { Button } from '@/components/ui/button'
+import { useScheduler } from '~/providers/scheduler-provider'
 
 // Define Event interface locally since it's not exported from types
 interface Event {

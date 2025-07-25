@@ -1,20 +1,21 @@
+import type mysql from 'mysql2/promise'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
-  redirect,
-} from 'react-router'
-import {
-  useNavigate,
-  useLoaderData,
-  useNavigation,
   Outlet,
+  redirect,
+  useLoaderData,
+  useNavigate,
+  useNavigation,
   useRouteError,
 } from 'react-router'
-import { FormField } from '../components/ui/form'
 import { z } from 'zod'
+import { FileInput } from '~/components/molecules/FileInput'
 import { InputItem } from '~/components/molecules/InputItem'
-import type mysql from 'mysql2/promise'
-
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { MultiPartForm } from '~/components/molecules/MultiPartForm'
+import { SelectInput } from '~/components/molecules/SelectItem'
+import { SwitchItem } from '~/components/molecules/SwitchItem'
 import {
   Dialog,
   DialogContent,
@@ -22,24 +23,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
+import { faucetSchema } from '~/schemas/faucets'
 import { commitSession, getSession } from '~/sessions'
-import { selectId, selectMany } from '~/utils/queryHelpers'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { MultiPartForm } from '~/components/molecules/MultiPartForm'
-import { FileInput } from '~/components/molecules/FileInput'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { FAUCET_TYPES } from '~/utils/constants'
+import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
-import { useCustomOptionalForm } from '~/utils/useCustomForm'
+import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
-import { csrf } from '~/utils/csrf.server'
-import { SelectInput } from '~/components/molecules/SelectItem'
-import { SwitchItem } from '~/components/molecules/SwitchItem'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
-import { faucetSchema } from '~/schemas/faucets'
-import { FAUCET_TYPES } from '~/utils/constants'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { useCustomOptionalForm } from '~/utils/useCustomForm'
+import { FormField } from '../components/ui/form'
 
 type FaucetData = {
   name: string

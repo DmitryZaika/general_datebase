@@ -1,9 +1,8 @@
 import Compressor from 'compressorjs'
-
-import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
-import { Input } from '~/components/ui/input'
 import { useState } from 'react'
 import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
+import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 
 type FileInput = {
   inputName?: string

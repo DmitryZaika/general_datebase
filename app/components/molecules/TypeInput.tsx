@@ -1,6 +1,6 @@
 // app/components/molecules/TypeSelect.tsx
-import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
-import type { FieldValues, ControllerRenderProps } from 'react-hook-form'
+
+import type { ControllerRenderProps, FieldValues } from 'react-hook-form'
 import {
   Select,
   SelectContent,
@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 
 type Option = { key: string; value: string }
 

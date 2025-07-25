@@ -1,33 +1,32 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import fetch from 'node-fetch'
+import { useEffect, useRef } from 'react'
+import { useForm } from 'react-hook-form'
 import {
-  ActionFunctionArgs,
-  LoaderFunctionArgs,
+  type ActionFunctionArgs,
+  data,
+  Form,
+  type LoaderFunctionArgs,
   redirect,
   useNavigation,
-  Form,
-  data,
 } from 'react-router'
-import { FormProvider, FormField } from '~/components/ui/form'
 import { getValidatedFormData } from 'remix-hook-form'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { SignatureInput } from '~/components/molecules/SignatureInput'
+import { AddressInput } from '~/components/organisms/AddressInput'
+import { CustomerSearch } from '~/components/organisms/CustomerSearch'
 import { Checkbox } from '~/components/ui/checkbox'
+import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
-import { useForm } from 'react-hook-form'
+import { db } from '~/db.server'
+import { useFullFetcher } from '~/hooks/useFullFetcher'
 import { commitSession, getSession } from '~/sessions'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { csrf } from '~/utils/csrf.server'
 import { getAdminUser, getEmployeeUser } from '~/utils/session.server'
-
-import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { toastData } from '~/utils/toastHelpers'
-import { AddressInput } from '~/components/organisms/AddressInput'
-import { SignatureInput } from '~/components/molecules/SignatureInput'
-import fetch from 'node-fetch'
-import { CustomerSearch } from '~/components/organisms/CustomerSearch'
-import { useFullFetcher } from '~/hooks/useFullFetcher'
-import { useEffect, useRef } from 'react'
-import { db } from '~/db.server'
 
 // ----------------------
 // Form validation schema

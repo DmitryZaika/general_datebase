@@ -1,25 +1,31 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { type LoaderFunctionArgs, redirect } from 'react-router'
-import { Link, Outlet, useLoaderData, useNavigation } from 'react-router'
+import { Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import {
+  Link,
+  type LoaderFunctionArgs,
+  Outlet,
+  redirect,
+  useLoaderData,
+  useNavigation,
+} from 'react-router'
+import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
+import { DataTable } from '~/components/ui/data-table'
 import {
+  Table,
   TableBody,
   TableCaption,
   TableCell,
   TableHead,
   TableHeader,
-  Table,
   TableRow,
 } from '~/components/ui/table'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { DataTable } from '~/components/ui/data-table'
-import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
 
 interface Instructions {
   id: number

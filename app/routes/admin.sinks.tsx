@@ -1,19 +1,25 @@
 // app/routes/admin.sinks.tsx
 
-import { type LoaderFunctionArgs, redirect, Outlet } from 'react-router'
-import { useLoaderData, Link, useNavigation, useLocation } from 'react-router'
-import { getAdminUser } from '~/utils/session.server'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { useEffect, useState } from 'react'
-import ModuleList from '~/components/ModuleList'
-import { SuperCarousel } from '~/components/organisms/SuperCarousel'
-import { FaPencilAlt, FaTimes } from 'react-icons/fa'
-import { useSafeSearchParams } from '~/hooks/use-safe-search-params'
-import { sinkFilterSchema } from '~/schemas/sinks'
-import { cleanParams } from '~/hooks/use-safe-search-params'
-import { type Sink, sinkQueryBuilder } from '~/utils/queries.server'
-import { SINK_TYPES } from '~/utils/constants'
 import { Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { FaPencilAlt, FaTimes } from 'react-icons/fa'
+import {
+  Link,
+  type LoaderFunctionArgs,
+  Outlet,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useNavigation,
+} from 'react-router'
+import ModuleList from '~/components/ModuleList'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { SuperCarousel } from '~/components/organisms/SuperCarousel'
+import { cleanParams, useSafeSearchParams } from '~/hooks/use-safe-search-params'
+import { sinkFilterSchema } from '~/schemas/sinks'
+import { SINK_TYPES } from '~/utils/constants'
+import { type Sink, sinkQueryBuilder } from '~/utils/queries.server'
+import { getAdminUser } from '~/utils/session.server'
 
 const customOrder = [
   'stainless 18 gauge',

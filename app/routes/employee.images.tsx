@@ -1,14 +1,12 @@
-import { type LoaderFunctionArgs, redirect } from 'react-router'
-import { useLoaderData } from 'react-router'
-import { Accordion, AccordionItem, AccordionContent } from '~/components/ui/accordion'
-import { Image } from '~/components/molecules/Image'
-import { db } from '~/db.server'
-
-import { selectMany } from '~/utils/queryHelpers'
-import ModuleList from '~/components/ModuleList'
-import { getEmployeeUser } from '~/utils/session.server'
 import { useEffect, useState } from 'react'
+import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import ModuleList from '~/components/ModuleList'
+import { Image } from '~/components/molecules/Image'
+import { Accordion, AccordionContent, AccordionItem } from '~/components/ui/accordion'
+import { db } from '~/db.server'
 import { useArrowToggle } from '~/hooks/useArrowToggle'
+import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
 
 interface Image {
   id: number

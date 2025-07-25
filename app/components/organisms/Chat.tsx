@@ -1,11 +1,11 @@
+import clsx from 'clsx'
 import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogTrigger } from '~/components/ui/dialog'
 import { DONE_KEY } from '~/utils/constants'
+import { DialogFullHeader } from '../molecules/DialogFullHeader'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import clsx from 'clsx'
-import { DialogFullHeader } from '../molecules/DialogFullHeader'
 
 interface Message {
   role: 'user' | 'assistant'

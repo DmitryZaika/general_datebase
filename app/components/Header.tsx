@@ -1,7 +1,7 @@
+import type { HeaderProps } from '~/types'
 import HeaderCustomers from './organisms/HeaderCustomers'
 import { HeaderDesktop } from './organisms/HeaderDesktop'
 import { HeaderMobile } from './organisms/HeaderMobile'
-import type { HeaderProps } from '~/types'
 
 export function Header({ user, isEmployee, isAdmin, isSuperUser }: HeaderProps) {
   if (!isEmployee && !isAdmin && !isSuperUser) {

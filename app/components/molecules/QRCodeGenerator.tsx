@@ -1,7 +1,7 @@
+import { PrinterIcon } from 'lucide-react'
 import { useRef } from 'react'
 import QRCode from 'react-qr-code'
 import { Button } from '~/components/ui/button'
-import { PrinterIcon } from 'lucide-react'
 
 interface QRCodeGeneratorProps {
   url: string

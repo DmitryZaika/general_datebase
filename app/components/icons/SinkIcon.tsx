@@ -1,5 +1,5 @@
-import React, { forwardRef } from 'react'
 import type { LucideProps } from 'lucide-react'
+import React, { forwardRef } from 'react'
 
 export const SinkIcon = forwardRef<SVGSVGElement, LucideProps>((props, ref) => {
   const {

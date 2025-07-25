@@ -1,22 +1,21 @@
-import { useNavigation } from 'react-router'
-import { STONE_TYPES, STONE_FINISHES } from '~/utils/constants'
-import { useSafeSearchParams } from '~/hooks/use-safe-search-params'
-import { stoneFilterSchema, StoneFilter } from '~/schemas/stones'
-import { CheckOption } from '~/components/molecules/CheckOption'
-import type { ISupplier } from '~/schemas/suppliers'
-import { LinkSpan } from '~/components/atoms/LinkSpan'
 import {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-  useCallback,
   type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react'
-import type { Stone } from '~/utils/queries.server'
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa'
-
+import { useNavigation } from 'react-router'
+import { LinkSpan } from '~/components/atoms/LinkSpan'
+import { CheckOption } from '~/components/molecules/CheckOption'
 import { SidebarGroupLabel, SidebarMenuSub } from '~/components/ui/sidebar'
+import { useSafeSearchParams } from '~/hooks/use-safe-search-params'
+import { StoneFilter, stoneFilterSchema } from '~/schemas/stones'
+import type { ISupplier } from '~/schemas/suppliers'
+import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
+import type { Stone } from '~/utils/queries.server'
 
 const isBrowser = typeof window !== 'undefined'
 

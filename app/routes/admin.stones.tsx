@@ -1,32 +1,34 @@
 //// filepath: c:\Users\sarah\general_datebase\app\routes\admin.stones.tsx
-import { type LoaderFunctionArgs, Outlet } from 'react-router'
+
+import { GridIcon, TableIcon } from '@radix-ui/react-icons'
+import type { ColumnDef } from '@tanstack/react-table'
+import { Plus, Search } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { FaPencilAlt, FaTimes } from 'react-icons/fa'
 import {
-  useLoaderData,
   Link,
-  useSearchParams,
-  useNavigation,
+  type LoaderFunctionArgs,
+  Outlet,
+  useLoaderData,
   useLocation,
   useNavigate,
+  useNavigation,
+  useSearchParams,
 } from 'react-router'
-import { FaPencilAlt, FaTimes } from 'react-icons/fa'
-import { getAdminUser } from '~/utils/session.server'
-import { stoneQueryBuilder } from '~/utils/queries.server'
-import { stoneFilterSchema } from '~/schemas/stones'
-import { cleanParams } from '~/hooks/use-safe-search-params'
-import { STONE_TYPES } from '~/utils/constants'
 import ModuleList from '~/components/ModuleList'
+import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
+import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { useEffect, useState } from 'react'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
 import { StonesSort } from '~/components/molecules/StonesSort'
 import { Button } from '~/components/ui/button'
-import { TableIcon, GridIcon } from '@radix-ui/react-icons'
-import { capitalizeFirstLetter } from '~/utils/words'
-import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '~/components/ui/data-table'
-import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
-import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
-import { Search, Plus } from 'lucide-react'
+import { cleanParams } from '~/hooks/use-safe-search-params'
+import { stoneFilterSchema } from '~/schemas/stones'
+import { STONE_TYPES } from '~/utils/constants'
+import { stoneQueryBuilder } from '~/utils/queries.server'
+import { getAdminUser } from '~/utils/session.server'
+import { capitalizeFirstLetter } from '~/utils/words'
 
 type ViewMode = 'grid' | 'table'
 

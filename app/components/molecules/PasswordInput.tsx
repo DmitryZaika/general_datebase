@@ -1,12 +1,11 @@
 'use client'
 
-import * as React from 'react'
 import { EyeIcon, EyeOffIcon } from 'lucide-react'
-import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
-
+import * as React from 'react'
 import { Button } from '~/components/ui/button'
-import { Input, type InputProps } from '../ui/input'
 import { cn } from '~/lib/utils'
+import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
+import { Input, type InputProps } from '../ui/input'
 
 const PasswordInput = ({
   className,

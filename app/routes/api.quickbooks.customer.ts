@@ -1,23 +1,23 @@
-import { getSession, commitSession } from '~/sessions'
 import {
+  type ActionFunctionArgs,
+  data,
   type LoaderFunctionArgs,
   redirect,
-  data,
-  type ActionFunctionArgs,
 } from 'react-router'
 import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
 import {
+  clearQboSession,
+  createQboCustomer,
   getQboToken,
-  setQboSession,
   getQboTokenState,
   QboTokenState,
-  clearQboSession,
   queryQboCustomersByContact,
   refreshQboToken,
-  createQboCustomer,
+  setQboSession,
 } from '~/utils/quickbooks.server'
+import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 export async function loader({ request }: LoaderFunctionArgs) {

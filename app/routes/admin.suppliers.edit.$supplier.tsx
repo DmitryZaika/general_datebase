@@ -1,6 +1,4 @@
-import { useLocation } from 'react-router'
-
-import { useNavigate, Outlet } from 'react-router'
+import { Outlet, useLocation, useNavigate } from 'react-router'
 
 import {
   Dialog,

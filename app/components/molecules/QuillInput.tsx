@@ -1,5 +1,5 @@
-import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 import { QuillEditor } from '../atoms/QuillEditor'
+import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 
 export function QuillInput({
   name,

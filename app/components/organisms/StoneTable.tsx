@@ -1,6 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import type { Stone } from '~/utils/queries'
 import { DataTable } from '~/components/ui/data-table'
+import type { Stone } from '~/utils/queries'
 
 export function StoneTable({
   stones,

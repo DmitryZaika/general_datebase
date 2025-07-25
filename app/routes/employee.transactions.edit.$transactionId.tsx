@@ -1,18 +1,14 @@
 import {
-  type LoaderFunctionArgs,
   ActionFunctionArgs,
-  redirect,
-  useLoaderData,
   Form,
   Link,
+  type LoaderFunctionArgs,
   Outlet,
+  redirect,
+  useLoaderData,
   useLocation,
+  useNavigate,
 } from 'react-router'
-import { getEmployeeUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { commitSession, getSession } from '~/sessions'
-import { selectMany, selectId } from '~/utils/queryHelpers'
-import { db } from '~/db.server'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -20,7 +16,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { useNavigate } from 'react-router'
+import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions'
+import { selectId, selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
 interface SaleDetails {
   id: number

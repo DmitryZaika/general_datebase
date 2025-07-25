@@ -1,7 +1,6 @@
-import { Card, CardHeader, CardTitle, CardContent } from '~/components/ui/card'
-import { Link, useLocation } from 'react-router'
-
 import type { JSX } from 'react'
+import { Link, useLocation } from 'react-router'
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 
 export function ImageCard({
   children,

@@ -1,17 +1,21 @@
 // app/routes/users.$user.tsx
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
+  Form,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
+  useNavigate,
 } from 'react-router'
-import { Form, useLoaderData, useNavigate } from 'react-router'
-import { FormProvider, FormField } from '~/components/ui/form'
 import { getValidatedFormData } from 'remix-hook-form'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
+import { SelectInput } from '~/components/molecules/SelectItem'
+import { SwitchItem } from '~/components/molecules/SwitchItem'
 import { Button } from '~/components/ui/button'
-import { useForm } from 'react-hook-form'
 import {
   Dialog,
   DialogContent,
@@ -19,16 +23,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import { FormField, FormProvider } from '~/components/ui/form'
 import { db } from '~/db.server'
+import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { SelectInput } from '~/components/molecules/SelectItem'
-import { SwitchItem } from '~/components/molecules/SwitchItem'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 import { replaceUnderscoresWithSpaces } from '~/utils/words'
 
 const userschema = z.object({

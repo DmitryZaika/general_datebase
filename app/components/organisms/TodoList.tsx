@@ -1,26 +1,11 @@
-import { useState, useEffect } from 'react'
-import { Button } from '../ui/button'
-import { clsx } from 'clsx'
-import { PencilIcon, TrashIcon, CheckIcon, GripVerticalIcon } from 'lucide-react'
-import type { Todo } from '~/types'
-import { Form, FormProvider, useForm } from 'react-hook-form'
-import { useFullFetcher } from '~/hooks/useFullFetcher'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { FormField } from '../ui/form'
-import { InputItem } from '../molecules/InputItem'
-import { todoListSchema, type TTodoListSchema } from '~/schemas/general'
-import { LoadingButton } from '../molecules/LoadingButton'
-import { Checkbox } from '~/components/ui/checkbox'
-import { DialogFullHeader } from '../molecules/DialogFullHeader'
-import { Dialog, DialogContent, DialogTrigger } from '~/components/ui/dialog'
 import {
-  DndContext,
   closestCenter,
+  DndContext,
+  type DragEndEvent,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
-  type DragEndEvent,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -30,6 +15,21 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { clsx } from 'clsx'
+import { CheckIcon, GripVerticalIcon, PencilIcon, TrashIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Form, FormProvider, useForm } from 'react-hook-form'
+import { Checkbox } from '~/components/ui/checkbox'
+import { Dialog, DialogContent, DialogTrigger } from '~/components/ui/dialog'
+import { useFullFetcher } from '~/hooks/useFullFetcher'
+import { type TTodoListSchema, todoListSchema } from '~/schemas/general'
+import type { Todo } from '~/types'
+import { DialogFullHeader } from '../molecules/DialogFullHeader'
+import { InputItem } from '../molecules/InputItem'
+import { LoadingButton } from '../molecules/LoadingButton'
+import { Button } from '../ui/button'
+import { FormField } from '../ui/form'
 
 interface EditFormProps {
   todo: Todo

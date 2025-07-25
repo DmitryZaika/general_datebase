@@ -1,24 +1,23 @@
-import { type LoaderFunctionArgs, redirect, Outlet } from 'react-router'
-import { useLoaderData } from 'react-router'
-import { getEmployeeUser } from '~/utils/session.server'
-import { useState, useEffect } from 'react'
-import { stoneFilterSchema } from '~/schemas/stones'
-import { cleanParams } from '~/hooks/use-safe-search-params'
-import { type Stone, stoneQueryBuilder } from '~/utils/queries'
-import { StoneSearch } from '~/components/molecules/StoneSearch'
 import type { ColumnDef } from '@tanstack/react-table'
-import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
-import { StoneTable } from '~/components/organisms/StoneTable'
 import { CheckIcon, MinusIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
+import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
+import { StoneSearch } from '~/components/molecules/StoneSearch'
+import { StoneTable } from '~/components/organisms/StoneTable'
 import { Input } from '~/components/ui/input'
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '~/components/ui/select'
+import { cleanParams } from '~/hooks/use-safe-search-params'
+import { stoneFilterSchema } from '~/schemas/stones'
+import { type Stone, stoneQueryBuilder } from '~/utils/queries'
+import { getEmployeeUser } from '~/utils/session.server'
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   let user

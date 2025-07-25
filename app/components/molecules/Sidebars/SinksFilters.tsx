@@ -1,13 +1,13 @@
-import { useNavigation } from 'react-router'
-import { SINK_TYPES } from '~/utils/constants'
-import { useSafeSearchParams } from '~/hooks/use-safe-search-params'
-import { sinkFilterSchema, type SinkFilter } from '~/schemas/sinks'
-import { CheckOption } from '~/components/molecules/CheckOption'
-import { LinkSpan } from '~/components/atoms/LinkSpan'
-import { useMemo, useCallback, useState, useEffect } from 'react'
-import type { ISupplier } from '~/schemas/suppliers'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa'
+import { useNavigation } from 'react-router'
+import { LinkSpan } from '~/components/atoms/LinkSpan'
+import { CheckOption } from '~/components/molecules/CheckOption'
 import { SidebarGroupLabel, SidebarMenuSub } from '~/components/ui/sidebar'
+import { useSafeSearchParams } from '~/hooks/use-safe-search-params'
+import { type SinkFilter, sinkFilterSchema } from '~/schemas/sinks'
+import type { ISupplier } from '~/schemas/suppliers'
+import { SINK_TYPES } from '~/utils/constants'
 
 interface IProps {
   base: string

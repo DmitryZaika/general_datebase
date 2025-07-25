@@ -1,16 +1,21 @@
-import { type LoaderFunctionArgs, Outlet, redirect, useLocation } from 'react-router'
-import { selectMany } from '~/utils/queryHelpers'
-import { db } from '~/db.server'
-import { useLoaderData } from 'react-router'
+import { useEffect, useState } from 'react'
+import {
+  type LoaderFunctionArgs,
+  Outlet,
+  redirect,
+  useLoaderData,
+  useLocation,
+} from 'react-router'
 import ModuleList from '~/components/ModuleList'
-import { getEmployeeUser } from '~/utils/session.server'
 import { ImageCard } from '~/components/organisms/ImageCard'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
-import { useState, useEffect } from 'react'
-import { faucetFilterSchema } from '~/schemas/faucets'
+import { db } from '~/db.server'
 import { cleanParams } from '~/hooks/use-safe-search-params'
-import { type Faucet, faucetQueryBuilder } from '~/utils/queries.server'
+import { faucetFilterSchema } from '~/schemas/faucets'
 import { FAUCET_TYPES } from '~/utils/constants'
+import { type Faucet, faucetQueryBuilder } from '~/utils/queries.server'
+import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
