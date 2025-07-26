@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
@@ -449,7 +449,7 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
 
               <div className='flex mt-4'>
                 <Button type='button' variant='blue' size='sm' onClick={handleAddRoom}>
-                  + Add Room
+                  <Plus className='h-3 w-3' /> Add Room
                 </Button>
               </div>
 
