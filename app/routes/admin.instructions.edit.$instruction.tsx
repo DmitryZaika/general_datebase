@@ -105,7 +105,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   }
   const instructionId = parseInt(params.instruction)
 
-  if (isNaN(instructionId)) {
+  if (Number.isNaN(instructionId)) {
     return forceRedirectError(request.headers, 'Invalid instruction id')
   }
 

@@ -240,7 +240,6 @@ export async function getQboCompanyInformation(
     },
   })
   if (!res.ok) {
-    console.error('Error fetching company information:', await res.text())
     return res.status
   }
   return await res.json()

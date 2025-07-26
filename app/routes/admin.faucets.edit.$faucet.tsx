@@ -216,11 +216,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 function FaucetInformation({
   faucetData,
   suppliers,
-  refresh,
 }: {
   faucetData: FaucetData
   suppliers: SupplierData[]
-  refresh: () => void
 }) {
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
@@ -353,9 +351,6 @@ export default function FaucetsEdit() {
       navigate('..')
     }
   }
-  const refresh = () => {
-    navigate('.', { replace: true })
-  }
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className='sm:max-w-[425px] overflow-auto max-h-[95vh]'>
@@ -373,11 +368,7 @@ export default function FaucetsEdit() {
             <TabsTrigger value='images'>Images</TabsTrigger>
           </TabsList>
           <TabsContent value='information'>
-            <FaucetInformation
-              faucetData={faucet}
-              suppliers={suppliers}
-              refresh={refresh}
-            />
+            <FaucetInformation faucetData={faucet} suppliers={suppliers} />
           </TabsContent>
           <TabsContent value='images'>
             <Outlet />
