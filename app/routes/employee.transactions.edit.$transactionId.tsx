@@ -1,10 +1,6 @@
 import {
-  ActionFunctionArgs,
-  Form,
-  Link,
   type LoaderFunctionArgs,
   Outlet,
-  redirect,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -17,10 +13,9 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
-import { selectId, selectMany } from '~/utils/queryHelpers'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError } from '~/utils/toastHelpers'
 
 interface SaleDetails {
   id: number

@@ -24,11 +24,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const sessionId = session.get('sessionId')
 
   if (sessionId) {
-    try {
-      await db.execute(`UPDATE sessions SET is_deleted = 1 WHERE id = ?`, [sessionId])
-    } catch (error) {
-      console.error('Error marking session as deleted:', error)
-    }
+    await db.execute(`UPDATE sessions SET is_deleted = 1 WHERE id = ?`, [sessionId])
   }
 
   // Return success data and the cookie clearing header

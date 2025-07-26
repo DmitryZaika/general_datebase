@@ -2,7 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { type ActionFunctionArgs, Form, useActionData } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
 import { PageLayout } from '~/components/PageLayout'
@@ -45,15 +44,12 @@ export async function action({ request }: ActionFunctionArgs) {
       `INSERT INTO customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
       [data.name, data.email, data.phoneNumber, data.address],
     )
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
-  }
+  } catch {}
   return { success: true }
 }
 
 export default function Customer() {
   const actionData = useActionData<typeof action>()
-  const token = useAuthenticityToken()
   const form = useForm<FormData>({
     resolver,
   })
