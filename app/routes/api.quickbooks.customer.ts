@@ -5,6 +5,7 @@ import {
   redirect,
 } from 'react-router'
 import { commitSession, getSession } from '~/sessions'
+import type { TokenSet } from '~/types'
 import {
   clearQboSession,
   createQboCustomer,
@@ -52,7 +53,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       },
     )
   }
-  let refresh
+  let refresh: TokenSet
   try {
     refresh = await refreshQboToken(request, user.company_id, refreshToken)
   } catch {

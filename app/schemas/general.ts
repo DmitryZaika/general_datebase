@@ -9,7 +9,7 @@ export type TTodoListSchema = z.infer<typeof todoListSchema>
 export const NullableId = z.preprocess(val => {
   if (val === '' || val === null || val === undefined) return null
   const num = parseInt(val as string, 10)
-  return isNaN(num) ? null : num
+  return Number.isNaN(num) ? null : num
 }, z.number().nullable())
 
 export const StringBoolean = z.union([

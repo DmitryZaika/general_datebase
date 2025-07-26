@@ -41,7 +41,6 @@ export function MultiPartForm<TFieldValues extends FieldValues = FieldValues>({
             method: 'post',
             encType: 'multipart/form-data',
           })
-          ;(errors: object) => console.error(errors)
         })}
       >
         {children}

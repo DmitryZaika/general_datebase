@@ -44,8 +44,7 @@ export const createCustomerMutation = (toast: Toast, onSuccess?: () => void) => 
   return {
     mutationFn: createCustomer,
     onSuccess: onSuccess,
-    onError: error => {
-      console.error('Error creating customer:', error)
+    onError: () => {
       toast({
         title: 'Error',
         description: 'Something went wrong. Please try again.',

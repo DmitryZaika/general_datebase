@@ -1,4 +1,4 @@
-import type { ColumnDef } from '@tanstack/react-table'
+import type { ColumnDef, Row } from '@tanstack/react-table'
 import { CheckIcon, MinusIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
@@ -33,6 +33,105 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const filters = stoneFilterSchema.parse(cleanParams(queryParams))
   const stones = await stoneQueryBuilder(filters, user.company_id)
   return { stones }
+}
+
+function ImportanceComponent({
+  row,
+  updateSamplesImportance,
+  setSortedStones,
+}: {
+  row: Row<Stone>
+  updateSamplesImportance: (stoneId: number, importance: number) => Promise<void>
+  setSortedStones: (stones: Stone[]) => void
+}) {
+  const stone = row.original
+  const [importance, setImportance] = useState<number>(stone.samples_importance ?? 1)
+
+  const options = [
+    { key: 3, label: 'High' },
+    { key: 2, label: 'Medium' },
+    { key: 1, label: 'Low' },
+  ]
+
+  const handleChange = async (val: string) => {
+    const num = Number(val)
+    setImportance(num)
+    await updateSamplesImportance(stone.id, num)
+    setSortedStones(prev =>
+      prev.map(s => (s.id === stone.id ? { ...s, samples_importance: num } : s)),
+    )
+  }
+
+  return (
+    <Select value={String(importance)} onValueChange={handleChange}>
+      <SelectTrigger className='min-w-[110px]'>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map(opt => (
+          <SelectItem key={String(opt.key)} value={String(opt.key)}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function AmountComponent({
+  row,
+  updateSamplesAmount,
+  setSortedStones,
+}: {
+  row: Row<Stone>
+  updateSamplesAmount: (stoneId: number, amount: number) => Promise<void>
+  setSortedStones: (stones: Stone[]) => void
+}) {
+  const stone = row.original
+  const [value, setValue] = useState<number>(stone.samples_amount)
+  const [firstFocus, setFirstFocus] = useState<boolean>(true)
+
+  const save = async () => {
+    await updateSamplesAmount(stone.id, value)
+    setSortedStones(prev =>
+      prev.map(s => (s.id === stone.id ? { ...s, samples_amount: value } : s)),
+    )
+  }
+
+  return (
+    <div className='flex items-center gap-2'>
+      <Input
+        type='number'
+        min={0}
+        value={value}
+        onChange={e => setValue(Number(e.target.value) || 0)}
+        className='w-20 px-2 py-1 border rounded'
+        onFocus={e => {
+          if (firstFocus) {
+            e.target.select()
+            setFirstFocus(false)
+          }
+        }}
+        onBlur={save}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            save()
+          }
+        }}
+      />
+      <button
+        className='p-1 text-green-600 hover:text-green-800'
+        onMouseDown={e => e.preventDefault()}
+        onClick={e => {
+          e.stopPropagation()
+          save()
+        }}
+      >
+        <CheckIcon className='w-4 h-4' />
+      </button>
+    </div>
+  )
 }
 
 export default function Samples() {
@@ -125,26 +224,20 @@ export default function Samples() {
     const formData = new FormData()
     formData.append('csrf', token)
     formData.append('amount', String(amount))
-    const response = await fetch(`/api/stones/${stoneId}/samples`, {
+    await fetch(`/api/stones/${stoneId}/samples`, {
       method: 'POST',
       body: formData,
     })
-    if (!response.ok) {
-      console.error('Failed to update amount')
-    }
   }
 
   async function updateSamplesImportance(stoneId: number, importance: number) {
     const formData = new FormData()
     formData.append('csrf', token)
     formData.append('importance', String(importance))
-    const response = await fetch(`/api/stones/${stoneId}/samples`, {
+    await fetch(`/api/stones/${stoneId}/samples`, {
       method: 'POST',
       body: formData,
     })
-    if (!response.ok) {
-      console.error('Failed to update importance')
-    }
   }
 
   const columns: ColumnDef<Stone>[] = [
@@ -190,50 +283,12 @@ export default function Samples() {
       accessorKey: 'amount',
       header: ({ column }) => <SortableHeader column={column} title='Amount' />,
       cell: ({ row }) => {
-        const stone = row.original
-        const [value, setValue] = useState<number>(stone.samples_amount)
-        const [firstFocus, setFirstFocus] = useState<boolean>(true)
-
-        const save = async () => {
-          await updateSamplesAmount(stone.id, value)
-          setSortedStones(prev =>
-            prev.map(s => (s.id === stone.id ? { ...s, samples_amount: value } : s)),
-          )
-        }
-
         return (
-          <div className='flex items-center gap-2'>
-            <Input
-              type='number'
-              min={0}
-              value={value}
-              onChange={e => setValue(Number(e.target.value) || 0)}
-              className='w-20 px-2 py-1 border rounded'
-              onFocus={e => {
-                if (firstFocus) {
-                  e.target.select()
-                  setFirstFocus(false)
-                }
-              }}
-              onBlur={save}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  save()
-                }
-              }}
-            />
-            <button
-              className='p-1 text-green-600 hover:text-green-800'
-              onMouseDown={e => e.preventDefault()}
-              onClick={e => {
-                e.stopPropagation()
-                save()
-              }}
-            >
-              <CheckIcon className='w-4 h-4' />
-            </button>
-          </div>
+          <AmountComponent
+            row={row}
+            updateSamplesAmount={updateSamplesAmount}
+            setSortedStones={setSortedStones}
+          />
         )
       },
     },
@@ -269,39 +324,12 @@ export default function Samples() {
       id: 'importance',
       header: 'Importance',
       cell: ({ row }) => {
-        const stone = row.original
-        const [importance, setImportance] = useState<number>(
-          stone.samples_importance ?? 1,
-        )
-
-        const options = [
-          { key: 3, label: 'High' },
-          { key: 2, label: 'Medium' },
-          { key: 1, label: 'Low' },
-        ]
-
-        const handleChange = async (val: string) => {
-          const num = Number(val)
-          setImportance(num)
-          await updateSamplesImportance(stone.id, num)
-          setSortedStones(prev =>
-            prev.map(s => (s.id === stone.id ? { ...s, samples_importance: num } : s)),
-          )
-        }
-
         return (
-          <Select value={String(importance)} onValueChange={handleChange}>
-            <SelectTrigger className='min-w-[110px]'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map(opt => (
-                <SelectItem key={String(opt.key)} value={String(opt.key)}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ImportanceComponent
+            row={row}
+            updateSamplesImportance={updateSamplesImportance}
+            setSortedStones={setSortedStones}
+          />
         )
       },
     },

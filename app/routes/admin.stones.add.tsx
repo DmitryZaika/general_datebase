@@ -341,6 +341,7 @@ export default function StonesAdd() {
                     )
                     .reduce(
                       (acc, item) => ({
+                        // biome-ignore lint/performance/noAccumulatingSpread: Its safe
                         ...acc,
                         [item.name]: item.hex_code,
                       }),

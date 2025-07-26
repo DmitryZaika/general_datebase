@@ -60,22 +60,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   // Handle payment status
   if (paymentStatus === 'success' && sessionId) {
-    try {
-      const session = await getStripe().checkout.sessions.retrieve(sessionId)
+    const session = await getStripe().checkout.sessions.retrieve(sessionId)
 
-      if (session.payment_status === 'paid' && session.metadata?.saleId) {
-        const flashSession = await getSession(request.headers.get('Cookie'))
-        flashSession.flash(
-          'message',
-          toastData('Success', 'Payment successful!', 'success'),
-        )
+    if (session.payment_status === 'paid' && session.metadata?.saleId) {
+      const flashSession = await getSession(request.headers.get('Cookie'))
+      flashSession.flash(
+        'message',
+        toastData('Success', 'Payment successful!', 'success'),
+      )
 
-        return redirect(`/customers/${viewId}`, {
-          headers: { 'Set-Cookie': await commitSession(flashSession) },
-        })
-      }
-    } catch (error) {
-      console.error('Error processing payment success:', error)
+      return redirect(`/customers/${viewId}`, {
+        headers: { 'Set-Cookie': await commitSession(flashSession) },
+      })
     }
   } else if (paymentStatus === 'cancelled') {
     const flashSession = await getSession(request.headers.get('Cookie'))

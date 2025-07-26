@@ -296,9 +296,7 @@ function commercialGdIndyText(
   pdfForm
     .getDropdown('Dropdown159')
     .select(seamText[seamKey as keyof typeof seamText] || 'N/A')
-  console.log('totalPrice', queryData[0].total_price)
   const fullPrice = queryData[0].total_price || 0
-  console.log('fullPrice', fullPrice)
   const halfPrice = fullPrice * 0.5
   pdfForm.getTextField('Text160').setText(fullPrice.toString())
   pdfForm

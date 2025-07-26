@@ -4,8 +4,8 @@ import {
   type ActionFunctionArgs,
   data,
   type LoaderFunctionArgs,
-  redirect,
   Form as RemixForm,
+  redirect,
   useActionData,
   useLoaderData,
   useNavigate,
@@ -99,8 +99,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             headers: { 'Set-Cookie': await commitSession(session) },
           },
         )
-      } catch (error) {
-        console.error('Error unlinking images:', error)
+      } catch {
         return { error: 'Failed to unlink images' }
       }
     } else if (id) {

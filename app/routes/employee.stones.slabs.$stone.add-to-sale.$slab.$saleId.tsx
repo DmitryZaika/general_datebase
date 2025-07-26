@@ -144,8 +144,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
           `UPDATE sinks SET slab_id = ?, price = ?, is_deleted = 1 WHERE id = ?`,
           [slabId, sinkPrice, sinkId],
         )
-      } else {
-        console.warn('No available sinks found for type ID:', data.sink)
       }
     }
 
@@ -190,8 +188,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         )
       }
     }
-  } catch (error) {
-    console.error('Error adding slab to sale: ', error)
+  } catch {
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Error', 'Failed to add slab to sale'))
     return redirect(`/employee/stones/slabs/${params.stone}${searchString}`, {

@@ -28,7 +28,7 @@ async function completeAddress(q: string): Promise<
   const res = await fetch(`/api/google/address-complete?q=${encodeURIComponent(q)}`)
   if (!res.ok) throw new Error('Failed to fetch address')
   const data = await res.json()
-  return data['suggestions']
+  return data.suggestions
 }
 
 type Props<T extends FieldValues> = {

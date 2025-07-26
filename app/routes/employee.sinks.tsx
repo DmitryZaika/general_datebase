@@ -29,13 +29,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 function InteractiveCard({
   sink,
   setCurrentId,
-  disabled,
   sinkType,
 }: {
   sink: Sink
   setCurrentId: (value: number, type: string) => void
   sinkType: string
-  disabled: boolean
 }) {
   const displayedAmount = sink.amount && sink.amount > 0 ? sink.amount : '—'
   const displayedWidth = sink.width && sink.width > 0 ? sink.width : '—'
@@ -145,7 +143,6 @@ export default function Sinks() {
             sink={sink}
             setCurrentId={handleSetCurrentId}
             sinkType={sink.type}
-            disabled={true}
           />
         ))}
       </ModuleList>
