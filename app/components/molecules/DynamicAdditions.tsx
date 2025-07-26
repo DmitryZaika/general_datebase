@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { Path, UseFormReturn } from 'react-hook-form'
 import { Button } from '~/components/ui/button'
@@ -201,7 +201,7 @@ export const FullDynamicAdditions = ({ form }: FullDynamicAdditionsProps) => {
     <div className='mt-4 space-y-2'>
       <h3 className='text-sm font-semibold text-gray-600'>Extra Items or discount</h3>
       <Button type='button' size='sm' onClick={handleAddItem}>
-        + Add Item
+        <Plus className='h-3 w-3' /> Add Item to Sell
       </Button>
       {extras.map((_, index) => (
         <div className='flex flex-row gap-2' key={index}>
