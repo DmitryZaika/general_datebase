@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import type { UseFormReturn } from 'react-hook-form'
+import type { Path, UseFormReturn } from 'react-hook-form'
 import { Button } from '~/components/ui/button'
 import type { TCustomerSchema } from '~/schemas/sales'
 import { CUSTOMER_ITEMS, HARDCODED_IGNORES } from '~/utils/constants'
@@ -169,6 +169,81 @@ export const DynamicAdditions = ({ form, index }: DynamicAdditionsProps) => {
       <h3 className='text-sm font-semibold text-gray-600'>Extra Items</h3>
       {selectedItems.map(itemKey => (
         <DynamicAddition key={itemKey} target={itemKey} form={form} index={index} />
+      ))}
+    </div>
+  )
+}
+
+interface FullDynamicAdditionsProps {
+  form: UseFormReturn<TCustomerSchema>
+  name: Path<TCustomerSchema>
+}
+
+export const FullDynamicAdditions = ({ form }: FullDynamicAdditionsProps) => {
+  const extras = form.watch('extras') || []
+
+  const handleAddItem = () => {
+    form.setValue('extras', [
+      ...extras,
+      {
+        adjustment: '',
+        price: 0,
+      },
+    ])
+  }
+  const handleRemove = (index: number) => {
+    const extras = form.getValues('extras')
+    const newExtras = extras.filter((_, i) => i !== index)
+    form.setValue('extras', newExtras)
+  }
+
+  return (
+    <div className='mt-4 space-y-2'>
+      <h3 className='text-sm font-semibold text-gray-600'>Extra Items or discount</h3>
+      <Button type='button' size='sm' onClick={handleAddItem}>
+        + Add Item
+      </Button>
+      {extras.map((_, index) => (
+        <div className='flex flex-row gap-2' key={index}>
+          <FormField
+            control={form.control}
+            name={`extras.${index}.adjustment`}
+            render={({ field }) => (
+              <InputItem
+                name='Adjustment'
+                placeholder='Enter Adjustment'
+                field={{
+                  ...field,
+                }}
+              />
+            )}
+          />
+          <FormField
+            control={form.control}
+            name={`extras.${index}.price`}
+            render={({ field }) => (
+              <InputItem
+                name='Price'
+                placeholder='Enter Price'
+                field={{
+                  ...field,
+                }}
+              />
+            )}
+          />
+          <div className='flex flex-col'>
+            <div className='h-6'></div>
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              className='h-10 w-10 p-0'
+              onClick={() => handleRemove(index)}
+            >
+              <X className='h-4 w-4' />
+            </Button>
+          </div>
+        </div>
       ))}
     </div>
   )

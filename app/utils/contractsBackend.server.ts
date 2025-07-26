@@ -6,6 +6,7 @@ import {
   extrasSchema,
   type TCustomerSchema,
   type TExtrasSchema,
+  type TFullExtrasSchema,
 } from '~/schemas/sales'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { CUSTOMER_ITEMS } from './constants'
@@ -24,6 +25,7 @@ interface Sale {
   email: string | null
   builder: boolean | null
   company_name: string | null
+  extras: TFullExtrasSchema | null
 }
 
 interface Slab {
@@ -62,6 +64,7 @@ const getSale = async (saleId: number): Promise<Sale | undefined> => {
           s.price,
           s.project_address,
           s.square_feet,
+          s.extras,
           c.name,
           c.address,
           c.postal_code,
@@ -222,7 +225,7 @@ export async function getCustomerSchemaFromSaleId(
     price: sale.price || 0,
     notes_to_sale: sale.notes || '',
     rooms: Object.values(roomsMap),
-
+    extras: sale.extras || [],
     company_name: sale.company_name || null,
   }
   return customerSchema.parse(final)
