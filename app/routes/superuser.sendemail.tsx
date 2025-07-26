@@ -8,7 +8,6 @@ import {
   useActionData,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
 import { Button } from '~/components/ui/button'
@@ -46,7 +45,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const session = await getSession(request.headers.get('Cookie'))
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     session.flash('message', toastData('Error', 'Invalid CSRF token'))
     return redirect('.', {
       headers: { 'Set-Cookie': await commitSession(session) },
@@ -62,8 +61,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   try {
     await sendEmail(data)
-  } catch (error) {
-    console.error('Error sending email: ', error)
+  } catch {
     session.flash('message', toastData('Error', 'Failed to send email'))
     return redirect('.', {
       headers: { 'Set-Cookie': await commitSession(session) },
@@ -86,7 +84,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function SuperuserSendEmail() {
   const actionData = useActionData<typeof action>()
-  const token = useAuthenticityToken()
   const form = useForm<FormData>({
     resolver,
     defaultValues: actionData?.receivedValues,

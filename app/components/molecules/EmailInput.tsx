@@ -1,10 +1,10 @@
 import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
-import type { ControllerRenderProps } from 'react-hook-form'
+import type { ControllerRenderProps, FieldValues, Path } from 'react-hook-form'
 import { InputItem } from '~/components/molecules/InputItem'
 
-interface EmailInputProps {
-  field: ControllerRenderProps<any, any>
+interface EmailInputProps<T extends FieldValues, V extends Path<T>> {
+  field: ControllerRenderProps<T, V>
   formClassName?: string
   disabled?: boolean
 }
@@ -18,11 +18,11 @@ const emailDomains = [
   '@icloud.com',
 ]
 
-export const EmailInput: React.FC<EmailInputProps> = ({
+export const EmailInput = <T extends FieldValues, V extends Path<T>>({
   field,
   formClassName,
   disabled,
-}) => {
+}: EmailInputProps<T, V>) => {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const suggestionsRef = useRef<HTMLDivElement>(null)

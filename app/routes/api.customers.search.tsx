@@ -21,8 +21,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     )
 
     return data({ customers })
-  } catch (error) {
-    console.error('Error searching customers:', error)
+  } catch {
     return data({ error: 'Failed to search customers' }, { status: 500 })
   }
 }

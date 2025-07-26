@@ -20,7 +20,6 @@ import { DataTable } from '~/components/ui/data-table'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -29,7 +28,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
 import { Input } from '~/components/ui/input'
@@ -220,7 +218,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     return {
       transactions: updatedTransactions,
-      currentUser: user.name,
       salesReps,
       filters: {
         search: searchTerm,
@@ -245,7 +242,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const formData = await request.formData()
   const intent = formData.get('intent')
-  const transactionId = formData.get('transactionId')
+  const transactionId = formData.get('transactionId') as string
   const installedDate = formData.get('installedDate') as string
   const isPaid = formData.get('isPaid') === 'true'
 
@@ -346,9 +343,7 @@ export async function action({ request }: ActionFunctionArgs) {
       return redirect(redirectUrl, {
         headers: { 'Set-Cookie': await commitSession(session) },
       })
-    } catch (error) {
-      console.error('Error updating status:', error)
-
+    } catch {
       const session = await getSession(request.headers.get('Cookie'))
       session.flash(
         'message',
@@ -369,8 +364,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function EmployeeTransactions() {
-  const { transactions, currentUser, salesReps, filters } =
-    useLoaderData<typeof loader>()
+  const { transactions, salesReps, filters } = useLoaderData<typeof loader>()
   const [searchParams, setSearchParams] = useSearchParams()
   const [searchValue, setSearchValue] = useState(filters.search)
   const [customers, setCustomers] = useState<{ id: number; name: string }[]>([])
@@ -393,7 +387,7 @@ export default function EmployeeTransactions() {
       const fetchCustomers = async () => {
         try {
           const response = await fetch(
-            '/api/customers/search?term=' + encodeURIComponent(searchValue),
+            `/api/customers/search?term=${encodeURIComponent(searchValue)}`,
           )
           if (response.ok) {
             const data = await response.json()
@@ -403,8 +397,7 @@ export default function EmployeeTransactions() {
             setCustomers([])
             setShowCustomers(false)
           }
-        } catch (error) {
-          console.error('Error fetching customers:', error)
+        } catch {
           setCustomers([])
           setShowCustomers(false)
         }

@@ -2,7 +2,6 @@ import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {
   type ActionFunctionArgs,
-  data,
   Form,
   Link,
   type LoaderFunctionArgs,
@@ -110,7 +109,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const stoneId = parseInt(params.stone, 10)
 
-  if (isNaN(stoneId)) {
+  if (Number.isNaN(stoneId)) {
     return forceRedirectError(request.headers, 'Invalid stone ID format')
   }
 
@@ -134,13 +133,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   let linkedSlabs: Slab[] = []
 
-  try {
-    const stoneLinks = await selectMany<{
-      source_stone_id: number
-      source_stone_name: string
-    }>(
-      db,
-      `SELECT 
+  const stoneLinks = await selectMany<{
+    source_stone_id: number
+    source_stone_name: string
+  }>(
+    db,
+    `SELECT 
          stone_slab_links.source_stone_id, 
          s.name as source_stone_name
        FROM stone_slab_links
@@ -148,28 +146,25 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
        WHERE stone_slab_links.stone_id = ?
        GROUP BY stone_slab_links.source_stone_id, s.name
        ORDER BY s.name ASC`,
-      [stoneId],
-    )
+    [stoneId],
+  )
 
-    for (const link of stoneLinks) {
-      const linkedStoneSlabs = await selectMany<Slab>(
-        db,
-        `SELECT 
+  for (const link of stoneLinks) {
+    const linkedStoneSlabs = await selectMany<Slab>(
+      db,
+      `SELECT 
            id, bundle, url, sale_id, width, length, cut_date, parent_id
          FROM slab_inventory 
          WHERE stone_id = ? AND cut_date IS NULL`,
-        [link.source_stone_id],
-      )
+      [link.source_stone_id],
+    )
 
-      linkedStoneSlabs.forEach(slab => {
-        slab.source_stone_id = link.source_stone_id
-        slab.source_stone_name = link.source_stone_name
-      })
+    linkedStoneSlabs.forEach(slab => {
+      slab.source_stone_id = link.source_stone_id
+      slab.source_stone_name = link.source_stone_name
+    })
 
-      linkedSlabs = [...linkedSlabs, ...linkedStoneSlabs]
-    }
-  } catch (err) {
-    console.error('Error fetching linked slabs:', err)
+    linkedSlabs = [...linkedSlabs, ...linkedStoneSlabs]
   }
 
   const allSlabs = [...slabs, ...linkedSlabs]
@@ -209,7 +204,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         slab_inventory.id DESC
     `
 
-    const rawTransactions = await selectMany<Record<string, any>>(
+    const rawTransactions = await selectMany<Record<string, unknown>>(
       db,
       sqlQuery,
       soldSlabIds,
@@ -219,12 +214,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         try {
           const parsed = TransactionSchema.parse(raw)
           return parsed
-        } catch (error) {
-          console.error(
-            `Validation error for transaction with sale_id ${raw.sale_id}:`,
-            error,
-          )
-          console.error('Raw transaction data:', raw)
+        } catch {
           return null
         }
       })
@@ -257,10 +247,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           square_feet: transaction.square_feet || 0,
           sink: transaction.sink_names || '',
         }
-      } else if (slab.sale_id) {
-        console.warn(
-          `WARNING: Slab ${slab.id} is marked as sold but has no transaction data!`,
-        )
       }
     })
   }
@@ -318,7 +304,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const user = await getEmployeeUser(request)
+  try {
+    await getEmployeeUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
   const formData = await request.formData()
   const intent = formData.get('intent') as string
 
@@ -331,7 +321,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const length = Number(formData.get('length'))
     const width = Number(formData.get('width'))
 
-    if (isNaN(slabId) || isNaN(length) || isNaN(width)) {
+    if (Number.isNaN(slabId) || Number.isNaN(length) || Number.isNaN(width)) {
       const session = await getSession(request.headers.get('Cookie'))
       session.flash(
         'message',
@@ -418,7 +408,6 @@ export default function SlabsModal() {
     const isEditing = editingSlab === slab.id
     const isHighlighted = highlightedSlab === slab.id
     const hasParent = slab.parent_id !== null
-    const hasChildren = allSlabs.some(otherSlab => otherSlab.parent_id === slab.id)
 
     return (
       <TooltipProvider key={slab.id}>

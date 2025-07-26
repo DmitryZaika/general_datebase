@@ -47,7 +47,6 @@ export async function action({ request }: ActionFunctionArgs) {
       )
     }
 
-    console.error('Error creating customer:', error)
     return Response.json(
       {
         success: false,

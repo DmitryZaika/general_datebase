@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import type { RowDataPacket } from 'mysql2'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
@@ -31,17 +32,13 @@ const userSchema = z.object({
 
 type FormData = z.infer<typeof userSchema>
 
-interface ActionData {
-  error?: string
-  errors?: Record<string, any>
-  defaultValues?: Partial<FormData>
-}
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getEmployeeUser(request)
     return redirect('/employee')
-  } catch {}
+  } catch {
+    // ignore
+  }
   const { searchParams } = new URL(request.url)
   const error = searchParams.get('error')
   return { error }
@@ -51,7 +48,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     await csrf.validate(request)
   } catch (e) {
-    return { error: String(e) } as ActionData
+    return { error: String(e) }
   }
   const {
     errors,
@@ -59,7 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
     receivedValues: defaultValues,
   } = await getValidatedFormData<FormData>(request, zodResolver(userSchema))
   if (errors) {
-    return { errors, defaultValues } as ActionData
+    return { errors, defaultValues }
   }
 
   const sessionId = await login(data.email, data.password, 60 * 60 * 24 * 7 * 30 * 12)
@@ -67,19 +64,19 @@ export async function action({ request }: ActionFunctionArgs) {
     return {
       error: 'Incorrect email or password. Please try again.',
       defaultValues: { ...defaultValues, password: '' },
-    } as ActionData
+    }
   }
   const session = await getSession(request.headers.get('Cookie'))
   session.set('sessionId', sessionId)
 
-  const [[row]] = await db.query(
+  const [row] = await db.execute<(RowDataPacket & { position: string | null })[]>(
     `SELECT p.name AS position
        FROM users u
        LEFT JOIN positions p ON p.id = u.position_id
      WHERE u.email = ? LIMIT 1`,
     [data.email],
   )
-  const position: string | null = row?.position ?? null
+  const position = row?.[0]?.position ?? null
 
   session.flash('message', toastData('Success', 'Logged in'))
 
@@ -92,7 +89,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function Login() {
   const navigation = useNavigation()
   const { error } = useLoaderData<{ error: string | null }>()
-  const actionData = useActionData<ActionData>()
+  const actionData = useActionData<typeof action>()
   const form = useForm<FormData>({
     resolver: zodResolver(userSchema),
     defaultValues: actionData?.defaultValues || { email: '', password: '' },

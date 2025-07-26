@@ -1,20 +1,12 @@
 import { useEffect, useState } from 'react'
-import {
-  type LoaderFunctionArgs,
-  Outlet,
-  redirect,
-  useLoaderData,
-  useLocation,
-} from 'react-router'
+import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { ImageCard } from '~/components/organisms/ImageCard'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
-import { db } from '~/db.server'
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { faucetFilterSchema } from '~/schemas/faucets'
 import { FAUCET_TYPES } from '~/utils/constants'
 import { type Faucet, faucetQueryBuilder } from '~/utils/queries.server'
-import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -37,7 +29,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 function InteractiveCard({
   faucet,
   setCurrentId,
-  disabled,
   faucetType,
 }: {
   faucet: Faucet
@@ -89,9 +80,8 @@ function InteractiveCard({
 export default function Faucets() {
   const { faucets } = useLoaderData<typeof loader>()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
-  const [activeType, setActiveType] = useState<string | undefined>(undefined)
+  const [_, setActiveType] = useState<string | undefined>(undefined)
   const [sortedFaucets, setSortedFaucets] = useState<Faucet[]>(faucets)
-  const location = useLocation()
 
   const getTypePriority = (type: string) => {
     const index = FAUCET_TYPES.indexOf(type)

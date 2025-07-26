@@ -39,7 +39,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     const transactionId = parseInt(params.transactionId, 10)
 
-    if (isNaN(transactionId)) {
+    if (Number.isNaN(transactionId)) {
       return redirect('/admin/transactions')
     }
 
@@ -57,8 +57,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
 
     return { transaction: transaction[0] }
-  } catch (error) {
-    console.error('Error loading transaction:', error)
+  } catch {
     return redirect('/admin/transactions')
   }
 }
@@ -194,8 +193,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         'Set-Cookie': await commitSession(session),
       },
     })
-  } catch (error) {
-    console.error('Error deleting transaction:', error)
+  } catch {
     const session = await getSession(request.headers.get('Cookie'))
     session.flash(
       'message',

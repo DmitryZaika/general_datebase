@@ -8,7 +8,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
   }
   const slabId = parseInt(params.slabId)
 
-  if (isNaN(slabId)) {
+  if (Number.isNaN(slabId)) {
     return new Response('Invalid slab ID', { status: 400 })
   }
 
@@ -24,8 +24,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
     }
 
     return redirect(`/employee/stones/slabs/${slabData[0].stone_id}?slab=${slabId}`)
-  } catch (error) {
-    console.error('Error in slab redirect:', error)
+  } catch {
     return new Response('Server error', { status: 500 })
   }
 }

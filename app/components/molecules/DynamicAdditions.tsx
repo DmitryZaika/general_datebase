@@ -110,7 +110,7 @@ export const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) =
             <DynamicControl
               key={item}
               target={target}
-              itemKey={item}
+              itemKey={item as keyof (typeof CUSTOMER_ITEMS)[ExtraItemKey]}
               form={form}
               index={index}
             />

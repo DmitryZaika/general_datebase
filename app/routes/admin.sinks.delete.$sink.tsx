@@ -22,16 +22,12 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   const sinkId = params.sink
-  try {
-    await db.execute(`UPDATE sink_type SET is_deleted = 1 WHERE id = ?`, [sinkId])
-    await db.execute(`UPDATE sinks SET is_deleted = 1 WHERE sink_type_id = ?`, [sinkId])
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
-  }
+  await db.execute(`UPDATE sink_type SET is_deleted = 1 WHERE id = ?`, [sinkId])
+  await db.execute(`UPDATE sinks SET is_deleted = 1 WHERE sink_type_id = ?`, [sinkId])
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Sink Deleted'))
   return redirect('..', {

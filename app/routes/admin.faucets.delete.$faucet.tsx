@@ -22,7 +22,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   const faucetId = params.faucet

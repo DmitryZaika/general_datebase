@@ -1,24 +1,18 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { Search } from 'lucide-react'
 import { useState } from 'react'
 import {
-  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
-  useLocation,
   useNavigate,
 } from 'react-router'
-import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { PageLayout } from '~/components/PageLayout'
-import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
-import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 
 interface Transaction {
   id: number
@@ -41,12 +35,9 @@ function formatDate(dateString: string) {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user
+  let user: User
   try {
     user = await getAdminUser(request)
-    if (!user || !user.company_id) {
-      return redirect('/login')
-    }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -97,7 +88,7 @@ const transactionColumns: ColumnDef<Transaction>[] = [
 
 export default function AdminTransactions() {
   const { transactions } = useLoaderData<typeof loader>()
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchTerm, _] = useState('')
   const navigate = useNavigate()
 
   const filteredTransactions = transactions.filter(transaction =>

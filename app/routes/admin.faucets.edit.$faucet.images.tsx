@@ -35,7 +35,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   if (!params.faucet) {
@@ -75,20 +75,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { errors }
   }
 
-  const faucet = await selectId<{ url: string }>(
-    db,
-    'select url from faucet_type WHERE id = ?',
+  await db.execute(`INSERT INTO installed_faucets (url, faucet_id) VALUES (?, ?)`, [
+    data.file,
     faucetId,
-  )
-
-  try {
-    await db.execute(`INSERT INTO installed_faucets (url, faucet_id) VALUES (?, ?)`, [
-      data.file,
-      faucetId,
-    ])
-  } catch (error) {
-    console.error('Error connecting to the database:', errors)
-  }
+  ])
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Image Added'))

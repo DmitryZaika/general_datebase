@@ -21,18 +21,14 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   const imageId = params.image ? parseInt(params.image, 10) : null
   if (!imageId) {
     return { error: 'Invalid image ID' }
   }
-  try {
-    const result = await db.execute(`DELETE FROM images WHERE id = ?`, [imageId])
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
-  }
+  await db.execute(`DELETE FROM images WHERE id = ?`, [imageId])
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'image Deleted'))
   return redirect('..', {

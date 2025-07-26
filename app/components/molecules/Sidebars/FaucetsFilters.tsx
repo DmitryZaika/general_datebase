@@ -58,7 +58,7 @@ export function FaucetsFilters({ base, suppliers }: IProps) {
       if (isSubmitting) return
 
       const type = searchParams.type ?? []
-      let newTypes
+      let newTypes: FaucetFilter['type']
 
       if (type.includes(typeToToggle)) {
         newTypes = type.filter(t => t !== typeToToggle)

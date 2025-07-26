@@ -39,7 +39,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 
@@ -49,28 +49,23 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   const user = await getAdminUser(request)
   try {
-    try {
-      const [result] = await db.execute<mysql.ResultSetHeader>(
-        `INSERT INTO sink_type (name, type, url, company_id, is_display, is_deleted, supplier_id, width, length, depth, retail_price, cost) 
+    await db.execute<mysql.ResultSetHeader>(
+      `INSERT INTO sink_type (name, type, url, company_id, is_display, is_deleted, supplier_id, width, length, depth, retail_price, cost) 
          VALUES (?, ?, ?, ?, ?, false, ?, ?, ?, 0, ?, ?);`,
-        [
-          data.name,
-          data.type,
-          data.file,
-          user.company_id,
-          data.is_display,
-          data.supplier_id,
-          data.width,
-          data.length,
-          data.retail_price,
-          data.cost,
-        ],
-      )
-    } catch (error) {
-      throw error
-    }
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
+      [
+        data.name,
+        data.type,
+        data.file,
+        user.company_id,
+        data.is_display,
+        data.supplier_id,
+        data.width,
+        data.length,
+        data.retail_price,
+        data.cost,
+      ],
+    )
+  } catch {
     const sinkId = parseInt(params.sink ?? '0', 10)
     if (!sinkId) {
       return new Response(JSON.stringify({ error: 'Invalid or missing sink ID' }), {

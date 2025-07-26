@@ -10,7 +10,6 @@ import {
   useNavigate,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
 import { SelectInput } from '~/components/molecules/SelectItem'
@@ -60,7 +59,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 
@@ -72,23 +71,19 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, receivedValues }
   }
   const password = await bcrypt.hash(data.password, 10)
-  try {
-    await db.execute(
-      `INSERT INTO users (name, phone_number, email, password, company_id, is_employee, is_admin, position_id)
+  await db.execute(
+    `INSERT INTO users (name, phone_number, email, password, company_id, is_employee, is_admin, position_id)
        VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
-      [
-        data.name,
-        data.phone_number,
-        data.email,
-        password,
-        data.company_id,
-        data.is_admin,
-        data.position_id,
-      ],
-    )
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
-  }
+    [
+      data.name,
+      data.phone_number,
+      data.email,
+      password,
+      data.company_id,
+      data.is_admin,
+      data.position_id,
+    ],
+  )
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'user added'))
   return redirect('..', {
@@ -121,7 +116,6 @@ export default function UsersAdd() {
     key: position.id,
     value: position.name,
   }))
-  const token = useAuthenticityToken()
   const form = useForm<FormData>({
     resolver,
     defaultValues: {

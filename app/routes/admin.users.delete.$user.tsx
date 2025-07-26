@@ -22,7 +22,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 
@@ -37,8 +37,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 
   try {
     await db.execute(`UPDATE users SET is_deleted = 1 WHERE id = ?`, [userId])
-  } catch (error) {
-    console.error('Error soft-deleting user: ', error)
+  } catch {
     return { error: 'Failed to soft-delete user' }
   }
 

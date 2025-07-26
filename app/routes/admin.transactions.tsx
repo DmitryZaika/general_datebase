@@ -301,48 +301,10 @@ const transactionColumns: ColumnDef<Transaction>[] = [
 export default function AdminTransactions() {
   const { transactions } = useLoaderData<typeof loader>()
   const [searchTerm, setSearchTerm] = useState('')
-  const location = useLocation()
 
   const filteredTransactions = transactions.filter(transaction =>
     transaction.customer_name.toLowerCase().includes(searchTerm.toLowerCase()),
   )
-
-  const getPDF = async () => {
-    try {
-      const response = await fetch('/api/pdf', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/pdf',
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to download PDF: ${response.statusText}`)
-      }
-
-      const blob = await response.blob()
-
-      const url = window.URL.createObjectURL(blob)
-
-      const link = document.createElement('a')
-      link.href = url
-
-      const contentDisposition = response.headers.get('content-disposition')
-      const filename = contentDisposition
-        ? contentDisposition.split('filename=')[1]?.replace(/["']/g, '')
-        : 'transaction-report.pdf'
-
-      link.download = filename
-
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Error downloading PDF:', error)
-      alert('Error downloading PDF. Please try again.')
-    }
-  }
 
   return (
     <>

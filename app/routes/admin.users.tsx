@@ -27,7 +27,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
-  const user = await getSuperUser(request)
+  await getSuperUser(request)
   const users = await selectMany<User>(
     db,
     ' select id, name, email, phone_number from users WHERE is_deleted = 0',

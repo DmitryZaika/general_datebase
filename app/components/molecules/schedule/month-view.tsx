@@ -21,13 +21,13 @@ interface Event {
 }
 
 const pageTransitionVariants = {
-  enter: (direction: number) => ({
+  enter: () => ({
     opacity: 0,
   }),
   center: {
     opacity: 1,
   },
-  exit: (direction: number) => ({
+  exit: () => ({
     opacity: 0,
     transition: {
       opacity: { duration: 0.2, ease: 'easeInOut' },
@@ -63,7 +63,7 @@ export default function MonthView() {
     if (dateParam) {
       const regex = /^(\d{2})-(\d{2})-(\d{4})$/
       const match = dateParam.match(regex)
-      const [, dd, mm, yyyy] = match
+      const [, dd, mm, yyyy] = match ?? []
       const day = parseInt(dd, 10)
       const month = parseInt(mm, 10) - 1 // месяцы в JS от 0 до 11
       const year = parseInt(yyyy, 10)
@@ -260,7 +260,7 @@ export default function MonthView() {
               ))}
 
               {/* Current month's days */}
-              {daysInMonth.map((dayObj: object) => {
+              {daysInMonth.map((dayObj: { day: number }) => {
                 const dayEvents: Event[] = getters.getEventsForDay(
                   dayObj.day,
                   currentDate,

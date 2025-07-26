@@ -81,8 +81,7 @@ export async function action({ request }: ActionFunctionArgs) {
         'Set-Cookie': await commitSession(session),
       },
     })
-  } catch (error) {
-    console.error('Error adding payroll rule:', error)
+  } catch {
     const session = await getSession(request.headers.get('Cookie'))
     session.flash(
       'message',

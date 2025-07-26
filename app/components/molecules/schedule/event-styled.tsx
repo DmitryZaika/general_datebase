@@ -55,7 +55,7 @@ interface Event {
   startDate: Date
   endDate: Date
   description?: string
-  variant?: string
+  variant?: 'primary' | 'danger' | 'success' | 'warning' | 'default'
   notes?: string
 }
 
@@ -76,7 +76,6 @@ export default function EventStyled({
 
   // Determine if delete button should be shown
   // Hide it for minimized events to save space, show on hover instead
-  const shouldShowDeleteButton = !event?.minmized
 
   // Handler function to open edit modal
   function handleEditEvent(e?: React.MouseEvent) {

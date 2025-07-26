@@ -2,9 +2,7 @@ import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {
   type ActionFunctionArgs,
-  data,
   Form,
-  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
@@ -12,7 +10,6 @@ import {
   useLocation,
   useNavigate,
   useNavigation,
-  useParams,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
@@ -28,7 +25,7 @@ import {
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getAdminUser, getEmployeeUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
 interface Slab {
@@ -129,13 +126,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   let linkedSlabs: Slab[] = []
 
-  try {
-    const stoneLinks = await selectMany<{
-      source_stone_id: number
-      source_stone_name: string
-    }>(
-      db,
-      `SELECT 
+  const stoneLinks = await selectMany<{
+    source_stone_id: number
+    source_stone_name: string
+  }>(
+    db,
+    `SELECT 
            stone_slab_links.source_stone_id, 
            s.name as source_stone_name
          FROM stone_slab_links
@@ -143,28 +139,25 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
          WHERE stone_slab_links.stone_id = ?
          GROUP BY stone_slab_links.source_stone_id, s.name
          ORDER BY s.name ASC`,
-      [stoneId],
-    )
+    [stoneId],
+  )
 
-    for (const link of stoneLinks) {
-      const linkedStoneSlabs = await selectMany<Slab>(
-        db,
-        `SELECT 
+  for (const link of stoneLinks) {
+    const linkedStoneSlabs = await selectMany<Slab>(
+      db,
+      `SELECT 
              id, bundle, url, sale_id, width, length, cut_date, parent_id
            FROM slab_inventory 
            WHERE stone_id = ? AND cut_date IS NULL`,
-        [link.source_stone_id],
-      )
+      [link.source_stone_id],
+    )
 
-      linkedStoneSlabs.forEach(slab => {
-        slab.source_stone_id = link.source_stone_id
-        slab.source_stone_name = link.source_stone_name
-      })
+    linkedStoneSlabs.forEach(slab => {
+      slab.source_stone_id = link.source_stone_id
+      slab.source_stone_name = link.source_stone_name
+    })
 
-      linkedSlabs = [...linkedSlabs, ...linkedStoneSlabs]
-    }
-  } catch (err) {
-    console.error('Error fetching linked slabs:', err)
+    linkedSlabs = [...linkedSlabs, ...linkedStoneSlabs]
   }
 
   const allSlabs = [...slabs, ...linkedSlabs]
@@ -214,8 +207,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         try {
           const parsed = TransactionSchema.parse(raw)
           return parsed
-        } catch (error) {
-          console.error(`Validation error for transaction:`, error)
+        } catch {
           return null
         }
       })
@@ -285,7 +277,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       slab_id: number
       customer_name: string
       seller_name: string
-    }>(db, parentSqlQuery, slabsWithParent)
+    }>(db, parentSqlQuery, slabsWithParent as number[])
 
     const parentTransactionsBySlabId = parentTransactions.reduce(
       (acc, transaction) => {
@@ -309,7 +301,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const user = await getEmployeeUser(request)
+  try {
+    await getAdminUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${encodeURIComponent(String(error))}`)
+  }
   const formData = await request.formData()
   const intent = formData.get('intent') as string
 
@@ -322,7 +318,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const length = Number(formData.get('length'))
     const width = Number(formData.get('width'))
 
-    if (isNaN(slabId) || isNaN(length) || isNaN(width)) {
+    if (Number.isNaN(slabId) || Number.isNaN(length) || Number.isNaN(width)) {
       const session = await getSession(request.headers.get('Cookie'))
       session.flash(
         'message',
@@ -360,7 +356,6 @@ export default function SlabsModal() {
   const navigation = useNavigation()
   const navigate = useNavigate()
   const location = useLocation()
-  const params = useParams()
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search)

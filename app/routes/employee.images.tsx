@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { Image } from '~/components/molecules/Image'
@@ -8,7 +7,7 @@ import { useArrowToggle } from '~/hooks/useArrowToggle'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
-interface Image {
+interface ItemImage {
   id: number
   name: string
   url: string | null
@@ -21,7 +20,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
   const user = await getEmployeeUser(request)
-  const images = await selectMany<Image>(
+  const images = await selectMany<ItemImage>(
     db,
     'SELECT id, name, url FROM images WHERE company_id = ?',
     [user.company_id],

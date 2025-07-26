@@ -1,21 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { FaFile } from 'react-icons/fa'
 import { Link, type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '~/components/ui/accordion'
-import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -76,8 +62,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     })
 
     return { suppliers, filesMap }
-  } catch (error) {
-    console.error('Error loading suppliers:', error)
+  } catch {
     return { suppliers: [], filesMap: {} }
   }
 }

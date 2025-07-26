@@ -43,7 +43,7 @@ interface UserData extends RowDataPacket {
   phone_number: string | null
 }
 
-async function getCompanyInfo(): Promise<object> {
+async function getCompanyInfo(): Promise<{ CompanyInfo: { CompanyName: string } }> {
   const result = await fetch('/api/quickbooks/company-info')
   if (!result.ok) {
     throw new Error(await result.text())
@@ -59,7 +59,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     try {
       await csrf.validate(request)
-    } catch (error) {
+    } catch {
       return { error: 'Invalid CSRF token' }
     }
 
@@ -105,7 +105,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  let user, rows
+  let user: User, rows: UserData[]
   try {
     user = await getEmployeeUser(request)
 
@@ -123,7 +123,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let quickBooksUrl = null
   try {
     quickBooksUrl = await getQboUrl(request, user.company_id)
-  } catch (error) {
+  } catch {
     quickBooksUrl = null
   }
   return { userData: rows[0], quickBooksUrl }

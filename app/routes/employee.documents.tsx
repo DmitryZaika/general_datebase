@@ -1,15 +1,14 @@
 import { Document, Page, pdfjs } from 'react-pdf'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css'
 import 'react-pdf/dist/esm/Page/TextLayer.css'
+import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import ModuleList from '~/components/ModuleList'
-import { Image } from '~/components/molecules/Image'
 import { Accordion, AccordionContent, AccordionItem } from '~/components/ui/accordion'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
-interface Document {
+interface ItemDocument {
   id: number
   name: string
   url: string | null
@@ -27,7 +26,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
   const user = await getEmployeeUser(request)
-  const documents = await selectMany<Document>(
+  const documents = await selectMany<ItemDocument>(
     db,
     'SELECT id, name, url FROM documents WHERE company_id = ?',
     [user.company_id],
