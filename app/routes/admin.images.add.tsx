@@ -38,7 +38,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   const { errors, data } = await parseMutliForm(request, imageSchema, 'images')

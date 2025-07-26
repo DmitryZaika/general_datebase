@@ -40,7 +40,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 
@@ -50,24 +50,20 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   const user = await getAdminUser(request)
   try {
-    try {
-      const [result] = await db.execute<mysql.ResultSetHeader>(
-        `INSERT INTO faucet_type (name, type, url, company_id, is_display, is_deleted, supplier_id, retail_price, cost) 
+    await db.execute<mysql.ResultSetHeader>(
+      `INSERT INTO faucet_type (name, type, url, company_id, is_display, is_deleted, supplier_id, retail_price, cost) 
          VALUES (?, ?, ?, ?, ?, false, ?, ?, ?);`,
-        [
-          data.name,
-          data.type,
-          data.file,
-          user.company_id,
-          data.is_display,
-          data.supplier_id,
-          data.retail_price,
-          data.cost,
-        ],
-      )
-    } catch (error) {
-      throw error
-    }
+      [
+        data.name,
+        data.type,
+        data.file,
+        user.company_id,
+        data.is_display,
+        data.supplier_id,
+        data.retail_price,
+        data.cost,
+      ],
+    )
   } catch (error) {
     console.error('Error connecting to the database: ', error)
     const faucetId = parseInt(params.faucet ?? '0', 10)

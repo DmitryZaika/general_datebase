@@ -12,17 +12,7 @@ import {
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { PageLayout } from '~/components/PageLayout'
-import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '~/components/ui/table'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'

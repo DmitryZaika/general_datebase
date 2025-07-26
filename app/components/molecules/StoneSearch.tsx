@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { CheckIcon, MinusIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { FaChevronRight, FaEdit, FaImage, FaSearch, FaTrash } from 'react-icons/fa'
+import { FaChevronRight, FaEdit, FaSearch, FaTrash } from 'react-icons/fa'
 import { useLocation, useNavigate } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import type { StoneImage } from '~/types'
 import { SuperCarousel } from '../organisms/SuperCarousel'
 
 type UserRole = 'employee' | 'admin' | 'customer'
@@ -30,19 +31,7 @@ const highlightStyles = `
   }
 `
 
-const getStones = async (
-  name: string,
-  userRole: UserRole,
-): Promise<
-  {
-    id: number
-    name: string
-    url: string
-    retail_price: number
-    cost_per_sqft: number
-    available: number
-  }[]
-> => {
+const getStones = async (name: string, userRole: UserRole): Promise<StoneImage[]> => {
   const showSoldOut = userRole === 'admin' || userRole === 'employee'
   const response = await fetch(
     `/api/stones/search?name=${encodeURIComponent(name)}&show_sold_out=${showSoldOut}`,
@@ -64,7 +53,7 @@ export function StoneSearch({
   const location = useLocation()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const [doneStoneId, setDoneStoneId] = useState<number | null>(null)
-  const { data, isLoading } = useQuery({
+  const { data } = useQuery({
     queryKey: ['stones', 'search', searchTerm, userRole],
     queryFn: () => getStones(searchTerm, userRole),
     enabled: !!searchTerm,
@@ -97,20 +86,6 @@ export function StoneSearch({
 
   const handleResultClick = (stoneId: number) => {
     setCurrentId(stoneId)
-
-    /*
-    if (userRole === "admin") {
-      const stoneElement = document.getElementById(`stone-${stoneId}`);
-      if (stoneElement) {
-        stoneElement.scrollIntoView({ behavior: "smooth", block: "center" });
-        
-        stoneElement.classList.add("stone-highlight");
-        setTimeout(() => {
-          stoneElement.classList.remove("stone-highlight");
-        }, 2000);
-      }
-    }
-    */
   }
 
   const handleSlabsClick = (stoneId: number, e: React.MouseEvent) => {

@@ -41,7 +41,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 
@@ -62,18 +62,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     imageId,
   )
 
-  try {
-    if (newFile) {
-      await db.execute(`UPDATE images SET name = ?, url = ? WHERE id = ?`, [
-        data.name,
-        data.file,
-        imageId,
-      ])
-    } else {
-      await db.execute(`UPDATE images SET name = ? WHERE id = ?`, [data.name, imageId])
-    }
-  } catch (error) {
-    console.error('Error connecting to the database: ', errors)
+  if (newFile) {
+    await db.execute(`UPDATE images SET name = ?, url = ? WHERE id = ?`, [
+      data.name,
+      data.file,
+      imageId,
+    ])
+  } else {
+    await db.execute(`UPDATE images SET name = ? WHERE id = ?`, [data.name, imageId])
   }
   if (image?.url && newFile) {
     deleteFile(image.url)
