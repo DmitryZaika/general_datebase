@@ -81,6 +81,13 @@ export const CUSTOMER_ITEMS = {
     amount: 'number',
     priceFn: ({ amount }: Record<string, number>) => amount * 6,
   },
+  sink_cut_out: {
+    priceFn: ({ price }: Record<string, number>) => price || 250,
+  },
+  adjustment: {
+    adjustment: 'string',
+    priceFn: ({ price }: Record<string, number>) => price,
+  },
   edge_price: {
     edge_type: {
       flat: 0,
