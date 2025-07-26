@@ -61,21 +61,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
     documentId,
   )
 
-  try {
-    if (newFile) {
-      await db.execute(`UPDATE documents SET name = ?, url = ? WHERE id = ?`, [
-        data.name,
-        data.file,
-        documentId,
-      ])
-    } else {
-      await db.execute(`UPDATE documents SET name = ? WHERE id = ?`, [
-        data.name,
-        documentId,
-      ])
-    }
-  } catch (error) {
-    console.error('Error connecting to the database: ', errors)
+  if (newFile) {
+    await db.execute(`UPDATE documents SET name = ?, url = ? WHERE id = ?`, [
+      data.name,
+      data.file,
+      documentId,
+    ])
+  } else {
+    await db.execute(`UPDATE documents SET name = ? WHERE id = ?`, [
+      data.name,
+      documentId,
+    ])
   }
 
   if (document?.url && newFile) {

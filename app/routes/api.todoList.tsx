@@ -9,7 +9,7 @@ import { db } from '~/db.server'
 import { type TTodoListSchema, todoListSchema } from '~/schemas/general'
 import type { Todo } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request)
@@ -31,7 +31,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  let user
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {

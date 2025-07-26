@@ -1,5 +1,4 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import fetch from 'node-fetch'
 import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import {
@@ -8,12 +7,10 @@ import {
   Form,
   type LoaderFunctionArgs,
   redirect,
-  useNavigation,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
-import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SignatureInput } from '~/components/molecules/SignatureInput'
 import { AddressInput } from '~/components/organisms/AddressInput'
@@ -25,7 +22,7 @@ import { db } from '~/db.server'
 import { useFullFetcher } from '~/hooks/useFullFetcher'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
-import { getAdminUser, getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 // ----------------------
@@ -122,8 +119,7 @@ export async function action({ request }: ActionFunctionArgs) {
         formData.signature,
       ],
     )
-  } catch (err) {
-    console.error('Failed to save checklist to database', err)
+  } catch {
     return { error: 'Database save failed' }
   }
 

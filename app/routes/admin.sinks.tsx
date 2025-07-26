@@ -9,25 +9,16 @@ import {
   Outlet,
   redirect,
   useLoaderData,
-  useLocation,
   useNavigation,
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
-import { cleanParams, useSafeSearchParams } from '~/hooks/use-safe-search-params'
+import { cleanParams } from '~/hooks/use-safe-search-params'
 import { sinkFilterSchema } from '~/schemas/sinks'
 import { SINK_TYPES } from '~/utils/constants'
 import { type Sink, sinkQueryBuilder } from '~/utils/queries.server'
 import { getAdminUser } from '~/utils/session.server'
-
-const customOrder = [
-  'stainless 18 gauge',
-  'stainless 16 gauge',
-  'composite',
-  'ceramic',
-  'farm house',
-]
 
 const formatPrice = (price: number | null | undefined): string => {
   if (price == null) return '-'
@@ -62,9 +53,7 @@ export default function AdminSinks() {
   const navigation = useNavigation()
   const [isAddingSink, setIsAddingSink] = useState(false)
   const [sortedSinks, setSortedSinks] = useState<Sink[]>(sinks)
-  const location = useLocation()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
-  const [searchParams] = useSafeSearchParams(sinkFilterSchema)
 
   const getTypePriority = (type: string) => {
     const index = SINK_TYPES.indexOf(type)

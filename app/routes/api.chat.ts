@@ -21,13 +21,11 @@ async function getContext(
   user_id: number,
   query: string,
 ): Promise<{ messages: Message[]; id: number }> {
-  console.time('db:get-context')
   const history = await selectMany<{ history: Message[]; id: number }>(
     db,
     'SELECT id, history from chat_history WHERE user_id = ?',
     [user_id],
   )
-  console.timeEnd('db:get-context')
 
   const currentConvo = history[0].history
   currentConvo.push({ role: 'user', content: query })
@@ -39,7 +37,6 @@ async function newContext(
   company_id: number,
   query: string,
 ): Promise<{ history: Message[]; id: number | undefined }> {
-  console.time('db:new-context')
   const instructions = await selectMany<InstructionSlim>(
     db,
     'SELECT id, title, rich_text from instructions WHERE company_id = ?',
@@ -50,9 +47,8 @@ async function newContext(
     'SELECT id from chat_history WHERE user_id = ?',
     [user_id],
   )
-  console.timeEnd('db:new-context')
 
-  let chatHistoryId
+  let chatHistoryId: number | undefined
   if (chatHistory.length > 0) {
     chatHistoryId = chatHistory[0].id
   }
@@ -72,13 +68,11 @@ async function newContext(
 }
 
 async function insertContext(user_id: number, messages: Message[], answer: string) {
-  console.time('db:insert-context')
   messages.push({ role: 'assistant', content: answer })
   await db.execute(`INSERT INTO chat_history (history, user_id) VALUES (?, ?);`, [
     JSON.stringify(messages),
     user_id,
   ])
-  console.timeEnd('db:insert-context')
 }
 
 async function updateContext(
@@ -87,18 +81,14 @@ async function updateContext(
   messages: Message[],
   answer: string,
 ) {
-  console.time('db:update-context')
   messages.push({ role: 'assistant', content: answer })
   await db.execute(
     `UPDATE chat_history SET history = ? WHERE id = ? AND user_id = ?;`,
     [JSON.stringify(messages), chatHistoryId, userId],
   )
-  console.timeEnd('db:update-context')
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  console.time('chat:total-request')
-
   const session = await getSession(request.headers.get('Cookie'))
   const activeSession = session.data.sessionId || null
   const url = new URL(request.url).searchParams
@@ -109,9 +99,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  console.time('auth:get-user')
   const user = (await getUserBySessionId(activeSession)) || null
-  console.timeEnd('auth:get-user')
 
   if (!user) {
     return new Response('Unauthorized', { status: 401 })
@@ -120,7 +108,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let messages: Message[] = []
   let chatHistoryId: number | undefined
 
-  console.time('context:prepare')
   if (isNew) {
     const result = await newContext(user.id, user.company_id, query)
     messages = result.history
@@ -130,9 +117,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     messages = result.messages
     chatHistoryId = result.id
   }
-  console.timeEnd('context:prepare')
 
-  console.time('openai:request')
   const response = await openai.chat.completions.create({
     model: 'gpt-4.1-mini-2025-04-14',
     messages: messages,
@@ -140,7 +125,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     max_tokens: 1024,
     stream: true,
   })
-  console.timeEnd('openai:request')
 
   return eventStream(
     request.signal,
@@ -155,48 +139,34 @@ export async function loader({ request }: LoaderFunctionArgs) {
       send({ event: 'info', data: 'Connecting to AI...' })
 
       ;(async () => {
-        console.time('openai:streaming')
         let answer = ''
-        let chunkCount = 0
-        let firstChunkReceived = false
-        const requestStartTime = Date.now()
 
         try {
           for await (const chunk of response) {
-            chunkCount++
-            if (chunkCount === 1) {
-              firstChunkReceived = true
-            }
-
             const message = chunk.choices[0].delta.content
             if (message) {
               send({ data: message })
               answer += message
             }
           }
-          console.timeEnd('openai:streaming')
 
           send({ data: DONE_KEY })
 
-          console.time('db:save-context')
           if (chatHistoryId) {
             updateContext(user.id, chatHistoryId, messages, answer)
           } else {
             insertContext(user.id, messages, answer)
           }
-          console.timeEnd('db:save-context')
         } catch (error) {
-          console.error('Error during streaming:', error)
           send({
-            data:
-              'Error: ' + (error instanceof Error ? error.message : 'Unknown error'),
+            data: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
           })
         }
-
-        console.timeEnd('chat:total-request')
       })()
 
-      return function clear() {}
+      return function clear() {
+        // do nothing
+      }
     },
     {
       headers: {

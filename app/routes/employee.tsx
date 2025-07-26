@@ -1,7 +1,5 @@
 import type { LoaderFunction, MetaFunction } from 'react-router'
 import { Outlet, redirect } from 'react-router'
-import { PageLayout } from '~/components/PageLayout'
-import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export const meta: MetaFunction = () => {

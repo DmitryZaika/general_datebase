@@ -23,9 +23,11 @@ export default function SpecialOrder() {
     const costPerSqftWithDelivery = totalSquareFeet ? totalCost / totalSquareFeet : 0
 
     return {
-      totalSquareFeet: isFinite(totalSquareFeet) ? totalSquareFeet.toFixed(2) : '0.00',
+      totalSquareFeet: Number.isFinite(totalSquareFeet)
+        ? totalSquareFeet.toFixed(2)
+        : '0.00',
       totalCost: width && length && price ? totalCost.toFixed(2) : '0.00',
-      totalPrice: isFinite(costPerSqftWithDelivery)
+      totalPrice: Number.isFinite(costPerSqftWithDelivery)
         ? costPerSqftWithDelivery.toFixed(2)
         : '0.00',
     }

@@ -181,7 +181,7 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
 export async function loader({ params }: LoaderFunctionArgs) {
   const checklistId = params.id
 
-  if (!checklistId || isNaN(Number(checklistId))) {
+  if (!checklistId || Number.isNaN(Number(checklistId))) {
     throw new Response('Invalid checklist ID', { status: 400 })
   }
 

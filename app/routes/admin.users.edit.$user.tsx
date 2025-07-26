@@ -53,7 +53,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   if (!params.user) {
@@ -121,7 +121,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return forceRedirectError(request.headers, 'No user id provided')
   }
   const userId = parseInt(params.user)
-  if (isNaN(userId)) {
+  if (Number.isNaN(userId)) {
     return forceRedirectError(request.headers, 'Invalid user id')
   }
   const user = await selectId<User>(

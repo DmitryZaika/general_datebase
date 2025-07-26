@@ -21,15 +21,11 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   const documentId = params.document
-  try {
-    await db.execute(`DELETE FROM documents WHERE id = ?`, [documentId])
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
-  }
+  await db.execute(`DELETE FROM documents WHERE id = ?`, [documentId])
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'document Deleted'))
   return redirect('..', {

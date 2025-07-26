@@ -9,7 +9,6 @@ import {
   useNavigation,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -50,7 +49,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 
@@ -97,7 +96,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function SuppliersAdd() {
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state === 'idle'
-  const token = useAuthenticityToken()
   const form = useForm<FormData>({
     resolver,
     defaultValues: {

@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import clsx from 'clsx'
-import { useEffect } from 'react'
-import { Form, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -66,7 +65,7 @@ export default function AddEventModal({
     defaultValues?.id ? 'PUT' : 'POST',
   )
 
-  const { watch, setValue, reset, handleSubmit } = form
+  const { watch, setValue, handleSubmit } = form
   const selectedColor = watch('color')
 
   const colorOptions = [
@@ -105,14 +104,9 @@ export default function AddEventModal({
     return `${year}-${month}-${day}T${hours}:${minutes}`
   }
 
-  const onSubmit = async (data: EventFormData) => {
-    try {
-      await fullSubmit()
-      onOpenChange(false) // Close modal after successful submission
-    } catch (error) {
-      // Handle error if needed - modal stays open on error
-      console.error('Failed to submit event:', error)
-    }
+  const onSubmit = async () => {
+    await fullSubmit()
+    onOpenChange(false)
   }
 
   return (

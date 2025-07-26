@@ -70,8 +70,6 @@ function getQRCodeHTML(
   isMultiple: boolean,
   customContent?: string,
 ) {
-  const isCustomLayout = customContent !== undefined
-
   return `
     <!DOCTYPE html>
     <html>

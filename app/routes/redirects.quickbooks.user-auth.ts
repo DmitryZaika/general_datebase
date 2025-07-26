@@ -1,16 +1,14 @@
 import { type LoaderFunctionArgs, redirect } from 'react-router'
-import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
-import { selectMany } from '~/utils/queryHelpers'
 import { getQboToken, setQboSession } from '~/utils/quickbooks.server'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const cookieHeader = request.headers.get('Cookie')
   const session = await getSession(cookieHeader)
 
-  let user
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {

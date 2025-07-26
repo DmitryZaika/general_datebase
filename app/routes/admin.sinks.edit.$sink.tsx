@@ -7,9 +7,7 @@ import {
   useLoaderData,
   useNavigate,
   useNavigation,
-  useRouteError,
 } from 'react-router'
-import { z } from 'zod'
 import { FileInput } from '~/components/molecules/FileInput'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -60,9 +58,11 @@ type LoaderData = {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const user = await getAdminUser(request).catch(err => {
-    return redirect(`/login?error=${err}`)
-  })
+  try {
+    await getAdminUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
   await csrf.validate(request).catch(() => {
     return { error: 'Invalid CSRF token' }
   })

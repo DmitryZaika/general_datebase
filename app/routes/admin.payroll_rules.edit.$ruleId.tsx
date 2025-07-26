@@ -159,7 +159,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export default function EditPayrollRule() {
   const { payrollRule } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
-  const [type, setType] = useState(payrollRule.type)
+  const [_, setType] = useState(payrollRule.type)
   const actionData = useActionData<ActionData>()
 
   const handleDialogChange = (open: boolean) => {

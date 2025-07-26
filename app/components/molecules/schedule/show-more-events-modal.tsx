@@ -1,12 +1,12 @@
 import { CalendarIcon } from 'lucide-react'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import EventStyled from '@/components/molecules/schedule/event-styled'
 import type { Event } from '@/types'
 
 export default function ShowMoreEventsModal() {
-  const dayEvents = []
+  const dayEvents: Event[] = []
 
-  const [events, setEvents] = useState<Event[]>(dayEvents)
+  const [events, setEvents] = useState<Event[]>([])
 
   useEffect(() => {
     setEvents(dayEvents)

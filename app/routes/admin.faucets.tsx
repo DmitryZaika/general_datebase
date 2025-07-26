@@ -7,13 +7,12 @@ import {
   Outlet,
   redirect,
   useLoaderData,
-  useLocation,
   useNavigation,
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
-import { cleanParams, useSafeSearchParams } from '~/hooks/use-safe-search-params'
+import { cleanParams } from '~/hooks/use-safe-search-params'
 import { faucetFilterSchema } from '~/schemas/faucets'
 import { FAUCET_TYPES } from '~/utils/constants'
 import { type Faucet, faucetQueryBuilder } from '~/utils/queries.server'
@@ -52,9 +51,7 @@ export default function AdminFaucets() {
   const navigation = useNavigation()
   const [isAddingFaucet, setIsAddingFaucet] = useState(false)
   const [sortedFaucets, setSortedFaucets] = useState<Faucet[]>(faucets)
-  const location = useLocation()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
-  const [searchParams] = useSafeSearchParams(faucetFilterSchema)
 
   const getTypePriority = (type: string) => {
     const index = FAUCET_TYPES.indexOf(type)

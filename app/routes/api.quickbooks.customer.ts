@@ -4,21 +4,17 @@ import {
   type LoaderFunctionArgs,
   redirect,
 } from 'react-router'
-import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
-import { selectMany } from '~/utils/queryHelpers'
 import {
   clearQboSession,
   createQboCustomer,
-  getQboToken,
   getQboTokenState,
   QboTokenState,
   queryQboCustomersByContact,
   refreshQboToken,
   setQboSession,
 } from '~/utils/quickbooks.server'
-import { getEmployeeUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { searchParams } = new URL(request.url)
@@ -33,7 +29,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return data({ success: false })
   }
 
-  let user
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
@@ -59,7 +55,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let refresh
   try {
     refresh = await refreshQboToken(request, user.company_id, refreshToken)
-  } catch (error) {
+  } catch {
     clearQboSession(session)
     return data(
       { success: false },
@@ -95,7 +91,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   // ---------- 2. авторизованный сотрудник ----------
-  let user
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {

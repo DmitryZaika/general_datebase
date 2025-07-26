@@ -11,7 +11,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const stoneId = parseInt(params.stoneId, 10)
-  if (isNaN(stoneId)) {
+  if (Number.isNaN(stoneId)) {
     return new Response(JSON.stringify({ error: 'Invalid Stone ID' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
@@ -45,8 +45,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     )
 
     return data({ slabs })
-  } catch (error) {
-    console.error('Error fetching slabs:', error)
+  } catch {
     return new Response(JSON.stringify({ error: 'Failed to fetch slabs' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

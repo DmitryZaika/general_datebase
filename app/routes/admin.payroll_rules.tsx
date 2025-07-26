@@ -2,13 +2,11 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import {
   type ActionFunctionArgs,
-  Form,
   Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
-  useLocation,
 } from 'react-router'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
@@ -79,7 +77,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function AdminPayrollRules() {
   const { payrollRules } = useLoaderData<typeof loader>()
-  const location = useLocation()
 
   const columns: ColumnDef<PayrollRule>[] = [
     {

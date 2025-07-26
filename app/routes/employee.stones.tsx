@@ -160,10 +160,6 @@ export default function Stones() {
     setSortedStones([...sortedInStock, ...sortedOutOfStock, ...sortedNotDisplayed])
   }, [stones])
 
-  const priorityFunction = (a: Stone, b: Stone) => {
-    return 0
-  }
-
   const toggleViewMode = () => {
     const newViewMode = viewMode === 'grid' ? 'table' : 'grid'
 
