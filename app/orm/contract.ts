@@ -97,16 +97,18 @@ export class Contract {
   protected async createSale(user: User, customerId: number) {
     const totalSquareFeet = await this.calculateTotalSquareFeet()
     const [salesResult] = await db.execute<ResultSetHeader>(
-      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price, project_address) 
-               VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL, ?, ?)`,
+      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price, project_address, extras) 
+               VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL, ?, ?, ?)`,
+
       [
         customerId,
         user.id,
         user.company_id,
         this.data.notes_to_sale || null,
         totalSquareFeet,
-        this.data.price || 0,
+        this.data.price,
         this.data.project_address || this.data.billing_address,
+        this.data.extras,
       ],
     )
 
@@ -149,7 +151,7 @@ export class Contract {
     }
     const totalSquareFeet = await this.calculateTotalSquareFeet()
     await db.execute(
-      `UPDATE sales SET customer_id = ?, seller_id = ?, notes = ?, square_feet = ?, price = ?, project_address = ? WHERE id = ? AND company_id = ?`,
+      `UPDATE sales SET customer_id = ?, seller_id = ?, notes = ?, square_feet = ?, price = ?, project_address = ?, extras = ? WHERE id = ? AND company_id = ?`,
       [
         customerId,
         user.id,
@@ -157,6 +159,7 @@ export class Contract {
         totalSquareFeet,
         this.data.price || 0,
         this.data.project_address || this.data.billing_address,
+        this.data.extras,
         this.saleId,
         user.company_id,
       ],

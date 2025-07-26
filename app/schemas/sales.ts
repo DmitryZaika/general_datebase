@@ -56,6 +56,13 @@ export const roomSchema = z.object({
 
 export type TRoomSchema = z.infer<typeof roomSchema>
 
+export const finalExtrasSchema = z.object({
+  adjustment: z.string().default(''),
+  price: z.coerce.number().default(0),
+})
+
+export type TFullExtrasSchema = z.infer<typeof finalExtrasSchema>[]
+
 export const customerSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   customer_id: z.coerce.number().optional(),
@@ -70,6 +77,7 @@ export const customerSchema = z.object({
   price: z.coerce.number().default(0),
   company_name: z.string().nullable().optional(),
   rooms: z.array(roomSchema).default([]),
+  extras: z.array(finalExtrasSchema).default([]),
 })
 
 export type TCustomerSchema = z.infer<typeof customerSchema>
