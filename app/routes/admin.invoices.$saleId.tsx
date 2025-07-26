@@ -1,18 +1,13 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Form,
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
   useLocation,
   useNavigate,
   useNavigation,
-  useParams,
 } from 'react-router'
-import { getValidatedFormData } from 'remix-hook-form'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { SelectInput } from '~/components/molecules/SelectItem'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -21,14 +16,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { FormField, FormProvider } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
-import { Switch } from '~/components/ui/switch'
 import { db } from '~/db.server'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { selectId, selectMany } from '~/utils/queryHelpers'
+import { selectId } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
 
 interface Transaction {
   id: number
@@ -44,9 +35,8 @@ interface Transaction {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  let user
   try {
-    user = await getEmployeeUser(request)
+    await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -99,12 +89,11 @@ export default function AddToSale() {
   const { transaction } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state === 'submitting'
-  const params = useParams()
   const location = useLocation()
 
-  const { data, isLoading } = useQuery({
+  const { data } = useQuery({
     queryKey: ['quickbooks', 'contact', transaction.email, transaction.phone],
-    queryFn: () => getCustomers(transaction.email),
+    queryFn: () => getCustomers(transaction.email || ''),
   })
 
   const handleChange = (open: boolean) => {
@@ -122,10 +111,10 @@ export default function AddToSale() {
 
         <div className='grid gap-4 py-4'>
           <h2>Customer Information</h2>
-          <Input value={transaction.customer_name} readOnly />
-          <Input value={transaction.email} readOnly />
-          <Input value={transaction.phone} readOnly />
-          <Input value={transaction.address} readOnly />
+          <Input value={transaction.customer_name || ''} readOnly />
+          <Input value={transaction.email || ''} readOnly />
+          <Input value={transaction.phone || ''} readOnly />
+          <Input value={transaction.address || ''} readOnly />
           {transaction.qbo_id === null && (
             <div>
               <p>Matching customers: {data?.length}</p>
@@ -136,8 +125,8 @@ export default function AddToSale() {
 
         <div>
           <h2>Invoice Information</h2>
-          <Input value={transaction.sale_date} readOnly />
-          <Input value={transaction.seller_name} readOnly />
+          <Input value={transaction.sale_date || ''} readOnly />
+          <Input value={transaction.seller_name || ''} readOnly />
         </div>
 
         <DialogFooter className='mt-4'>

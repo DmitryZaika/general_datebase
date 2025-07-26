@@ -50,7 +50,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 
@@ -67,20 +67,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { errors, receivedValues }
   }
 
-  try {
-    await db.execute(
-      `UPDATE instructions SET title = ?, parent_id = ?, after_id = ?, rich_text = ? WHERE id = ?;`,
-      [
-        data.title,
-        data.parent_id || null,
-        data.after_id || null,
-        data.rich_text,
-        instructionId,
-      ],
-    )
-  } catch (error) {
-    console.error('Error updating the database: ', error)
-  }
+  await db.execute(
+    `UPDATE instructions SET title = ?, parent_id = ?, after_id = ?, rich_text = ? WHERE id = ?;`,
+    [
+      data.title,
+      data.parent_id || null,
+      data.after_id || null,
+      data.rich_text,
+      instructionId,
+    ],
+  )
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Instruction updated'))

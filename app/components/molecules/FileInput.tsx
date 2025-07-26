@@ -1,6 +1,4 @@
 import Compressor from 'compressorjs'
-import { useState } from 'react'
-import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 
@@ -57,9 +55,6 @@ export function FileInput({
           const tempFile = new File([result], 'temp.jpg')
           onChange(tempFile)
         }
-      },
-      error(err) {
-        console.error(err.message)
       },
     })
   }

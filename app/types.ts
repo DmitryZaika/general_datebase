@@ -27,6 +27,15 @@ export interface Stone {
   retail_price: number
 }
 
+export interface StoneImage {
+  id: number
+  name: string
+  url: string
+  retail_price: number
+  cost_per_sqft: number
+  available: number
+}
+
 export type StoneSlim = Omit<Stone, 'retail_price'>
 
 export interface Faucet {

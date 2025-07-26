@@ -1,9 +1,9 @@
 import React from 'react'
-import type { ControllerRenderProps } from 'react-hook-form'
+import type { ControllerRenderProps, FieldValues, Path } from 'react-hook-form'
 import { InputItem } from '~/components/molecules/InputItem'
 
-interface PhoneInputProps {
-  field: ControllerRenderProps<any, any>
+interface PhoneInputProps<T extends FieldValues, V extends Path<T>> {
+  field: ControllerRenderProps<T, V>
   formClassName?: string
   disabled?: boolean
 }
@@ -31,11 +31,11 @@ const formatPhoneNumber = (value: string, isDeleting: boolean = false) => {
   return truncated
 }
 
-export const PhoneInput: React.FC<PhoneInputProps> = ({
+export const PhoneInput = <T extends FieldValues, V extends Path<T>>({
   field,
   formClassName,
   disabled,
-}) => {
+}: PhoneInputProps<T, V>) => {
   const [lastValue, setLastValue] = React.useState(field.value || '')
 
   React.useEffect(() => {
