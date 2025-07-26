@@ -2,10 +2,11 @@ import { data, type LoaderFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
 import type { Sink } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
+import type { User } from '~/utils/session.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  let user
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {

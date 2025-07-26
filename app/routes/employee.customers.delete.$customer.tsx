@@ -21,7 +21,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   if (!params.customer) {
@@ -34,8 +34,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 
   try {
     await db.execute(`DELETE FROM customers WHERE id = ?`, [customerId])
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
+  } catch {
     return { error: 'Failed to delete customer' }
   }
 

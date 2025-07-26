@@ -19,20 +19,15 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     const positions = JSON.parse(positionsData.toString())
 
-    try {
-      for (const { id, position } of positions) {
-        await db.execute(
-          'UPDATE todolist SET position = ? WHERE id = ? AND user_id = ?',
-          [position, id, user.id],
-        )
-      }
-
-      return Response.json({ success: true })
-    } catch (error) {
-      throw error
+    for (const { id, position } of positions) {
+      await db.execute(
+        'UPDATE todolist SET position = ? WHERE id = ? AND user_id = ?',
+        [position, id, user.id],
+      )
     }
-  } catch (error) {
-    console.error('Error updating todo positions:', error)
+
+    return Response.json({ success: true })
+  } catch {
     return new Response('Error updating positions', { status: 500 })
   }
 }

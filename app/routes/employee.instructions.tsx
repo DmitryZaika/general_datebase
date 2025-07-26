@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
 import {
@@ -8,10 +8,10 @@ import {
   AccordionTrigger,
 } from '~/components/ui/accordion'
 import { db } from '~/db.server'
+import '~/styles/instructions.css'
 import type { Instruction } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import '~/styles/instructions.css'
 
 interface InstructionNode {
   id: number
@@ -206,51 +206,6 @@ function cleanData(instructions: Instruction[]): InstructionNode[] {
   return rootNodes
 }
 
-function findInstructionById(
-  nodes: InstructionNode[],
-  id: number,
-): InstructionNode | null {
-  for (const node of nodes) {
-    if (node.id === id) {
-      return node
-    }
-
-    if (node.children.length > 0) {
-      const found = findInstructionById(node.children, id)
-      if (found) {
-        return found
-      }
-    }
-  }
-
-  return null
-}
-
-function findPathToNode(
-  allNodes: InstructionNode[],
-  nodeMap: Map<number, InstructionNode>,
-  targetId: number,
-): number[] {
-  const path: number[] = []
-  let currentId = targetId
-
-  const node = findInstructionById(allNodes, targetId)
-  if (!node) return path
-
-  path.unshift(currentId)
-
-  while (true) {
-    const current = nodeMap.get(currentId)
-    if (!current || current.parent_id === null || current.parent_id === undefined) break
-
-    const parentId = current.parent_id
-    path.unshift(parentId)
-    currentId = parentId
-  }
-
-  return path
-}
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     await getEmployeeUser(request)
@@ -297,63 +252,59 @@ export default function Instructions() {
       }
 
       setTimeout(() => {
-        try {
-          const targetElement = document.getElementById(`instruction-${id}`)
-          if (!targetElement) {
-            return
-          }
-
-          const accordionItem = targetElement.closest('[data-state]')
-          if (!accordionItem || !(accordionItem instanceof HTMLElement)) {
-            return
-          }
-
-          const button = accordionItem.querySelector('button[data-state]')
-          if (!button || !(button instanceof HTMLElement)) {
-            return
-          }
-
-          if (isRepeatedClick) {
-            button.click()
-            return
-          }
-
-          const ancestorAccordions: HTMLElement[] = []
-          let parent = accordionItem.parentElement
-
-          while (parent) {
-            const parentAccordion = parent.closest('[data-state]')
-            if (
-              parentAccordion &&
-              parentAccordion instanceof HTMLElement &&
-              parentAccordion !== accordionItem
-            ) {
-              ancestorAccordions.unshift(parentAccordion)
-              parent = parentAccordion.parentElement
-            } else {
-              break
-            }
-          }
-
-          for (const accordion of ancestorAccordions) {
-            if (accordion.getAttribute('data-state') === 'closed') {
-              const accordionButton = accordion.querySelector('button[data-state]')
-              if (accordionButton && accordionButton instanceof HTMLElement) {
-                accordionButton.click()
-              }
-            }
-          }
-
-          if (accordionItem.getAttribute('data-state') === 'closed') {
-            button.click()
-          }
-
-          setTimeout(() => {
-            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }, 100)
-        } catch (error) {
-          console.error('Error in navigation:', error)
+        const targetElement = document.getElementById(`instruction-${id}`)
+        if (!targetElement) {
+          return
         }
+
+        const accordionItem = targetElement.closest('[data-state]')
+        if (!accordionItem || !(accordionItem instanceof HTMLElement)) {
+          return
+        }
+
+        const button = accordionItem.querySelector('button[data-state]')
+        if (!button || !(button instanceof HTMLElement)) {
+          return
+        }
+
+        if (isRepeatedClick) {
+          button.click()
+          return
+        }
+
+        const ancestorAccordions: HTMLElement[] = []
+        let parent = accordionItem.parentElement
+
+        while (parent) {
+          const parentAccordion = parent.closest('[data-state]')
+          if (
+            parentAccordion &&
+            parentAccordion instanceof HTMLElement &&
+            parentAccordion !== accordionItem
+          ) {
+            ancestorAccordions.unshift(parentAccordion)
+            parent = parentAccordion.parentElement
+          } else {
+            break
+          }
+        }
+
+        for (const accordion of ancestorAccordions) {
+          if (accordion.getAttribute('data-state') === 'closed') {
+            const accordionButton = accordion.querySelector('button[data-state]')
+            if (accordionButton && accordionButton instanceof HTMLElement) {
+              accordionButton.click()
+            }
+          }
+        }
+
+        if (accordionItem.getAttribute('data-state') === 'closed') {
+          button.click()
+        }
+
+        setTimeout(() => {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 100)
       }, 100)
     },
     [selectedId],

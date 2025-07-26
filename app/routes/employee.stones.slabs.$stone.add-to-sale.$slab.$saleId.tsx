@@ -64,16 +64,15 @@ type FormData = z.infer<typeof schema>
 const resolver = zodResolver(schema)
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  let user
   try {
-    user = await getEmployeeUser(request)
+    await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 
@@ -297,7 +296,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       slabDetails,
       sinks,
     }
-  } catch (error) {
+  } catch {
     return redirect(`/employee/stones/slabs/${params.stone}`)
   }
 }

@@ -125,8 +125,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   try {
     await csrf.validate(request)
-  } catch (error) {
-    console.error('CSRF validation error:', error)
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 
@@ -137,7 +136,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const noLeftovers = formData.get('noLeftovers') === 'true'
 
   // Set noLeftovers to true if dimensions are missing or invalid
-  const hasValidDimensions = !isNaN(length) && !isNaN(width) && length > 0 && width > 0
+  const hasValidDimensions =
+    !Number.isNaN(length) && !Number.isNaN(width) && length > 0 && width > 0
   const effectiveNoLeftovers = !hasValidDimensions || noLeftovers
 
   try {

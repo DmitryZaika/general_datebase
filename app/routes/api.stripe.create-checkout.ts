@@ -2,6 +2,7 @@ import { type ActionFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
 import { getStripe } from '~/utils/getStripe'
+import { selectMany } from '~/utils/queryHelpers'
 import { toastData } from '~/utils/toastHelpers'
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -23,7 +24,13 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     // Get sale details
-    const [sale] = await db.execute(
+    const sale = await selectMany<{
+      id: number
+      price: number
+      customer_name: string
+      customer_email: string
+    }>(
+      db,
       `SELECT 
                 s.id,
                 s.price,
@@ -32,7 +39,7 @@ export async function action({ request }: ActionFunctionArgs) {
             FROM sales s
             JOIN customers c ON s.customer_id = c.id
             WHERE s.id = ?`,
-      [saleId],
+      [Number(saleId)],
     )
 
     if (!sale || !sale[0]) {
@@ -74,8 +81,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     return redirect(session.url)
-  } catch (error) {
-    console.error('Stripe checkout error:', error)
+  } catch {
     const session = await getSession(request.headers.get('Cookie'))
     session.flash(
       'message',

@@ -6,6 +6,7 @@ import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
 import { StoneTable } from '~/components/organisms/StoneTable'
+import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import {
   Select,
@@ -17,10 +18,10 @@ import {
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
@@ -36,7 +37,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Samples() {
   const { stones } = useLoaderData<typeof loader>()
-  const [currentId, setCurrentId] = useState<number | undefined>(undefined)
+  const [_, setCurrentId] = useState<number | undefined>(undefined)
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones)
   const [colorSort, setColorSort] = useState<boolean>(false)
   const token = useAuthenticityToken()

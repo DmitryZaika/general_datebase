@@ -73,8 +73,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       queryParams,
     )
     return new Response(JSON.stringify({ success: true }))
-  } catch (error) {
-    console.error('Error updating samples amount:', error)
+  } catch {
     return new Response(JSON.stringify({ error: 'Failed to update' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

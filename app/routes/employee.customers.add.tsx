@@ -25,7 +25,6 @@ export default function CustomersAdd() {
   const navigate = useNavigate()
 
   const onSuccess = () => {
-    console.log('onSuccess')
     navigate('..')
   }
 
