@@ -105,7 +105,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const stoneId = parseInt(params.stone, 10)
 
-  if (isNaN(stoneId)) {
+  if (Number.isNaN(stoneId)) {
     return forceRedirectError(request.headers, 'Invalid stone ID format')
   }
 
@@ -240,10 +240,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           square_feet: transaction.square_feet || 0,
           sink: transaction.sink_names || '',
         }
-      } else if (slab.sale_id) {
-        console.warn(
-          `WARNING: Slab ${slab.id} is marked as sold but has no transaction data!`,
-        )
       }
     })
   }
@@ -484,8 +480,6 @@ export default function SlabsModal() {
                   </button>
                 )}
               </div>
-
-              {!isEditing && <></>}
             </div>
           </TooltipTrigger>
           {(slab.sale_id || slab.parent_transaction) && (
@@ -521,23 +515,20 @@ export default function SlabsModal() {
                       </p>
                     )}
 
-                    {slab.transaction.sink && (
-                      <>
-                        {formatSinkList(slab.transaction.sink)
-                          .split(',')
-                          .map((sink, index) => (
-                            <p key={index} className={index > 0 ? 'text-sm ml-10' : ''}>
-                              {index === 0 ? (
-                                <>
-                                  <strong>Sink:</strong> {sink}
-                                </>
-                              ) : (
-                                sink
-                              )}
-                            </p>
-                          ))}
-                      </>
-                    )}
+                    {slab.transaction.sink &&
+                      formatSinkList(slab.transaction.sink)
+                        .split(',')
+                        .map((sink, index) => (
+                          <p key={index} className={index > 0 ? 'text-sm ml-10' : ''}>
+                            {index === 0 ? (
+                              <>
+                                <strong>Sink:</strong> {sink}
+                              </>
+                            ) : (
+                              sink
+                            )}
+                          </p>
+                        ))}
 
                     {slab.transaction.sale_notes && (
                       <p>

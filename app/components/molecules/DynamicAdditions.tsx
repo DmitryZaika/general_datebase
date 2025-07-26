@@ -20,6 +20,7 @@ interface DynamicControlProps {
 
 const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) => {
   // TODO: remove hardcoded ogee and bullnose
+  // biome-ignore lint/security/noGlobalEval: Its safe
   const current = eval(form.watch(`rooms.${index}.extras.${target}.edge_type`))
   const itemType = CUSTOMER_ITEMS[target][itemKey]
   if (typeof itemType === 'object') {

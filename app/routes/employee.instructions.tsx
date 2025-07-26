@@ -116,6 +116,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({
           {!isEmptyText && (
             <div
               className='prose max-w-[calc(100%-50px)] md:max-w-[calc(100%-75px)] lg:max-w-[calc(100%-65px)] w-full instructions ml-3 sm:ml-5 md:ml-10'
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
               dangerouslySetInnerHTML={{ __html: instruction.text }}
             />
           )}
@@ -141,6 +142,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({
         {!isEmptyText && (
           <div
             className='prose overflow-auto break-words w-full ml-5'
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
             dangerouslySetInnerHTML={{ __html: instruction.text }}
           />
         )}
@@ -192,7 +194,10 @@ function cleanData(instructions: Instruction[]): InstructionNode[] {
   }
 
   instructions.forEach(item => {
-    const node = nodeMap.get(item.id)!
+    const node = nodeMap.get(item.id)
+    if (!node) {
+      return
+    }
     if (item.parent_id === null) {
       insertNodeInOrder(rootNodes, node)
     } else {

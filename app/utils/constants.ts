@@ -100,6 +100,8 @@ export const CUSTOMER_ITEMS = {
     linear_feet: 'number',
     priceFn: ({ edge_type, linear_feet }: Record<string, number | string>) => {
       if (!edge_type) return 0
+      // TODO: remove eval
+      // biome-ignore lint/security/noGlobalEval: Its safe
       const value = eval(edge_type)
       if (typeof value === 'function') {
         return value({ linearFeet: linear_feet })

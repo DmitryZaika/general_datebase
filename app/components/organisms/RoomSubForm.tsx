@@ -129,7 +129,6 @@ export const RoomSubForm = ({
             }
           }
         })
-        .catch(console.error)
     }
   }, [index, stone?.id, stone?.name])
 
