@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -30,8 +30,9 @@ import { FormField, FormProvider } from '~/components/ui/form'
 import { Switch } from '~/components/ui/switch'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { customerSchema, roomSchema, type TCustomerSchema } from '~/schemas/sales'
-import type { Customer } from '~/types'
+import type { Customer, Faucet, Sink } from '~/types'
 import { roomPrice } from '~/utils/contracts'
+import { FullDynamicAdditions } from '../molecules/DynamicAdditions'
 
 const resolver = zodResolver(customerSchema)
 
@@ -51,6 +52,26 @@ const fetchCustomers = async (customerName: string) => {
   return limitedCustomers
 }
 
+const fetchSinkType = async (): Promise<Sink[]> => {
+  const url = `/api/sinkType`
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch slabs')
+  }
+  const data = await response.json()
+  return data
+}
+
+const fetchFaucetType = async (): Promise<Faucet[]> => {
+  const url = `/api/allFaucets`
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error('Failed to fetch slabs')
+  }
+  const data = await response.json()
+  return data
+}
+
 export function ContractForm({ starting, saleId }: IContractFormProps) {
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state !== 'idle'
@@ -61,11 +82,11 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
   const [isBuilder, setIsBuilder] = useState(!!starting.company_name)
   const { data: sink_type = [] } = useQuery({
     queryKey: ['sink_type'],
-    queryFn: () => fetch('/api/sinkType').then(res => res.json()),
+    queryFn: fetchSinkType,
   })
   const { data: faucet_type = [] } = useQuery({
     queryKey: ['faucet_type'],
-    queryFn: () => fetch('/api/allFaucets').then(res => res.json()),
+    queryFn: fetchFaucetType,
   })
 
   const form = useForm<TCustomerSchema>({
@@ -213,27 +234,47 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
     }
   }
 
-  // Auto-sum total price across all rooms, including extra items
-  useEffect(() => {
-    const subscription = form.watch(({ name }) => {
-      // Skip if the manual price field itself is being edited
-      if (name === 'price') return
-
-      const rooms = form.getValues('rooms')
-      let total = 0
-
-      rooms.forEach(room => {
-        total += roomPrice(room, sink_type, faucet_type)
-      })
-
-      // Update price if changed
-      if (form.getValues('price') !== total) {
-        form.setValue('price', total, { shouldValidate: total > 0 })
-      }
+  const roomValues = form.watch('rooms')
+  const extrasValues = form.watch('extras') || []
+  console.log(extrasValues)
+  const totalRoomPrice = useMemo(() => {
+    let total = 0
+    roomValues.forEach(room => {
+      total += roomPrice(room, sink_type, faucet_type)
     })
+    console.log(extrasValues)
+    extrasValues.forEach(extra => {
+      total += Number(extra.price)
+      console.log(total)
+    })
+    return total
+  }, [
+    JSON.stringify(roomValues),
+    JSON.stringify(sink_type),
+    JSON.stringify(faucet_type),
+    JSON.stringify(extrasValues),
+  ])
+  form.setValue('price', totalRoomPrice)
 
-    return () => subscription.unsubscribe()
-  }, [sink_type, faucet_type])
+  // useEffect(() => {
+
+  //   const subscription = form.watch(({ name }) => {
+  //     if (name === 'price') return
+
+  //     const rooms = form.getValues('rooms')
+  //     let total = 0
+
+  //     rooms.forEach(room => {
+  //       total += roomPrice(room, sink_type, faucet_type)
+  //     })
+
+  //       if (form.getValues('price') !== total) {
+  //         form.setValue('price', total, { shouldValidate: total > 0 })
+  //       }
+  //     })
+
+  //     return () => subscription.unsubscribe()
+  //   }, [sink_type, faucet_type])
 
   const handleBuilderChange = (checked: boolean) => {
     setIsBuilder(checked)
@@ -412,6 +453,8 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
                 </Button>
               </div>
 
+              <FullDynamicAdditions form={form} name='extras' />
+
               <div className='flex flex-row gap-2 mt-6'>
                 <FormField
                   control={form.control}
@@ -428,12 +471,12 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
                 <FormField
                   control={form.control}
                   name='price'
-                  disabled={true}
                   render={({ field }) => (
                     <InputItem
-                      name={'Price'}
-                      placeholder={'Price'}
+                      name='Price'
+                      placeholder='Price'
                       field={field}
+                      disabled={true} // только чтение, но значение отправится
                       formClassName='mb-0 w-3/4'
                     />
                   )}

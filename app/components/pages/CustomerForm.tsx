@@ -27,7 +27,6 @@ export function CustomerForm({ handleChange, onSubmit, isLoading }: CustomerForm
   const form = useForm<CustomerDialogSchema>({
     resolver,
   })
-  console.log(form.formState.errors)
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent>
