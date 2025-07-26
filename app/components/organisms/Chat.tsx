@@ -1,6 +1,5 @@
-import clsx from 'clsx'
 import type React from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogTrigger } from '~/components/ui/dialog'
 import { DONE_KEY } from '~/utils/constants'
 import { DialogFullHeader } from '../molecules/DialogFullHeader'
@@ -59,7 +58,6 @@ export const Chat = () => {
   const [input, setInput] = useState<string>('')
   const [answer, setAnswer] = useState<string>('')
   const [isThinking, setIsThinking] = useState<boolean>(false)
-  const [isVisible, setIsVisible] = useState<boolean>(true)
 
   const addMessage = (message: Message) =>
     setMessages(prevMessages => [...prevMessages, message])
@@ -68,8 +66,6 @@ export const Chat = () => {
     setIsThinking(true)
     setInput('')
     event.preventDefault()
-
-    const requestStartTime = Date.now()
 
     const formData = new FormData(event.target as HTMLFormElement)
     const query = formData.get('query') as string | null
@@ -88,38 +84,33 @@ export const Chat = () => {
         sse.close()
         setIsThinking(false)
       } else {
-        if (!answer) {
-        }
         setAnswer(prevResults => prevResults + event.data)
       }
     })
 
-    sse.addEventListener('error', event => {
-      console.error('SSE error after:', Date.now() - requestStartTime, 'ms')
+    sse.addEventListener('error', () => {
       sse.close()
     })
   }
 
   return (
     <Dialog modal={false}>
-      {isVisible && (
-        <DialogTrigger className='fixed rounded-full bottom-5 right-5 bg-blue-500 hover:bg-blue-600 duration-200 text-white size-14 flex items-center align-center justify-center cursor-pointer'>
-          <svg
-            xmlns='http://www.w3.org/2000/svg'
-            fill='none'
-            viewBox='0 0 24 24'
-            strokeWidth={2}
-            stroke='currentColor'
-            className='size-6'
-          >
-            <path
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              d='M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z'
-            />
-          </svg>
-        </DialogTrigger>
-      )}
+      <DialogTrigger className='fixed rounded-full bottom-5 right-5 bg-blue-500 hover:bg-blue-600 duration-200 text-white size-14 flex items-center align-center justify-center cursor-pointer'>
+        <svg
+          xmlns='http://www.w3.org/2000/svg'
+          fill='none'
+          viewBox='0 0 24 24'
+          strokeWidth={2}
+          stroke='currentColor'
+          className='size-6'
+        >
+          <path
+            strokeLinecap='round'
+            strokeLinejoin='round'
+            d='M12 20.25c4.97 0 9-3.813 9-8.504 0-4.692-4.03-8.496-9-8.496S3 7.054 3 11.746c0 1.846.728 3.559 1.938 4.875L3 20.25l5.455-2.224a10.5 10.5 0 003.545.624z'
+          />
+        </svg>
+      </DialogTrigger>
       <DialogContent
         hideClose
         className='h-full p-0 gap-0'
