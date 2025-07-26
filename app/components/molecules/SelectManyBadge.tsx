@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react'
-import React, { useState } from 'react'
+import { useState } from 'react'
 import type { ControllerRenderProps, FieldValues } from 'react-hook-form'
 import {
   Select,
