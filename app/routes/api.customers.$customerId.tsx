@@ -1,7 +1,6 @@
 import type { RowDataPacket } from 'mysql2'
 import { data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
-import { selectId } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
 interface Customer {
@@ -35,8 +34,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
 
     return data({ customer: customer[0] })
-  } catch (error) {
-    console.error('Error fetching customer:', error)
+  } catch {
     return data({ error: 'Failed to fetch customer' }, { status: 500 })
   }
 }

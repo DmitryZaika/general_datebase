@@ -1,9 +1,11 @@
 // app/routes/api.address-autocomplete.ts
 import { data, type LoaderFunctionArgs } from 'react-router'
-import { z } from 'zod'
 
-const qs = z.object({ q: z.string().min(3).max(100) })
-const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY!
+const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY
+
+if (!GOOGLE_KEY) {
+  throw new Error('GOOGLE_MAPS_API_KEY is not set')
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const searchParams = new URL(request.url).searchParams
@@ -17,7 +19,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': GOOGLE_KEY,
-    },
+    } as HeadersInit,
     body: JSON.stringify({
       input: q,
       languageCode: 'en',
@@ -25,8 +27,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }),
   })
   if (!gRes.ok) {
-    const txt = await gRes.text()
-    console.error('Places API error:', gRes.status, txt)
     return data({ error: 'Google Places error' }, { status: 502 })
   }
 
@@ -41,42 +41,38 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Optionally fetch zip codes for each suggestion
   const suggestionsWithZipCodes = await Promise.all(
     gJson.suggestions.map(async s => {
-      try {
-        // Fetch place details to get zip code
-        const detailsUrl = new URL(
-          `https://places.googleapis.com/v1/places/${s.placePrediction.placeId}`,
-        )
-        const detailsRes = await fetch(detailsUrl, {
-          method: 'get',
-          signal: request.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': GOOGLE_KEY,
-            'X-Goog-FieldMask': 'addressComponents',
-          },
-        })
+      // Fetch place details to get zip code
+      const detailsUrl = new URL(
+        `https://places.googleapis.com/v1/places/${s.placePrediction.placeId}`,
+      )
+      const detailsRes = await fetch(detailsUrl, {
+        method: 'get',
+        signal: request.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': GOOGLE_KEY,
+          'X-Goog-FieldMask': 'addressComponents',
+        },
+      })
 
-        if (detailsRes.ok) {
-          const detailsJson = (await detailsRes.json()) as {
-            addressComponents: Array<{
-              longText: string
-              shortText: string
-              types: string[]
-            }>
-          }
-
-          const zipCode = detailsJson.addressComponents?.find(component =>
-            component.types.includes('postal_code'),
-          )?.longText
-
-          return {
-            description: s.placePrediction.text,
-            place_id: s.placePrediction.placeId,
-            zip_code: zipCode,
-          }
+      if (detailsRes.ok) {
+        const detailsJson = (await detailsRes.json()) as {
+          addressComponents: Array<{
+            longText: string
+            shortText: string
+            types: string[]
+          }>
         }
-      } catch (error) {
-        console.error('Error fetching place details:', error)
+
+        const zipCode = detailsJson.addressComponents?.find(component =>
+          component.types.includes('postal_code'),
+        )?.longText
+
+        return {
+          description: s.placePrediction.text,
+          place_id: s.placePrediction.placeId,
+          zip_code: zipCode,
+        }
       }
 
       // Fallback if details fetch fails
