@@ -196,7 +196,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           slab_inventory.id DESC
       `
 
-    const rawTransactions = await selectMany<Record<string, any>>(
+    const rawTransactions = await selectMany<Record<string, unknown>>(
       db,
       sqlQuery,
       soldSlabIds,

@@ -1,15 +1,7 @@
 'use client'
 
 // SchedulerContext.tsx
-import React, {
-  createContext,
-  Dispatch,
-  type ReactNode,
-  useContext,
-  useEffect,
-  useReducer,
-} from 'react'
-import { z } from 'zod'
+import { createContext, type ReactNode, useContext, useEffect, useReducer } from 'react'
 
 import type {
   Action,
@@ -28,11 +20,6 @@ interface SchedulerState {
 
 // Define the variant options
 export const variants = ['success', 'primary', 'default', 'warning', 'danger'] as const
-
-// Initial state
-const initialState: SchedulerState = {
-  events: [],
-}
 
 // Reducer function
 const schedulerReducer = (state: SchedulerState, action: Action): SchedulerState => {
@@ -219,10 +206,10 @@ export const SchedulerProvider = ({
       periodOptions.periodIndex !== undefined
 
     let numEventsOnHour = useCustomPeriod
-      ? periodOptions!.eventsInSamePeriod!
+      ? periodOptions?.eventsInSamePeriod
       : allEventsInRange.length
     let indexOnHour = useCustomPeriod
-      ? periodOptions!.periodIndex!
+      ? periodOptions?.periodIndex
       : allEventsInRange.indexOf(event)
 
     // If there are no overlapping events or using custom grouping failed, give full width
@@ -261,16 +248,14 @@ export const SchedulerProvider = ({
 
       // Calculate the top position based on the event's start time (64px per hour)
       eventTop = eventStartHour * 64
-    } else {
-      console.error('Invalid event or missing start/end dates.')
     }
 
     // Improved width and position calculation
     // Use a smaller width if we have multiple overlapping events
-    const widthPercentage = Math.min(95 / Math.max(numEventsOnHour, 1), 95)
+    const widthPercentage = Math.min(95 / Math.max(numEventsOnHour ?? 1, 1), 95)
 
     // Calculate left position with a small gap between events
-    const leftPosition = indexOnHour * (widthPercentage + 1)
+    const leftPosition = (indexOnHour ?? 0) * (widthPercentage + 1)
 
     // Ensure left position doesn't go beyond container
     const safeLeftPosition = Math.min(leftPosition, 100 - widthPercentage)
@@ -287,7 +272,7 @@ export const SchedulerProvider = ({
             : eventHeight
       }px`,
       top: `${eventTop}px`,
-      zIndex: indexOnHour + 1,
+      zIndex: (indexOnHour ?? 0) + 1,
       left: `${safeLeftPosition}%`,
       maxWidth: `${widthPercentage}%`,
       minWidth: `${widthPercentage}%`,

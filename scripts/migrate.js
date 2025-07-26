@@ -43,10 +43,13 @@ const umzug = sequelize =>
 const runMigrations = async sequelize => {
   try {
     await sequelize.authenticate()
+    // biome-ignore lint/suspicious/noConsole: for tests
     console.log('Подключение к базе данных успешно.')
     await umzug(sequelize).up()
+    // biome-ignore lint/suspicious/noConsole: for tests
     console.log('Миграции успешно выполнены.')
   } catch (error) {
+    // biome-ignore lint/suspicious/noConsole: for tests
     console.error('Ошибка выполнения миграций:', error)
   } finally {
     await sequelize.close()

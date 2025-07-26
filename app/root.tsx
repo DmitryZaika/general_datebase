@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { RowDataPacket } from 'mysql2'
 import { posthog } from 'posthog-js'
 import { useEffect } from 'react'
 import type { LinksFunction, LoaderFunctionArgs } from 'react-router'
@@ -46,16 +47,14 @@ export const links: LinksFunction = () => [
 export function Posthog() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      import('posthog-js')
-        .then(({ default: posthog }) => {
-          if (!posthog.__loaded) {
-            posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
-              api_host: 'https://us.i.posthog.com',
-              person_profiles: 'always',
-            })
-          }
-        })
-        .catch(console.error)
+      import('posthog-js').then(({ default: posthog }) => {
+        if (!posthog.__loaded) {
+          posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
+            api_host: 'https://us.i.posthog.com',
+            person_profiles: 'always',
+          })
+        }
+      })
     }
   }, [])
 
@@ -76,10 +75,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let stoneSuppliers: ISupplier[] | undefined
   let sinkSuppliers: ISupplier[] | undefined
   let faucetSuppliers: ISupplier[] | undefined
-  let colors: { id: number; name: string; hex_code: string }[] | undefined
   let position: string | null = null
 
-  colors = await selectMany<{ id: number; name: string; hex_code: string }>(
+  const colors = await selectMany<{ id: number; name: string; hex_code: string }>(
     db,
     `SELECT c.id, c.name, c.hex_code 
       FROM colors c
@@ -118,11 +116,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
       [user.company_id],
     )
 
-    const [[row]] = await db.query(
+    const [row] = await db.query<(RowDataPacket & { position: string })[]>(
       `SELECT p.name AS position FROM users u LEFT JOIN positions p ON p.id = u.position_id WHERE u.id = ? LIMIT 1`,
       [user.id],
     )
-    position = row?.position ?? null
+    position = row?.[0]?.position ?? null
   }
 
   return data(
