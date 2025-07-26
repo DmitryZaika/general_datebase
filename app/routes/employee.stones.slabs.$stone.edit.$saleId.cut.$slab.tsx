@@ -119,7 +119,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const slabIdNum = parseInt(slabId, 10)
   const saleIdNum = parseInt(saleId, 10)
 
-  if (isNaN(slabIdNum) || isNaN(saleIdNum)) {
+  if (Number.isNaN(slabIdNum) || Number.isNaN(saleIdNum)) {
     return forceRedirectError(request.headers, 'Invalid ID format')
   }
 
@@ -188,17 +188,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
           [slabIdNum, insertId],
         )
       }
-
-      // Check if there are any child slabs with sale_id that need fixing
-      const [childSlabs] = await db.execute<RowDataPacket[]>(
-        `SELECT id, sale_id FROM slab_inventory 
-         WHERE parent_id = ? AND sale_id IS NOT NULL AND id != ?`,
-        [slabIdNum, insertId],
-      )
-
-      // Log for debugging purposes
-
-      // Ensure we don't clear sale_id for sold child slabs
     }
 
     const [remainingSlabsResult] = await db.execute<RowDataPacket[]>(
@@ -244,9 +233,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         headers: { 'Set-Cookie': await commitSession(session) },
       },
     )
-  } catch (error) {
-    console.error('Error cutting slab:', error)
-
+  } catch {
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Error', 'Failed to cut slab'))
 
@@ -270,7 +257,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function CutSlab() {
-  const { slab, stoneId, saleId, slabId } = useLoaderData<typeof loader>()
+  const { slab, stoneId, saleId } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state !== 'idle'
   const formRef = useRef<HTMLFormElement>(null)

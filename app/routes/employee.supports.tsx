@@ -5,7 +5,7 @@ import { Accordion, AccordionContent, AccordionItem } from '~/components/ui/acco
 import { db } from '~/db.server'
 import { useArrowToggle } from '~/hooks/useArrowToggle'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 interface Support {
   id: number
@@ -14,7 +14,7 @@ interface Support {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {

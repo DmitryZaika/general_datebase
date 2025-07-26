@@ -6,10 +6,8 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
-  useNavigate,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
 import { SelectInput } from '~/components/molecules/SelectItem'
@@ -47,7 +45,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
 
@@ -58,11 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors) {
     return { errors, receivedValues }
   }
-  try {
-    saveCompanyQBO(data.companyId, data.qboClientId, data.qboClientSecret)
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
-  }
+  saveCompanyQBO(data.companyId, data.qboClientId, data.qboClientSecret)
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'keys added'))
   return redirect('..', {
@@ -81,18 +75,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 }
 
 export default function UsersAdd() {
-  const navigate = useNavigate()
   const { companies } = useLoaderData<typeof loader>()
-  const token = useAuthenticityToken()
   const form = useForm<FormData>({
     resolver,
   })
   const fullSubmit = useFullSubmit(form)
-  const handleChange = (open: boolean) => {
-    if (open === false) {
-      navigate('..')
-    }
-  }
   return (
     <FormProvider {...form}>
       <Form onSubmit={fullSubmit} className='container mx-auto py-5'>
