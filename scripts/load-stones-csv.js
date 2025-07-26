@@ -1,7 +1,7 @@
+import mysql from 'mysql2/promise'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import mysql from 'mysql2/promise'
 
 const access = {
   user: process.env.DB_USER,
@@ -82,4 +82,4 @@ async function saveData(data) {
 
 const data = getCsvData()
 const cleanData = convertData(data)
-const updateData = await saveData(cleanData)
+await saveData(cleanData)
