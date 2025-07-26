@@ -166,7 +166,7 @@ export async function createQboCustomer(
     throw new Error('Нужно указать имя клиента')
   }
 
-  const body: Record<string, any> = { DisplayName: name }
+  const body: Record<string, unknown> = { DisplayName: name }
 
   body.PrimaryEmailAddr = { Address: email }
   body.PrimaryPhone = { FreeFormNumber: phone }

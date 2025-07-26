@@ -45,14 +45,16 @@ export const deleteFile = async (url: string) => {
     )
     await waitUntilObjectNotExists(
       { client, maxWaitTime: 30 },
-      { Bucket: STORAGE_BUCKET!, Key: finalKey },
+      { Bucket: STORAGE_BUCKET, Key: finalKey },
     )
   } catch (caught) {
     if (caught instanceof S3ServiceException && caught.name === 'NoSuchBucket') {
+      // biome-ignore lint/suspicious/noConsole: for tests
       console.error(
         `Error from S3 while deleting object from ${STORAGE_BUCKET}. The bucket doesn't exist.`,
       )
     } else if (caught instanceof S3ServiceException) {
+      // biome-ignore lint/suspicious/noConsole: for tests
       console.error(
         `Error from S3 while deleting object from ${STORAGE_BUCKET}.  ${caught.name}: ${caught.message}`,
       )
@@ -163,10 +165,12 @@ export const downloadPDF = async (url: string) => {
     }
   } catch (caught) {
     if (caught instanceof S3ServiceException && caught.name === 'NoSuchBucket') {
+      // biome-ignore lint/suspicious/noConsole: for tests
       console.error(
         `Error from S3 while downloading PDF from ${STORAGE_BUCKET}. The bucket doesn't exist.`,
       )
     } else if (caught instanceof S3ServiceException) {
+      // biome-ignore lint/suspicious/noConsole: for tests
       console.error(
         `Error from S3 while downloading PDF from ${STORAGE_BUCKET}. ${caught.name}: ${caught.message}`,
       )
