@@ -166,7 +166,7 @@ function createToggleFilterHandler<T>(options: FilterHandlerOptions<T>) {
 
       const currentValues = searchParams[filterKey] ?? defaultValue
       const itemValue = itemToValue ? itemToValue(item) : item
-      let newValues: number[]
+      let newValues: number[] | string | number | string[]
 
       if (Array.isArray(currentValues)) {
         if (currentValues.includes(itemValue)) {
@@ -313,15 +313,12 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
     itemToValue: (supplier: ISupplier) => supplier.id,
   })
 
-  const toggleShowSoldOut = useCallback(
-    (val: string) => {
-      if (isSubmitting) return
+  const toggleShowSoldOut = useCallback(() => {
+    if (isSubmitting) return
 
-      const show_sold_out = searchParams.show_sold_out ?? true
-      setSearchParams({ ...searchParams, show_sold_out: !show_sold_out })
-    },
-    [isSubmitting, searchParams, setSearchParams],
-  )
+    const show_sold_out = searchParams.show_sold_out ?? true
+    setSearchParams({ ...searchParams, show_sold_out: !show_sold_out })
+  }, [isSubmitting, searchParams, setSearchParams])
 
   const toggleFinishing = createToggleFilterHandler({
     searchParams,

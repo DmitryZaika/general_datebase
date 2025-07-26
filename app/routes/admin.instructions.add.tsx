@@ -70,40 +70,27 @@ export async function action({ request }: ActionFunctionArgs) {
   const parentId = data.parent_id || null
   const afterId = data.after_id || null
   const user = await getAdminUser(request)
-  try {
-    const [result] = await db.execute<ResultSetHeader>(
-      `INSERT INTO instructions (title, parent_id, after_id, rich_text, company_id)
+  const [result] = await db.execute<ResultSetHeader>(
+    `INSERT INTO instructions (title, parent_id, after_id, rich_text, company_id)
        VALUES (?, ?, ?, ?, ?)`,
-      [data.title, parentId, afterId, data.rich_text, user.company_id],
-    )
-    insertId = result.insertId
-  } catch (error) {
-    console.error('Db error: ', error, {
-      title: data.title,
-      parentId,
-      afterId,
-      text: data.rich_text,
-    })
-  }
+    [data.title, parentId, afterId, data.rich_text, user.company_id],
+  )
+  insertId = result.insertId
 
-  try {
-    const query = `UPDATE instructions
+  const query = `UPDATE instructions
       SET after_id = ?
       WHERE 
         (after_id = ? OR (after_id IS NULL AND ? IS NULL))
         AND id != ?
         AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL));`
-    await db.execute(query, [
-      insertId,
-      data.after_id,
-      data.after_id,
-      insertId,
-      parentId,
-      parentId,
-    ])
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
-  }
+  await db.execute(query, [
+    insertId,
+    data.after_id,
+    data.after_id,
+    insertId,
+    parentId,
+    parentId,
+  ])
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Instruction added'))

@@ -179,47 +179,43 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
   }
 
   const fetchCustomerDetails = async (customerId: number) => {
-    try {
-      const response = await fetch(`/api/customers/${customerId}`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.customer) {
-          form.setValue('name', data.customer.name)
+    const response = await fetch(`/api/customers/${customerId}`)
+    if (response.ok) {
+      const data = await response.json()
+      if (data.customer) {
+        form.setValue('name', data.customer.name)
 
-          setIsBuilder(!!data.customer.company_name)
-          form.setValue('company_name', data.customer.company_name || null)
+        setIsBuilder(!!data.customer.company_name)
+        form.setValue('company_name', data.customer.company_name || null)
 
-          if (data.customer.address) {
-            form.setValue('billing_address', data.customer.address)
-            setDisabledFields(prev => ({ ...prev, billing_address: true }))
+        if (data.customer.address) {
+          form.setValue('billing_address', data.customer.address)
+          setDisabledFields(prev => ({ ...prev, billing_address: true }))
 
-            if (form.getValues('same_address')) {
-              form.setValue('project_address', data.customer.address)
-            }
-          } else {
-            form.setValue('billing_address', '')
-            setDisabledFields(prev => ({ ...prev, billing_address: false }))
+          if (form.getValues('same_address')) {
+            form.setValue('project_address', data.customer.address)
           }
+        } else {
+          form.setValue('billing_address', '')
+          setDisabledFields(prev => ({ ...prev, billing_address: false }))
+        }
 
-          if (data.customer.phone) {
-            form.setValue('phone', data.customer.phone)
-            setDisabledFields(prev => ({ ...prev, phone: true }))
-          } else {
-            form.setValue('phone', '')
-            setDisabledFields(prev => ({ ...prev, phone: false }))
-          }
+        if (data.customer.phone) {
+          form.setValue('phone', data.customer.phone)
+          setDisabledFields(prev => ({ ...prev, phone: true }))
+        } else {
+          form.setValue('phone', '')
+          setDisabledFields(prev => ({ ...prev, phone: false }))
+        }
 
-          if (data.customer.email) {
-            form.setValue('email', data.customer.email)
-            setDisabledFields(prev => ({ ...prev, email: true }))
-          } else {
-            form.setValue('email', '')
-            setDisabledFields(prev => ({ ...prev, email: false }))
-          }
+        if (data.customer.email) {
+          form.setValue('email', data.customer.email)
+          setDisabledFields(prev => ({ ...prev, email: true }))
+        } else {
+          form.setValue('email', '')
+          setDisabledFields(prev => ({ ...prev, email: false }))
         }
       }
-    } catch (error) {
-      console.error('Error fetching customer details:', error)
     }
   }
 
@@ -236,16 +232,14 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
 
   const roomValues = form.watch('rooms')
   const extrasValues = form.watch('extras') || []
-  console.log(extrasValues)
+
   const totalRoomPrice = useMemo(() => {
     let total = 0
     roomValues.forEach(room => {
       total += roomPrice(room, sink_type, faucet_type)
     })
-    console.log(extrasValues)
     extrasValues.forEach(extra => {
       total += Number(extra.price)
-      console.log(total)
     })
     return total
   }, [

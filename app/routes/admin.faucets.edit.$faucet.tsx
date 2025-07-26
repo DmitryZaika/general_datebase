@@ -75,90 +75,81 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   const newFile = data.file && data.file !== 'undefined'
 
-  try {
-    let oldUrl = null
-    if (newFile) {
-      const [oldFileRows] = await db.execute<mysql.RowDataPacket[]>(
-        `SELECT url FROM faucet_type WHERE id = ?`,
-        [faucetId],
-      )
-      oldUrl = oldFileRows[0]?.url
-    }
+  let oldUrl = null
+  if (newFile) {
+    const [oldFileRows] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT url FROM faucet_type WHERE id = ?`,
+      [faucetId],
+    )
+    oldUrl = oldFileRows[0]?.url
+  }
 
-    try {
-      if (newFile) {
-        await db.execute(
-          `UPDATE faucet_type
+  if (newFile) {
+    await db.execute(
+      `UPDATE faucet_type
             SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, cost = ?, retail_price = ?
            WHERE id = ?`,
-          [
-            data.name,
-            data.type,
-            data.file,
-            data.is_display,
-            !data.supplier_id || data.supplier_id === 0 ? null : data.supplier_id,
-            data.cost,
-            data.retail_price,
-            faucetId,
-          ],
-        )
-      } else {
-        await db.execute(
-          `UPDATE faucet_type
+      [
+        data.name,
+        data.type,
+        data.file,
+        data.is_display,
+        !data.supplier_id || data.supplier_id === 0 ? null : data.supplier_id,
+        data.cost,
+        data.retail_price,
+        faucetId,
+      ],
+    )
+  } else {
+    await db.execute(
+      `UPDATE faucet_type
            SET name = ?, type = ?, is_display = ?, supplier_id = ?, cost = ?, retail_price = ?
            WHERE id = ?`,
-          [
-            data.name,
-            data.type,
-            data.is_display,
-            !data.supplier_id || data.supplier_id === 0 ? null : data.supplier_id,
-            data.cost,
-            data.retail_price,
-            faucetId,
-          ],
-        )
-      }
+      [
+        data.name,
+        data.type,
+        data.is_display,
+        !data.supplier_id || data.supplier_id === 0 ? null : data.supplier_id,
+        data.cost,
+        data.retail_price,
+        faucetId,
+      ],
+    )
+  }
 
-      const [countRows] = await db.execute<mysql.RowDataPacket[]>(
-        `SELECT COUNT(*) as count FROM faucets WHERE faucet_type_id = ? AND is_deleted = 0`,
+  const [countRows] = await db.execute<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) as count FROM faucets WHERE faucet_type_id = ? AND is_deleted = 0`,
+    [faucetId],
+  )
+  const currentAmount = countRows[0]?.count || 0
+  const newAmount = data.amount || 0
+
+  if (newAmount > currentAmount) {
+    const toAdd = newAmount - currentAmount
+    for (let i = 0; i < toAdd; i++) {
+      await db.execute(
+        `INSERT INTO faucets (faucet_type_id, is_deleted) VALUES (?, 0)`,
         [faucetId],
       )
-      const currentAmount = countRows[0]?.count || 0
-      const newAmount = data.amount || 0
-
-      if (newAmount > currentAmount) {
-        const toAdd = newAmount - currentAmount
-        for (let i = 0; i < toAdd; i++) {
-          await db.execute(
-            `INSERT INTO faucets (faucet_type_id, is_deleted) VALUES (?, 0)`,
-            [faucetId],
-          )
-        }
-      } else if (newAmount < currentAmount) {
-        const toDelete = currentAmount - newAmount
-
-        const [allUnusedRows] = await db.execute<mysql.RowDataPacket[]>(
-          `SELECT id FROM faucets 
-           WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0`,
-          [faucetId],
-        )
-
-        const rowsToUpdate = allUnusedRows.slice(0, toDelete)
-
-        for (const row of rowsToUpdate) {
-          await db.execute(`UPDATE faucets SET is_deleted = 1 WHERE id = ?`, [row.id])
-        }
-      }
-
-      if (newFile && oldUrl) {
-        await deleteFile(oldUrl)
-      }
-    } catch (error) {
-      console.error('Error updating faucet: ', error)
-      throw error
     }
-  } catch (error) {
-    console.error('Error updating faucet: ', error)
+  } else if (newAmount < currentAmount) {
+    const toDelete = currentAmount - newAmount
+
+    const [allUnusedRows] = await db.execute<mysql.RowDataPacket[]>(
+      `SELECT id FROM faucets 
+           WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0`,
+      [faucetId],
+    )
+
+    const rowsToUpdate = allUnusedRows.slice(0, toDelete)
+
+    for (const row of rowsToUpdate) {
+      await db.execute(`UPDATE faucets SET is_deleted = 1 WHERE id = ?`, [row.id])
+    }
+  }
+
+  if (newFile && oldUrl) {
+    await deleteFile(oldUrl)
   }
 
   const session = await getSession(request.headers.get('Cookie'))
@@ -225,11 +216,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 function FaucetInformation({
   faucetData,
   suppliers,
-  refresh,
 }: {
   faucetData: FaucetData
   suppliers: SupplierData[]
-  refresh: () => void
 }) {
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
@@ -362,9 +351,6 @@ export default function FaucetsEdit() {
       navigate('..')
     }
   }
-  const refresh = () => {
-    navigate('.', { replace: true })
-  }
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className='sm:max-w-[425px] overflow-auto max-h-[95vh]'>
@@ -382,11 +368,7 @@ export default function FaucetsEdit() {
             <TabsTrigger value='images'>Images</TabsTrigger>
           </TabsList>
           <TabsContent value='information'>
-            <FaucetInformation
-              faucetData={faucet}
-              suppliers={suppliers}
-              refresh={refresh}
-            />
+            <FaucetInformation faucetData={faucet} suppliers={suppliers} />
           </TabsContent>
           <TabsContent value='images'>
             <Outlet />

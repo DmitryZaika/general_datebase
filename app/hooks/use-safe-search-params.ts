@@ -14,9 +14,8 @@ export function cleanParams(searchParams: URLSearchParams): Record<string, unkno
   for (const [key, val] of searchParams.entries()) {
     try {
       rawObj[key] = JSON.parse(val)
-    } catch (e) {
-      // Если разбор не удается, сохраняем значение как есть
-      console.warn(`Failed to parse parameter "${key}" with value "${val}"`)
+    } catch {
+      // If parsing fails, keep the value as is
       rawObj[key] = val
     }
   }

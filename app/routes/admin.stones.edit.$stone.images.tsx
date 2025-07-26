@@ -4,8 +4,8 @@ import {
   type ActionFunctionArgs,
   data,
   type LoaderFunctionArgs,
-  Form as RemixForm,
   redirect,
+  Form as RemixForm,
   useActionData,
   useLoaderData,
   useNavigate,
@@ -136,14 +136,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
         return { errors }
       }
 
-      try {
-        await db.execute(`INSERT INTO installed_stones (url, stone_id) VALUES (?, ?)`, [
-          parsedData.file,
-          stoneId,
-        ])
-      } catch (error) {
-        console.error('Error connecting to the database:', error)
-      }
+      await db.execute(`INSERT INTO installed_stones (url, stone_id) VALUES (?, ?)`, [
+        parsedData.file,
+        stoneId,
+      ])
 
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Image Added'))
@@ -179,8 +175,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
               headers: { 'Set-Cookie': await commitSession(session) },
             },
           )
-        } catch (error) {
-          console.error('Error linking images:', error)
+        } catch {
           return { error: 'Failed to link images' }
         }
       }
@@ -232,12 +227,11 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
      WHERE sil.stone_id = ?
      ORDER BY s.name ASC`,
     [stoneId],
-  ).catch(err => {
-    console.error('Error fetching linked images:', err)
+  ).catch(() => {
     return []
   })
 
-  return { stones, allStones, linkedImages, currentStoneId: stoneId }
+  return { stones, allStones, linkedImages }
 }
 
 function AddImage() {
@@ -280,15 +274,9 @@ interface LinkImagesDialogProps {
   allStones: Array<{ id: number; name: string }>
   isOpen: boolean
   onClose: () => void
-  currentStoneId: number
 }
 
-function LinkImagesDialog({
-  allStones,
-  isOpen,
-  onClose,
-  currentStoneId,
-}: LinkImagesDialogProps) {
+function LinkImagesDialog({ allStones, isOpen, onClose }: LinkImagesDialogProps) {
   const [selectedStoneId, setSelectedStoneId] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const navigation = useNavigation()
@@ -376,8 +364,7 @@ function LinkImagesDialog({
 }
 
 export default function SelectImages() {
-  const { stones, allStones, linkedImages, currentStoneId } =
-    useLoaderData<typeof loader>()
+  const { stones, allStones, linkedImages } = useLoaderData<typeof loader>()
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [unlinkSourceId, setUnlinkSourceId] = useState<number | null>(null)
@@ -500,7 +487,6 @@ export default function SelectImages() {
         allStones={allStones}
         isOpen={showLinkDialog}
         onClose={() => setShowLinkDialog(false)}
-        currentStoneId={currentStoneId}
       />
     </>
   )

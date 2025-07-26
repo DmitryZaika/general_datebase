@@ -166,7 +166,7 @@ export async function createQboCustomer(
     throw new Error('Нужно указать имя клиента')
   }
 
-  const body: Record<string, any> = { DisplayName: name }
+  const body: Record<string, unknown> = { DisplayName: name }
 
   body.PrimaryEmailAddr = { Address: email }
   body.PrimaryPhone = { FreeFormNumber: phone }
@@ -240,7 +240,6 @@ export async function getQboCompanyInformation(
     },
   })
   if (!res.ok) {
-    console.error('Error fetching company information:', await res.text())
     return res.status
   }
   return await res.json()

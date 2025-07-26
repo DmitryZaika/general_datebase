@@ -64,7 +64,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     const ruleId = parseInt(params.ruleId, 10)
 
-    if (isNaN(ruleId)) {
+    if (Number.isNaN(ruleId)) {
       return redirect('/admin/payroll_rules')
     }
 
@@ -81,8 +81,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
 
     return { payrollRule: payrollRule[0] }
-  } catch (error) {
-    console.error('Error loading payroll rule:', error)
+  } catch {
     return redirect('/admin/payroll_rules')
   }
 }
@@ -100,7 +99,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     const ruleId = parseInt(params.ruleId, 10)
 
-    if (isNaN(ruleId)) {
+    if (Number.isNaN(ruleId)) {
       return redirect('/admin/payroll_rules')
     }
 

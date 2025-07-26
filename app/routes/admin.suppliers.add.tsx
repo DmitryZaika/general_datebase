@@ -61,22 +61,18 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, receivedValues }
   }
   const user = getAdminUser(request)
-  try {
-    await db.execute(
-      `INSERT INTO suppliers  (website, supplier_name, manager,  phone, email, notes, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        data.website,
-        data.supplier_name,
-        data.manager ?? null,
-        data.phone ?? null,
-        data.email ?? null,
-        data.notes ?? null,
-        (await user).company_id,
-      ],
-    )
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
-  }
+  await db.execute(
+    `INSERT INTO suppliers  (website, supplier_name, manager,  phone, email, notes, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.website,
+      data.supplier_name,
+      data.manager ?? null,
+      data.phone ?? null,
+      data.email ?? null,
+      data.notes ?? null,
+      (await user).company_id,
+    ],
+  )
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'supplier added'))
   return redirect('..', {
