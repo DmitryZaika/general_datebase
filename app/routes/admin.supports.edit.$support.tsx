@@ -41,7 +41,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   if (!params.support) {
@@ -61,21 +61,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
     supportId,
   )
 
-  try {
-    if (newFile) {
-      await db.execute(`UPDATE supports SET name = ?, url = ? WHERE id = ?`, [
-        data.name,
-        data.file,
-        supportId,
-      ])
-    } else {
-      await db.execute(`UPDATE supports SET name = ? WHERE id = ?`, [
-        data.name,
-        supportId,
-      ])
-    }
-  } catch (error) {
-    console.error('Error connecting to the database: ', errors)
+  if (newFile) {
+    await db.execute(`UPDATE supports SET name = ?, url = ? WHERE id = ?`, [
+      data.name,
+      data.file,
+      supportId,
+    ])
+  } else {
+    await db.execute(`UPDATE supports SET name = ? WHERE id = ?`, [
+      data.name,
+      supportId,
+    ])
   }
   if (support?.url && newFile) {
     deleteFile(support.url)

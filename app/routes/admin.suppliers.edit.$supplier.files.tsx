@@ -38,7 +38,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   if (!params.supplier) {
@@ -106,7 +106,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export function AddFile() {
   const navigation = useNavigation()
-  const [resetKey, setResetKey] = useState(0)
   const isSubmitting = navigation.state !== 'idle'
   const form = useCustomOptionalForm(fileSchema, {
     defaultValues: {
@@ -120,7 +119,6 @@ export function AddFile() {
         name: '',
         file: undefined,
       })
-      setResetKey(prev => prev + 1)
     }
   }, [navigation.state, form])
   return (
@@ -162,7 +160,7 @@ export function AddFile() {
 
 export default function EditSupplierFiles() {
   const { files } = useLoaderData<typeof loader>()
-  const [selectedFile, setSelectedFile] = useState<string | null>(null)
+  const [_, setSelectedFile] = useState<string | null>(null)
   const navigation = useNavigation()
   const isSubmitting = navigation.state === 'submitting'
   return (

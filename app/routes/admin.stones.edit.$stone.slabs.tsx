@@ -10,7 +10,6 @@ import {
   useLoaderData,
   useNavigate,
   useNavigation,
-  useParams,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
@@ -583,7 +582,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   if (!params.stone) {
@@ -901,9 +900,7 @@ export default function EditStoneSlabs() {
   } | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const navigate = useNavigate()
-  const params = useParams()
   const navigation = useNavigation()
-  const actionData = useActionData()
   const isSubmitting = navigation.state === 'submitting'
 
   // Event handlers
