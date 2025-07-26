@@ -6,7 +6,6 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
-  useNavigate,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { z } from 'zod'
@@ -101,7 +100,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const supplierId = parseInt(params.supplier)
 
-  if (isNaN(supplierId)) {
+  if (Number.isNaN(supplierId)) {
     return forceRedirectError(request.headers, 'Invalid supplier id')
   }
 
@@ -126,7 +125,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 }
 
 export default function SuppliersAdd() {
-  const navigate = useNavigate()
   const { website, supplier_name, manager, email, phone, notes } =
     useLoaderData<typeof loader>()
   const form = useForm<FormData>({

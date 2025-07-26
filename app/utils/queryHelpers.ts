@@ -9,8 +9,7 @@ export async function selectMany<T>(
   try {
     const [rows] = await db.query<T[] & RowDataPacket[]>(query, params)
     return rows
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
+  } catch {
     return []
   }
 }
@@ -26,8 +25,7 @@ export async function selectId<T>(
       return undefined
     }
     return rows[0]
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
+  } catch {
     return undefined
   }
 }

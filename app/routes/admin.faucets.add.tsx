@@ -64,8 +64,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.cost,
       ],
     )
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
+  } catch {
     const faucetId = parseInt(params.faucet ?? '0', 10)
     if (!faucetId) {
       return new Response(JSON.stringify({ error: 'Invalid or missing faucet ID' }), {

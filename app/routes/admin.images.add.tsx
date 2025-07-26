@@ -47,15 +47,11 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const user = await getAdminUser(request)
-  try {
-    await db.execute(`INSERT INTO images (name, url, company_id) VALUES (?,  ?, ?);`, [
-      data.name,
-      data.file,
-      user.company_id,
-    ])
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
-  }
+  await db.execute(`INSERT INTO images (name, url, company_id) VALUES (?,  ?, ?);`, [
+    data.name,
+    data.file,
+    user.company_id,
+  ])
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Image added'))
 

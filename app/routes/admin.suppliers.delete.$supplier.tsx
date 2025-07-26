@@ -28,8 +28,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 
   try {
     await db.execute(`DELETE FROM suppliers WHERE id = ?`, [supplierId])
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
+  } catch {
     return { error: 'Failed to delete supplier' }
   }
 
