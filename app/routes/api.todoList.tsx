@@ -6,7 +6,7 @@ import {
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { db } from '~/db.server'
-import { todoListSchema, type TTodoListSchema } from '~/schemas/general'
+import { type TTodoListSchema, todoListSchema } from '~/schemas/general'
 import type { Todo } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'

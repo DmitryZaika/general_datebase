@@ -1,5 +1,5 @@
-import SchedulerViewFilteration from '@/components/molecules/schedule/schedular-view-filteration'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import SchedulerViewFilteration from '@/components/molecules/schedule/schedular-view-filteration'
 import { db } from '~/db.server'
 import { SchedulerProvider } from '~/providers/scheduler-provider'
 import type { Period } from '~/types'
