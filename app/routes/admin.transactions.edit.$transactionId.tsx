@@ -1,27 +1,22 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { RowDataPacket } from 'mysql2'
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
   data,
   Form,
-  Link,
   type LoaderFunctionArgs,
   Outlet,
-  Params,
   redirect,
   useFetcher,
   useLoaderData,
-  useLocation,
   useNavigate,
   useNavigation,
 } from 'react-router'
-import { AuthenticityTokenInput, useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { SelectInput } from '~/components/molecules/SelectItem'
 import { DeleteRow } from '~/components/pages/DeleteRow'
 import { Button } from '~/components/ui/button'
 import {
@@ -34,11 +29,10 @@ import {
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
-import { selectId, selectMany } from '~/utils/queryHelpers'
-import { getAdminUser, getEmployeeUser } from '~/utils/session.server'
+import { selectMany } from '~/utils/queryHelpers'
+import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
 interface SaleDetails {
@@ -91,22 +85,6 @@ const sinkSchema = z.object({
 type SinkFormData = z.infer<typeof sinkSchema>
 const sinksResolver = zodResolver(sinkSchema)
 
-const schema = z.object({
-  sinks: z.array(
-    z.object({
-      is_deleted: z.boolean().default(false),
-    }),
-  ),
-  new_sinks: z
-    .array(
-      z.object({
-        sink_type_id: z.string().optional(),
-        price: z.coerce.number().optional(),
-      }),
-    )
-    .optional(),
-})
-
 const sinkAddSchema = z.object({
   sink_type_id: z.string().min(1, 'Please select a sink'),
   price: z.coerce.number().optional(),
@@ -122,14 +100,6 @@ const customerSchema = z.object({
 type CustomerFormData = z.infer<typeof customerSchema>
 const customerResolver = zodResolver(customerSchema)
 
-const saleInfoSchema = z.object({
-  customer_name: z.string().min(1, 'Customer name is required'),
-  seller_id: z.coerce.number().min(1, 'Seller is required'),
-})
-
-type SaleInfoFormData = z.infer<typeof saleInfoSchema>
-const saleInfoResolver = zodResolver(saleInfoSchema)
-
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await getAdminUser(request)
   if (!params.transactionId) {
@@ -137,7 +107,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const saleId = parseInt(params.transactionId, 10)
 
-  if (isNaN(saleId)) {
+  if (Number.isNaN(saleId)) {
     return forceRedirectError(request.headers, 'Invalid transaction ID format')
   }
 
@@ -244,18 +214,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   const saleId = parseInt(params.transactionId, 10)
-  if (isNaN(saleId)) {
+  if (Number.isNaN(saleId)) {
     return forceRedirectError(request.headers, 'Invalid transaction ID format')
   }
 
-  // Stone ID is not required for admin transaction edits
-
   try {
-  } catch (error) {
-    console.error('CSRF validation error:', error)
+    await csrf.validate(request)
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
-
   const formData = await request.formData()
   const intent = formData.get('intent') as string
 
@@ -371,10 +338,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const customer_name = formData.get('customer_name') as string
       const seller_id = parseInt(formData.get('seller_id') as string)
 
-      if (!customer_name || isNaN(seller_id)) {
-        console.error(
-          `[ERROR] Invalid sale info data: customer_name=${customer_name}, seller_id=${seller_id}`,
-        )
+      if (!customer_name || Number.isNaN(seller_id)) {
         throw new Error('Invalid sale info update data')
       }
 
@@ -403,8 +367,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             headers: { 'Set-Cookie': await commitSession(session) },
           },
         )
-      } catch (dbError) {
-        console.error('Database error:', dbError)
+      } catch {
         throw new Error('Failed to update transaction information')
       }
     } else if (intent === 'create-customer') {
@@ -529,9 +492,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         headers: { 'Set-Cookie': await commitSession(session) },
       },
     )
-  } catch (error) {
-    console.error('Error updating transaction:', error)
-
+  } catch {
     const session = await getSession(request.headers.get('Cookie'))
     session.flash(
       'message',
@@ -957,7 +918,7 @@ export default function EditTransaction() {
               </p>
             ) : (
               <div className='space-y-3'>
-                {slabs.map((slab, index) => (
+                {slabs.map(slab => (
                   <div
                     key={slab.id}
                     className={`p-3 rounded-md border shadow-sm ${
@@ -1001,7 +962,7 @@ export default function EditTransaction() {
           <TabsContent value='sinks' className='bg-gray-50 rounded-md p-3 shadow-inner'>
             <div className='max-h-[25vh] overflow-y-auto mb-4'>
               <div className='space-y-3'>
-                {sinks.map((sink, index) => (
+                {sinks.map(sink => (
                   <div
                     key={sink.id}
                     className={`p-3 rounded-md border shadow-sm ${

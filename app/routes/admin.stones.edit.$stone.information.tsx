@@ -97,18 +97,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const colorsField = data.colors
 
     if (typeof colorsField === 'string') {
-      try {
-        if (colorsField.startsWith('[')) {
-          colorsArray = JSON.parse(colorsField).map(Number)
-        } else if (colorsField) {
-          colorsArray = [Number(colorsField)]
-        }
-      } catch (e) {}
+      if (colorsField.startsWith('[')) {
+        colorsArray = JSON.parse(colorsField).map(Number)
+      } else if (colorsField) {
+        colorsArray = [Number(colorsField)]
+      }
     } else if (Array.isArray(colorsField)) {
       colorsArray = colorsField.map(Number)
     }
 
-    colorsArray = colorsArray.filter(id => !isNaN(id) && id > 0)
+    colorsArray = colorsArray.filter(id => !Number.isNaN(id) && id > 0)
 
     await db.execute(`DELETE FROM stone_colors WHERE stone_id = ?`, [stoneId])
 
@@ -134,7 +132,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return redirect(`../..${searchString}`, {
       headers: { 'Set-Cookie': await commitSession(session) },
     })
-  } catch (error) {
+  } catch {
     return { errors: { message: 'Failed to update stone' } }
   }
 }

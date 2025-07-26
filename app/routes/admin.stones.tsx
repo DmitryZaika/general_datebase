@@ -2,7 +2,7 @@
 
 import { GridIcon, TableIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { FaPencilAlt, FaTimes } from 'react-icons/fa'
 import {
@@ -20,12 +20,10 @@ import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
-import { StonesSort } from '~/components/molecules/StonesSort'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
-import { STONE_TYPES } from '~/utils/constants'
 import { stoneQueryBuilder } from '~/utils/queries.server'
 import { getAdminUser } from '~/utils/session.server'
 import { capitalizeFirstLetter } from '~/utils/words'
@@ -221,10 +219,6 @@ export default function AdminStones() {
 
   const handleAddStoneClick = () => {
     setIsAddingStone(true)
-  }
-
-  const priorityFunction = (a: Stone, b: Stone) => {
-    return 0
   }
 
   const getEditUrl = (stoneId: number) => {

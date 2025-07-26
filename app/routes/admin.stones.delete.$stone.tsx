@@ -23,7 +23,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   if (!params.stone) {
@@ -39,11 +39,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
     deleteFile(stone.url)
   }
 
-  try {
-    await db.execute(`DELETE FROM stones WHERE id = ?`, [stoneId])
-  } catch (error) {
-    console.error('Error connecting to the database: ', error)
-  }
+  await db.execute(`DELETE FROM stones WHERE id = ?`, [stoneId])
 
   const url = new URL(request.url)
   const searchParams = url.searchParams.toString()

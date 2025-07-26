@@ -1,16 +1,9 @@
-import {
-  type ActionFunctionArgs,
-  type LoaderFunctionArgs,
-  redirect,
-  useLoaderData,
-  useNavigate,
-} from 'react-router'
+import { type ActionFunctionArgs, redirect, useNavigate } from 'react-router'
 import { DeleteRow } from '~/components/pages/DeleteRow'
 
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
-import { selectId } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
@@ -22,7 +15,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
   try {
     await csrf.validate(request)
-  } catch (error) {
+  } catch {
     return { error: 'Invalid CSRF token' }
   }
   if (!params.supplier) {
@@ -47,35 +40,8 @@ export async function action({ params, request }: ActionFunctionArgs) {
   })
 }
 
-export const loader = async ({ params, request }: LoaderFunctionArgs) => {
-  try {
-    await getAdminUser(request)
-  } catch (error) {
-    return redirect(`/login?error=${error}`)
-  }
-  const supplierId = params.supplier ? parseInt(params.supplier, 10) : null
-  if (!supplierId) {
-    return { supplier_name: undefined }
-  }
-
-  const supplier = await selectId<{ supplier_name: string }>(
-    db,
-    'select supplier_name from suppliers WHERE id = ?',
-    supplierId,
-  )
-
-  if (!supplier) {
-    return { supplier_name: undefined }
-  }
-
-  return {
-    supplier_name: supplier ? supplier.supplier_name : undefined,
-  }
-}
-
 export default function SuppliersAdd() {
   const navigate = useNavigate()
-  const { supplier_name } = useLoaderData<typeof loader>()
 
   const handleChange = (open: boolean) => {
     if (open === false) {

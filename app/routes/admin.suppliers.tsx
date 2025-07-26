@@ -12,7 +12,6 @@ import {
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
