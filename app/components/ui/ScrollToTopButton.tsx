@@ -42,8 +42,7 @@ export function ScrollToTopButton() {
           behavior: 'smooth',
         })
       }
-    } catch (error) {
-      console.error('Ошибка при прокрутке:', error)
+    } catch {
       const mainElement = document.querySelector('main')
       if (mainElement) {
         mainElement.scrollTop = 0

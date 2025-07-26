@@ -36,8 +36,7 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
         navigate: false,
       })
     },
-    errors => {
-      console.error('Form validation errors:', errors)
+    () => {
       form.trigger()
     },
   )
