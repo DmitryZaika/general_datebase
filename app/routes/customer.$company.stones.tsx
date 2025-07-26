@@ -1,18 +1,12 @@
 import { useState } from 'react'
-import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
+import { type LoaderFunctionArgs, Outlet, useLoaderData } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
 import { ImageCard } from '~/components/organisms/ImageCard'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '~/components/ui/accordion'
 import { db } from '~/db.server'
 import { cleanParams } from '~/hooks/use-safe-search-params'
-import { StoneFilter, stoneFilterSchema } from '~/schemas/stones'
+import { stoneFilterSchema } from '~/schemas/stones'
 import { stoneQueryBuilder } from '~/utils/queries.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { capitalizeFirstLetter } from '~/utils/words'
@@ -29,12 +23,6 @@ interface Stone {
   amount: number | null
   on_sale: boolean | number
   created_date: string
-}
-
-const customOrder = ['granite', 'quartz', 'marble', 'dolomite', 'quartzite']
-
-function customSortType(a: string, b: string) {
-  return customOrder.indexOf(a.toLowerCase()) - customOrder.indexOf(b.toLowerCase())
 }
 
 function sortStones(a: Stone, b: Stone) {
@@ -68,7 +56,6 @@ interface InteractiveCardProps {
 }
 
 function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProps) {
-  const displayedAmount = stone.amount && stone.amount > 0 ? stone.amount : '—'
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : '—'
   const displayedLength = stone.length && stone.length > 0 ? stone.length : '—'
   const isOnSale = !!stone.on_sale
@@ -132,9 +119,9 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
 }
 
 export default function Stones() {
-  const { stones, colors } = useLoaderData<typeof loader>()
+  const { stones } = useLoaderData<typeof loader>()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
-  const [activeType, setActiveType] = useState<string | undefined>(undefined)
+  const [_, setActiveType] = useState<string | undefined>(undefined)
 
   const handleCardClick = (id: number, type: string) => {
     setCurrentId(id)

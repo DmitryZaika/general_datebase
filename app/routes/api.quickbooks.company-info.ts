@@ -45,7 +45,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       },
     )
   }
-  const refresh = await refreshQboToken(request, user.company_id, refreshToken)
+  // TODO: fix this
+  const refresh = await refreshQboToken(request, 1234567890, refreshToken)
   setQboSession(session, refresh)
   const result = await getQboCompanyInformation(refresh.access_token, realmId)
   if (typeof result === 'number') {

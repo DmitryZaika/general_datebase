@@ -15,7 +15,7 @@ import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
 import { getStripe } from '~/utils/getStripe'
-import { selectId, selectMany } from '~/utils/queryHelpers'
+import { selectMany } from '~/utils/queryHelpers'
 import { toastData } from '~/utils/toastHelpers'
 
 const paramsSchema = z.object({
@@ -177,7 +177,6 @@ export default function CustomersView() {
   const { customer, sales } = useLoaderData<typeof loader>()
   const [searchParams] = useSearchParams()
   const paymentStatus = searchParams.get('payment_status')
-  const params = useParams()
 
   useEffect(() => {
     // Clear the URL parameters after processing
