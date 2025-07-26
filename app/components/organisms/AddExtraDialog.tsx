@@ -37,8 +37,8 @@ export const AddExtraDialog = ({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button type='button' variant='blue' size='sm'>
-          <Plus className='h-3 w-3' /> Add Extra Item
+        <Button type='button' size='sm'>
+          <Plus className='h-3 w-3' /> Add Extra Item to Room
         </Button>
       </DialogTrigger>
       <DialogContent className='sm:max-w-[400px]'>

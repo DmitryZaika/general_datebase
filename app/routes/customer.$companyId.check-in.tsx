@@ -37,6 +37,7 @@ const customerCheckInSchema = z.object({
   phone: z.string().min(1, 'Phone number is required'),
   email: z.string().optional(),
   address: z.string().optional(),
+  address_zip_code: z.string().optional(),
   referral_source: z
     .enum([
       'google',
@@ -74,6 +75,7 @@ export default function CustomerCheckIn() {
       phone: '',
       email: '',
       address: '',
+      address_zip_code: '',
       referral_source: undefined,
       safety_instructions_acknowledged: false,
     },
@@ -172,7 +174,7 @@ export default function CustomerCheckIn() {
                 )}
               />
 
-              <AddressInput form={form} field='address' />
+              <AddressInput form={form} field='address' zipField='address_zip_code' />
 
               <FormField
                 control={form.control}
