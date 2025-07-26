@@ -1,9 +1,5 @@
 import { SESClient } from '@aws-sdk/client-ses'
 
-if (!process.env.AWS_EMAIL || !process.env.AWS_EMAIL_SECRET) {
-  throw new Error('AWS_EMAIL and AWS_EMAIL_SECRET must be set')
-}
-
 const ses = new SESClient({
   region: process.env.AWS_REGION ?? 'us-east-2',
   credentials: {
