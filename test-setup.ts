@@ -8,6 +8,7 @@ dotenv.config()
 
 // Ensure we're using a test database
 if (!process.env.DB_DATABASE?.includes('test')) {
+  // biome-ignore lint/suspicious/noConsole: for tests
   console.warn('Warning: Database name should contain "test" for safety')
 }
 
@@ -36,7 +37,7 @@ vi.mock('~/db.server', () => {
   }
 })
 
-// Mock console.log for cleaner test output
+// biome-ignore lint/suspicious/noConsole: for tests
 const originalLog = console.log
 beforeEach(() => {
   console.log = vi.fn()

@@ -1,7 +1,6 @@
 // Image.tsx
 
 import { X } from 'lucide-react'
-import * as React from 'react'
 import { Dialog, DialogContentImage, DialogTrigger } from '~/components/ui/dialog'
 
 interface ImageProps {
