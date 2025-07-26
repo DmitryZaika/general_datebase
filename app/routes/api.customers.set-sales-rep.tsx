@@ -43,8 +43,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     return data({ success: true })
-  } catch (error) {
-    console.error(error)
+  } catch {
     return data({ error: 'Failed to update' }, { status: 500 })
   }
 }

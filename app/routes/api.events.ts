@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { eventSchema, eventUpdateSchema } from '~/schemas/events'
-import { selectId, selectMany } from '~/utils/queryHelpers'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
 interface DatabaseEvent {
@@ -71,7 +71,7 @@ async function createEvent(formData: FormData, userId: number) {
   return Response.json({ success: true, id: result[0].insertId })
 }
 
-async function updateEvent(formData: FormData, userId: number, companyId: number) {
+async function updateEvent(formData: FormData, _: number, companyId: number) {
   const eventId = parseInt(formData.get('id') as string)
   const existingEvents = await selectMany<DatabaseEvent>(
     db,
@@ -181,8 +181,7 @@ export async function action({ request }: ActionFunctionArgs) {
           { status: 400 },
         )
     }
-  } catch (error) {
-    console.error('Event action error:', error)
+  } catch {
     return Response.json(
       { success: false, error: 'Internal server error' },
       { status: 500 },

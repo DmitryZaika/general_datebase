@@ -164,9 +164,7 @@ function homeownerGdIndyText(
   pdfForm
     .getDropdown('Dropdown42')
     .select(seamText[seamKeyHome as keyof typeof seamText] || 'N/A')
-  console.log('queryData', queryData)
   const fullPrice = queryData[0].total_price || 0
-  console.log('fullPrice', fullPrice)
   const halfPrice = fullPrice * 0.5
   pdfForm.getTextField('Text37').setText(fullPrice.toString())
   pdfForm
@@ -178,7 +176,7 @@ function commercialGdIndyText(
   pdfForm: PDFForm,
   queryData: IQuery[],
   sinks: ICountQuery[],
-  faucets: ICountQuery[],
+  _faucets: ICountQuery[],
 ) {
   // Header fields
   pdfForm
