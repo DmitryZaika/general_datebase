@@ -1,5 +1,5 @@
 import { Plus, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { Path, UseFormReturn } from 'react-hook-form'
 import { Button } from '~/components/ui/button'
 import type { TCustomerSchema } from '~/schemas/sales'
@@ -16,9 +16,16 @@ interface DynamicControlProps {
   itemKey: keyof (typeof CUSTOMER_ITEMS)[ExtraItemKey]
   form: UseFormReturn<TCustomerSchema>
   index: number
+  handleInputChange: () => void
 }
 
-const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) => {
+const DynamicControl = ({
+  itemKey,
+  target,
+  form,
+  index,
+  handleInputChange,
+}: DynamicControlProps) => {
   // TODO: remove hardcoded ogee and bullnose
   // biome-ignore lint/security/noGlobalEval: Its safe
   const current = eval(form.watch(`rooms.${index}.extras.${target}.edge_type`))
@@ -30,7 +37,13 @@ const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) =
         name={`rooms.${index}.extras.${target}.${itemKey}`}
         render={({ field }) => (
           <SelectInput
-            field={field}
+            field={{
+              ...field,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                field.onChange(e)
+                handleInputChange()
+              },
+            }}
             placeholder='Select option'
             name={replaceUnderscoresWithSpaces(itemKey)}
             options={Object.entries(itemType).map(([key, value]) => ({
@@ -54,7 +67,15 @@ const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) =
         <InputItem
           name={replaceUnderscoresWithSpaces(itemKey)}
           placeholder={`Enter ${itemKey}`}
-          field={field}
+          field={{
+            ...field,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              const newValue =
+                itemType === 'number' ? Number(e.target.value) : e.target.value
+              field.onChange(newValue)
+              handleInputChange()
+            },
+          }}
         />
       )}
     />
@@ -76,17 +97,14 @@ export const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) =
     number
   > // Backwards compatibility
 
-  useEffect(() => {
+  function handleInputChange() {
     if (isPriceManuallySet) return
-    let newPrice = context.priceFn(current)
-    if (Number.isNaN(newPrice)) {
-      newPrice = 0
-    }
+    const newPrice = context.priceFn(current) || 0
 
     if (newPrice !== current.price) {
       form.setValue(`rooms.${index}.extras.${target}.price`, newPrice)
     }
-  }, [JSON.stringify(current), context, isPriceManuallySet])
+  }
 
   const handleRemove = () => {
     const extras = form.getValues(`rooms.${index}.extras`)
@@ -114,6 +132,7 @@ export const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) =
               itemKey={item as keyof (typeof CUSTOMER_ITEMS)[ExtraItemKey]}
               form={form}
               index={index}
+              handleInputChange={handleInputChange}
             />
           ))}
 
