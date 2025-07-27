@@ -69,7 +69,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const saleId = parseInt(params.transactionId, 10)
-  if (isNaN(saleId)) {
+  if (Number.isNaN(saleId)) {
     return forceRedirectError(request.headers, 'Invalid transaction ID format')
   }
 

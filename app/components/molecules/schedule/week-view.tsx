@@ -336,7 +336,7 @@ export default function WeeklyView() {
 
                         {/* Events for this day */}
                         <div className='absolute inset-0 pointer-events-none'>
-                          {dayEvents.map((event: Event, eventIndex) => {
+                          {dayEvents.map((event: Event) => {
                             const {
                               height,
                               left,

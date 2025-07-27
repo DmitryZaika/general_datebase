@@ -195,33 +195,31 @@ function SortableTodoItem({ todo, refresh }: SortableTodoItemProps) {
   }
 
   return (
-    <>
-      <div
-        ref={setNodeRef}
-        style={style}
-        className={clsx(
-          'flex items-center py-2 border-b border-gray-200 hover:bg-gray-100 transition-colors rounded-lg',
-          isDragging && 'opacity-50',
-        )}
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={clsx(
+        'flex items-center py-2 border-b border-gray-200 hover:bg-gray-100 transition-colors rounded-lg',
+        isDragging && 'opacity-50',
+      )}
+    >
+      <button
+        className='touch-none p-1 opacity-40 hover:opacity-100 cursor-pointer'
+        {...attributes}
+        {...listeners}
       >
-        <button
-          className='touch-none p-1 opacity-40 hover:opacity-100 cursor-pointer'
-          {...attributes}
-          {...listeners}
-        >
-          <GripVerticalIcon className='h-4 w-4' />
-        </button>
-        <FinishForm todo={todo} refresh={refresh} />
-        <EditForm todo={todo} refresh={refresh} />
-        <DeleteForm todo={todo} refresh={refresh} />
-        <p className='text-sm text-gray-500'>
-          {new Date(todo.created_date).toLocaleDateString(undefined, {
-            month: 'numeric',
-            day: 'numeric',
-          })}
-        </p>
-      </div>
-    </>
+        <GripVerticalIcon className='h-4 w-4' />
+      </button>
+      <FinishForm todo={todo} refresh={refresh} />
+      <EditForm todo={todo} refresh={refresh} />
+      <DeleteForm todo={todo} refresh={refresh} />
+      <p className='text-sm text-gray-500'>
+        {new Date(todo.created_date).toLocaleDateString(undefined, {
+          month: 'numeric',
+          day: 'numeric',
+        })}
+      </p>
+    </div>
   )
 }
 

@@ -64,7 +64,6 @@ interface SlabItemProps {
   showDeleteButton?: boolean
   isSubmitting?: boolean
   onDeleteClick?: (slab: { id: number; bundle: string }) => void
-  onPrintQRCode?: (slab: SlabData) => void
   onBundleUpdate?: (slabId: number, newBundle: string) => void
 }
 
@@ -78,7 +77,6 @@ interface LinkSlabsDialogProps {
   allStones: Array<{ id: number; name: string }>
   isOpen: boolean
   onClose: () => void
-  currentStoneId: number
 }
 
 // Component definitions
@@ -89,7 +87,6 @@ function SlabItem({
   showDeleteButton,
   isSubmitting,
   onDeleteClick,
-  onPrintQRCode,
   onBundleUpdate,
 }: SlabItemProps) {
   const [isEditing, setIsEditing] = useState(false)
@@ -109,7 +106,7 @@ function SlabItem({
   const handleBundleUpdate = () => {
     // Prevent saving empty bundle names
     if (!newBundle.trim()) return
-    onBundleUpdate && onBundleUpdate(slab.id, newBundle)
+    onBundleUpdate?.(slab.id, newBundle)
     setIsEditing(false)
   }
 
@@ -187,7 +184,7 @@ function SlabItem({
           {showDeleteButton && (
             <Button
               type='button'
-              onClick={() => onDeleteClick && onDeleteClick(slab)}
+              onClick={() => onDeleteClick?.(slab)}
               disabled={isSubmitting}
               className='size-9 flex items-center gap-2'
             >
@@ -231,12 +228,7 @@ function LinkedSlabsGroup({
   )
 }
 
-function LinkSlabsDialog({
-  allStones,
-  isOpen,
-  onClose,
-  currentStoneId,
-}: LinkSlabsDialogProps) {
+function LinkSlabsDialog({ allStones, isOpen, onClose }: LinkSlabsDialogProps) {
   const [selectedStoneId, setSelectedStoneId] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const navigation = useNavigation()
@@ -623,8 +615,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           headers: { 'Set-Cookie': await commitSession(session) },
         },
       )
-    } catch (error) {
-      console.error('Error updating slab bundle:', error)
+    } catch {
       return { error: 'Failed to update slab number' }
     }
   }
@@ -672,8 +663,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       } else {
         return forceRedirectError(request.headers, 'No id provided')
       }
-    } catch (error) {
-      console.error('Error processing DELETE request:', error)
+    } catch {
       return { error: 'Failed to process delete request' }
     }
   }
@@ -711,8 +701,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
 
         return { error: 'Invalid form data' }
-      } catch (error) {
-        console.error('Error processing form data:', error)
+      } catch {
         return { error: 'Failed to process form data' }
       }
     }
@@ -761,7 +750,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
           },
         )
       } catch (error: unknown) {
-        console.error('Error processing slab form:', error)
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error occurred'
         return data({ error: `Failed to add slab: ${errorMessage}` })
@@ -831,14 +819,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }>
   }> = []
 
-  try {
-    // Get stone links
-    const stoneLinks = await selectMany<{
-      source_stone_id: number
-      source_stone_name: string
-    }>(
-      db,
-      `SELECT 
+  // Get stone links
+  const stoneLinks = await selectMany<{
+    source_stone_id: number
+    source_stone_name: string
+  }>(
+    db,
+    `SELECT 
          stone_slab_links.source_stone_id, 
          s.name as source_stone_name
        FROM stone_slab_links
@@ -846,34 +833,31 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
        WHERE stone_slab_links.stone_id = ?
        GROUP BY stone_slab_links.source_stone_id, s.name
        ORDER BY s.name ASC`,
-      [stoneId],
-    )
+    [stoneId],
+  )
 
-    // Get slabs for each linked stone
-    for (const link of stoneLinks) {
-      const slabs = await selectMany<{
-        id: number
-        bundle: string
-        url: string
-        width: number
-        length: number
-      }>(
-        db,
-        `SELECT 
+  // Get slabs for each linked stone
+  for (const link of stoneLinks) {
+    const slabs = await selectMany<{
+      id: number
+      bundle: string
+      url: string
+      width: number
+      length: number
+    }>(
+      db,
+      `SELECT 
            id, bundle, url, width, length
          FROM slab_inventory 
          WHERE stone_id = ? AND cut_date IS NULL`,
-        [link.source_stone_id],
-      )
+      [link.source_stone_id],
+    )
 
-      linkedSlabs.push({
-        source_stone_id: link.source_stone_id,
-        source_stone_name: link.source_stone_name,
-        slabs,
-      })
-    }
-  } catch (err) {
-    console.error('Error fetching linked slabs:', err)
+    linkedSlabs.push({
+      source_stone_id: link.source_stone_id,
+      source_stone_name: link.source_stone_name,
+      slabs,
+    })
   }
 
   return {
@@ -881,14 +865,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     stone,
     allStones,
     linkedSlabs,
-    currentStoneId: stoneId,
   }
 }
 
 // Main component
 export default function EditStoneSlabs() {
-  const { slabs, stone, allStones, linkedSlabs, currentStoneId } =
-    useLoaderData<typeof loader>()
+  const { slabs, stone, allStones, linkedSlabs } = useLoaderData<typeof loader>()
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
@@ -929,26 +911,15 @@ export default function EditStoneSlabs() {
       formData.append('csrf', csrfToken)
     }
 
-    try {
-      const response = await fetch(window.location.pathname, {
-        method: 'PATCH',
-        body: formData,
-      })
+    const response = await fetch(window.location.pathname, {
+      method: 'PATCH',
+      body: formData,
+    })
 
-      if (response.ok) {
-        // Refresh the page to show updated data
-        navigate(`.${window.location.search}`, { replace: true })
-      } else {
-        console.error('Failed to update bundle')
-      }
-    } catch (error) {
-      console.error('Error updating bundle:', error)
+    if (response.ok) {
+      // Refresh the page to show updated data
+      navigate(`.${window.location.search}`, { replace: true })
     }
-  }
-
-  // Handle single QR code printing
-  const handleSlabQRCodePrint = (slab: SlabData) => {
-    printSingleSlabQRCode(slab, stone.name)
   }
 
   // Handle printing all QR codes
@@ -1015,7 +986,6 @@ export default function EditStoneSlabs() {
             showDeleteButton={true}
             isSubmitting={isSubmitting}
             onDeleteClick={handleDeleteClick}
-            onPrintQRCode={handleSlabQRCodePrint}
             onBundleUpdate={handleBundleUpdate}
           />
         ))}
@@ -1070,7 +1040,6 @@ export default function EditStoneSlabs() {
         allStones={allStones}
         isOpen={showLinkDialog}
         onClose={() => setShowLinkDialog(false)}
-        currentStoneId={currentStoneId}
       />
 
       <ImagePreviewDialog
