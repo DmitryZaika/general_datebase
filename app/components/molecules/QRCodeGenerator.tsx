@@ -1,29 +1,29 @@
-import { useRef } from 'react';
-import QRCode from 'react-qr-code';
-import { Button } from '~/components/ui/button';
-import { PrinterIcon } from 'lucide-react';
+import { PrinterIcon } from 'lucide-react'
+import { useRef } from 'react'
+import QRCode from 'react-qr-code'
+import { Button } from '~/components/ui/button'
 
 interface QRCodeGeneratorProps {
-  url: string;
-  title?: string;
-  size?: number;
+  url: string
+  title?: string
+  size?: number
 }
 
 export function QRCodeGenerator({ url, title, size = 200 }: QRCodeGeneratorProps) {
-  const qrRef = useRef<HTMLDivElement>(null);
+  const qrRef = useRef<HTMLDivElement>(null)
 
   // Функция для печати QR-кода
   const printQRCode = () => {
-    if (!qrRef.current) return;
-    
-    const printWindow = window.open('', '_blank');
+    if (!qrRef.current) return
+
+    const printWindow = window.open('', '_blank')
     if (!printWindow) {
-      alert('Пожалуйста, разрешите всплывающие окна для печати QR-кода.');
-      return;
+      alert('Пожалуйста, разрешите всплывающие окна для печати QR-кода.')
+      return
     }
-    
-    const titleText = title || 'QR Code';
-    
+
+    const titleText = title || 'QR Code'
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -79,46 +79,46 @@ export function QRCodeGenerator({ url, title, size = 200 }: QRCodeGeneratorProps
           </script>
         </body>
       </html>
-    `);
-    
-    printWindow.document.close();
-  };
+    `)
+
+    printWindow.document.close()
+  }
 
   return (
-    <div className="flex flex-col items-center">
-      <div ref={qrRef} className="bg-white p-4 rounded-md">
+    <div className='flex flex-col items-center'>
+      <div ref={qrRef} className='bg-white p-4 rounded-md'>
         <QRCode value={url} size={size} />
       </div>
-      
-      <div className="mt-2 text-sm text-gray-500 text-center max-w-[300px] overflow-hidden text-ellipsis">
+
+      <div className='mt-2 text-sm text-gray-500 text-center max-w-[300px] overflow-hidden text-ellipsis'>
         {url}
       </div>
-      
-      <Button 
-        onClick={printQRCode} 
-        className="mt-4 flex items-center gap-2"
-        variant="default"
+
+      <Button
+        onClick={printQRCode}
+        className='mt-4 flex items-center gap-2'
+        variant='default'
       >
-        <PrinterIcon className="h-4 w-4" />
+        <PrinterIcon className='h-4 w-4' />
         <span>Печать</span>
       </Button>
     </div>
-  );
+  )
 }
 
 // Простая утилитарная функция для печати QR-кода
 export function simplePrintQRCode(url: string, title?: string) {
-  const printWindow = window.open('', '_blank');
+  const printWindow = window.open('', '_blank')
   if (!printWindow) {
-    alert('Пожалуйста, разрешите всплывающие окна для печати QR-кода.');
-    return;
+    alert('Пожалуйста, разрешите всплывающие окна для печати QR-кода.')
+    return
   }
-  
-  const titleText = title || 'QR Code';
-  const encodedUrl = encodeURIComponent(url);
-  
-  const hasCustomLayout = title?.includes('<div');
-  
+
+  const titleText = title || 'QR Code'
+  const encodedUrl = encodeURIComponent(url)
+
+  const hasCustomLayout = title?.includes('<div')
+
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
@@ -197,12 +197,12 @@ export function simplePrintQRCode(url: string, title?: string) {
       </head>
       <body>
         <div class="qr-container">
-          ${hasCustomLayout ? 
-            `<div class="custom-layout">
+          ${
+            hasCustomLayout
+              ? `<div class="custom-layout">
               ${title}
-             </div>` 
-            : 
-            `${title ? `<div class="qr-title">${title}</div>` : ''}
+             </div>`
+              : `${title ? `<div class="qr-title">${title}</div>` : ''}
              <img class="qr-standard" src="https://api.qrserver.com/v1/create-qr-code/?size=96x96&data=${encodedUrl}" alt="QR Code">
              <div class="qr-url">${url}</div>`
           }
@@ -210,12 +210,13 @@ export function simplePrintQRCode(url: string, title?: string) {
         <script>
           window.onload = function() {
             // If custom layout, replace first div with QR code image
-            ${hasCustomLayout ? 
-              `const layoutDiv = document.querySelector('.custom-layout > div > div:first-child');
+            ${
+              hasCustomLayout
+                ? `const layoutDiv = document.querySelector('.custom-layout > div > div:first-child');
                if (layoutDiv) {
                  layoutDiv.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=96x96&data=${encodedUrl}" alt="QR Code" style="width:0.6in; height:0.6in;">';
-               }` 
-              : ''
+               }`
+                : ''
             }
             
             setTimeout(function() {
@@ -226,7 +227,7 @@ export function simplePrintQRCode(url: string, title?: string) {
         </script>
       </body>
     </html>
-  `);
-  
-  printWindow.document.close();
-} 
+  `)
+
+  printWindow.document.close()
+}

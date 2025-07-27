@@ -1,7 +1,16 @@
-import { FormControl, FormItem, FormLabel, FormMessage } from "../ui/form";
-import { Switch } from "~/components/ui/switch";
+import type { ControllerRenderProps, FieldValues, Path } from 'react-hook-form'
+import { Switch } from '~/components/ui/switch'
+import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 
-export function SwitchItem({ name, field }: { name: string; field: any }) {
+interface SwitchItemProps<T extends FieldValues, V extends Path<T>> {
+  name: string
+  field: ControllerRenderProps<T, V>
+}
+
+export function SwitchItem<T extends FieldValues, V extends Path<T>>({
+  name,
+  field,
+}: SwitchItemProps<T, V>) {
   return (
     <FormItem>
       <FormControl>
@@ -10,5 +19,5 @@ export function SwitchItem({ name, field }: { name: string; field: any }) {
       <FormLabel>{name}</FormLabel>
       <FormMessage />
     </FormItem>
-  );
+  )
 }

@@ -1,116 +1,115 @@
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from '@hookform/resolvers/zod'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2'
+import { useForm } from 'react-hook-form'
 import {
-  ActionFunctionArgs,
-  LoaderFunctionArgs,
+  type ActionFunctionArgs,
+  Form,
+  type LoaderFunctionArgs,
   redirect,
-  useNavigation,
-  useParams,
   useLoaderData,
   useLocation,
-} from "react-router";
-import { Form, useNavigate } from "react-router";
-import { FormProvider, FormField } from "~/components/ui/form";
-import { getValidatedFormData } from "remix-hook-form";
-import { z } from "zod";
-import { InputItem } from "~/components/molecules/InputItem";
-import { Button } from "~/components/ui/button";
-import { useForm } from "react-hook-form";
+  useNavigate,
+  useNavigation,
+  useParams,
+} from 'react-router'
+import { getValidatedFormData } from 'remix-hook-form'
+import { z } from 'zod'
+import { InputItem } from '~/components/molecules/InputItem'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { SelectInput } from '~/components/molecules/SelectItem'
+import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog";
-import { db } from "~/db.server";
-import { commitSession, getSession } from "~/sessions";
-import { toastData } from "~/utils/toastHelpers";
-import { RowDataPacket, ResultSetHeader } from "mysql2";
-
-import { csrf } from "~/utils/csrf.server";
-import { getEmployeeUser } from "~/utils/session.server";
-import { useFullSubmit } from "~/hooks/useFullSubmit";
-import { LoadingButton } from "~/components/molecules/LoadingButton";
-import { selectMany, selectId } from "~/utils/queryHelpers";
-import { SelectInput } from "~/components/molecules/SelectItem";
-import { Switch } from "~/components/ui/switch";
+} from '~/components/ui/dialog'
+import { FormField, FormProvider } from '~/components/ui/form'
+import { Switch } from '~/components/ui/switch'
+import { db } from '~/db.server'
+import { useFullSubmit } from '~/hooks/useFullSubmit'
+import { commitSession, getSession } from '~/sessions'
+import { csrf } from '~/utils/csrf.server'
+import { selectId, selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
 
 interface SaleDetails {
-  id: number;
-  customer_name: string;
-  sale_date: string;
-  bundles: string[];
-  sinks: string[];
+  id: number
+  customer_name: string
+  sale_date: string
+  bundles: string[]
+  sinks: string[]
 }
 
 interface Sink {
-  id: number;
-  name: string;
-  type: string;
+  id: number
+  name: string
+  type: string
 }
 
 const schema = z.object({
   notes_to_slab: z
     .union([z.string(), z.number()])
-    .transform((val) => (val ? String(val) : ""))
+    .transform(val => (val ? String(val) : ''))
     .optional(),
   sink: z.union([z.string(), z.number()]).optional(),
   square_feet: z.coerce.number().optional(),
   is_full_slab_sold: z.boolean().default(false),
-});
+})
 
-type FormData = z.infer<typeof schema>;
+type FormData = z.infer<typeof schema>
 
-const resolver = zodResolver(schema);
+const resolver = zodResolver(schema)
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  let user;
   try {
-    user = await getEmployeeUser(request);
+    await getEmployeeUser(request)
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
 
   try {
-    await csrf.validate(request);
-  } catch (error) {
-    return { error: "Invalid CSRF token" };
+    await csrf.validate(request)
+  } catch {
+    return { error: 'Invalid CSRF token' }
   }
 
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
-    resolver
-  );
+    resolver,
+  )
   if (errors) {
-    return { errors, receivedValues };
+    return { errors, receivedValues }
   }
 
-  const { slab, saleId } = params;
+  const { slab, saleId } = params
   if (!slab || !saleId) {
-    return { error: "Slab ID or Sale ID is missing" };
+    return { error: 'Slab ID or Sale ID is missing' }
   }
 
-  const url = new URL(request.url);
-  const searchParams = url.searchParams.toString();
-  const searchString = searchParams ? `?${searchParams}` : "";
+  const url = new URL(request.url)
+  const searchParams = url.searchParams.toString()
+  const searchString = searchParams ? `?${searchParams}` : ''
 
   try {
     const [slabCheck] = await db.execute<RowDataPacket[]>(
       `SELECT id, stone_id, bundle, length, width, url FROM slab_inventory WHERE id = ?`,
-      [slab]
-    );
+      [slab],
+    )
 
     if (!slabCheck || slabCheck.length === 0) {
-      throw new Error("Slab not found");
+      throw new Error('Slab not found')
     }
 
     const [saleCheck] = await db.execute<RowDataPacket[]>(
       `SELECT id FROM sales WHERE id = ?`,
-      [saleId]
-    );
+      [saleId],
+    )
 
     if (!saleCheck || saleCheck.length === 0) {
-      throw new Error("Sale not found");
+      throw new Error('Sale not found')
     }
 
     if (data.sink) {
@@ -122,59 +121,53 @@ export async function action({ request, params }: ActionFunctionArgs) {
          AND s.sale_id IS NULL 
          AND s.is_deleted = 0
          LIMIT 1`,
-        [data.sink]
-      );
+        [data.sink],
+      )
 
       if (availableSinks && availableSinks.length > 0) {
-        const sinkId = availableSinks[0].id;
-        const sinkPrice = parseFloat(availableSinks[0].retail_price) || null;
+        const sinkId = availableSinks[0].id
+        const sinkPrice = parseFloat(availableSinks[0].retail_price) || null
 
         // Find a slab in this sale to attach the sink to
         const [slabInSale] = await db.execute<RowDataPacket[]>(
           `SELECT id FROM slab_inventory WHERE sale_id = ? LIMIT 1`,
-          [saleId]
-        );
+          [saleId],
+        )
 
         if (slabInSale.length === 0) {
-          throw new Error("No slabs found in this sale to attach sink to");
+          throw new Error('No slabs found in this sale to attach sink to')
         }
 
-        const slabId = slabInSale[0].id;
+        const slabId = slabInSale[0].id
 
         await db.execute(
           `UPDATE sinks SET slab_id = ?, price = ?, is_deleted = 1 WHERE id = ?`,
-          [slabId, sinkPrice, sinkId]
-        );
-      } else {
-        console.warn("No available sinks found for type ID:", data.sink);
+          [slabId, sinkPrice, sinkId],
+        )
       }
     }
 
     const [slabInSaleCheck] = await db.execute<RowDataPacket[]>(
       `SELECT id, cut_date FROM slab_inventory WHERE sale_id = ? AND id = ?`,
-      [saleId, slab]
-    );
+      [saleId, slab],
+    )
 
     if (slabInSaleCheck && slabInSaleCheck.length > 0) {
       if (slabInSaleCheck[0].cut_date) {
         await db.execute(
           `UPDATE slab_inventory SET cut_date = NULL, notes = ?, square_feet = ? WHERE id = ?`,
-          [
-            data.notes_to_slab || null,
-            data.square_feet || null,
-            slabInSaleCheck[0].id,
-          ]
-        );
+          [data.notes_to_slab || null, data.square_feet || null, slabInSaleCheck[0].id],
+        )
       } else {
-        throw new Error("This slab is already added to this sale");
+        throw new Error('This slab is already added to this sale')
       }
     } else {
       if (data.is_full_slab_sold) {
         // If selling the full slab, just update the existing slab record
         await db.execute(
           `UPDATE slab_inventory SET sale_id = ?, notes = ?, square_feet = ? WHERE id = ?`,
-          [saleId, data.notes_to_slab || null, data.square_feet || null, slab]
-        );
+          [saleId, data.notes_to_slab || null, data.square_feet || null, slab],
+        )
       } else {
         // If not selling the full slab, create a copy of the slab
         await db.execute<ResultSetHeader>(
@@ -191,53 +184,52 @@ export async function action({ request, params }: ActionFunctionArgs) {
             data.notes_to_slab || null,
             data.square_feet || null,
             saleId,
-          ]
-        );
+          ],
+        )
       }
     }
-  } catch (error) {
-    console.error("Error adding slab to sale: ", error);
-    const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Error", "Failed to add slab to sale"));
+  } catch {
+    const session = await getSession(request.headers.get('Cookie'))
+    session.flash('message', toastData('Error', 'Failed to add slab to sale'))
     return redirect(`/employee/stones/slabs/${params.stone}${searchString}`, {
-      headers: { "Set-Cookie": await commitSession(session) },
-    });
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
   }
 
-  const session = await getSession(request.headers.get("Cookie"));
+  const session = await getSession(request.headers.get('Cookie'))
   session.flash(
-    "message",
-    toastData("Success", "Slab added to existing sale successfully")
-  );
+    'message',
+    toastData('Success', 'Slab added to existing sale successfully'),
+  )
   return redirect(`/employee/stones/slabs/${params.stone}${searchString}`, {
-    headers: { "Set-Cookie": await commitSession(session) },
-  });
+    headers: { 'Set-Cookie': await commitSession(session) },
+  })
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
-    const user = await getEmployeeUser(request);
+    const user = await getEmployeeUser(request)
 
-    const { slab, saleId } = params;
+    const { slab, saleId } = params
     if (!slab || !saleId) {
-      throw new Error("Slab ID or Sale ID is missing");
+      throw new Error('Slab ID or Sale ID is missing')
     }
 
     const sale = await selectId<{
-      id: number;
-      customer_name: string;
-      sale_date: string;
+      id: number
+      customer_name: string
+      sale_date: string
     }>(
       db,
       `SELECT s.id, c.name as customer_name, s.sale_date
        FROM sales s 
        JOIN customers c ON s.customer_id = c.id 
        WHERE s.id = ?`,
-      parseInt(saleId, 10)
-    );
+      parseInt(saleId, 10),
+    )
 
     if (!sale) {
-      throw new Error("Sale not found");
+      throw new Error('Sale not found')
     }
 
     const bundles = await selectMany<{ bundle: string }>(
@@ -245,8 +237,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       `SELECT bundle
        FROM slab_inventory
        WHERE sale_id = ?`,
-      [saleId]
-    );
+      [saleId],
+    )
 
     const saleSinks = await selectMany<{ name: string }>(
       db,
@@ -255,23 +247,23 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
        JOIN sink_type ON sinks.sink_type_id = sink_type.id
        JOIN slab_inventory ON sinks.slab_id = slab_inventory.id
        WHERE slab_inventory.sale_id = ?`,
-      [saleId]
-    );
+      [saleId],
+    )
 
     const slabDetails = await selectId<{
-      bundle: string;
-      stone_name: string;
+      bundle: string
+      stone_name: string
     }>(
       db,
       `SELECT si.bundle, st.name as stone_name
        FROM slab_inventory si
        JOIN stones st ON si.stone_id = st.id
        WHERE si.id = ?`,
-      parseInt(slab, 10)
-    );
+      parseInt(slab, 10),
+    )
 
     if (!slabDetails) {
-      throw new Error("Slab not found");
+      throw new Error('Slab not found')
     }
 
     const sinks = await selectMany<Sink>(
@@ -287,112 +279,109 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
          AND s.is_deleted = 0
        )
        ORDER BY st.name ASC`,
-      [user.company_id]
-    );
+      [user.company_id],
+    )
 
     const saleDetails: SaleDetails = {
       ...sale,
-      bundles: bundles.map((b) => b.bundle),
-      sinks: saleSinks.map((s) => s.name),
-    };
+      bundles: bundles.map(b => b.bundle),
+      sinks: saleSinks.map(s => s.name),
+    }
 
     return {
       saleDetails,
       slabDetails,
       sinks,
-    };
-  } catch (error) {
-    return redirect(`/employee/stones/slabs/${params.stone}`);
+    }
+  } catch {
+    return redirect(`/employee/stones/slabs/${params.stone}`)
   }
-};
+}
 export default function AddToSale() {
-  const { saleDetails, slabDetails, sinks } = useLoaderData<typeof loader>();
-  const navigate = useNavigate();
-  const isSubmitting = useNavigation().state === "submitting";
-  const params = useParams();
-  const location = useLocation();
+  const { saleDetails, slabDetails, sinks } = useLoaderData<typeof loader>()
+  const navigate = useNavigate()
+  const isSubmitting = useNavigation().state === 'submitting'
+  const params = useParams()
+  const location = useLocation()
 
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
-      notes_to_slab: "",
-      sink: "",
+      notes_to_slab: '',
+      sink: '',
       square_feet: undefined,
       is_full_slab_sold: false,
     },
-  });
+  })
 
-  const fullSubmit = useFullSubmit(form);
+  const fullSubmit = useFullSubmit(form)
 
   const handleChange = (open: boolean) => {
     if (open === false) {
-      navigate(`/employee/stones/slabs/${params.stone}${location.search}`);
+      navigate(`/employee/stones/slabs/${params.stone}${location.search}`)
     }
-  };
+  }
 
-  const formattedDate = new Date(saleDetails.sale_date).toLocaleDateString();
+  const formattedDate = new Date(saleDetails.sale_date).toLocaleDateString()
   const bundlesList = saleDetails.bundles.length
-    ? saleDetails.bundles.join(", ")
-    : "No slabs yet";
+    ? saleDetails.bundles.join(', ')
+    : 'No slabs yet'
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className='sm:max-w-[425px]'>
         <DialogHeader>
           <DialogTitle>Add Slab to Existing Sale</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="bg-gray-50 p-3 rounded-md">
-            <div className="font-medium">Sale Details:</div>
-            <div className="text-sm mt-1">
+        <div className='space-y-4 py-4'>
+          <div className='bg-gray-50 p-3 rounded-md'>
+            <div className='font-medium'>Sale Details:</div>
+            <div className='text-sm mt-1'>
               <p>
-                <span className="font-medium">Customer:</span>{" "}
+                <span className='font-medium'>Customer:</span>{' '}
                 {saleDetails.customer_name}
               </p>
               <p>
-                <span className="font-medium">Date:</span> {formattedDate}
+                <span className='font-medium'>Date:</span> {formattedDate}
               </p>
               <p>
-                <span className="font-medium">Current Bundles:</span>{" "}
-                {bundlesList}
+                <span className='font-medium'>Current Bundles:</span> {bundlesList}
               </p>
               {saleDetails.sinks.length > 0 && (
                 <p>
-                  <span className="font-medium">Sinks:</span>{" "}
-                  {saleDetails.sinks.join(", ")}
+                  <span className='font-medium'>Sinks:</span>{' '}
+                  {saleDetails.sinks.join(', ')}
                 </p>
               )}
             </div>
           </div>
 
-          <div className="bg-gray-50 p-3 rounded-md">
-            <div className="font-medium">Adding Slab:</div>
-            <div className="text-sm mt-1">
+          <div className='bg-gray-50 p-3 rounded-md'>
+            <div className='font-medium'>Adding Slab:</div>
+            <div className='text-sm mt-1'>
               <p>
-                <span className="font-medium">Stone:</span>{" "}
-                {slabDetails.stone_name}
+                <span className='font-medium'>Stone:</span> {slabDetails.stone_name}
               </p>
               <p>
-                <span className="font-medium">Bundle:</span>{" "}
-                {slabDetails.bundle}
+                <span className='font-medium'>Bundle:</span> {slabDetails.bundle}
               </p>
             </div>
           </div>
         </div>
 
         <FormProvider {...form}>
-          <Form id="addToSaleForm" method="post" onSubmit={fullSubmit}>
-            <div className="space-y-4">
+          <Form id='addToSaleForm' method='post' onSubmit={fullSubmit}>
+            <div className='space-y-4'>
               <FormField
                 control={form.control}
-                name="sink"
+                name='sink'
                 render={({ field }) => (
                   <SelectInput
                     field={field}
-                    placeholder="Add a Sink"
-                    name="Additional Sink"
-                    options={sinks.map((sink) => ({
+                    placeholder='Add a Sink'
+                    name='Additional Sink'
+                    options={sinks.map(sink => ({
                       key: String(sink.id),
                       value: sink.name,
                     }))}
@@ -401,45 +390,45 @@ export default function AddToSale() {
               />
               <FormField
                 control={form.control}
-                name="square_feet"
+                name='square_feet'
                 render={({ field }) => (
                   <InputItem
-                    name={"Square Feet"}
-                    placeholder={"Square Feet"}
+                    name={'Square Feet'}
+                    placeholder={'Square Feet'}
                     field={field}
                   />
                 )}
               />
               <FormField
                 control={form.control}
-                name="notes_to_slab"
+                name='notes_to_slab'
                 render={({ field }) => (
                   <InputItem
-                    name={"Notes to Slab"}
-                    placeholder={"Additional notes"}
+                    name={'Notes to Slab'}
+                    placeholder={'Additional notes'}
                     field={field}
                   />
                 )}
               />
               <FormField
                 control={form.control}
-                name="is_full_slab_sold"
+                name='is_full_slab_sold'
                 render={({ field }) => (
-                  <div className="flex items-center space-x-2">
+                  <div className='flex items-center space-x-2'>
                     <Switch
                       checked={field.value}
                       onCheckedChange={field.onChange}
-                      id="is_full_slab_sold"
+                      id='is_full_slab_sold'
                     />
-                    <label htmlFor="is_full_slab_sold">Full Slab Sold</label>
+                    <label htmlFor='is_full_slab_sold'>Full Slab Sold</label>
                   </div>
                 )}
               />
             </div>
 
-            <DialogFooter className="mt-4">
+            <DialogFooter className='mt-4'>
               <Button
-                variant="outline"
+                variant='outline'
                 onClick={() => handleChange(false)}
                 disabled={isSubmitting}
               >
@@ -451,5 +440,5 @@ export default function AddToSale() {
         </FormProvider>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

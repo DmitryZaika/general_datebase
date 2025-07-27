@@ -1,59 +1,59 @@
-import { data, type LoaderFunctionArgs } from "react-router";
-import { z } from "zod";
+import { data, type LoaderFunctionArgs } from 'react-router'
 
-const qs = z.object({ place_id: z.string().min(1) });
-const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY!;
+const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY
+
+if (!GOOGLE_KEY) {
+  throw new Error('GOOGLE_MAPS_API_KEY is not set')
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const searchParams = new URL(request.url).searchParams;
-  const place_id = searchParams.get("place_id");
+  const searchParams = new URL(request.url).searchParams
+  const place_id = searchParams.get('place_id')
 
-  const url = new URL(`https://places.googleapis.com/v1/places/${place_id}`);
+  const url = new URL(`https://places.googleapis.com/v1/places/${place_id}`)
 
   const gRes = await fetch(url, {
-    method: "get",
+    method: 'get',
     signal: request.signal,
     headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": GOOGLE_KEY,
-      "X-Goog-FieldMask": "id,displayName,formattedAddress,addressComponents",
-    },
-  });
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': GOOGLE_KEY,
+      'X-Goog-FieldMask': 'id,displayName,formattedAddress,addressComponents',
+    } as HeadersInit,
+  })
 
   if (!gRes.ok) {
-    const txt = await gRes.text();
-    console.error("Places Details API error:", gRes.status, txt);
-    return data({ error: "Google Places Details error" }, { status: 502 });
+    return data({ error: 'Google Places Details error' }, { status: 502 })
   }
 
   const gJson = (await gRes.json()) as {
-    id: string;
-    displayName: { text: string };
-    formattedAddress: string;
+    id: string
+    displayName: { text: string }
+    formattedAddress: string
     addressComponents: Array<{
-      longText: string;
-      shortText: string;
-      types: string[];
-    }>;
-  };
+      longText: string
+      shortText: string
+      types: string[]
+    }>
+  }
 
   // Extract zip code from address components
-  const zipCode = gJson.addressComponents?.find((component) =>
-    component.types.includes("postal_code")
-  )?.longText;
+  const zipCode = gJson.addressComponents?.find(component =>
+    component.types.includes('postal_code'),
+  )?.longText
 
   // Extract city, state, country
-  const city = gJson.addressComponents?.find((component) =>
-    component.types.includes("locality")
-  )?.longText;
+  const city = gJson.addressComponents?.find(component =>
+    component.types.includes('locality'),
+  )?.longText
 
-  const state = gJson.addressComponents?.find((component) =>
-    component.types.includes("administrative_area_level_1")
-  )?.shortText;
+  const state = gJson.addressComponents?.find(component =>
+    component.types.includes('administrative_area_level_1'),
+  )?.shortText
 
-  const country = gJson.addressComponents?.find((component) =>
-    component.types.includes("country")
-  )?.shortText;
+  const country = gJson.addressComponents?.find(component =>
+    component.types.includes('country'),
+  )?.shortText
 
   return data({
     place_id: gJson.id,
@@ -64,5 +64,5 @@ export async function loader({ request }: LoaderFunctionArgs) {
     state: state,
     country: country,
     address_components: gJson.addressComponents,
-  });
+  })
 }

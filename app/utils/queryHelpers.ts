@@ -1,18 +1,16 @@
-import mysql from "mysql2/promise";
-import { RowDataPacket } from "mysql2";
-
+import type { RowDataPacket } from 'mysql2'
+import type mysql from 'mysql2/promise'
 
 export async function selectMany<T>(
   db: mysql.Pool,
   query: string,
-  params: any[] = [],
+  params: (string | number)[] = [],
 ): Promise<T[]> {
   try {
-    const [rows] = await db.query<T[] & RowDataPacket[]>(query, params);
-    return rows;
-  } catch (error) {
-    console.error("Error connecting to the database: ", error);
-    return [];
+    const [rows] = await db.query<T[] & RowDataPacket[]>(query, params)
+    return rows
+  } catch {
+    return []
   }
 }
 
@@ -22,13 +20,12 @@ export async function selectId<T>(
   id: number,
 ): Promise<T | undefined> {
   try {
-    const [rows] = await db.query<T[] & RowDataPacket[]>(query, [id]);
+    const [rows] = await db.query<T[] & RowDataPacket[]>(query, [id])
     if (rows.length < 1) {
-      return undefined;
+      return undefined
     }
-    return rows[0];
-  } catch (error) {
-    console.error("Error connecting to the database: ", error);
-    return undefined;
+    return rows[0]
+  } catch {
+    return undefined
   }
 }
