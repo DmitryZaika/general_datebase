@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
-import { Form } from 'react-router'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import {
@@ -11,7 +12,13 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { FormField, FormProvider } from '~/components/ui/form'
-import { type CustomerDialogSchema, customerDialogSchema } from '~/schemas/customers'
+import { useToast } from '~/hooks/use-toast'
+import {
+  createCustomerMutation,
+  type CustomerDialogSchema,
+  customerDialogSchema,
+  updateCustomerMutation,
+} from '~/schemas/customers'
 import { EmailInput } from '../molecules/EmailInput'
 import { AddressInput } from '../organisms/AddressInput'
 
@@ -19,59 +26,103 @@ const resolver = zodResolver(customerDialogSchema)
 
 interface CustomerFormProps {
   handleChange: (open: boolean) => void
-  onSubmit: (data: CustomerDialogSchema) => void
-  isLoading: boolean
+  onSuccess: (value: number, name: string) => void
+  companyId: number
+  customerId?: number
 }
 
-export function CustomerForm({ handleChange, onSubmit, isLoading }: CustomerFormProps) {
+const getCustomerInfo = async (customerId: number) => {
+  const response = await fetch(`/api/customers/${customerId}`)
+  const data = await response.json()
+  console.log(data)
+  return customerDialogSchema.parse(data.customer)
+}
+
+export function CustomerForm({
+  handleChange,
+  onSuccess,
+  companyId,
+  customerId,
+}: CustomerFormProps) {
+  const toast = useToast()
+  const mutateObject = customerId
+    ? updateCustomerMutation(toast, value => onSuccess(value, form.getValues('name')))
+    : createCustomerMutation(toast, value => onSuccess(value, form.getValues('name')))
+  const mutation = useMutation(mutateObject)
+  const { data, isLoading } = useQuery({
+    queryKey: ['customer', customerId],
+    queryFn: () => getCustomerInfo(customerId || 0),
+    enabled: !!customerId,
+  })
+
   const form = useForm<CustomerDialogSchema>({
     resolver,
   })
+
+  useEffect(() => {
+    if (data) {
+      form.reset(data)
+    }
+  }, [data])
+
+  const onSubmit = (data: CustomerDialogSchema) => {
+    mutation.mutate({ ...data, company_id: companyId, id: customerId || 0 })
+  }
+
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Customer</DialogTitle>
+          <DialogTitle>{isLoading ? 'Loading...' : 'Add Customer'}</DialogTitle>
         </DialogHeader>
-        <FormProvider {...form}>
-          <Form id='customerForm' method='post' onSubmit={form.handleSubmit(onSubmit)}>
-            <FormField
-              control={form.control}
-              name='name'
-              render={({ field }) => (
-                <InputItem
-                  name={'Name'}
-                  placeholder={'Name of the customer'}
-                  field={field}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name='email'
-              render={({ field }) => <EmailInput field={field} />}
-            />
-            <FormField
-              control={form.control}
-              name='phone'
-              render={({ field }) => (
-                <InputItem
-                  name={'Phone'}
-                  placeholder={"Customer's phone number"}
-                  field={field}
-                />
-              )}
-            />
+        {isLoading ? (
+          <div>Loading...</div>
+        ) : (
+          <FormProvider {...form}>
+            <form
+              id='customerForm'
+              onSubmit={e => {
+                e.preventDefault()
+                e.stopPropagation()
+                form.handleSubmit(onSubmit)()
+              }}
+            >
+              <FormField
+                control={form.control}
+                name='name'
+                render={({ field }) => (
+                  <InputItem
+                    name={'Name'}
+                    placeholder={'Name of the customer'}
+                    field={field}
+                  />
+                )}
+              />
+              <FormField
+                control={form.control}
+                name='email'
+                render={({ field }) => <EmailInput field={field} />}
+              />
+              <FormField
+                control={form.control}
+                name='phone'
+                render={({ field }) => (
+                  <InputItem
+                    name={'Phone'}
+                    placeholder={"Customer's phone number"}
+                    field={field}
+                  />
+                )}
+              />
 
-            <AddressInput form={form} field='address' />
+              <AddressInput form={form} field='address' />
 
-            <DialogFooter>
-              <LoadingButton type='submit' loading={isLoading}>
-                Save changes
-              </LoadingButton>
-            </DialogFooter>
-          </Form>
-        </FormProvider>
+              <DialogFooter>
+                <LoadingButton loading={mutation.isPending}>Save changes</LoadingButton>
+              </DialogFooter>
+            </form>
+          </FormProvider>
+        )}
       </DialogContent>
     </Dialog>
   )

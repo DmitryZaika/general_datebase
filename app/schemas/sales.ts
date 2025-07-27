@@ -50,7 +50,6 @@ export const roomSchema = z.object({
   seam: z.string().default('standard'),
   ten_year_sealer: z.boolean().default(false),
   slabs: z.array(slabOptionsSchema).default([]),
-
   extras: extrasSchema.default(EXTRA_DEFAULTS),
 })
 
@@ -64,15 +63,10 @@ export const finalExtrasSchema = z.object({
 export type TFullExtrasSchema = z.infer<typeof finalExtrasSchema>[]
 
 export const customerSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
   customer_id: z.coerce.number().optional(),
   seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
-  billing_address: z.any(),
-  billing_zip_code: z.coerce.string().optional(),
   project_address: z.any(),
   same_address: z.boolean().default(true),
-  phone: z.any(),
-  email: z.any(),
   notes_to_sale: StringOrNumber,
   price: z.coerce.number().default(0),
   company_name: z.string().nullable().optional(),

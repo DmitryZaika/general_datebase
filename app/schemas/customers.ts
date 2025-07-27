@@ -6,7 +6,7 @@ export const customerSignupSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   phone: z.string().optional(),
   email: z.string().optional(),
-  address: z.string().min(1, 'Address is required'),
+  address: z.string().optional(),
   referral_source: z
     .enum([
       'google',
@@ -31,19 +31,54 @@ export const createCustomer = async (data: CustomerSignupSchema) => {
   return response.json()
 }
 
+export const updateCustomer = async (id: number, data: CustomerSignupSchema) => {
+  const clean = customerSignupSchema.parse(data)
+  const response = await fetch(`/api/customers/${id}`, {
+    method: 'POST',
+    body: JSON.stringify(clean),
+  })
+  return response.json()
+}
+
 export const customerDialogSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   phone: z.union([z.coerce.string().min(10), z.literal('')]),
-  address: z.string().length(10),
+  address: z.string().min(10, 'Address must be at least 10 characters long'),
 })
 
 export type CustomerDialogSchema = z.infer<typeof customerDialogSchema>
 
-export const createCustomerMutation = (toast: Toast, onSuccess?: () => void) => {
+export const createCustomerMutation = (
+  toast: Toast,
+  onSuccess?: (id: number) => void,
+) => {
   return {
     mutationFn: createCustomer,
-    onSuccess: onSuccess,
+    onSuccess: (data: { customerId: number }) => {
+      onSuccess?.(data.customerId)
+    },
+    onError: error => {
+      console.error('Error creating customer:', error)
+      toast({
+        title: 'Error',
+        description: 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      })
+    },
+  }
+}
+
+export const updateCustomerMutation = (
+  toast: Toast,
+  onSuccess?: (id: number) => void,
+) => {
+  return {
+    mutationFn: (data: CustomerSignupSchema & { id: number }) =>
+      updateCustomer(data.id, data),
+    onSuccess: (_, { id }) => {
+      onSuccess?.(id)
+    },
     onError: error => {
       console.error('Error creating customer:', error)
       toast({
