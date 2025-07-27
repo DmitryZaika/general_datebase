@@ -76,7 +76,7 @@ export const updateCustomerMutation = (
   return {
     mutationFn: (data: CustomerSignupSchema & { id: number }) =>
       updateCustomer(data.id, data),
-    onSuccess: (_, { id }) => {
+    onSuccess: (_: unknown, { id }: { id: number }) => {
       onSuccess?.(id)
     },
     onError: error => {

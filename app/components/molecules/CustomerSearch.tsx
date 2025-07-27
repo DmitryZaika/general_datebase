@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { Cross } from 'lucide-react'
 import { useState } from 'react'
-import { UseFormReturn } from 'react-hook-form'
+import type { UseFormReturn } from 'react-hook-form'
 import { CustomerForm } from '~/components/pages/CustomerForm'
-import { TCustomerSchema } from '~/schemas/sales'
-import { Customer } from '~/types'
+import type { TCustomerSchema } from '~/schemas/sales'
+import type { Customer } from '~/types'
 import { Button } from '../ui/button'
 import { Command, CommandGroup, CommandItem } from '../ui/command'
 import { Input } from '../ui/input'
@@ -35,9 +35,9 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
   const [searchTerm, setSearchTerm] = useState<string | null>(null)
   const [selectedOption, setSelectedOption] = useState<SelectOption>(selectOptions[0])
   const [currentCustomer, setCurrentCustomer] = useState<string | null>(null)
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState<boolean>(false)
 
-  const hasSelectedCustomer = form.watch('customer_id')
+  const selectedCustomer = form.watch('customer_id')
 
   const { data: customerSuggestions = [], isFetching } = useQuery({
     queryKey: ['customers', selectedOption, searchTerm],
@@ -91,14 +91,14 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
             </CommandGroup>
           </Command>
         )}
-        {hasSelectedCustomer && (
+        {selectedCustomer && (
           <Button onClick={handleDeselect}>
             <Cross className='w-4 h-4' />
           </Button>
         )}
       </div>
       <Button type='button' variant='ghost' onClick={handleSpecial}>
-        {hasSelectedCustomer ? 'Edit' : 'Add'} Customer
+        {selectedCustomer ? 'Edit' : 'Add'} Customer
       </Button>
 
       {isOpen && (
@@ -106,6 +106,7 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
           handleChange={setIsOpen}
           onSuccess={handleSuccess}
           companyId={companyId}
+          customerId={selectedCustomer || undefined}
         />
       )}
     </div>
