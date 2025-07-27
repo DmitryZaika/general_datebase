@@ -1,9 +1,9 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { Bell } from 'lucide-react'
-import { useEffect, useState } from 'react'
 import { Button } from '~/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
+import { queryClient } from '~/utils/api'
 
 interface NotificationItem {
   id: string | number
@@ -13,56 +13,22 @@ interface NotificationItem {
 
 interface NotificationProps {
   className?: string
-  /**
-   * Prefetched notifications can be passed directly; otherwise the component
-   * will attempt to fetch them from `/api/notifications` on mount.
-   */
-  initialNotifications?: NotificationItem[]
+}
+async function getNotifications(): Promise<NotificationItem[]> {
+  const response = await fetch('/api/notifications')
+  if (!response.ok) {
+    throw Error('Bad Request')
+  }
+
+  const data: { notifications: NotificationItem[] } = await response.json()
+  return data.notifications
 }
 
-export function Notification({
-  className,
-  initialNotifications = [],
-}: NotificationProps) {
-  const [notifications, setNotifications] =
-    useState<NotificationItem[]>(initialNotifications)
-  const [isLoading, setIsLoading] = useState(false)
-
-  useEffect(() => {
-    // If notifications not provided, fetch them once on mount
-    if (initialNotifications.length === 0) {
-      setIsLoading(true)
-      fetch('/api/notifications')
-        .then(async res => {
-          if (!res.ok) throw new Error('Failed to fetch notifications')
-          return res.json()
-        })
-        .then(data => {
-          if (data?.notifications) setNotifications(data.notifications)
-        })
-        .catch(() => {
-          // Silent fail; keep empty notification list
-        })
-        .finally(() => setIsLoading(false))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialNotifications.length])
-
-  // Poll periodically for new notifications (every 10 s)
-  useEffect(() => {
-    const fetchLatest = async () => {
-      const res = await fetch('/api/notifications')
-      if (!res.ok) return
-      const data = await res.json()
-      if (data?.notifications) setNotifications(data.notifications)
-    }
-
-    // first call right away to catch any due notifications that appeared while component mounted
-    fetchLatest()
-
-    const interval = setInterval(fetchLatest, 10000)
-    return () => clearInterval(interval)
-  }, [])
+export function Notification({ className }: NotificationProps) {
+  const { data: notifications = [], isLoading } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: getNotifications,
+  })
 
   const mutation = useMutation({
     mutationFn: async (id: number) => {
@@ -72,8 +38,8 @@ export function Notification({
         body: JSON.stringify({ id }),
       })
     },
-    onSuccess: (_, id) => {
-      setNotifications(prev => prev.filter(n => n.id !== id))
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: ['notifications'] })
     },
   })
 

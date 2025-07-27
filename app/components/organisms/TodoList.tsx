@@ -31,9 +31,12 @@ import { LoadingButton } from '../molecules/LoadingButton'
 import { Button } from '../ui/button'
 import { FormField } from '../ui/form'
 
-interface EditFormProps {
+type EmptyFunction = () => void
+type CallbackFunction = (callback: () => void) => void
+
+interface EditFormProps<T> {
   todo: Todo
-  refresh: (() => void) | ((callback: () => void) => void)
+  refresh: T
 }
 
 function AddForm({ refresh }: { refresh: () => void }) {
@@ -73,7 +76,7 @@ function AddForm({ refresh }: { refresh: () => void }) {
   )
 }
 
-function EditForm({ refresh, todo }: EditFormProps) {
+function EditForm({ refresh, todo }: EditFormProps<CallbackFunction>) {
   const form = useForm<TTodoListSchema>({
     resolver: zodResolver(todoListSchema),
     defaultValues: { rich_text: todo.rich_text },
@@ -128,7 +131,7 @@ function EditForm({ refresh, todo }: EditFormProps) {
   )
 }
 
-function DeleteForm({ refresh, todo }: EditFormProps) {
+function DeleteForm({ refresh, todo }: EditFormProps<EmptyFunction>) {
   const form = useForm()
   const { fullSubmit, fetcher } = useFullFetcher(
     form,
@@ -152,7 +155,7 @@ function DeleteForm({ refresh, todo }: EditFormProps) {
   )
 }
 
-function FinishForm({ refresh, todo }: EditFormProps) {
+function FinishForm({ refresh, todo }: EditFormProps<EmptyFunction>) {
   const [checked, setChecked] = useState<boolean>(Boolean(todo.is_done))
 
   async function handleCheckboxChange(isDone: boolean) {
