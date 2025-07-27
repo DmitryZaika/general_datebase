@@ -39,12 +39,10 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, defaultValues }
   }
 
-  try {
-    await db.execute(
-      `INSERT INTO customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
-      [data.name, data.email, data.phoneNumber, data.address],
-    )
-  } catch {}
+  await db.execute(
+    `INSERT INTO customers (name, email, phone, address) VALUES (?, ?, ?, ?)`,
+    [data.name, data.email, data.phoneNumber, data.address],
+  )
   return { success: true }
 }
 

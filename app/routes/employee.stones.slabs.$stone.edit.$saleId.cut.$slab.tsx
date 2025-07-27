@@ -67,7 +67,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const slabIdNum = parseInt(slabId, 10)
   const saleIdNum = parseInt(saleId, 10)
 
-  if (isNaN(slabIdNum) || isNaN(saleIdNum)) {
+  if (Number.isNaN(slabIdNum) || Number.isNaN(saleIdNum)) {
     return forceRedirectError(request.headers, 'Invalid ID format')
   }
 
@@ -282,9 +282,7 @@ export default function CutSlab() {
 
         // Directly submit the form
         form.submit()
-      } catch (error) {
-        console.error('Error auto-submitting form:', error)
-        // Fallback: redirect back to the edit page
+      } catch {
         navigate(`/employee/stones/slabs/${stoneId}/edit/${saleId}${location.search}`)
       }
     }
@@ -297,55 +295,53 @@ export default function CutSlab() {
   const isAlreadyCut = slab?.cut_date !== null
 
   return (
-    <>
-      <Dialog
-        open={false}
-        onOpenChange={open => {
-          if (!open) handleDialogClose()
-        }}
-      >
-        <DialogContent className='bg-white rounded-lg pt-4 px-4 shadow-lg text-gray-800 max-w-md'>
-          <DialogHeader className='mb-3 pb-2 border-b border-gray-200'>
-            <DialogTitle className='text-xl font-semibold text-gray-900'>
-              Cut Slab: {slab.stone_name} - {slab.bundle}
-            </DialogTitle>
-            {isAlreadyCut && (
-              <div className='text-amber-600 text-sm mt-1'>
-                This slab has already been cut. Adding more pieces.
-              </div>
-            )}
-          </DialogHeader>
+    <Dialog
+      open={false}
+      onOpenChange={open => {
+        if (!open) handleDialogClose()
+      }}
+    >
+      <DialogContent className='bg-white rounded-lg pt-4 px-4 shadow-lg text-gray-800 max-w-md'>
+        <DialogHeader className='mb-3 pb-2 border-b border-gray-200'>
+          <DialogTitle className='text-xl font-semibold text-gray-900'>
+            Cut Slab: {slab.stone_name} - {slab.bundle}
+          </DialogTitle>
+          {isAlreadyCut && (
+            <div className='text-amber-600 text-sm mt-1'>
+              This slab has already been cut. Adding more pieces.
+            </div>
+          )}
+        </DialogHeader>
 
-          <Form method='post' ref={formRef}>
-            <AuthenticityTokenInput />
+        <Form method='post' ref={formRef}>
+          <AuthenticityTokenInput />
 
-            {/* Hidden inputs for auto cut */}
-            <input type='hidden' name='noLeftovers' value='true' />
-            <input type='hidden' name='addAnother' value='false' />
+          {/* Hidden inputs for auto cut */}
+          <input type='hidden' name='noLeftovers' value='true' />
+          <input type='hidden' name='addAnother' value='false' />
 
-            <DialogFooter className='pt-3 border-t border-gray-200 space-x-2'>
-              <Button
-                type='button'
-                variant='outline'
-                onClick={handleDialogClose}
-                disabled={isSubmitting}
-                className='text-sm font-medium'
-              >
-                Cancel
-              </Button>
+          <DialogFooter className='pt-3 border-t border-gray-200 space-x-2'>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={handleDialogClose}
+              disabled={isSubmitting}
+              className='text-sm font-medium'
+            >
+              Cancel
+            </Button>
 
-              <LoadingButton
-                loading={isSubmitting}
-                type='submit'
-                name='addAnother'
-                value='false'
-              >
-                Save
-              </LoadingButton>
-            </DialogFooter>
-          </Form>
-        </DialogContent>
-      </Dialog>
-    </>
+            <LoadingButton
+              loading={isSubmitting}
+              type='submit'
+              name='addAnother'
+              value='false'
+            >
+              Save
+            </LoadingButton>
+          </DialogFooter>
+        </Form>
+      </DialogContent>
+    </Dialog>
   )
 }

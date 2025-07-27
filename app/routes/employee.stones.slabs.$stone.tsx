@@ -492,24 +492,17 @@ export default function SlabsModal() {
               </div>
 
               {!isEditing && (
-                <>
-                  <div className='flex gap-2 ml-auto'>
-                    {slab.sale_id ? (
-                      <Link to={`edit/${slab.sale_id}/${location.search}`}>
-                        <Button type='button'>Edit</Button>
-                      </Link>
-                    ) : (
-                      <>
-                        <Link
-                          to={`sell/${slab.id}/${location.search}`}
-                          className='ml-auto'
-                        >
-                          <Button className='px-4 py-2'>Sell</Button>
-                        </Link>
-                      </>
-                    )}
-                  </div>
-                </>
+                <div className='flex gap-2 ml-auto'>
+                  {slab.sale_id ? (
+                    <Link to={`edit/${slab.sale_id}/${location.search}`}>
+                      <Button type='button'>Edit</Button>
+                    </Link>
+                  ) : (
+                    <Link to={`sell/${slab.id}/${location.search}`} className='ml-auto'>
+                      <Button className='px-4 py-2'>Sell</Button>
+                    </Link>
+                  )}
+                </div>
               )}
             </div>
           </TooltipTrigger>
@@ -546,23 +539,20 @@ export default function SlabsModal() {
                       </p>
                     )}
 
-                    {slab.transaction.sink && (
-                      <>
-                        {formatSinkList(slab.transaction.sink)
-                          .split(',')
-                          .map((sink, index) => (
-                            <p key={index} className={index > 0 ? 'text-sm ml-10' : ''}>
-                              {index === 0 ? (
-                                <>
-                                  <strong>Sink:</strong> {sink}
-                                </>
-                              ) : (
-                                sink
-                              )}
-                            </p>
-                          ))}
-                      </>
-                    )}
+                    {slab.transaction.sink &&
+                      formatSinkList(slab.transaction.sink)
+                        .split(',')
+                        .map((sink, index) => (
+                          <p key={index} className={index > 0 ? 'text-sm ml-10' : ''}>
+                            {index === 0 ? (
+                              <>
+                                <strong>Sink:</strong> {sink}
+                              </>
+                            ) : (
+                              sink
+                            )}
+                          </p>
+                        ))}
 
                     {slab.transaction.sale_notes && (
                       <p>

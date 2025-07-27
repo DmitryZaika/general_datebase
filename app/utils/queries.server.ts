@@ -2,7 +2,6 @@ import { db } from '~/db.server'
 import type { FaucetFilter } from '~/schemas/faucets'
 import type { SinkFilter } from '~/schemas/sinks'
 import type { StoneFilter } from '~/schemas/stones'
-import { STONE_TYPES } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 
 export interface Stone {

@@ -449,7 +449,7 @@ export default function EmployeeTransactions() {
     setInstallDialogOpen(true)
   }
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = () => {
     // Закрываем диалог перед отправкой формы
     setInstallDialogOpen(false)
     // Не прерываем стандартную отправку формы

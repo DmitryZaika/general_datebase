@@ -16,7 +16,6 @@ export function HeaderDesktop({
   isAdmin,
   isSuperUser,
   className,
-  isEmployee,
 }: HeaderDesktopProps) {
   const location = useLocation()
   const isAdminPage = location.pathname.startsWith('/admin')

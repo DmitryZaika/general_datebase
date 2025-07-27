@@ -32,26 +32,10 @@ export function FaucetsFilters({ base, suppliers }: IProps) {
 
   const showSoldOutToggle = useMemo(() => ['admin', 'employee'].includes(base), [base])
 
-  function createClearFilterHandler<T>(
-    searchParams: T,
-    setSearchParams: (params: T) => void,
-    isSubmitting: boolean,
-    filterKey: string,
-    defaultValue: number | string | string[],
-  ) {
-    return useCallback(() => {
-      if (isSubmitting) return
-      setSearchParams({ ...searchParams, [filterKey]: defaultValue })
-    }, [searchParams, setSearchParams, isSubmitting, filterKey, defaultValue])
+  const clearTypeFilters = () => {
+    if (isSubmitting) return
+    setSearchParams({ ...searchParams, type: [] })
   }
-
-  const clearTypeFilters = createClearFilterHandler(
-    searchParams,
-    setSearchParams,
-    isSubmitting,
-    'type',
-    [],
-  )
 
   const toggleFaucetType = useCallback(
     (typeToToggle: FaucetFilter['type'][number]) => {

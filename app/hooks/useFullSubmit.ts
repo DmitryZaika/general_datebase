@@ -27,7 +27,7 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
   const fullSubmit = form.handleSubmit(
     data => {
       const sanitizedData = cleanData(data)
-      sanitizedData['csrf'] = token
+      sanitizedData.csrf = token
 
       submit(sanitizedData, {
         method: method,
