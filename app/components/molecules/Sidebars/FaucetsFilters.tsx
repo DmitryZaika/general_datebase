@@ -1,129 +1,92 @@
-import { useNavigation } from "react-router";
-import { FAUCET_TYPES } from "~/utils/constants";
-import { useSafeSearchParams } from "~/hooks/use-safe-search-params";
-import { faucetFilterSchema, FaucetFilter } from "~/schemas/faucets";
-import { CheckOption } from "~/components/molecules/CheckOption";
-import { LinkSpan } from "~/components/atoms/LinkSpan";
-import { useMemo, useCallback, useState, useEffect } from "react";
-import { ISupplier } from "~/schemas/suppliers";
-import { FaChevronDown, FaChevronUp } from "react-icons/fa";
-import { SidebarGroupLabel, SidebarMenuSub } from "~/components/ui/sidebar";
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { FaChevronDown, FaChevronUp } from 'react-icons/fa'
+import { useNavigation } from 'react-router'
+import { LinkSpan } from '~/components/atoms/LinkSpan'
+import { CheckOption } from '~/components/molecules/CheckOption'
+import { SidebarGroupLabel, SidebarMenuSub } from '~/components/ui/sidebar'
+import { useSafeSearchParams } from '~/hooks/use-safe-search-params'
+import { type FaucetFilter, faucetFilterSchema } from '~/schemas/faucets'
+import type { ISupplier } from '~/schemas/suppliers'
+import { FAUCET_TYPES } from '~/utils/constants'
 
 interface IProps {
-  base: string;
-  suppliers?: ISupplier[];
+  base: string
+  suppliers?: ISupplier[]
 }
 
 export function FaucetsFilters({ base, suppliers }: IProps) {
-  const [searchParams, setSearchParams] =
-    useSafeSearchParams(faucetFilterSchema);
-  const navigation = useNavigation();
-  const isSubmitting = useMemo(
-    () => navigation.state !== "idle",
-    [navigation.state]
-  );
-  const [suppliersExpanded, setSuppliersExpanded] = useState(false);
+  const [searchParams, setSearchParams] = useSafeSearchParams(faucetFilterSchema)
+  const navigation = useNavigation()
+  const isSubmitting = useMemo(() => navigation.state !== 'idle', [navigation.state])
+  const [suppliersExpanded, setSuppliersExpanded] = useState(false)
 
   useEffect(() => {
-    localStorage.setItem(
-      "faucetSuppliersExpanded",
-      JSON.stringify(suppliersExpanded)
-    );
-  }, [suppliersExpanded]);
+    localStorage.setItem('faucetSuppliersExpanded', JSON.stringify(suppliersExpanded))
+  }, [suppliersExpanded])
 
   useEffect(() => {
     if (searchParams.supplier !== 0) {
-      setSuppliersExpanded(true);
+      setSuppliersExpanded(true)
     }
-  }, [searchParams.supplier]);
+  }, [searchParams.supplier])
 
-  const showSoldOutToggle = useMemo(
-    () => ["admin", "employee"].includes(base),
-    [base]
-  );
+  const showSoldOutToggle = useMemo(() => ['admin', 'employee'].includes(base), [base])
 
-  function createClearFilterHandler(
-    searchParams: any,
-    setSearchParams: (params: any) => void,
-    isSubmitting: boolean,
-    filterKey: string,
-    defaultValue: any
-  ) {
-    return useCallback(() => {
-      if (isSubmitting) return;
-      setSearchParams({ ...searchParams, [filterKey]: defaultValue });
-    }, [searchParams, setSearchParams, isSubmitting, filterKey, defaultValue]);
+  const clearTypeFilters = () => {
+    if (isSubmitting) return
+    setSearchParams({ ...searchParams, type: [] })
   }
 
-  const clearTypeFilters = createClearFilterHandler(
-    searchParams,
-    setSearchParams,
-    isSubmitting,
-    "type",
-    []
-  );
-
-  const clearSupplier = createClearFilterHandler(
-    searchParams,
-    setSearchParams,
-    isSubmitting,
-    "supplier",
-    0
-  );
-
   const toggleFaucetType = useCallback(
-    (typeToToggle: FaucetFilter["type"][number]) => {
-      if (isSubmitting) return;
+    (typeToToggle: FaucetFilter['type'][number]) => {
+      if (isSubmitting) return
 
-      const type = searchParams.type ?? [];
-      let newTypes;
+      const type = searchParams.type ?? []
+      let newTypes: FaucetFilter['type']
 
       if (type.includes(typeToToggle)) {
-        newTypes = type.filter((t) => t !== typeToToggle);
+        newTypes = type.filter(t => t !== typeToToggle)
       } else {
-        newTypes = [...type, typeToToggle];
+        newTypes = [...type, typeToToggle]
       }
 
-      setSearchParams({ ...searchParams, type: newTypes });
+      setSearchParams({ ...searchParams, type: newTypes })
     },
-    [isSubmitting, searchParams, setSearchParams]
-  );
+    [isSubmitting, searchParams, setSearchParams],
+  )
 
-  const toggleShowSoldOut = useCallback(
-    (val: string) => {
-      if (isSubmitting) return;
+  const toggleShowSoldOut = useCallback(() => {
+    if (isSubmitting) return
 
-      const show_sold_out = searchParams.show_sold_out ?? false;
-      setSearchParams({ ...searchParams, show_sold_out: !show_sold_out });
-    },
-    [isSubmitting, searchParams, setSearchParams]
-  );
+    const show_sold_out = searchParams.show_sold_out ?? false
+    setSearchParams({ ...searchParams, show_sold_out: !show_sold_out })
+  }, [isSubmitting, searchParams, setSearchParams])
 
   const toggleSupplier = useCallback(
     (supplierId: number) => {
-      if (isSubmitting) return;
+      if (isSubmitting) return
 
       setSearchParams({
         ...searchParams,
         supplier: supplierId,
-      });
+      })
     },
-    [isSubmitting, searchParams, setSearchParams]
-  );
+    [isSubmitting, searchParams, setSearchParams],
+  )
 
   const toggleSuppliersExpanded = useCallback(() => {
-    setSuppliersExpanded((prev) => !prev);
-  }, []);
+    setSuppliersExpanded(prev => !prev)
+  }, [])
 
   return (
     <SidebarMenuSub>
       <SidebarGroupLabel>
-        Faucet Types{" "}
+        Faucet Types{' '}
         {searchParams.type && searchParams.type.length > 0 && (
           <LinkSpan
-            className="ml-2"
+            className='ml-2'
             onClick={clearTypeFilters}
-            variant="blue"
+            variant='blue'
             disabled={isSubmitting}
           >
             Clear
@@ -131,13 +94,11 @@ export function FaucetsFilters({ base, suppliers }: IProps) {
         )}
       </SidebarGroupLabel>
 
-      {FAUCET_TYPES.map((item) => (
+      {FAUCET_TYPES.map(item => (
         <CheckOption
           value={item}
           key={item}
-          selected={
-            searchParams.type ? searchParams.type.includes(item) : false
-          }
+          selected={searchParams.type ? searchParams.type.includes(item) : false}
           toggleValue={toggleFaucetType}
           isLoading={isSubmitting}
         />
@@ -147,22 +108,22 @@ export function FaucetsFilters({ base, suppliers }: IProps) {
         <>
           <SidebarGroupLabel
             onClick={toggleSuppliersExpanded}
-            className="flex items-center cursor-pointer"
+            className='flex items-center cursor-pointer'
           >
-            <span>Suppliers</span>{" "}
+            <span>Suppliers</span>{' '}
             {suppliersExpanded ? (
-              <FaChevronUp className="ml-1 text-gray-500" size={12} />
+              <FaChevronUp className='ml-1 text-gray-500' size={12} />
             ) : (
-              <FaChevronDown className="ml-1 text-gray-500" size={12} />
+              <FaChevronDown className='ml-1 text-gray-500' size={12} />
             )}
             {searchParams.supplier !== 0 && (
               <LinkSpan
-                className="ml-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleSupplier(0);
+                className='ml-2'
+                onClick={e => {
+                  e.stopPropagation()
+                  toggleSupplier(0)
                 }}
-                variant="blue"
+                variant='blue'
                 disabled={isSubmitting}
               >
                 Clear
@@ -171,15 +132,13 @@ export function FaucetsFilters({ base, suppliers }: IProps) {
           </SidebarGroupLabel>
 
           {suppliersExpanded &&
-            suppliers.map((supplier) => (
+            suppliers.map(supplier => (
               <div
                 key={supplier.id}
                 onClick={() => toggleSupplier(Number(supplier.id))}
                 className={`p-1 cursor-pointer hover:bg-gray-100 transition-colors ${
-                  searchParams.supplier === Number(supplier.id)
-                    ? "bg-gray-100"
-                    : ""
-                } ${isSubmitting ? "opacity-60" : ""}`}
+                  searchParams.supplier === Number(supplier.id) ? 'bg-gray-100' : ''
+                } ${isSubmitting ? 'opacity-60' : ''}`}
               >
                 <LinkSpan
                   isSelected={searchParams.supplier === Number(supplier.id)}
@@ -193,16 +152,14 @@ export function FaucetsFilters({ base, suppliers }: IProps) {
       )}
 
       {showSoldOutToggle && (
-        <>
-          <CheckOption
-            value="Show sold out"
-            selected={!!searchParams.show_sold_out}
-            toggleValue={toggleShowSoldOut}
-            isLoading={isSubmitting}
-            defaultChecked={false}
-          />
-        </>
+        <CheckOption
+          value='Show sold out'
+          selected={!!searchParams.show_sold_out}
+          toggleValue={toggleShowSoldOut}
+          isLoading={isSubmitting}
+          defaultChecked={false}
+        />
       )}
     </SidebarMenuSub>
-  );
+  )
 }

@@ -1,91 +1,88 @@
-import { LoadingButton } from "~/components/molecules/LoadingButton";
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { useNavigate, useNavigation } from "react-router";
-import { FormField } from "../components/ui/form";
-
-import { z } from "zod";
-import { InputItem } from "~/components/molecules/InputItem";
+import {
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+  redirect,
+  useNavigate,
+  useNavigation,
+} from 'react-router'
+import { z } from 'zod'
+import { FileInput } from '~/components/molecules/FileInput'
+import { InputItem } from '~/components/molecules/InputItem'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { MultiPartForm } from '~/components/molecules/MultiPartForm'
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog";
-import { db } from "~/db.server";
-import { commitSession, getSession } from "~/sessions";
-import { toastData } from "~/utils/toastHelpers";
-import { FileInput } from "~/components/molecules/FileInput";
-import { parseMutliForm } from "~/utils/parseMultiForm";
-import { MultiPartForm } from "~/components/molecules/MultiPartForm";
-import { useCustomForm } from "~/utils/useCustomForm";
-import { getAdminUser } from "~/utils/session.server";
-import { csrf } from "~/utils/csrf.server";
+} from '~/components/ui/dialog'
+import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions'
+import { csrf } from '~/utils/csrf.server'
+import { parseMutliForm } from '~/utils/parseMultiForm'
+import { getAdminUser } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
+import { useCustomForm } from '~/utils/useCustomForm'
+import { FormField } from '../components/ui/form'
 
 const documentSchema = z.object({
   name: z.string().min(1),
-});
+})
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    await getAdminUser(request);
+    await getAdminUser(request)
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
   try {
-    await csrf.validate(request);
-  } catch (error) {
-    return { error: "Invalid CSRF token" };
+    await csrf.validate(request)
+  } catch {
+    return { error: 'Invalid CSRF token' }
   }
 
-  const { errors, data } = await parseMutliForm(
-    request,
-    documentSchema,
-    "documents",
-  );
+  const { errors, data } = await parseMutliForm(request, documentSchema, 'documents')
   if (errors || !data) {
-    return { errors };
+    return { errors }
   }
-  let user = await getAdminUser(request);
-  try {
-    await db.execute(
-      `INSERT INTO main.documents (name, url, company_id) VALUES (?,  ?, ?);`,
-      [data.name, data.file, user.company_id],
-    );
-  } catch (error) {
-    console.error("Error connecting to the database: ", error);
-  }
-  const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Success", "Document added"));
-  return redirect("..", {
-    headers: { "Set-Cookie": await commitSession(session) },
-  });
+  const user = await getAdminUser(request)
+  await db.execute(`INSERT INTO documents (name, url, company_id) VALUES (?,  ?, ?);`, [
+    data.name,
+    data.file,
+    user.company_id,
+  ])
+  const session = await getSession(request.headers.get('Cookie'))
+  session.flash('message', toastData('Success', 'Document added'))
+  return redirect('..', {
+    headers: { 'Set-Cookie': await commitSession(session) },
+  })
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request);
-    return { user };
+    const user = await getAdminUser(request)
+    return { user }
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
-};
+}
 
 export default function DocumentsAdd() {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
   // const actionData = useActionData<typeof action>();
-  const isSubmitting = useNavigation().state !== "idle";
-  const form = useCustomForm(documentSchema);
+  const isSubmitting = useNavigation().state !== 'idle'
+  const form = useCustomForm(documentSchema)
 
   const handleChange = (open: boolean) => {
     if (open === false) {
-      navigate("..");
+      navigate('..')
     }
-  };
+  }
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className='sm:max-w-[425px]'>
         <DialogHeader>
           <DialogTitle>Add Document</DialogTitle>
         </DialogHeader>
@@ -93,24 +90,24 @@ export default function DocumentsAdd() {
         <MultiPartForm form={form}>
           <FormField
             control={form.control}
-            name="name"
+            name='name'
             render={({ field }) => (
               <InputItem
-                name={"Name"}
-                placeholder={"Name of the document"}
+                name={'Name'}
+                placeholder={'Name of the document'}
                 field={field}
               />
             )}
           />
           <FormField
             control={form.control}
-            name="file"
+            name='file'
             render={({ field }) => (
               <FileInput
-                label="Document"
-                inputName="documents"
-                id="document"
-                type="pdf"
+                label='Document'
+                inputName='documents'
+                id='document'
+                type='pdf'
                 onChange={field.onChange}
               />
             )}
@@ -121,5 +118,5 @@ export default function DocumentsAdd() {
         </MultiPartForm>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

@@ -1,16 +1,16 @@
-import { defineConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
-import { reactRouter } from "@react-router/dev/vite";
-import path from "path";
-import tailwindcss from "@tailwindcss/vite";
-import devtoolsJson from 'vite-plugin-devtools-json';
+import path from 'node:path'
+import { reactRouter } from '@react-router/dev/vite'
+import tailwindcss from '@tailwindcss/vite'
+import { defineConfig } from 'vite'
+import devtoolsJson from 'vite-plugin-devtools-json'
+import tsconfigPaths from 'vite-tsconfig-paths'
 
 export default defineConfig({
   plugins: [tsconfigPaths(), tailwindcss(), reactRouter(), devtoolsJson()],
   resolve: {
     alias: {
-      "@images": path.resolve(__dirname, "public/images"),
-      "~": path.resolve(__dirname, "app"),
+      '@images': path.resolve(__dirname, 'public/images'),
+      '~': path.resolve(__dirname, 'app'),
     },
   },
   build: {
@@ -19,6 +19,6 @@ export default defineConfig({
     },
   },
   server: {
-     allowedHosts: [".ngrok-free.app"],
-  }
-});
+    allowedHosts: ['.ngrok-free.app'],
+  },
+})

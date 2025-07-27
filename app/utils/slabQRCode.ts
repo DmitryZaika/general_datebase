@@ -1,56 +1,51 @@
 export interface SlabData {
-  id: number;
-  bundle: string;
-  length: number;
-  width: number;
-  stoneName?: string;
+  id: number
+  bundle: string
+  length: number
+  width: number
+  stoneName?: string
 }
 
 export function printSingleSlabQRCode(slab: SlabData, stoneName?: string) {
-  const printWindow = window.open('', '_blank');
+  const printWindow = window.open('', '_blank')
   if (!printWindow) {
-    alert('Пожалуйста, разрешите всплывающие окна для печати QR-кода.');
-    return;
+    alert('Пожалуйста, разрешите всплывающие окна для печати QR-кода.')
+    return
   }
-  
-  const url = `${window.location.origin}/redirects/slab/${slab.id}`;
-  const encodedUrl = encodeURIComponent(url);
-  
-  const stoneNameToUse = stoneName || slab.stoneName || '';
-  
-  printWindow.document.write(getQRCodeHTML(
-    encodedUrl,
-    { ...slab, stoneName: stoneNameToUse },
-    false
-  ));
-  
-  printWindow.document.close();
+
+  const url = `${window.location.origin}/redirects/slab/${slab.id}`
+  const encodedUrl = encodeURIComponent(url)
+
+  const stoneNameToUse = stoneName || slab.stoneName || ''
+
+  printWindow.document.write(
+    getQRCodeHTML(encodedUrl, { ...slab, stoneName: stoneNameToUse }, false),
+  )
+
+  printWindow.document.close()
 }
 
 export function printAllSlabsQRCodes(slabs: SlabData[], stoneName?: string) {
-  const printWindow = window.open('', '_blank');
+  const printWindow = window.open('', '_blank')
   if (!printWindow) {
-    alert('Пожалуйста, разрешите всплывающие окна для печати QR-кодов.');
-    return;
+    alert('Пожалуйста, разрешите всплывающие окна для печати QR-кодов.')
+    return
   }
-  
-  const allSlabsHtml = slabs.map(slab => {
-    const url = `${window.location.origin}/redirects/slab/${slab.id}`;
-    const encodedUrl = encodeURIComponent(url);
-    
-    const stoneNameToUse = slab.stoneName || stoneName || '';
-    
-    return generateQRCodeLabelHTML(encodedUrl, { ...slab, stoneName: stoneNameToUse });
-  }).join('');
-  
-  printWindow.document.write(getQRCodeHTML(
-    '',
-    null,
-    true,
-    allSlabsHtml
-  ));
-  
-  printWindow.document.close();
+
+  const allSlabsHtml = slabs
+    .map(slab => {
+      const url = `${window.location.origin}/redirects/slab/${slab.id}`
+      const encodedUrl = encodeURIComponent(url)
+
+      const stoneNameToUse = slab.stoneName || stoneName || ''
+
+      return generateQRCodeLabelHTML(encodedUrl, { ...slab, stoneName: stoneNameToUse })
+    })
+    .join('')
+
+  printWindow.document.write(getQRCodeHTML('', null, true, allSlabsHtml))
+
+  printWindow.document.close()
 }
 
 function generateQRCodeLabelHTML(encodedUrl: string, slab: SlabData) {
@@ -63,20 +58,18 @@ function generateQRCodeLabelHTML(encodedUrl: string, slab: SlabData) {
         <div class="stone-name">Granite Depot</div>
         <div class="stone-info">${slab.stoneName || ''}</div>
         <div class="bundle-info">Bund:${slab.bundle} / S# ${slab.id}</div>
-        <div class="size-info">${slab.length} x ${slab.width} = ${(slab.length * slab.width / 144).toFixed(3)}</div>
+        <div class="size-info">${slab.length} x ${slab.width} = ${((slab.length * slab.width) / 144).toFixed(3)}</div>
       </div>
     </div>
-  `;
+  `
 }
 
 function getQRCodeHTML(
   encodedUrl: string,
   slab: SlabData | null,
   isMultiple: boolean,
-  customContent?: string
+  customContent?: string,
 ) {
-  const isCustomLayout = customContent !== undefined;
-  
   return `
     <!DOCTYPE html>
     <html>
@@ -105,7 +98,9 @@ function getQRCodeHTML(
             padding: 0;
             margin: 0;
           }
-          ${isMultiple ? `
+          ${
+            isMultiple
+              ? `
           .qr-codes-container {
             display: flex;
             flex-wrap: wrap;
@@ -115,7 +110,9 @@ function getQRCodeHTML(
             gap: 0.05in;
             padding: 0.05in;
           }
-          ` : ''}
+          `
+              : ''
+          }
           .label-container {
             display: flex;
             width: 3in;
@@ -185,8 +182,13 @@ function getQRCodeHTML(
       </head>
       <body>
         ${isMultiple ? '<div class="qr-codes-container">' : ''}
-        ${customContent ? customContent : 
-          slab ? generateQRCodeLabelHTML(encodedUrl, slab) : ''}
+        ${
+          customContent
+            ? customContent
+            : slab
+              ? generateQRCodeLabelHTML(encodedUrl, slab)
+              : ''
+        }
         ${isMultiple ? '</div>' : ''}
         <script>
           window.onload = function() {
@@ -198,5 +200,5 @@ function getQRCodeHTML(
         </script>
       </body>
     </html>
-  `;
-} 
+  `
+}

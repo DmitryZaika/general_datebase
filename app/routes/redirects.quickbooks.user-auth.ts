@@ -1,40 +1,41 @@
-import { getSession, commitSession } from '~/sessions';
-import { LoaderFunctionArgs, redirect } from "react-router";
-import { db } from "~/db.server";
-import { selectMany } from "~/utils/queryHelpers";
-import { getEmployeeUser } from "~/utils/session.server";
-import { getQboToken, setQboSession } from "~/utils/quickbooks.server";
-import { toastData } from "~/utils/toastHelpers";
+import { type LoaderFunctionArgs, redirect } from 'react-router'
+import { commitSession, getSession } from '~/sessions'
+import { getQboToken, setQboSession } from '~/utils/quickbooks.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const cookieHeader = request.headers.get('Cookie');
-  const session = await getSession(cookieHeader);
+  const cookieHeader = request.headers.get('Cookie')
+  const session = await getSession(cookieHeader)
 
-  let user;
+  let user: User
   try {
-    user = await getEmployeeUser(request);
+    user = await getEmployeeUser(request)
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
-  const url = new URL(request.url);
-  const realmId = url.searchParams.get('realmId');
+  const url = new URL(request.url)
+  const realmId = url.searchParams.get('realmId')
   if (!realmId) {
-    session.flash("message", toastData("Error", "Invalid data returned from quickbooks"));
+    session.flash(
+      'message',
+      toastData('Error', 'Invalid data returned from quickbooks'),
+    )
     return redirect('/employee/user', {
       headers: {
         'Set-Cookie': await commitSession(session),
       },
-    });
+    })
   }
 
-  const qboToken = await getQboToken(request, user.company_id);
-    session.set('qboRealmId',    realmId);
-    setQboSession(session, qboToken);
-    session.flash("message", toastData("Success", "Quickbooks connected successfully"));
+  const qboToken = await getQboToken(request, user.company_id)
+  session.set('qboRealmId', realmId)
+  setQboSession(session, qboToken)
+  session.flash('message', toastData('Success', 'Quickbooks connected successfully'))
 
   return redirect('/employee/user', {
     headers: {
       'Set-Cookie': await commitSession(session),
     },
-  });
+  })
 }

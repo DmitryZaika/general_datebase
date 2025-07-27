@@ -1,27 +1,27 @@
-import { LoaderFunctionArgs, data } from "react-router";
-import { db } from "~/db.server";
-import { selectMany } from "~/utils/queryHelpers";
+import { data, type LoaderFunctionArgs } from 'react-router'
+import { db } from '~/db.server'
+import { selectMany } from '~/utils/queryHelpers'
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!params.stoneId) {
-    return new Response(JSON.stringify({ error: "Stone ID is required" }), {
+    return new Response(JSON.stringify({ error: 'Stone ID is required' }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 
-  const stoneId = parseInt(params.stoneId, 10);
-  if (isNaN(stoneId)) {
-    return new Response(JSON.stringify({ error: "Invalid Stone ID" }), {
+  const stoneId = parseInt(params.stoneId, 10)
+  if (Number.isNaN(stoneId)) {
+    return new Response(JSON.stringify({ error: 'Invalid Stone ID' }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 
-  const url = new URL(request.url);
+  const url = new URL(request.url)
   const excludeSlabIds = JSON.parse(
-    decodeURIComponent(url.searchParams.get("exclude") || "[]")
-  );
+    decodeURIComponent(url.searchParams.get('exclude') || '[]'),
+  )
 
   try {
     let query = `
@@ -29,27 +29,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       FROM slab_inventory
       WHERE stone_id = ?
       AND sale_id IS NULL
-    `;
+    `
 
-    const queryParams = [stoneId];
+    const queryParams = [stoneId]
 
     if (excludeSlabIds.length > 0) {
-      query += " AND id NOT IN (?)";
-      queryParams.push(excludeSlabIds);
+      query += ' AND id NOT IN (?)'
+      queryParams.push(excludeSlabIds)
     }
 
     const slabs = await selectMany<{ id: number; bundle: string }>(
       db,
       query,
-      queryParams
-    );
+      queryParams,
+    )
 
-    return data({ slabs });
-  } catch (error) {
-    console.error("Error fetching slabs:", error);
-    return new Response(JSON.stringify({ error: "Failed to fetch slabs" }), {
+    return data({ slabs })
+  } catch {
+    return new Response(JSON.stringify({ error: 'Failed to fetch slabs' }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 }

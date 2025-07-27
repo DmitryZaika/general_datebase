@@ -1,100 +1,98 @@
-import { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef } from '@tanstack/react-table'
+import { Calendar, MoreHorizontal, Search } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import {
+  type ActionFunctionArgs,
+  Form,
   Link,
-  LoaderFunctionArgs,
+  type LoaderFunctionArgs,
   Outlet,
   redirect,
-  useSearchParams,
-  useNavigate,
-  Form,
-  ActionFunctionArgs,
+  useLoaderData,
   useLocation,
-} from "react-router";
-import { selectMany } from "~/utils/queryHelpers";
-import { db } from "~/db.server";
-import { useLoaderData } from "react-router";
-import { getEmployeeUser } from "~/utils/session.server";
-import { PageLayout } from "~/components/PageLayout";
-import { DataTable } from "~/components/ui/data-table";
-import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
-import { Button } from "~/components/ui/button";
-import { useState, useEffect } from "react";
-import { Input } from "~/components/ui/input";
-import { Search, MoreHorizontal, Calendar } from "lucide-react";
+  useNavigate,
+  useSearchParams,
+} from 'react-router'
+import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
+import { PageLayout } from '~/components/PageLayout'
+import { Button } from '~/components/ui/button'
+import { DataTable } from '~/components/ui/data-table'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
+import { Input } from '~/components/ui/input'
+import { Label } from '~/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
-import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
-import { toastData } from "~/utils/toastHelpers";
-import { getSession, commitSession } from "~/sessions";
+} from '~/components/ui/select'
+import { Switch } from '~/components/ui/switch'
+import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions'
+import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
 
 interface Transaction {
-  id: number;
-  sale_date: string;
-  customer_name: string;
-  seller_name: string;
-  bundle: string;
-  bundle_with_cut: string;
-  stone_name: string;
-  sf?: number;
-  all_cut?: number;
-  any_cut?: number;
-  total_slabs?: number;
-  cut_slabs?: number;
-  cancelled_date: string | null;
-  installed_date: string | null;
-  sink_type?: string;
-  status?: string;
+  id: number
+  sale_date: string
+  customer_name: string
+  seller_name: string
+  bundle: string
+  bundle_with_cut: string
+  stone_name: string
+  sf?: number
+  all_cut?: number
+  any_cut?: number
+  total_slabs?: number
+  cut_slabs?: number
+  cancelled_date: string | null
+  installed_date: string | null
+  sink_type?: string
+  status?: string
 }
 
 interface SlabInfo {
-  id: number;
-  cut_date: string | null;
+  id: number
+  cut_date: string | null
 }
 
 function formatDate(dateString: string) {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getEmployeeUser(request);
+    const user = await getEmployeeUser(request)
     if (!user || !user.company_id) {
-      return redirect("/login");
+      return redirect('/login')
     }
 
-    const companyId = user.company_id;
-    const url = new URL(request.url);
+    const companyId = user.company_id
+    const url = new URL(request.url)
 
-    const searchTerm = url.searchParams.get("search") || "";
-    const salesRep = url.searchParams.get("salesRep") || user.name;
-    const status = url.searchParams.get("status") || "in_progress";
+    const searchTerm = url.searchParams.get('search') || ''
+    const salesRep = url.searchParams.get('salesRep') || user.name
+    const status = url.searchParams.get('status') || 'in_progress'
 
     let query = `
       SELECT 
@@ -124,20 +122,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         stones st ON si.stone_id = st.id
       WHERE
         s.company_id = ?
-    `;
+    `
 
-    const queryParams: any[] = [companyId];
+    const queryParams: (string | number)[] = [companyId]
 
-    if (salesRep && salesRep !== "All") {
-      query += " AND u.name = ?";
-      queryParams.push(salesRep);
+    if (salesRep && salesRep !== 'All') {
+      query += ' AND u.name = ?'
+      queryParams.push(salesRep)
     }
 
-    if (status === "in_progress") {
-      query += " AND s.installed_date IS NULL AND s.cancelled_date IS NULL";
-    } else if (status === "finished") {
-      query +=
-        " AND (s.installed_date IS NOT NULL OR s.cancelled_date IS NOT NULL)";
+    if (status === 'in_progress') {
+      query += ' AND s.installed_date IS NULL AND s.cancelled_date IS NULL'
+    } else if (status === 'finished') {
+      query += ' AND (s.installed_date IS NOT NULL OR s.cancelled_date IS NOT NULL)'
     }
 
     if (searchTerm) {
@@ -146,14 +143,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         u.name LIKE ? OR
         si.bundle LIKE ? OR
         st.name LIKE ?
-      )`;
-      const searchPattern = `%${searchTerm}%`;
-      queryParams.push(
-        searchPattern,
-        searchPattern,
-        searchPattern,
-        searchPattern
-      );
+      )`
+      const searchPattern = `%${searchTerm}%`
+      queryParams.push(searchPattern, searchPattern, searchPattern, searchPattern)
     }
 
     query += `
@@ -161,13 +153,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         s.id, s.sale_date, c.name, u.name
       ORDER BY 
         s.sale_date DESC
-    `;
+    `
 
-    const transactions = await selectMany<Transaction>(db, query, queryParams);
+    const transactions = await selectMany<Transaction>(db, query, queryParams)
 
     interface SinkInfo {
-      sale_id: number;
-      sink_types: string;
+      sale_id: number
+      sink_types: string
     }
 
     const sinkDetails = await selectMany<SinkInfo>(
@@ -189,8 +181,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          sales.id
        ORDER BY 
          sales.id`,
-      [companyId]
-    );
+      [companyId],
+    )
 
     const allSalesReps = await selectMany<{ name: string }>(
       db,
@@ -198,208 +190,195 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        FROM users 
        JOIN sales ON users.id = sales.seller_id 
        WHERE sales.company_id = ?`,
-      [companyId]
-    );
+      [companyId],
+    )
 
-    const salesReps = ["All", ...allSalesReps.map((rep) => rep.name)];
+    const salesReps = ['All', ...allSalesReps.map(rep => rep.name)]
 
-    const updatedTransactions = transactions.map((t) => {
-      const sinkInfo = sinkDetails.find((sd) => sd.sale_id === t.id);
-      let status = "Sold";
+    const updatedTransactions = transactions.map(t => {
+      const sinkInfo = sinkDetails.find(sd => sd.sale_id === t.id)
+      let status = 'Sold'
 
       if (t.cancelled_date) {
-        status = "Cancelled";
+        status = 'Cancelled'
       } else if (t.installed_date) {
-        status = "Installed";
+        status = 'Installed'
       } else if (t.all_cut === 1) {
-        status = "Cut";
+        status = 'Cut'
       } else if (t.any_cut === 1) {
-        status = "Partially Cut";
+        status = 'Partially Cut'
       }
 
       return {
         ...t,
         sink_type: sinkInfo ? sinkInfo.sink_types : undefined,
         status: status,
-      };
-    });
+      }
+    })
 
     return {
       transactions: updatedTransactions,
-      currentUser: user.name,
       salesReps,
       filters: {
         search: searchTerm,
         salesRep,
         status,
       },
-    };
+    }
   } catch (error) {
-    return redirect(`/login?error=${error}`);
+    return redirect(`/login?error=${error}`)
   }
-};
+}
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await getEmployeeUser(request);
+  const user = await getEmployeeUser(request)
   if (!user || !user.company_id) {
-    const session = await getSession(request.headers.get("Cookie"));
-    session.flash("message", toastData("Error", "Unauthorized", "destructive"));
-    return redirect("/login", {
-      headers: { "Set-Cookie": await commitSession(session) },
-    });
+    const session = await getSession(request.headers.get('Cookie'))
+    session.flash('message', toastData('Error', 'Unauthorized', 'destructive'))
+    return redirect('/login', {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
   }
 
-  const formData = await request.formData();
-  const intent = formData.get("intent");
-  const transactionId = formData.get("transactionId");
-  const installedDate = formData.get("installedDate") as string;
-  const isPaid = formData.get("isPaid") === "true";
+  const formData = await request.formData()
+  const intent = formData.get('intent')
+  const transactionId = formData.get('transactionId') as string
+  const installedDate = formData.get('installedDate') as string
+  const isPaid = formData.get('isPaid') === 'true'
 
   // Сохраняем текущий URL для редиректа обратно
-  const url = new URL(request.url);
+  const url = new URL(request.url)
   const redirectUrl =
-    url.searchParams.get("redirectTo") || `/employee/transactions${url.search}`;
+    url.searchParams.get('redirectTo') || `/employee/transactions${url.search}`
 
-  if (intent === "mark-installed") {
+  if (intent === 'mark-installed') {
     try {
       const transaction = await selectMany<{ installed_date: string | null }>(
         db,
         `SELECT installed_date FROM sales WHERE id = ?`,
-        [transactionId]
-      );
+        [transactionId],
+      )
 
       if (transaction.length === 0) {
-        const session = await getSession(request.headers.get("Cookie"));
+        const session = await getSession(request.headers.get('Cookie'))
         session.flash(
-          "message",
-          toastData("Error", "Transaction not found", "destructive")
-        );
+          'message',
+          toastData('Error', 'Transaction not found', 'destructive'),
+        )
         return redirect(redirectUrl, {
-          headers: { "Set-Cookie": await commitSession(session) },
-        });
+          headers: { 'Set-Cookie': await commitSession(session) },
+        })
       }
 
       if (transaction[0].installed_date) {
-        const session = await getSession(request.headers.get("Cookie"));
+        const session = await getSession(request.headers.get('Cookie'))
         session.flash(
-          "message",
+          'message',
           toastData(
-            "Error",
-            "Transaction is already marked as installed",
-            "destructive"
-          )
-        );
+            'Error',
+            'Transaction is already marked as installed',
+            'destructive',
+          ),
+        )
         return redirect(redirectUrl, {
-          headers: { "Set-Cookie": await commitSession(session) },
-        });
+          headers: { 'Set-Cookie': await commitSession(session) },
+        })
       }
 
       const slabs = await selectMany<SlabInfo>(
         db,
         `SELECT id, cut_date FROM slab_inventory WHERE sale_id = ?`,
-        [transactionId]
-      );
+        [transactionId],
+      )
 
       if (slabs.length === 0) {
-        const session = await getSession(request.headers.get("Cookie"));
+        const session = await getSession(request.headers.get('Cookie'))
         session.flash(
-          "message",
-          toastData(
-            "Error",
-            "No slabs found for this transaction",
-            "destructive"
-          )
-        );
+          'message',
+          toastData('Error', 'No slabs found for this transaction', 'destructive'),
+        )
         return redirect(redirectUrl, {
-          headers: { "Set-Cookie": await commitSession(session) },
-        });
+          headers: { 'Set-Cookie': await commitSession(session) },
+        })
       }
 
-      const allCut = slabs.every((slab) => slab.cut_date !== null);
+      const allCut = slabs.every(slab => slab.cut_date !== null)
 
       if (!allCut) {
-        const session = await getSession(request.headers.get("Cookie"));
+        const session = await getSession(request.headers.get('Cookie'))
         session.flash(
-          "message",
+          'message',
           toastData(
-            "Error",
-            "Cannot mark as installed - not all slabs are cut",
-            "destructive"
-          )
-        );
+            'Error',
+            'Cannot mark as installed - not all slabs are cut',
+            'destructive',
+          ),
+        )
         return redirect(redirectUrl, {
-          headers: { "Set-Cookie": await commitSession(session) },
-        });
+          headers: { 'Set-Cookie': await commitSession(session) },
+        })
       }
 
       // Format the date for SQL or use current date if not provided
       const dateToUse = installedDate
-        ? new Date(installedDate).toISOString().slice(0, 19).replace("T", " ")
-        : new Date().toISOString().slice(0, 19).replace("T", " ");
+        ? new Date(installedDate).toISOString().slice(0, 19).replace('T', ' ')
+        : new Date().toISOString().slice(0, 19).replace('T', ' ')
 
       // If paid is true, update both installed_date and paid_date
       if (isPaid) {
         await db.execute(
           `UPDATE sales SET installed_date = ?, paid_date = ? WHERE id = ?`,
-          [dateToUse, dateToUse, transactionId]
-        );
+          [dateToUse, dateToUse, transactionId],
+        )
       } else {
         await db.execute(`UPDATE sales SET installed_date = ? WHERE id = ?`, [
           dateToUse,
           transactionId,
-        ]);
+        ])
       }
 
-      const session = await getSession(request.headers.get("Cookie"));
-      session.flash(
-        "message",
-        toastData("Success", "Transaction marked as installed")
-      );
+      const session = await getSession(request.headers.get('Cookie'))
+      session.flash('message', toastData('Success', 'Transaction marked as installed'))
 
       return redirect(redirectUrl, {
-        headers: { "Set-Cookie": await commitSession(session) },
-      });
-    } catch (error) {
-      console.error("Error updating status:", error);
-
-      const session = await getSession(request.headers.get("Cookie"));
+        headers: { 'Set-Cookie': await commitSession(session) },
+      })
+    } catch {
+      const session = await getSession(request.headers.get('Cookie'))
       session.flash(
-        "message",
-        toastData("Error", "Failed to update status", "destructive")
-      );
+        'message',
+        toastData('Error', 'Failed to update status', 'destructive'),
+      )
 
       return redirect(redirectUrl, {
-        headers: { "Set-Cookie": await commitSession(session) },
-      });
+        headers: { 'Set-Cookie': await commitSession(session) },
+      })
     }
   }
 
-  const session = await getSession(request.headers.get("Cookie"));
-  session.flash("message", toastData("Error", "Invalid action", "destructive"));
+  const session = await getSession(request.headers.get('Cookie'))
+  session.flash('message', toastData('Error', 'Invalid action', 'destructive'))
   return redirect(redirectUrl, {
-    headers: { "Set-Cookie": await commitSession(session) },
-  });
+    headers: { 'Set-Cookie': await commitSession(session) },
+  })
 }
 
 export default function EmployeeTransactions() {
-  const { transactions, currentUser, salesReps, filters } =
-    useLoaderData<typeof loader>();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [searchValue, setSearchValue] = useState(filters.search);
-  const [customers, setCustomers] = useState<{ id: number; name: string }[]>(
-    []
-  );
-  const [showCustomers, setShowCustomers] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [installDialogOpen, setInstallDialogOpen] = useState(false);
-  const [selectedTransactionId, setSelectedTransactionId] = useState<
-    number | null
-  >(null);
+  const { transactions, salesReps, filters } = useLoaderData<typeof loader>()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchValue, setSearchValue] = useState(filters.search)
+  const [customers, setCustomers] = useState<{ id: number; name: string }[]>([])
+  const [showCustomers, setShowCustomers] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [installDialogOpen, setInstallDialogOpen] = useState(false)
+  const [selectedTransactionId, setSelectedTransactionId] = useState<number | null>(
+    null,
+  )
   const [installDate, setInstallDate] = useState<string>(
-    new Date().toISOString().slice(0, 10)
-  );
-  const [isPaid, setIsPaid] = useState(true);
+    new Date().toISOString().slice(0, 10),
+  )
+  const [isPaid, setIsPaid] = useState(true)
 
   // Fetch customers when search value changes
   useEffect(() => {
@@ -408,241 +387,228 @@ export default function EmployeeTransactions() {
       const fetchCustomers = async () => {
         try {
           const response = await fetch(
-            "/api/customers/search?term=" + encodeURIComponent(searchValue)
-          );
+            `/api/customers/search?term=${encodeURIComponent(searchValue)}`,
+          )
           if (response.ok) {
-            const data = await response.json();
-            setCustomers(data.customers || []);
-            setShowCustomers(data.customers && data.customers.length > 0);
+            const data = await response.json()
+            setCustomers(data.customers || [])
+            setShowCustomers(data.customers && data.customers.length > 0)
           } else {
-            setCustomers([]);
-            setShowCustomers(false);
+            setCustomers([])
+            setShowCustomers(false)
           }
-        } catch (error) {
-          console.error("Error fetching customers:", error);
-          setCustomers([]);
-          setShowCustomers(false);
+        } catch {
+          setCustomers([])
+          setShowCustomers(false)
         }
-      };
+      }
 
-      fetchCustomers();
+      fetchCustomers()
     } else {
-      setCustomers([]);
-      setShowCustomers(false);
+      setCustomers([])
+      setShowCustomers(false)
     }
-  }, [searchValue]);
+  }, [searchValue])
 
   const handleSalesRepChange = (value: string) => {
-    searchParams.set("salesRep", value);
-    setSearchParams(searchParams);
-  };
+    searchParams.set('salesRep', value)
+    setSearchParams(searchParams)
+  }
 
   const handleStatusChange = (value: string) => {
-    searchParams.set("status", value);
-    setSearchParams(searchParams);
-  };
+    searchParams.set('status', value)
+    setSearchParams(searchParams)
+  }
 
   const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    searchParams.set("search", searchValue);
-    setSearchParams(searchParams);
-    setShowCustomers(false);
-  };
+    e.preventDefault()
+    searchParams.set('search', searchValue)
+    setSearchParams(searchParams)
+    setShowCustomers(false)
+  }
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchValue(e.target.value);
-  };
+    setSearchValue(e.target.value)
+  }
 
   const handleSelectCustomer = (customer: { id: number; name: string }) => {
-    setSearchValue(customer.name);
-    searchParams.set("search", customer.name);
-    setSearchParams(searchParams);
-    setShowCustomers(false);
-  };
+    setSearchValue(customer.name)
+    searchParams.set('search', customer.name)
+    setSearchParams(searchParams)
+    setShowCustomers(false)
+  }
 
   const handleRowClick = (id: number) => {
-    navigate(`edit/${id}${location.search}`);
-  };
+    navigate(`edit/${id}${location.search}`)
+  }
 
   const openInstallDialog = (id: number) => {
-    setSelectedTransactionId(id);
-    setInstallDate(new Date().toISOString().slice(0, 10)); // Reset to today
-    setIsPaid(true); // Reset paid to default true
-    setInstallDialogOpen(true);
-  };
+    setSelectedTransactionId(id)
+    setInstallDate(new Date().toISOString().slice(0, 10)) // Reset to today
+    setIsPaid(true) // Reset paid to default true
+    setInstallDialogOpen(true)
+  }
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = () => {
     // Закрываем диалог перед отправкой формы
-    setInstallDialogOpen(false);
+    setInstallDialogOpen(false)
     // Не прерываем стандартную отправку формы
-  };
+  }
 
   const transactionColumns: ColumnDef<Transaction>[] = [
     {
-      accessorKey: "sale_date",
-      header: ({ column }) => <SortableHeader column={column} title="Date" />,
+      accessorKey: 'sale_date',
+      header: ({ column }) => <SortableHeader column={column} title='Date' />,
       cell: ({ row }) => formatDate(row.original.sale_date),
-      sortingFn: "datetime",
+      sortingFn: 'datetime',
     },
     {
-      accessorKey: "customer_name",
-      header: ({ column }) => (
-        <SortableHeader column={column} title="Customer" />
-      ),
+      accessorKey: 'customer_name',
+      header: ({ column }) => <SortableHeader column={column} title='Customer' />,
       cell: ({ row }) => {
         return (
           <Link
             to={`edit/${row.original.id}${location.search}`}
-            className="text-blue-600 hover:underline"
+            className='text-blue-600 hover:underline'
           >
             {row.original.customer_name}
           </Link>
-        );
+        )
       },
     },
     {
-      accessorKey: "seller_name",
-      header: ({ column }) => (
-        <SortableHeader column={column} title="Sold By" />
-      ),
+      accessorKey: 'seller_name',
+      header: ({ column }) => <SortableHeader column={column} title='Sold By' />,
     },
     {
-      accessorKey: "stone_name",
-      header: ({ column }) => <SortableHeader column={column} title="Stone" />,
+      accessorKey: 'stone_name',
+      header: ({ column }) => <SortableHeader column={column} title='Stone' />,
       cell: ({ row }) => {
-        const stonesArr = (row.original.stone_name || "")
-          .split(/,\s*/)
-          .filter(Boolean);
-        if (!stonesArr.length) return <span>N/A</span>;
+        const stonesArr = (row.original.stone_name || '').split(/,\s*/).filter(Boolean)
+        if (!stonesArr.length) return <span>N/A</span>
 
         return (
-          <div className="flex flex-col">
+          <div className='flex flex-col'>
             {stonesArr.map((s, idx) => (
               <span key={idx}>{s}</span>
             ))}
           </div>
-        );
+        )
       },
     },
     {
-      accessorKey: "sf",
-      header: ({ column }) => <SortableHeader column={column} title="Sqft" />,
+      accessorKey: 'sf',
+      header: ({ column }) => <SortableHeader column={column} title='Sqft' />,
       cell: ({ row }) => {
-        return row.original.sf ? (
-          <span>{row.original.sf}</span>
-        ) : (
-          <span>N/A</span>
-        );
+        return row.original.sf ? <span>{row.original.sf}</span> : <span>N/A</span>
       },
     },
     {
-      accessorKey: "sink_type",
-      header: ({ column }) => <SortableHeader column={column} title="Sink" />,
+      accessorKey: 'sink_type',
+      header: ({ column }) => <SortableHeader column={column} title='Sink' />,
       cell: ({ row }) => {
-        const sinks = (row.original.sink_type || "")
-          .split(", ")
-          .filter(Boolean);
-        if (!sinks.length) return <span>N/A</span>;
+        const sinks = (row.original.sink_type || '').split(', ').filter(Boolean)
+        if (!sinks.length) return <span>N/A</span>
 
-        const sinkCounts: { [key: string]: number } = {};
-        sinks.forEach((sink) => {
-          sinkCounts[sink] = (sinkCounts[sink] || 0) + 1;
-        });
+        const sinkCounts: { [key: string]: number } = {}
+        sinks.forEach(sink => {
+          sinkCounts[sink] = (sinkCounts[sink] || 0) + 1
+        })
 
         const formattedSinks = Object.entries(sinkCounts).map(([sink, count]) =>
-          count > 1 ? `${sink} x ${count}` : sink
-        );
+          count > 1 ? `${sink} x ${count}` : sink,
+        )
 
         return (
-          <div className="flex flex-col">
+          <div className='flex flex-col'>
             {formattedSinks.map((sink, index) => (
               <span key={index}>{sink}</span>
             ))}
           </div>
-        );
+        )
       },
     },
     {
-      accessorKey: "bundle",
-      header: ({ column }) => <SortableHeader column={column} title="Bundle" />,
+      accessorKey: 'bundle',
+      header: ({ column }) => <SortableHeader column={column} title='Bundle' />,
       cell: ({ row }) => {
-        const bundleInfo = (row.original.bundle_with_cut || "")
-          .split(",")
-          .filter(Boolean);
-        if (!bundleInfo.length) return <span>N/A</span>;
+        const bundleInfo = (row.original.bundle_with_cut || '')
+          .split(',')
+          .filter(Boolean)
+        if (!bundleInfo.length) return <span>N/A</span>
 
-        const bundleStatusMap: { [key: string]: boolean } = {};
-        bundleInfo.forEach((item) => {
-          const [bundle, status] = item.split(":");
-          bundleStatusMap[bundle] = status === "CUT";
-        });
+        const bundleStatusMap: { [key: string]: boolean } = {}
+        bundleInfo.forEach(item => {
+          const [bundle, status] = item.split(':')
+          bundleStatusMap[bundle] = status === 'CUT'
+        })
 
-        const bundles = (row.original.bundle || "").split(",").filter(Boolean);
+        const bundles = (row.original.bundle || '').split(',').filter(Boolean)
 
         return (
-          <div className="flex flex-col">
+          <div className='flex flex-col'>
             {bundles.map((bundle, index) => {
-              const isCut = bundleStatusMap[bundle] === true;
+              const isCut = bundleStatusMap[bundle] === true
               return (
                 <span
                   key={index}
-                  className={isCut ? "text-blue-500" : "text-green-500"}
+                  className={isCut ? 'text-blue-500' : 'text-green-500'}
                 >
                   {bundle}
                 </span>
-              );
+              )
             })}
           </div>
-        );
+        )
       },
     },
     {
-      accessorKey: "status",
-      header: ({ column }) => <SortableHeader column={column} title="Status" />,
+      accessorKey: 'status',
+      header: ({ column }) => <SortableHeader column={column} title='Status' />,
       cell: ({ row }) => {
-        let colorClass = "text-green-500";
+        let colorClass = 'text-green-500'
         if (row.original.cancelled_date) {
-          colorClass = "text-red-500";
+          colorClass = 'text-red-500'
         } else if (row.original.installed_date) {
-          colorClass = "text-purple-500";
+          colorClass = 'text-purple-500'
         } else if (row.original.all_cut === 1) {
-          colorClass = "text-blue-500";
+          colorClass = 'text-blue-500'
         } else if (row.original.any_cut === 1) {
-          colorClass = "text-gray-500";
+          colorClass = 'text-gray-500'
         }
 
-        return <span className={colorClass}>{row.original.status}</span>;
+        return <span className={colorClass}>{row.original.status}</span>
       },
     },
     {
-      id: "actions",
+      id: 'actions',
       cell: ({ row }) => {
-        const isInstalled = row.original.installed_date !== null;
-        const isCancelled = row.original.cancelled_date !== null;
-        const allCut = row.original.all_cut === 1;
+        const isInstalled = row.original.installed_date !== null
+        const isCancelled = row.original.cancelled_date !== null
+        const allCut = row.original.all_cut === 1
 
-        const canInstall = allCut && !isInstalled && !isCancelled;
+        const canInstall = allCut && !isInstalled && !isCancelled
 
         return (
           <div
-            className="flex items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
+            className='flex items-center justify-center'
+            onClick={e => e.stopPropagation()}
           >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
+                <Button variant='ghost' className='h-8 w-8 p-0'>
+                  <span className='sr-only'>Open menu</span>
+                  <MoreHorizontal className='h-4 w-4' />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align='end'>
                 <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openInstallDialog(row.original.id);
+                  onClick={e => {
+                    e.stopPropagation()
+                    openInstallDialog(row.original.id)
                   }}
                   disabled={!canInstall}
-                  className={!canInstall ? "opacity-50 cursor-not-allowed" : ""}
+                  className={!canInstall ? 'opacity-50 cursor-not-allowed' : ''}
                 >
                   Mark as Installed
                 </DropdownMenuItem>
@@ -652,30 +618,27 @@ export default function EmployeeTransactions() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        );
+        )
       },
     },
-  ];
+  ]
 
-  const formAction = `/employee/transactions${location.search}`;
+  const formAction = `/employee/transactions${location.search}`
 
   return (
     <>
-      <PageLayout title="Sales Transactions">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <div className="flex gap-4 items-center">
-              <div className="w-1/8 min-w-[120px]">
-                <div className="mb-1 text-sm font-medium">Sales Rep</div>
-                <Select
-                  value={filters.salesRep}
-                  onValueChange={handleSalesRepChange}
-                >
+      <PageLayout title='Sales Transactions'>
+        <div className='flex justify-between items-center'>
+          <div className='flex items-center gap-4'>
+            <div className='flex gap-4 items-center'>
+              <div className='w-1/8 min-w-[120px]'>
+                <div className='mb-1 text-sm font-medium'>Sales Rep</div>
+                <Select value={filters.salesRep} onValueChange={handleSalesRepChange}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Sales Rep" />
+                    <SelectValue placeholder='Sales Rep' />
                   </SelectTrigger>
                   <SelectContent>
-                    {salesReps.map((rep) => (
+                    {salesReps.map(rep => (
                       <SelectItem key={rep} value={rep}>
                         {rep}
                       </SelectItem>
@@ -684,44 +647,38 @@ export default function EmployeeTransactions() {
                 </Select>
               </div>
 
-              <div className="w-1/8 min-w-[120px]">
-                <div className="mb-1 text-sm font-medium">Status</div>
-                <Select
-                  value={filters.status}
-                  onValueChange={handleStatusChange}
-                >
+              <div className='w-1/8 min-w-[120px]'>
+                <div className='mb-1 text-sm font-medium'>Status</div>
+                <Select value={filters.status} onValueChange={handleStatusChange}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Status" />
+                    <SelectValue placeholder='Status' />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="finished">Finished</SelectItem>
-                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value='in_progress'>In Progress</SelectItem>
+                    <SelectItem value='finished'>Finished</SelectItem>
+                    <SelectItem value='all'>All Statuses</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           </div>
-          <div className="relative">
-            <form
-              onSubmit={handleSearchSubmit}
-              className="flex items-center gap-2"
-            >
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+          <div className='relative'>
+            <form onSubmit={handleSearchSubmit} className='flex items-center gap-2'>
+              <div className='relative'>
+                <Search className='absolute left-2 top-2.5 h-4 w-4 text-gray-500' />
                 <Input
-                  placeholder="Search transactions..."
+                  placeholder='Search transactions...'
                   value={searchValue}
                   onChange={handleSearchChange}
-                  className="pl-8 w-64"
+                  className='pl-8 w-64'
                 />
                 {showCustomers && customers.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg">
-                    <ul className="py-1 divide-y divide-gray-200">
-                      {customers.map((customer) => (
+                  <div className='absolute z-10 w-full mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg'>
+                    <ul className='py-1 divide-y divide-gray-200'>
+                      {customers.map(customer => (
                         <li
                           key={customer.id}
-                          className="px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                          className='px-4 py-2 hover:bg-gray-50 cursor-pointer'
                           onClick={() => handleSelectCustomer(customer)}
                         >
                           {customer.name}
@@ -731,7 +688,7 @@ export default function EmployeeTransactions() {
                   </div>
                 )}
               </div>
-              <Button type="submit" variant="outline" size="sm">
+              <Button type='submit' variant='outline' size='sm'>
                 Search
               </Button>
             </form>
@@ -739,9 +696,9 @@ export default function EmployeeTransactions() {
         </div>
         <DataTable
           columns={transactionColumns}
-          data={transactions.map((transaction) => ({
+          data={transactions.map(transaction => ({
             ...transaction,
-            className: "hover:bg-gray-50 cursor-pointer",
+            className: 'hover:bg-gray-50 cursor-pointer',
             onClick: () => handleRowClick(transaction.id),
           }))}
         />
@@ -753,54 +710,49 @@ export default function EmployeeTransactions() {
             <DialogTitle>Mark Transaction as Installed</DialogTitle>
           </DialogHeader>
 
-          <Form method="post" action={formAction} onSubmit={handleFormSubmit}>
-            <input type="hidden" name="intent" value="mark-installed" />
+          <Form method='post' action={formAction} onSubmit={handleFormSubmit}>
+            <input type='hidden' name='intent' value='mark-installed' />
             <input
-              type="hidden"
-              name="transactionId"
-              value={selectedTransactionId?.toString() || ""}
+              type='hidden'
+              name='transactionId'
+              value={selectedTransactionId?.toString() || ''}
             />
 
-            <div className="py-4 space-y-4">
-              <div className="flex items-center gap-4">
-                <Label
-                  htmlFor="installation-date"
-                  className="text-right w-[140px]"
-                >
+            <div className='py-4 space-y-4'>
+              <div className='flex items-center gap-4'>
+                <Label htmlFor='installation-date' className='text-right w-[140px]'>
                   Installation Date
                 </Label>
-                <div className="relative ">
-                  <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                <div className='relative '>
+                  <Calendar className='absolute left-3 top-2.5 h-4 w-4 text-gray-500' />
                   <Input
-                    id="installation-date"
-                    name="installedDate"
-                    type="date"
+                    id='installation-date'
+                    name='installedDate'
+                    type='date'
                     value={installDate}
-                    onChange={(e) => setInstallDate(e.target.value)}
-                    className="pl-10"
+                    onChange={e => setInstallDate(e.target.value)}
+                    className='pl-10'
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                <Label htmlFor="paid-switch" className="text-right w-[140px]">
+              <div className='flex items-center gap-4'>
+                <Label htmlFor='paid-switch' className='text-right w-[140px]'>
                   Paid
                 </Label>
-                <div className="flex items-center gap-2">
+                <div className='flex items-center gap-2'>
                   <input
-                    type="hidden"
-                    name="isPaid"
-                    value={isPaid ? "true" : "false"}
+                    type='hidden'
+                    name='isPaid'
+                    value={isPaid ? 'true' : 'false'}
                   />
                   <Switch
-                    id="paid-switch"
+                    id='paid-switch'
                     checked={isPaid}
                     onCheckedChange={setIsPaid}
                   />
-                  <span className="text-sm text-gray-500">
-                    {isPaid
-                      ? "Mark as paid on same date"
-                      : "Do not mark as paid"}
+                  <span className='text-sm text-gray-500'>
+                    {isPaid ? 'Mark as paid on same date' : 'Do not mark as paid'}
                   </span>
                 </div>
               </div>
@@ -808,13 +760,13 @@ export default function EmployeeTransactions() {
 
             <DialogFooter>
               <Button
-                type="button"
-                variant="outline"
+                type='button'
+                variant='outline'
                 onClick={() => setInstallDialogOpen(false)}
               >
                 Cancel
               </Button>
-              <Button type="submit">Confirm</Button>
+              <Button type='submit'>Confirm</Button>
             </DialogFooter>
           </Form>
         </DialogContent>
@@ -822,5 +774,5 @@ export default function EmployeeTransactions() {
 
       <Outlet />
     </>
-  );
+  )
 }

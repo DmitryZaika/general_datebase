@@ -32,9 +32,9 @@
   --border-radius-md: "calc(var(--radius) - 2px)";
   --border-radius-sm: "calc(var(--radius) - 4px)";
   --border-color: white;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji",
-    Arial;
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji", Arial;
 
   @keyframes accordion-down {
     from {

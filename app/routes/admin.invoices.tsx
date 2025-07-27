@@ -1,53 +1,50 @@
-import { ColumnDef } from "@tanstack/react-table";
-import { Link, LoaderFunctionArgs, Outlet, redirect, useLocation, useNavigate } from "react-router";
-import { selectMany } from "~/utils/queryHelpers";
-import { db } from "~/db.server";
-import { useLoaderData } from "react-router";
-import { getAdminUser } from "~/utils/session.server";
-import { PageLayout } from "~/components/PageLayout";
-import { DataTable } from "~/components/ui/data-table";
-import { SortableHeader } from "~/components/molecules/DataTable/SortableHeader";
-import { Button } from "~/components/ui/button";
-import { ActionDropdown } from "~/components/molecules/DataTable/ActionDropdown";
-import { useState } from "react";
-import { Input } from "~/components/ui/input";
-import { Search } from "lucide-react";
+import type { ColumnDef } from '@tanstack/react-table'
+import { useState } from 'react'
+import {
+  type LoaderFunctionArgs,
+  Outlet,
+  redirect,
+  useLoaderData,
+  useNavigate,
+} from 'react-router'
+import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
+import { PageLayout } from '~/components/PageLayout'
+import { DataTable } from '~/components/ui/data-table'
+import { db } from '~/db.server'
+import { selectMany } from '~/utils/queryHelpers'
+import { getAdminUser, type User } from '~/utils/session.server'
 
 interface Transaction {
-  id: number;
-  sale_date: string;
-  customer_name: string;
-  seller_name: string;
-  bundle: string;
-  cancelled_date: string | null;
-  installed_date: string | null;
+  id: number
+  sale_date: string
+  customer_name: string
+  seller_name: string
+  bundle: string
+  cancelled_date: string | null
+  installed_date: string | null
 }
 
-
 function formatDate(dateString: string) {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user;
+  let user: User
   try {
-    user = await getAdminUser(request);
-    if (!user || !user.company_id) {
-      return redirect('/login');
-    } 
-    } catch(error) {
-      return redirect(`/login?error=${error}`);
-    }
-    
-    const transactions = await selectMany<Transaction>(
-      db,
-      `SELECT 
+    user = await getAdminUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
+
+  const transactions = await selectMany<Transaction>(
+    db,
+    `SELECT 
         s.id,
         s.sale_date,
         c.name as customer_name,
@@ -66,50 +63,50 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         s.id, s.sale_date, c.name, u.name
       ORDER BY 
         s.sale_date DESC`,
-      [user.company_id]
-    );
-    return { transactions };
-};
+    [user.company_id],
+  )
+  return { transactions }
+}
 
 const transactionColumns: ColumnDef<Transaction>[] = [
   {
-    accessorKey: "sale_date",
-    header: ({ column }) => <SortableHeader column={column} title="Date" />,
+    accessorKey: 'sale_date',
+    header: ({ column }) => <SortableHeader column={column} title='Date' />,
     cell: ({ row }) => formatDate(row.original.sale_date),
-    sortingFn: "datetime",
+    sortingFn: 'datetime',
   },
   {
-    accessorKey: "customer_name",
-    header: ({ column }) => <SortableHeader column={column} title="Customer" />,
-    cell: ({ row }) => row.original.customer_name
+    accessorKey: 'customer_name',
+    header: ({ column }) => <SortableHeader column={column} title='Customer' />,
+    cell: ({ row }) => row.original.customer_name,
   },
   {
-    accessorKey: "seller_name",
-    header: ({ column }) => <SortableHeader column={column} title="Sold By" />,
+    accessorKey: 'seller_name',
+    header: ({ column }) => <SortableHeader column={column} title='Sold By' />,
   },
-];
+]
 
 export default function AdminTransactions() {
-  const { transactions } = useLoaderData<typeof loader>();
-  const [searchTerm, setSearchTerm] = useState("");
-  let navigate = useNavigate();
+  const { transactions } = useLoaderData<typeof loader>()
+  const [searchTerm, _] = useState('')
+  const navigate = useNavigate()
 
-  const filteredTransactions = transactions.filter(transaction => 
-    transaction.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTransactions = transactions.filter(transaction =>
+    transaction.customer_name.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
   return (
     <>
-      <PageLayout title="Invoices">
-        <DataTable 
-          columns={transactionColumns} 
+      <PageLayout title='Invoices'>
+        <DataTable
+          columns={transactionColumns}
           data={filteredTransactions.map(transaction => ({
             ...transaction,
-            onClick: () => navigate(`${transaction.id}`)
-          }))} 
+            onClick: () => navigate(`${transaction.id}`),
+          }))}
         />
       </PageLayout>
       <Outlet />
     </>
-  );
-} 
+  )
+}

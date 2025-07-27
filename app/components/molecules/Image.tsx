@@ -1,24 +1,20 @@
 // Image.tsx
-import * as React from "react";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContentImage,
-} from "~/components/ui/dialog";
-import { X } from "lucide-react";
+
+import { X } from 'lucide-react'
+import { Dialog, DialogContentImage, DialogTrigger } from '~/components/ui/dialog'
 
 interface ImageProps {
-  name?: string;
-  src: string | null;
-  alt?: string;
-  className?: string;
-  isOpen: boolean;
-  id: number;
-  setImage: (value: undefined | number) => void;
+  name?: string
+  src: string | null
+  alt?: string
+  className?: string
+  isOpen: boolean
+  id: number
+  setImage: (value: undefined | number) => void
 }
 
 export function Image({
-  className = "",
+  className = '',
   src,
   name,
   alt,
@@ -28,45 +24,45 @@ export function Image({
 }: ImageProps) {
   const handleOpenChange = (open: boolean) => {
     if (!open) {
-      setImage(undefined);
+      setImage(undefined)
     }
-  };
+  }
 
   const handleClose = () => {
-    setImage(undefined);
-  };
+    setImage(undefined)
+  }
 
   return (
-    <div className="flex gap-2 flex-col items-center">
+    <div className='flex gap-2 flex-col items-center'>
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
           <img
-            src={src || "/path/to/placeholder.png"}
-            alt={alt || name || "Image"}
+            src={src || '/path/to/placeholder.png'}
+            alt={alt || name || 'Image'}
             className={`object-cover  w-full h-40 border-2  rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300 ${className}`}
-            loading="lazy"
+            loading='lazy'
             onClick={() => setImage(id)}
           />
         </DialogTrigger>
 
-        <DialogContentImage className="flex justify-center items-center">
+        <DialogContentImage className='flex justify-center items-center'>
           <button
             onClick={handleClose}
-            className="absolute top-4 cursor-pointer right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-75 transition"
-            aria-label="Закрыть"
+            className='absolute top-4 cursor-pointer right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-75 transition'
+            aria-label='Закрыть'
           >
-            <X className="w-6 h-6" />
+            <X className='w-6 h-6' />
           </button>
 
           <img
-            src={src || "/path/to/placeholder.png"}
-            alt={alt || name || "Image"}
-            className="h-[90vh] w-auto max-h-[90vh] max-w-[90vw] object-contain"
-            onClick={(e) => e.stopPropagation()}
+            src={src || '/path/to/placeholder.png'}
+            alt={alt || name || 'Image'}
+            className='h-[90vh] w-auto max-h-[90vh] max-w-[90vw] object-contain'
+            onClick={e => e.stopPropagation()}
           />
         </DialogContentImage>
       </Dialog>
-      {name && <p className="text-center font-bold font-sans">{name}</p>}
+      {name && <p className='text-center font-bold font-sans'>{name}</p>}
     </div>
-  );
+  )
 }

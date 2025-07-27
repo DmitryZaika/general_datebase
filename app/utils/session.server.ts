@@ -1,40 +1,41 @@
 // utils/session.server.ts
-import { db } from "~/db.server";
-import { RowDataPacket } from "mysql2";
-import bcrypt from "bcryptjs";
-import { v4 as uuidv4 } from "uuid";
-import { getSession } from "~/sessions";
+
+import bcrypt from 'bcryptjs'
+import type { RowDataPacket } from 'mysql2'
+import { v4 as uuidv4 } from 'uuid'
+import { db } from '~/db.server'
+import { getSession } from '~/sessions'
 
 interface LoginUser {
-  id: number;
-  password: string;
-  email: string;
+  id: number
+  password: string
+  email: string
 }
 
 export interface User {
-  id: number;
-  email: string;
-  name: string;
-  is_employee: boolean;
-  is_admin: boolean;
-  is_superuser: boolean;
-  company_id: number;
+  id: number
+  email: string
+  name: string
+  is_employee: boolean
+  is_admin: boolean
+  is_superuser: boolean
+  company_id: number
 }
 
 interface SessionUser {
-  id: number;
-  email: string;
-  name: string;
-  is_employee: boolean;
-  is_admin: boolean;
-  is_superuser: boolean;
-  company_id: number;
+  id: number
+  email: string
+  name: string
+  is_employee: boolean
+  is_admin: boolean
+  is_superuser: boolean
+  company_id: number
 }
 
 function getExpirationDate(expiration: number): string {
-  const now = new Date();
-  const expirationDate = new Date(now.getTime() + expiration * 1000);
-  return expirationDate.toISOString().slice(0, 19).replace("T", " ");
+  const now = new Date()
+  const expirationDate = new Date(now.getTime() + expiration * 1000)
+  return expirationDate.toISOString().slice(0, 19).replace('T', ' ')
 }
 
 export async function register(
@@ -44,12 +45,12 @@ export async function register(
   isEmployee: number = 1,
   isAdmin: number = 0,
 ) {
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 10)
   await db.execute(
-    `INSERT INTO main.users (email, password, company_id, isEmployee, isAdmin) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO users (email, password, company_id, isEmployee, isAdmin) VALUES (?, ?, ?, ?, ?)`,
     [email, passwordHash, company_id, isEmployee, isAdmin],
-  );
-  return true;
+  )
+  return true
 }
 
 export async function login(
@@ -58,23 +59,23 @@ export async function login(
   expiration: number,
 ): Promise<string | undefined> {
   const [rows] = await db.query<LoginUser[] & RowDataPacket[]>(
-    "SELECT id, password, email FROM users WHERE email = ? AND is_deleted = 0",
+    'SELECT id, password, email FROM users WHERE email = ? AND is_deleted = 0',
     [email],
-  );
+  )
   if (rows.length < 1) {
-    return undefined;
+    return undefined
   }
-  const user = rows[0];
+  const user = rows[0]
   if (!(await bcrypt.compare(password, user.password))) {
-    return undefined;
+    return undefined
   }
-  const id = uuidv4();
+  const id = uuidv4()
   await db.execute(
-    `INSERT INTO main.sessions (id, user_id, expiration_date) VALUES (?, ?, ?)`,
+    `INSERT INTO sessions (id, user_id, expiration_date) VALUES (?, ?, ?)`,
     [id, user.id, getExpirationDate(expiration)],
-  );
+  )
 
-  return id;
+  return id
 }
 
 async function getUser(sessionId: string): Promise<SessionUser | undefined> {
@@ -87,53 +88,50 @@ async function getUser(sessionId: string): Promise<SessionUser | undefined> {
        AND users.is_deleted = 0`,
 
     [sessionId],
-  );
+  )
   if (rows.length < 1) {
-    return undefined;
+    return undefined
   }
-  return rows[0];
+  return rows[0]
 }
 
 async function handlePermissions(
   request: Request,
   validUser: (value: SessionUser) => boolean,
 ): Promise<SessionUser> {
-  const cookie = request.headers.get("Cookie");
-  const session = await getSession(cookie);
-  const sessionId = session.get("sessionId");
+  const cookie = request.headers.get('Cookie')
+  const session = await getSession(cookie)
+  const sessionId = session.get('sessionId')
   if (sessionId === undefined) {
-    throw new TypeError("Session ID cannot be undefined");
+    throw new TypeError('Session ID cannot be undefined')
   }
-  const user = await getUser(sessionId);
+  const user = await getUser(sessionId)
   if (user === undefined) {
-    throw new TypeError("Could not find session");
+    throw new TypeError('Could not find session')
   }
   if (!validUser(user)) {
-    throw new TypeError("Invalid user permissions");
+    throw new TypeError('Invalid user permissions')
   }
-  return user;
+  return user
 }
 
 export async function getAdminUser(request: Request): Promise<SessionUser> {
-  return await handlePermissions(
-    request,
-    (user) => user.is_admin || user.is_superuser,
-  );
+  return await handlePermissions(request, user => user.is_admin || user.is_superuser)
 }
 
 export async function getEmployeeUser(request: Request): Promise<SessionUser> {
   return await handlePermissions(
     request,
-    (user) => user.is_employee || user.is_admin || user.is_superuser,
-  );
+    user => user.is_employee || user.is_admin || user.is_superuser,
+  )
 }
 
 export async function getSuperUser(request: Request): Promise<SessionUser> {
-  return await handlePermissions(request, (user) => user.is_superuser);
+  return await handlePermissions(request, user => user.is_superuser)
 }
 
 export async function getUserBySessionId(
   sessionId: string,
 ): Promise<SessionUser | undefined> {
-  return await getUser(sessionId);
+  return await getUser(sessionId)
 }
