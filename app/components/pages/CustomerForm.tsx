@@ -14,8 +14,8 @@ import {
 import { FormField, FormProvider } from '~/components/ui/form'
 import { useToast } from '~/hooks/use-toast'
 import {
-  createCustomerMutation,
   type CustomerDialogSchema,
+  createCustomerMutation,
   customerDialogSchema,
   updateCustomerMutation,
 } from '~/schemas/customers'
@@ -34,8 +34,12 @@ interface CustomerFormProps {
 const getCustomerInfo = async (customerId: number) => {
   const response = await fetch(`/api/customers/${customerId}`)
   const data = await response.json()
-  console.log(data)
-  return customerDialogSchema.parse(data.customer)
+  return {
+    name: data.customer.name,
+    email: data.customer.email,
+    phone: data.customer.phone,
+    address: data.customer.address,
+  }
 }
 
 export function CustomerForm({
