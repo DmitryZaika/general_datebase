@@ -84,8 +84,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  let user: User
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -95,11 +96,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
   const slabId = parseInt(params.slab, 10)
 
-  return { slabId }
+  return { slabId, companyId: user.company_id }
 }
 
 export default function SlabSell() {
-  const { slabId } = useLoaderData<typeof loader>()
+  const { slabId, companyId } = useLoaderData<typeof loader>()
   const starting = {
     same_address: true,
     rooms: [
@@ -113,5 +114,5 @@ export default function SlabSell() {
       }),
     ],
   }
-  return <ContractForm starting={starting} />
+  return <ContractForm starting={starting} companyId={companyId} />
 }

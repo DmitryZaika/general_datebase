@@ -7,17 +7,18 @@ import {
 import { CustomerForm } from '~/components/pages/CustomerForm'
 import { getEmployeeUser } from '~/utils/session.server'
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const customerId = parseInt(params.customerId || '0')
   try {
     const user = await getEmployeeUser(request)
-    return { user }
+    return { user, customerId }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
-export default function CustomersAdd() {
-  const { user } = useLoaderData<typeof loader>()
+export default function CustomersEdit() {
+  const { user, customerId } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
 
   const onSuccess = () => {
@@ -35,6 +36,7 @@ export default function CustomersAdd() {
       handleChange={handleChange}
       onSuccess={onSuccess}
       companyId={user.company_id}
+      customerId={customerId}
     />
   )
 }

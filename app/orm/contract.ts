@@ -21,87 +21,14 @@ export class Contract {
     return new Contract(data, salesId)
   }
 
-  protected async verifyCustomer(user: User) {
-    const [customerVerify] = await db.execute<RowDataPacket[]>(
-      `SELECT id FROM customers WHERE id = ? AND company_id = ?`,
-      [this.data.customer_id, user.company_id],
-    )
-
-    if (!customerVerify || customerVerify.length === 0) {
-      throw new Error('Customer not found')
-    }
-  }
-
-  protected async updateCustomer(user: User) {
-    if (!this.data.customer_id) return
-
-    const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT address, phone, email, company_name FROM customers WHERE id = ? AND company_id = ?`,
-      [this.data.customer_id, user.company_id],
-    )
-
-    if (!rows || rows.length === 0) {
-      throw new Error('Customer not found')
-    }
-
-    const current = rows[0]
-    const updateFields: string[] = []
-    const updateValues: (string | null)[] = []
-
-    if (
-      this.data.company_name &&
-      (!current.company_name || current.company_name === null)
-    ) {
-      updateFields.push('company_name = ?')
-      updateValues.push(this.data.company_name)
-    }
-
-    if (this.data.billing_address && (!current.address || current.address === '')) {
-      updateFields.push('address = ?')
-      updateValues.push(this.data.billing_address)
-    }
-
-    if (this.data.phone && (!current.phone || current.phone === '')) {
-      updateFields.push('phone = ?')
-      updateValues.push(this.data.phone)
-    }
-
-    if (this.data.email && (!current.email || current.email === '')) {
-      updateFields.push('email = ?')
-      updateValues.push(this.data.email)
-    }
-
-    if (updateFields.length > 0) {
-      await db.execute(
-        `UPDATE customers SET ${updateFields.join(', ')} WHERE id = ? AND company_id = ?`,
-        [...updateValues, this.data.customer_id, user.company_id],
-      )
-    }
-  }
-
-  protected async createCustomer(user: User) {
-    const [customerResult] = await db.execute<ResultSetHeader>(
-      `INSERT INTO customers (name, company_id, phone, email, address, postal_code) VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        this.data.name,
-        user.company_id,
-        this.data.phone || null,
-        this.data.email || null,
-        this.data.billing_address || null,
-        this.data.billing_zip_code || null,
-      ],
-    )
-    return customerResult.insertId
-  }
-
-  protected async createSale(user: User, customerId: number) {
+  protected async createSale(user: User) {
     const totalSquareFeet = await this.calculateTotalSquareFeet()
     const [salesResult] = await db.execute<ResultSetHeader>(
       `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price, project_address, extras) 
                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL, ?, ?, ?)`,
 
       [
-        customerId,
+        this.data.customer_id,
         user.id,
         user.company_id,
         this.data.notes_to_sale || null,
@@ -145,7 +72,7 @@ export class Contract {
     )
   }
 
-  protected async updateSale(user: User, customerId: number) {
+  protected async updateSale(user: User) {
     if (this.saleId === null) {
       throw new Error('Sale not found')
     }
@@ -153,7 +80,7 @@ export class Contract {
     await db.execute(
       `UPDATE sales SET customer_id = ?, seller_id = ?, notes = ?, square_feet = ?, price = ?, project_address = ?, extras = ? WHERE id = ? AND company_id = ?`,
       [
-        customerId,
+        this.data.customer_id,
         user.id,
         this.data.notes_to_sale || null,
         totalSquareFeet,
@@ -273,16 +200,7 @@ export class Contract {
   }
 
   async sell(user: User) {
-    let customerId: number
-    if (this.data.customer_id) {
-      await this.verifyCustomer(user)
-      customerId = this.data.customer_id
-    } else {
-      customerId = await this.createCustomer(user)
-    }
-    await this.updateCompanyName(customerId, user)
-
-    this.saleId = await this.createSale(user, customerId)
+    this.saleId = await this.createSale(user)
     for (const room of this.data.rooms) {
       const firstSlab = room.slabs[0]
       for (const slab of room.slabs) {
@@ -324,19 +242,7 @@ export class Contract {
       throw new Error('Sale not found')
     }
 
-    let customerId: number
-    if (this.data.customer_id) {
-      await this.verifyCustomer(user)
-      await this.updateCustomer(user)
-      customerId = this.data.customer_id
-    } else {
-      customerId = await this.createCustomer(user)
-    }
-
-    await this.updateSale(user, customerId)
-
-    await this.updateCompanyName(customerId, user)
-
+    await this.updateSale(user)
     await this.unsellSlabs(this.saleId)
 
     for (const room of this.data.rooms) {
