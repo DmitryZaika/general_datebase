@@ -65,10 +65,7 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
   }
 
   function handleDeselect() {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     form.setValue('customer_id', undefined)
-
     form.setValue('billing_address', '')
     form.setValue('project_address', '')
     setCurrentCustomer(null)

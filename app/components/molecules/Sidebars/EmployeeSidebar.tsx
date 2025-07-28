@@ -1,7 +1,7 @@
 import {
   Building2,
   Calculator,
-  Calendar,
+  ChevronDown,
   ClipboardList,
   DollarSign,
   FileIcon,
@@ -15,7 +15,9 @@ import {
   User,
   Users,
 } from 'lucide-react'
+import { useState } from 'react'
 import { useLoaderData, useLocation } from 'react-router'
+import { Collapsible } from '~/components/Collapsible'
 import { CorbelIcon } from '~/components/icons/CorbelIcon'
 import { SinkIcon } from '~/components/icons/SinkIcon'
 import {
@@ -27,6 +29,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from '~/components/ui/sidebar'
 import type { ISupplier } from '~/schemas/suppliers'
 import { getBase } from '~/utils/urlHelpers'
@@ -136,16 +141,16 @@ const getItems = (
         url: `/employee/user`,
         icon: User,
       },
-      {
-        title: 'Schedule',
-        url: `/employee/schedule`,
-        icon: Calendar,
-      },
-      {
-        title: 'Samples',
-        url: `/${base}/samples`,
-        icon: Package,
-      },
+      // {
+      //   title: 'Schedule',
+      //   url: `/employee/schedule`,
+      //   icon: Calendar,
+      // },
+      // {
+      //   title: 'Samples',
+      //   url: `/${base}/samples`,
+      //   icon: Package,
+      // },
       {
         title: 'Checklists',
         url: `/employee/checklists`,
@@ -201,6 +206,38 @@ export function EmployeeSidebar({
     companyId,
   )
 
+  const inventoryTitles = ['Stones', 'Sinks', 'Faucets'] as const
+  const crmTitles = ['Customers'] as const
+  const resourceTitles = ['Supports', 'Documents', 'Images', 'Instructions'] as const
+  const operationTitles = ['Suppliers', 'Checklists', 'Special Order'] as const
+
+  const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))
+  const crmItems = items.filter(item => crmTitles.includes(item.title))
+  const resourcesItems = items.filter(item => resourceTitles.includes(item.title))
+  const operationsItems = items.filter(item => operationTitles.includes(item.title))
+
+  const excluded = [
+    ...inventoryTitles,
+    ...crmTitles,
+    ...resourceTitles,
+    ...operationTitles,
+  ]
+  const otherItems = items.filter(item => !excluded.includes(item.title))
+
+  // open states
+  const [inventoryOpen, setInventoryOpen] = useState(
+    inventoryItems.some(i => location.pathname.startsWith(i.url)),
+  )
+  const [crmOpen, setCrmOpen] = useState(
+    crmItems.some(i => location.pathname.startsWith(i.url)),
+  )
+  const [resourcesOpen, setResourcesOpen] = useState(
+    resourcesItems.some(i => location.pathname.startsWith(i.url)),
+  )
+  const [operationsOpen, setOperationsOpen] = useState(
+    operationsItems.some(i => location.pathname.startsWith(i.url)),
+  )
+
   return (
     <Sidebar>
       <SidebarContent>
@@ -208,7 +245,175 @@ export function EmployeeSidebar({
           <SidebarGroupLabel>Granite Depot</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map(item => {
+              {/* INVENTORY */}
+              {inventoryItems.length > 0 && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <button
+                      type='button'
+                      className='w-full flex items-center cursor-pointer'
+                      onClick={() => setInventoryOpen(o => !o)}
+                    >
+                      <Package />
+                      <span>Inventory</span>
+                      <ChevronDown
+                        className={`ml-auto transition-transform ${inventoryOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                  </SidebarMenuButton>
+                  <Collapsible
+                    isOpen={inventoryOpen}
+                    openDuration='duration-300'
+                    closeDuration='duration-300'
+                    className='pl-2'
+                  >
+                    <SidebarMenuSub>
+                      {inventoryItems.map(sub => {
+                        const isActive = location.pathname.startsWith(sub.url)
+                        return (
+                          <SidebarMenuSubItem key={sub.title}>
+                            <SidebarMenuSubButton asChild isActive={isActive}>
+                              <a href={sub.url}>
+                                <sub.icon />
+                                <span>{sub.title}</span>
+                              </a>
+                            </SidebarMenuSubButton>
+                            {sub.component && isActive && <sub.component />}
+                          </SidebarMenuSubItem>
+                        )
+                      })}
+                    </SidebarMenuSub>
+                  </Collapsible>
+                </SidebarMenuItem>
+              )}
+
+              {/* CRM */}
+              {crmItems.length > 0 && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <button
+                      type='button'
+                      className='w-full flex items-center cursor-pointer'
+                      onClick={() => setCrmOpen(o => !o)}
+                    >
+                      <Users />
+                      <span>CRM</span>
+                      <ChevronDown
+                        className={`ml-auto transition-transform ${crmOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                  </SidebarMenuButton>
+                  <Collapsible
+                    isOpen={crmOpen}
+                    openDuration='duration-300'
+                    closeDuration='duration-300'
+                    className='pl-2'
+                  >
+                    <SidebarMenuSub>
+                      {crmItems.map(sub => {
+                        const isActive = location.pathname.startsWith(sub.url)
+                        return (
+                          <SidebarMenuSubItem key={sub.title}>
+                            <SidebarMenuSubButton asChild isActive={isActive}>
+                              <a href={sub.url}>
+                                <sub.icon />
+                                <span>{sub.title}</span>
+                              </a>
+                            </SidebarMenuSubButton>
+                            {sub.component && isActive && <sub.component />}
+                          </SidebarMenuSubItem>
+                        )
+                      })}
+                    </SidebarMenuSub>
+                  </Collapsible>
+                </SidebarMenuItem>
+              )}
+
+              {/* RESOURCES */}
+              {resourcesItems.length > 0 && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <button
+                      type='button'
+                      className='w-full flex items-center cursor-pointer'
+                      onClick={() => setResourcesOpen(o => !o)}
+                    >
+                      <FileIcon />
+                      <span>Resources</span>
+                      <ChevronDown
+                        className={`ml-auto transition-transform ${resourcesOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                  </SidebarMenuButton>
+                  <Collapsible
+                    isOpen={resourcesOpen}
+                    openDuration='duration-300'
+                    closeDuration='duration-300'
+                    className='pl-2'
+                  >
+                    <SidebarMenuSub>
+                      {resourcesItems.map(sub => {
+                        const isActive = location.pathname.startsWith(sub.url)
+                        return (
+                          <SidebarMenuSubItem key={sub.title}>
+                            <SidebarMenuSubButton asChild isActive={isActive}>
+                              <a href={sub.url}>
+                                <sub.icon />
+                                <span>{sub.title}</span>
+                              </a>
+                            </SidebarMenuSubButton>
+                            {sub.component && isActive && <sub.component />}
+                          </SidebarMenuSubItem>
+                        )
+                      })}
+                    </SidebarMenuSub>
+                  </Collapsible>
+                </SidebarMenuItem>
+              )}
+
+              {/* OPERATIONS */}
+              {operationsItems.length > 0 && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <button
+                      type='button'
+                      className='w-full flex items-center cursor-pointer'
+                      onClick={() => setOperationsOpen(o => !o)}
+                    >
+                      <Calculator />
+                      <span>Operations</span>
+                      <ChevronDown
+                        className={`ml-auto transition-transform ${operationsOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                  </SidebarMenuButton>
+                  <Collapsible
+                    isOpen={operationsOpen}
+                    openDuration='duration-300'
+                    closeDuration='duration-300'
+                    className='pl-2'
+                  >
+                    <SidebarMenuSub>
+                      {operationsItems.map(sub => {
+                        const isActive = location.pathname.startsWith(sub.url)
+                        return (
+                          <SidebarMenuSubItem key={sub.title}>
+                            <SidebarMenuSubButton asChild isActive={isActive}>
+                              <a href={sub.url}>
+                                <sub.icon />
+                                <span>{sub.title}</span>
+                              </a>
+                            </SidebarMenuSubButton>
+                            {sub.component && isActive && <sub.component />}
+                          </SidebarMenuSubItem>
+                        )
+                      })}
+                    </SidebarMenuSub>
+                  </Collapsible>
+                </SidebarMenuItem>
+              )}
+
+              {otherItems.map(item => {
                 const isActive =
                   isCustomerRoute && item.title === 'Stones'
                     ? location.pathname.includes('/stones')
