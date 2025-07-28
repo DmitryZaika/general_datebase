@@ -35,12 +35,14 @@ type Props<T extends FieldValues> = {
   form: UseFormReturn<T>
   field: Path<T>
   zipField?: Path<T>
+  type: 'billing' | 'project'
 }
 
 export function AddressInput<T extends FieldValues>({
   form,
   field,
   zipField,
+  type,
 }: Props<T>) {
   const [open, setOpen] = useState(false)
 
@@ -71,21 +73,19 @@ export function AddressInput<T extends FieldValues>({
     // requestAnimationFrame(() => setOpen(false));
   }
 
+  const toUpperCase = (str: string) => str.charAt(0).toUpperCase() + str.slice(1)
+
   return (
     <FormField
       control={form.control}
       name={field}
       render={({ field: rhf }) => (
         <FormItem className='relative'>
-          <FormLabel>
-            {field === 'billing_address' ? 'Billing Address' : 'Project Address'}
-          </FormLabel>
+          <FormLabel>{`${toUpperCase(type)} Address`}</FormLabel>
           <FormControl>
             <div className='relative w-full'>
               <Input
-                placeholder={`Enter ${
-                  field === 'billing_address' ? 'billing' : 'project'
-                } address (min 10 characters)`}
+                placeholder={`Enter ${toUpperCase(type)} address (min 10 characters)`}
                 value={
                   zipField
                     ? replaceZipCode(rhf.value ?? '', form.watch(zipField) ?? '')

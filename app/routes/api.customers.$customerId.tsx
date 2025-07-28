@@ -1,5 +1,5 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2'
-import { ActionFunctionArgs, data, type LoaderFunctionArgs } from 'react-router'
+import { type ActionFunctionArgs, data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -54,7 +54,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const validatedData = customerSignupSchema.parse(userData)
 
   await db.execute<ResultSetHeader>(
-    `UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, referral_source = ?, from_check_in = ?, company_id = ? WHERE id = ?`,
+    `UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, referral_source = ?, from_check_in = ?, company_id = ?, company_name = ? WHERE id = ?`,
     [
       validatedData.name,
       validatedData.phone || null,
@@ -63,6 +63,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       validatedData.referral_source || null,
       true,
       validatedData.company_id,
+      validatedData.company_name || null,
       customerId,
     ],
   )
