@@ -11,18 +11,20 @@ interface RawSelectProps<T extends string> {
   options: readonly T[]
   value: T
   onChange: (value: T) => void
+  label?: string
 }
 
 export function RawSelect<T extends string>({
   options,
   value,
   onChange,
+  label,
 }: RawSelectProps<T>) {
   return (
-    <div className='flex flex-col gap-2 w-1/2'>
-      <Label>Customer</Label>
+    <div className='flex flex-col gap-1 w-full'>
+      {label && <Label>{label}</Label>}
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className='min-w-[150px]'>
+        <SelectTrigger className='min-w-[120px]'>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

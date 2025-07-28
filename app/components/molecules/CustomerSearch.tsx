@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Cross } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { CustomerForm } from '~/components/pages/CustomerForm'
@@ -34,7 +34,10 @@ const fetchCustomers = async (customerName: string, searchType: SelectOption) =>
 export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
   const [searchTerm, setSearchTerm] = useState<string | null>(null)
   const [selectedOption, setSelectedOption] = useState<SelectOption>(selectOptions[0])
-  const [currentCustomer, setCurrentCustomer] = useState<string | null>(null)
+  const [currentCustomer, setCurrentCustomer] = useState<string | null>(() => {
+    const n = form.getValues('name') as unknown as string | undefined
+    return n && n.trim() !== '' ? n : null
+  })
   const [isOpen, setIsOpen] = useState<boolean>(false)
 
   const selectedCustomer = form.watch('customer_id')
@@ -49,11 +52,25 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
     form.setValue('customer_id', value)
     const customer = customerSuggestions.find(c => c.id === value)
     setCurrentCustomer(customer?.name ?? null)
+    if (customer?.name) {
+      form.setValue('name', customer.name)
+    }
+
+    if (customer?.address) {
+      form.setValue('billing_address', customer.address)
+      form.setValue('project_address', customer.address)
+      form.setValue('same_address', true)
+    }
     setSearchTerm(null)
   }
 
   function handleDeselect() {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     form.setValue('customer_id', undefined)
+
+    form.setValue('billing_address', '')
+    form.setValue('project_address', '')
     setCurrentCustomer(null)
   }
 
@@ -68,15 +85,23 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
   }
 
   return (
-    <div className='flex  gap-2 '>
-      <RawSelect
-        options={selectOptions}
-        value={selectedOption}
-        onChange={setSelectedOption}
-      />
-      <div className='relative flex flex-col gap-2 w-1/2'>
+    <div className='flex items-end gap-1'>
+      <div className=''>
+        <RawSelect
+          label='Search by'
+          options={selectOptions}
+          value={selectedOption}
+          onChange={value => {
+            setSelectedOption(value)
+            setSearchTerm(null)
+          }}
+        />
+      </div>
+
+      <div className='relative flex flex-col gap-1'>
         <Label>Customer</Label>
         <Input
+          placeholder='Start typing customer…'
           value={searchTerm ?? currentCustomer ?? ''}
           onChange={e => setSearchTerm(e.target.value)}
         />
@@ -92,13 +117,25 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
           </Command>
         )}
         {selectedCustomer && (
-          <Button onClick={handleDeselect}>
-            <Cross className='w-4 h-4' />
+          <Button
+            type='button'
+            variant='ghost'
+            size='icon'
+            className='absolute -top-0 right-0 z-10 text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 '
+            onClick={handleDeselect}
+          >
+            <X className='h-3 w-3' />
           </Button>
         )}
       </div>
-      <Button type='button' variant='ghost' onClick={handleSpecial}>
-        {selectedCustomer ? 'Edit' : 'Add'} Customer
+      <Button
+        type='button'
+        variant='blue'
+        size='sm'
+        className='w-2/9 '
+        onClick={handleSpecial}
+      >
+        {selectedCustomer ? 'Edit Customer' : 'Add Customer'}
       </Button>
 
       {isOpen && (

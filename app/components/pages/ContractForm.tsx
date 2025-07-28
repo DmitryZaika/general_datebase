@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -106,6 +106,13 @@ export function ContractForm({ starting, saleId, companyId }: IContractFormProps
     }
   }
 
+  useEffect(() => {
+    const address = form.watch('same_address')
+    if (address) {
+      form.setValue('project_address', form.getValues('billing_address'))
+    }
+  }, [form.watch('same_address')])
+
   const roomValues = form.watch('rooms')
   const extrasValues = form.watch('extras') || []
 
@@ -155,7 +162,7 @@ export function ContractForm({ starting, saleId, companyId }: IContractFormProps
               </div>
 
               {!form.watch('same_address') && (
-                <AddressInput form={form} field='project_address' />
+                <AddressInput form={form} field='project_address' type='project' />
               )}
 
               {form.watch('rooms').map((room, index) => (

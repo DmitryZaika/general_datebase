@@ -20,7 +20,9 @@ import {
   updateCustomerMutation,
 } from '~/schemas/customers'
 import { EmailInput } from '../molecules/EmailInput'
+import { PhoneInput } from '../molecules/PhoneInput'
 import { AddressInput } from '../organisms/AddressInput'
+import { Switch } from '../ui/switch'
 
 const resolver = zodResolver(customerDialogSchema)
 
@@ -39,6 +41,7 @@ const getCustomerInfo = async (customerId: number) => {
     email: data.customer.email,
     phone: data.customer.phone,
     address: data.customer.address,
+    company_name: data.customer.company_name,
   }
 }
 
@@ -48,10 +51,10 @@ export function CustomerForm({
   companyId,
   customerId,
 }: CustomerFormProps) {
-  const toast = useToast()
+  const { toast: toastFn } = useToast()
   const mutateObject = customerId
-    ? updateCustomerMutation(toast, value => onSuccess(value, form.getValues('name')))
-    : createCustomerMutation(toast, value => onSuccess(value, form.getValues('name')))
+    ? updateCustomerMutation(toastFn, value => onSuccess(value, form.getValues('name')))
+    : createCustomerMutation(toastFn, value => onSuccess(value, form.getValues('name')))
   const mutation = useMutation(mutateObject)
   const { data, isLoading } = useQuery({
     queryKey: ['customer', customerId],
@@ -65,7 +68,10 @@ export function CustomerForm({
 
   useEffect(() => {
     if (data) {
-      form.reset(data)
+      form.reset({
+        ...data,
+        builder: Boolean(data.company_name && data.company_name.trim() !== ''),
+      })
     }
   }, [data])
 
@@ -110,19 +116,39 @@ export function CustomerForm({
               <FormField
                 control={form.control}
                 name='phone'
-                render={({ field }) => (
-                  <InputItem
-                    name={'Phone'}
-                    placeholder={"Customer's phone number"}
-                    field={field}
-                  />
-                )}
+                render={({ field }) => <PhoneInput field={field} />}
               />
 
-              <AddressInput form={form} field='address' />
-
+              <AddressInput form={form} field='address' type='billing' />
+              <div className='flex items-center space-x-2 my-2'>
+                <FormField
+                  control={form.control}
+                  name='builder'
+                  render={({ field }) => (
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={value => {
+                        field.onChange(value)
+                        if (!value) {
+                          form.setValue('company_name', '')
+                        }
+                      }}
+                      id='builder_switch'
+                      label='Builder'
+                      className=''
+                    />
+                  )}
+                />
+              </div>
+              {form.watch('builder') && (
+                <InputItem
+                  name='Company Name'
+                  placeholder='Company Name'
+                  field={form.register('company_name')}
+                />
+              )}
               <DialogFooter>
-                <LoadingButton loading={mutation.isPending}>Save changes</LoadingButton>
+                <LoadingButton loading={mutation.isPending}>Submit</LoadingButton>
               </DialogFooter>
             </form>
           </FormProvider>

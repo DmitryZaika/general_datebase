@@ -1,5 +1,5 @@
 import type { ResultSetHeader } from 'mysql2'
-import { ActionFunctionArgs, data } from 'react-router'
+import { type ActionFunctionArgs, data } from 'react-router'
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
 
@@ -15,7 +15,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const validatedData = customerSignupSchema.parse(userData)
 
   const [result] = await db.execute<ResultSetHeader>(
-    `INSERT INTO customers (name, phone, email, address, referral_source, from_check_in, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO customers (name, phone, email, address, referral_source, from_check_in, company_id, company_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       validatedData.name,
       validatedData.phone || null,
@@ -24,6 +24,7 @@ export async function action({ request }: ActionFunctionArgs) {
       validatedData.referral_source || null,
       true,
       validatedData.company_id,
+      validatedData.company_name || null,
     ],
   )
 
