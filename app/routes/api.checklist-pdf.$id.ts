@@ -73,7 +73,7 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
       height: logoDims.height,
     })
     cursorY -= logoDims.height + 20
-  } catch (_) {
+  } catch {
     // If remote logo fails, skip drawing any logo.
   }
 

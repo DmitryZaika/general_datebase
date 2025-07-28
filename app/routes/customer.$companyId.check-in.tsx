@@ -174,7 +174,12 @@ export default function CustomerCheckIn() {
                 )}
               />
 
-              <AddressInput form={form} field='address' zipField='address_zip_code' />
+              <AddressInput
+                form={form}
+                field='address'
+                zipField='address_zip_code'
+                type='project'
+              />
 
               <FormField
                 control={form.control}
