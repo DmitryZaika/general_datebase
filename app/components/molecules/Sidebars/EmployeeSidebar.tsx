@@ -80,6 +80,11 @@ const getItems = (
       url: `/employee/customers`,
       icon: Users,
     })
+    finalList.push({
+      title: 'Deals',
+      url: `/employee/deals`,
+      icon: DollarSign,
+    })
   }
   if (['admin', 'employee'].includes(base)) {
     finalList.push(
@@ -207,7 +212,7 @@ export function EmployeeSidebar({
   )
 
   const inventoryTitles = ['Stones', 'Sinks', 'Faucets'] as const
-  const crmTitles = ['Customers'] as const
+  const crmTitles = ['Customers', 'Deals'] as const
   const resourceTitles = ['Supports', 'Documents', 'Images', 'Instructions'] as const
   const operationTitles = ['Suppliers', 'Checklists', 'Special Order'] as const
 

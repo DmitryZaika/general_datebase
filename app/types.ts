@@ -76,9 +76,9 @@ export interface TokenSet {
 export interface Customer {
   id: number
   name: string
-  address: string | null
-  phone: string | null
-  email: string | null
+  address?: string | null
+  phone?: string | null
+  email?: string | null
 }
 
 export interface StoneSearchResult {
