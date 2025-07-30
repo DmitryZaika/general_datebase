@@ -14,22 +14,26 @@ interface IProps {
   actions: Record<string, string>
   asBlank?: boolean
   label?: string
+  className?: string
+  wrapperClassName?: string
 }
 
 export const ActionDropdown = ({
   actions,
   asBlank = false,
   label = 'Actions',
+  className,
+  wrapperClassName,
 }: IProps) => {
   const [open, setOpen] = useState(false)
 
   return (
-    <div className='flex justify-end pr-5'>
+    <div className={`flex justify-end pr-5 ${wrapperClassName}`}>
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             variant='ghost'
-            className='h-8 w-8 p-0'
+            className={`h-8 w-8 p-0 ${className}`}
             disabled={Object.keys(actions).length === 0}
             onClick={e => {
               e.stopPropagation()
