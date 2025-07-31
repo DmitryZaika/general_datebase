@@ -15,15 +15,20 @@ import {
 } from './ui/dialog'
 import { FormField } from './ui/form'
 
-export default function DealsForm({
+export function DealsForm({
   open,
   onOpenChange,
+  hiddenFields = {},
+  listsId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  hiddenFields?: Record<string, string | number | boolean>
+  listsId: { id: number }[]
 }) {
   const form = useForm<DealsDialogSchema>({
     resolver: zodResolver(dealsSchema),
+    defaultValues: hiddenFields as Partial<DealsDialogSchema>,
   })
   const fullSubmit = useFullSubmit(form)
 
@@ -37,6 +42,14 @@ export default function DealsForm({
         <FormProvider {...form}>
           <Form id='dealForm' method='post' onSubmit={fullSubmit}>
             <AuthenticityTokenInput />
+            {Object.entries(hiddenFields).map(([name, value]) => (
+              <input
+                key={name}
+                type='hidden'
+                {...form.register(name as keyof DealsDialogSchema)}
+                value={String(value)}
+              />
+            ))}
             <FormField
               control={form.control}
               name='name'
@@ -82,3 +95,5 @@ export default function DealsForm({
     </Dialog>
   )
 }
+
+export default DealsForm
