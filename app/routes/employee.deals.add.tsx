@@ -14,7 +14,7 @@ import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
-import { selectId } from '~/utils/queryHelpers'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
@@ -68,9 +68,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
-  const listsIds = await selectId(db, `SELECT id FROM deals_list WHERE user_id = ?`, [
-    user.id,
-  ])
+  const listsIds = await selectMany<{ id: number }>(
+    db,
+    `SELECT id FROM deals_list WHERE user_id = ?`,
+    [user.id],
+  )
   return { listsIds }
 }
 
