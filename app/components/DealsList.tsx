@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import { Link, Outlet } from 'react-router'
+import { Link } from 'react-router'
 import DealsCard from './DealsCard'
 import { ActionDropdown } from './molecules/DataTable/ActionDropdown'
 import { Button } from './ui/button'
@@ -32,7 +32,7 @@ export default function DealsList({
             <ActionDropdown
               actions={{ edit: `edit-list/${id}`, delete: `delete/${id}` }}
               label='List actions'
-              className='!text-white'
+              className='!text-white hover:!text-black'
               wrapperClassName='!pr-0'
             />
           </div>
@@ -40,14 +40,13 @@ export default function DealsList({
       </CardHeader>
       <DealsCard title={title} customers={customers} description={description} />
       <div className='p-3 border-t'>
-        <Link to={`add?list=${title}`} relative='path'>
-          <Button variant='ghost' className={` w-full flex gap-2 `}>
+        <Link to={`add?list_id=${id}`} relative='path'>
+          <Button variant='ghost' type='button' className={` w-full flex gap-2 `}>
             <Plus className='w-4 h-4' />
             Add Deal
           </Button>
         </Link>
       </div>
-      <Outlet />
     </Card>
   )
 }
