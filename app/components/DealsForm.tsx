@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { FormProvider, useForm } from 'react-hook-form'
 import { Form } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
+import { CustomerSearch } from '~/components/molecules/CustomerSearch'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { InputItem } from './molecules/InputItem'
@@ -16,19 +17,21 @@ import {
 import { FormField } from './ui/form'
 
 export function DealsForm({
+  initial,
   open,
   onOpenChange,
   hiddenFields = {},
-  listsId,
+  companyId,
 }: {
+  initial?: Partial<DealsDialogSchema>
   open: boolean
   onOpenChange: (open: boolean) => void
   hiddenFields?: Record<string, string | number | boolean>
-  listsId: { id: number }[]
+  companyId: number
 }) {
   const form = useForm<DealsDialogSchema>({
     resolver: zodResolver(dealsSchema),
-    defaultValues: hiddenFields as Partial<DealsDialogSchema>,
+    defaultValues: { ...hiddenFields, ...(initial || {}) },
   })
   const fullSubmit = useFullSubmit(form)
 
@@ -42,25 +45,10 @@ export function DealsForm({
         <FormProvider {...form}>
           <Form id='dealForm' method='post' onSubmit={fullSubmit}>
             <AuthenticityTokenInput />
-            {Object.entries(hiddenFields).map(([name, value]) => (
-              <input
-                key={name}
-                type='hidden'
-                {...form.register(name as keyof DealsDialogSchema)}
-                value={String(value)}
-              />
+            {Object.entries(hiddenFields).map(([k, v]) => (
+              <input type='hidden' name={k} value={String(v)} key={k} />
             ))}
-            <FormField
-              control={form.control}
-              name='name'
-              render={({ field }) => (
-                <InputItem
-                  name={'Name'}
-                  placeholder={'Name of the customer'}
-                  field={field}
-                />
-              )}
-            />
+            <CustomerSearch form={form} companyId={companyId} />
             <FormField
               control={form.control}
               name='amount'

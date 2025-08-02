@@ -39,17 +39,15 @@ export async function action({ request }: ActionFunctionArgs) {
 
   await db.execute(
     `INSERT INTO deals
-     (name, amount, customer_id, description, status, list_id, position, is_deleted)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+     (customer_id, amount, description, status, list_id, position)
+     VALUES (?, ?, ?, ?, ?, ?);`,
     [
-      data.name,
+      data.customer_id,
       data.amount,
-      data.customer_id ?? 99999,
-      data.description ?? null,
-      data.status ?? 'new',
-      data.list_id ?? 12,
-      data.position ?? 0,
-      data.is_deleted ?? false,
+      data.description,
+      data.status,
+      data.list_id,
+      data.position,
     ],
   )
 
@@ -68,19 +66,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
-  const listsIds = await selectMany<{ id: number }>(
+  const listsId = await selectMany<{ id: number }>(
     db,
     `SELECT id FROM deals_list WHERE user_id = ?`,
     [user.id],
   )
-  return { listsIds }
+  return { listsId, companyId: user.company_id }
 }
 
 export default function AddDeal() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [open, setOpen] = useState(true)
-  const { listsIds } = useLoaderData<typeof loader>()
+  const { listsId, companyId } = useLoaderData<typeof loader>()
   const handleOpenChange = (o: boolean) => {
     setOpen(o)
     if (!o) navigate('..')
@@ -89,8 +87,8 @@ export default function AddDeal() {
   const listIdParam = parseInt(searchParams.get('list_id') || '', 10)
   const hiddenFields: Record<string, string | number | boolean> = {
     status: 'new',
-    position: 0,
-    is_deleted: false,
+    position: 1,
+    company_id: companyId,
   }
   if (!Number.isNaN(listIdParam)) {
     hiddenFields.list_id = listIdParam
@@ -98,7 +96,8 @@ export default function AddDeal() {
 
   return (
     <DealsForm
-      listsIds={listsIds}
+      companyId={companyId}
+      listsId={listsId}
       open={open}
       onOpenChange={handleOpenChange}
       hiddenFields={hiddenFields}

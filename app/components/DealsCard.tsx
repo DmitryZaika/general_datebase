@@ -9,44 +9,45 @@ import { CardContent } from '@/components/ui/card'
 // import { ToastMessage } from '~/utils/toastHelpers'
 
 interface IProps {
-  title: string
   customers: ExtendedCustomer[]
-
-  description?: string
 }
 
 interface ExtendedCustomer {
   id: number
   name: string
-  amount: number
+  amount?: number
+  description?: string
+  list_id?: number
+  position?: number
+  customer_id?: number
+  status?: string
 }
 
-export default function DealsCard({ customers, description }: IProps) {
+export default function DealsCard({ customers }: IProps) {
   return (
-    <CardContent className='p-4 flex-col overflow-y-auto space-y-2'>
+    <CardContent className='p-4 flex-col overflow-y-auto space-y-2 w-full'>
       {customers.map(customer => (
         <Link
           to={`edit/${customer.id}`}
           key={customer.id}
-          className='bg-white border rounded-lg p-3 shadow-sm hover:shadow-md transition-all flex justify-between items-center group'
+          className='bg-white w-full border rounded-lg p-3 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3'
         >
-          <div>
-            <div className='flex items-center justify-between gap-2'>
-              <h3 className='text-xl font-medium truncate'>{customer.name}</h3>
-              <Pencil className='w-4 h-4' />
-            </div>
+          <div className='flex-1'>
+            <h3 className='text-xl font-medium truncate'>{customer.name}</h3>
             <div className='flex items-center gap-2'>
-              <p className='text-sm font-medium'>Amount: </p>
+              <p className='text-sm font-medium'>Amount:</p>
               <p className='text-sm font-medium'>
-                $ {customer.amount.toLocaleString()}
+                $ {customer.amount?.toLocaleString()}
               </p>
             </div>
-            <div className='flex items-center gap-2 '>
-              {description && (
-                <p className='text-sm text-slate-500 cursor-pointer'>{description}</p>
-              )}
-            </div>
+            {customer.description && (
+              <p className='text-sm text-slate-500 mt-1 break-words'>
+                {customer.description}
+              </p>
+            )}
           </div>
+
+          <Pencil className='w-4 h-4 flex-shrink-0 text-gray-500 group-hover:text-black' />
         </Link>
       ))}
       {customers.length === 0 && (

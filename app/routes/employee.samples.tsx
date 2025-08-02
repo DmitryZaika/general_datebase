@@ -42,7 +42,7 @@ function ImportanceComponent({
 }: {
   row: Row<Stone>
   updateSamplesImportance: (stoneId: number, importance: number) => Promise<void>
-  setSortedStones: (stones: Stone[]) => void
+  setSortedStones: React.Dispatch<React.SetStateAction<Stone[]>>
 }) {
   const stone = row.original
   const [importance, setImportance] = useState<number>(stone.samples_importance ?? 1)
@@ -85,7 +85,7 @@ function AmountComponent({
 }: {
   row: Row<Stone>
   updateSamplesAmount: (stoneId: number, amount: number) => Promise<void>
-  setSortedStones: (stones: Stone[]) => void
+  setSortedStones: React.Dispatch<React.SetStateAction<Stone[]>>
 }) {
   const stone = row.original
   const [value, setValue] = useState<number>(stone.samples_amount)

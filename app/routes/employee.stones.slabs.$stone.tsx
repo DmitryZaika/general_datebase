@@ -252,9 +252,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   // Get parent transactions for slabs with parent_id
-  const slabsWithParent = allSlabs
+  const slabsWithParent: number[] = allSlabs
     .filter(slab => slab.parent_id)
-    .map(slab => slab.parent_id)
+    .map(slab => slab.parent_id) as number[]
 
   if (slabsWithParent.length > 0) {
     const parentPlaceholders = slabsWithParent.map(() => '?').join(',')

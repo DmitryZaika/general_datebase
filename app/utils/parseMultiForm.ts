@@ -9,16 +9,16 @@ import { s3UploadHandler } from '~/utils/s3.server'
 const fileSchema = z.object({
   file: z.string(),
 })
-interface ValidatedData<T> {
+interface ValidatedData<T extends z.AnyZodObject> {
   data: z.infer<T & typeof fileSchema> | undefined
   errors: FieldErrors<FieldValues> | undefined
 }
 
-export async function parseMutliForm<T>(
+export async function parseMutliForm<T extends z.AnyZodObject>(
   request: Request,
   schema: T,
   folder: string,
-): Promise<ValidatedData<typeof schema & typeof fileSchema>> {
+): Promise<ValidatedData<T>> {
   const finalSchema = schema.merge(fileSchema)
   const resolver = zodResolver(finalSchema)
 
@@ -32,5 +32,5 @@ export async function parseMutliForm<T>(
   csrf.validate(formData, request.headers)
 
   const { data, errors } = await validateFormData(formData, resolver)
-  return { data: data as z.infer<typeof finalSchema>, errors }
+  return { data: data as z.infer<T & typeof fileSchema>, errors }
 }

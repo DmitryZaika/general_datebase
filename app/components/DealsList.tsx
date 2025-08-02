@@ -7,17 +7,18 @@ import { Card, CardHeader, CardTitle } from './ui/card'
 
 interface DealsListProps {
   title: string
-  customers: { id: number; name: string; amount: number }[]
-  description?: string
+  customers: {
+    id: number
+    name: string
+    amount?: number
+    description?: string
+    list_id?: number
+    position?: number
+  }[]
   id: number
 }
 
-export default function DealsList({
-  title,
-  customers,
-  description,
-  id,
-}: DealsListProps) {
+export default function DealsList({ title, customers, id }: DealsListProps) {
   return (
     <Card className='w-72 flex flex-col h-full shadow-sm'>
       <CardHeader className={` bg-black rounded-t-xl py-2 px-4`}>
@@ -38,7 +39,7 @@ export default function DealsList({
           </div>
         </div>
       </CardHeader>
-      <DealsCard title={title} customers={customers} description={description} />
+      <DealsCard customers={customers} />
       <div className='p-3 border-t'>
         <Link to={`add?list_id=${id}`} relative='path'>
           <Button variant='ghost' type='button' className={` w-full flex gap-2 `}>

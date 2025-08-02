@@ -14,7 +14,7 @@ interface Props<TFormValues extends Record<string, unknown>> {
   idField?: Path<TFormValues> // default "customer_id"
 }
 
-export function CustomerSearch<T extends Record<string, unknown>>({
+export function CustomerSearchMinimal<T extends Record<string, unknown>>({
   form,
   nameField = 'name' as Path<T>,
   idField = 'customer_id' as Path<T>,

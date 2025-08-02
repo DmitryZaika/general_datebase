@@ -1,5 +1,7 @@
 import { z } from 'zod'
-import type { Toast } from '~/hooks/use-toast'
+import type { ToastProps } from '~/components/ui/toast'
+
+type ToastFunction = (props: ToastProps & { description: string }) => void
 
 export const customerSignupSchema = z.object({
   company_id: z.number().min(1, 'Company ID is required'),
@@ -53,7 +55,7 @@ export const customerDialogSchema = z.object({
 export type CustomerDialogSchema = z.infer<typeof customerDialogSchema>
 
 export const createCustomerMutation = (
-  toast: Toast,
+  toast: ToastFunction,
   onSuccess?: (id: number) => void,
 ) => {
   return {
@@ -61,8 +63,7 @@ export const createCustomerMutation = (
     onSuccess: (data: { customerId: number }) => {
       onSuccess?.(data.customerId)
     },
-    onError: error => {
-      console.error('Error creating customer:', error)
+    onError: () => {
       toast({
         title: 'Error',
         description: 'Something went wrong. Please try again.',
@@ -73,7 +74,7 @@ export const createCustomerMutation = (
 }
 
 export const updateCustomerMutation = (
-  toast: Toast,
+  toast: ToastFunction,
   onSuccess?: (id: number) => void,
 ) => {
   return {
@@ -82,8 +83,7 @@ export const updateCustomerMutation = (
     onSuccess: (_: unknown, { id }: { id: number }) => {
       onSuccess?.(id)
     },
-    onError: error => {
-      console.error('Error creating customer:', error)
+    onError: () => {
       toast({
         title: 'Error',
         description: 'Something went wrong. Please try again.',
