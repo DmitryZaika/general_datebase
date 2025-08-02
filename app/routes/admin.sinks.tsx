@@ -55,7 +55,7 @@ export default function AdminSinks() {
   const [sortedSinks, setSortedSinks] = useState<Sink[]>(sinks)
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
 
-  const getTypePriority = (type: string) => {
+  const getTypePriority = (type: (typeof SINK_TYPES)[number]) => {
     const index = SINK_TYPES.indexOf(type)
     return index === -1 ? SINK_TYPES.length : index
   }

@@ -9,7 +9,7 @@ import {
   type TFullExtrasSchema,
 } from '~/schemas/sales'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { CUSTOMER_ITEMS } from './constants'
+import type { CUSTOMER_ITEMS } from './constants'
 
 interface Sale {
   customer_id: number
@@ -33,7 +33,7 @@ interface Slab {
   room_id: string
   room: string | null
   seam: string | null
-  edge: string | null
+  edge: keyof typeof CUSTOMER_ITEMS.edge_price.edge_type | null
   backsplash: string | null
   tear_out: string | null
   square_feet: number | null
@@ -168,19 +168,7 @@ export async function getCustomerSchemaFromSaleId(
   slabs.forEach(slab => {
     const roomId = slab.room_id
 
-    const lookup = CUSTOMER_ITEMS.edge_price.edge_type
-    const key = slab.edge?.toLowerCase() || 'flat'
-    const newValue = lookup[key]
     const extras = extrasSchema.parse(slab.extras || EXTRA_DEFAULTS)
-    if (typeof extras?.edge_price === 'number') {
-      extras.edge_price = {
-        edge_type: newValue,
-        price: extras.edge_price,
-      }
-    }
-    if (extras?.edge_price === undefined) {
-      extras.edge_price = { edge_type: newValue }
-    }
 
     if (!roomsMap[roomId]) {
       roomsMap[roomId] = {
@@ -188,7 +176,6 @@ export async function getCustomerSchemaFromSaleId(
         room_id: roomId || uuidv7(), // Backwards compatibility
         sink_type: sinkMap[slab.id] || [],
         faucet_type: faucetMap[slab.id] || [],
-        edge: slab.edge || 'flat',
         backsplash: slab.backsplash || 'no',
         square_feet: slab.square_feet || 0,
         retail_price: slab.retail_price || 0,
@@ -217,11 +204,8 @@ export async function getCustomerSchemaFromSaleId(
     customer_id: sale.customer_id,
     seller_id: sale.seller_id || undefined,
     billing_address: sale.address || '',
-    billing_zip_code: sale.postal_code || undefined,
     project_address: sale.project_address || '',
     same_address: (sale.project_address || '') === (sale.address || ''),
-    phone: sale.phone || '',
-    email: sale.email || '',
     price: sale.price || 0,
     notes_to_sale: sale.notes || '',
     rooms: Object.values(roomsMap),

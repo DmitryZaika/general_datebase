@@ -38,7 +38,6 @@ export const roomSchema = z.object({
   room_id: z.string().default(uuidv7),
   sink_type: z.array(sinkOptionsSchema).default([]),
   faucet_type: z.array(faucetOptionsSchema).default([]),
-  edge: z.string().default('flat'),
   backsplash: z.string().default('no'),
   square_feet: z.coerce.number().default(0),
   retail_price: z.coerce.number().default(0),

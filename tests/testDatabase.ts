@@ -145,17 +145,16 @@ export class TestDataFactory {
   ): TCustomerSchema {
     return {
       name: 'Test Customer',
-      customer_id: undefined,
+      customer_id: 1,
       seller_id: 1,
       billing_address: '123 Test Street, Test City, TC 12345',
-      billing_zip_code: '12345',
       project_address: '456 Project Street, Project City, PC 67890',
       same_address: false,
-      phone: '555-123-4567',
-      email: 'customer@test.com',
+
       notes_to_sale: 'Test notes',
       price: 5000,
       company_name: 'Test Company',
+      extras: [],
       rooms: [TestDataFactory.createRoom()],
       ...overrides,
     }
@@ -165,8 +164,8 @@ export class TestDataFactory {
     return {
       room: 'kitchen',
       room_id: 'dcdd9054-dadd-431d-a861-d0639f70f67b',
-      sink_type: [{ id: 1 }],
-      faucet_type: [{ id: 1 }],
+      sink_type: [{ id: 1, type_id: 1 }],
+      faucet_type: [{ id: 1, type_id: 1 }],
       edge: 'Flat',
       backsplash: 'No',
       square_feet: 25,

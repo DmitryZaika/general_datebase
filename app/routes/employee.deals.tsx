@@ -71,12 +71,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       'SELECT id, name FROM deals_list WHERE user_id = ?',
       [user.id],
     )
-    const deals = await selectMany<DealsDialogSchema>(
+    const deals = await selectMany<DealsDialogSchema & { id: number }>(
       db,
-      `SELECT id, name, amount, customer_id, description, status, list_id, position, is_deleted
+      `SELECT id, customer_id, amount, description, status, list_id, position, deleted_at
        FROM deals
-       WHERE user_id = ?`,
-      [user.id],
+       WHERE deleted_at IS NULL`,
     )
     const customers = await selectMany<{ id: number; name: string }>(
       db,
@@ -121,7 +120,7 @@ const AddList = ({ setOpen }: { open: boolean; setOpen: (o: boolean) => void }) 
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: -320, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 260, damping: 25 }}
-      className='w-[260px] sm:w-[320px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl p-5 space-y-4'
+      className='w-[260px] sm:w-[320px] h-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl p-5 space-y-4'
     >
       <div className='flex items-center justify-between'>
         <h2 className='text-lg font-semibold text-zinc-800 dark:text-zinc-100'>
@@ -160,7 +159,7 @@ const AddList = ({ setOpen }: { open: boolean; setOpen: (o: boolean) => void }) 
 }
 
 export default function EmployeeDeals() {
-  const { deals, lists } = useLoaderData<typeof loader>()
+  const { deals, customers, lists } = useLoaderData<typeof loader>()
   const [open, setOpen] = useState(true)
 
   return (
@@ -168,14 +167,24 @@ export default function EmployeeDeals() {
       {lists.map(list => {
         const listDeals = deals
           .filter(d => d.list_id === list.id)
-          .map(d => ({ id: d.id, name: d.name, amount: d.amount }))
+          .map(d => {
+            const customer = customers.find(c => c.id === d.customer_id)
+            return {
+              id: d.id,
+              customer_id: d.customer_id,
+              name: customer ? customer.name : `Customer #${d.customer_id}`,
+              amount: d.amount,
+              description: d.description,
+              status: d.status,
+              position: d.position,
+            }
+          })
 
         return (
           <DealsList
             key={list.id}
             title={list.name}
             customers={listDeals}
-            description={undefined}
             id={list.id}
           />
         )

@@ -36,7 +36,7 @@ import { FullDynamicAdditions } from '../molecules/DynamicAdditions'
 const resolver = zodResolver(customerSchema)
 
 interface IContractFormProps {
-  starting: Partial<TCustomerSchema>
+  startings: Partial<TCustomerSchema>
   saleId?: number
   companyId: number
 }
@@ -61,7 +61,7 @@ const fetchFaucetType = async (): Promise<Faucet[]> => {
   return data
 }
 
-export function ContractForm({ starting, saleId, companyId }: IContractFormProps) {
+export function ContractForm({ startings, saleId, companyId }: IContractFormProps) {
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state !== 'idle'
   const location = useLocation()
@@ -76,7 +76,7 @@ export function ContractForm({ starting, saleId, companyId }: IContractFormProps
 
   const form = useForm<TCustomerSchema>({
     resolver,
-    defaultValues: starting,
+    defaultValues: startings,
   })
 
   const fullSubmit = useFullSubmit(form, undefined, 'POST', value => {
@@ -89,7 +89,6 @@ export function ContractForm({ starting, saleId, companyId }: IContractFormProps
   const handleAddRoom = () => {
     const currentRooms = form.getValues('rooms')
     const newRoom = roomSchema.parse({
-      edge: 'flat',
       tear_out: 'no',
       stove: 'f/s',
       waterfall: 'no',
@@ -165,7 +164,7 @@ export function ContractForm({ starting, saleId, companyId }: IContractFormProps
                 <AddressInput form={form} field='project_address' type='project' />
               )}
 
-              {form.watch('rooms').map((room, index) => (
+              {form.watch('rooms').map((_room, index) => (
                 <RoomSubForm
                   key={index}
                   form={form}

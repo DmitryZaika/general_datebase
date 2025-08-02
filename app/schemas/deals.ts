@@ -1,14 +1,14 @@
 import { z } from 'zod'
 
 export const dealsSchema = z.object({
+  company_id: z.coerce.number().optional(),
   name: z.string().min(1, 'Name is required'),
-  amount: z.coerce.number().min(1, 'Amount is required'),
-  description: z.string().optional(),
-  customer_id: z.number().optional(),
-  status: z.string().optional(),
-  list_id: z.coerce.number().optional(),
-  position: z.number().optional(),
-  is_deleted: z.boolean().optional(),
+  amount: z.coerce.number().optional(),
+  description: z.string().default(' '),
+  customer_id: z.number(),
+  status: z.string(),
+  list_id: z.coerce.number(),
+  position: z.number(),
 })
 
 export type DealsDialogSchema = z.infer<typeof dealsSchema>

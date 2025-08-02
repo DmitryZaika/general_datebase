@@ -51,11 +51,10 @@ export class Contract {
 
   protected async updateSlab(slabId: number, room: TRoomSchema) {
     await db.execute(
-      `UPDATE slab_inventory SET room_uuid = UUID_TO_BIN(?), seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?, stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ?, sale_id = ? WHERE id = ?`,
+      `UPDATE slab_inventory SET room_uuid = UUID_TO_BIN(?), seam = ?,  room = ?, backsplash = ?, tear_out = ?, square_feet = ?, stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ?, sale_id = ? WHERE id = ?`,
       [
         room.room_id,
         room.seam,
-        room.edge,
         room.room,
         room.backsplash,
         room.tear_out,
@@ -108,13 +107,12 @@ export class Contract {
 
   protected async sellSlab(slabId: number, room: TRoomSchema) {
     await db.execute(
-      `UPDATE slab_inventory SET sale_id = ?, room_uuid = UUID_TO_BIN(?), seam = ?, edge = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
+      `UPDATE slab_inventory SET sale_id = ?, room_uuid = UUID_TO_BIN(?), seam = ?, room = ?, backsplash = ?, tear_out = ?, square_feet = ?,
               stove = ?, ten_year_sealer = ?, waterfall = ?, corbels = ?, price = ?, extras = ? WHERE id = ?`,
       [
         this.saleId,
         room.room_id,
         room.seam,
-        room.edge,
         room.room,
         room.backsplash,
         room.tear_out,
@@ -132,7 +130,7 @@ export class Contract {
 
   protected async unsellSlab(slabId: number) {
     await db.execute(
-      `UPDATE slab_inventory SET sale_id = NULL, room_uuid = NULL, seam = NULL, edge = NULL, room = NULL, backsplash = NULL, tear_out = NULL, square_feet = NULL,
+      `UPDATE slab_inventory SET sale_id = NULL, room_uuid = NULL, seam = NULL, room = NULL, backsplash = NULL, tear_out = NULL, square_feet = NULL,
             stove = NULL, ten_year_sealer = NULL, waterfall = NULL, corbels = NULL, price = NULL, extras = NULL WHERE id = ?`,
       [slabId],
     )
@@ -140,7 +138,7 @@ export class Contract {
 
   protected async unsellSlabs(saleId: number) {
     await db.execute(
-      `UPDATE slab_inventory SET sale_id = NULL, room_uuid = NULL, seam = NULL, edge = NULL, room = NULL, backsplash = NULL, tear_out = NULL, square_feet = NULL,
+      `UPDATE slab_inventory SET sale_id = NULL, room_uuid = NULL, seam = NULL, room = NULL, backsplash = NULL, tear_out = NULL, square_feet = NULL,
           stove = NULL, ten_year_sealer = NULL, waterfall = NULL, corbels = NULL, price = NULL, extras = NULL WHERE sale_id = ?`,
       [saleId],
     )

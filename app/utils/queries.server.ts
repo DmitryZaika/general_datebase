@@ -3,6 +3,7 @@ import type { FaucetFilter } from '~/schemas/faucets'
 import type { SinkFilter } from '~/schemas/sinks'
 import type { StoneFilter } from '~/schemas/stones'
 import { selectMany } from '~/utils/queryHelpers'
+import type { SINK_TYPES } from './constants'
 
 export interface Stone {
   id: number
@@ -114,7 +115,7 @@ export const stoneQueryBuilder = async (
 export interface Sink {
   id: number
   name: string
-  type: string
+  type: (typeof SINK_TYPES)[number]
   url: string | null
   is_display: boolean | number
   length: number | null

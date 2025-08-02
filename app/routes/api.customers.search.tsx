@@ -21,11 +21,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let searchType: 'name' | 'phone' | 'email'
   try {
     ;({ term, searchType } = customerSchema.parse(customerData))
-  } catch (error) {
+  } catch {
     return data({ error: 'Invalid search parameters' }, { status: 422 })
   }
 
-  console.log(user.company_id, searchType, term)
   try {
     const customers = await selectMany<Customer>(
       db,

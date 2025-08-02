@@ -3,7 +3,7 @@ import { useState } from 'react'
 import type { Path, UseFormReturn } from 'react-hook-form'
 import { Button } from '~/components/ui/button'
 import type { TCustomerSchema } from '~/schemas/sales'
-import { CUSTOMER_ITEMS, HARDCODED_IGNORES } from '~/utils/constants'
+import { CUSTOMER_ITEMS, EDGE_TYPES, HARDCODED_IGNORES } from '~/utils/constants'
 import { replaceUnderscoresWithSpaces } from '~/utils/words'
 import { FormField } from '../ui/form'
 import { InputItem } from './InputItem'
@@ -26,9 +26,9 @@ const DynamicControl = ({
   index,
   handleInputChange,
 }: DynamicControlProps) => {
-  // biome-ignore lint/security/noGlobalEval: Its safe
-  const current = eval(form.watch(`rooms.${index}.extras.${target}.edge_type`))
+  const current = form.watch(`rooms.${index}.extras.${target}.edge_type`)
   const itemType = CUSTOMER_ITEMS[target][itemKey]
+
   if (typeof itemType === 'object') {
     return (
       <FormField
@@ -45,8 +45,8 @@ const DynamicControl = ({
             }}
             placeholder='Select option'
             name={replaceUnderscoresWithSpaces(itemKey)}
-            options={Object.entries(itemType).map(([key, value]) => ({
-              key: value,
+            options={Object.keys(itemType).map(key => ({
+              key: key,
               value: replaceUnderscoresWithSpaces(key),
             }))}
           />
@@ -55,7 +55,10 @@ const DynamicControl = ({
     )
   }
 
-  if (target === 'edge_price' && typeof current !== 'function') {
+  if (
+    target === 'edge_price' &&
+    typeof EDGE_TYPES[current as keyof typeof EDGE_TYPES] !== 'function'
+  ) {
     return null
   }
   return (
@@ -70,7 +73,7 @@ const DynamicControl = ({
             ...field,
             onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
               const newValue =
-                itemType === 'number' ? Number(e.target.value) : e.target.value
+                typeof itemType === 'number' ? Number(e.target.value) : e.target.value
               field.onChange(newValue)
               handleInputChange()
             },

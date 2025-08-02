@@ -14,7 +14,7 @@ import { z } from 'zod'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SignatureInput } from '~/components/molecules/SignatureInput'
 import { AddressInput } from '~/components/organisms/AddressInput'
-import { CustomerSearch } from '~/components/organisms/CustomerSearch'
+import { CustomerSearchMinimal } from '~/components/organisms/CustomerSearch'
 import { Checkbox } from '~/components/ui/checkbox'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
@@ -197,12 +197,12 @@ export default function AdminChecklists() {
         <FormProvider {...form}>
           <Form method='post' onSubmit={fullSubmit}>
             <input type='hidden' name='csrf' value={token} />
-            <CustomerSearch
+            <CustomerSearchMinimal
               form={form}
               nameField='customer_name'
               idField='customer_id'
             />
-            <AddressInput form={form} field='installation_address' />
+            <AddressInput form={form} field='installation_address' type='project' />
 
             {/* Checklist items */}
             <div className='my-4 space-y-2'>
