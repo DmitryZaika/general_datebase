@@ -50,7 +50,7 @@ export default function DealsList({ title, customers, id }: DealsListProps) {
             />
           ) : (
             <CardTitle
-              className='text-sm font-semibold tracking-wide text-white cursor-pointer w-'
+              className='text-sm font-semibold tracking-wide text-white cursor-pointer w-full'
               onClick={e => {
                 e.stopPropagation()
                 setEditing(true)

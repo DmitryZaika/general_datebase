@@ -102,6 +102,7 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
           value={searchTerm ?? currentCustomer ?? ''}
           onChange={e => setSearchTerm(e.target.value)}
           disabled={!!selectedCustomer}
+          autoFocus
         />
         {searchTerm && customerSuggestions.length > 0 && (
           <Command className='z-60 top-full mt-1 w-full h-auto max-h-50 overflow-y-auto border rounded-md bg-white shadow-md absolute'>
