@@ -1,12 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { FormProvider, useForm } from 'react-hook-form'
-import { Form } from 'react-router'
+import { Form, Link, Outlet } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { CustomerSearch } from '~/components/molecules/CustomerSearch'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { InputItem } from './molecules/InputItem'
 import { LoadingButton } from './molecules/LoadingButton'
+import { Button } from './ui/button'
 import {
   Dialog,
   DialogContent,
@@ -22,12 +23,14 @@ export function DealsForm({
   onOpenChange,
   hiddenFields = {},
   companyId,
+  dealId,
 }: {
   initial?: Partial<DealsDialogSchema>
   open: boolean
   onOpenChange: (open: boolean) => void
   hiddenFields?: Record<string, string | number | boolean>
   companyId: number
+  dealId?: number
 }) {
   const form = useForm<DealsDialogSchema>({
     resolver: zodResolver(dealsSchema),
@@ -39,12 +42,13 @@ export function DealsForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit Deal</DialogTitle>
+          <DialogTitle>{dealId ? 'Edit Deal' : 'Create Deal'}</DialogTitle>
         </DialogHeader>
 
         <FormProvider {...form}>
           <Form id='dealForm' method='post' onSubmit={fullSubmit}>
             <AuthenticityTokenInput />
+
             {Object.entries(hiddenFields).map(([k, v]) => (
               <input type='hidden' name={k} value={String(v)} key={k} />
             ))}
@@ -73,13 +77,27 @@ export function DealsForm({
             />
 
             <DialogFooter>
-              <LoadingButton loading={false} type='submit'>
-                Submit
-              </LoadingButton>
+              <div className='flex justify-between gap-2 w-full'>
+                {dealId && (
+                  <div className='flex justify-start'>
+                    <Link to={`delete`} relative='path'>
+                      <Button variant='destructive' type='button' className='mb-4'>
+                        Delete
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+                <div className='flex justify-end w-full'>
+                  <LoadingButton loading={false} type='submit'>
+                    {dealId ? 'Save' : 'Create'}
+                  </LoadingButton>
+                </div>
+              </div>
             </DialogFooter>
           </Form>
         </FormProvider>
       </DialogContent>
+      <Outlet />
     </Dialog>
   )
 }

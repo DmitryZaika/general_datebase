@@ -68,7 +68,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const user = await getEmployeeUser(request)
     const lists = await selectMany<{ id: number; name: string }>(
       db,
-      'SELECT id, name FROM deals_list WHERE user_id = ?',
+      'SELECT id, name FROM deals_list WHERE user_id = ? AND deleted_at IS NULL',
       [user.id],
     )
     const deals = await selectMany<DealsDialogSchema & { id: number }>(
