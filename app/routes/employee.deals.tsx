@@ -142,7 +142,7 @@ const AddList = ({ setOpen }: { open: boolean; setOpen: (o: boolean) => void }) 
             control={form.control}
             name='name'
             render={({ field }) => (
-              <InputItem field={field} placeholder='Enter list name…' />
+              <InputItem field={field} inputAutoFocus placeholder='Enter list name…' />
             )}
           />
 
