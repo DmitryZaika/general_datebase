@@ -24,11 +24,13 @@ export async function action({ params, request }: ActionFunctionArgs) {
   } catch {
     return { error: 'Invalid CSRF token' }
   }
-  const dealId = params.dealId
-  await db.execute(`DELETE FROM deals_list WHERE id = ?`, [dealId])
+  const dealListId = params.dealListId
+  await db.execute(`UPDATE deals_list SET deleted_at = NOW() WHERE id = ?`, [
+    dealListId,
+  ])
 
   const session = await getSession(request.headers.get('Cookie'))
-  session.flash('message', toastData('Success', 'Deal Deleted'))
+  session.flash('message', toastData('Success', 'Deal list deleted'))
   return redirect('..', {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
@@ -40,15 +42,15 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
-  if (!params.dealId) {
-    return forceRedirectError(request.headers, 'No deal id provided')
+  if (!params.dealListId) {
+    return forceRedirectError(request.headers, 'No deal list id provided')
   }
-  const dealId = parseInt(params.dealId)
+  const dealListId = parseInt(params.dealListId)
 
   const deal = await selectId<{ name: string }>(
     db,
-    'select name from deals_list WHERE id = ?',
-    dealId,
+    'select name from deals_list WHERE id = ? AND deleted_at IS NULL',
+    dealListId,
   )
   return {
     name: deal?.name,
