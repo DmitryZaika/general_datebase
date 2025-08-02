@@ -69,6 +69,7 @@ export function DealsForm({
               name='description'
               render={({ field }) => (
                 <InputItem
+                  inputAutoFocus={!!dealId}
                   name={'Description'}
                   placeholder={'Description of the deal'}
                   field={field}
