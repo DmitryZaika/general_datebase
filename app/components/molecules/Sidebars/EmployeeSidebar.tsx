@@ -80,11 +80,11 @@ const getItems = (
       url: `/employee/customers`,
       icon: Users,
     })
-    finalList.push({
-      title: 'Deals',
-      url: `/employee/deals`,
-      icon: DollarSign,
-    })
+    // finalList.push({
+    //   title: 'Deals',
+    //   url: `/employee/deals`,
+    //   icon: DollarSign,
+    // })
   }
   if (['admin', 'employee'].includes(base)) {
     finalList.push(
