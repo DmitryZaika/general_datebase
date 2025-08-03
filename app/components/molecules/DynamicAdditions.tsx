@@ -1,5 +1,5 @@
 import { Plus, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Path, UseFormReturn } from 'react-hook-form'
 import { Button } from '~/components/ui/button'
 import type { TCustomerSchema } from '~/schemas/sales'
@@ -98,6 +98,14 @@ export const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) =
     string,
     number
   > // Backwards compatibility
+
+  useEffect(() => {
+    console.log(current)
+    const newPrice = context.priceFn(current) || 0
+    if (newPrice !== current.price) {
+      form.setValue(`rooms.${index}.extras.${target}.price`, newPrice)
+    }
+  }, [current])
 
   function handleInputChange() {
     if (isPriceManuallySet) return

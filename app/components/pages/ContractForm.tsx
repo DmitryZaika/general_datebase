@@ -86,6 +86,8 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
     return value
   })
 
+  console.log(form.getValues())
+
   const handleAddRoom = () => {
     const currentRooms = form.getValues('rooms')
     const newRoom = roomSchema.parse({
