@@ -166,7 +166,6 @@ export class TestDataFactory {
       room_id: 'dcdd9054-dadd-431d-a861-d0639f70f67b',
       sink_type: [{ id: 1, type_id: 1 }],
       faucet_type: [{ id: 1, type_id: 1 }],
-      edge: 'Flat',
       backsplash: 'No',
       square_feet: 25,
       retail_price: 2500,
@@ -179,7 +178,10 @@ export class TestDataFactory {
       ten_year_sealer: false,
       slabs: [{ id: 1, is_full: true }],
       extras: {
-        edge_price: 0,
+        edge_price: {
+          edge_type: 'Flat',
+          edge_price: 0,
+        },
         tear_out_price: 0,
         stove_price: 0,
         waterfall_price: 0,

@@ -14,7 +14,7 @@ interface IQuery {
   phone: string | null
   email: string | null
   room: string | null
-  edge: string | null
+  edge_type: string | null
   backsplash: string | null
   stone_name: string | null
   stone_id: string | null
@@ -56,9 +56,13 @@ const seamText = {
   'none!': 'NONE',
 }
 
-const prettyCount = (item: { name: string; count: number } | undefined) => {
-  if (!item) return 'N/A'
+const prettyCount = (item: { name: string; count: number }) => {
   return item.count > 1 ? `${item.name} X ${item.count}` : item.name
+}
+
+const prettyCounts = (items: { name: string; count: number }[]) => {
+  if (!items || items.length === 0) return 'N/A'
+  return items.map(prettyCount).join(', ')
 }
 
 function homeownerGdIndyText(
@@ -100,18 +104,19 @@ function homeownerGdIndyText(
           ? row.room.charAt(0).toUpperCase() + row.room.slice(1).toLowerCase()
           : undefined,
       )
-    const sink = sinks.find(s => s.room_uuid === row.room_uuid)
-    const sinkName = prettyCount(sink)
-    const faucet = faucets.find(f => f.room_uuid === row.room_uuid)
-    const faucetName = prettyCount(faucet)
+    const sinksForRoom = sinks.filter(s => s.room_uuid === row.room_uuid)
+    const sinkName = prettyCounts(sinksForRoom)
+    const faucetsForRoom = faucets.filter(f => f.room_uuid === row.room_uuid)
+    const faucetName = prettyCounts(faucetsForRoom)
     pdfForm.getTextField(colorField).setText(row.stone_name || 'N/A')
     pdfForm.getTextField(sinkField).setText(sinkName)
     pdfForm.getTextField(faucetField).setText(faucetName)
     pdfForm
       .getTextField(edgeField)
       .setText(
-        row.edge
-          ? row.edge.charAt(0).toUpperCase() + row.edge.slice(1).toLowerCase()
+        typeof row.extras.edge_price === 'object' && row.extras.edge_price?.edge_type
+          ? row.extras.edge_price.edge_type.charAt(0).toUpperCase() +
+              row.extras.edge_price.edge_type.slice(1).toLowerCase()
           : 'N/A',
       )
     pdfForm
@@ -200,7 +205,7 @@ function commercialGdIndyText(
       room: 'Text131',
       color: 'Text132',
       sink: 'Text133',
-      edge: 'Text134',
+      edge_type: 'Text134',
       back: 'Text135',
       sqft: 'Text146',
       price: 'Text147',
@@ -209,7 +214,7 @@ function commercialGdIndyText(
       room: 'Text136',
       color: 'Text137',
       sink: 'Text138',
-      edge: 'Text139',
+      edge_type: 'Text139',
       back: 'Text140',
       sqft: 'Text148',
       price: 'Text149',
@@ -218,7 +223,7 @@ function commercialGdIndyText(
       room: 'Text141',
       color: 'Text142',
       sink: 'Text143',
-      edge: 'Text144',
+      edge_type: 'Text144',
       back: 'Text145',
       sqft: 'Text150',
       price: 'Text151',
@@ -246,15 +251,16 @@ function commercialGdIndyText(
           ? row.room.charAt(0).toUpperCase() + row.room.slice(1).toLowerCase()
           : undefined,
       )
-    const sink = sinks.find(s => s.room_uuid === row.room_uuid)
-    const sinkName = prettyCount(sink)
+    const sinksForRoom = sinks.filter(s => s.room_uuid === row.room_uuid)
+    const sinkName = prettyCounts(sinksForRoom)
     pdfForm.getTextField(map.color).setText(row.stone_name || 'N/A')
     pdfForm.getTextField(map.sink).setText(sinkName || 'N/A')
     pdfForm
-      .getTextField(map.edge)
+      .getTextField(map.edge_type)
       .setText(
-        row.edge
-          ? row.edge.charAt(0).toUpperCase() + row.edge.slice(1).toLowerCase()
+        typeof row.extras.edge_price === 'object' && row.extras.edge_price?.edge_type
+          ? row.extras.edge_price.edge_type.charAt(0).toUpperCase() +
+              row.extras.edge_price.edge_type.slice(1).toLowerCase()
           : 'N/A',
       )
     pdfForm
@@ -357,7 +363,6 @@ async function getData(saleId: number) {
             customers.postal_code as zip_code,
             users.name as seller_name,
             slab_inventory.room,
-            slab_inventory.edge,
             slab_inventory.backsplash,
             slab_inventory.square_feet,
             slab_inventory.tear_out,

@@ -114,5 +114,5 @@ export default function SlabSell() {
       }),
     ],
   }
-  return <ContractForm starting={starting} companyId={companyId} />
+  return <ContractForm startings={starting} companyId={companyId} />
 }
