@@ -59,6 +59,12 @@ export const BASE_PRICES = {
   },
 }
 
+const OVERSIZE_PIECE = {
+  '20+ sqft': 200,
+  '40+ sqft': 400,
+  '50+ sqft': 500,
+}
+
 export const EDGE_TYPES = {
   flat: 0,
   eased: 100,
@@ -74,12 +80,9 @@ export const CUSTOMER_ITEMS = {
     priceFn: ({ miles }: Record<string, number>) => miles * 4,
   },
   oversize_piece: {
-    sqft: {
-      '20+ sqft': 200,
-      '40+ sqft': 400,
-      '50+ sqft': 500,
-    },
-    priceFn: ({ sqft }: Record<string, number>) => sqft,
+    sqft: OVERSIZE_PIECE,
+    priceFn: ({ sqft }: Record<string, number | string>) =>
+      OVERSIZE_PIECE[sqft as keyof typeof OVERSIZE_PIECE],
   },
   mitter_edge_price: {
     amount: 'number',
