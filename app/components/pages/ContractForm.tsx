@@ -86,8 +86,6 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
     return value
   })
 
-  console.log(form.getValues())
-
   const handleAddRoom = () => {
     const currentRooms = form.getValues('rooms')
     const newRoom = roomSchema.parse({
@@ -120,10 +118,12 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
   const totalRoomPrice = useMemo(() => {
     let total = 0
     roomValues.forEach(room => {
-      total += roomPrice(room, sink_type, faucet_type)
+      const price = roomPrice(room, sink_type, faucet_type)
+      total += Math.round(price * 100) / 100
     })
     extrasValues.forEach(extra => {
-      total += Number(extra.price)
+      const roundedPrice = Math.round(extra.price * 100) / 100
+      total += roundedPrice
     })
     return total
   }, [

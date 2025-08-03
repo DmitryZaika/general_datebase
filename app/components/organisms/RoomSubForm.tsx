@@ -88,7 +88,8 @@ export const RoomSubForm = ({
   const roomValues = form.watch(`rooms.${index}`)
 
   const totalRoomPrice = useMemo(() => {
-    return roomPrice(roomValues, sink_type, faucet_type)
+    const price = roomPrice(roomValues, sink_type, faucet_type)
+    return Math.round(price * 100) / 100
   }, [
     JSON.stringify(roomValues),
     JSON.stringify(sink_type),
