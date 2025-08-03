@@ -16,6 +16,38 @@ export async function action({ request }: ActionFunctionArgs) {
       customer_id,
     ])
 
+    // --- auto add to New Customers list of assigned user ---
+    if (sales_rep) {
+      // глобальный список "New Customers" имеет id = 1
+      const listId = 1
+
+      // следующая позиция в списке
+      const [posRow] = await db.query(
+        'SELECT COALESCE(MAX(position),0)+1 AS next FROM deals WHERE list_id = ? AND deleted_at IS NULL',
+        [listId],
+      )
+
+      // уже есть сделка по этому клиенту?
+      const [deal] = await db.query(
+        'SELECT id FROM deals WHERE customer_id = ? AND deleted_at IS NULL LIMIT 1',
+        [customer_id],
+      )
+
+      if (deal) {
+        // перенос + проставляем user_id
+        await db.execute(
+          'UPDATE deals SET list_id = ?, position = ?, user_id = ? WHERE id = ?',
+          [listId, posRow.next, sales_rep, deal.id],
+        )
+      } else {
+        // создаём новую сделку в New Customers
+        await db.execute(
+          'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
+          [customer_id, 'new', listId, posRow.next, sales_rep],
+        )
+      }
+    }
+
     if (sales_rep) {
       await db.query(
         `INSERT INTO notifications (user_id, customer_id, message, due_at)
