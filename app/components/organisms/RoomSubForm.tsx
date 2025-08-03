@@ -125,7 +125,7 @@ export const RoomSubForm = ({
             const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
             if (squareFeet > 0) {
               const totalPrice = squareFeet * foundStone.retail_price
-              form.setValue(`rooms.${index}.total_price`, totalPrice)
+              updateTotalPrice(totalPrice)
             }
           }
         })
@@ -192,17 +192,22 @@ export const RoomSubForm = ({
     form.setValue(`rooms.${index}.extras.${target}`, price)
   }
 
+  const updateTotalPrice = (value: number) => {
+    const roundedPrice = Math.round(value * 100) / 100
+    form.setValue(`rooms.${index}.total_price`, roundedPrice)
+  }
+
   const handleRetailPriceChange = (price: number) => {
     const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
     const totalPrice = squareFeet * price
-    form.setValue(`rooms.${index}.total_price`, totalPrice)
+    updateTotalPrice(totalPrice)
   }
 
   const handleSquareFeetChange = (squareFeet: number) => {
     const tearOutValue = form.getValues(`rooms.${index}.tear_out`)
     handleExtraChange(tearOutValue, 'tear_out_price')
     const retailPrice = form.getValues(`rooms.${index}.retail_price`) || 0
-    form.setValue(`rooms.${index}.total_price`, squareFeet * retailPrice)
+    updateTotalPrice(squareFeet * retailPrice)
   }
 
   useEffect(() => {
@@ -253,7 +258,7 @@ export const RoomSubForm = ({
             form.setValue(`rooms.${index}.retail_price`, price)
             const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
             const totalPrice = squareFeet * price
-            form.setValue(`rooms.${index}.total_price`, totalPrice)
+            updateTotalPrice(totalPrice)
           }}
         />
 
@@ -283,7 +288,7 @@ export const RoomSubForm = ({
                 ...field,
                 onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
                   field.onChange(event)
-                  handleSquareFeetChange(parseInt(event.target.value) || 0)
+                  handleSquareFeetChange(parseFloat(event.target.value) || 0)
                 },
               }}
               formClassName={`mb-0 ${inputWidth}`}
@@ -302,7 +307,7 @@ export const RoomSubForm = ({
                 ...field,
                 onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
                   field.onChange(event)
-                  handleRetailPriceChange(parseInt(event.target.value) || 0)
+                  handleRetailPriceChange(parseFloat(event.target.value) || 0)
                 },
               }}
               formClassName={`mb-0 ${inputWidth}`}
@@ -691,7 +696,7 @@ export const RoomSubForm = ({
       )}
 
       <div className='text-right font-semibold text-lg my-4'>
-        Total Room Price: ${parseFloat(totalRoomPrice || '0').toFixed(2)}
+        Total Room Price: ${totalRoomPrice}
       </div>
     </>
   )

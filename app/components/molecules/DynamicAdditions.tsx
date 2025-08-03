@@ -100,19 +100,19 @@ export const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) =
   > // Backwards compatibility
 
   useEffect(() => {
-    console.log(current)
     const newPrice = context.priceFn(current) || 0
-    if (newPrice !== current.price) {
-      form.setValue(`rooms.${index}.extras.${target}.price`, newPrice)
+    const roundedPrice = Math.round(newPrice * 100) / 100
+    if (roundedPrice !== current.price) {
+      form.setValue(`rooms.${index}.extras.${target}.price`, roundedPrice)
     }
   }, [current])
 
   function handleInputChange() {
     if (isPriceManuallySet) return
     const newPrice = context.priceFn(current) || 0
-
-    if (newPrice !== current.price) {
-      form.setValue(`rooms.${index}.extras.${target}.price`, newPrice)
+    const roundedPrice = Math.round(newPrice * 100) / 100
+    if (roundedPrice !== current.price) {
+      form.setValue(`rooms.${index}.extras.${target}.price`, roundedPrice)
     }
   }
 
