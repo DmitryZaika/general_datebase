@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { CustomerForm } from '~/components/pages/CustomerForm'
+import { cn } from '~/lib/utils'
 import type { TCustomerSchema } from '~/schemas/sales'
 import type { Customer } from '~/types'
 import { Button } from '../ui/button'
@@ -13,6 +14,27 @@ import { RawSelect } from './RawSelect'
 
 const selectOptions = ['name', 'phone', 'email'] as const
 type SelectOption = (typeof selectOptions)[number]
+
+function CustomerSearchError({
+  error,
+  className,
+}: {
+  error: string | undefined
+  className?: string
+}) {
+  return (
+    <div>
+      <p
+        className={cn(
+          'text-[0.8rem] font-medium text-red-500 dark:text-red-900',
+          className,
+        )}
+      >
+        {error}
+      </p>
+    </div>
+  )
+}
 
 interface CustomerSearchProps {
   form: UseFormReturn<TCustomerSchema>
@@ -42,6 +64,14 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
 
   const selectedCustomer = form.watch('customer_id')
 
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (form.formState.errors.customer_id) {
+      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      inputRef.current?.focus()
+    }
+  }, [form.formState.errors.customer_id])
   const { data: customerSuggestions = [], isFetching } = useQuery({
     queryKey: ['customers', selectedOption, searchTerm],
     queryFn: () => fetchCustomers(searchTerm ?? '', selectedOption),
@@ -98,12 +128,24 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
       <div className='relative flex flex-col gap-1'>
         <Label>Customer</Label>
         <Input
+          ref={inputRef}
           placeholder='Start typing customer…'
           value={searchTerm ?? currentCustomer ?? ''}
-          onChange={e => setSearchTerm(e.target.value)}
+          onChange={e => {
+            setSearchTerm(e.target.value)
+            if (form.formState.errors.customer_id) {
+              form.clearErrors('customer_id')
+            }
+          }}
           disabled={!!selectedCustomer}
           autoFocus
         />
+        {form.formState.errors.customer_id && (
+          <CustomerSearchError
+            error={form.formState.errors.customer_id.message}
+            className='text-red-500'
+          />
+        )}
         {searchTerm && customerSuggestions.length > 0 && (
           <Command className='z-60 top-full mt-1 w-full h-auto max-h-50 overflow-y-auto border rounded-md bg-white shadow-md absolute'>
             <CommandGroup heading={isFetching ? 'Searching…' : 'Suggestions'}>

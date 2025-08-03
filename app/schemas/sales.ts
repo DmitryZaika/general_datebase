@@ -25,7 +25,10 @@ export const extrasSchema = z.record(
 export type TExtrasSchema = z.infer<typeof extrasSchema>
 
 export const EXTRA_DEFAULTS = {
-  edge_price: 0,
+  edge_price: {
+    edge_type: 'flat',
+    price: 0,
+  },
   tear_out_price: 0,
   stove_price: 0,
   waterfall_price: 0,
