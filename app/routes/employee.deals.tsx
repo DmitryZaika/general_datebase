@@ -52,10 +52,28 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors }
   }
 
-  await db.execute('INSERT INTO deals_list (name, user_id) VALUES (?, ?)', [
-    dealListData.name,
+  const [res] = await db.execute(
+    'INSERT INTO deals_list (name, position, user_id) VALUES (?, 0, ?)',
+    [dealListData.name, user.id],
+  )
+  const newListId = res.insertId
+
+  // добавляем сделки для всех уже назначенных этому пользователю клиентов
+  const [custRows] = await db.query('SELECT id FROM customers WHERE sales_rep = ?', [
     user.id,
   ])
+  if (custRows.length) {
+    const placeholders = custRows.map(() => '(?,?,?,?,?)').join(',')
+    const values = []
+    custRows.forEach((c, idx: number) => {
+      values.push(c.id, 'new', newListId, idx + 1, user.id)
+    })
+    await db.execute(
+      `INSERT INTO deals (customer_id,status,list_id,position,user_id) VALUES ${placeholders}
+       ON DUPLICATE KEY UPDATE list_id = VALUES(list_id), position = VALUES(position)`,
+      values,
+    )
+  }
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'List added successfully'))
   return redirect('.', {
@@ -68,7 +86,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const user = await getEmployeeUser(request)
     const lists = await selectMany<{ id: number; name: string }>(
       db,
-      'SELECT id, name FROM deals_list WHERE user_id = ? AND deleted_at IS NULL',
+      'SELECT id, name FROM deals_list WHERE (user_id = ? OR user_id IS NULL) AND deleted_at IS NULL ORDER BY (user_id IS NULL) DESC, id',
       [user.id],
     )
     const deals = await selectMany<DealsDialogSchema & { id: number }>(
@@ -177,6 +195,7 @@ export default function EmployeeDeals() {
               description: d.description,
               status: d.status,
               position: d.position,
+              list_id: d.list_id,
             }
           })
 
@@ -186,6 +205,7 @@ export default function EmployeeDeals() {
             title={list.name}
             customers={listDeals}
             id={list.id}
+            lists={lists}
           />
         )
       })}
