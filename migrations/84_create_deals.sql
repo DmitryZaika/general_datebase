@@ -8,6 +8,8 @@ CREATE TABLE deals (
     position INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at DATETIME NULL,
+    user_id INT NULL, 
     FOREIGN KEY (customer_id) REFERENCES customers(id),
-    FOREIGN KEY (list_id) REFERENCES deals_list(id)
+    FOREIGN KEY (list_id) REFERENCES deals_list(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
