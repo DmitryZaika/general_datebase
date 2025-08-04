@@ -52,9 +52,19 @@ export function CustomerForm({
   customerId,
 }: CustomerFormProps) {
   const { toast: toastFn } = useToast()
+  const successToast = (message: string) =>
+    toastFn({ title: 'Success', description: message, variant: 'success' })
+
+  const handleSuccess = (id: number) => {
+    successToast(
+      customerId ? 'Customer updated successfully' : 'Customer added successfully',
+    )
+    onSuccess(id, form.getValues('name'))
+  }
+
   const mutateObject = customerId
-    ? updateCustomerMutation(toastFn, value => onSuccess(value, form.getValues('name')))
-    : createCustomerMutation(toastFn, value => onSuccess(value, form.getValues('name')))
+    ? updateCustomerMutation(toastFn, handleSuccess)
+    : createCustomerMutation(toastFn, handleSuccess)
   const mutation = useMutation(mutateObject)
   const { data, isLoading } = useQuery({
     queryKey: ['customer', customerId],
