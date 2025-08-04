@@ -65,7 +65,6 @@ export function CustomerForm({
   const form = useForm<CustomerDialogSchema>({
     resolver,
   })
-
   useEffect(() => {
     if (data) {
       form.reset({
