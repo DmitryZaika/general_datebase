@@ -26,13 +26,12 @@ import {
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser, type User } from '~/utils/session.server'
+import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 export async function action({ request }: ActionFunctionArgs) {
-  let user: User
   try {
-    user = await getEmployeeUser(request)
+    await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -43,37 +42,12 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   const resolver = zodResolver(dealListSchema)
 
-  const { errors, data: dealListData } = await getValidatedFormData<DealListSchema>(
-    request,
-    resolver,
-  )
+  const { errors } = await getValidatedFormData<DealListSchema>(request, resolver)
 
   if (errors) {
     return { errors }
   }
 
-  const [res] = await db.execute(
-    'INSERT INTO deals_list (name, position, user_id) VALUES (?, 0, ?)',
-    [dealListData.name, user.id],
-  )
-  const newListId = res.insertId
-
-  // добавляем сделки для всех уже назначенных этому пользователю клиентов
-  const [custRows] = await db.query('SELECT id FROM customers WHERE sales_rep = ?', [
-    user.id,
-  ])
-  if (custRows.length) {
-    const placeholders = custRows.map(() => '(?,?,?,?,?)').join(',')
-    const values = []
-    custRows.forEach((c, idx: number) => {
-      values.push(c.id, 'new', newListId, idx + 1, user.id)
-    })
-    await db.execute(
-      `INSERT INTO deals (customer_id,status,list_id,position,user_id) VALUES ${placeholders}
-       ON DUPLICATE KEY UPDATE list_id = VALUES(list_id), position = VALUES(position)`,
-      values,
-    )
-  }
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'List added successfully'))
   return redirect('.', {
