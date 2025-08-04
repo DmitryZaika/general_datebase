@@ -35,7 +35,7 @@ const customerCheckInSchema = z.object({
   company_id: z.number().min(1, 'Company ID is required'),
   name: z.string().min(1, 'Name is required'),
   phone: z.string().min(1, 'Phone number is required'),
-  email: z.string().optional(),
+  email: z.string().email('Invalid email address'),
   address: z.string().optional(),
   address_zip_code: z.string().optional(),
   referral_source: z

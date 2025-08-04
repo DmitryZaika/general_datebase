@@ -30,6 +30,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const customerId = result.insertId
 
+  /* Temporarily disabled automatic deal creation
   // add deal in global "New Customers" list (id=1)
   const [[row]] = await db.query(
     'SELECT COALESCE(MAX(position),0)+1 AS next FROM deals WHERE list_id = 1 AND deleted_at IS NULL',
@@ -38,6 +39,7 @@ export async function action({ request }: ActionFunctionArgs) {
     'INSERT INTO deals (customer_id,status,list_id,position) VALUES (?,?,1,?)',
     [customerId, 'new', row.next],
   )
+  */
 
   return data({
     success: true,
