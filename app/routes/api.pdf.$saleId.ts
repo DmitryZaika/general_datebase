@@ -65,6 +65,12 @@ const prettyCounts = (items: { name: string; count: number }[]) => {
   return items.map(prettyCount).join(', ')
 }
 
+const replaceZero = (value: string): number | string => {
+  if (!value) return value
+  const num = Math.round(Number(value) * 100) / 100
+  return Number.isInteger(num) || value.endsWith('.00') ? num.toString() : value
+}
+
 function homeownerGdIndyText(
   pdfForm: PDFForm,
   queryData: IQuery[],
@@ -130,8 +136,12 @@ function homeownerGdIndyText(
 
     const sqftField = `Text${25 + i * 2}`
     const priceField = `Text${26 + i * 2}`
-    pdfForm.getTextField(sqftField).setText(row.square_feet?.toString() || 'N/A')
-    pdfForm.getTextField(priceField).setText(row.retail_price?.toString() || 'N/A')
+    pdfForm
+      .getTextField(sqftField)
+      .setText(replaceZero(row.square_feet?.toString() || 'N/A').toString())
+    pdfForm
+      .getTextField(priceField)
+      .setText(replaceZero(row.retail_price?.toString() || 'N/A').toString())
     i++
   }
 
@@ -169,12 +179,12 @@ function homeownerGdIndyText(
   pdfForm
     .getDropdown('Dropdown42')
     .select(seamText[seamKeyHome as keyof typeof seamText] || 'N/A')
-  const fullPrice = queryData[0].total_price || 0
-  const halfPrice = fullPrice * 0.5
+  const fullPrice = replaceZero(queryData[0].total_price?.toString() || '0')
+  const halfPrice = Number(fullPrice) * 0.5
   pdfForm.getTextField('Text37').setText(fullPrice.toString())
   pdfForm
     .getTextField('Text38')
-    .setText(fullPrice > 1000 ? halfPrice.toString() : fullPrice.toString())
+    .setText(Number(fullPrice) > 1000 ? halfPrice.toString() : fullPrice.toString())
 }
 
 function commercialGdIndyText(
@@ -272,8 +282,12 @@ function commercialGdIndyText(
           : 'N/A',
       )
 
-    pdfForm.getTextField(map.sqft).setText(row.square_feet?.toString() || 'N/A')
-    pdfForm.getTextField(map.price).setText(row.retail_price?.toString() || 'N/A')
+    pdfForm
+      .getTextField(map.sqft)
+      .setText(replaceZero(row.square_feet?.toString() || 'N/A').toString())
+    pdfForm
+      .getTextField(map.price)
+      .setText(replaceZero(row.retail_price?.toString() || 'N/A').toString())
     i++
   }
   const uniqueRooms = queryData.filter(
@@ -302,12 +316,12 @@ function commercialGdIndyText(
   pdfForm
     .getDropdown('Dropdown159')
     .select(seamText[seamKey as keyof typeof seamText] || 'N/A')
-  const fullPrice = queryData[0].total_price || 0
-  const halfPrice = fullPrice * 0.5
+  const fullPrice = replaceZero(queryData[0].total_price?.toString() || '0')
+  const halfPrice = Number(fullPrice) * 0.5
   pdfForm.getTextField('Text160').setText(fullPrice.toString())
   pdfForm
     .getTextField('Text161')
-    .setText(fullPrice > 1000 ? halfPrice.toString() : fullPrice.toString())
+    .setText(Number(fullPrice) > 1000 ? halfPrice.toString() : fullPrice.toString())
 }
 
 const texts = {
@@ -373,7 +387,7 @@ async function getData(saleId: number) {
             slab_inventory.extras,
             stones.name as stone_name,
             stones.id as stone_id,
-            stones.retail_price,
+            slab_inventory.price as retail_price,
             customers.company_name,
             customers.address as billing_address,
             HEX(slab_inventory.room_uuid) as room_uuid
