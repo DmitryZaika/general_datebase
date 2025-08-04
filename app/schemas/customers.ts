@@ -9,7 +9,7 @@ export const customerSignupSchema = z.object({
   phone: z.string().optional(),
   email: z.string().optional(),
   address: z.string().optional(),
-  company_name: z.string().optional(),
+  company_name: z.string().nullish(),
   referral_source: z
     .enum([
       'google',
@@ -49,7 +49,7 @@ export const customerDialogSchema = z.object({
   phone: z.union([z.coerce.string().min(10), z.literal('')]),
   address: z.string().min(10, 'Address must be at least 10 characters long'),
   builder: z.boolean().default(false),
-  company_name: z.string().optional(),
+  company_name: z.string().nullish(),
 })
 
 export type CustomerDialogSchema = z.infer<typeof customerDialogSchema>
