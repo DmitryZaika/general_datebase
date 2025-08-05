@@ -53,9 +53,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       db,
       'SELECT id, name FROM deals_list WHERE deleted_at IS NULL ORDER BY position',
     )
-    const deals = await selectMany<DealsDialogSchema & { id: number; user_id: number }>(
+    const deals = await selectMany<
+      DealsDialogSchema & { id: number; user_id: number; due_date: string | null }
+    >(
       db,
-      `SELECT id, customer_id, amount, description, status, list_id, position, deleted_at
+      `SELECT id, customer_id, amount, description, status, list_id, position, due_date, deleted_at
        FROM deals
        WHERE deleted_at IS NULL AND user_id = ?`,
       [user.id],
@@ -160,9 +162,20 @@ export default function EmployeeDeals() {
               status: d.status,
               position: d.position,
               list_id: d.list_id,
+              due_date: d.due_date
+                ? typeof d.due_date === 'string'
+                  ? d.due_date
+                  : new Date(d.due_date).toISOString().slice(0, 10)
+                : null,
             }
           })
 
+        // sort by due_date (earliest first, nulls last)
+        listDeals.sort((a, b) => {
+          if (!a.due_date) return 1
+          if (!b.due_date) return -1
+          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+        })
         return (
           <DealsList
             key={list.id}

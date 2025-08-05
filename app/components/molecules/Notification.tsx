@@ -60,7 +60,7 @@ export function Notification({
     // first call right away to catch any due notifications that appeared while component mounted
     fetchLatest()
 
-    const interval = setInterval(fetchLatest, 10000)
+    const interval = setInterval(fetchLatest, 1000 * 60 * 60 * 6)
     return () => clearInterval(interval)
   }, [])
 

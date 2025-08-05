@@ -10,10 +10,11 @@ interface IProps {
 interface ExtendedCustomer {
   id: number
   name: string
-  amount?: number
-  description?: string
+  amount?: number | null
+  description?: string | null
   list_id: number
   position?: number
+  due_date?: string | null
 }
 
 import { useDroppable } from '@dnd-kit/core'
