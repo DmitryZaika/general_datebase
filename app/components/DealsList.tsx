@@ -11,10 +11,11 @@ interface DealsListProps {
   customers: {
     id: number
     name: string
-    amount?: number
-    description?: string
+    amount?: number | null
+    description?: string | null
     list_id: number
     position?: number
+    due_date?: string | null
   }[]
   lists: { id: number; name: string }[]
   id: number

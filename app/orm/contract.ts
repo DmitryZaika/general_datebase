@@ -13,6 +13,14 @@ export class Contract {
     this.saleId = saleId
   }
 
+  private async getCustomerAddress(user: User) {
+    const [rows] = await db.query<RowDataPacket[]>(
+      `SELECT address FROM customers WHERE id = ? AND company_id = ? LIMIT 1`,
+      [this.data.customer_id, user.company_id],
+    )
+    return rows[0]?.address ?? ''
+  }
+
   static async fromSalesId(salesId: number) {
     const data = await getCustomerSchemaFromSaleId(salesId)
     if (!data) {
@@ -34,7 +42,7 @@ export class Contract {
         this.data.notes_to_sale || null,
         totalSquareFeet,
         this.data.price,
-        this.data.project_address || this.data.billing_address,
+        this.data.project_address || (await this.getCustomerAddress(user)),
         this.data.extras,
       ],
     )
