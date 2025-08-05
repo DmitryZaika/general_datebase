@@ -27,31 +27,16 @@ export async function action({ request }: ActionFunctionArgs) {
         [listId],
       )
 
-      // уже есть сделка по этому клиенту?
-      const [deal] = await db.query(
-        'SELECT id FROM deals WHERE customer_id = ? AND deleted_at IS NULL LIMIT 1',
-        [customer_id],
+      await db.execute(
+        'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
+        [customer_id, 'new', 1, posRow, sales_rep],
       )
-
-      if (deal) {
-        // перенос + проставляем user_id
-        await db.execute(
-          'UPDATE deals SET list_id = ?, position = ?, user_id = ? WHERE id = ?',
-          [listId, posRow.next, sales_rep, deal.id],
-        )
-      } else {
-        // создаём новую сделку в New Customers
-        await db.execute(
-          'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
-          [customer_id, 'new', listId, posRow.next, sales_rep],
-        )
-      }
     }
 
     if (sales_rep) {
       await db.query(
         `INSERT INTO notifications (user_id, customer_id, message, due_at)
-				 SELECT ?, id, CONCAT('Please text to ', name), created_date + INTERVAL 24 HOUR
+				 SELECT ?, id, CONCAT('Please text ', name), created_date + INTERVAL 24 HOUR
 				 FROM customers
 				 WHERE id = ?
 				   AND NOT EXISTS (

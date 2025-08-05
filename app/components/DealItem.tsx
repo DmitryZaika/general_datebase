@@ -56,7 +56,7 @@ export default function DealItem({ deal, lists }: DealItemProps) {
             }}
           >
             {lists.map(l => (
-              <option key={l.id} value={l.id}>
+              <option className='' key={l.id} value={l.id}>
                 {l.name}
               </option>
             ))}
@@ -66,7 +66,7 @@ export default function DealItem({ deal, lists }: DealItemProps) {
           <Pencil className='w-5 h-5 flex-shrink-0 text-gray-500 group-hover:text-black' />
         </Link>
       </div>
-      <h3 className='text-xl font-medium truncate'>{deal.name}</h3>
+      <h3 className='text-xl font-medium truncate whitespace-normal'>{deal.name}</h3>
 
       <div className='flex items-center gap-2 w-full'>
         <p className='text-sm font-medium'>Amount:</p>
