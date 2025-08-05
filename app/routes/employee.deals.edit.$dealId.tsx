@@ -41,13 +41,12 @@ export async function action({ request }: ActionFunctionArgs) {
 
   await db.execute(
     `UPDATE deals
-       SET customer_id = ?, amount = ?, description = ?, status = ?, list_id = ?, position = ?
+       SET customer_id = ?, amount = ?, description = ?, list_id = ?, position = ?
      WHERE id = ?`,
     [
       data.customer_id,
       data.amount,
       data.description,
-      data.status,
       data.list_id,
       data.position,
       dealId,
