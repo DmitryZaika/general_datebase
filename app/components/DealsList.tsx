@@ -21,7 +21,7 @@ interface DealsListProps {
 }
 
 export default function DealsList({ title, customers, id, lists }: DealsListProps) {
-  const locked = id === 1 // New Customers list is locked
+  const locked = [1, 2, 3, 4, 5].includes(id) // New Customers list is locked
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(title)
 
@@ -38,7 +38,7 @@ export default function DealsList({ title, customers, id, lists }: DealsListProp
     setEditing(false)
   }
   return (
-    <Card className='min-w-[18rem] w-72 flex flex-col h-full shadow-sm'>
+    <Card className='min-w-[18rem] w-72 max-h-[calc(100vh-7rem)] flex flex-col h-full shadow-sm'>
       <CardHeader className='bg-black rounded-t-xl py-2 px-4'>
         <div className='flex justify-between items-center'>
           {editing ? (
@@ -77,7 +77,7 @@ export default function DealsList({ title, customers, id, lists }: DealsListProp
           )}
         </div>
       </CardHeader>
-      <DealsCard customers={customers} lists={lists} />
+      <DealsCard customers={customers} lists={lists} listId={id} />
       <div className='p-3 border-t'>
         <Link to={`add?list_id=${id}`} relative='path'>
           <Button variant='ghost' type='button' className='w-full flex gap-2'>

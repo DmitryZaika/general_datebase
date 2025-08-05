@@ -26,14 +26,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   try {
+    const like = `%${term}%`
+    const prefixLike = `${term}%`
+    const wordLike = `% ${term} %`
+
     const customers = await selectMany<Customer>(
       db,
-      `SELECT id, name, address, phone, email, company_name 
-       FROM customers 
-       WHERE company_id = ? AND ?? LIKE ?
-       ORDER BY name DESC
+      `SELECT id, name, address, phone, email, company_name
+       FROM customers
+       WHERE company_id = ?
+         AND ?? LIKE ?
+       ORDER BY
+         CASE
+           WHEN ?? LIKE ? THEN 0   /* prefix */
+           WHEN ?? LIKE ? THEN 1   /* word  */
+           ELSE 2
+         END,
+         name ASC
        LIMIT 5`,
-      [user.company_id, searchType, `%${term}%`],
+      [user.company_id, searchType, like, searchType, prefixLike, searchType, wordLike],
     )
 
     return data({ customers })

@@ -4,9 +4,9 @@ export const dealsSchema = z.object({
   company_id: z.coerce.number().optional(),
   name: z.string().min(1, 'Name is required'),
   amount: z.coerce.number().optional(),
-  description: z.string().default(' '),
+  description: z.string().nullish(),
   customer_id: z.number(),
-  status: z.string(),
+  status: z.string().nullish(),
   list_id: z.coerce.number(),
   position: z.number(),
 })

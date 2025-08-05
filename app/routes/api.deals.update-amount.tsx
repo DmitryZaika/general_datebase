@@ -8,10 +8,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const form = await request.formData()
   const id = Number(form.get('id'))
-  const toList = Number(form.get('toList'))
-  if (!id || !toList) return data({ error: 'bad payload' }, { status: 400 })
+  const amountStr = form.get('amount') as string | null
+  if (!id || amountStr === null) return data({ error: 'bad payload' }, { status: 400 })
 
-  await db.execute('UPDATE deals SET list_id = ? WHERE id = ?', [toList, id])
-
+  const amount = amountStr === '' ? null : parseFloat(amountStr)
+  await db.execute('UPDATE deals SET amount = ? WHERE id = ?', [amount, id])
   return data({ ok: true })
 }
