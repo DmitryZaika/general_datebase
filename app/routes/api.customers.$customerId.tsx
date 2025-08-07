@@ -54,14 +54,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const validatedData = customerSignupSchema.parse(userData)
 
   await db.execute<ResultSetHeader>(
-    `UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, referral_source = ?, from_check_in = ?, company_id = ?, company_name = ? WHERE id = ?`,
+    `UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, referral_source = ?, source = ?, company_id = ?, company_name = ? WHERE id = ?`,
     [
       validatedData.name,
       validatedData.phone || null,
       validatedData.email || null,
       validatedData.address,
       validatedData.referral_source || null,
-      true,
+      validatedData.source,
       validatedData.company_id,
       validatedData.company_name || null,
       customerId,

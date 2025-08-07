@@ -91,15 +91,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     status: rows[0].status,
     list_id: rows[0].list_id,
     position: rows[0].position,
-    name: rows[0].name || '',
+    user_id: user.id,
   }
-  return { dealId, companyId: user.company_id, deal }
+  return { dealId, companyId: user.company_id, deal, user_id: user.id }
 }
 
 export default function DealEdit() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(true)
-  const { companyId, dealId, deal } = useLoaderData<typeof loader>()
+  const { companyId, dealId, deal, user_id } = useLoaderData<typeof loader>()
   const handleOpenChange = (o: boolean) => {
     setOpen(o)
     if (!o) navigate('..')
@@ -112,6 +112,7 @@ export default function DealEdit() {
       companyId={companyId}
       dealId={dealId}
       initial={deal}
+      user_id={user_id}
     />
   )
 }

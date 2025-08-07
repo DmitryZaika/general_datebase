@@ -39,8 +39,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
   await db.execute(
     `INSERT INTO deals
-     (customer_id, amount, description, status, list_id, position)
-     VALUES (?, ?, ?, ?, ?, ?);`,
+     (customer_id, amount, description, status, list_id, position, user_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?);`,
     [
       data.customer_id,
       data.amount,
@@ -48,6 +48,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data.status,
       data.list_id,
       data.position,
+      data.user_id,
     ],
   )
 
@@ -71,14 +72,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     `SELECT id FROM deals_list WHERE user_id = ?`,
     [user.id],
   )
-  return { listsId, companyId: user.company_id }
+  const user_id = user.id
+  return { listsId, companyId: user.company_id, user_id }
 }
 
 export default function AddDeal() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [open, setOpen] = useState(true)
-  const { listsId, companyId } = useLoaderData<typeof loader>()
+  const { listsId, companyId, user_id } = useLoaderData<typeof loader>()
   const handleOpenChange = (o: boolean) => {
     setOpen(o)
     if (!o) navigate('..')
@@ -98,6 +100,7 @@ export default function AddDeal() {
     <DealsForm
       companyId={companyId}
       listsId={listsId}
+      user_id={user_id}
       open={open}
       onOpenChange={handleOpenChange}
       hiddenFields={hiddenFields}

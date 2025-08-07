@@ -24,6 +24,7 @@ export function DealsForm({
   hiddenFields = {},
   companyId,
   dealId,
+  user_id,
 }: {
   initial?: Partial<DealsDialogSchema>
   open: boolean
@@ -31,10 +32,11 @@ export function DealsForm({
   hiddenFields?: Record<string, string | number | boolean>
   companyId: number
   dealId?: number
+  user_id: number
 }) {
   const form = useForm<DealsDialogSchema>({
     resolver: zodResolver(dealsSchema),
-    defaultValues: { ...hiddenFields, ...(initial || {}) },
+    defaultValues: { ...hiddenFields, ...(initial || {}), user_id },
   })
   const fullSubmit = useFullSubmit(form)
 
@@ -52,7 +54,7 @@ export function DealsForm({
             {Object.entries(hiddenFields).map(([k, v]) => (
               <input type='hidden' name={k} value={String(v)} key={k} />
             ))}
-            <CustomerSearch form={form} companyId={companyId} />
+            <CustomerSearch form={form} companyId={companyId} source='user-input' />
             <FormField
               control={form.control}
               name='amount'

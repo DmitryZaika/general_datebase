@@ -31,10 +31,10 @@ interface Customer {
   address: string
   sales_rep: number | null
   sales_rep_name: string | null
-  from_check_in: number
   created_date: string
   className?: string
   company_id: number
+  source: 'check-in' | 'user-input'
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -59,7 +59,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const customers = await selectMany<Customer>(
     db,
-    `SELECT c.id, c.name, c.email, c.phone, c.address, c.sales_rep, c.from_check_in, c.created_date, u.name AS sales_rep_name, c.company_id
+    `SELECT c.id, c.name, c.email, c.phone, c.address, c.sales_rep, c.created_date, u.name AS sales_rep_name, c.company_id, c.source
      FROM customers c
      LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
      ${where}`,
@@ -196,7 +196,7 @@ export default function AdminCustomers() {
 
   const filtered = customers.filter(c => {
     if (tabParam === 'leads') return
-    if (tabParam === 'walkin') return c.from_check_in === 1
+    if (tabParam === 'walkin') return c.source === 'check-in'
     return true
   })
 

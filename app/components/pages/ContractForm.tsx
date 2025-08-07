@@ -133,8 +133,6 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
     JSON.stringify(extrasValues),
   ])
   form.setValue('price', totalRoomPrice)
-  console.log(form.formState.errors, 'form errors')
-  console.log(form.getValues(), 'form values')
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>

@@ -39,6 +39,7 @@ function CustomerSearchError({
 interface CustomerSearchProps {
   form: UseFormReturn<TCustomerSchema>
   companyId: number
+  source: 'check-in' | 'user-input'
 }
 
 const fetchCustomers = async (customerName: string, searchType: SelectOption) => {
@@ -53,7 +54,14 @@ const fetchCustomers = async (customerName: string, searchType: SelectOption) =>
   return data.customers
 }
 
-export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
+async function fetchCustomerById(customerId: number) {
+  const res = await fetch(`/api/customers/${customerId}`)
+  if (!res.ok) return null
+  const json = await res.json()
+  return json.customer as Customer | null
+}
+
+export function CustomerSearch({ form, companyId, source }: CustomerSearchProps) {
   const [searchTerm, setSearchTerm] = useState<string | null>(null)
   const [selectedOption, setSelectedOption] = useState<SelectOption>(selectOptions[0])
   const [currentCustomer, setCurrentCustomer] = useState<string | null>(() => {
@@ -72,6 +80,21 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
       inputRef.current?.focus()
     }
   }, [form.formState.errors.customer_id])
+  useEffect(() => {
+    const idNum = Number(selectedCustomer)
+    if (idNum && !currentCustomer) {
+      fetchCustomerById(idNum).then(c => {
+        if (c?.name) {
+          setCurrentCustomer(c.name)
+          try {
+            form.setValue('name', c.name)
+          } catch {
+            console.error('Failed to set name', c.name)
+          }
+        }
+      })
+    }
+  }, [selectedCustomer])
   const { data: customerSuggestions = [], isFetching } = useQuery({
     queryKey: ['customers', selectedOption, searchTerm],
     queryFn: () => fetchCustomers(searchTerm ?? '', selectedOption),
@@ -185,6 +208,7 @@ export function CustomerSearch({ form, companyId }: CustomerSearchProps) {
           onSuccess={handleSuccess}
           companyId={companyId}
           customerId={selectedCustomer || undefined}
+          source={source}
         />
       )}
     </div>
