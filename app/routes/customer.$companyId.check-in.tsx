@@ -38,6 +38,7 @@ const customerCheckInSchema = z.object({
   email: z.string().email('Invalid email address'),
   address: z.string().optional(),
   address_zip_code: z.string().optional(),
+  source: z.enum(['check-in', 'user-input']),
   referral_source: z
     .enum([
       'google',
@@ -78,6 +79,7 @@ export default function CustomerCheckIn() {
       address_zip_code: '',
       referral_source: undefined,
       safety_instructions_acknowledged: false,
+      source: 'check-in',
     },
   })
 

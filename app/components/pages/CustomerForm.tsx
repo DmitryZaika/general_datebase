@@ -31,6 +31,7 @@ interface CustomerFormProps {
   onSuccess: (value: number, name: string) => void
   companyId: number
   customerId?: number
+  source: 'check-in' | 'user-input'
 }
 
 const getCustomerInfo = async (customerId: number) => {
@@ -50,6 +51,7 @@ export function CustomerForm({
   onSuccess,
   companyId,
   customerId,
+  source,
 }: CustomerFormProps) {
   const { toast: toastFn } = useToast()
   const successToast = (message: string) =>
@@ -85,7 +87,7 @@ export function CustomerForm({
   }, [data])
 
   const onSubmit = (data: CustomerDialogSchema) => {
-    mutation.mutate({ ...data, company_id: companyId, id: customerId || 0 })
+    mutation.mutate({ ...data, company_id: companyId, id: customerId || 0, source })
   }
 
   return (

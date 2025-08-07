@@ -21,6 +21,7 @@ export const customerSignupSchema = z.object({
       'other',
     ])
     .optional(),
+  source: z.enum(['check-in', 'user-input']),
 })
 
 export type CustomerSignupSchema = z.infer<typeof customerSignupSchema>
