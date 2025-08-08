@@ -130,10 +130,11 @@ export function CustomerSearch({ form, companyId, source }: CustomerSearchProps)
 
   function handleSuccess(value: number, name: string) {
     setIsOpen(false)
+    setSearchTerm(null)
     setCurrentCustomer(name)
     form.setValue('customer_id', value)
   }
-
+  console.log(currentCustomer, 'currentCustomer')
   return (
     <div className='flex items-end gap-1'>
       <div className=''>

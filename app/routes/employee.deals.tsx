@@ -9,11 +9,7 @@ import {
 import { getValidatedFormData } from 'remix-hook-form'
 import DealsList from '~/components/DealsList'
 import { db } from '~/db.server'
-import {
-  type DealListSchema,
-  type DealsDialogSchema,
-  dealListSchema,
-} from '~/schemas/deals'
+import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -31,9 +27,9 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch {
     return { error: 'Invalid CSRF token' }
   }
-  const resolver = zodResolver(dealListSchema)
+  const resolver = zodResolver(dealsSchema)
 
-  const { errors } = await getValidatedFormData<DealListSchema>(request, resolver)
+  const { errors } = await getValidatedFormData<DealsDialogSchema>(request, resolver)
 
   if (errors) {
     return { errors }
