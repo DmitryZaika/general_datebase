@@ -41,7 +41,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
   await db.execute(
     `UPDATE deals
-       SET customer_id = ?, amount = ?, description = ?, list_id = ?, position = ?
+       SET customer_id = ?, amount = ?, description = ?, list_id = ?, position = ?,
+           due_date = IF(? IN (4,5), NULL, due_date)
      WHERE id = ?`,
     [
       data.customer_id,
@@ -49,6 +50,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data.description,
       data.list_id,
       data.position,
+      data.list_id,
       dealId,
     ],
   )

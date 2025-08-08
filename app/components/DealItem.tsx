@@ -108,6 +108,9 @@ export default function DealItem({ deal, lists }: DealItemProps) {
               fd.append('id', String(deal.id))
               fd.append('toList', String(newList))
               fetcher.submit(fd, { method: 'post', action: '/api/deals/change-list' })
+              if (newList === 4 || newList === 5) {
+                setLocalDate(null)
+              }
             }}
           >
             {lists.map(l => (
