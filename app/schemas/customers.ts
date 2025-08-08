@@ -48,7 +48,7 @@ export const customerDialogSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   phone: z.union([z.coerce.string().min(10), z.literal('')]),
-  address: z.string().min(10, 'Address must be at least 10 characters long'),
+  address: z.string().min(5, 'Address must be at least 5 characters long'),
   builder: z.boolean().default(false),
   company_name: z.string().nullish(),
 })
