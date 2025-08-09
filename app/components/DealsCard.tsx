@@ -5,6 +5,7 @@ interface IProps {
   customers: ExtendedCustomer[]
   lists: { id: number; name: string }[]
   listId: number
+  readonly?: boolean
 }
 
 interface ExtendedCustomer {
@@ -20,7 +21,12 @@ interface ExtendedCustomer {
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 
-export default function DealsCard({ customers, lists, listId }: IProps) {
+export default function DealsCard({
+  customers,
+  lists,
+  listId,
+  readonly = false,
+}: IProps) {
   const { setNodeRef } = useDroppable({ id: listId })
 
   return (
@@ -33,7 +39,7 @@ export default function DealsCard({ customers, lists, listId }: IProps) {
         className='p-2 flex-col overflow-y-auto space-y-2 w-full min-h-[40px]'
       >
         {customers.map(c => (
-          <DealItem key={c.id} deal={c} lists={lists} />
+          <DealItem key={c.id} deal={c} lists={lists} readonly={readonly} />
         ))}
         {customers.length === 0 && (
           <p className='text-xs text-center text-slate-400'>No deals yet</p>
