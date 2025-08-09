@@ -20,7 +20,7 @@ export async function action({ request }: ActionFunctionArgs) {
       validatedData.name,
       validatedData.phone || null,
       validatedData.email || null,
-      validatedData.address,
+      validatedData.address || null,
       validatedData.referral_source || null,
       validatedData.source,
       validatedData.company_id,
