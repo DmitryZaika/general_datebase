@@ -17,6 +17,7 @@ interface DealItemProps {
     due_date?: string | null
   }
   lists: { id: number; name: string }[]
+  readonly?: boolean
 }
 
 function parseLocal(dateInput: string | null | undefined): Date {
@@ -36,7 +37,7 @@ function getDateColor(dateStr: string | null | undefined): string {
   return selected < today ? 'text-red-500' : 'text-gray-500'
 }
 
-export default function DealItem({ deal, lists }: DealItemProps) {
+export default function DealItem({ deal, lists, readonly = false }: DealItemProps) {
   const [localDate, setLocalDate] = useState<string | null>(deal.due_date ?? null)
   const [editAmount, setEditAmount] = useState(false)
   const [editDesc, setEditDesc] = useState(false)
@@ -95,35 +96,38 @@ export default function DealItem({ deal, lists }: DealItemProps) {
       className='flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3'
     >
       {/* Header with list selector & edit icon */}
-      <div className='flex justify-between items-center w-full'>
-        <div className='flex items-end gap-1'>
-          <p className='text-md font-medium'>List:</p>
-          <select
-            className='text-xs border rounded px-1 mb-1'
-            value={deal.list_id}
-            onChange={e => {
-              const newList = Number(e.target.value)
-              if (newList === deal.list_id) return
-              const fd = new FormData()
-              fd.append('id', String(deal.id))
-              fd.append('toList', String(newList))
-              fetcher.submit(fd, { method: 'post', action: '/api/deals/change-list' })
-              if (newList === 4 || newList === 5) {
-                setLocalDate(null)
-              }
-            }}
-          >
-            {lists.map(l => (
-              <option key={l.id} value={l.id} className='text-xs'>
-                {l.name}
-              </option>
-            ))}
-          </select>
+      {!readonly && (
+        <div className='flex justify-between items-center w-full'>
+          <div className='flex items-end gap-1'>
+            <p className='text-md font-medium'>List:</p>
+            <select
+              className='text-xs border rounded px-1 mb-1'
+              value={deal.list_id}
+              disabled={readonly}
+              onChange={e => {
+                const newList = Number(e.target.value)
+                if (newList === deal.list_id) return
+                const fd = new FormData()
+                fd.append('id', String(deal.id))
+                fd.append('toList', String(newList))
+                fetcher.submit(fd, { method: 'post', action: '/api/deals/change-list' })
+                if (newList === 4 || newList === 5) {
+                  setLocalDate(null)
+                }
+              }}
+            >
+              {lists.map(l => (
+                <option key={l.id} value={l.id} className='text-xs'>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Link to={`edit/${deal.id}`}>
+            <Pencil className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black' />
+          </Link>
         </div>
-        <Link to={`edit/${deal.id}`}>
-          <Pencil className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black' />
-        </Link>
-      </div>
+      )}
 
       {/* Deal name */}
       <h3 className='text-xl font-medium truncate whitespace-normal'>{deal.name}</h3>
@@ -156,7 +160,7 @@ export default function DealItem({ deal, lists }: DealItemProps) {
         ) : (
           <p
             className='text-sm font-medium cursor-pointer'
-            onClick={() => setEditAmount(true)}
+            onClick={() => !readonly && setEditAmount(true)}
           >
             $ {formatMoney(deal.amount)}
           </p>
@@ -184,13 +188,22 @@ export default function DealItem({ deal, lists }: DealItemProps) {
             }
           }}
         />
-      ) : (
+      ) : deal.description ? (
         <p
-          className='text-sm text-slate-500 mt-1 break-words whitespace-pre-wrap cursor-pointer'
-          onClick={() => setEditDesc(true)}
+          className={`text-sm text-slate-500 mt-1 break-words whitespace-pre-wrap ${readonly ? '' : 'cursor-pointer'}`}
+          onClick={() => !readonly && setEditDesc(true)}
         >
-          {deal.description || 'Add description'}
+          {deal.description}
         </p>
+      ) : (
+        !readonly && (
+          <p
+            className='text-sm text-slate-500 mt-1 break-words whitespace-pre-wrap cursor-pointer'
+            onClick={() => setEditDesc(true)}
+          >
+            Add description
+          </p>
+        )
       )}
 
       {/* Date section */}
@@ -217,19 +230,21 @@ export default function DealItem({ deal, lists }: DealItemProps) {
       {localDate ? (
         <p
           className={`text-sm font-medium cursor-pointer ${getDateColor(localDate)}`}
-          onClick={e => openPicker(e.currentTarget)}
+          onClick={e => !readonly && openPicker(e.currentTarget)}
         >
           {formatDisplay(localDate)}
         </p>
       ) : (
-        <Button
-          variant='ghost'
-          size='icon'
-          className='h-3 w-3 p-2'
-          onClick={e => openPicker(e.currentTarget)}
-        >
-          <Calendar className='w-5 h-5' />
-        </Button>
+        !readonly && (
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-3 w-3 p-2'
+            onClick={e => openPicker(e.currentTarget)}
+          >
+            <Calendar className='w-5 h-5' />
+          </Button>
+        )
       )}
     </div>
   )

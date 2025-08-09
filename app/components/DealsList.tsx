@@ -19,10 +19,17 @@ interface DealsListProps {
   }[]
   lists: { id: number; name: string }[]
   id: number
+  readonly?: boolean
 }
 
-export default function DealsList({ title, customers, id, lists }: DealsListProps) {
-  const locked = [1, 2, 3, 4, 5].includes(id) // New Customers list is locked
+export default function DealsList({
+  title,
+  customers,
+  id,
+  lists,
+  readonly = false,
+}: DealsListProps) {
+  const locked = readonly || [1, 2, 3, 4, 5].includes(id) // Lock all in readonly
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(title)
 
@@ -80,14 +87,16 @@ export default function DealsList({ title, customers, id, lists }: DealsListProp
           )}
         </div>
       </CardHeader>
-      <DealsCard customers={customers} lists={lists} listId={id} />
-      <div className='p-3 border-t'>
-        <Link to={`add?list_id=${id}`} relative='path'>
-          <Button variant='ghost' type='button' className='w-full flex gap-2'>
-            <Plus className='w-4 h-4' /> Add Deal
-          </Button>
-        </Link>
-      </div>
+      <DealsCard customers={customers} lists={lists} listId={id} readonly={readonly} />
+      {!readonly && (
+        <div className='p-3 border-t'>
+          <Link to={`add?list_id=${id}`} relative='path'>
+            <Button variant='ghost' type='button' className='w-full flex gap-2'>
+              <Plus className='w-4 h-4' /> Add Deal
+            </Button>
+          </Link>
+        </div>
+      )}
     </Card>
   )
 }
