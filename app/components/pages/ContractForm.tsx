@@ -144,7 +144,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
           <Form id='contractForm' onSubmit={fullSubmit}>
             <AuthenticityTokenInput />
             <div className=''>
-              <CustomerSearch form={form} companyId={companyId} />
+              <CustomerSearch form={form} companyId={companyId} source='user-input' />
               <div className='flex items-center space-x-2 my-2'>
                 <FormField
                   control={form.control}

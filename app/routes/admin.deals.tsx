@@ -7,7 +7,6 @@ import {
   useNavigate,
 } from 'react-router'
 import DealsList from '~/components/DealsList'
-import { PageLayout } from '~/components/PageLayout'
 import {
   Select,
   SelectContent,
@@ -105,7 +104,7 @@ export default function AdminDeals() {
   }
 
   return (
-    <PageLayout title='Deals (Admin)'>
+    <>
       <div className='mb-4 flex justify-between items-center'>
         <div />
         <div className='w-64'>
@@ -165,6 +164,6 @@ export default function AdminDeals() {
           )
         })}
       </div>
-    </PageLayout>
+    </>
   )
 }

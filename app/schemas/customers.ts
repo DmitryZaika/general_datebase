@@ -30,8 +30,13 @@ export const createCustomer = async (data: CustomerSignupSchema) => {
   const clean = customerSignupSchema.parse(data)
   const response = await fetch('/api/customers/create', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(clean),
   })
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw new Error(text || `Request failed with ${response.status}`)
+  }
   return response.json()
 }
 
@@ -39,8 +44,13 @@ export const updateCustomer = async (id: number, data: CustomerSignupSchema) => 
   const clean = customerSignupSchema.parse(data)
   const response = await fetch(`/api/customers/${id}`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(clean),
   })
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw new Error(text || `Request failed with ${response.status}`)
+  }
   return response.json()
 }
 
@@ -64,10 +74,14 @@ export const createCustomerMutation = (
     onSuccess: (data: { customerId: number }) => {
       onSuccess?.(data.customerId)
     },
-    onError: () => {
+    onError: (error: unknown) => {
+      console.error('createCustomer error:', error)
       toast({
         title: 'Error',
-        description: 'Something went wrong. Please try again.',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
         variant: 'destructive',
       })
     },
@@ -84,10 +98,14 @@ export const updateCustomerMutation = (
     onSuccess: (_: unknown, { id }: { id: number }) => {
       onSuccess?.(id)
     },
-    onError: () => {
+    onError: (error: unknown) => {
+      console.error('updateCustomer error:', error)
       toast({
         title: 'Error',
-        description: 'Something went wrong. Please try again.',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
         variant: 'destructive',
       })
     },
