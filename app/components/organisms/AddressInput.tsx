@@ -97,7 +97,7 @@ export function AddressInput<T extends FieldValues>({
           <FormControl>
             <div className='relative w-full'>
               <Input
-                placeholder={`Enter ${toUpperCase(type)} address (min 10 characters)`}
+                placeholder={`Enter ${toUpperCase(type)} address (min 5 characters)`}
                 value={
                   zipField
                     ? replaceZipCode(rhf.value ?? '', form.watch(zipField) ?? '')
