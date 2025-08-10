@@ -405,7 +405,6 @@ export default function DailyView() {
                             maxWidth: '100%',
                             minWidth: '100%',
                             top: '0px',
-                            zIndex: 1,
                           }
 
                     return (

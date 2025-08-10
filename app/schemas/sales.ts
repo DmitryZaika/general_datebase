@@ -25,7 +25,10 @@ export const extrasSchema = z.record(
 export type TExtrasSchema = z.infer<typeof extrasSchema>
 
 export const EXTRA_DEFAULTS = {
-  edge_price: 0,
+  edge_price: {
+    edge_type: 'flat',
+    price: 0,
+  },
   tear_out_price: 0,
   stove_price: 0,
   waterfall_price: 0,
@@ -38,7 +41,6 @@ export const roomSchema = z.object({
   room_id: z.string().default(uuidv7),
   sink_type: z.array(sinkOptionsSchema).default([]),
   faucet_type: z.array(faucetOptionsSchema).default([]),
-  edge: z.string().default('flat'),
   backsplash: z.string().default('no'),
   square_feet: z.coerce.number().default(0),
   retail_price: z.coerce.number().default(0),
@@ -50,7 +52,6 @@ export const roomSchema = z.object({
   seam: z.string().default('standard'),
   ten_year_sealer: z.boolean().default(false),
   slabs: z.array(slabOptionsSchema).default([]),
-
   extras: extrasSchema.default(EXTRA_DEFAULTS),
 })
 
@@ -64,18 +65,15 @@ export const finalExtrasSchema = z.object({
 export type TFullExtrasSchema = z.infer<typeof finalExtrasSchema>[]
 
 export const customerSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  customer_id: z.coerce.number().optional(),
+  customer_id: z.coerce.number(),
+  name: z.string().optional(),
   seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
-  billing_address: z.any(),
-  billing_zip_code: z.coerce.string().optional(),
   project_address: z.any(),
   same_address: z.boolean().default(true),
-  phone: z.any(),
-  email: z.any(),
   notes_to_sale: StringOrNumber,
   price: z.coerce.number().default(0),
   company_name: z.string().nullable().optional(),
+  billing_address: z.string().optional(),
   rooms: z.array(roomSchema).default([]),
   extras: z.array(finalExtrasSchema).default([]),
 })

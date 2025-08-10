@@ -24,7 +24,7 @@ import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
 import { getQboUrl } from '~/utils/quickbooks.server'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 const userSchema = z.object({

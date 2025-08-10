@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, X } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { Plus } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -12,10 +12,8 @@ import {
   useNavigation,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
-import { EmailInput } from '~/components/molecules/EmailInput'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { PhoneInput } from '~/components/molecules/PhoneInput'
 import { AddressInput } from '~/components/organisms/AddressInput'
 import { RoomSubForm } from '~/components/organisms/RoomSubForm'
 import { Button } from '~/components/ui/button'
@@ -30,26 +28,17 @@ import { FormField, FormProvider } from '~/components/ui/form'
 import { Switch } from '~/components/ui/switch'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { customerSchema, roomSchema, type TCustomerSchema } from '~/schemas/sales'
-import type { Customer, Faucet, Sink } from '~/types'
+import type { Faucet, Sink } from '~/types'
 import { roomPrice } from '~/utils/contracts'
+import { CustomerSearch } from '../molecules/CustomerSearch'
 import { FullDynamicAdditions } from '../molecules/DynamicAdditions'
 
 const resolver = zodResolver(customerSchema)
 
 interface IContractFormProps {
-  starting: Partial<TCustomerSchema>
+  startings: Partial<TCustomerSchema>
   saleId?: number
-}
-
-const fetchCustomers = async (customerName: string) => {
-  const url = `/api/customers/search?term=${encodeURIComponent(customerName)}`
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error('Failed to fetch slabs')
-  }
-  const data = await response.json()
-  const limitedCustomers: Customer[] = (data.customers || []).slice(0, 1)
-  return limitedCustomers
+  companyId: number
 }
 
 const fetchSinkType = async (): Promise<Sink[]> => {
@@ -72,14 +61,10 @@ const fetchFaucetType = async (): Promise<Faucet[]> => {
   return data
 }
 
-export function ContractForm({ starting, saleId }: IContractFormProps) {
+export function ContractForm({ startings, saleId, companyId }: IContractFormProps) {
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state !== 'idle'
-  const [isExistingCustomer, setIsExistingCustomer] = useState(false)
   const location = useLocation()
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const suggestionsRef = useRef<HTMLDivElement>(null)
-  const [isBuilder, setIsBuilder] = useState(!!starting.company_name)
   const { data: sink_type = [] } = useQuery({
     queryKey: ['sink_type'],
     queryFn: fetchSinkType,
@@ -91,7 +76,7 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
 
   const form = useForm<TCustomerSchema>({
     resolver,
-    defaultValues: starting,
+    defaultValues: startings,
   })
 
   const fullSubmit = useFullSubmit(form, undefined, 'POST', value => {
@@ -104,7 +89,6 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
   const handleAddRoom = () => {
     const currentRooms = form.getValues('rooms')
     const newRoom = roomSchema.parse({
-      edge: 'flat',
       tear_out: 'no',
       stove: 'f/s',
       waterfall: 'no',
@@ -115,120 +99,18 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
     form.setValue('rooms', [...currentRooms, newRoom])
   }
 
-  const [disabledFields, setDisabledFields] = useState({
-    phone: false,
-    email: false,
-    billing_address: false,
-  })
-
-  const { data: customerSuggestions = [] } = useQuery({
-    queryKey: ['customers', form.watch('name')],
-    queryFn: () => fetchCustomers(form.watch('name')),
-    enabled: !!form.watch('name'),
-  })
-
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate(`..${location.search}`)
     }
   }
 
-  const handleSelectSuggestion = (customer: {
-    id: number
-    name: string
-    address: string | null
-    phone: string | null
-    email: string | null
-    company_name: string | null
-  }) => {
-    form.setValue('name', customer.name)
-    form.setValue('customer_id', customer.id)
-
-    setIsBuilder(!!customer.company_name)
-    form.setValue('company_name', customer.company_name || null)
-
-    if (customer.address) {
-      form.setValue('billing_address', customer.address)
-      setDisabledFields(prev => ({ ...prev, billing_address: true }))
-      if (form.getValues('same_address')) {
-        form.setValue('project_address', customer.address)
-      }
-    } else {
-      form.setValue('billing_address', '')
-      setDisabledFields(prev => ({ ...prev, billing_address: false }))
+  useEffect(() => {
+    const address = form.watch('same_address')
+    if (address) {
+      form.setValue('project_address', form.getValues('billing_address'))
     }
-
-    if (customer.phone) {
-      form.setValue('phone', customer.phone)
-      setDisabledFields(prev => ({ ...prev, phone: true }))
-    } else {
-      setDisabledFields(prev => ({ ...prev, phone: false }))
-    }
-
-    if (customer.email) {
-      form.setValue('email', customer.email)
-      setDisabledFields(prev => ({ ...prev, email: true }))
-    } else {
-      setDisabledFields(prev => ({ ...prev, email: false }))
-    }
-
-    setIsExistingCustomer(true)
-    setShowSuggestions(false)
-
-    fetchCustomerDetails(customer.id)
-  }
-
-  const fetchCustomerDetails = async (customerId: number) => {
-    const response = await fetch(`/api/customers/${customerId}`)
-    if (response.ok) {
-      const data = await response.json()
-      if (data.customer) {
-        form.setValue('name', data.customer.name)
-
-        setIsBuilder(!!data.customer.company_name)
-        form.setValue('company_name', data.customer.company_name || null)
-
-        if (data.customer.address) {
-          form.setValue('billing_address', data.customer.address)
-          setDisabledFields(prev => ({ ...prev, billing_address: true }))
-
-          if (form.getValues('same_address')) {
-            form.setValue('project_address', data.customer.address)
-          }
-        } else {
-          form.setValue('billing_address', '')
-          setDisabledFields(prev => ({ ...prev, billing_address: false }))
-        }
-
-        if (data.customer.phone) {
-          form.setValue('phone', data.customer.phone)
-          setDisabledFields(prev => ({ ...prev, phone: true }))
-        } else {
-          form.setValue('phone', '')
-          setDisabledFields(prev => ({ ...prev, phone: false }))
-        }
-
-        if (data.customer.email) {
-          form.setValue('email', data.customer.email)
-          setDisabledFields(prev => ({ ...prev, email: true }))
-        } else {
-          form.setValue('email', '')
-          setDisabledFields(prev => ({ ...prev, email: false }))
-        }
-      }
-    }
-  }
-
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    form.setValue('name', e.target.value)
-    if (!showSuggestions) {
-      setShowSuggestions(true)
-    }
-    if (isExistingCustomer) {
-      setIsExistingCustomer(false)
-      form.setValue('customer_id', undefined)
-    }
-  }
+  }, [form.watch('same_address')])
 
   const roomValues = form.watch('rooms')
   const extrasValues = form.watch('extras') || []
@@ -236,10 +118,12 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
   const totalRoomPrice = useMemo(() => {
     let total = 0
     roomValues.forEach(room => {
-      total += roomPrice(room, sink_type, faucet_type)
+      const price = roomPrice(room, sink_type, faucet_type)
+      total += Math.round(price * 100) / 100
     })
     extrasValues.forEach(extra => {
-      total += Number(extra.price)
+      const roundedPrice = Math.round(extra.price * 100) / 100
+      total += roundedPrice
     })
     return total
   }, [
@@ -250,32 +134,6 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
   ])
   form.setValue('price', totalRoomPrice)
 
-  // useEffect(() => {
-
-  //   const subscription = form.watch(({ name }) => {
-  //     if (name === 'price') return
-
-  //     const rooms = form.getValues('rooms')
-  //     let total = 0
-
-  //     rooms.forEach(room => {
-  //       total += roomPrice(room, sink_type, faucet_type)
-  //     })
-
-  //       if (form.getValues('price') !== total) {
-  //         form.setValue('price', total, { shouldValidate: total > 0 })
-  //       }
-  //     })
-
-  //     return () => subscription.unsubscribe()
-  //   }, [sink_type, faucet_type])
-
-  const handleBuilderChange = (checked: boolean) => {
-    setIsBuilder(checked)
-    if (checked) return
-    form.setValue('company_name', null)
-  }
-
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className='sm:max-w-[500px] max-h-[90vh] overflow-y-auto'>
@@ -283,80 +141,10 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
           <DialogTitle>Sell Slab - Add Customer</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <Form id='customerForm' onSubmit={fullSubmit}>
+          <Form id='contractForm' onSubmit={fullSubmit}>
             <AuthenticityTokenInput />
             <div className=''>
-              <div className='flex items-start gap-2'>
-                <div className='flex-grow relative'>
-                  <FormField
-                    control={form.control}
-                    name='name'
-                    render={({ field }) => (
-                      <InputItem
-                        name={'Customer Name'}
-                        placeholder={'Enter customer name'}
-                        field={{
-                          ...field,
-                          disabled: isExistingCustomer,
-                          onChange: handleNameChange,
-                        }}
-                      />
-                    )}
-                  />
-                  {isExistingCustomer && (
-                    <div className='absolute right-0 top-0 bg-blue-100 text-blue-800 text-xs px-2 rounded-md flex items-center gap-1'>
-                      <span>Existing</span>
-                      <Button
-                        variant='ghost'
-                        size='icon'
-                        onClick={() => {
-                          setIsExistingCustomer(false)
-                          form.setValue('customer_id', undefined)
-                          setDisabledFields(prev => ({
-                            ...prev,
-                            billing_address: false,
-                            phone: false,
-                            email: false,
-                          }))
-                        }}
-                      >
-                        <X className='h-2 w-2' />
-                      </Button>
-                    </div>
-                  )}
-
-                  {showSuggestions && customerSuggestions.length > 0 && (
-                    <div
-                      ref={suggestionsRef}
-                      className='absolute z-10 w-full -mt-4 max-h-20 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg'
-                    >
-                      <ul className='py-1 divide-y divide-gray-200'>
-                        {customerSuggestions.map(customer => (
-                          <li
-                            key={customer.id}
-                            className='px-2 py-0.5 hover:bg-gray-50 cursor-pointer'
-                            onClick={() => handleSelectSuggestion(customer)}
-                          >
-                            {customer.name}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <FormField
-                control={form.control}
-                name='customer_id'
-                render={({ field }) => <input type='hidden' {...field} />}
-              />
-
-              <AddressInput
-                form={form}
-                field='billing_address'
-                zipField='billing_zip_code'
-              />
+              <CustomerSearch form={form} companyId={companyId} source='user-input' />
               <div className='flex items-center space-x-2 my-2'>
                 <FormField
                   control={form.control}
@@ -375,63 +163,10 @@ export function ContractForm({ starting, saleId }: IContractFormProps) {
               </div>
 
               {!form.watch('same_address') && (
-                <AddressInput form={form} field='project_address' />
+                <AddressInput form={form} field='project_address' type='project' />
               )}
 
-              <div className='flex flex-row gap-2'>
-                <FormField
-                  control={form.control}
-                  name='phone'
-                  render={({ field }) => (
-                    <PhoneInput
-                      field={field}
-                      formClassName='mb-0 w-1/2'
-                      disabled={disabledFields.phone}
-                    />
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name='email'
-                  render={({ field }) => (
-                    <EmailInput
-                      field={{
-                        ...field,
-                        disabled: disabledFields.email,
-                      }}
-                      formClassName='mb-0'
-                    />
-                  )}
-                />
-              </div>
-
-              {/* Builder checkbox */}
-
-              <div className='flex items-center space-x-2 my-2'>
-                <Switch
-                  checked={isBuilder}
-                  onCheckedChange={handleBuilderChange}
-                  id='builder_checkbox'
-                  label='Builder'
-                />
-              </div>
-
-              {isBuilder && (
-                <FormField
-                  control={form.control}
-                  name='company_name'
-                  render={({ field }) => (
-                    <InputItem
-                      name={'Company Name'}
-                      placeholder={'Enter company name'}
-                      field={field}
-                      formClassName='mb-2'
-                    />
-                  )}
-                />
-              )}
-
-              {form.watch('rooms').map((_, index) => (
+              {form.watch('rooms').map((_room, index) => (
                 <RoomSubForm
                   key={index}
                   form={form}

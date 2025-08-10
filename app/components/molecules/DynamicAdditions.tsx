@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Path, UseFormReturn } from 'react-hook-form'
 import { Button } from '~/components/ui/button'
 import type { TCustomerSchema } from '~/schemas/sales'
-import { CUSTOMER_ITEMS, HARDCODED_IGNORES } from '~/utils/constants'
+import { CUSTOMER_ITEMS, EDGE_TYPES, HARDCODED_IGNORES } from '~/utils/constants'
 import { replaceUnderscoresWithSpaces } from '~/utils/words'
 import { FormField } from '../ui/form'
 import { InputItem } from './InputItem'
@@ -16,13 +16,19 @@ interface DynamicControlProps {
   itemKey: keyof (typeof CUSTOMER_ITEMS)[ExtraItemKey]
   form: UseFormReturn<TCustomerSchema>
   index: number
+  handleInputChange: () => void
 }
 
-const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) => {
-  // TODO: remove hardcoded ogee and bullnose
-  // biome-ignore lint/security/noGlobalEval: Its safe
-  const current = eval(form.watch(`rooms.${index}.extras.${target}.edge_type`))
+const DynamicControl = ({
+  itemKey,
+  target,
+  form,
+  index,
+  handleInputChange,
+}: DynamicControlProps) => {
+  const current = form.watch(`rooms.${index}.extras.${target}.edge_type`)
   const itemType = CUSTOMER_ITEMS[target][itemKey]
+
   if (typeof itemType === 'object') {
     return (
       <FormField
@@ -30,11 +36,17 @@ const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) =
         name={`rooms.${index}.extras.${target}.${itemKey}`}
         render={({ field }) => (
           <SelectInput
-            field={field}
+            field={{
+              ...field,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                field.onChange(e)
+                handleInputChange()
+              },
+            }}
             placeholder='Select option'
             name={replaceUnderscoresWithSpaces(itemKey)}
-            options={Object.entries(itemType).map(([key, value]) => ({
-              key: value,
+            options={Object.keys(itemType).map(key => ({
+              key: key,
               value: replaceUnderscoresWithSpaces(key),
             }))}
           />
@@ -43,7 +55,10 @@ const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) =
     )
   }
 
-  if (target === 'edge_price' && typeof current !== 'function') {
+  if (
+    target === 'edge_price' &&
+    typeof EDGE_TYPES[current as keyof typeof EDGE_TYPES] !== 'function'
+  ) {
     return null
   }
   return (
@@ -54,7 +69,15 @@ const DynamicControl = ({ itemKey, target, form, index }: DynamicControlProps) =
         <InputItem
           name={replaceUnderscoresWithSpaces(itemKey)}
           placeholder={`Enter ${itemKey}`}
-          field={field}
+          field={{
+            ...field,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              const newValue =
+                typeof itemType === 'number' ? Number(e.target.value) : e.target.value
+              field.onChange(newValue)
+              handleInputChange()
+            },
+          }}
         />
       )}
     />
@@ -77,16 +100,21 @@ export const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) =
   > // Backwards compatibility
 
   useEffect(() => {
-    if (isPriceManuallySet) return
-    let newPrice = context.priceFn(current)
-    if (Number.isNaN(newPrice)) {
-      newPrice = 0
+    const newPrice = context.priceFn(current) || 0
+    const roundedPrice = Math.round(newPrice * 100) / 100
+    if (roundedPrice !== current.price) {
+      form.setValue(`rooms.${index}.extras.${target}.price`, roundedPrice)
     }
+  }, [current])
 
-    if (newPrice !== current.price) {
-      form.setValue(`rooms.${index}.extras.${target}.price`, newPrice)
+  function handleInputChange() {
+    if (isPriceManuallySet) return
+    const newPrice = context.priceFn(current) || 0
+    const roundedPrice = Math.round(newPrice * 100) / 100
+    if (roundedPrice !== current.price) {
+      form.setValue(`rooms.${index}.extras.${target}.price`, roundedPrice)
     }
-  }, [JSON.stringify(current), context, isPriceManuallySet])
+  }
 
   const handleRemove = () => {
     const extras = form.getValues(`rooms.${index}.extras`)
@@ -114,6 +142,7 @@ export const DynamicAddition = ({ target, form, index }: DynamicAdditionProps) =
               itemKey={item as keyof (typeof CUSTOMER_ITEMS)[ExtraItemKey]}
               form={form}
               index={index}
+              handleInputChange={handleInputChange}
             />
           ))}
 

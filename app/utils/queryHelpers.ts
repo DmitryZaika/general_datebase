@@ -4,7 +4,7 @@ import type mysql from 'mysql2/promise'
 export async function selectMany<T>(
   db: mysql.Pool,
   query: string,
-  params: (string | number)[] = [],
+  params: (string | number | number[])[] = [],
 ): Promise<T[]> {
   try {
     const [rows] = await db.query<T[] & RowDataPacket[]>(query, params)

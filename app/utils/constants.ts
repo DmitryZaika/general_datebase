@@ -59,18 +59,30 @@ export const BASE_PRICES = {
   },
 }
 
+const OVERSIZE_PIECE = {
+  '20+ sqft': 200,
+  '40+ sqft': 400,
+  '50+ sqft': 500,
+}
+
+export const EDGE_TYPES = {
+  flat: 0,
+  eased: 100,
+  '1/4_bevel': 200,
+  '1/2_bevel': 200,
+  ogee: ({ linearFeet }: { linearFeet: number }) => linearFeet * 25,
+  bullnose: ({ linearFeet }: { linearFeet: number }) => linearFeet * 18,
+}
+
 export const CUSTOMER_ITEMS = {
   tripFee: {
     miles: 'number',
     priceFn: ({ miles }: Record<string, number>) => miles * 4,
   },
   oversize_piece: {
-    sqft: {
-      '20+ sqft': 200,
-      '40+ sqft': 400,
-      '50+ sqft': 500,
-    },
-    priceFn: ({ sqft }: Record<string, number>) => sqft,
+    sqft: OVERSIZE_PIECE,
+    priceFn: ({ sqft }: Record<string, number | string>) =>
+      OVERSIZE_PIECE[sqft as keyof typeof OVERSIZE_PIECE],
   },
   mitter_edge_price: {
     amount: 'number',
@@ -89,24 +101,14 @@ export const CUSTOMER_ITEMS = {
     priceFn: ({ price }: Record<string, number>) => price,
   },
   edge_price: {
-    edge_type: {
-      flat: 0,
-      eased: 100,
-      '1/4_bevel': 200,
-      '1/2_bevel': 199,
-      ogee: ({ linearFeet }: { linearFeet: number }) => linearFeet * 25,
-      bullnose: ({ linearFeet }: { linearFeet: number }) => linearFeet * 18,
-    },
+    edge_type: EDGE_TYPES,
     linear_feet: 'number',
     priceFn: ({ edge_type, linear_feet }: Record<string, number | string>) => {
-      if (!edge_type) return 0
-      // TODO: remove eval
-      // biome-ignore lint/security/noGlobalEval: Its safe
-      const value = eval(edge_type)
-      if (typeof value === 'function') {
-        return value({ linearFeet: linear_feet })
+      const edgeType = EDGE_TYPES[edge_type as keyof typeof EDGE_TYPES]
+      if (typeof edgeType === 'function') {
+        return edgeType({ linearFeet: Number(linear_feet) })
       }
-      return value
+      return edgeType
     },
   },
 }

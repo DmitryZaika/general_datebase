@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import type { FieldValues, Path, UseFormReturn } from 'react-hook-form'
+import type {
+  FieldPathValue,
+  FieldValues,
+  Path,
+  PathValue,
+  UseFormReturn,
+} from 'react-hook-form'
 import { useDebounce } from 'use-debounce'
 import { Command, CommandGroup, CommandItem } from '~/components/ui/command'
 import {
@@ -31,16 +37,22 @@ async function completeAddress(q: string): Promise<
   return data.suggestions
 }
 
+export type StringPath<T extends FieldValues> = {
+  [K in Path<T>]: PathValue<T, K> extends string | undefined ? K : never
+}[Path<T>]
+
 type Props<T extends FieldValues> = {
   form: UseFormReturn<T>
-  field: Path<T>
-  zipField?: Path<T>
+  field: StringPath<T>
+  zipField?: StringPath<T>
+  type: 'billing' | 'project'
 }
 
 export function AddressInput<T extends FieldValues>({
   form,
   field,
   zipField,
+  type,
 }: Props<T>) {
   const [open, setOpen] = useState(false)
 
@@ -55,7 +67,9 @@ export function AddressInput<T extends FieldValues>({
   })
 
   function handleSelect(address: string, zipCode: string) {
-    const addressWithZip = zipField ? replaceZipCode(address, zipCode ?? '') : address
+    const addressWithZip = (
+      zipField ? replaceZipCode(address, zipCode ?? '') : address
+    ) as FieldPathValue<T, StringPath<T>>
 
     form.setValue(field, addressWithZip, {
       shouldValidate: true,
@@ -63,7 +77,7 @@ export function AddressInput<T extends FieldValues>({
     })
 
     if (zipField) {
-      form.setValue(zipField, zipCode ?? '', {
+      form.setValue(zipField, zipCode as PathValue<T, StringPath<T>>, {
         shouldValidate: true,
         shouldDirty: true,
       })
@@ -71,21 +85,19 @@ export function AddressInput<T extends FieldValues>({
     // requestAnimationFrame(() => setOpen(false));
   }
 
+  const toUpperCase = (str: string) => str.charAt(0).toUpperCase() + str.slice(1)
+
   return (
     <FormField
       control={form.control}
       name={field}
       render={({ field: rhf }) => (
         <FormItem className='relative'>
-          <FormLabel>
-            {field === 'billing_address' ? 'Billing Address' : 'Project Address'}
-          </FormLabel>
+          <FormLabel>{`${toUpperCase(type)} Address`}</FormLabel>
           <FormControl>
             <div className='relative w-full'>
               <Input
-                placeholder={`Enter ${
-                  field === 'billing_address' ? 'billing' : 'project'
-                } address (min 10 characters)`}
+                placeholder={`Enter ${toUpperCase(type)} address (min 5 characters)`}
                 value={
                   zipField
                     ? replaceZipCode(rhf.value ?? '', form.watch(zipField) ?? '')

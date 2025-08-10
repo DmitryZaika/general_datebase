@@ -11,15 +11,15 @@ interface CollapsibleProps {
 
 export function Collapsible({
   isOpen,
-  openDuration = 'duration-[1500ms]',
-  closeDuration = 'duration-[1000ms]',
+  openDuration = 'duration-300',
+  closeDuration = 'duration-300',
   maxHeight = 'max-h-[5000px]',
   children,
   className = ' sm:pl-4',
 }: CollapsibleProps) {
   return (
     <div
-      className={`overflow-hidden transition-all ${
+      className={`overflow-hidden transition-[max-height] ease-in-out ${
         isOpen ? `${openDuration} ${maxHeight}` : `${closeDuration} max-h-0`
       } ${className}`}
     >

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { data, type LoaderFunctionArgs, useLoaderData } from 'react-router'
+import { data, Form, type LoaderFunctionArgs, useLoaderData } from 'react-router'
 import { z } from 'zod'
 import { EmailInput } from '~/components/molecules/EmailInput'
 import { InputItem } from '~/components/molecules/InputItem'
@@ -35,9 +35,10 @@ const customerCheckInSchema = z.object({
   company_id: z.number().min(1, 'Company ID is required'),
   name: z.string().min(1, 'Name is required'),
   phone: z.string().min(1, 'Phone number is required'),
-  email: z.string().optional(),
+  email: z.string().email('Invalid email address'),
   address: z.string().optional(),
   address_zip_code: z.string().optional(),
+  source: z.enum(['check-in', 'user-input']),
   referral_source: z
     .enum([
       'google',
@@ -54,7 +55,7 @@ const customerCheckInSchema = z.object({
     .refine(val => val === true, 'You must acknowledge the safety instructions'),
 })
 
-type FormData = z.infer<typeof customerCheckInSchema>
+type CheckInFormData = z.infer<typeof customerCheckInSchema>
 
 const resolver = zodResolver(customerCheckInSchema)
 
@@ -67,7 +68,7 @@ export default function CustomerCheckIn() {
   const { toast } = useToast()
   const { companyId } = useLoaderData<typeof loader>()
 
-  const form = useForm<FormData>({
+  const form = useForm<CheckInFormData>({
     resolver,
     defaultValues: {
       company_id: companyId,
@@ -78,6 +79,7 @@ export default function CustomerCheckIn() {
       address_zip_code: '',
       referral_source: undefined,
       safety_instructions_acknowledged: false,
+      source: 'check-in',
     },
   })
 
@@ -150,7 +152,7 @@ export default function CustomerCheckIn() {
         <h1 className=' text-center text-2xl font-semibold'>Safety Instructions</h1>
         {safetyInstructions}
         <FormProvider {...form}>
-          <form onSubmit={form.handleSubmit(data => mutate(data))}>
+          <Form onSubmit={form.handleSubmit(data => mutate(data))}>
             <div className='space-y-4 py-4'>
               <FormField
                 control={form.control}
@@ -174,7 +176,12 @@ export default function CustomerCheckIn() {
                 )}
               />
 
-              <AddressInput form={form} field='address' zipField='address_zip_code' />
+              <AddressInput
+                form={form}
+                field='address'
+                zipField='address_zip_code'
+                type='project'
+              />
 
               <FormField
                 control={form.control}
@@ -238,7 +245,7 @@ export default function CustomerCheckIn() {
                 Submit
               </LoadingButton>
             </div>
-          </form>
+          </Form>
         </FormProvider>
       </div>
     </div>
