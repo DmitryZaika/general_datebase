@@ -14,14 +14,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import type { EventFormData } from '@/types'
+import type { Event } from '~/types'
 
 export default function SelectDate({
   data,
   setValue,
 }: {
   data?: { startDate: Date; endDate: Date }
-  setValue: UseFormSetValue<EventFormData>
+  setValue: UseFormSetValue<Event>
 }) {
   const [startDate, setStartDate] = useState<Date>(
     data?.startDate instanceof Date ? data.startDate : new Date(),

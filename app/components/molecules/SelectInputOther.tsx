@@ -1,5 +1,9 @@
 import { useState } from 'react'
-import type { ControllerRenderProps, FieldValues } from 'react-hook-form'
+import type {
+  ControllerRenderProps,
+  FieldPathValue,
+  FieldValues,
+} from 'react-hook-form'
 import { Input } from '~/components/ui/input'
 import {
   Select,
@@ -8,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import type { StringPath } from '../organisms/AddressInput'
 import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 
 interface SelectInputOtherProps<TFieldValues extends FieldValues = FieldValues> {
@@ -15,7 +20,10 @@ interface SelectInputOtherProps<TFieldValues extends FieldValues = FieldValues> 
   placeholder?: string
   field: ControllerRenderProps<TFieldValues>
   disabled?: boolean
-  options: { key: TFieldValues; value: string }[]
+  options: {
+    key: FieldPathValue<TFieldValues, StringPath<TFieldValues>>
+    value: string
+  }[]
   className?: string
   defaultValue?: string
 }

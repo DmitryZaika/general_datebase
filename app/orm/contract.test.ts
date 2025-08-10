@@ -75,8 +75,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ id: sinkTypeId }],
-            faucet_type: [{ id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId }],
+            faucet_type: [{ type_id: faucetTypeId }],
           }),
         ],
       })
@@ -118,8 +118,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ id: sinkTypeId }],
-            faucet_type: [{ id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId }],
+            faucet_type: [{ type_id: faucetTypeId }],
           }),
         ],
       })
@@ -177,8 +177,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: false }],
-            sink_type: [{ id: sinkTypeId }],
-            faucet_type: [{ id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId }],
+            faucet_type: [{ type_id: faucetTypeId }],
           }),
         ],
       })
@@ -237,8 +237,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ id: sinkTypeId }],
-            faucet_type: [{ id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId }],
+            faucet_type: [{ type_id: faucetTypeId }],
           }),
         ],
       })
@@ -259,8 +259,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ id: sinkTypeId }],
-            faucet_type: [{ id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId }],
+            faucet_type: [{ type_id: faucetTypeId }],
             square_feet: 35,
           }),
         ],

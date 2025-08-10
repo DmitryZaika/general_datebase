@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, type Variants } from 'framer-motion'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useRef, useState } from 'react'
@@ -7,15 +7,16 @@ import AddEventModal from '@/components/molecules/schedule/add-event-modal'
 import EventStyled from '@/components/molecules/schedule/event-styled'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useScheduler } from '~/providers/scheduler-provider'
+import { useScheduler, type variants } from '~/providers/scheduler-provider'
 
 interface Event {
-  id: string
+  id: number
   title: string
   startDate: Date
   endDate: Date
   description?: string
-  variant?: string
+  variant?: (typeof variants)[number]
+  minmized?: boolean
   notes?: string
 }
 
@@ -42,20 +43,20 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.12 } },
 }
 
-const pageTransitionVariants = {
-  enter: () => ({
+const pageTransitionVariants: Variants = {
+  enter: {
     opacity: 0,
-  }),
+  },
   center: {
     x: 0,
     opacity: 1,
   },
-  exit: () => ({
+  exit: {
     opacity: 0,
     transition: {
       opacity: { duration: 0.2, ease: 'easeInOut' },
     },
-  }),
+  },
 }
 
 /*
@@ -234,7 +235,7 @@ export default function DailyView() {
       startDate: date,
       endDate: new Date(date.getTime() + 60 * 60 * 1000), // 1-hour duration
       title: '',
-      id: '',
+      id: 1,
       variant: 'primary',
     })
   }

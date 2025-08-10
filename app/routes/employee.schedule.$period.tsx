@@ -2,7 +2,7 @@ import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import SchedulerViewFilteration from '@/components/molecules/schedule/schedular-view-filteration'
 import { db } from '~/db.server'
 import { SchedulerProvider } from '~/providers/scheduler-provider'
-import type { Period } from '~/types'
+import type { Period, variants } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -80,6 +80,13 @@ function getPeriodDates(period: Period, dateStr?: string) {
   }
 }
 
+function getColorMap(color: string): (typeof variants)[number] {
+  if (color === 'red') return 'danger'
+  if (color === 'green') return 'success'
+  if (color === 'yellow') return 'warning'
+  return 'primary'
+}
+
 function formatDateStr(date: Date): string {
   const day = date.getDate().toString().padStart(2, '0')
   const month = (date.getMonth() + 1).toString().padStart(2, '0')
@@ -138,14 +145,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
       description: event.description,
       startDate: new Date(event.start_date),
       endDate: new Date(event.end_date),
-      variant:
-        event.color === 'red'
-          ? 'danger'
-          : event.color === 'green'
-            ? 'success'
-            : event.color === 'yellow'
-              ? 'warning'
-              : 'primary',
+      variant: getColorMap(event.color),
       allDay: event.all_day,
       color: event.color,
       status: event.status,

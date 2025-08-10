@@ -151,7 +151,7 @@ export type Variant = (typeof variants)[number]
 
 // Event interface matching database schema
 export interface Event {
-  id: string
+  id: number
   title: string
   description?: string
   startDate: Date

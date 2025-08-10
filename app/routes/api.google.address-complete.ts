@@ -13,13 +13,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const url = new URL('https://places.googleapis.com/v1/places:autocomplete')
 
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    'X-Goog-Api-Key': GOOGLE_KEY || '',
+  }
+
   const gRes = await fetch(url, {
     method: 'post',
     signal: request.signal,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': GOOGLE_KEY,
-    } as HeadersInit,
+    headers,
     body: JSON.stringify({
       input: q,
       languageCode: 'en',
@@ -48,11 +50,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       const detailsRes = await fetch(detailsUrl, {
         method: 'get',
         signal: request.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': GOOGLE_KEY,
-          'X-Goog-FieldMask': 'addressComponents',
-        },
+        headers,
       })
 
       if (detailsRes.ok) {

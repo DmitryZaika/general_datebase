@@ -29,20 +29,17 @@ export const EmailInput = <T extends FieldValues, V extends Path<T>>({
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
+    const raw = e.target.value
+    const value = raw.replace(/\s+/g, '')
     field.onChange(value)
 
-    // Check if user typed @ and show domain suggestions
     if (value.includes('@') && !value.includes('.')) {
       const beforeAt = value.split('@')[0]
       const afterAt = value.split('@')[1] || ''
-
       if (beforeAt && afterAt.length === 0) {
-        // Just typed @, show all suggestions
         setSuggestions(emailDomains.map(domain => beforeAt + domain))
         setShowSuggestions(true)
       } else if (beforeAt && afterAt.length > 0) {
-        // Typing after @, filter suggestions
         const filtered = emailDomains
           .filter(domain =>
             domain.toLowerCase().startsWith(`@${afterAt.toLowerCase()}`),
