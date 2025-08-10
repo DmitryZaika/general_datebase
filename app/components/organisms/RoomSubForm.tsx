@@ -172,22 +172,27 @@ export const RoomSubForm = ({
     target: keyof typeof BASE_PRICES,
   ) => {
     const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
-
     const base = BASE_PRICES[target]
 
-    if (typeof base === 'function') {
-      const price = base(value as number)
-      form.setValue(`rooms.${index}.extras.${target}`, price)
-      return
-    }
+    let price = 0
 
-    const selected = base[value] ?? 0
-    let price: number
-
-    if (typeof selected === 'function') {
-      price = selected({ squareFeet })
+    if (typeof base === 'number') {
+      price = base
+    } else if (typeof base === 'function') {
+      price = base(Number(value))
     } else {
-      price = Number(selected) || 0
+      const selected =
+        (
+          base as Record<
+            string | number,
+            number | ((a: { squareFeet: number }) => number)
+          >
+        )[value as string | number] ?? 0
+
+      price =
+        typeof selected === 'function'
+          ? selected({ squareFeet })
+          : Number(selected) || 0
     }
 
     form.setValue(`rooms.${index}.extras.${target}`, price)

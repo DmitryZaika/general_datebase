@@ -69,7 +69,7 @@ export default function EventStyled({
   onDelete,
 }: {
   event: EventStyledProps
-  onDelete?: (id: string) => void
+  onDelete?: (id: number) => void
 }) {
   const { handlers } = useScheduler()
   const [showEditModal, setShowEditModal] = useState(false)
@@ -105,7 +105,7 @@ export default function EventStyled({
           onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation()
             handlers.handleDeleteEvent(event?.id.toString())
-            onDelete?.(event?.id.toString())
+            onDelete?.(event?.id)
           }}
           variant='destructive'
           size='icon'

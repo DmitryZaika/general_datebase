@@ -17,7 +17,7 @@ export default function ShowMoreEventsModal() {
       {events.length > 0 ? (
         events.map((event: Event) => (
           <EventStyled
-            onDelete={id => {
+            onDelete={(id: number) => {
               setEvents(events.filter(event => event.id !== id))
             }}
             key={event.id}

@@ -3,8 +3,8 @@ import { SESClient } from '@aws-sdk/client-ses'
 const ses = new SESClient({
   region: process.env.AWS_REGION ?? 'us-east-2',
   credentials: {
-    accessKeyId: process.env.AWS_EMAIL,
-    secretAccessKey: process.env.AWS_EMAIL_SECRET,
+    accessKeyId: process.env.AWS_EMAIL || '',
+    secretAccessKey: process.env.AWS_EMAIL_SECRET || '',
   },
 })
 

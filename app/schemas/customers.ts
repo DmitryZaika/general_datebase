@@ -99,7 +99,6 @@ export const updateCustomerMutation = (
       onSuccess?.(id)
     },
     onError: (error: unknown) => {
-      console.error('updateCustomer error:', error)
       toast({
         title: 'Error',
         description:

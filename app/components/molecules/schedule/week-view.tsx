@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AnimatePresence, motion } from 'framer-motion' // Import Framer Motion
+import { AnimatePresence, motion, type Variants } from 'framer-motion' // Import Framer Motion
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -8,16 +8,16 @@ import AddEventModal from '@/components/molecules/schedule/add-event-modal'
 import EventStyled from '@/components/molecules/schedule/event-styled'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useScheduler } from '~/providers/scheduler-provider'
+import { useScheduler, type variants } from '~/providers/scheduler-provider'
 
 // Define Event interface locally since it's not exported from types
 interface Event {
-  id: string
+  id: number
   title: string
   startDate: Date
   endDate: Date
   description?: string
-  variant?: string
+  variant?: (typeof variants)[number]
   notes?: string
 }
 
@@ -43,7 +43,7 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.12 } },
 }
 
-const pageTransitionVariants = {
+const pageTransitionVariants: Variants = {
   enter: (_: number) => ({
     opacity: 0,
   }),
@@ -159,7 +159,7 @@ export default function WeeklyView() {
       startDate: date,
       endDate: new Date(date.getTime() + 60 * 60 * 1000),
       title: '',
-      id: '',
+      id: 0,
       variant: 'primary',
     })
   }
