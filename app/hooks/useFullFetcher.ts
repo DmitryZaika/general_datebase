@@ -19,11 +19,11 @@ export function useFullFetcher<TFieldValues extends FieldValues = FieldValues>(
     )
   }
 
-  const fullSubmit = form.handleSubmit(data => {
+  const fullSubmit = form.handleSubmit(async data => {
     const sanitizedData = cleanData(data)
     sanitizedData.csrf = token
 
-    fetcher.submit(sanitizedData, {
+    await fetcher.submit(sanitizedData, {
       method: method,
       action: action,
       encType: 'application/x-www-form-urlencoded',

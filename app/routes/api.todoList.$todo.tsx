@@ -58,17 +58,8 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
 
   if (request.method === 'POST') {
-    const {
-      errors,
-      data,
-      receivedValues: defaultValues,
-    } = await getValidatedFormData<TTodoListSchema>(
-      request,
-      zodResolver(todoListSchema),
-    )
-    if (errors) {
-      return Response.json({ errors, defaultValues })
-    }
+    const raw = await request.json()
+    const data = todoListSchema.parse(raw)
 
     await editAction(data.rich_text, todoId, user.id)
     return Response.json({ success: true })
