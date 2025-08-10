@@ -18,6 +18,7 @@ export interface Sink {
   type: string
   retail_price: number
   sink_count: number
+  available: number
 }
 
 export interface Stone {
@@ -31,6 +32,7 @@ export interface StoneImage {
   id: number
   name: string
   url: string
+  type: string
   retail_price: number
   cost_per_sqft: number
   available: number
@@ -44,6 +46,7 @@ export interface Faucet {
   type: string
   retail_price: number
   faucet_count: number
+  available: number
 }
 
 export interface InstructionSlim {

@@ -54,18 +54,18 @@ export default function AdminFaucets() {
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
 
   const getTypePriority = (type: string) => {
-    const index = FAUCET_TYPES.indexOf(type)
+    const index = FAUCET_TYPES.indexOf(type as (typeof FAUCET_TYPES)[number])
     return index === -1 ? FAUCET_TYPES.length : index
   }
 
   useEffect(() => {
-    // Make sure faucets with 0 or null amount still appear
     const inStock = faucets.filter(
-      faucet => Number(faucet.amount) > 0 && Boolean(faucet.is_display),
+      faucet => Number(faucet.available) > 0 && Boolean(faucet.is_display),
     )
     const outOfStock = faucets.filter(
       faucet =>
-        (!faucet.amount || Number(faucet.amount) <= 0) && Boolean(faucet.is_display),
+        (!faucet.available || Number(faucet.available) <= 0) &&
+        Boolean(faucet.is_display),
     )
     const notDisplayed = faucets.filter(faucet => !faucet.is_display)
 
@@ -124,7 +124,7 @@ export default function AdminFaucets() {
           </div>
           {sortedFaucets.map(faucet => {
             const displayedAmount =
-              faucet.amount && faucet.amount > 0 ? faucet.amount : '—'
+              faucet.available && faucet.available > 0 ? faucet.available : '—'
             const retailPrice = formatPrice(faucet.retail_price)
             const cost = formatPrice(faucet.cost)
 
@@ -153,7 +153,7 @@ export default function AdminFaucets() {
                   </div>
 
                   <p className='text-center font-bold mt-2'>{faucet.name}</p>
-                  <p className='text-center text-sm'>Amount: {displayedAmount}</p>
+                  <p className='text-center text-sm'>Available: {displayedAmount}</p>
                   <p className='text-center text-sm'>
                     Price: ${retailPrice}/${cost}
                   </p>
