@@ -23,7 +23,6 @@ import { useEffect, useState } from 'react'
 import { Form, FormProvider, useForm } from 'react-hook-form'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Dialog, DialogContent, DialogTrigger } from '~/components/ui/dialog'
-import { useFullFetcher } from '~/hooks/useFullFetcher'
 import { type TTodoListSchema, todoListSchema } from '~/schemas/general'
 import type { Todo } from '~/types'
 import { queryClient } from '~/utils/api'
@@ -51,7 +50,7 @@ function AddForm() {
     defaultValues: { rich_text: '' },
   })
 
-  const { mutate, error } = useMutation({
+  const { mutate } = useMutation({
     mutationFn: addTodo,
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: ['todos'] })
@@ -61,7 +60,7 @@ function AddForm() {
 
   return (
     <FormProvider {...form}>
-      <Form
+      <form
         onSubmit={form.handleSubmit(data => mutate(data))}
         className='flex items-center space-x-2 '
       >
@@ -80,7 +79,7 @@ function AddForm() {
         <Button type='submit' variant={'blue'}>
           Add
         </Button>
-      </Form>
+      </form>
     </FormProvider>
   )
 }
@@ -94,26 +93,32 @@ async function editTodo(data: TTodoListSchema, todoId: number) {
 }
 
 function EditForm({ todo }: EditFormProps) {
-  const [text, setText] = useState(todo.rich_text)
+  const [isEditing, setEditing] = useState<boolean>(false)
   const form = useForm<TTodoListSchema>({
     resolver: zodResolver(todoListSchema),
     defaultValues: { rich_text: todo.rich_text },
   })
 
-  const { mutate, error, isPending } = useMutation({
-    mutationFn: data => editTodo(data, todo.id),
-    onSuccess: data => {
-      setText(data.rich_text)
+  const { mutate, isPending } = useMutation({
+    mutationFn: (data: TTodoListSchema) => editTodo(data, todo.id),
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: ['todos'] })
       form.reset()
     },
   })
 
-  const [isEditing, setEditing] = useState<boolean>(false)
+  const handleSubmit = (data: TTodoListSchema) => {
+    mutate(data, {
+      onSuccess: () => {
+        setEditing(false)
+      },
+    })
+  }
 
   return (
     <FormProvider {...form}>
-      <Form
-        onSubmit={form.handleSubmit(data => mutate(data))}
+      <form
+        onSubmit={form.handleSubmit(handleSubmit)}
         className='flex items-center space-x-2  grow'
       >
         <div className='grow w-full'>
@@ -149,7 +154,7 @@ function EditForm({ todo }: EditFormProps) {
             <PencilIcon />
           </Button>
         )}
-      </Form>
+      </form>
     </FormProvider>
   )
 }
@@ -164,17 +169,22 @@ async function deleteTodo(todoId: number) {
 function DeleteForm({ todo }: EditFormProps) {
   const form = useForm()
 
-  const { mutate, error, isPending } = useMutation({
-    mutationFn: data => deleteTodo(todo.id),
-    onSuccess: data => {
+  const { mutate } = useMutation({
+    mutationFn: () => deleteTodo(todo.id),
+    onSuccess: () => {
       queryClient.refetchQueries({ queryKey: ['todos'] })
       form.reset()
     },
   })
 
+  const handleDelete = () => {
+    mutate()
+    form.reset()
+  }
+
   return (
     <FormProvider {...form}>
-      <Form onSubmit={form.handleSubmit(data => mutate(data))}>
+      <Form onSubmit={handleDelete}>
         <Button variant='ghost'>
           <TrashIcon />
         </Button>
@@ -264,7 +274,7 @@ async function onGetTodos(): Promise<Todo[]> {
 }
 
 export function TodoList() {
-  const [data, setData] = useState()
+  const [data, setData] = useState<Todo[]>([])
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -277,7 +287,7 @@ export function TodoList() {
   })
 
   useEffect(() => {
-    setData(rawData)
+    setData(rawData ?? [])
   }, [JSON.stringify(rawData)])
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -309,8 +319,6 @@ export function TodoList() {
       body: formData,
     })
   }
-
-  console.log(data)
   return (
     <Dialog modal={false}>
       <DialogTrigger
