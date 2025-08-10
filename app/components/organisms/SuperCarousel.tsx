@@ -14,8 +14,19 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { useArrowCarousel } from '~/hooks/useArrowToggle'
-import type { StoneImage } from '~/types'
 import { capitalizeFirstLetter } from '~/utils/words'
+
+interface ImageInput {
+  id: number
+  url: string | null
+  name: string
+  type: string
+  available: number | null
+  width?: number | null
+  length?: number | null
+  retail_price?: number | null
+  cost_per_sqft?: number
+}
 
 interface ImageProps {
   name?: string
@@ -26,7 +37,7 @@ interface ImageProps {
   id: number
   type: string
   setImage: (value: undefined | number) => void
-  image?: StoneImage
+  image?: ImageInput
   showInfo?: boolean
   userRole?: string
 }
@@ -168,7 +179,7 @@ export function SuperCarousel({
   type,
   userRole,
 }: {
-  images: StoneImage[]
+  images: ImageInput[]
   currentId?: number
   setCurrentId?: (value: number | undefined) => void
   type: string

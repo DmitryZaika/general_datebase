@@ -1,3 +1,4 @@
+import type { ResultSetHeader } from 'mysql2'
 import type { ActionFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { eventSchema, eventUpdateSchema } from '~/schemas/events'
@@ -50,7 +51,7 @@ async function createEvent(formData: FormData, userId: number) {
 
   const validatedData = eventSchema.parse(data)
 
-  const result = await db.execute(
+  const result = await db.execute<ResultSetHeader>(
     `INSERT INTO events (title, description, start_date, end_date, all_day, color, status, notes, created_user_id, assigned_user_id, sale_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [

@@ -13,10 +13,10 @@ export interface Stone {
   is_display: number
   length: number | null
   width: number | null
-  amount: number
   available: number
   created_date: string
   on_sale: boolean
+  amount: number
   retail_price: number
   cost_per_sqft: number
   level: number | null
@@ -120,7 +120,7 @@ export interface Sink {
   is_display: boolean | number
   length: number | null
   width: number | null
-  amount: number | null
+  available: number | null
   supplier_id: number | null
   retail_price: number | null
   cost: number | null
@@ -155,7 +155,7 @@ export async function sinkQueryBuilder(
       sink_type.is_display, 
       sink_type.length, 
       sink_type.width, 
-      COUNT(sinks.id) AS amount, 
+      COUNT(sinks.id) AS available, 
       sink_type.supplier_id, 
       sink_type.retail_price, 
       sink_type.cost
@@ -178,7 +178,7 @@ export async function sinkQueryBuilder(
 
   const sinks = await selectMany<Sink>(db, query, params)
 
-  return show_sold_out ? sinks : sinks.filter(sink => (sink.amount || 0) > 0)
+  return show_sold_out ? sinks : sinks.filter(sink => (sink.available || 0) > 0)
 }
 
 export interface Faucet {
@@ -187,7 +187,7 @@ export interface Faucet {
   type: string
   url: string | null
   is_display: boolean | number
-  amount: number | null
+  available: number | null
   supplier_id: number | null
   retail_price: number | null
   cost: number | null
@@ -220,7 +220,7 @@ export async function faucetQueryBuilder(
       faucet_type.type, 
       faucet_type.url, 
       faucet_type.is_display, 
-      COUNT(faucets.id) AS amount, 
+      COUNT(faucets.id) AS available, 
       faucet_type.supplier_id, 
       faucet_type.retail_price, 
       faucet_type.cost
@@ -241,5 +241,5 @@ export async function faucetQueryBuilder(
 
   const faucets = await selectMany<Faucet>(db, query, params)
 
-  return show_sold_out ? faucets : faucets.filter(faucet => (faucet.amount || 0) > 0)
+  return show_sold_out ? faucets : faucets.filter(faucet => (faucet.available || 0) > 0)
 }
