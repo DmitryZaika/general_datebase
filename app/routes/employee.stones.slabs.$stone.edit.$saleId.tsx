@@ -95,8 +95,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  let user: User
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -105,17 +106,23 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
   const saleId = parseInt(params.saleId, 10)
 
-  const starting = await getCustomerSchemaFromSaleId(saleId)
-  if (!starting) {
-    return redirect(`/employee/stones/slabs`)
+  const startings = await getCustomerSchemaFromSaleId(saleId)
+  if (!startings) {
+    return redirect(`/employee/deals`)
   }
 
-  return { saleId, starting }
+  return { saleId, startings, companyId: user.company_id }
 }
 
 export default function SlabEdit() {
   const data = useLoaderData<typeof loader>()
-  const starting = customerSchema.parse(data.starting)
+  const startings = customerSchema.parse(data.startings)
 
-  return <ContractForm starting={starting} saleId={data.saleId} />
+  return (
+    <ContractForm
+      startings={startings}
+      saleId={data.saleId}
+      companyId={data.companyId}
+    />
+  )
 }

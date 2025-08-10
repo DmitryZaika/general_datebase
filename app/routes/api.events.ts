@@ -111,7 +111,7 @@ async function updateEvent(formData: FormData, _: number, companyId: number) {
   await db.execute(
     `UPDATE events 
      SET title = ?, description = ?, start_date = ?, end_date = ?, all_day = ?, 
-         color = ?, status = ?, notes = ?, assigned_user_id = ?, sale_id = ?, 
+         color = ?, notes = ?, assigned_user_id = ?, sale_id = ?, 
          updated_date = CURRENT_TIMESTAMP
      WHERE id = ?`,
     [
@@ -121,7 +121,6 @@ async function updateEvent(formData: FormData, _: number, companyId: number) {
       formatDateForMySQL(validatedData.end_date),
       validatedData.all_day,
       validatedData.color,
-      validatedData.status,
       validatedData.notes || null,
       validatedData.assigned_user_id || null,
       validatedData.sale_id || null,

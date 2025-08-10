@@ -65,7 +65,6 @@ function StoneTable({ stones }: { stones: Stone[] }) {
   }
 
   const handleRowClick = (stoneId: number) => {
-    // Use a relative path for Remix navigation
     const navigationPath = `${stoneId}${location.search}`
     navigate(navigationPath)
   }
