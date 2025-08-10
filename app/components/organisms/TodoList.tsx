@@ -16,6 +16,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { clsx } from 'clsx'
 import { CheckIcon, GripVerticalIcon, PencilIcon, TrashIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -25,37 +26,45 @@ import { Dialog, DialogContent, DialogTrigger } from '~/components/ui/dialog'
 import { useFullFetcher } from '~/hooks/useFullFetcher'
 import { type TTodoListSchema, todoListSchema } from '~/schemas/general'
 import type { Todo } from '~/types'
+import { queryClient } from '~/utils/api'
 import { DialogFullHeader } from '../molecules/DialogFullHeader'
 import { InputItem } from '../molecules/InputItem'
 import { LoadingButton } from '../molecules/LoadingButton'
 import { Button } from '../ui/button'
 import { FormField } from '../ui/form'
 
-type EmptyFunction = () => void
-type CallbackFunction = (callback: () => void) => void
-
-interface EditFormProps<T> {
+interface EditFormProps {
   todo: Todo
-  refresh: T
 }
 
-function AddForm({ refresh }: { refresh: () => void }) {
+async function addTodo(data: TTodoListSchema) {
+  const response = await fetch('/api/todoList', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw Error('Unsuccessfully updated data')
+}
+
+function AddForm() {
   const form = useForm<TTodoListSchema>({
     resolver: zodResolver(todoListSchema),
     defaultValues: { rich_text: '' },
   })
-  const { fullSubmit, fetcher } = useFullFetcher(form, '/api/todoList')
 
-  useEffect(() => {
-    if (fetcher.state === 'idle') {
-      refresh()
+  const { mutate, error } = useMutation({
+    mutationFn: addTodo,
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: ['todos'] })
       form.reset()
-    }
-  }, [fetcher.state])
+    },
+  })
 
   return (
     <FormProvider {...form}>
-      <Form onSubmit={fullSubmit} className='flex items-center space-x-2 '>
+      <Form
+        onSubmit={form.handleSubmit(data => mutate(data))}
+        className='flex items-center space-x-2 '
+      >
         <FormField
           control={form.control}
           name='rich_text'
@@ -76,23 +85,37 @@ function AddForm({ refresh }: { refresh: () => void }) {
   )
 }
 
-function EditForm({ refresh, todo }: EditFormProps<CallbackFunction>) {
+async function editTodo(data: TTodoListSchema, todoId: number) {
+  const response = await fetch(`/api/todoList/${todoId}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw Error('Unsuccessfully updated data')
+}
+
+function EditForm({ todo }: EditFormProps) {
+  const [text, setText] = useState(todo.rich_text)
   const form = useForm<TTodoListSchema>({
     resolver: zodResolver(todoListSchema),
     defaultValues: { rich_text: todo.rich_text },
   })
-  const { fullSubmit, fetcher } = useFullFetcher(form, `/api/todoList/${todo.id}`)
-  const [isEditing, setEditing] = useState<boolean>(false)
 
-  useEffect(() => {
-    if (fetcher.state === 'idle') {
-      refresh(() => setEditing(false))
-    }
-  }, [fetcher.state])
+  const { mutate, error, isPending } = useMutation({
+    mutationFn: data => editTodo(data, todo.id),
+    onSuccess: data => {
+      setText(data.rich_text)
+      form.reset()
+    },
+  })
+
+  const [isEditing, setEditing] = useState<boolean>(false)
 
   return (
     <FormProvider {...form}>
-      <Form onSubmit={fullSubmit} className='flex items-center space-x-2  grow'>
+      <Form
+        onSubmit={form.handleSubmit(data => mutate(data))}
+        className='flex items-center space-x-2  grow'
+      >
         <div className='grow w-full'>
           {isEditing ? (
             <FormField
@@ -118,7 +141,7 @@ function EditForm({ refresh, todo }: EditFormProps<CallbackFunction>) {
           )}
         </div>
         {isEditing ? (
-          <LoadingButton loading={fetcher.state !== 'idle'}>
+          <LoadingButton loading={isPending}>
             <CheckIcon />
           </LoadingButton>
         ) : (
@@ -131,22 +154,27 @@ function EditForm({ refresh, todo }: EditFormProps<CallbackFunction>) {
   )
 }
 
-function DeleteForm({ refresh, todo }: EditFormProps<EmptyFunction>) {
+async function deleteTodo(todoId: number) {
+  const response = await fetch(`/api/todoList/${todoId}`, {
+    method: 'DELETE',
+  })
+  if (!response.ok) throw Error('Unsuccessfully updated data')
+}
+
+function DeleteForm({ todo }: EditFormProps) {
   const form = useForm()
-  const { fullSubmit, fetcher } = useFullFetcher(
-    form,
-    `/api/todoList/${todo.id}`,
-    'DELETE',
-  )
-  useEffect(() => {
-    if (fetcher.state === 'idle') {
-      refresh()
-    }
-  }, [fetcher.state])
+
+  const { mutate, error, isPending } = useMutation({
+    mutationFn: data => deleteTodo(todo.id),
+    onSuccess: data => {
+      queryClient.refetchQueries({ queryKey: ['todos'] })
+      form.reset()
+    },
+  })
 
   return (
     <FormProvider {...form}>
-      <Form onSubmit={fullSubmit}>
+      <Form onSubmit={form.handleSubmit(data => mutate(data))}>
         <Button variant='ghost'>
           <TrashIcon />
         </Button>
@@ -155,7 +183,7 @@ function DeleteForm({ refresh, todo }: EditFormProps<EmptyFunction>) {
   )
 }
 
-function FinishForm({ refresh, todo }: EditFormProps<EmptyFunction>) {
+function FinishForm({ todo }: EditFormProps) {
   const [checked, setChecked] = useState<boolean>(Boolean(todo.is_done))
 
   async function handleCheckboxChange(isDone: boolean) {
@@ -166,7 +194,7 @@ function FinishForm({ refresh, todo }: EditFormProps<EmptyFunction>) {
       method: 'PATCH',
       body: formData,
     })
-    refresh()
+    queryClient.refetchQueries({ queryKey: ['todos'] })
   }
 
   async function handleToggle(value: boolean) {
@@ -185,10 +213,9 @@ function FinishForm({ refresh, todo }: EditFormProps<EmptyFunction>) {
 
 interface SortableTodoItemProps {
   todo: Todo
-  refresh: () => void
 }
 
-function SortableTodoItem({ todo, refresh }: SortableTodoItemProps) {
+function SortableTodoItem({ todo }: SortableTodoItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: todo.id })
 
@@ -213,9 +240,9 @@ function SortableTodoItem({ todo, refresh }: SortableTodoItemProps) {
       >
         <GripVerticalIcon className='h-4 w-4' />
       </button>
-      <FinishForm todo={todo} refresh={refresh} />
-      <EditForm todo={todo} refresh={refresh} />
-      <DeleteForm todo={todo} refresh={refresh} />
+      <FinishForm todo={todo} />
+      <EditForm todo={todo} />
+      <DeleteForm todo={todo} />
       <p className='text-sm text-gray-500'>
         {new Date(todo.created_date).toLocaleDateString(undefined, {
           month: 'numeric',
@@ -226,54 +253,32 @@ function SortableTodoItem({ todo, refresh }: SortableTodoItemProps) {
   )
 }
 
+async function onGetTodos(): Promise<Todo[]> {
+  const response = await fetch('/api/todoList')
+  if (!response.ok) {
+    throw Error('Bad Request')
+  }
+
+  const data: { todos: Todo[] } = await response.json()
+  return data.todos
+}
+
 export function TodoList() {
-  const [data, setData] = useState<{ todos: Todo[] } | undefined>()
+  const [data, setData] = useState()
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
   )
-
-  const getTodos = (callback: undefined | (() => void) = undefined) => {
-    fetch('/api/todoList')
-      .then(async res => await res.json())
-      .then(newData => {
-        const sortedTodos = [...newData.todos].sort((a, b) => {
-          if (a.is_done && !b.is_done) return 1
-          if (!a.is_done && b.is_done) return -1
-          return a.position - b.position
-        })
-
-        if (JSON.stringify(sortedTodos) !== JSON.stringify(newData.todos)) {
-          const formData = new FormData()
-          formData.append(
-            'positions',
-            JSON.stringify(
-              sortedTodos.map((todo, index) => ({
-                id: todo.id,
-                position: index,
-              })),
-            ),
-          )
-
-          fetch('/api/todoList/reorder', {
-            method: 'POST',
-            body: formData,
-          }).then(() => {
-            setData({ todos: sortedTodos })
-            if (callback) callback()
-          })
-        } else {
-          setData({ todos: sortedTodos })
-          if (callback) callback()
-        }
-      })
-  }
+  const { data: rawData } = useQuery({
+    queryKey: ['todos'],
+    queryFn: onGetTodos,
+  })
 
   useEffect(() => {
-    getTodos()
-  }, [])
+    setData(rawData)
+  }, [JSON.stringify(rawData)])
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
@@ -282,11 +287,11 @@ export function TodoList() {
       return
     }
 
-    const oldIndex = data.todos.findIndex(todo => todo.id === active.id)
-    const newIndex = data.todos.findIndex(todo => todo.id === over.id)
+    const oldIndex = data.findIndex(todo => todo.id === active.id)
+    const newIndex = data.findIndex(todo => todo.id === over.id)
 
-    const newTodos = arrayMove(data.todos, oldIndex, newIndex)
-    setData({ todos: newTodos })
+    const newTodos = arrayMove(data, oldIndex, newIndex)
+    setData(newTodos)
 
     const formData = new FormData()
     formData.append(
@@ -305,6 +310,7 @@ export function TodoList() {
     })
   }
 
+  console.log(data)
   return (
     <Dialog modal={false}>
       <DialogTrigger
@@ -327,7 +333,7 @@ export function TodoList() {
           </DialogFullHeader>
 
           <div className='px-2 flex flex-col'>
-            <AddForm refresh={getTodos} />
+            <AddForm />
 
             <div className='overflow-hidden md:max-h-full'>
               <DndContext
@@ -336,11 +342,11 @@ export function TodoList() {
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={data?.todos?.map(todo => todo.id) || []}
+                  items={data?.map(todo => todo.id) || []}
                   strategy={verticalListSortingStrategy}
                 >
-                  {data?.todos?.map(todo => (
-                    <SortableTodoItem key={todo.id} todo={todo} refresh={getTodos} />
+                  {data?.map(todo => (
+                    <SortableTodoItem key={todo.id} todo={todo} />
                   ))}
                 </SortableContext>
               </DndContext>
