@@ -66,13 +66,16 @@ async function getOauthClient(request: Request, companyId: number) {
   return new OAuthClient({
     clientId,
     clientSecret,
-    environment: process.env.QBO_ENV ?? 'sandbox',
+    environment: process.env.QBO_ENV === 'production' ? 'production' : 'sandbox',
     redirectUri: redirect,
     logging: true,
   })
 }
 
-export async function getQboUrl(request: Request, companyId: number): OAuthClient {
+export async function getQboUrl(
+  request: Request,
+  companyId: number,
+): Promise<OAuthClient> {
   return (await getOauthClient(request, companyId)).authorizeUri({
     scope: 'com.intuit.quickbooks.accounting',
   })

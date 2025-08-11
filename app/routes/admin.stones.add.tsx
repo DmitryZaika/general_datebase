@@ -1,3 +1,4 @@
+import type { ResultSetHeader } from 'mysql2'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -51,7 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const user = await getAdminUser(request)
-  const [result] = await db.execute(
+  const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO stones
      (name, type, finishing, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price, level)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
