@@ -1,19 +1,5 @@
-import { useState } from 'react'
-import {
-  type LoaderFunctionArgs,
-  redirect,
-  useLoaderData,
-  useLocation,
-  useNavigate,
-} from 'react-router'
+import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import DealsList from '~/components/DealsList'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
@@ -69,59 +55,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     )
 
     // Sales reps for filter
-    const allSalesReps = await selectMany<{ name: string }>(
-      db,
-      `SELECT DISTINCT u.name 
-       FROM users u 
-       JOIN deals d ON u.id = d.user_id
-       JOIN customers c ON d.customer_id = c.id
-       WHERE c.company_id = ? AND d.deleted_at IS NULL`,
-      [companyId],
-    )
-    const salesReps = ['All', ...allSalesReps.map(r => r.name)]
 
-    return { deals, customers, lists, salesReps, filters: { salesRep } }
+    return { deals, customers, lists }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export default function AdminDeals() {
-  const { deals, customers, lists, salesReps, filters } = useLoaderData<typeof loader>()
-  const [selectedRep, setSelectedRep] = useState(filters.salesRep)
-  const navigate = useNavigate()
-  const location = useLocation()
-
-  const onChangeRep = (value: string) => {
-    setSelectedRep(value)
-    const url = new URL(window.location.origin + location.pathname + location.search)
-    if (value === 'All') {
-      url.searchParams.delete('salesRep')
-    } else {
-      url.searchParams.set('salesRep', value)
-    }
-    navigate(url.pathname + url.search)
-  }
+  const { deals, customers, lists } = useLoaderData<typeof loader>()
 
   return (
     <>
-      <div className='mb-4 flex justify-between items-center'>
-        <div />
-        <div className='w-64'>
-          <Select value={selectedRep} onValueChange={onChangeRep}>
-            <SelectTrigger>
-              <SelectValue placeholder='Select Sales Rep' />
-            </SelectTrigger>
-            <SelectContent>
-              {salesReps.map(rep => (
-                <SelectItem key={rep} value={rep}>
-                  {rep}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <div />
       <div className='flex gap-4'>
         {lists.map(list => {
           const listDeals = deals
