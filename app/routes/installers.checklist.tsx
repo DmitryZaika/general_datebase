@@ -152,7 +152,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 // -------------
 export default function AdminChecklists() {
   const token = useAuthenticityToken()
-  const sigRef = useRef<unknown>(null)
+  const sigRef = useRef<{ clear: () => void }>(null)
 
   const form = useForm<FormData>({
     resolver,
