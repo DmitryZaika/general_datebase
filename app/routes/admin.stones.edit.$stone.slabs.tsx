@@ -65,7 +65,6 @@ interface SlabItemProps {
 
 interface LinkedSlabsGroupProps {
   slabs: Array<SlabData & { url: string }>
-  sourceStoneName: string
   onBundleUpdate?: (slabId: number, newBundle: string) => void
 }
 
@@ -193,11 +192,7 @@ function SlabItem({
   )
 }
 
-function LinkedSlabsGroup({
-  slabs,
-  sourceStoneName,
-  onBundleUpdate,
-}: LinkedSlabsGroupProps) {
+function LinkedSlabsGroup({ slabs, onBundleUpdate }: LinkedSlabsGroupProps) {
   // Create handler for printing QR codes with source stone name
 
   return (
@@ -996,7 +991,6 @@ export default function EditStoneSlabs() {
               </div>
               <LinkedSlabsGroup
                 slabs={item.slabs}
-                sourceStoneName={item.source_stone_name}
                 onBundleUpdate={handleBundleUpdate}
               />
             </div>

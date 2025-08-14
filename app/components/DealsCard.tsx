@@ -3,8 +3,6 @@ import DealItem from './DealItem'
 
 interface IProps {
   customers: ExtendedCustomer[]
-  lists: { id: number; name: string }[]
-  listId: number
   readonly?: boolean
 }
 
@@ -18,28 +16,17 @@ interface ExtendedCustomer {
   due_date?: string | null
 }
 
-import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 
-export default function DealsCard({
-  customers,
-  lists,
-  listId,
-  readonly = false,
-}: IProps) {
-  const { setNodeRef } = useDroppable({ id: listId })
-
+export default function DealsCard({ customers, readonly = false }: IProps) {
   return (
     <SortableContext
       items={customers.map(c => c.id)}
       strategy={verticalListSortingStrategy}
     >
-      <CardContent
-        ref={setNodeRef}
-        className='p-2 flex-col overflow-y-auto space-y-2 w-full min-h-[40px]'
-      >
+      <CardContent className='p-2 flex-col overflow-y-auto space-y-2 w-full min-h-[40px]'>
         {customers.map(c => (
-          <DealItem key={c.id} deal={c} lists={lists} readonly={readonly} />
+          <DealItem key={c.id} deal={c} readonly={readonly} />
         ))}
         {customers.length === 0 && (
           <p className='text-xs text-center text-slate-400'>No deals yet</p>

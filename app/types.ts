@@ -99,7 +99,7 @@ export interface StoneSearchResult {
 }
 export type Action =
   | { type: 'ADD_EVENT'; payload: Event }
-  | { type: 'REMOVE_EVENT'; payload: { id: string } }
+  | { type: 'REMOVE_EVENT'; payload: { id: number } }
   | { type: 'UPDATE_EVENT'; payload: Event }
   | { type: 'SET_EVENTS'; payload: Event[] }
 
@@ -122,8 +122,8 @@ export interface Handlers {
     zIndex: number
   }
   handleAddEvent: (event: Event) => void
-  handleUpdateEvent: (event: Event, id: string) => void
-  handleDeleteEvent: (id: string) => void
+  handleUpdateEvent: (event: Event, id: number) => void
+  handleDeleteEvent: (id: number) => void
 }
 
 // Define getters interface

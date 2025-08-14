@@ -13,9 +13,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   // Empty string means clear date
   const dateParam = dateStr === '' ? null : dateStr
-  await db.execute(
-    'UPDATE deals SET due_date = CASE WHEN list_id IN (4,5) THEN NULL ELSE ? END WHERE id = ?',
-    [dateParam, id],
-  )
+  // Do not force-clear based on list here. Clearing is handled when moving into lists 4 or 5.
+  await db.execute('UPDATE deals SET due_date = ? WHERE id = ?', [dateParam, id])
   return data({ ok: true })
 }

@@ -91,11 +91,15 @@ export default function AdminDeals() {
               }
             })
 
-          // sort by due_date (earliest first, nulls last)
           listDeals.sort((a, b) => {
-            if (!a.due_date) return 1
-            if (!b.due_date) return -1
-            return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+            const aHasDate = Boolean(a.due_date)
+            const bHasDate = Boolean(b.due_date)
+            if (!aHasDate && !bHasDate) return 0
+            if (!aHasDate) return -1
+            if (!bHasDate) return 1
+            return (
+              new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
+            )
           })
 
           return (

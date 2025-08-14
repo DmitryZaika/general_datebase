@@ -61,7 +61,7 @@ export const SchedulerProvider = ({
 }: {
   onAddEvent?: (event: Event) => void
   onUpdateEvent?: (event: Event) => void
-  onDeleteEvent?: (id: string) => void
+  onDeleteEvent?: (id: number) => void
   weekStartsOn?: startOfWeek
   children: ReactNode
   initialState?: Event[]
@@ -286,14 +286,14 @@ export const SchedulerProvider = ({
     }
   }
 
-  function handleUpdateEvent(event: Event, id: string) {
+  function handleUpdateEvent(event: Event, id: number) {
     dispatch({ type: 'UPDATE_EVENT', payload: { ...event, id } })
     if (onUpdateEvent) {
       onUpdateEvent(event)
     }
   }
 
-  function handleDeleteEvent(id: string) {
+  function handleDeleteEvent(id: number) {
     dispatch({ type: 'REMOVE_EVENT', payload: { id } })
     if (onDeleteEvent) {
       onDeleteEvent(id)
