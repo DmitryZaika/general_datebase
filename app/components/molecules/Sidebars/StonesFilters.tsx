@@ -185,9 +185,7 @@ function createToggleFilterHandler<T extends object, V extends keyof T>(
       if (newValues.length === 0 && defaultValue && !Array.isArray(defaultValue)) {
         newValues = defaultValue
       }
-    } else {
-      newValues = currentValues === itemValue ? defaultValue : itemValue
-    }
+    } else newValues = currentValues === itemValue ? defaultValue : itemValue
 
     setSearchParams({ ...searchParams, [filterKey]: newValues })
   }

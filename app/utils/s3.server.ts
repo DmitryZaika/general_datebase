@@ -1,4 +1,5 @@
-import { PassThrough } from 'node:stream'
+import type { IncomingMessage } from 'node:http'
+import { PassThrough, Readable } from 'node:stream'
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -156,9 +157,12 @@ export const downloadPDF = async (url: string) => {
       throw new Error('The requested file is not a PDF')
     }
 
-    // Return the PDF data stream
+    if (!(response.Body instanceof Readable)) {
+      throw new Error('The requested file is not a PDF')
+    }
+
     return {
-      stream: response.Body,
+      stream: response.Body as IncomingMessage | Readable,
       contentType: contentType,
       contentLength: response.ContentLength,
       filename: finalKey.split('/').pop(),
@@ -182,10 +186,11 @@ export const downloadPDF = async (url: string) => {
 // Helper function to get PDF as a buffer directly
 export const downloadPDFAsBuffer = async (url: string) => {
   const pdfData = await downloadPDF(url)
-
+  if (!pdfData?.stream) {
+    return null
+  }
   // Convert the stream to a buffer
   const chunks: Uint8Array[] = []
-  // @ts-ignore - AWS SDK stream types
   for await (const chunk of pdfData.stream) {
     chunks.push(chunk)
   }
