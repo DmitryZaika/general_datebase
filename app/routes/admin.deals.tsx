@@ -108,7 +108,6 @@ export default function AdminDeals() {
               title={list.name}
               customers={listDeals}
               id={list.id}
-              lists={lists}
               readonly
             />
           )
