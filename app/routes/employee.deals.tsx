@@ -322,7 +322,6 @@ export default function EmployeeDeals() {
             title={list.name}
             customers={board[list.id] ?? []}
             id={list.id}
-            lists={lists}
           />
         ))}
         <Outlet />
