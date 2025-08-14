@@ -20,6 +20,7 @@ import { DataTable } from '~/components/ui/data-table'
 import { FormField } from '~/components/ui/form'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
+import type { sourceEnum } from '~/schemas/customers'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -34,7 +35,7 @@ interface Customer {
   created_date: string
   className?: string
   company_id: number
-  source: 'check-in' | 'user-input'
+  source: (typeof sourceEnum)[number]
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

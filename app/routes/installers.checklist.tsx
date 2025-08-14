@@ -7,14 +7,15 @@ import {
   Form,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
+import { CustomerSearch } from '~/components/molecules/CustomerSearch'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { SignatureInput } from '~/components/molecules/SignatureInput'
+import { SignatureInput, type SigRef } from '~/components/molecules/SignatureInput'
 import { AddressInput } from '~/components/organisms/AddressInput'
-import { CustomerSearchMinimal } from '~/components/organisms/CustomerSearch'
 import { Checkbox } from '~/components/ui/checkbox'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
@@ -141,7 +142,8 @@ export async function action({ request }: ActionFunctionArgs) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getEmployeeUser(request)
-    return { user }
+    const companyId = user.company_id
+    return { user, companyId }
   } catch (_error) {
     return redirect(`/login?error=${_error}`)
   }
@@ -152,8 +154,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 // -------------
 export default function AdminChecklists() {
   const token = useAuthenticityToken()
-  const sigRef = useRef<{ clear: () => void }>(null)
-
+  const sigRef = useRef<SigRef>(null)
+  const { companyId } = useLoaderData<typeof loader>()
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
@@ -197,10 +199,15 @@ export default function AdminChecklists() {
         <FormProvider {...form}>
           <Form method='post' onSubmit={fullSubmit}>
             <input type='hidden' name='csrf' value={token} />
-            <CustomerSearchMinimal
-              form={form}
-              nameField='customer_name'
-              idField='customer_id'
+            <CustomerSearch
+              onCustomerChange={value => form.setValue('customer_id', value ?? null)}
+              selectedCustomer={form.watch('customer_id') ?? undefined}
+              companyId={companyId}
+              source='check-list'
+              error={form.formState.errors.customer_id?.message}
+              setError={error =>
+                form.setError('customer_id', { message: error ?? undefined })
+              }
             />
             <AddressInput form={form} field='installation_address' type='project' />
 

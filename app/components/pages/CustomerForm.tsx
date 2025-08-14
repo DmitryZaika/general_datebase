@@ -17,6 +17,7 @@ import {
   type CustomerDialogSchema,
   createCustomerMutation,
   customerDialogSchema,
+  type sourceEnum,
   updateCustomerMutation,
 } from '~/schemas/customers'
 import { EmailInput } from '../molecules/EmailInput'
@@ -31,7 +32,7 @@ interface CustomerFormProps {
   onSuccess: (value: number, name: string) => void
   companyId: number
   customerId?: number
-  source: 'check-in' | 'user-input'
+  source: (typeof sourceEnum)[number]
 }
 
 const getCustomerInfo = async (customerId: number) => {

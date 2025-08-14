@@ -104,7 +104,7 @@ export default function EventStyled({
         <Button
           onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation()
-            handlers.handleDeleteEvent(event?.id.toString())
+            handlers.handleDeleteEvent(event?.id)
             onDelete?.(event?.id)
           }}
           variant='destructive'

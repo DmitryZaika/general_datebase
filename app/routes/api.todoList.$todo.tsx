@@ -1,10 +1,8 @@
 // app/routes/todoList.ts
 
-import { zodResolver } from '@hookform/resolvers/zod'
 import type { ActionFunctionArgs } from 'react-router'
-import { getValidatedFormData } from 'remix-hook-form'
 import { db } from '~/db.server'
-import { type TTodoListSchema, todoListSchema } from '~/schemas/general'
+import { todoListSchema } from '~/schemas/general'
 import { getEmployeeUser } from '~/utils/session.server'
 import { forceRedirectError } from '~/utils/toastHelpers'
 
@@ -75,7 +73,5 @@ export async function action({ params, request }: ActionFunctionArgs) {
     await updateDoneAction(todoId, isDone, user.id)
     return Response.json({ success: true })
   }
-  6
-
   return Response.json({ success: false })
 }

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -73,6 +73,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
     queryKey: ['faucet_type'],
     queryFn: fetchFaucetType,
   })
+  const [sameAddress, setSameAddress] = useState(false)
 
   const form = useForm<TCustomerSchema>({
     resolver,
@@ -106,11 +107,10 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
   }
 
   useEffect(() => {
-    const address = form.watch('same_address')
-    if (address) {
-      form.setValue('project_address', form.getValues('billing_address'))
+    if (!sameAddress) {
+      form.setValue('project_address', undefined)
     }
-  }, [form.watch('same_address')])
+  }, [sameAddress])
 
   const roomValues = form.watch('rooms')
   const extrasValues = form.watch('extras') || []
@@ -144,25 +144,26 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
           <Form id='contractForm' onSubmit={fullSubmit}>
             <AuthenticityTokenInput />
             <div className=''>
-              <CustomerSearch form={form} companyId={companyId} source='user-input' />
+              <CustomerSearch
+                onCustomerChange={value => form.setValue('customer_id', value ?? null)}
+                companyId={companyId}
+                source='user-input'
+                selectedCustomer={form.watch('customer_id') ?? undefined}
+                error={form.formState.errors.customer_id?.message}
+                setError={error =>
+                  form.setError('customer_id', { message: error ?? undefined })
+                }
+              />
               <div className='flex items-center space-x-2 my-2'>
-                <FormField
-                  control={form.control}
-                  name='same_address'
-                  render={({ field }) => (
-                    <>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        id='same_address'
-                        label='Project address same as billing address'
-                      />
-                    </>
-                  )}
+                <Switch
+                  checked={sameAddress}
+                  onCheckedChange={setSameAddress}
+                  id='same_address'
+                  label='Project address same as billing address'
                 />
               </div>
 
-              {!form.watch('same_address') && (
+              {!sameAddress && (
                 <AddressInput form={form} field='project_address' type='project' />
               )}
 
