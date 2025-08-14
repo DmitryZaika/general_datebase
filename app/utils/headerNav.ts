@@ -26,6 +26,7 @@ export const getMirroredUrl = (isAdminPage: boolean, location: Location) => {
     'supports',
     'documents',
     'images',
+    'deals',
     'transactions',
   ]
 

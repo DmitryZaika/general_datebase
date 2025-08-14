@@ -1,12 +1,10 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   redirect,
 } from 'react-router'
-import { getValidatedFormData } from 'remix-hook-form'
 import { db } from '~/db.server'
-import { type TTodoListSchema, todoListSchema } from '~/schemas/general'
+import { todoListSchema } from '~/schemas/general'
 import type { Todo } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'

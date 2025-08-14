@@ -8,14 +8,49 @@ interface RHFField {
   value: unknown
 }
 
+export interface SigRef {
+  isEmpty: () => boolean
+  getTrimmedCanvas: () => { toDataURL: (format: string) => string }
+  clear: () => void
+}
+
 interface Props {
   field: RHFField
   name?: string
-  sigRef: React.RefObject<unknown>
+  sigRef: React.RefObject<SigRef | null>
+}
+
+interface ModType {
+  default:
+    | React.ComponentType<{
+        ref: React.RefObject<unknown>
+        penColor: string
+        backgroundColor: string
+        canvasProps: { width: number; height: number; className: string }
+        onEnd: () => void
+      }>
+    | {
+        SignatureCanvas: React.LazyExoticComponent<
+          React.ComponentType<{
+            ref: React.RefObject<unknown>
+            penColor: string
+            backgroundColor: string
+            canvasProps: { width: number; height: number; className: string }
+            onEnd: () => void
+          }>
+        >
+      }
+  SignatureCanvas: React.ComponentType<{
+    ref: React.RefObject<unknown>
+    penColor: string
+    backgroundColor: string
+    canvasProps: { width: number; height: number; className: string }
+    onEnd: () => void
+  }>
 }
 
 const SigCanvasLazy = React.lazy(() =>
-  import('react-signature-canvas').then((mod: unknown) => {
+  import('react-signature-canvas').then((mod: ModType) => {
     const C =
       typeof mod.default === 'function'
         ? mod.default

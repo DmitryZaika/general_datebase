@@ -129,7 +129,7 @@ describe('Contract Integration Tests', () => {
 
       // Verify new customer was created
       const customers = await DatabaseTestHelper.selectFromTable('customers', {
-        name: customerData.name,
+        customer_id: customerId,
       })
       expect(customers.length).toBe(2) // One from setup, one from sell
 
