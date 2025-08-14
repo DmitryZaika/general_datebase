@@ -85,7 +85,6 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
   useEffect(() => {
     if (pickerCoords && dateInputRef.current) {
       const el = dateInputRef.current
-      // @ts-ignore
       el.showPicker ? el.showPicker() : el.focus()
     }
   }, [pickerCoords])

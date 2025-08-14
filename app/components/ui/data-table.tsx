@@ -6,6 +6,7 @@ import {
   type SortingState,
   useReactTable,
 } from '@tanstack/react-table'
+import type React from 'react'
 import { useState } from 'react'
 
 import {
@@ -20,6 +21,17 @@ import {
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+}
+
+function hasTableRowExtras(value: unknown): value is {
+  className?: string
+  onClick?: (e: React.MouseEvent<HTMLTableRowElement>) => void
+} {
+  if (value === null || typeof value !== 'object') return false
+  const obj = value as Record<string, unknown>
+  const classNameOk = obj.className === undefined || typeof obj.className === 'string'
+  const onClickOk = obj.onClick === undefined || typeof obj.onClick === 'function'
+  return classNameOk && onClickOk
 }
 
 export function DataTable<TData, TValue>({
@@ -62,28 +74,29 @@ export function DataTable<TData, TValue>({
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map(row => (
-              <TableRow
-                key={row.id}
-                data-state={row.getIsSelected() && 'selected'}
-                // @ts-ignore
-                className={row.original?.className}
-                // @ts-ignore
-                onClick={e => {
-                  // @ts-ignore
-                  if (row.original?.onClick) {
-                    // @ts-ignore
-                    row.original.onClick(e)
-                  }
-                }}
-              >
-                {row.getVisibleCells().map(cell => (
-                  <TableCell key={cell.id} className='whitespace-nowrap pl-4'>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
+            table.getRowModel().rows.map(row =>
+              (() => {
+                const extras = hasTableRowExtras(row.original)
+                  ? row.original
+                  : undefined
+                return (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && 'selected'}
+                    className={extras?.className}
+                    onClick={e => {
+                      extras?.onClick?.(e)
+                    }}
+                  >
+                    {row.getVisibleCells().map(cell => (
+                      <TableCell key={cell.id} className='whitespace-nowrap pl-4'>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                )
+              })(),
+            )
           ) : (
             <TableRow>
               <TableCell colSpan={columns.length} className='h-24 text-center'>
