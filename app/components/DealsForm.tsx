@@ -54,7 +54,16 @@ export function DealsForm({
             {Object.entries(hiddenFields).map(([k, v]) => (
               <input type='hidden' name={k} value={String(v)} key={k} />
             ))}
-            <CustomerSearch form={form} companyId={companyId} source='user-input' />
+            <CustomerSearch
+              onCustomerChange={value => form.setValue('customer_id', value ?? null)}
+              companyId={companyId}
+              source='user-input'
+              selectedCustomer={form.watch('customer_id') ?? undefined}
+              error={form.formState.errors.customer_id?.message}
+              setError={error =>
+                form.setError('customer_id', { message: error ?? undefined })
+              }
+            />
             <FormField
               control={form.control}
               name='amount'

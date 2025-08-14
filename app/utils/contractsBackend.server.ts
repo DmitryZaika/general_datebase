@@ -18,8 +18,6 @@ interface Sale {
   price: number | null
   project_address: string | null
   square_feet: number | null
-  name: string
-  address: string | null
   postal_code: string | null
   phone: string | null
   email: string | null
@@ -65,8 +63,6 @@ const getSale = async (saleId: number): Promise<Sale | undefined> => {
           s.project_address,
           s.square_feet,
           s.extras,
-          c.name,
-          c.address,
           c.postal_code,
           c.phone,
           c.email,
@@ -200,12 +196,9 @@ export async function getCustomerSchemaFromSaleId(
 
   // 6. Build final schema object
   const final: TCustomerSchema = {
-    name: sale.name,
     customer_id: sale.customer_id,
     seller_id: sale.seller_id || undefined,
-    billing_address: sale.address || '',
-    project_address: sale.project_address || '',
-    same_address: (sale.project_address || '') === (sale.address || ''),
+    project_address: sale.project_address || undefined,
     price: sale.price || 0,
     notes_to_sale: sale.notes || '',
     rooms: Object.values(roomsMap),

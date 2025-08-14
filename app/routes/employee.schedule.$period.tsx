@@ -140,7 +140,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
     period: period as Period,
     currentDate: currentDateStr,
     events: events.map(event => ({
-      id: event.id.toString(),
+      id: event.id,
       title: event.title,
       description: event.description,
       startDate: new Date(event.start_date),

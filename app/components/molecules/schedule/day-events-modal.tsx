@@ -75,7 +75,7 @@ export default function DayEventsModal({
 
   const handleDeleteEvent = async (eventId: number) => {
     if (confirm('Are you sure you want to delete this event?')) {
-      handlers.handleDeleteEvent(eventId.toString())
+      handlers.handleDeleteEvent(eventId)
     }
   }
 

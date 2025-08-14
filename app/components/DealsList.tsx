@@ -1,3 +1,4 @@
+import { useDroppable } from '@dnd-kit/core'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -29,9 +30,13 @@ export default function DealsList({
   lists,
   readonly = false,
 }: DealsListProps) {
-  const locked = readonly || [1, 2, 3, 4, 5].includes(id) // Lock all in readonly
+  const locked = readonly || [1, 2, 3, 4, 5, 6].includes(id) // Lock all in readonly
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(title)
+  const { setNodeRef } = useDroppable({
+    id: `list-${id}`,
+    data: { type: 'list', listId: id },
+  })
 
   async function save() {
     if (value.trim() === '' || value === title) {
@@ -47,6 +52,7 @@ export default function DealsList({
   }
   return (
     <Card
+      ref={setNodeRef}
       className={`min-w-[18rem] w-72 max-h-[calc(100vh-7rem)] flex flex-col h-full shadow-sm ${id === 4 ? 'bg-green-100' : id === 5 ? 'bg-red-100' : ''}`}
     >
       <CardHeader className='bg-black rounded-t-xl py-2 px-4'>
