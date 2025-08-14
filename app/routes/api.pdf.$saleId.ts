@@ -408,6 +408,9 @@ async function getData(saleId: number) {
 
 async function getPdf(contractType: string) {
   const pdfData = await downloadPDFAsBuffer(urls[contractType as keyof typeof urls])
+  if (!pdfData) {
+    throw new Error('PDF data not found')
+  }
   const pdfDoc = await PDFDocument.load(pdfData.buffer)
   const pdfForm = pdfDoc.getForm()
   return { pdfDoc, pdfData, pdfForm }
