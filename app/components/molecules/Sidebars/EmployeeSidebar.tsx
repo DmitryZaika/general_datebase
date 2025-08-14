@@ -218,10 +218,10 @@ export function EmployeeSidebar({
     companyId,
   )
 
-  const inventoryTitles = ['Stones', 'Sinks', 'Faucets'] as const
-  const crmTitles = ['Customers', 'Deals'] as const
-  const resourceTitles = ['Supports', 'Documents', 'Images', 'Instructions'] as const
-  const operationTitles = ['Suppliers', 'Checklists', 'Special Order'] as const
+  const inventoryTitles = ['Stones', 'Sinks', 'Faucets']
+  const crmTitles = ['Customers', 'Deals']
+  const resourceTitles = ['Supports', 'Documents', 'Images', 'Instructions']
+  const operationTitles = ['Suppliers', 'Checklists', 'Special Order']
 
   const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))
   const crmItems = items.filter(item => crmTitles.includes(item.title))
