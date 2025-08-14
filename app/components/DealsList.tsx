@@ -18,7 +18,6 @@ interface DealsListProps {
     position?: number
     due_date?: string | null
   }[]
-  lists: { id: number; name: string }[]
   id: number
   readonly?: boolean
 }
@@ -27,7 +26,6 @@ export default function DealsList({
   title,
   customers,
   id,
-  lists,
   readonly = false,
 }: DealsListProps) {
   const locked = readonly || [1, 2, 3, 4, 5, 6].includes(id) // Lock all in readonly
@@ -93,7 +91,7 @@ export default function DealsList({
           )}
         </div>
       </CardHeader>
-      <DealsCard customers={customers} lists={lists} listId={id} readonly={readonly} />
+      <DealsCard customers={customers} readonly={readonly} />
       {!readonly && (
         <div className='p-3 border-t'>
           <Link to={`add?list_id=${id}`} relative='path'>
