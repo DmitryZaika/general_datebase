@@ -34,6 +34,7 @@ export default function DealsList({
   const { setNodeRef } = useDroppable({
     id: `list-${id}`,
     data: { type: 'list', listId: id },
+    disabled: readonly,
   })
 
   async function save() {
