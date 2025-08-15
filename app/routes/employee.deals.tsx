@@ -253,7 +253,6 @@ export default function EmployeeDeals() {
     if (!over) return
 
     const activeId = Number(active.id)
-    // support dropping over a list container (empty list) or over another deal
     let toListId: number | undefined
     const overData = over.data?.current
     if (overData?.type === 'list') {
@@ -274,10 +273,8 @@ export default function EmployeeDeals() {
     const fromListId = findContainerOfDeal(activeId)
     if (fromListId === undefined || toListId === undefined) return
 
-    // If same list or invalid drop target, do nothing (sorting is automatic)
     if (fromListId === toListId) return
 
-    // Move deal to new list, then sort both lists and persist
     setBoard(prev => {
       const copy = { ...prev }
       const fromArr = [...(copy[fromListId] || [])]
@@ -292,7 +289,6 @@ export default function EmployeeDeals() {
       return copy
     })
 
-    // Persist only the moved deal's list change. Positions inside lists are managed by sort rule.
     await fetch('/api/deals/reorder', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

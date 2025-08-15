@@ -53,6 +53,7 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: deal.id,
     data: { listId: deal.list_id, position: deal.position, type: 'deal' },
+    disabled: readonly,
   })
 
   const style: React.CSSProperties = {
@@ -105,33 +106,38 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
       ref={setNodeRef}
       style={style}
       className={`relative flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3 ${isSaving ? 'opacity-60' : ''}`}
-      {...attributes}
-      {...listeners}
+      {...(!readonly ? attributes : {})}
+      {...(!readonly ? listeners : {})}
     >
       {/* Title row with drag handle and edit icon */}
       <div className='flex items-center w-full gap-2'>
-        <div className='flex items-center cursor-grab gap-2 flex-1'>
-          <button
-            className='touch-none cursor-grab opacity-50 hover:opacity-100 p-1'
-            aria-label='Drag'
-            onPointerDown={e => e.stopPropagation()}
-          >
-            <GripVertical className='w-4 h-4' />
-          </button>
+        <div
+          className={`flex items-center gap-2 flex-1 ${readonly ? '' : 'cursor-grab'}`}
+        >
+          {!readonly && (
+            <button
+              className='touch-none cursor-grab opacity-50 hover:opacity-100 p-1'
+              aria-label='Drag'
+              onPointerDown={e => e.stopPropagation()}
+            >
+              <GripVertical className='w-4 h-4' />
+            </button>
+          )}
           <h3 className='text-xl font-medium truncate whitespace-normal flex-1 select-none'>
             {deal.name}
           </h3>
         </div>
-        <Link
-          to={`edit/${deal.id}`}
-          className='absolute top-1 right-1 z-20'
-          onPointerDown={e => e.stopPropagation()}
-        >
-          <Pencil className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black' />
-        </Link>
+        {!readonly && (
+          <Link
+            to={`edit/${deal.id}`}
+            className='absolute top-1 right-1 z-20'
+            onPointerDown={e => e.stopPropagation()}
+          >
+            <Pencil className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black' />
+          </Link>
+        )}
       </div>
 
-      {/* Amount inline edit */}
       <div className='flex items-center gap-2 w-full'>
         <p className='text-sm font-medium'>Amount:</p>
         {editAmount ? (
@@ -244,6 +250,7 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
           }}
           defaultValue={localDate ?? ''}
           onChange={e => {
+            console.log(e)
             const selected = e.currentTarget.value
             setPickerCoords(null)
             if (selected) submitDate(selected)
