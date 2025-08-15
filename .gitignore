@@ -7,3 +7,4 @@ node_modules
 public/images
 build.log
 oAuthClient-log.log
+tsconfig.tsbuildinfo

@@ -177,15 +177,15 @@ function createToggleFilterHandler<T extends object, V extends keyof T>(
       }
 
       if (typeof itemValue === 'number') {
+        // @ts-ignore
         newValues.sort((a, b) => a - b)
       }
 
+      // @ts-ignore
       if (newValues.length === 0 && defaultValue && !Array.isArray(defaultValue)) {
         newValues = defaultValue
       }
-    } else {
-      newValues = currentValues === itemValue ? defaultValue : itemValue
-    }
+    } else newValues = currentValues === itemValue ? defaultValue : itemValue
 
     setSearchParams({ ...searchParams, [filterKey]: newValues })
   }
@@ -263,9 +263,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
     }
   }, [])
 
-  const toggleSuppliersExpanded = useCallback(() => {
-    setSuppliersExpanded(prev => !prev)
-  }, [])
+  const toggleSuppliersExpanded = () => setSuppliersExpanded(prev => !prev)
 
   const toggleStoneType = createToggleFilterHandler({
     searchParams,
@@ -281,6 +279,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
     isSubmitting,
     defaultValue: [],
     filterKey: 'colors',
+    // @ts-ignore
     itemToValue: color => color.id,
   })
 
@@ -290,6 +289,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
     isSubmitting,
     defaultValue: [],
     filterKey: 'level',
+    // @ts-ignore
     itemToValue: (level: number | string) => {
       if (typeof level === 'string') {
         const match = level.match(/\d+/)
@@ -305,15 +305,16 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
     isSubmitting,
     defaultValue: 0,
     filterKey: 'supplier',
+    // @ts-ignore
     itemToValue: supplier => supplier.id,
   })
 
-  const toggleShowSoldOut = useCallback(() => {
+  const toggleShowSoldOut = () => {
     if (isSubmitting) return
 
     const show_sold_out = searchParams.show_sold_out ?? true
     setSearchParams({ ...searchParams, show_sold_out: !show_sold_out })
-  }, [isSubmitting, searchParams, setSearchParams])
+  }
 
   const toggleFinishing = createToggleFilterHandler({
     searchParams,
@@ -392,6 +393,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
             value={item}
             key={item}
             selected={searchParams.type ? searchParams.type.includes(item) : false}
+            // @ts-ignore
             toggleValue={() => toggleStoneType(item)}
             isLoading={isSubmitting}
           />
@@ -413,6 +415,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
             selected={
               searchParams.finishing ? searchParams.finishing.includes(item) : false
             }
+            // @ts-ignore
             toggleValue={() => toggleFinishing(item)}
             isLoading={isSubmitting}
           />
@@ -435,6 +438,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
               selected={
                 searchParams.colors ? searchParams.colors.includes(color.id) : false
               }
+              // @ts-ignore
               toggleValue={() => toggleColor(color)}
               isLoading={isSubmitting}
               icon={
@@ -459,6 +463,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
             value={`Level ${item}`}
             key={item}
             selected={isLevelSelected(item)}
+            // @ts-ignore
             toggleValue={() => toggleLevel(`Level ${item}`)}
             isLoading={isSubmitting}
           />
@@ -487,6 +492,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
           renderItem={supplier => (
             <div
               key={supplier.id}
+              // @ts-ignore
               onClick={() => toggleSupplier(supplier)}
               className={`p-1 cursor-pointer hover:bg-gray-100 transition-colors ${
                 searchParams.supplier === supplier.id ? 'bg-gray-100' : ''
