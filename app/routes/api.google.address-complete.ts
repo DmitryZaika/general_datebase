@@ -13,15 +13,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const url = new URL('https://places.googleapis.com/v1/places:autocomplete')
 
-  const headers: HeadersInit = {
+  // Field mask for autocomplete response
+  const autocompleteHeaders: HeadersInit = {
     'Content-Type': 'application/json',
     'X-Goog-Api-Key': GOOGLE_KEY || '',
+    'X-Goog-FieldMask':
+      'suggestions.placePrediction.text,suggestions.placePrediction.placeId',
+  }
+
+  // Field mask for place details (zip code comes from addressComponents)
+  const detailsHeaders: HeadersInit = {
+    'Content-Type': 'application/json',
+    'X-Goog-Api-Key': GOOGLE_KEY || '',
+    'X-Goog-FieldMask': 'addressComponents',
   }
 
   const gRes = await fetch(url, {
     method: 'post',
     signal: request.signal,
-    headers,
+    headers: autocompleteHeaders,
     body: JSON.stringify({
       input: q,
       languageCode: 'en',
@@ -33,29 +43,36 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   const gJson = (await gRes.json()) as {
-    suggestions: { placePrediction: { text: string; placeId: string } }[]
+    suggestions: {
+      placePrediction: {
+        text: string | { text: string }
+        placeId: string
+      }
+    }[]
   }
 
-  if (gJson.suggestions === undefined || gJson.suggestions.length === 0) {
+  if (!gJson.suggestions || gJson.suggestions.length === 0) {
     return data({ suggestions: [] })
   }
 
-  // Optionally fetch zip codes for each suggestion
   const suggestionsWithZipCodes = await Promise.all(
     gJson.suggestions.map(async s => {
-      // Fetch place details to get zip code
-      const detailsUrl = new URL(
-        `https://places.googleapis.com/v1/places/${s.placePrediction.placeId}`,
-      )
+      const placeId = s.placePrediction.placeId
+      const descriptionText =
+        typeof s.placePrediction.text === 'string'
+          ? s.placePrediction.text
+          : (s.placePrediction.text?.text ?? '')
+
+      const detailsUrl = new URL(`https://places.googleapis.com/v1/places/${placeId}`)
       const detailsRes = await fetch(detailsUrl, {
         method: 'get',
         signal: request.signal,
-        headers,
+        headers: detailsHeaders,
       })
 
       if (detailsRes.ok) {
         const detailsJson = (await detailsRes.json()) as {
-          addressComponents: Array<{
+          addressComponents?: Array<{
             longText: string
             shortText: string
             types: string[]
@@ -67,16 +84,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
         )?.longText
 
         return {
-          description: s.placePrediction.text,
-          place_id: s.placePrediction.placeId,
-          zip_code: zipCode,
+          description: { text: descriptionText },
+          place_id: placeId,
+          zip_code: zipCode ?? null,
         }
       }
 
-      // Fallback if details fetch fails
       return {
-        description: s.placePrediction.text,
-        place_id: s.placePrediction.placeId,
+        description: { text: descriptionText },
+        place_id: placeId,
         zip_code: null,
       }
     }),

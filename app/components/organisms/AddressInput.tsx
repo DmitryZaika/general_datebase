@@ -67,9 +67,10 @@ export function AddressInput<T extends FieldValues>({
   })
 
   function handleSelect(address: string, zipCode: string) {
-    const addressWithZip = (
-      zipField ? replaceZipCode(address, zipCode ?? '') : address
-    ) as FieldPathValue<T, StringPath<T>>
+    const addressWithZip = replaceZipCode(address, zipCode ?? '') as FieldPathValue<
+      T,
+      StringPath<T>
+    >
 
     form.setValue(field, addressWithZip, {
       shouldValidate: true,
