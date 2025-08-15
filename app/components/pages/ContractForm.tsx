@@ -73,7 +73,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
     queryKey: ['faucet_type'],
     queryFn: fetchFaucetType,
   })
-  const [sameAddress, setSameAddress] = useState(false)
+  const [sameAddress, setSameAddress] = useState(true)
 
   const form = useForm<TCustomerSchema>({
     resolver,

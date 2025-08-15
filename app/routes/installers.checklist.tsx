@@ -210,8 +210,6 @@ export default function AdminChecklists() {
               }
             />
             <AddressInput form={form} field='installation_address' type='project' />
-
-            {/* Checklist items */}
             <div className='my-4 space-y-2'>
               <p className='font-medium'>Check all that apply</p>
               {checklistItems.map(([name, label]) => (
