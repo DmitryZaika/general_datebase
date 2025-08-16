@@ -44,6 +44,10 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
   const [isSaving, setIsSaving] = useState(false)
   const dateInputRef = useRef<HTMLInputElement | null>(null)
   const descTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const descDisplayRef = useRef<HTMLParagraphElement | null>(null)
+  const [descExpanded, setDescExpanded] = useState(false)
+  const [descOverflow, setDescOverflow] = useState(false)
+  const [lineHeightPx, setLineHeightPx] = useState<number>(20)
   const [pickerCoords, setPickerCoords] = useState<{
     top: number
     left: number
@@ -95,6 +99,20 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
       resizeTextarea(descTextareaRef.current)
     }
   }, [editDesc])
+
+  // Detect if description exceeds 4 lines
+  useEffect(() => {
+    if (editDesc) return
+    const el = descDisplayRef.current
+    if (!el) return
+    const styles = window.getComputedStyle(el)
+    const lh = parseFloat(styles.lineHeight)
+    const computedLineHeight = Number.isFinite(lh) ? lh : 20
+    setLineHeightPx(computedLineHeight)
+    const maxH = computedLineHeight * 4
+    // Use scrollHeight vs desired max height to decide overflow
+    setDescOverflow(el.scrollHeight > maxH + 1)
+  }, [deal.description, editDesc])
 
   function formatDisplay(dateStr: string) {
     const d = parseLocal(dateStr)
@@ -217,13 +235,34 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
           }}
         />
       ) : deal.description ? (
-        <p
-          className={`text-sm text-slate-500 mt-1 break-words whitespace-pre-wrap ${readonly ? '' : 'cursor-pointer'}`}
-          onClick={() => !readonly && setEditDesc(true)}
-          onPointerDown={e => e.stopPropagation()}
-        >
-          {deal.description}
-        </p>
+        <div className='w-full'>
+          <p
+            ref={descDisplayRef}
+            className={`text-sm leading-5 text-slate-500 mt-1 break-words whitespace-pre-wrap ${readonly ? '' : 'cursor-pointer'}`}
+            onClick={() => !readonly && setEditDesc(true)}
+            onPointerDown={e => e.stopPropagation()}
+            style={{
+              maxHeight: descExpanded ? 'none' : `${lineHeightPx * 4}px`,
+              overflow: descExpanded ? 'visible' : 'hidden',
+            }}
+          >
+            {deal.description}
+          </p>
+          {descOverflow && (
+            <div className='mt-1'>
+              <Button
+                variant='ghost'
+                size='sm'
+                className='h-6 px-2 text-xs'
+                onClick={() => setDescExpanded(v => !v)}
+                onPointerDown={e => e.stopPropagation()}
+                style={{ position: 'relative', zIndex: 20 }}
+              >
+                {descExpanded ? 'Show less' : 'Show more'}
+              </Button>
+            </div>
+          )}
+        </div>
       ) : (
         !readonly && (
           <p
@@ -250,7 +289,6 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
           }}
           defaultValue={localDate ?? ''}
           onChange={e => {
-            console.log(e)
             const selected = e.currentTarget.value
             setPickerCoords(null)
             if (selected) submitDate(selected)
