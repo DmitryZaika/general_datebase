@@ -30,7 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function TeachMode() {
   const { instructions } = useLoaderData() as { instructions: InstructionMedium[] }
 
-  const [text, setText] = React.useState<null>(null)
+  const [text, setText] = React.useState('')
   const [selected, setSelected] = React.useState<string>('')
   const [submitted, setSubmitted] = React.useState(false)
   const [loadingMCQ, setLoadingMCQ] = React.useState(false)
@@ -149,8 +149,27 @@ export default function TeachMode() {
 
   const handleFormSubmit = async () => {
     setText('')
+    const prompt = `
+      You are a question generator. You MUST return JSON ALWAYS. You will return a JSON
+      object with the following keys: "question", "options", and "answer".
+      The "question" key should contain a string representing the question.
+      The "options" key should contain an array of strings representing the answer options.
+      The "answer" key should contain a string representing the correct answer.
 
-    const query = encodeURIComponent('Generate a question')
+      Here are some examples:
+      {
+        "question": "What is the capital of France?",
+        "options": ["Paris", "London", "Berlin", "Madrid"],
+        "answer": "Paris"
+      }
+
+      {
+        "question": "What is the capital of Spain?",
+        "options": ["Paris", "London", "Berlin", "Madrid"],
+        "answer": "Madrid"
+      }
+     `
+    const query = encodeURIComponent(prompt)
     const sse = new EventSource(`/api/chat?query=${query}&isNew=true`)
 
     sse.addEventListener('message', event => {
