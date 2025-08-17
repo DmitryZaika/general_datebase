@@ -2,6 +2,7 @@ import * as React from 'react'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { db } from '~/db.server'
 import type { InstructionSlim } from '~/types'
+import { DONE_KEY } from '~/utils/constants'
 import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 import { selectMany } from '../utils/queryHelpers'
 
@@ -29,12 +30,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function TeachMode() {
   const { instructions } = useLoaderData() as { instructions: InstructionMedium[] }
 
-  const [mcq, setMcq] = React.useState<{
-    question?: string
-    options?: Record<string, string>
-    correct?: string
-  } | null>(null)
-  const [selected, setSelected] = React.useState<string | null>(null)
+  const [text, setText] = React.useState<null>(null)
+  const [selected, setSelected] = React.useState<string>('')
   const [submitted, setSubmitted] = React.useState(false)
   const [loadingMCQ, setLoadingMCQ] = React.useState(false)
   const [expanded, setExpanded] = React.useState<Record<number, boolean>>({})
@@ -150,70 +147,23 @@ export default function TeachMode() {
     )
   }
 
-  async function generateMCQFromInstructions(prompt: InstructionMedium[]) {
-    const formatInstructions = (instr: InstructionMedium[]) =>
-      instr
-        .map(i => `${i.title}:\n${i.rich_text.replace(/<[^>]+>/g, '').trim()}\n`)
-        .join('\n')
+  const handleFormSubmit = async () => {
+    setText('')
 
-    const serializedPrompt = formatInstructions(prompt)
-    console.log('[DEBUG] Serialized prompt:', serializedPrompt)
+    const query = encodeURIComponent('Generate a question')
+    const sse = new EventSource(`/api/chat?query=${query}&isNew=true`)
 
-    setLoadingMCQ(true)
-    let liveAnswer = ''
-
-    try {
-      const res = await fetch(
-        `/api/chat?query=${encodeURIComponent(serializedPrompt)}&isNew=true`,
-      )
-      console.log('[DEBUG] Fetch response:', res)
-
-      if (!res.body) {
-        console.error('[ERROR] No response body!')
-        setLoadingMCQ(false)
-        return
+    sse.addEventListener('message', event => {
+      if (event.data === DONE_KEY) {
+        sse.close()
+      } else {
+        setText(prevResults => prevResults + event.data)
       }
+    })
 
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let done = false
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read()
-        done = readerDone
-        if (value) {
-          const chunk = decoder.decode(value, { stream: true })
-          console.log('[DEBUG] Chunk received:', chunk)
-
-          const lines = chunk.split(/\r?\n/).filter(line => line.startsWith('data:'))
-          for (const line of lines) {
-            const data = line.replace(/^data:\s*/, '')
-            if (data === 'DONE') continue
-            liveAnswer += data
-
-            setMcq(prev => ({
-              ...(prev || {}),
-              question: liveAnswer.replace(/\n/g, '<br>'),
-            }))
-          }
-        }
-      }
-
-      console.log('[DEBUG] Full liveAnswer received:', liveAnswer)
-
-      // Try parsing JSON at the end
-      try {
-        const parsed = JSON.parse(liveAnswer.replace(/\[DONE\].*$/s, '').trim())
-        console.log('[DEBUG] Parsed MCQ JSON:', parsed)
-        setMcq(parsed)
-      } catch (err) {
-        console.warn('[WARN] Could not parse JSON at end, using live text.', err)
-      }
-    } catch (err) {
-      console.error('[ERROR] Error fetching MCQ:', err)
-    } finally {
-      setLoadingMCQ(false)
-    }
+    sse.addEventListener('error', () => {
+      sse.close()
+    })
   }
 
   return (
@@ -225,7 +175,7 @@ export default function TeachMode() {
       ))}
 
       <button
-        onClick={() => generateMCQFromInstructions(instructions)}
+        onClick={handleFormSubmit}
         disabled={loadingMCQ}
         style={{
           marginTop: 20,
@@ -236,40 +186,18 @@ export default function TeachMode() {
         {loadingMCQ ? 'Generating...' : 'Generate Question'}
       </button>
 
-      {mcq && (
+      {true && (
         <div
+          className='mt-5 p-5'
           style={{
-            marginTop: 40,
-            padding: 20,
             border: '2px solid #888',
             borderRadius: 8,
           }}
         >
           <h3>Question:</h3>
-          <p dangerouslySetInnerHTML={{ __html: mcq.question || '' }} />
+          <p>{text}</p>
 
-          {mcq.options ? (
-            <ul style={{ listStyle: 'none', padding: 0 }}>
-              {Object.entries(mcq.options).map(([key, value]) => (
-                <li key={key}>
-                  <label>
-                    <input
-                      type='radio'
-                      name='mcq'
-                      value={key}
-                      checked={selected === key}
-                      onChange={() => setSelected(key)}
-                    />
-                    {key}: {value}
-                  </label>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No options available for this question.</p>
-          )}
-
-          {mcq.correct && (
+          {true && (
             <button
               onClick={() => {
                 if (!selected) return alert('Select an option first')
@@ -281,11 +209,11 @@ export default function TeachMode() {
             </button>
           )}
 
-          {submitted && selected && mcq.correct && (
+          {submitted && selected && (
             <p style={{ fontWeight: 700, marginTop: 10 }}>
-              {selected === mcq.correct
+              {selected === 'hello'
                 ? '✅ Correct!'
-                : `❌ Incorrect, correct answer: ${mcq.correct}`}
+                : `❌ Incorrect, correct answer: 6}`}
             </p>
           )}
         </div>
