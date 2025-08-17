@@ -158,34 +158,80 @@ export default function TeachMode() {
     }
   }
 
+  // Function to get random content from instructions
+  const getRandomInstructionContent = React.useCallback(() => {
+    if (instructions.length === 0) return null
+
+    // Get a random instruction
+    const randomInstruction =
+      instructions[Math.floor(Math.random() * instructions.length)]
+
+    // Clean HTML content for better processing
+    const cleanText = randomInstruction.rich_text
+      ?.replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    return {
+      title: randomInstruction.title,
+      content: cleanText || randomInstruction.title,
+    }
+  }, [instructions])
+
   const handleFormSubmit = async () => {
+    if (loadingMCQ) return
+
+    setLoadingMCQ(true)
     setText('')
-    const prompt = `
-      You are a question generator. You MUST return JSON ALWAYS. You will return a JSON
-      object with the following keys: "question", "options", and "answer".
-      The "question" key should contain a string representing the question.
-      The "options" key should contain an array of strings representing the answer options.
-      The "answer" key should contain a string representing the correct answer.
+    setSelected('')
+    setSubmitted(false)
 
-      Here are some examples:
-      {
-        "question": "What is the capital of France?",
-        "options": ["Paris", "London", "Berlin", "Madrid"],
-        "answer": "Paris"
-      }
+    // Get random content from instructions
+    const randomContent = getRandomInstructionContent()
 
-      {
-        "question": "What is the capital of Spain?",
-        "options": ["Paris", "London", "Berlin", "Madrid"],
-        "answer": "Madrid"
-      }
-     `
+    if (!randomContent) {
+      alert('No instruction content available to generate questions from')
+      setLoadingMCQ(false)
+      return
+    }
+
+    // Create a dynamic prompt based on the actual instruction content
+    const prompt = `You are a question generator. You MUST return JSON ALWAYS. You will return a JSON object with the following keys: "question", "options", and "answer".
+
+Based on the following educational content, create a multiple choice question:
+
+Title: ${randomContent.title}
+Content: ${randomContent.content}
+
+Guidelines:
+- Create a question that tests understanding of the key concepts from this content
+- Provide 4 plausible answer options
+- Make sure only one option is correct
+- The question should be clear and educational
+
+Return ONLY valid JSON in this exact format:
+{
+  "question": "Your question here?",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "answer": "The correct option"
+}
+
+Examples of good questions:
+{
+  "question": "What is the main topic discussed in this content?",
+  "options": ["Topic A", "Topic B", "Topic C", "Topic D"],
+  "answer": "Topic B"
+}
+
+Now generate a question based on the provided content.`
+
     const query = encodeURIComponent(prompt)
     const sse = new EventSource(`/api/chat?query=${query}&isNew=true`)
 
     sse.addEventListener('message', event => {
       if (event.data === DONE_KEY) {
         sse.close()
+        setLoadingMCQ(false)
       } else {
         setText(prevResults => prevResults + event.data)
       }
@@ -193,11 +239,11 @@ export default function TeachMode() {
 
     sse.addEventListener('error', () => {
       sse.close()
+      setLoadingMCQ(false)
     })
   }
 
   const values = cleanJSON(text)
-  console.log(values)
 
   return (
     <div style={{ padding: 20 }}>
@@ -208,10 +254,27 @@ export default function TeachMode() {
       ))}
 
       <Button onClick={handleFormSubmit} disabled={loadingMCQ}>
-        {loadingMCQ ? 'Generating...' : 'Generate Question'}
+        {loadingMCQ ? 'Generating Question...' : 'Generate Random Question'}
       </Button>
 
-      <p>{text}</p>
+      {loadingMCQ && (
+        <div style={{ marginTop: 10, color: '#666' }}>
+          <p>Creating a question from your course content...</p>
+        </div>
+      )}
+
+      {text && !values && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 10,
+            backgroundColor: '#f5f5f5',
+            borderRadius: 4,
+          }}
+        >
+          <p>Raw response: {text}</p>
+        </div>
+      )}
 
       {values !== null && (
         <div
@@ -219,23 +282,27 @@ export default function TeachMode() {
           style={{
             border: '2px solid #888',
             borderRadius: 8,
+            marginTop: 20,
           }}
         >
-          <h1>{values.question}</h1>
-          {values.options.map((answer, index) => (
+          <h2 style={{ marginBottom: 15 }}>{values.question}</h2>
+          {values.options?.map((answer: string, index: number) => (
             <div key={index} style={{ marginBottom: 8 }}>
-              <label>
+              <label
+                style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+              >
                 <input
                   type='radio'
-                  name='mcq' // all radios in this group share the same name
-                  value={answer} // the value submitted when this option is selected
-                  checked={selected === answer} // controlled input
+                  name='mcq'
+                  value={answer}
+                  checked={selected === answer}
                   onChange={() => {
-                    setSelected(answer) // update state when selected
-                    setSubmitted(false) // reset submission
+                    setSelected(answer)
+                    setSubmitted(false)
                   }}
-                />{' '}
-                {answer} {/* Display the answer text next to the radio button */}
+                  style={{ marginRight: 8 }}
+                />
+                {answer}
               </label>
             </div>
           ))}
@@ -243,22 +310,44 @@ export default function TeachMode() {
           <button
             onClick={() => {
               if (!selected) {
-                alert('Select an option first')
+                alert('Please select an option first')
                 return
               }
-              setSubmitted(true) // mark that user submitted
+              setSubmitted(true)
             }}
-            style={{ marginTop: 10, padding: '6px 12px', cursor: 'pointer' }}
+            style={{
+              marginTop: 15,
+              padding: '8px 16px',
+              cursor: 'pointer',
+              backgroundColor: '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+            }}
+            disabled={!selected}
           >
-            Submit
+            Submit Answer
           </button>
 
           {submitted && selected && (
-            <p style={{ fontWeight: 700, marginTop: 10 }}>
-              {selected === values.answer
-                ? '✅ Correct!'
-                : `❌ Incorrect, correct answer: ${values.answer}`}
-            </p>
+            <div
+              style={{
+                marginTop: 15,
+                padding: 10,
+                borderRadius: 4,
+                backgroundColor: selected === values.answer ? '#d4edda' : '#f8d7da',
+                border:
+                  selected === values.answer
+                    ? '1px solid #c3e6cb'
+                    : '1px solid #f5c6cb',
+              }}
+            >
+              <p style={{ margin: 0, fontWeight: 700 }}>
+                {selected === values.answer
+                  ? '✅ Correct! Well done!'
+                  : `❌ Incorrect. The correct answer is: ${values.answer}`}
+              </p>
+            </div>
           )}
         </div>
       )}

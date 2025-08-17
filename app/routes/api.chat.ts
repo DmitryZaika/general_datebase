@@ -122,7 +122,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const response = await openai.chat.completions.create({
     model: 'gpt-4.1-mini-2025-04-14',
     messages: messages,
-    temperature: 0.5,
+    temperature: 1.1,
     max_tokens: 1024,
     stream: true,
   })
