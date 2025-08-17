@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Building2,
   Calculator,
   ChevronDown,
@@ -126,6 +127,11 @@ const getItems = (
         url: `/${base}/instructions`,
         icon: Lightbulb,
       },
+      {
+        title: 'Teach Mode',
+        url: `/employee/teach-mode`,
+        icon: BookOpen,
+      },
     )
   }
   if (base === 'employee') {
@@ -218,7 +224,7 @@ export function EmployeeSidebar({
 
   const inventoryTitles = ['Stones', 'Sinks', 'Faucets'] as const
   const crmTitles = ['Customers', 'Deals'] as const
-  const resourceTitles = ['Supports', 'Documents', 'Images', 'Instructions'] as const
+  const resourceTitles = ['Supports', 'Documents', 'Images', 'Instructions', 'Teach Mode'] as const
   const operationTitles = ['Suppliers', 'Checklists', 'Special Order'] as const
 
   const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))

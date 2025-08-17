@@ -1,8 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 
-if (!process.env.AES_KEY) {
-  throw new Error('QBO_AES_KEY not stated')
-}
 export const AES_KEY = Buffer.from(process.env.AES_KEY, 'hex')
 if (AES_KEY.length !== 32) throw new Error('QBO_AES_KEY должен быть 256‑битным')
 
