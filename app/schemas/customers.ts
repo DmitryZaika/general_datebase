@@ -3,7 +3,7 @@ import type { ToastProps } from '~/components/ui/toast'
 
 type ToastFunction = (props: ToastProps & { description: string }) => void
 
-export const sourceEnum = ['check-in', 'user-input', 'check-list'] as const
+export const sourceEnum = ['check-in', 'user-input', 'check-list', 'leads'] as const
 
 export const customerSignupSchema = z.object({
   company_id: z.number().min(1, 'Company ID is required'),

@@ -3,13 +3,20 @@ import { useState } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
+  Outlet,
   redirect,
   useLoaderData,
   useNavigate,
   useSearchParams,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import { DealsForm } from '~/components/DealsForm'
+import DealsForm from '~/components/DealsForm'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions'
@@ -91,12 +98,19 @@ export default function AddDeal() {
   }
 
   return (
-    <DealsForm
-      companyId={companyId}
-      user_id={user_id}
-      open={open}
-      onOpenChange={handleOpenChange}
-      hiddenFields={hiddenFields}
-    />
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create Deal</DialogTitle>
+        </DialogHeader>
+
+        <DealsForm
+          companyId={companyId}
+          user_id={user_id}
+          hiddenFields={hiddenFields}
+        />
+      </DialogContent>
+      <Outlet />
+    </Dialog>
   )
 }

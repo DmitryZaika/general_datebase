@@ -3,23 +3,14 @@ import type { RowDataPacket } from 'mysql2'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
-  Outlet,
   redirect,
-  useLocation,
-  useNavigate,
+  useLoaderData,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
-import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
+import DealsForm from '~/components/DealsForm'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions'
-
 import { csrf } from '~/utils/csrf.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
@@ -104,34 +95,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return { dealId, companyId: user.company_id, deal, user_id: user.id }
 }
 
-export default function DealsEdit() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const handleChange = (open: boolean) => {
-    if (!open) {
-      navigate(`..${location.search}`)
-    }
-  }
+export default function DealEditInformation() {
+  const { companyId, user_id, deal } = useLoaderData<typeof loader>()
 
-  return (
-    <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[425px] overflow-auto flex flex-col justify-baseline min-h-[375px] max-h-[95vh] p-5'>
-        <DialogHeader>
-          <DialogTitle>Edit Deal</DialogTitle>
-        </DialogHeader>
-        <Tabs
-          value={location.pathname.split('/').pop()}
-          onValueChange={value => navigate(value)}
-        >
-          <TabsList className='mb-5'>
-            <TabsTrigger value={`information${location.search}`}>General</TabsTrigger>
-            <TabsTrigger value={`images${location.search}`}>Images</TabsTrigger>
-            <TabsTrigger value={`documents${location.search}`}>Documents</TabsTrigger>
-            <TabsTrigger value={`project${location.search}`}>Project</TabsTrigger>
-          </TabsList>
-          <Outlet />
-        </Tabs>
-      </DialogContent>
-    </Dialog>
-  )
+  return <DealsForm companyId={companyId} user_id={user_id} initial={deal} />
 }

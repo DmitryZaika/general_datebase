@@ -147,7 +147,7 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
         </div>
         {!readonly && (
           <Link
-            to={`edit/${deal.id}`}
+            to={`edit/${deal.id}/information`}
             className='absolute top-1 right-1 z-20'
             onPointerDown={e => e.stopPropagation()}
           >
