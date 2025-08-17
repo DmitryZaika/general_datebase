@@ -63,6 +63,7 @@ function getMirroredUrl(path: string, search: string) {
     'supports',
     'documents',
     'images',
+    'deals',
   ]
   if (supportedSections.includes(currentSection)) {
     return `/${targetRole}/${currentSection}${search}`

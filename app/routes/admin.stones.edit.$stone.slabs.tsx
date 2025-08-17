@@ -34,11 +34,7 @@ import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
-import {
-  printAllSlabsQRCodes,
-  printSingleSlabQRCode,
-  type SlabData,
-} from '~/utils/slabQRCode'
+import { printAllSlabsQRCodes, type SlabData } from '~/utils/slabQRCode'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 import { useCustomOptionalForm } from '~/utils/useCustomForm'
 
@@ -69,7 +65,6 @@ interface SlabItemProps {
 
 interface LinkedSlabsGroupProps {
   slabs: Array<SlabData & { url: string }>
-  sourceStoneName: string
   onBundleUpdate?: (slabId: number, newBundle: string) => void
 }
 
@@ -197,15 +192,8 @@ function SlabItem({
   )
 }
 
-function LinkedSlabsGroup({
-  slabs,
-  sourceStoneName,
-  onBundleUpdate,
-}: LinkedSlabsGroupProps) {
+function LinkedSlabsGroup({ slabs, onBundleUpdate }: LinkedSlabsGroupProps) {
   // Create handler for printing QR codes with source stone name
-  const handleLinkedSlabQRCodePrint = (slab: SlabData) => {
-    printSingleSlabQRCode(slab, sourceStoneName)
-  }
 
   return (
     <div className='mt-4'>
@@ -216,7 +204,6 @@ function LinkedSlabsGroup({
               key={slab.id}
               slab={slab}
               showDeleteButton={false}
-              onPrintQRCode={handleLinkedSlabQRCodePrint}
               onBundleUpdate={onBundleUpdate}
             />
           ))
@@ -367,16 +354,6 @@ function DeleteConfirmDialog({
       document.getElementById('deleteSlabButton')?.click()
     }
   }
-
-  useEffect(() => {
-    if (showDialog) {
-      window.addEventListener('keydown', handleKeyDown)
-    }
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [showDialog])
 
   return (
     <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -1014,7 +991,6 @@ export default function EditStoneSlabs() {
               </div>
               <LinkedSlabsGroup
                 slabs={item.slabs}
-                sourceStoneName={item.source_stone_name}
                 onBundleUpdate={handleBundleUpdate}
               />
             </div>

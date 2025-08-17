@@ -36,7 +36,8 @@ function InteractiveCard({
   faucetType: string
   disabled: boolean
 }) {
-  const displayedAmount = faucet.amount && faucet.amount > 0 ? faucet.amount : '—'
+  const displayedAmount =
+    faucet.available && faucet.available > 0 ? faucet.available : '—'
 
   return (
     <div
@@ -52,7 +53,7 @@ function InteractiveCard({
       <ImageCard
         disabled={true}
         fieldList={{
-          Amount: `${displayedAmount}`,
+          Available: `${displayedAmount}`,
           Price:
             faucet.retail_price === 0 ? `Contact for price` : `$${faucet.retail_price}`,
         }}
@@ -84,16 +85,16 @@ export default function Faucets() {
   const [sortedFaucets, setSortedFaucets] = useState<Faucet[]>(faucets)
 
   const getTypePriority = (type: string) => {
-    const index = FAUCET_TYPES.indexOf(type)
+    const index = FAUCET_TYPES.indexOf(type as (typeof FAUCET_TYPES)[number])
     return index === -1 ? FAUCET_TYPES.length : index
   }
 
   useEffect(() => {
     const inStock = faucets.filter(
-      faucet => Number(faucet.amount) > 0 && Boolean(faucet.is_display),
+      faucet => Number(faucet.available) > 0 && Boolean(faucet.is_display),
     )
     const outOfStock = faucets.filter(
-      faucet => Number(faucet.amount) <= 0 && Boolean(faucet.is_display),
+      faucet => Number(faucet.available) <= 0 && Boolean(faucet.is_display),
     )
     const notDisplayed = faucets.filter(faucet => !faucet.is_display)
 

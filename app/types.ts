@@ -18,6 +18,7 @@ export interface Sink {
   type: string
   retail_price: number
   sink_count: number
+  available: number
 }
 
 export interface Stone {
@@ -31,6 +32,7 @@ export interface StoneImage {
   id: number
   name: string
   url: string
+  type: string
   retail_price: number
   cost_per_sqft: number
   available: number
@@ -44,6 +46,7 @@ export interface Faucet {
   type: string
   retail_price: number
   faucet_count: number
+  available: number
 }
 
 export interface InstructionSlim {
@@ -96,7 +99,7 @@ export interface StoneSearchResult {
 }
 export type Action =
   | { type: 'ADD_EVENT'; payload: Event }
-  | { type: 'REMOVE_EVENT'; payload: { id: string } }
+  | { type: 'REMOVE_EVENT'; payload: { id: number } }
   | { type: 'UPDATE_EVENT'; payload: Event }
   | { type: 'SET_EVENTS'; payload: Event[] }
 
@@ -119,8 +122,8 @@ export interface Handlers {
     zIndex: number
   }
   handleAddEvent: (event: Event) => void
-  handleUpdateEvent: (event: Event, id: string) => void
-  handleDeleteEvent: (id: string) => void
+  handleUpdateEvent: (event: Event, id: number) => void
+  handleDeleteEvent: (id: number) => void
 }
 
 // Define getters interface
@@ -148,7 +151,7 @@ export type Variant = (typeof variants)[number]
 
 // Event interface matching database schema
 export interface Event {
-  id: string
+  id: number
   title: string
   description?: string
   startDate: Date

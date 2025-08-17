@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-// @ts-ignore
 import bcrypt from 'bcryptjs'
 import type { RowDataPacket } from 'mysql2'
 import { useForm } from 'react-hook-form'
@@ -124,13 +123,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   try {
     quickBooksUrl = await getQboUrl(request, user.company_id)
   } catch {
-    quickBooksUrl = null
+    quickBooksUrl = undefined
   }
   return { userData: rows[0], quickBooksUrl }
 }
 
 export default function UserProfile() {
-  const { userData, quickBooksUrl } = useLoaderData<typeof loader>()
+  const { userData } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
   const token = useAuthenticityToken()
@@ -162,7 +161,7 @@ export default function UserProfile() {
           <p>Logged into: {data?.CompanyInfo?.CompanyName}</p>
         ) : (
           <Button asChild>
-            <a href={quickBooksUrl}>Authorize Quickbooks</a>
+            <a>Authorize Quickbooks</a>
           </Button>
         )}
         <FormProvider {...form}>

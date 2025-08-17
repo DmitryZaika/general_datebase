@@ -6,7 +6,7 @@ import { SequelizeStorage, Umzug } from 'umzug'
 
 const __dirname = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '')
 
-const umzug = sequelize =>
+const umzug = (sequelize: Sequelize) =>
   new Umzug({
     migrations: {
       glob: ['migrations/*.sql', { cwd: __dirname }],
@@ -15,6 +15,9 @@ const umzug = sequelize =>
           throw new Error('Down migrations are not supported')
         }
         const up = async () => {
+          if (!path) {
+            throw new Error('Migration file path is required')
+          }
           const sql = fs.readFileSync(path, 'utf8')
           const queries = sql.split(';').filter(q => q.trim())
           for (const query of queries) {
@@ -31,16 +34,9 @@ const umzug = sequelize =>
       folder: 'migrations',
       template: filepath => [[filepath, '']],
     },
-    sorter: migrations => {
-      const collator = new Intl.Collator(undefined, {
-        numeric: true,
-        sensitivity: 'base',
-      })
-      return migrations.sort((a, b) => collator.compare(a.name, b.name))
-    },
   })
 
-const runMigrations = async sequelize => {
+const runMigrations = async (sequelize: Sequelize) => {
   try {
     await sequelize.authenticate()
     // biome-ignore lint/suspicious/noConsole: for tests
@@ -56,11 +52,15 @@ const runMigrations = async sequelize => {
   }
 }
 
-export const testMigrations = async (database, user, password, host) => {
+export const testMigrations = async (
+  database: string,
+  user: string,
+  password: string,
+  host: string,
+) => {
   const sequelize = new Sequelize(database, user, password, {
     host,
     dialect: 'mysql',
-    multipleStatements: true,
   })
   await runMigrations(sequelize)
 }
@@ -75,7 +75,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const sequelize = new Sequelize(DB_DATABASE, DB_USER, DB_PASSWORD, {
     host: DB_HOST,
     dialect: 'mysql',
-    multipleStatements: true,
   })
 
   runMigrations(sequelize)

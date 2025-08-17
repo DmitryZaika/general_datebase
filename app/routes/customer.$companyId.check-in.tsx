@@ -11,7 +11,7 @@ import { AddressInput } from '~/components/organisms/AddressInput'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Label } from '~/components/ui/label'
 import { useToast } from '~/hooks/use-toast'
-import { createCustomerMutation } from '~/schemas/customers'
+import { createCustomerMutation, sourceEnum } from '~/schemas/customers'
 import {
   FormControl,
   FormField,
@@ -38,7 +38,7 @@ const customerCheckInSchema = z.object({
   email: z.string().email('Invalid email address'),
   address: z.string().optional(),
   address_zip_code: z.string().optional(),
-  source: z.enum(['check-in', 'user-input']),
+  source: z.enum(sourceEnum),
   referral_source: z
     .enum([
       'google',
