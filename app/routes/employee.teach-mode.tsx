@@ -1,5 +1,7 @@
 import * as React from 'react'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { Label } from '@/components/ui/label'
+import { Button } from '~/components/ui/button'
 import { db } from '~/db.server'
 import type { InstructionSlim } from '~/types'
 import { DONE_KEY } from '~/utils/constants'
@@ -147,6 +149,15 @@ export default function TeachMode() {
     )
   }
 
+  function cleanJSON(value: string) {
+    if (value === '') return null
+    try {
+      return JSON.parse(value)
+    } catch (error) {
+      return null
+    }
+  }
+
   const handleFormSubmit = async () => {
     setText('')
     const prompt = `
@@ -185,6 +196,9 @@ export default function TeachMode() {
     })
   }
 
+  const values = cleanJSON(text)
+  console.log(values)
+
   return (
     <div style={{ padding: 20 }}>
       {roots.map(root => (
@@ -193,19 +207,13 @@ export default function TeachMode() {
         </div>
       ))}
 
-      <button
-        onClick={handleFormSubmit}
-        disabled={loadingMCQ}
-        style={{
-          marginTop: 20,
-          padding: '8px 16px',
-          cursor: loadingMCQ ? 'not-allowed' : 'pointer',
-        }}
-      >
+      <Button onClick={handleFormSubmit} disabled={loadingMCQ}>
         {loadingMCQ ? 'Generating...' : 'Generate Question'}
-      </button>
+      </Button>
 
-      {true && (
+      <p>{text}</p>
+
+      {values !== null && (
         <div
           className='mt-5 p-5'
           style={{
@@ -213,26 +221,43 @@ export default function TeachMode() {
             borderRadius: 8,
           }}
         >
-          <h3>Question:</h3>
-          <p>{text}</p>
+          <h1>{values.question}</h1>
+          {values.options.map((answer, index) => (
+            <div key={index} style={{ marginBottom: 8 }}>
+              <label>
+                <input
+                  type='radio'
+                  name='mcq' // all radios in this group share the same name
+                  value={answer} // the value submitted when this option is selected
+                  checked={selected === answer} // controlled input
+                  onChange={() => {
+                    setSelected(answer) // update state when selected
+                    setSubmitted(false) // reset submission
+                  }}
+                />{' '}
+                {answer} {/* Display the answer text next to the radio button */}
+              </label>
+            </div>
+          ))}
 
-          {true && (
-            <button
-              onClick={() => {
-                if (!selected) return alert('Select an option first')
-                setSubmitted(true)
-              }}
-              style={{ marginTop: 10, padding: '6px 12px', cursor: 'pointer' }}
-            >
-              Submit
-            </button>
-          )}
+          <button
+            onClick={() => {
+              if (!selected) {
+                alert('Select an option first')
+                return
+              }
+              setSubmitted(true) // mark that user submitted
+            }}
+            style={{ marginTop: 10, padding: '6px 12px', cursor: 'pointer' }}
+          >
+            Submit
+          </button>
 
           {submitted && selected && (
             <p style={{ fontWeight: 700, marginTop: 10 }}>
-              {selected === 'hello'
+              {selected === values.answer
                 ? '✅ Correct!'
-                : `❌ Incorrect, correct answer: 6}`}
+                : `❌ Incorrect, correct answer: ${values.answer}`}
             </p>
           )}
         </div>
