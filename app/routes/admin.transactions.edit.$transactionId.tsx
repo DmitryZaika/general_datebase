@@ -382,7 +382,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         [customer_name, user.company_id],
       )
 
-      const customerId = customerResult.insertId
+      const customerId = customerResult[0].insertId
 
       if (!customerId) {
         throw new Error('Failed to create customer')

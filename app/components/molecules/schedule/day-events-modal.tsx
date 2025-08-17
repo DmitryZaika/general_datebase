@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useScheduler } from '~/providers/scheduler-provider'
+import { useScheduler, type variants } from '~/providers/scheduler-provider'
 
 interface Event {
   id: number
@@ -15,7 +15,7 @@ interface Event {
   startDate: Date
   endDate: Date
   description?: string
-  variant?: string
+  variant?: (typeof variants)[number]
   notes?: string
 }
 
@@ -75,7 +75,7 @@ export default function DayEventsModal({
 
   const handleDeleteEvent = async (eventId: number) => {
     if (confirm('Are you sure you want to delete this event?')) {
-      handlers.handleDeleteEvent(eventId.toString())
+      handlers.handleDeleteEvent(eventId)
     }
   }
 

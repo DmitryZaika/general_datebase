@@ -75,8 +75,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ id: sinkTypeId }],
-            faucet_type: [{ id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId }],
+            faucet_type: [{ type_id: faucetTypeId }],
           }),
         ],
       })
@@ -118,8 +118,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ id: sinkTypeId }],
-            faucet_type: [{ id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId }],
+            faucet_type: [{ type_id: faucetTypeId }],
           }),
         ],
       })
@@ -129,7 +129,7 @@ describe('Contract Integration Tests', () => {
 
       // Verify new customer was created
       const customers = await DatabaseTestHelper.selectFromTable('customers', {
-        name: customerData.name,
+        customer_id: customerId,
       })
       expect(customers.length).toBe(2) // One from setup, one from sell
 
@@ -177,8 +177,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: false }],
-            sink_type: [{ id: sinkTypeId }],
-            faucet_type: [{ id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId }],
+            faucet_type: [{ type_id: faucetTypeId }],
           }),
         ],
       })
@@ -237,8 +237,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ id: sinkTypeId }],
-            faucet_type: [{ id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId }],
+            faucet_type: [{ type_id: faucetTypeId }],
           }),
         ],
       })
@@ -259,8 +259,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ id: sinkTypeId }],
-            faucet_type: [{ id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId }],
+            faucet_type: [{ type_id: faucetTypeId }],
             square_feet: 35,
           }),
         ],

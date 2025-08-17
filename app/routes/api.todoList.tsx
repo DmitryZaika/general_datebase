@@ -1,12 +1,10 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   redirect,
 } from 'react-router'
-import { getValidatedFormData } from 'remix-hook-form'
 import { db } from '~/db.server'
-import { type TTodoListSchema, todoListSchema } from '~/schemas/general'
+import { todoListSchema } from '~/schemas/general'
 import type { Todo } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
@@ -14,14 +12,8 @@ import { getEmployeeUser, type User } from '~/utils/session.server'
 export async function action({ request }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request)
 
-  const {
-    errors,
-    data,
-    receivedValues: defaultValues,
-  } = await getValidatedFormData<TTodoListSchema>(request, zodResolver(todoListSchema))
-  if (errors) {
-    return Response.json({ errors, defaultValues })
-  }
+  const raw = await request.json()
+  const data = todoListSchema.parse(raw)
 
   await db.execute(`INSERT INTO todolist (rich_text, user_id) VALUES (?, ?);`, [
     data.rich_text,

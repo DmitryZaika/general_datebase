@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, type Variants } from 'framer-motion'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
@@ -7,7 +7,7 @@ import AddEventModal from '@/components/molecules/schedule/add-event-modal'
 import DayEventsModal from '@/components/molecules/schedule/day-events-modal'
 import EventStyled from '@/components/molecules/schedule/event-styled'
 import { Button } from '@/components/ui/button'
-import { useScheduler } from '~/providers/scheduler-provider'
+import { useScheduler, type variants } from '~/providers/scheduler-provider'
 
 // Define Event interface locally since it's not exported from types
 interface Event {
@@ -16,23 +16,23 @@ interface Event {
   startDate: Date
   endDate: Date
   description?: string
-  variant?: string
+  variant?: (typeof variants)[number]
   notes?: string
 }
 
-const pageTransitionVariants = {
+const pageTransitionVariants: Variants = {
   enter: () => ({
     opacity: 0,
   }),
   center: {
     opacity: 1,
   },
-  exit: () => ({
+  exit: {
     opacity: 0,
     transition: {
       opacity: { duration: 0.2, ease: 'easeInOut' },
     },
-  }),
+  },
 }
 
 // Helper function to format date as dd-mm-yyyy
@@ -215,16 +215,7 @@ export default function MonthView() {
         <motion.div
           key={`${currentDate.getFullYear()}-${currentDate.getMonth()}`}
           custom={direction}
-          variants={{
-            ...pageTransitionVariants,
-            center: {
-              ...pageTransitionVariants.center,
-              transition: {
-                opacity: { duration: 0.2 },
-                staggerChildren: 0.02,
-              },
-            },
-          }}
+          variants={pageTransitionVariants}
           initial='enter'
           animate='center'
           exit='exit'

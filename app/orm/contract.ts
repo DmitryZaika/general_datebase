@@ -91,7 +91,7 @@ export class Contract {
         this.data.notes_to_sale || null,
         totalSquareFeet,
         this.data.price || 0,
-        this.data.project_address || this.data.billing_address,
+        this.data.project_address || (await this.getCustomerAddress(user)),
         this.data.extras,
         this.saleId,
         user.company_id,

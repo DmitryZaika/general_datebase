@@ -14,7 +14,6 @@ import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
-import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
@@ -67,20 +66,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
-  const listsId = await selectMany<{ id: number }>(
-    db,
-    `SELECT id FROM deals_list WHERE user_id = ?`,
-    [user.id],
-  )
   const user_id = user.id
-  return { listsId, companyId: user.company_id, user_id }
+  return { companyId: user.company_id, user_id }
 }
 
 export default function AddDeal() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [open, setOpen] = useState(true)
-  const { listsId, companyId, user_id } = useLoaderData<typeof loader>()
+  const { companyId, user_id } = useLoaderData<typeof loader>()
   const handleOpenChange = (o: boolean) => {
     setOpen(o)
     if (!o) navigate('..')
@@ -99,7 +93,6 @@ export default function AddDeal() {
   return (
     <DealsForm
       companyId={companyId}
-      listsId={listsId}
       user_id={user_id}
       open={open}
       onOpenChange={handleOpenChange}

@@ -35,7 +35,7 @@ function InteractiveCard({
   setCurrentId: (value: number, type: string) => void
   sinkType: string
 }) {
-  const displayedAmount = sink.amount && sink.amount > 0 ? sink.amount : '—'
+  const displayedAmount = sink.available && sink.available > 0 ? sink.available : '—'
   const displayedWidth = sink.width && sink.width > 0 ? sink.width : '—'
   const displayedLength = sink.length && sink.length > 0 ? sink.length : '—'
 
@@ -53,7 +53,7 @@ function InteractiveCard({
       <ImageCard
         disabled={true}
         fieldList={{
-          Amount: `${displayedAmount}`,
+          Available: `${displayedAmount}`,
           Size: `${displayedLength} x ${displayedWidth}  `,
           Price:
             sink.retail_price === 0 ? `Contact for price` : `$${sink.retail_price}`,
@@ -86,16 +86,16 @@ export default function Sinks() {
   const [sortedSinks, setSortedSinks] = useState<Sink[]>(sinks)
 
   const getTypePriority = (type: string) => {
-    const index = SINK_TYPES.indexOf(type)
+    const index = SINK_TYPES.indexOf(type as (typeof SINK_TYPES)[number])
     return index === -1 ? SINK_TYPES.length : index
   }
 
   useEffect(() => {
     const inStock = sinks.filter(
-      sink => Number(sink.amount) > 0 && Boolean(sink.is_display),
+      sink => Number(sink.available) > 0 && Boolean(sink.is_display),
     )
     const outOfStock = sinks.filter(
-      sink => Number(sink.amount) <= 0 && Boolean(sink.is_display),
+      sink => Number(sink.available) <= 0 && Boolean(sink.is_display),
     )
     const notDisplayed = sinks.filter(sink => !sink.is_display)
 

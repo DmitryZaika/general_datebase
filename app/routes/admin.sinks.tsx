@@ -63,10 +63,11 @@ export default function AdminSinks() {
   useEffect(() => {
     // Make sure sinks with 0 or null amount still appear
     const inStock = sinks.filter(
-      sink => Number(sink.amount) > 0 && Boolean(sink.is_display),
+      sink => Number(sink.available) > 0 && Boolean(sink.is_display),
     )
     const outOfStock = sinks.filter(
-      sink => (!sink.amount || Number(sink.amount) <= 0) && Boolean(sink.is_display),
+      sink =>
+        (!sink.available || Number(sink.available) <= 0) && Boolean(sink.is_display),
     )
     const notDisplayed = sinks.filter(sink => !sink.is_display)
 
@@ -124,7 +125,8 @@ export default function AdminSinks() {
             />
           </div>
           {sortedSinks.map(sink => {
-            const displayedAmount = sink.amount && sink.amount > 0 ? sink.amount : '—'
+            const displayedAmount =
+              sink.available && sink.available > 0 ? sink.available : '—'
             const displayedWidth = sink.width && sink.width > 0 ? sink.width : '—'
             const displayedLength = sink.length && sink.length > 0 ? sink.length : '—'
             const retailPrice = formatPrice(sink.retail_price)
@@ -155,7 +157,7 @@ export default function AdminSinks() {
                   </div>
 
                   <p className='text-center font-bold mt-2'>{sink.name}</p>
-                  <p className='text-center text-sm'>Amount: {displayedAmount}</p>
+                  <p className='text-center text-sm'>Available: {displayedAmount}</p>
                   <p className='text-center text-sm'>
                     Size: {displayedLength} x {displayedWidth}
                   </p>

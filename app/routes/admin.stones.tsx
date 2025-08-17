@@ -24,25 +24,11 @@ import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
-import { stoneQueryBuilder } from '~/utils/queries.server'
+import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
 import { getAdminUser } from '~/utils/session.server'
 import { capitalizeFirstLetter } from '~/utils/words'
 
 type ViewMode = 'grid' | 'table'
-
-interface Stone {
-  id: number
-  name: string
-  type: string
-  url: string | null
-  is_display: boolean | number
-  length: number | null
-  width: number | null
-  amount: number
-  available: number
-  retail_price: number
-  cost_per_sqft: number
-}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request)

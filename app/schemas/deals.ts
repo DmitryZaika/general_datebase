@@ -4,7 +4,7 @@ export const dealsSchema = z.object({
   company_id: z.coerce.number().optional(),
   amount: z.coerce.number().optional(),
   description: z.string().nullish(),
-  customer_id: z.number(),
+  customer_id: z.number().nullish(),
   status: z.string().nullish(),
   list_id: z.coerce.number(),
   position: z.number(),

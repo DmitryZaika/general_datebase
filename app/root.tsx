@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import type { RowDataPacket } from 'mysql2'
 import { posthog } from 'posthog-js'
 import { useEffect } from 'react'
@@ -27,6 +27,7 @@ import { Toaster } from './components/ui/toaster'
 import { useToast } from './hooks/use-toast'
 import { commitSession, getSession } from './sessions'
 import './tailwind.css'
+import { queryClient } from './utils/api'
 import { selectMany } from './utils/queryHelpers'
 import { getUserBySessionId } from './utils/session.server'
 import type { ToastMessage } from './utils/toastHelpers'
@@ -143,8 +144,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     },
   )
 }
-
-const queryClient = new QueryClient()
 
 export default function App() {
   const {

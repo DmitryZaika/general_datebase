@@ -144,13 +144,9 @@ export class TestDataFactory {
     overrides: Partial<TCustomerSchema> = {},
   ): TCustomerSchema {
     return {
-      name: 'Test Customer',
       customer_id: 1,
       seller_id: 1,
-      billing_address: '123 Test Street, Test City, TC 12345',
       project_address: '456 Project Street, Project City, PC 67890',
-      same_address: false,
-
       notes_to_sale: 'Test notes',
       price: 5000,
       company_name: 'Test Company',

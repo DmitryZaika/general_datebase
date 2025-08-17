@@ -36,6 +36,7 @@ import {
 } from '~/components/ui/sidebar'
 import type { ISupplier } from '~/schemas/suppliers'
 import { getBase } from '~/utils/urlHelpers'
+import { SalesRepsFilter } from '../SalesRepsFilter'
 import { FaucetsFilters } from './FaucetsFilters'
 import { SinksFilters } from './SinksFilters'
 import { StonesFilters } from './StonesFilters'
@@ -175,6 +176,7 @@ const getItems = (
         title: 'Deals',
         url: `/admin/deals`,
         icon: DollarSign,
+        component: () => <SalesRepsFilter />,
       },
       {
         title: 'Transactions',
@@ -222,10 +224,10 @@ export function EmployeeSidebar({
     companyId,
   )
 
-  const inventoryTitles = ['Stones', 'Sinks', 'Faucets'] as const
-  const crmTitles = ['Customers', 'Deals'] as const
-  const resourceTitles = ['Supports', 'Documents', 'Images', 'Instructions', 'Teach Mode'] as const
-  const operationTitles = ['Suppliers', 'Checklists', 'Special Order'] as const
+  const inventoryTitles = ['Stones', 'Sinks', 'Faucets']
+  const crmTitles = ['Customers', 'Deals']
+  const resourceTitles = ['Supports', 'Documents', 'Images', 'Instructions', 'Teach Mode']
+  const operationTitles = ['Suppliers', 'Checklists', 'Special Order']
 
   const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))
   const crmItems = items.filter(item => crmTitles.includes(item.title))

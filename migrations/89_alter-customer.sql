@@ -1,0 +1,12 @@
+ALTER TABLE customers
+  ADD COLUMN remodal_type VARCHAR(255) NULL,
+  ADD COLUMN project_size VARCHAR(255) NULL,
+  ADD COLUMN contact_time VARCHAR(255) NULL,
+  ADD COLUMN remove_and_dispose VARCHAR(255) NULL,
+  ADD COLUMN improve_offer TINYINT(1) NULL,
+  ADD COLUMN sink VARCHAR(255) NULL,
+  ADD COLUMN when_start VARCHAR(255) NULL,
+  ADD COLUMN details TEXT NULL,
+  ADD COLUMN compaign_name VARCHAR(255) NULL,
+  ADD COLUMN adset_name VARCHAR(255) NULL,
+  ADD COLUMN ad_name VARCHAR(255) NULL;
