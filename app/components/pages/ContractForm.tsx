@@ -145,7 +145,9 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
             <AuthenticityTokenInput />
             <div className=''>
               <CustomerSearch
-                onCustomerChange={value => form.setValue('customer_id', value ?? null)}
+                onCustomerChange={value =>
+                  form.setValue('customer_id', value ?? undefined)
+                }
                 companyId={companyId}
                 source='user-input'
                 selectedCustomer={form.watch('customer_id') ?? undefined}

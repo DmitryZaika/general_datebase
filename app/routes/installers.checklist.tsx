@@ -7,12 +7,11 @@ import {
   Form,
   type LoaderFunctionArgs,
   redirect,
-  useLoaderData,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
-import { CustomerSearch } from '~/components/molecules/CustomerSearch'
+import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SignatureInput, type SigRef } from '~/components/molecules/SignatureInput'
 import { AddressInput } from '~/components/organisms/AddressInput'
@@ -155,7 +154,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminChecklists() {
   const token = useAuthenticityToken()
   const sigRef = useRef<SigRef>(null)
-  const { companyId } = useLoaderData<typeof loader>()
+  // const { companyId } = useLoaderData<typeof loader>()
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
@@ -184,7 +183,6 @@ export default function AdminChecklists() {
       sigRef.current?.clear()
     }
   }, [fetcher.state, fetcher.data, form])
-
   return (
     <div className='flex justify-center py-10'>
       <div className='w-full max-w-xl border rounded-md bg-white p-8 shadow-sm'>
@@ -199,7 +197,7 @@ export default function AdminChecklists() {
         <FormProvider {...form}>
           <Form method='post' onSubmit={fullSubmit}>
             <input type='hidden' name='csrf' value={token} />
-            <CustomerSearch
+            {/* <CustomerSearch
               onCustomerChange={value => form.setValue('customer_id', value ?? null)}
               selectedCustomer={form.watch('customer_id') ?? undefined}
               companyId={companyId}
@@ -208,6 +206,13 @@ export default function AdminChecklists() {
               setError={error =>
                 form.setError('customer_id', { message: error ?? undefined })
               }
+            /> */}
+            <FormField
+              control={form.control}
+              name='customer_name'
+              render={({ field }) => (
+                <InputItem name='Customer Name' placeholder='Customer' field={field} />
+              )}
             />
             <AddressInput form={form} field='installation_address' type='project' />
             <div className='my-4 space-y-2'>

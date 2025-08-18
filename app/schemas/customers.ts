@@ -58,9 +58,9 @@ export const updateCustomer = async (id: number, data: CustomerSignupSchema) => 
 
 export const customerDialogSchema = z.object({
   name: z.string().min(1),
-  email: z.string().email(),
+  email: z.union([z.string().email(), z.literal('')]),
   phone: z.union([z.coerce.string().min(10), z.literal('')]),
-  address: z.string().min(5, 'Address must be at least 5 characters long'),
+  address: z.string().optional(),
   builder: z.boolean().default(false),
   company_name: z.string().nullish(),
 })

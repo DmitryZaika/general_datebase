@@ -65,7 +65,7 @@ export const finalExtrasSchema = z.object({
 export type TFullExtrasSchema = z.infer<typeof finalExtrasSchema>[]
 
 export const customerSchema = z.object({
-  customer_id: z.coerce.number().nullish(),
+  customer_id: z.coerce.number().optional(),
   seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
   project_address: z.string().optional(),
   notes_to_sale: StringOrNumber,

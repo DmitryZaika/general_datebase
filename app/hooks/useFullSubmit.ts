@@ -29,7 +29,7 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
       const sanitizedData = cleanData(data)
       sanitizedData.csrf = token
 
-      submit(sanitizedData, {
+      return submit(sanitizedData, {
         method: method,
         action: action,
         encType: 'application/x-www-form-urlencoded',

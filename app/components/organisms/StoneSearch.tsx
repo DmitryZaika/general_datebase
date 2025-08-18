@@ -79,7 +79,7 @@ export const StoneSearch = ({
             variant='ghost'
             size='sm'
             onClick={handleRemoveStone}
-            className='absolute -top-4 right-0 z-10 text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 '
+            className='absolute h-6 w-6 -top-4 right-0 z-10 text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 '
           >
             <X className='h-3 w-3' />
           </Button>
