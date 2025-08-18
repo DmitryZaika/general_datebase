@@ -53,7 +53,7 @@ export async function action({ request }: ActionFunctionArgs) {
   )
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Deal updated successfully'))
-  return redirect(`../`, {
+  return redirect(`/employee/deals`, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }
@@ -96,7 +96,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 }
 
 export default function DealEditInformation() {
-  const { companyId, user_id, deal } = useLoaderData<typeof loader>()
+  const { companyId, user_id, deal, dealId } = useLoaderData<typeof loader>()
 
-  return <DealsForm companyId={companyId} user_id={user_id} initial={deal} />
+  return (
+    <DealsForm companyId={companyId} user_id={user_id} initial={deal} dealId={dealId} />
+  )
 }

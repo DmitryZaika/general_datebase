@@ -40,9 +40,9 @@ const getCustomerInfo = async (customerId: number) => {
   const data = await response.json()
   return {
     name: data.customer.name,
-    email: data.customer.email,
+    email: data.customer.email ?? '',
     phone: data.customer.phone,
-    address: data.customer.address,
+    address: data.customer.address ?? '',
     company_name: data.customer.company_name,
   }
 }
@@ -68,7 +68,7 @@ export function CustomerForm({
   const mutateObject = customerId
     ? updateCustomerMutation(toastFn, handleSuccess)
     : createCustomerMutation(toastFn, handleSuccess)
-  const mutation = useMutation(mutateObject)
+  const { mutate, isPending } = useMutation(mutateObject)
   const { data, isLoading } = useQuery({
     queryKey: ['customer', customerId],
     queryFn: () => getCustomerInfo(customerId || 0),
@@ -77,6 +77,10 @@ export function CustomerForm({
 
   const form = useForm<CustomerDialogSchema>({
     resolver,
+    defaultValues: {
+      email: '',
+      address: '',
+    },
   })
   useEffect(() => {
     if (data) {
@@ -88,7 +92,7 @@ export function CustomerForm({
   }, [data])
 
   const onSubmit = (data: CustomerDialogSchema) => {
-    mutation.mutate({ ...data, company_id: companyId, id: customerId || 0, source })
+    mutate({ ...data, company_id: companyId, id: customerId || 0, source })
   }
 
   return (
@@ -160,7 +164,7 @@ export function CustomerForm({
                 />
               )}
               <DialogFooter>
-                <LoadingButton loading={mutation.isPending}>Submit</LoadingButton>
+                <LoadingButton loading={isPending}>Submit</LoadingButton>
               </DialogFooter>
             </form>
           </FormProvider>

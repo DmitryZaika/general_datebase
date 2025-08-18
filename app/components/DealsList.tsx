@@ -28,7 +28,7 @@ export default function DealsList({
   id,
   readonly = false,
 }: DealsListProps) {
-  const locked = readonly || [1, 2, 3, 4, 5, 6].includes(id) // Lock all in readonly
+  const locked = readonly || [1, 2, 3, 4, 5, 6].includes(id)
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(title)
   const { setNodeRef } = useDroppable({

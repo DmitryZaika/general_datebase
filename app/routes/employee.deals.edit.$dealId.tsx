@@ -115,7 +115,7 @@ export default function DealsEdit() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[425px] overflow-auto flex flex-col justify-baseline min-h-[375px] max-h-[95vh] p-5'>
+      <DialogContent className='sm:max-w-[500px] overflow-auto flex flex-col justify-baseline min-h-[390px] max-h-[95vh] p-5'>
         <DialogHeader>
           <DialogTitle>Edit Deal</DialogTitle>
         </DialogHeader>
@@ -123,7 +123,7 @@ export default function DealsEdit() {
           value={location.pathname.split('/').pop()}
           onValueChange={value => navigate(value)}
         >
-          <TabsList className='mb-5'>
+          <TabsList className='mb-5 grid grid-cols-4'>
             <TabsTrigger value={`information${location.search}`}>General</TabsTrigger>
             <TabsTrigger value={`images${location.search}`}>Images</TabsTrigger>
             <TabsTrigger value={`documents${location.search}`}>Documents</TabsTrigger>
