@@ -198,6 +198,7 @@ export default function AdminCustomers() {
   const filtered = customers.filter(c => {
     if (tabParam === 'leads') return c.source === 'leads'
     if (tabParam === 'walkin') return c.source === 'check-in'
+    if (tabParam === 'all') return true
   })
 
   let displayed = filtered
