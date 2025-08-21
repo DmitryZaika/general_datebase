@@ -11,9 +11,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const dealId = parseInt(params.dealId, 10)
 
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT c.id, c.name, c.email, c.phone, c.address, c.city, c.state, c.postal_code, c.company_id, c.company_name,
+    `SELECT c.name, c.email, c.phone, c.address, c.city, c.state, c.postal_code, c.company_name,
             c.remodal_type, c.project_size, c.contact_time, c.remove_and_dispose, c.improve_offer, c.sink,
-            c.when_start, c.details, c.compaign_name, c.adset_name, c.ad_name
+            c.when_start, c.details, c.compaign_name, c.adset_name, c.ad_name, c.backsplash, c.kitchen_stove,
+            c.your_message, c.attached_file, c.qbo_id, c.notes
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
       WHERE d.id = ? AND c.company_id = ?`,
@@ -27,16 +28,47 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export default function DealProjectInfo() {
   const { customer } = useLoaderData<typeof loader>()
+
+  // Extract attached_file separately to render as image
+  const attachedFile = customer.attached_file
+  const otherFields = Object.entries(customer).filter(
+    ([k, v]) => v != null && k !== 'attached_file',
+  )
+
   return (
-    <div>
-      {Object.entries(customer)
-        .filter(([k, v]) => v != null && !['id', 'company_id'].includes(k))
-        .map(([k, v]) => (
+    <div className='space-y-4'>
+      <div>
+        {otherFields.map(([k, v]) => (
           <p key={k}>
-            Customer {k.replace(/_/g, ' ').replace(/\b\w/g, s => s.toUpperCase())}:{' '}
+            <span className='font-bold'>
+              {k.replace(/_/g, ' ').replace(/\b\w/g, s => s.toUpperCase())}:
+            </span>{' '}
             {String(v)}
           </p>
         ))}
+      </div>
+
+      {attachedFile && (
+        <div className='mt-6'>
+          <p className='font-bold mb-2'>Attached File:</p>
+          <img
+            src={String(attachedFile)}
+            alt='Attached project file'
+            className='max-w-full h-auto rounded-lg shadow-lg border'
+            onError={e => {
+              // If image fails to load, show as link instead
+              const target = e.target as HTMLImageElement
+              target.style.display = 'none'
+              const link = document.createElement('a')
+              link.href = String(attachedFile)
+              link.textContent = String(attachedFile)
+              link.target = '_blank'
+              link.className = 'text-blue-600 hover:text-blue-800 underline'
+              target.parentNode?.appendChild(link)
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }
