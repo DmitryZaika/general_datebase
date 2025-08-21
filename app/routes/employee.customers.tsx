@@ -220,12 +220,14 @@ export default function AdminCustomers() {
         </TabsList>
       </Tabs>
       <div className='w-fit'>
-        <Link to={`add`} relative='path' className='inline-flex w-fit'>
-          <LoadingButton loading={false} className='inline-flex items-center'>
-            <Plus className='w-4 h-4 mr-1' />
-            Add Customer
-          </LoadingButton>
-        </Link>
+        {tabParam === 'all' && (
+          <Link to={`add`} relative='path' className='inline-flex w-fit'>
+            <LoadingButton loading={false} className='inline-flex items-center'>
+              <Plus className='w-4 h-4 mr-1' />
+              Add Customer
+            </LoadingButton>
+          </Link>
+        )}
       </div>
       <DataTable key={tabParam} columns={customerColumns} data={displayed} />
       <Outlet />
