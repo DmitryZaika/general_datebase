@@ -85,9 +85,18 @@ export class Contract {
     }
     const totalSquareFeet = await this.calculateTotalSquareFeet()
     await db.execute(
-      `UPDATE sales SET customer_id = ?, notes = ?, square_feet = ?, price = ?, project_address = ?, extras = ? WHERE id = ? AND company_id = ?`,
+      `UPDATE sales 
+         SET customer_id = ?,
+             seller_id = COALESCE(?, seller_id),
+             notes = ?,
+             square_feet = ?,
+             price = ?,
+             project_address = ?,
+             extras = ?
+       WHERE id = ? AND company_id = ?`,
       [
         this.data.customer_id,
+        this.data.seller_id ?? null,
         this.data.notes_to_sale || null,
         totalSquareFeet,
         this.data.price || 0,

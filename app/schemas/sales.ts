@@ -74,7 +74,6 @@ export const customerSchema = z.object({
   seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
   project_address: z.string().optional(),
   notes_to_sale: StringOrNumber,
-
   price: z.coerce.number().default(0),
   company_name: z.string().nullable().optional(),
   rooms: z.array(roomSchema).default([]),
