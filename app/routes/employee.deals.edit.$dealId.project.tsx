@@ -1,5 +1,7 @@
+import type { ColumnDef } from '@tanstack/react-table'
 import type { RowDataPacket } from 'mysql2'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -26,26 +28,37 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return { customer: rows[0] }
 }
 
+const columns: ColumnDef<{ key: string; value: string }>[] = [
+  {
+    header: 'Key',
+    accessorKey: 'key',
+  },
+  {
+    header: 'Value',
+    accessorKey: 'value',
+    cell: ({ row }) => (
+      <span className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden'>
+        {row.original.value}
+      </span>
+    ),
+  },
+]
 export default function DealProjectInfo() {
   const { customer } = useLoaderData<typeof loader>()
 
   // Extract attached_file separately to render as image
   const attachedFile = customer.attached_file
-  const otherFields = Object.entries(customer).filter(
-    ([k, v]) => v != null && k !== 'attached_file',
-  )
+  const otherFields = Object.entries(customer)
+    .filter(([k, v]) => v != null && k !== 'attached_file')
+    .map(([k, v]) => ({
+      key: k.replace(/_/g, ' ').replace(/\b\w/g, s => s.toUpperCase()),
+      value: String(v),
+    }))
 
   return (
     <div className='space-y-4'>
       <div>
-        {otherFields.map(([k, v]) => (
-          <p key={k}>
-            <span className='font-bold'>
-              {k.replace(/_/g, ' ').replace(/\b\w/g, s => s.toUpperCase())}:
-            </span>{' '}
-            {String(v)}
-          </p>
-        ))}
+        <DataTable columns={columns} data={otherFields} noHeader />
       </div>
 
       {attachedFile && (
