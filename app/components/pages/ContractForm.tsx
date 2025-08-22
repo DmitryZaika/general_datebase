@@ -146,7 +146,10 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
             <div className=''>
               <CustomerSearch
                 onCustomerChange={value =>
-                  form.setValue('customer_id', value ?? undefined)
+                  form.setValue(
+                    'customer_id',
+                    value ?? (undefined as unknown as number),
+                  )
                 }
                 companyId={companyId}
                 source='user-input'
