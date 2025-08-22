@@ -32,6 +32,13 @@ import type { Faucet, Sink } from '~/types'
 import { roomPrice } from '~/utils/contracts'
 import { CustomerSearch } from '../molecules/CustomerSearch'
 import { FullDynamicAdditions } from '../molecules/DynamicAdditions'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select'
 
 const resolver = zodResolver(customerSchema)
 
@@ -61,6 +68,14 @@ const fetchFaucetType = async (): Promise<Faucet[]> => {
   return data
 }
 
+type Seller = { id: number; name: string }
+const fetchSalesReps = async (): Promise<Seller[]> => {
+  const res = await fetch('/api/sales-reps')
+  if (!res.ok) throw new Error('Failed to fetch sales reps')
+  const json = await res.json()
+  return json.users ?? []
+}
+
 export function ContractForm({ startings, saleId, companyId }: IContractFormProps) {
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state !== 'idle'
@@ -72,6 +87,11 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
   const { data: faucet_type = [] } = useQuery({
     queryKey: ['faucet_type'],
     queryFn: fetchFaucetType,
+  })
+  const { data: sellers = [] } = useQuery({
+    queryKey: ['sales-reps', companyId],
+    queryFn: fetchSalesReps,
+    enabled: Boolean(saleId),
   })
   const [sameAddress, setSameAddress] = useState(true)
 
@@ -170,6 +190,31 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
 
               {!sameAddress && (
                 <AddressInput form={form} field='project_address' type='project' />
+              )}
+              {saleId && (
+                <FormField
+                  control={form.control}
+                  name='seller_id'
+                  render={({ field }) => (
+                    <div className='mb-2 w-3/4'>
+                      <Select
+                        value={field.value ? String(field.value) : ''}
+                        onValueChange={val => field.onChange(Number(val))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder='Select a seller' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sellers.map(s => (
+                            <SelectItem key={s.id} value={String(s.id)}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                />
               )}
 
               {form.watch('rooms').map((_room, index) => (
