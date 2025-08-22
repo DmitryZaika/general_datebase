@@ -23,7 +23,9 @@ function MainComponent({
   return (
     <>
       <CustomerSearch
-        onCustomerChange={value => form.setValue('customer_id', value ?? null)}
+        onCustomerChange={value =>
+          form.setValue('customer_id', value ?? (undefined as unknown as number))
+        }
         companyId={companyId}
         source='user-input'
         selectedCustomer={form.watch('customer_id') ?? undefined}
