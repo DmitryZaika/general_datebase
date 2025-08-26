@@ -38,6 +38,7 @@ interface Customer {
   className?: string
   company_id: number
   source: (typeof sourceEnum)[number]
+  invalid_lead: string | null
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -62,7 +63,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const customers = await selectMany<Customer>(
     db,
-    `SELECT c.id, c.name, c.email, c.phone, c.address, c.sales_rep, c.created_date, u.name AS sales_rep_name, c.company_id, c.source
+    `SELECT c.id, c.name, c.email, c.phone, c.address, c.sales_rep, c.created_date, u.name AS sales_rep_name, c.company_id, c.source, c.invalid_lead
      FROM customers c
      LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
      ${where}`,
@@ -71,7 +72,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const processed = customers.map(c => ({
     ...c,
-    className: c.sales_rep === null ? 'bg-red-200' : undefined,
+    className:
+      c.sales_rep === null
+        ? c.invalid_lead && c.invalid_lead !== ''
+          ? 'bg-yellow-100'
+          : 'bg-red-200'
+        : undefined,
   }))
   return {
     customers: processed,
@@ -179,9 +185,11 @@ const customerColumns: ColumnDef<Customer>[] = [
 function CustomerActions({ customer }: { customer: Customer }) {
   const { toast } = useToast()
   const navigate = useNavigate()
+  const location = useLocation()
   const actions: Record<string, string> = {
-    edit: `edit/${customer.id}`,
-    delete: `delete/${customer.id}`,
+    edit: `edit/${customer.id}${location.search}`,
+    delete: `delete/${customer.id}${location.search}`,
+    invalid: `invalid/${customer.id}${location.search}`,
   }
 
   return (
