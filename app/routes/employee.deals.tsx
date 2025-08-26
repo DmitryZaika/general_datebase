@@ -281,7 +281,12 @@ export default function EmployeeDeals() {
       const toArr = [...(copy[toListId] || [])]
       const idx = fromArr.findIndex(d => d.id === activeId)
       if (idx === -1) return prev
-      const moved = { ...fromArr[idx], list_id: toListId }
+      const shouldClearDate = toListId === 4 || toListId === 5
+      const moved = {
+        ...fromArr[idx],
+        list_id: toListId,
+        due_date: shouldClearDate ? null : fromArr[idx].due_date,
+      }
       fromArr.splice(idx, 1)
       toArr.push(moved)
       copy[fromListId] = sortDeals(fromArr)

@@ -10,11 +10,13 @@ export const slabOptionsSchema = z.object({
 const sinkOptionsSchema = z.object({
   id: z.coerce.number().optional(),
   type_id: z.coerce.number(),
+  price: z.coerce.number(),
 })
 
 const faucetOptionsSchema = z.object({
   id: z.coerce.number().optional(),
   type_id: z.coerce.number(),
+  price: z.coerce.number(),
 })
 
 export const extrasSchema = z.record(
@@ -39,6 +41,7 @@ export const EXTRA_DEFAULTS = {
 export const roomSchema = z.object({
   room: z.string().default('kitchen'),
   room_id: z.string().default(uuidv7),
+  stone_id: z.coerce.number().optional(),
   sink_type: z.array(sinkOptionsSchema).default([]),
   faucet_type: z.array(faucetOptionsSchema).default([]),
   backsplash: z.string().default('no'),

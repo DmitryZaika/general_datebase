@@ -160,26 +160,31 @@ export class Contract {
     )
   }
 
-  protected async sellSink(slabId: number, sinkTypeId: number) {
+  protected async sellSink(slabId: number, sinkTypeId: number, price: number) {
     await db.execute(
-      `UPDATE sinks SET slab_id = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 ORDER BY id LIMIT 1`,
-      [slabId, sinkTypeId],
+      `UPDATE sinks SET slab_id = ? , price = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 ORDER BY id LIMIT 1`,
+      [slabId, price, sinkTypeId],
+    )
+  }
+  protected async unsellSink(slabId: number) {
+    await db.execute(
+      `UPDATE sinks SET slab_id = NULL, price = NULL WHERE slab_id = ?`,
+      [slabId],
     )
   }
 
-  protected async unsellSink(slabId: number) {
-    await db.execute(`UPDATE sinks SET slab_id = NULL WHERE slab_id = ?`, [slabId])
-  }
-
-  protected async sellFaucet(slabId: number, faucetTypeId: number) {
+  protected async sellFaucet(slabId: number, faucetTypeId: number, price: number) {
     await db.execute(
-      `UPDATE faucets SET slab_id = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 ORDER BY id LIMIT 1`,
-      [slabId, faucetTypeId],
+      `UPDATE faucets SET slab_id = ? , price = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 ORDER BY id LIMIT 1`,
+      [slabId, price, faucetTypeId],
     )
   }
 
   protected async unsellFaucet(slabId: number) {
-    await db.execute(`UPDATE faucets SET slab_id = NULL WHERE slab_id = ?`, [slabId])
+    await db.execute(
+      `UPDATE faucets SET slab_id = NULL, price = NULL WHERE slab_id = ?`,
+      [slabId],
+    )
   }
 
   protected async duplicateSlab(slabId: number) {
@@ -225,10 +230,10 @@ export class Contract {
         }
       }
       for (const sinkType of room.sink_type) {
-        await this.sellSink(firstSlab.id, sinkType.type_id)
+        await this.sellSink(firstSlab.id, sinkType.type_id, sinkType.price)
       }
       for (const faucetType of room.faucet_type) {
-        await this.sellFaucet(firstSlab.id, faucetType.type_id)
+        await this.sellFaucet(firstSlab.id, faucetType.type_id, faucetType.price)
       }
     }
     return this.saleId
@@ -286,10 +291,10 @@ export class Contract {
 
       // Sell sinks and faucets **once per room**, associated with the first slab
       for (const sinkType of room.sink_type) {
-        await this.sellSink(firstSlab.id, sinkType.type_id)
+        await this.sellSink(firstSlab.id, sinkType.type_id, sinkType.price)
       }
       for (const faucetType of room.faucet_type) {
-        await this.sellFaucet(firstSlab.id, faucetType.type_id)
+        await this.sellFaucet(firstSlab.id, faucetType.type_id, faucetType.price)
       }
     }
   }

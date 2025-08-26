@@ -75,8 +75,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ type_id: sinkTypeId }],
-            faucet_type: [{ type_id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId, price: 0 }],
+            faucet_type: [{ type_id: faucetTypeId, price: 0 }],
           }),
         ],
       })
@@ -118,8 +118,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ type_id: sinkTypeId }],
-            faucet_type: [{ type_id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId, price: 0 }],
+            faucet_type: [{ type_id: faucetTypeId, price: 0 }],
           }),
         ],
       })
@@ -177,8 +177,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: false }],
-            sink_type: [{ type_id: sinkTypeId }],
-            faucet_type: [{ type_id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId, price: 0 }],
+            faucet_type: [{ type_id: faucetTypeId, price: 0 }],
           }),
         ],
       })
@@ -237,8 +237,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ type_id: sinkTypeId }],
-            faucet_type: [{ type_id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId, price: 0 }],
+            faucet_type: [{ type_id: faucetTypeId, price: 0 }],
           }),
         ],
       })
@@ -259,8 +259,8 @@ describe('Contract Integration Tests', () => {
         rooms: [
           TestDataFactory.createRoom({
             slabs: [{ id: slabId, is_full: true }],
-            sink_type: [{ type_id: sinkTypeId }],
-            faucet_type: [{ type_id: faucetTypeId }],
+            sink_type: [{ type_id: sinkTypeId, price: 0 }],
+            faucet_type: [{ type_id: faucetTypeId, price: 0 }],
             square_feet: 35,
           }),
         ],
