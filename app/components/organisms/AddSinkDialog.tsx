@@ -41,6 +41,7 @@ export const AddSinkDialog = ({
       ...(form.getValues(`rooms.${roomIndex}.sink_type`) || []),
       {
         type_id: selectedSink,
+        price: sink_type.find(s => s.id === selectedSink)?.retail_price || 0,
       },
     ])
     setShow(false)

@@ -217,9 +217,9 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
                 />
               )}
 
-              {form.watch('rooms').map((_room, index) => (
+              {form.watch('rooms').map((room, index) => (
                 <RoomSubForm
-                  key={index}
+                  key={room.room_id}
                   form={form}
                   index={index}
                   sink_type={sink_type}

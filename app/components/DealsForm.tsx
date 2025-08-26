@@ -95,7 +95,7 @@ export function DealsForm({
           <div className='flex justify-between gap-2 w-full'>
             {dealId && (
               <div className='flex justify-start'>
-                <Link to={`delete`} relative='path'>
+                <Link to={`../delete`} relative='path'>
                   <Button variant='destructive' type='button' className='mb-4'>
                     Delete
                   </Button>

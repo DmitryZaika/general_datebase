@@ -54,6 +54,11 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
   } | null>(null)
   const fetcher = useFetcher()
 
+  // Keep local date in sync with deal prop changes (e.g., after DnD between lists)
+  useEffect(() => {
+    setLocalDate(deal.due_date ?? null)
+  }, [deal.due_date])
+
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: deal.id,
     data: { listId: deal.list_id, position: deal.position, type: 'deal' },

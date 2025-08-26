@@ -42,6 +42,7 @@ export const AddFaucetDialog = ({
       ...currentFaucets,
       {
         type_id: selectedFaucet,
+        price: faucet_type.find(f => f.id === selectedFaucet)?.retail_price || 0,
       },
     ])
     setShow(false)

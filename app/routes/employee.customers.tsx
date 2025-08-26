@@ -13,6 +13,7 @@ import {
   useSearchParams,
 } from 'react-router'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
+import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SelectInput } from '~/components/molecules/SelectItem'
 import { PageLayout } from '~/components/PageLayout'
@@ -20,6 +21,7 @@ import { DataTable } from '~/components/ui/data-table'
 import { FormField } from '~/components/ui/form'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
+import { useToast } from '~/hooks/use-toast'
 import type { sourceEnum } from '~/schemas/customers'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -168,18 +170,51 @@ const customerColumns: ColumnDef<Customer>[] = [
   },
   {
     id: 'actions',
-    cell: ({ row }: { row: Row<Customer> }) => {
-      return (
-        <ActionDropdown
-          actions={{
-            edit: `edit/${row.original.id}`,
-            delete: `delete/${row.original.id}`,
-          }}
-        />
-      )
-    },
+    cell: ({ row }: { row: Row<Customer> }) => (
+      <CustomerActions customer={row.original} />
+    ),
   },
 ]
+
+function CustomerActions({ customer }: { customer: Customer }) {
+  const { toast } = useToast()
+  const navigate = useNavigate()
+  const actions: Record<string, string> = {
+    edit: `edit/${customer.id}`,
+    delete: `delete/${customer.id}`,
+  }
+
+  return (
+    <div onClick={e => e.stopPropagation()}>
+      <ActionDropdown
+        actions={actions}
+        onItemClick={(action, link, e) => {
+          if (action !== 'delete') return
+          e.preventDefault()
+          e.stopPropagation()
+          ;(async () => {
+            const res = await fetch(`/api/deals/count-by-customer/${customer.id}`)
+            if (res.ok) {
+              const json = await res.json()
+              if ((json.count ?? 0) > 0) {
+                toast({
+                  title: 'Action required',
+                  description: 'Delete all related deals with this customer.',
+                  duration: 7000,
+                  variant: 'destructive',
+                })
+                return
+              }
+            }
+
+            navigate(link)
+          })()
+          return false
+        }}
+      />
+    </div>
+  )
+}
 
 export default function AdminCustomers() {
   const { customers } = useLoaderData<typeof loader>()
@@ -212,13 +247,16 @@ export default function AdminCustomers() {
 
   return (
     <PageLayout title='Customers List'>
-      <Tabs value={tabParam} onValueChange={handleTabChange} className='mb-4'>
-        <TabsList>
-          <TabsTrigger value='walkin'>Walk-in</TabsTrigger>
-          <TabsTrigger value='leads'>Leads</TabsTrigger>
-          <TabsTrigger value='all'>All Customers</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className='flex items-center justify-between'>
+        <Tabs value={tabParam} onValueChange={handleTabChange}>
+          <TabsList>
+            <TabsTrigger value='walkin'>Walk-in</TabsTrigger>
+            <TabsTrigger value='leads'>Leads</TabsTrigger>
+            <TabsTrigger value='all'>All Customers</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <FindCustomer />
+      </div>
       <div className='w-fit'>
         {tabParam === 'all' && (
           <Link to={`add`} relative='path' className='inline-flex w-fit'>
