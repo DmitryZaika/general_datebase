@@ -79,11 +79,13 @@ export const RoomSubForm = ({
   index,
   sink_type,
   faucet_type,
+  isEdit,
 }: {
   form: UseFormReturn<TCustomerSchema>
   index: number
   sink_type: Sink[]
   faucet_type: Faucet[]
+  isEdit?: boolean
 }) => {
   const roomValues = form.watch(`rooms.${index}`)
 
@@ -107,7 +109,7 @@ export const RoomSubForm = ({
     if (slabIds.length > 0) {
       getStone(slabIds[0]).then(setStone)
     }
-  }, [])
+  }, [JSON.stringify(slabIds)])
 
   const { data: slabMap } = useQuery({
     queryKey: ['slabMap', slabIds],
@@ -115,6 +117,15 @@ export const RoomSubForm = ({
   })
 
   useEffect(() => {
+    const rp = form.getValues(`rooms.${index}.retail_price`) || 0
+    const sqft = form.getValues(`rooms.${index}.square_feet`) || 0
+    if (rp > 0 && sqft > 0) {
+      updateTotalPrice(sqft * rp)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isEdit) return
     if (stone?.name) {
       fetch(`/api/stones/search?name=${encodeURIComponent(stone?.name)}`)
         .then(response => response.json())
@@ -131,7 +142,7 @@ export const RoomSubForm = ({
           }
         })
     }
-  }, [index, stone?.id, stone?.name])
+  }, [isEdit, index, stone?.id, stone?.name])
 
   const handleSwitchSlab = (slabId: number, isFull: boolean) => {
     form.setValue(

@@ -224,6 +224,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
                   index={index}
                   sink_type={sink_type}
                   faucet_type={faucet_type}
+                  isEdit={Boolean(saleId)}
                 />
               ))}
 
