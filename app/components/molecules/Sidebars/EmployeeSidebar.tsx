@@ -187,6 +187,11 @@ const getItems = (
         url: `/admin/users`,
         icon: Users,
       },
+      {
+        title: 'Statistic',
+        url: `/employee/statistics`,
+        icon: DollarSign,
+      },
     )
   }
   return finalList
@@ -219,7 +224,7 @@ export function EmployeeSidebar({
   )
 
   const inventoryTitles = ['Stones', 'Sinks', 'Faucets']
-  const crmTitles = ['Customers', 'Deals']
+  const crmTitles = ['Customers', 'Deals', 'Statistic']
   const resourceTitles = [
     'Suppliers',
     'Supports',

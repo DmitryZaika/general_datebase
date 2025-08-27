@@ -1,5 +1,11 @@
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+  useNavigate,
+} from 'react-router'
 import DealsList from '~/components/DealsList'
+import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
@@ -64,10 +70,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AdminDeals() {
   const { deals, customers, lists } = useLoaderData<typeof loader>()
+  const navigate = useNavigate()
 
   return (
     <>
-      <div />
+      <div className='flex justify-between items-center mb-3'>
+        <Tabs
+          value='board'
+          onValueChange={v =>
+            navigate(v === 'statistics' ? '/admin/statistics' : '/admin/deals')
+          }
+        >
+          <TabsList>
+            <TabsTrigger value='board'>CRM</TabsTrigger>
+            <TabsTrigger value='statistics'>Statistics</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
       <div className='flex gap-4'>
         {lists.map(list => {
           const listDeals = deals
