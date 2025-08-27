@@ -255,15 +255,19 @@ export default function AdminCustomers() {
 
   return (
     <PageLayout title='Customers List'>
-      <div className='flex items-center justify-between'>
-        <Tabs value={tabParam} onValueChange={handleTabChange}>
-          <TabsList>
-            <TabsTrigger value='walkin'>Walk-in</TabsTrigger>
-            <TabsTrigger value='leads'>Leads</TabsTrigger>
-            <TabsTrigger value='all'>All Customers</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <FindCustomer />
+      <div className='flex flex-col md:flex-row items-center justify-between'>
+        <div className='flex items-center gap-2'>
+          <Tabs value={tabParam} onValueChange={handleTabChange}>
+            <TabsList>
+              <TabsTrigger value='walkin'>Walk-in</TabsTrigger>
+              <TabsTrigger value='leads'>Leads</TabsTrigger>
+              <TabsTrigger value='all'>All Customers</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+        <div className='flex items-center gap-2'>
+          <FindCustomer />
+        </div>
       </div>
       <div className='w-fit'>
         {tabParam === 'all' && (
