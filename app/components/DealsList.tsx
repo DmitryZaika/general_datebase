@@ -1,6 +1,5 @@
 import { useDroppable } from '@dnd-kit/core'
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
 import { Link } from 'react-router'
 import DealsCard from './DealsCard'
 import { ActionDropdown } from './molecules/DataTable/ActionDropdown'
@@ -29,54 +28,25 @@ export default function DealsList({
   readonly = false,
 }: DealsListProps) {
   const locked = readonly || [1, 2, 3, 4, 5, 6].includes(id)
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(title)
   const { setNodeRef } = useDroppable({
     id: `list-${id}`,
     data: { type: 'list', listId: id },
     disabled: readonly,
   })
 
-  async function save() {
-    if (value.trim() === '' || value === title) {
-      setEditing(false)
-      return
-    }
-    await fetch('/api/deals-list/rename', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, name: value }),
-    })
-    setEditing(false)
-  }
   return (
     <Card
       ref={setNodeRef}
       className={`min-w-[18rem] w-72 max-h-[calc(100vh-10rem)] flex flex-col h-full shadow-sm ${id === 4 ? 'bg-green-100' : id === 5 ? 'bg-red-100' : ''}`}
     >
-      <CardHeader className='bg-black rounded-t-xl py-2 px-4'>
+      <CardHeader className='bg-black rounded-t-xl py-2 px-3'>
         <div className='flex justify-between items-center'>
-          {editing ? (
-            <input
-              value={value}
-              onChange={e => setValue(e.target.value)}
-              onBlur={save}
-              onKeyDown={e => e.key === 'Enter' && save()}
-              className='text-sm font-semibold tracking-wide bg-white text-black rounded px-1 outline-none'
-              autoFocus
-            />
-          ) : (
-            <CardTitle
-              className='text-sm font-semibold tracking-wide text-white w-full'
-              onClick={e => {
-                if (locked) return
-                e.stopPropagation()
-                setEditing(true)
-              }}
-            >
-              {value}
-            </CardTitle>
-          )}
+          <CardTitle className='text-sm font-semibold tracking-wide text-white w-full'>
+            {title}
+          </CardTitle>
+          <span className='text-xs font-medium text-white/90 bg-white/20 rounded-full px-2 py-0.5'>
+            {customers.length}
+          </span>
           {!locked && (
             <div className='flex gap-2 items-center'>
               <span className='text-xs font-medium text-white/90 bg-white/20 rounded-full px-2 py-0.5'>
