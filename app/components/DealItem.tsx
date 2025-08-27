@@ -135,7 +135,7 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
       {/* Title row with drag handle and edit icon */}
       <div className='flex items-center w-full gap-2'>
         <div
-          className={`flex items-center gap-2 flex-1 ${readonly ? '' : 'cursor-grab'}`}
+          className={`flex items-center gap-1 flex-1 ${readonly ? '' : 'cursor-grab'}`}
         >
           {!readonly && (
             <button
