@@ -30,7 +30,7 @@ import { toastData } from '~/utils/toastHelpers'
 // ----------------------
 const checklistSchema = z.object({
   customer_name: z.string().min(1, 'Required'),
-  installation_address: z.string().min(1, 'Required'),
+  installation_address: z.coerce.string().min(1, 'Required'),
   material_correct: z.union([z.literal('on'), z.literal('')]).optional(),
   seams_satisfaction: z.union([z.literal('on'), z.literal('')]).optional(),
   appliances_fit: z.union([z.literal('on'), z.literal('')]).optional(),
