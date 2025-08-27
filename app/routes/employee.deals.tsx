@@ -17,9 +17,12 @@ import {
   Outlet,
   redirect,
   useLoaderData,
+  useLocation,
+  useNavigate,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import DealsList from '~/components/DealsList'
+import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions'
@@ -158,6 +161,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function EmployeeDeals() {
   const { deals, customers, lists } = useLoaderData<typeof loader>()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   type Deal = {
     id: number
@@ -243,6 +248,14 @@ export default function EmployeeDeals() {
     return undefined
   }
 
+  const findDealIdByCustomer = (customerId: number): number | undefined => {
+    for (const l of lists) {
+      const hit = board[l.id]?.find(d => d.customer_id === customerId)
+      if (hit) return hit.id
+    }
+    return undefined
+  }
+
   const handleDragStart = (event: DragStartEvent) => {
     const id = Number(event.active.id)
     setActiveId(id)
@@ -316,6 +329,21 @@ export default function EmployeeDeals() {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
+      <div className='w-full flex justify-end mb-2'>
+        <FindCustomer
+          disableRowClick
+          onEdit={customerId => {
+            const dealId = findDealIdByCustomer(customerId)
+            if (dealId) navigate(`edit/${dealId}/information${location.search}`)
+          }}
+          onDelete={customerId => {
+            const dealId = findDealIdByCustomer(customerId)
+            if (dealId) navigate(`edit/${dealId}/delete`)
+          }}
+          resolveId={findDealIdByCustomer}
+          noActionsLabel='No Deals'
+        />
+      </div>
       <div className='flex  gap-4'>
         {lists.map(list => (
           <DealsList
@@ -348,6 +376,7 @@ export default function EmployeeDeals() {
             })()
           : null}
       </DragOverlay>
+      <Outlet />
     </DndContext>
   )
 }

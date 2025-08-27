@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FaEdit, FaSearch, FaTrash } from 'react-icons/fa'
 import { useLocation, useNavigate } from 'react-router'
 import { useToast } from '~/hooks/use-toast'
@@ -17,7 +17,29 @@ async function getCustomers(name: string): Promise<Customer[]> {
   return data?.customers || []
 }
 
-export function FindCustomer({ className }: { className?: string }) {
+export function FindCustomer({
+  className,
+  disableRowClick = false,
+  editBasePath = '/employee/customers',
+  deleteBasePath = '/employee/customers',
+  buildEditLink,
+  buildDeleteLink,
+  onEdit,
+  onDelete,
+  resolveId,
+  noActionsLabel = 'No Items',
+}: {
+  className?: string
+  disableRowClick?: boolean
+  editBasePath?: string
+  deleteBasePath?: string
+  buildEditLink?: (customerId: number, search: string) => string
+  buildDeleteLink?: (customerId: number, search: string) => string
+  onEdit?: (customerId: number) => void
+  onDelete?: (customerId: number) => void
+  resolveId?: (customerId: number) => number | undefined
+  noActionsLabel?: string
+}) {
   const [searchTerm, setSearchTerm] = useState('')
   const [isInputFocused, setIsInputFocused] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -29,6 +51,18 @@ export function FindCustomer({ className }: { className?: string }) {
     queryFn: () => getCustomers(searchTerm),
     enabled: !!searchTerm,
   })
+
+  const displayCustomers = useMemo(() => {
+    const seen = new Set<string>()
+    const result: Customer[] = []
+    for (const c of customers) {
+      const key = (c.name || '').trim().toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      result.push(c)
+    }
+    return result
+  }, [customers])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -43,6 +77,7 @@ export function FindCustomer({ className }: { className?: string }) {
   }, [])
 
   const handleResultClick = (customerId: number) => {
+    if (disableRowClick) return
     navigate(`/employee/customers/view/${customerId}${location.search}`)
   }
 
@@ -62,23 +97,29 @@ export function FindCustomer({ className }: { className?: string }) {
         </div>
       </div>
 
-      {isInputFocused && customers.length > 0 && (
+      {isInputFocused && displayCustomers.length > 0 && (
         <div className='absolute z-50 w-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'>
-          {customers.map(customer => (
+          {displayCustomers.map(customer => (
             <div
               key={customer.id}
-              onClick={() => handleResultClick(customer.id)}
+              onClick={
+                disableRowClick ? undefined : () => handleResultClick(customer.id)
+              }
               className='p-1.5 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center'
-              onAuxClick={e => {
-                if (e.button === 1) {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  window.open(
-                    `/employee/customers/view/${customer.id}${location.search}`,
-                    '_blank',
-                  )
-                }
-              }}
+              onAuxClick={
+                disableRowClick
+                  ? undefined
+                  : e => {
+                      if (e.button === 1) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        window.open(
+                          `/employee/customers/view/${customer.id}${location.search}`,
+                          '_blank',
+                        )
+                      }
+                    }
+              }
             >
               <div className='flex-1 flex-row '>
                 <div className='font-medium text-gray-800'>{customer.name}</div>
@@ -88,50 +129,67 @@ export function FindCustomer({ className }: { className?: string }) {
                 </div>
               </div>
               <div className='flex items-center space-x-2'>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  onClick={e => {
-                    e.stopPropagation()
-                    navigate(
-                      `/employee/customers/edit/${customer.id}${location.search}`,
-                    )
-                  }}
-                  className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
-                >
-                  <FaEdit style={{ minWidth: '20px', minHeight: '20px' }} />
-                </Button>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  onClick={e => {
-                    e.stopPropagation()
-                    ;(async () => {
-                      const res = await fetch(
-                        `/api/deals/count-by-customer/${customer.id}`,
-                      )
-                      if (res.ok) {
-                        const json = await res.json()
-                        if ((json.count ?? 0) > 0) {
-                          toast({
-                            title: 'Action required',
-                            description: 'Delete all related deals with this customer.',
-                            duration: 7000,
-                            variant: 'destructive',
-                          })
+                {resolveId && resolveId(customer.id) === undefined ? (
+                  <span className='text-xs text-gray-500'>{noActionsLabel}</span>
+                ) : (
+                  <>
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      onClick={e => {
+                        e.stopPropagation()
+                        if (onEdit) {
+                          onEdit(customer.id)
                           return
                         }
-                      }
+                        const link = buildEditLink
+                          ? buildEditLink(customer.id, location.search)
+                          : `${editBasePath}/edit/${customer.id}${location.search}`
+                        navigate(link)
+                      }}
+                      className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                    >
+                      <FaEdit style={{ minWidth: '20px', minHeight: '20px' }} />
+                    </Button>
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      onClick={e => {
+                        e.stopPropagation()
+                        if (onDelete) {
+                          onDelete(customer.id)
+                          return
+                        }
+                        ;(async () => {
+                          const res = await fetch(
+                            `/api/deals/count-by-customer/${customer.id}`,
+                          )
+                          if (res.ok) {
+                            const json = await res.json()
+                            if ((json.count ?? 0) > 0) {
+                              toast({
+                                title: 'Action required',
+                                description:
+                                  'Delete all related deals with this customer.',
+                                duration: 7000,
+                                variant: 'destructive',
+                              })
+                              return
+                            }
+                          }
 
-                      navigate(
-                        `/employee/customers/delete/${customer.id}${location.search}`,
-                      )
-                    })()
-                  }}
-                  className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
-                >
-                  <FaTrash style={{ minWidth: '16px', minHeight: '16px' }} />
-                </Button>
+                          const link = buildDeleteLink
+                            ? buildDeleteLink(customer.id, location.search)
+                            : `${deleteBasePath}/delete/${customer.id}${location.search}`
+                          navigate(link)
+                        })()
+                      }}
+                      className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                    >
+                      <FaTrash style={{ minWidth: '16px', minHeight: '16px' }} />
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           ))}
