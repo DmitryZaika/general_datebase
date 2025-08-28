@@ -162,6 +162,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       customersByRepWhere.push('DATE(c.created_date) <= ?')
       customersByRepParams.push(toDate)
     }
+    if (hasRepFilter) {
+      customersByRepWhere.push('u.name = ?')
+      customersByRepParams.push(salesRepParam)
+    }
 
     const customersByRep = await selectMany<CustomersByRep>(
       db,
