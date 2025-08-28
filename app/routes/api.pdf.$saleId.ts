@@ -223,21 +223,6 @@ async function buildPdf(
 
   // Add logo on the left - simplified approach
 
-  const logoUrl =
-    'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp'
-  const logoResponse = await fetch(logoUrl)
-  if (logoResponse.ok) {
-    const logoBytes = await logoResponse.arrayBuffer()
-    const logoImage = await pdfDoc.embedPng(logoBytes)
-    const logoSize = 30
-    page.drawImage(logoImage, {
-      x: 20,
-      y: 750,
-      width: logoSize,
-      height: logoSize,
-    })
-  }
-
   // Center "Granite Depot" text
   const companyText = 'Granite Depot'
   const textWidth = bold.widthOfTextAtSize(companyText, 20)
