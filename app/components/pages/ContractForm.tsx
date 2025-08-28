@@ -152,7 +152,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
     JSON.stringify(faucet_type),
     JSON.stringify(extrasValues),
   ])
-  form.setValue('price', totalRoomPrice)
+  form.setValue('price', Math.round(totalRoomPrice * 100) / 100)
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
