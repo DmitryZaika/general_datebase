@@ -4,11 +4,12 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
 } from 'react-router'
+import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
 import { PageLayout } from '~/components/PageLayout'
 import { DataTable } from '~/components/ui/data-table'
-import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
@@ -42,8 +43,13 @@ type CustomersBySource = {
 
 type CustomersByRep = {
   rep_name: string | null
+  walkin: number
+  leads: number
+  manual: number
   total: number
 }
+
+type DealsList = { id: number; name: string; position: number }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
@@ -53,6 +59,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url)
     const fromDate = url.searchParams.get('fromDate') || ''
     const toDate = url.searchParams.get('toDate') || ''
+    const salesRepParam = url.searchParams.get('salesRep') || 'All'
+    const hasRepFilter = salesRepParam !== 'All'
 
     const dateFilters: string[] = []
     const dateParams: (string | number)[] = []
@@ -79,10 +87,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               COALESCE(AVG(s.price), 0) AS avg_ticket
        FROM sales s
        JOIN users u ON s.seller_id = u.id
-       WHERE ${salesWhere.join(' AND ')}
+       WHERE ${salesWhere.join(' AND ')}${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY u.id, u.name
        ORDER BY total_revenue DESC`,
-      [user.company_id, ...dateParams],
+      hasRepFilter
+        ? [user.company_id, ...dateParams, salesRepParam]
+        : [user.company_id, ...dateParams],
     )
 
     const dealsByRep = await selectMany<DealsByRep>(
@@ -94,10 +104,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        FROM deals d
        JOIN users u ON d.user_id = u.id
        JOIN customers c ON d.customer_id = c.id
-       WHERE c.company_id = ? AND d.deleted_at IS NULL
+       WHERE c.company_id = ? AND d.deleted_at IS NULL${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY u.id, u.name
        ORDER BY deals_count DESC`,
-      [user.company_id],
+      hasRepFilter ? [user.company_id, salesRepParam] : [user.company_id],
     )
 
     const dealsByStage = await selectMany<DealsByStage>(
@@ -108,10 +118,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        FROM deals d
        JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
-       WHERE c.company_id = ? AND d.deleted_at IS NULL
+       JOIN users u ON d.user_id = u.id
+       WHERE c.company_id = ? AND d.deleted_at IS NULL${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY l.id, l.name
        ORDER BY l.position ASC`,
-      [user.company_id],
+      hasRepFilter ? [user.company_id, salesRepParam] : [user.company_id],
     )
 
     const customersTotals = await selectMany<{
@@ -141,21 +152,42 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [user.company_id],
     )
 
+    const customersByRepWhere: string[] = ['c.company_id = ?']
+    const customersByRepParams: (string | number)[] = [user.company_id]
+    if (fromDate) {
+      customersByRepWhere.push('DATE(c.created_date) >= ?')
+      customersByRepParams.push(fromDate)
+    }
+    if (toDate) {
+      customersByRepWhere.push('DATE(c.created_date) <= ?')
+      customersByRepParams.push(toDate)
+    }
+
     const customersByRep = await selectMany<CustomersByRep>(
       db,
-      `SELECT u.name AS rep_name, COUNT(c.id) AS total
+      `SELECT u.name AS rep_name,
+              SUM(CASE WHEN c.source = 'check-in' THEN 1 ELSE 0 END) AS walkin,
+              SUM(CASE WHEN c.source = 'leads' THEN 1 ELSE 0 END) AS leads,
+              SUM(CASE WHEN c.source = 'user-input' THEN 1 ELSE 0 END) AS manual,
+              COUNT(c.id) AS total
        FROM customers c
        LEFT JOIN users u ON c.sales_rep = u.id
-       WHERE c.company_id = ?
+       WHERE ${customersByRepWhere.join(' AND ')}
        GROUP BY u.name
        ORDER BY total DESC`,
-      [user.company_id],
+      customersByRepParams,
+    )
+
+    const lists = await selectMany<DealsList>(
+      db,
+      `SELECT id, name, position FROM deals_list WHERE deleted_at IS NULL ORDER BY position`,
     )
 
     return {
       salesBySeller,
       dealsByRep,
       dealsByStage,
+      lists,
       customersTotals: customersTotals[0] || {
         total: 0,
         without_rep: 0,
@@ -177,6 +209,7 @@ export default function AdminStatistics() {
     salesBySeller,
     dealsByRep,
     dealsByStage,
+    lists,
     customersTotals,
     customersBySource,
     customersByRep,
@@ -185,6 +218,7 @@ export default function AdminStatistics() {
   } = useLoaderData<typeof loader>()
 
   const navigate = useNavigate()
+  const location = useLocation()
   const [from, setFrom] = useState(fromDate || '')
   const [to, setTo] = useState(toDate || '')
 
@@ -223,9 +257,36 @@ export default function AdminStatistics() {
     },
   ]
 
+  const stageRows = useMemo(() => {
+    const map = new Map<string, DealsByStage>()
+    dealsByStage.forEach(s => map.set(s.list_name, s))
+    return lists.map(l => {
+      const hit = map.get(l.name)
+      return {
+        list_name: l.name,
+        deals_count: hit?.deals_count || 0,
+        total_amount: hit?.total_amount || 0,
+      } as DealsByStage
+    })
+  }, [JSON.stringify(dealsByStage), JSON.stringify(lists)])
+
+  const totalDealsInStages = useMemo(
+    () => stageRows.reduce((acc, s) => acc + (s.deals_count || 0), 0),
+    [JSON.stringify(stageRows)],
+  )
+
   const dealsStageColumns: ColumnDef<DealsByStage>[] = [
     { accessorKey: 'list_name', header: 'Stage' },
-    { accessorKey: 'deals_count', header: 'Deals' },
+    {
+      accessorKey: 'deals_count',
+      header: 'Deals',
+      cell: ({ row }) => {
+        const count = row.original.deals_count || 0
+        const pct =
+          totalDealsInStages > 0 ? Math.round((count / totalDealsInStages) * 100) : 0
+        return `${count} (${pct}%)`
+      },
+    },
     {
       accessorKey: 'total_amount',
       header: 'Total Amount',
@@ -233,82 +294,94 @@ export default function AdminStatistics() {
     },
   ]
 
+  const sourceLabel = (s: string | null) => {
+    if (!s) return '-'
+    if (s === 'check-in') return 'Walk-in'
+    if (s === 'leads') return 'Leads'
+    if (s === 'user-input') return 'Manual added'
+    return s
+  }
+
   const customersBySourceColumns: ColumnDef<CustomersBySource>[] = [
-    { accessorKey: 'source', header: 'Source' },
+    {
+      accessorKey: 'source',
+      header: 'Source',
+      cell: ({ row }) => sourceLabel(row.original.source),
+    },
     { accessorKey: 'total', header: 'Customers' },
   ]
 
   const customersByRepColumns: ColumnDef<CustomersByRep>[] = [
-    { accessorKey: 'rep_name', header: 'Sales Rep' },
-    { accessorKey: 'total', header: 'Customers' },
+    {
+      accessorKey: 'rep_name',
+      header: 'Sales Rep',
+      cell: ({ row }) => row.original.rep_name || 'Not assigned',
+    },
+    { accessorKey: 'walkin', header: 'Walk-in' },
+    { accessorKey: 'leads', header: 'Leads' },
+    { accessorKey: 'manual', header: 'Manual added' },
+    { accessorKey: 'total', header: 'Total' },
   ]
 
-  const salesTotals = useMemo(() => {
-    const totalRevenue = salesBySeller.reduce(
-      (acc, s) => acc + (s.total_revenue || 0),
-      0,
-    )
-    const totalCount = salesBySeller.reduce((acc, s) => acc + (s.sales_count || 0), 0)
-    const avgTicket = totalCount > 0 ? totalRevenue / totalCount : 0
-    return { totalRevenue, totalCount, avgTicket }
-  }, [JSON.stringify(salesBySeller)])
+  const handleFiltersSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const params = new URLSearchParams(location.search)
+    if (from) params.set('fromDate', from)
+    if (to) params.set('toDate', to)
+    navigate({ pathname: '/admin/statistics', search: params.toString() })
+  }
+
+  const handleClear = () => {
+    setFrom('')
+    setTo('')
+    const params = new URLSearchParams(location.search)
+    params.delete('fromDate')
+    params.delete('toDate')
+    params.delete('salesRep')
+    navigate({ pathname: '/admin/statistics', search: params.toString() })
+  }
 
   return (
     <PageLayout title='Statistics'>
       <div className='flex justify-between items-center mb-4'>
-        <Tabs
-          value='statistics'
-          onValueChange={v =>
-            navigate(v === 'statistics' ? '/admin/statistics' : '/admin/deals')
-          }
-        >
-          <TabsList>
-            <TabsTrigger value='board'>CRM</TabsTrigger>
-            <TabsTrigger value='statistics'>Statistics</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <div className='flex items-center gap-2'>
-          <form method='get' className='flex items-center gap-2'>
-            <input
-              type='date'
-              name='fromDate'
-              value={from}
-              onChange={e => setFrom(e.target.value)}
-              className='border rounded px-2 py-1'
-            />
-            <input
-              type='date'
-              name='toDate'
-              value={to}
-              onChange={e => setTo(e.target.value)}
-              className='border rounded px-2 py-1'
-            />
-            <button
-              type='submit'
-              className='px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded'
-            >
-              Apply
-            </button>
+        <div className='flex items-center w-full'>
+          <form
+            onSubmit={handleFiltersSubmit}
+            className='flex items-center justify-between gap-2 w-full'
+          >
+            <div className='flex items-center gap-2'>
+              <SalesRepsFilter className='-mt-5' />
+            </div>
+            <div className='flex items-center gap-2'>
+              <input
+                type='date'
+                name='fromDate'
+                value={from}
+                onChange={e => setFrom(e.target.value)}
+                className='border rounded px-2 py-1'
+              />
+              <input
+                type='date'
+                name='toDate'
+                value={to}
+                onChange={e => setTo(e.target.value)}
+                className='border rounded px-2 py-1'
+              />
+              <button
+                type='button'
+                onClick={handleClear}
+                className='px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded'
+              >
+                Clear
+              </button>
+              <button
+                type='submit'
+                className='px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded'
+              >
+                Apply
+              </button>
+            </div>
           </form>
-        </div>
-      </div>
-
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-6'>
-        <div className='border rounded p-4'>
-          <div className='text-sm text-slate-500'>Total Sales</div>
-          <div className='text-2xl font-semibold'>
-            {currency.format(salesTotals.totalRevenue)}
-          </div>
-        </div>
-        <div className='border rounded p-4'>
-          <div className='text-sm text-slate-500'>Sales Count</div>
-          <div className='text-2xl font-semibold'>{salesTotals.totalCount}</div>
-        </div>
-        <div className='border rounded p-4'>
-          <div className='text-sm text-slate-500'>Average Ticket</div>
-          <div className='text-2xl font-semibold'>
-            {currency.format(salesTotals.avgTicket)}
-          </div>
         </div>
       </div>
 
@@ -324,7 +397,7 @@ export default function AdminStatistics() {
         </div>
         <div>
           <h2 className='text-xl font-semibold mb-2'>Deals by Stage</h2>
-          <DataTable columns={dealsStageColumns} data={dealsByStage} />
+          <DataTable columns={dealsStageColumns} data={stageRows} />
         </div>
       </div>
 

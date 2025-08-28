@@ -1,11 +1,5 @@
-import {
-  type LoaderFunctionArgs,
-  redirect,
-  useLoaderData,
-  useNavigate,
-} from 'react-router'
+import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import DealsList from '~/components/DealsList'
-import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
@@ -70,68 +64,52 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AdminDeals() {
   const { deals, customers, lists } = useLoaderData<typeof loader>()
-  const navigate = useNavigate()
 
   return (
-    <>
-      <div className='flex justify-between items-center mb-3'>
-        <Tabs
-          value='board'
-          onValueChange={v =>
-            navigate(v === 'statistics' ? '/admin/statistics' : '/admin/deals')
-          }
-        >
-          <TabsList>
-            <TabsTrigger value='board'>CRM</TabsTrigger>
-            <TabsTrigger value='statistics'>Statistics</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-      <div className='flex gap-4'>
-        {lists.map(list => {
-          const listDeals = deals
-            .filter(d => d.list_id === list.id)
-            .map(d => {
-              const customer = customers.find(c => c.id === d.customer_id)
-              return {
-                id: d.id,
-                customer_id: d.customer_id,
-                name: customer ? customer.name : `Customer #${d.customer_id}`,
-                amount: d.amount,
-                description: d.description,
-                status: d.status ?? undefined,
-                position: d.position ?? undefined,
-                list_id: d.list_id,
-                due_date: d.due_date
-                  ? typeof d.due_date === 'string'
-                    ? d.due_date
-                    : new Date(d.due_date).toISOString().slice(0, 10)
-                  : null,
-              }
-            })
-
-          listDeals.sort((a, b) => {
-            const aHasDate = Boolean(a.due_date)
-            const bHasDate = Boolean(b.due_date)
-            if (!aHasDate && !bHasDate) return 0
-            if (!aHasDate) return -1
-            if (!bHasDate) return 1
-            return (
-              new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
-            )
+    <div className='flex gap-4'>
+      {lists.map(list => {
+        const listDeals = deals
+          .filter(d => d.list_id === list.id)
+          .map(d => {
+            const customer = customers.find(c => c.id === d.customer_id)
+            return {
+              id: d.id,
+              customer_id: d.customer_id,
+              name: customer ? customer.name : `Customer #${d.customer_id}`,
+              amount: d.amount,
+              description: d.description,
+              status: d.status ?? undefined,
+              position: d.position ?? undefined,
+              list_id: d.list_id,
+              due_date: d.due_date
+                ? typeof d.due_date === 'string'
+                  ? d.due_date
+                  : new Date(d.due_date).toISOString().slice(0, 10)
+                : null,
+            }
           })
 
+        listDeals.sort((a, b) => {
+          const aHasDate = Boolean(a.due_date)
+          const bHasDate = Boolean(b.due_date)
+          if (!aHasDate && !bHasDate) return 0
+          if (!aHasDate) return -1
+          if (!bHasDate) return 1
           return (
-            <DealsList
-              key={list.id}
-              title={list.name}
-              customers={listDeals}
-              id={list.id}
-              readonly
-            />
+            new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
           )
-        })}
-      </div>
-    </>
+        })
+
+        return (
+          <DealsList
+            key={list.id}
+            title={list.name}
+            customers={listDeals}
+            id={list.id}
+            readonly
+          />
+        )
+      })}
+    </div>
   )
 }

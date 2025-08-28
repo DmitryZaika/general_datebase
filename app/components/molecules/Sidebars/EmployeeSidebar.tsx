@@ -189,7 +189,7 @@ const getItems = (
       },
       {
         title: 'Statistic',
-        url: `/employee/statistics`,
+        url: `/admin/statistics`,
         icon: DollarSign,
       },
     )
