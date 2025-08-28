@@ -10,7 +10,7 @@ import {
 
 let cachedNames: string[] | null = null
 
-export function SalesRepsFilter() {
+export function SalesRepsFilter({ className }: { className?: string }) {
   const [names, setNames] = useState<string[]>(cachedNames ?? ['All'])
   const location = useLocation()
   const navigate = useNavigate()
@@ -47,7 +47,7 @@ export function SalesRepsFilter() {
   }
 
   return (
-    <div className='px-2 py-2'>
+    <div className={`px-2 py-2 min-w-30 ${className}`}>
       <div className='text-xs text-slate-500 mb-1'>Sales Rep</div>
       <Select value={current} onValueChange={onChange}>
         <SelectTrigger className='h-8'>
