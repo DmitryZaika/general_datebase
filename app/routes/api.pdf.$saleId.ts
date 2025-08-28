@@ -1,9 +1,8 @@
-import { PDFDocument, type PDFForm } from 'pdf-lib'
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import { type ActionFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
 import { extrasSchema, type TExtrasSchema } from '~/schemas/sales'
 import { selectMany } from '~/utils/queryHelpers'
-import { downloadPDFAsBuffer } from '~/utils/s3.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 interface IQuery {
@@ -28,17 +27,13 @@ interface IQuery {
   seam: string | null
   zip_code: string | null
   extras: TExtrasSchema
+  sale_extras: ISaleExtras[]
   company_name: string | null
   billing_address: string | null
   room_uuid: string
 }
 
-const urls = {
-  homeownerGDIndy:
-    'https://granite-database.s3.us-east-2.amazonaws.com/base-contracts/Contract.pdf',
-  commercialGDIndy:
-    'https://granite-database.s3.us-east-2.amazonaws.com/base-contracts/Contract_commercial.pdf',
-}
+// legacy template urls removed; building PDF from scratch
 
 const stoveText = {
   'f/s': 'F/S',
@@ -56,313 +51,63 @@ const seamText = {
   'none!': 'NONE',
 }
 
-const prettyCount = (item: { name: string; count: number }) => {
-  return item.count > 1 ? `${item.name} X ${item.count}` : item.name
-}
-
-const prettyCounts = (items: { name: string; count: number }[]) => {
-  if (!items || items.length === 0) return 'N/A'
-  return items.map(prettyCount).join(', ')
-}
-
-const replaceZero = (value: string): number | string => {
-  if (!value) return value
-  const num = Math.round(Number(value) * 100) / 100
-  return Number.isInteger(num) || value.endsWith('.00') ? num.toString() : value
-}
-
-function homeownerGdIndyText(
-  pdfForm: PDFForm,
-  queryData: IQuery[],
-  sinks: ICountQuery[],
-  faucets: ICountQuery[],
-) {
-  pdfForm
-    .getTextField('Text1')
-    .setText(queryData[0].sale_date?.toLocaleDateString('en-US') || undefined)
-  pdfForm.getTextField('Text2').setText(queryData[0].seller_name || undefined)
-  pdfForm.getTextField('Text3').setText(queryData[0].customer_name || undefined)
-  pdfForm.getTextField('Text4').setText(queryData[0].project_address || undefined)
-  pdfForm.getTextField('Text5').setText(queryData[0].phone || undefined)
-  pdfForm.getTextField('Text6').setText(queryData[0].email || undefined)
-
-  const analyzedRooms: string[] = []
-  let i = 0
-  for (const queryItem of queryData) {
-    if (analyzedRooms.includes(queryItem.room_uuid)) {
-      continue
-    }
-
-    analyzedRooms.push(queryItem.room_uuid)
-    const row = queryItem
-
-    const roomField = `Text${7 + i * 6}`
-    const colorField = `Text${8 + i * 6}`
-    const sinkField = `Text${9 + i * 6}`
-    const faucetField = `Text${10 + i * 6}`
-    const edgeField = `Text${11 + i * 6}`
-    const backsplashField = `Text${12 + i * 6}`
-
-    pdfForm
-      .getTextField(roomField)
-      .setText(
-        row.room
-          ? row.room.charAt(0).toUpperCase() + row.room.slice(1).toLowerCase()
-          : undefined,
-      )
-    const sinksForRoom = sinks.filter(s => s.room_uuid === row.room_uuid)
-    const sinkName = prettyCounts(sinksForRoom)
-    const faucetsForRoom = faucets.filter(f => f.room_uuid === row.room_uuid)
-    const faucetName = prettyCounts(faucetsForRoom)
-    pdfForm.getTextField(colorField).setText(row.stone_name || 'N/A')
-    pdfForm.getTextField(sinkField).setText(sinkName)
-    pdfForm.getTextField(faucetField).setText(faucetName)
-    pdfForm
-      .getTextField(edgeField)
-      .setText(
-        typeof row.extras.edge_price === 'object' && row.extras.edge_price?.edge_type
-          ? row.extras.edge_price.edge_type.charAt(0).toUpperCase() +
-              row.extras.edge_price.edge_type.slice(1).toLowerCase()
-          : 'N/A',
-      )
-    pdfForm
-      .getTextField(backsplashField)
-      .setText(
-        row.backsplash
-          ? row.backsplash.charAt(0).toUpperCase() +
-              row.backsplash.slice(1).toLowerCase()
-          : 'N/A',
-      )
-
-    const sqftField = `Text${25 + i * 2}`
-    const priceField = `Text${26 + i * 2}`
-    pdfForm
-      .getTextField(sqftField)
-      .setText(replaceZero(row.square_feet?.toString() || 'N/A').toString())
-    pdfForm
-      .getTextField(priceField)
-      .setText(replaceZero(row.retail_price?.toString() || 'N/A').toString())
-    i++
-  }
-
-  const uniqueRooms = queryData.filter(
-    (value, index, self) =>
-      self.findIndex(v => v.room_uuid === value.room_uuid) === index,
-  )
-  const totalCorbels = uniqueRooms.reduce((sum, row) => {
-    return sum + (row.corbels || 0)
-  }, 0)
-
-  const hasLaminateTearOut = queryData.some(
-    row => row.tear_out === 'laminate_t/o' || row.tear_out === 'vanity_t/o',
-  )
-
-  const hasStoneTearOut = queryData.some(row => row.tear_out === 'stone_t/o')
-  const hasTenYearSealer = queryData.some(row => row.extras.ten_year_sealer)
-  const hasWaterfall = queryData.some(row => row.waterfall === 'yes')
-
-  pdfForm.getTextField('Text31').setText(hasLaminateTearOut ? 'Yes' : 'No')
-
-  pdfForm.getTextField('Text32').setText(hasStoneTearOut ? 'Yes' : 'No')
-
-  pdfForm
-    .getTextField('Text33')
-    .setText(stoveText[queryData[0].stove as keyof typeof stoveText] || 'N/A')
-
-  pdfForm.getTextField('Text34').setText(hasTenYearSealer ? 'Yes' : 'No')
-
-  pdfForm.getTextField('Text35').setText(hasWaterfall ? 'Yes' : 'No')
-
-  pdfForm.getTextField('Text36').setText(totalCorbels.toString())
-
-  const seamKeyHome = (queryData[0].seam || '').toLowerCase()
-  pdfForm
-    .getDropdown('Dropdown42')
-    .select(seamText[seamKeyHome as keyof typeof seamText] || 'N/A')
-  const fullPrice = replaceZero(queryData[0].total_price?.toString() || '0')
-  const halfPrice = Number(fullPrice) * 0.5
-  pdfForm.getTextField('Text37').setText(fullPrice.toString())
-  pdfForm
-    .getTextField('Text38')
-    .setText(Number(fullPrice) > 1000 ? halfPrice.toString() : fullPrice.toString())
-}
-
-function commercialGdIndyText(
-  pdfForm: PDFForm,
-  queryData: IQuery[],
-  sinks: ICountQuery[],
-  _faucets: ICountQuery[],
-) {
-  // Header fields
-  pdfForm
-    .getTextField('Text123')
-    .setText(queryData[0].sale_date?.toLocaleDateString('en-US') || undefined)
-  pdfForm.getTextField('Text124').setText(queryData[0].seller_name || undefined)
-
-  // Customer / company
-  pdfForm.getTextField('Text125').setText(queryData[0].customer_name || undefined)
-  pdfForm.getTextField('Text126').setText(queryData[0].company_name || undefined)
-
-  pdfForm.getTextField('Text127').setText(queryData[0].project_address || undefined)
-  pdfForm.getTextField('Text128').setText(queryData[0].billing_address || undefined) // Billing address – оставляем то же или пусто
-
-  pdfForm.getTextField('Text129').setText(queryData[0].phone || undefined)
-  pdfForm.getTextField('Text130').setText(queryData[0].email || undefined)
-
-  // Up to three rooms
-  const roomBase = [
-    {
-      room: 'Text131',
-      color: 'Text132',
-      sink: 'Text133',
-      edge_type: 'Text134',
-      back: 'Text135',
-      sqft: 'Text146',
-      price: 'Text147',
-    },
-    {
-      room: 'Text136',
-      color: 'Text137',
-      sink: 'Text138',
-      edge_type: 'Text139',
-      back: 'Text140',
-      sqft: 'Text148',
-      price: 'Text149',
-    },
-    {
-      room: 'Text141',
-      color: 'Text142',
-      sink: 'Text143',
-      edge_type: 'Text144',
-      back: 'Text145',
-      sqft: 'Text150',
-      price: 'Text151',
-    },
-  ]
-
-  const analyzedRooms: string[] = []
-  let i = 0
-  for (const queryItem of queryData) {
-    if (i >= 3) {
-      break
-    }
-    if (analyzedRooms.includes(queryItem.room_uuid)) {
-      continue
-    }
-
-    analyzedRooms.push(queryItem.room_uuid)
-    const row = queryItem
-    const map = roomBase[i]
-
-    pdfForm
-      .getTextField(map.room)
-      .setText(
-        row.room
-          ? row.room.charAt(0).toUpperCase() + row.room.slice(1).toLowerCase()
-          : undefined,
-      )
-    const sinksForRoom = sinks.filter(s => s.room_uuid === row.room_uuid)
-    const sinkName = prettyCounts(sinksForRoom)
-    pdfForm.getTextField(map.color).setText(row.stone_name || 'N/A')
-    pdfForm.getTextField(map.sink).setText(sinkName || 'N/A')
-    pdfForm
-      .getTextField(map.edge_type)
-      .setText(
-        typeof row.extras.edge_price === 'object' && row.extras.edge_price?.edge_type
-          ? row.extras.edge_price.edge_type.charAt(0).toUpperCase() +
-              row.extras.edge_price.edge_type.slice(1).toLowerCase()
-          : 'N/A',
-      )
-    pdfForm
-      .getTextField(map.back)
-      .setText(
-        row.backsplash
-          ? row.backsplash.charAt(0).toUpperCase() +
-              row.backsplash.slice(1).toLowerCase()
-          : 'N/A',
-      )
-
-    pdfForm
-      .getTextField(map.sqft)
-      .setText(replaceZero(row.square_feet?.toString() || 'N/A').toString())
-    pdfForm
-      .getTextField(map.price)
-      .setText(replaceZero(row.retail_price?.toString() || 'N/A').toString())
-    i++
-  }
-  const uniqueRooms = queryData.filter(
-    (value, index, self) =>
-      self.findIndex(v => v.room_uuid === value.room_uuid) === index,
-  )
-  const totalCorbels = uniqueRooms.reduce((sum, row) => sum + (row.corbels || 0), 0)
-  const hasLaminateTearOut = queryData.some(
-    r => r.tear_out === 'laminate_t/o' || r.tear_out === 'vanity_t/o',
-  )
-  const hasStoneTearOut = queryData.some(r => r.tear_out === 'stone_t/o')
-  const hasTenYearSealer = queryData.some(r => r.extras.ten_year_sealer)
-  const hasWaterfall = queryData.some(r => r.waterfall === 'yes')
-
-  pdfForm.getTextField('Text152').setText(hasLaminateTearOut ? 'Yes' : 'No')
-  pdfForm.getTextField('Text153').setText(hasStoneTearOut ? 'Yes' : 'No')
-
-  pdfForm
-    .getTextField('Text154')
-    .setText(stoveText[queryData[0].stove as keyof typeof stoveText] || 'N/A')
-  pdfForm.getTextField('Text155').setText(hasTenYearSealer ? 'Yes' : 'No')
-  pdfForm.getTextField('Text156').setText(hasWaterfall ? 'Yes' : 'No')
-  pdfForm.getTextField('Text157').setText(totalCorbels.toString())
-
-  const seamKey = (queryData[0].seam || '').toLowerCase()
-  pdfForm
-    .getDropdown('Dropdown159')
-    .select(seamText[seamKey as keyof typeof seamText] || 'N/A')
-  const fullPrice = replaceZero(queryData[0].total_price?.toString() || '0')
-  const halfPrice = Number(fullPrice) * 0.5
-  pdfForm.getTextField('Text160').setText(fullPrice.toString())
-  pdfForm
-    .getTextField('Text161')
-    .setText(Number(fullPrice) > 1000 ? halfPrice.toString() : fullPrice.toString())
-}
-
-const texts = {
-  homeownerGDIndy: homeownerGdIndyText,
-  commercialGDIndy: commercialGdIndyText,
-}
-
 interface ICountQuery {
   name: string
   count: number
   room_uuid: string
 }
 
-async function getSinks(saleId: number): Promise<ICountQuery[]> {
+interface ISinkQuery extends ICountQuery {
+  type: string
+  price: number | null
+  retail_price: number | null
+}
+
+async function getSinks(saleId: number): Promise<ISinkQuery[]> {
   const query = `
     select
       sink_type.name as name,
+      sink_type.type as type,
       count(sinks.id) as count,
-      HEX(slab_inventory.room_uuid) as room_uuid
+      HEX(slab_inventory.room_uuid) as room_uuid,
+      sinks.price as price,
+      sink_type.retail_price as retail_price
     from sinks
     join slab_inventory on slab_inventory.id = sinks.slab_id
     join sink_type on sink_type.id = sinks.sink_type_id
     where slab_inventory.sale_id = ?
-    group by sink_type.name, slab_inventory.room_uuid
+    group by sink_type.name, sink_type.type, slab_inventory.room_uuid, sinks.price, sink_type.retail_price
   `
-  return await selectMany<ICountQuery>(db, query, [saleId])
+  return await selectMany<ISinkQuery>(db, query, [saleId])
 }
 
-async function getFaucets(saleId: number): Promise<ICountQuery[]> {
+interface IFaucetQuery extends ICountQuery {
+  type: string
+  price: number | null
+  retail_price: number | null
+}
+
+async function getFaucets(saleId: number): Promise<IFaucetQuery[]> {
   const query = `
     select
       faucet_type.name as name,
+      faucet_type.type as type,
       count(faucets.id) as count,
-      HEX(slab_inventory.room_uuid) as room_uuid
+      HEX(slab_inventory.room_uuid) as room_uuid,
+      faucets.price as price,
+      faucet_type.retail_price as retail_price
     from faucets
     join slab_inventory on slab_inventory.id = faucets.slab_id
     join faucet_type on faucet_type.id = faucets.faucet_type_id
     where slab_inventory.sale_id = ?
-    group by faucet_type.name, slab_inventory.room_uuid
+    group by faucet_type.name, faucet_type.type, slab_inventory.room_uuid, faucets.price, faucet_type.retail_price
   `
-  return await selectMany<ICountQuery>(db, query, [saleId])
+  return await selectMany<IFaucetQuery>(db, query, [saleId])
+}
+
+interface ISaleExtras {
+  adjustment: string
+  price: number
 }
 
 async function getData(saleId: number) {
@@ -371,6 +116,7 @@ async function getData(saleId: number) {
             sales.sale_date,
             sales.project_address,
             sales.price as total_price,
+            sales.extras as sale_extras,
             customers.name as customer_name,
             customers.phone,
             customers.email,
@@ -399,21 +145,572 @@ async function getData(saleId: number) {
         where sales.id = ?
         order by slab_inventory.id
     `
-  const response = await selectMany<IQuery>(db, query, [saleId])
+  const response = await selectMany<IQuery & { sale_extras: ISaleExtras[] }>(
+    db,
+    query,
+    [saleId],
+  )
   return response.map(row => ({
     ...row,
     extras: extrasSchema.parse(row.extras || {}),
+    sale_extras: row.sale_extras
+      ? typeof row.sale_extras === 'string'
+        ? JSON.parse(row.sale_extras)
+        : row.sale_extras
+      : [],
   }))
 }
 
-async function getPdf(contractType: string) {
-  const pdfData = await downloadPDFAsBuffer(urls[contractType as keyof typeof urls])
-  if (!pdfData) {
-    throw new Error('PDF data not found')
+async function buildPdf(
+  queryData: IQuery[],
+  sinks: ISinkQuery[],
+  faucets: IFaucetQuery[],
+) {
+  const pdfDoc = await PDFDocument.create()
+  const page = pdfDoc.addPage([612, 792])
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  const draw = (
+    text: string,
+    x: number,
+    y: number,
+    size = 10,
+    isBold = false,
+    color = rgb(0, 0, 0),
+  ) => {
+    page.drawText(text, { x, y, size, font: isBold ? bold : font, color })
   }
-  const pdfDoc = await PDFDocument.load(pdfData.buffer)
-  const pdfForm = pdfDoc.getForm()
-  return { pdfDoc, pdfData, pdfForm }
+
+  const wrapText = (text: string, size: number, maxWidth: number): string[] => {
+    if (!text) return []
+    const words = text.split(/\s+/)
+    const lines: string[] = []
+    let line = ''
+    for (const w of words) {
+      const test = line ? `${line} ${w}` : w
+      const width = font.widthOfTextAtSize(test, size)
+      if (width <= maxWidth) {
+        line = test
+      } else {
+        if (line) lines.push(line)
+        if (font.widthOfTextAtSize(w, size) > maxWidth) {
+          let cur = ''
+          for (const ch of w) {
+            const t = cur + ch
+            if (font.widthOfTextAtSize(t, size) <= maxWidth) cur = t
+            else {
+              if (cur) lines.push(cur)
+              cur = ch
+            }
+          }
+          line = cur
+        } else {
+          line = w
+        }
+      }
+    }
+    if (line) lines.push(line)
+    return lines
+  }
+
+  page.drawRectangle({
+    x: 0,
+    y: 742,
+    width: 612,
+    height: 50,
+    color: rgb(0.1, 0.2, 0.35),
+  })
+
+  // Add logo on the left - simplified approach
+
+  const logoUrl =
+    'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp'
+  const logoResponse = await fetch(logoUrl)
+  if (logoResponse.ok) {
+    const logoBytes = await logoResponse.arrayBuffer()
+    const logoImage = await pdfDoc.embedPng(logoBytes)
+    const logoSize = 30
+    page.drawImage(logoImage, {
+      x: 20,
+      y: 750,
+      width: logoSize,
+      height: logoSize,
+    })
+  }
+
+  // Center "Granite Depot" text
+  const companyText = 'Granite Depot'
+  const textWidth = bold.widthOfTextAtSize(companyText, 20)
+  const centerX = (612 - textWidth) / 2
+  draw(companyText, centerX, 760, 20, true, rgb(1, 1, 1))
+
+  const headerY = 720
+  draw('Date', 24, headerY, 10, true)
+  draw(
+    queryData[0].sale_date ? queryData[0].sale_date.toLocaleDateString('en-US') : 'N/A',
+    120,
+    headerY,
+  )
+  draw('Sales Rep', 24, headerY - 16, 10, true)
+  draw(queryData[0].seller_name || 'N/A', 120, headerY - 16)
+  draw('Customer', 24, headerY - 32, 10, true)
+  draw(queryData[0].customer_name || 'N/A', 120, headerY - 32)
+  draw('Project Address', 24, headerY - 48, 10, true)
+  const addr = queryData[0].project_address || 'N/A'
+  const wrappedAddr = wrapText(addr, 10, 440)
+  let addrConsumed = 0
+  if (wrappedAddr.length > 0) {
+    const lh = 12
+    for (let i = 0; i < wrappedAddr.length; i++) {
+      draw(wrappedAddr[i], 120, headerY - 48 - i * lh)
+    }
+    addrConsumed = (wrappedAddr.length - 1) * 12
+  }
+  draw('Phone', 320, headerY, 10, true)
+  draw(queryData[0].phone || 'N/A', 380, headerY)
+  draw('Email', 320, headerY - 16, 10, true)
+  draw(queryData[0].email || 'N/A', 380, headerY - 16)
+
+  let y = headerY - 78 - addrConsumed
+
+  const rightX = 570
+  const money = (n: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
+
+  const drawLineAmount = (text: string, amount: number | null) => {
+    const size = 10
+    const maxWidth = 520
+    const lines = wrapText(text, size, maxWidth)
+    const lh = size + 2
+
+    // Draw text lines
+    for (let i = 0; i < lines.length; i++) {
+      draw(lines[i], 30, y - i * lh)
+    }
+
+    // Draw amount if present
+    if (amount !== null) {
+      draw(
+        money(amount),
+        rightX - font.widthOfTextAtSize(money(amount), size),
+        y,
+        size,
+        true,
+      )
+    }
+
+    // Draw dotted line from start of text to end of amount for ALL items with prices (including $0)
+    if (amount !== null) {
+      const lineY = y - 2 // Higher position to avoid overlapping with text below
+      const textStartX = 30 // Start from the beginning of text
+      const amountEndX = rightX // End at the right edge where price ends
+
+      // Draw dotted line
+      const dotSpacing = 3
+      const lineLength = amountEndX - textStartX
+      const numDots = Math.floor(lineLength / dotSpacing)
+
+      for (let i = 0; i < numDots; i++) {
+        const dotX = textStartX + i * dotSpacing
+        page.drawCircle({
+          x: dotX,
+          y: lineY,
+          size: 0.5,
+          color: rgb(0.6, 0.6, 0.6),
+        })
+      }
+    }
+
+    y -= lh * lines.length
+  }
+
+  const seen = new Set<string>()
+  let grandTotal = 0
+
+  for (const row of queryData) {
+    if (seen.has(row.room_uuid)) continue
+    seen.add(row.room_uuid)
+
+    // Section title
+    const roomTitle = row.room
+      ? row.room.charAt(0).toUpperCase() + row.room.slice(1).toLowerCase()
+      : 'Room'
+    draw(roomTitle, 30, y, 12, true)
+    y -= 14
+
+    // Stone name and base calculation
+    const stoneName = row.stone_name || 'Stone'
+    const sqftVal = Number(row.square_feet || '0')
+    const pricePer = Number(row.retail_price || '0')
+    const baseAmount = Math.round(sqftVal * pricePer * 100) / 100
+
+    // Determine stone type based on name
+    let stoneType = 'Stone'
+    if (stoneName.toLowerCase().includes('perlatus')) {
+      stoneType = 'Dolomite'
+    } else if (stoneName.toLowerCase().includes('luna pearl')) {
+      stoneType = 'Granite'
+    } else if (stoneName.toLowerCase().includes('calacatta')) {
+      stoneType = 'Marble'
+    } else if (stoneName.toLowerCase().includes('super white')) {
+      stoneType = 'Quartz'
+    } else if (stoneName.toLowerCase().includes('quartz')) {
+      stoneType = 'Quartz'
+    } else if (stoneName.toLowerCase().includes('granite')) {
+      stoneType = 'Granite'
+    } else if (stoneName.toLowerCase().includes('marble')) {
+      stoneType = 'Marble'
+    } else if (stoneName.toLowerCase().includes('dolomite')) {
+      stoneType = 'Dolomite'
+    }
+
+    drawLineAmount(
+      `${stoneType} ${stoneName} ${sqftVal} sq ft * $${pricePer}`,
+      baseAmount,
+    )
+
+    // Collect all items with prices for this room
+    const roomItems: { label: string; value: number }[] = []
+    let roomSubtotal = baseAmount
+
+    // Installation and fabrication (if they have prices)
+    const extras = row.extras as Record<string, number | boolean>
+    if (typeof extras?.installation_price === 'number' && extras.installation_price) {
+      const price = Number(extras.installation_price)
+      roomItems.push({ label: `Installation ${sqftVal} sq ft`, value: price })
+      roomSubtotal += price
+    }
+    if (typeof extras?.fabrication_price === 'number' && extras.fabrication_price) {
+      const price = Number(extras.fabrication_price)
+      roomItems.push({ label: `Fabrication ${sqftVal} sq ft`, value: price })
+      roomSubtotal += price
+    }
+
+    // Other extras with prices
+    if (typeof extras?.tear_out_price === 'number' && extras.tear_out_price) {
+      const price = Number(extras.tear_out_price)
+      roomItems.push({ label: `Tear-Out: Yes`, value: price })
+      roomSubtotal += price
+    }
+    if (typeof extras?.stove_price === 'number' && extras.stove_price) {
+      const price = Number(extras.stove_price)
+      const stove = row.stove
+        ? stoveText[row.stove as keyof typeof stoveText] || ''
+        : ''
+      roomItems.push({ label: `Stove: ${stove}`, value: price })
+      roomSubtotal += price
+    }
+    if (typeof extras?.waterfall_price === 'number' && extras.waterfall_price) {
+      const price = Number(extras.waterfall_price)
+      roomItems.push({ label: `Waterfall: Yes`, value: price })
+      roomSubtotal += price
+    }
+    if (typeof extras?.corbels_price === 'number' && extras.corbels_price) {
+      const price = Number(extras.corbels_price)
+      roomItems.push({ label: `Corbels: ${row.corbels || 1}`, value: price })
+      roomSubtotal += price
+    }
+    if (typeof extras?.seam_price === 'number' && extras.seam_price) {
+      const price = Number(extras.seam_price)
+      const seamKey = row.seam
+        ? (row.seam.toLowerCase() as keyof typeof seamText)
+        : 'standard'
+      const label = seamText[seamKey] || row.seam || 'standard'
+      roomItems.push({ label: `Seam: ${label}`, value: price })
+      roomSubtotal += price
+    }
+    // Remove this section - we'll handle ten_year_sealer in the extras section below
+
+    // Extra items from the interface - check all possible extras
+    if (extras) {
+      // Sink Cut Out
+      if (extras.sink_cut_out && typeof extras.sink_cut_out === 'object') {
+        const sinkCutOut = extras.sink_cut_out as Record<string, number>
+        const price = Number(sinkCutOut.price || 250)
+        roomItems.push({ label: `Sink Cut Out`, value: price })
+        roomSubtotal += price
+      }
+
+      // Oversize Piece
+      if (extras.oversize_piece && typeof extras.oversize_piece === 'object') {
+        const oversize = extras.oversize_piece as Record<string, unknown>
+        const price = Number(oversize.price || 0)
+        if (price > 0) {
+          roomItems.push({ label: `Oversized Piece`, value: price })
+          roomSubtotal += price
+        }
+      }
+
+      // Trip Fee
+      if (extras.tripFee && typeof extras.tripFee === 'object') {
+        const tripFee = extras.tripFee as Record<string, number>
+        const price = Number(tripFee.price || 0)
+        if (price > 0) {
+          roomItems.push({ label: `Trip Fee`, value: price })
+          roomSubtotal += price
+        }
+      }
+
+      // Mitter Edge Price
+      if (extras.mitter_edge_price && typeof extras.mitter_edge_price === 'object') {
+        const mitter = extras.mitter_edge_price as Record<string, number>
+        const price = Number(mitter.price || 0)
+        if (price > 0) {
+          roomItems.push({ label: `Mitter Edge`, value: price })
+          roomSubtotal += price
+        }
+      }
+
+      // Adjustment (can be positive or negative for discounts)
+      if (extras.adjustment && typeof extras.adjustment === 'object') {
+        const adjustment = extras.adjustment as Record<string, unknown>
+        const price = Number(adjustment.price || 0)
+        const adjustmentText = (adjustment.adjustment as string) || 'Adjustment'
+        if (price !== 0) {
+          roomItems.push({ label: adjustmentText, value: price })
+          roomSubtotal += price
+        }
+      }
+
+      // Check for other extra items that might be added dynamically
+      // Look for any other keys in extras that have price property
+      for (const [key, value] of Object.entries(extras)) {
+        if (
+          key !== 'adjustment' &&
+          key !== 'sink_cut_out' &&
+          key !== 'oversize_piece' &&
+          key !== 'tripFee' &&
+          key !== 'mitter_edge_price' &&
+          key !== 'ten_year_sealer' &&
+          key !== 'edge_price' &&
+          key !== 'installation_price' &&
+          key !== 'fabrication_price' &&
+          key !== 'tear_out_price' &&
+          key !== 'stove_price' &&
+          key !== 'waterfall_price' &&
+          key !== 'corbels_price' &&
+          key !== 'seam_price' &&
+          key !== 'ten_year_sealer_price'
+        ) {
+          if (typeof value === 'object' && value !== null) {
+            const item = value as Record<string, unknown>
+            if (typeof item.price === 'number' && item.price !== 0) {
+              const itemName =
+                (item.name as string) ||
+                (item.label as string) ||
+                key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+              roomItems.push({ label: itemName, value: item.price })
+              roomSubtotal += item.price
+            }
+          }
+        }
+      }
+
+      // Ten Year Sealer (from extras object)
+      if (extras.ten_year_sealer && typeof extras.ten_year_sealer === 'object') {
+        const sealer = extras.ten_year_sealer as Record<string, unknown>
+        const sealerAmount = Number(sealer.amount || 0)
+        const sealerPrice = Number(sealer.price || 0)
+        const label =
+          sealerAmount > 0 ? `10 Year Sealer: ${sealerAmount}` : '10 Year Sealer: Yes'
+        roomItems.push({ label, value: sealerPrice })
+        roomSubtotal += sealerPrice
+      }
+    }
+    if (extras?.edge_price) {
+      const ep = extras.edge_price as unknown as Record<string, unknown>
+      const epPrice = Number(
+        typeof ep === 'number' ? ep : typeof ep?.price === 'number' ? ep.price : 0,
+      )
+      const epType =
+        typeof ep === 'object' && ep?.edge_type ? ` - ${ep.edge_type as string}` : ''
+      if (epPrice > 0) {
+        roomItems.push({ label: `Finished Edge${epType}`, value: epPrice })
+        roomSubtotal += epPrice
+      }
+    }
+
+    // Sinks with prices
+    const sinksForRoom = sinks.filter(s => s.room_uuid === row.room_uuid)
+    for (const sink of sinksForRoom) {
+      const sinkPrice = Number(sink.price || sink.retail_price || 0)
+      const sinkLabel =
+        `Sink ${sink.type} ${sink.name} ${sink.count > 1 ? sink.count : ''}`.trim()
+      const totalSinkPrice = sinkPrice * sink.count
+      roomItems.push({ label: sinkLabel, value: totalSinkPrice })
+      roomSubtotal += totalSinkPrice
+    }
+
+    // Faucets with prices
+    const faucetsForRoom = faucets.filter(f => f.room_uuid === row.room_uuid)
+    for (const faucet of faucetsForRoom) {
+      const faucetPrice = Number(faucet.price || faucet.retail_price || 0)
+      const faucetLabel =
+        `Faucet ${faucet.type} ${faucet.name} ${faucet.count > 1 ? faucet.count : ''}`.trim()
+      const totalFaucetPrice = faucetPrice * faucet.count
+      roomItems.push({ label: faucetLabel, value: totalFaucetPrice })
+      roomSubtotal += totalFaucetPrice
+    }
+
+    // Add all non-priced options as well
+    const stove = row.stove ? stoveText[row.stove as keyof typeof stoveText] || '' : ''
+    if (stove && !roomItems.some(item => item.label.includes('Stove'))) {
+      roomItems.push({ label: `Stove: ${stove}`, value: 0 })
+    }
+    if (
+      row.tear_out &&
+      row.tear_out !== 'no' &&
+      !roomItems.some(item => item.label.includes('Tear-Out'))
+    ) {
+      roomItems.push({ label: 'Tear-Out: Yes', value: 0 })
+    }
+    // Only add ten_year_sealer here if it's a boolean and not already added as an object
+    if (
+      extras &&
+      extras.ten_year_sealer === true &&
+      !roomItems.some(item => item.label.includes('10 Year Sealer'))
+    ) {
+      roomItems.push({ label: '10 Year Sealer: Yes', value: 0 })
+    }
+    if (
+      row.waterfall === 'yes' &&
+      !roomItems.some(item => item.label.includes('Waterfall'))
+    ) {
+      roomItems.push({ label: 'Waterfall: Yes', value: 0 })
+    }
+    if (
+      row.corbels &&
+      row.corbels > 0 &&
+      !roomItems.some(item => item.label.includes('Corbels'))
+    ) {
+      roomItems.push({ label: `Corbels: ${row.corbels}`, value: 0 })
+    }
+    if (
+      row.seam &&
+      row.seam !== 'standard' &&
+      !roomItems.some(item => item.label.includes('Seam'))
+    ) {
+      const seamKey = row.seam.toLowerCase() as keyof typeof seamText
+      const label = seamText[seamKey] || row.seam
+      roomItems.push({ label: `Seam: ${label}`, value: 0 })
+    }
+
+    // Display all room items
+    for (const item of roomItems) {
+      drawLineAmount(item.label, item.value)
+    }
+
+    // Subtotal for this room
+    y -= 4
+    draw('Sub Total', 30, y, 10, true)
+
+    // Ensure roomSubtotal is a valid number
+    const validRoomSubtotal = Number.isNaN(roomSubtotal) ? 0 : roomSubtotal
+
+    draw(
+      money(validRoomSubtotal),
+      rightX - font.widthOfTextAtSize(money(validRoomSubtotal), 10),
+      y,
+      10,
+      true,
+    )
+
+    // Draw dotted line under Sub Total
+    const subtotalLineY = y - 2 // Higher position to avoid overlapping with text below
+    const subtotalTextStartX = 30 // Start from the beginning of text
+    const subtotalAmountEndX = rightX // End at the right edge where price ends
+
+    const dotSpacing = 3
+    const lineLength = subtotalAmountEndX - subtotalTextStartX
+    const numDots = Math.floor(lineLength / dotSpacing)
+
+    for (let i = 0; i < numDots; i++) {
+      const dotX = subtotalTextStartX + i * dotSpacing
+      page.drawCircle({
+        x: dotX,
+        y: subtotalLineY,
+        size: 0.5,
+        color: rgb(0.6, 0.6, 0.6),
+      })
+    }
+
+    y -= 30 // Increased spacing between rooms
+
+    grandTotal += validRoomSubtotal
+  }
+
+  // Add sale level extras (adjustments, discounts, etc.)
+  if (
+    queryData.length > 0 &&
+    queryData[0].sale_extras &&
+    Array.isArray(queryData[0].sale_extras) &&
+    queryData[0].sale_extras.length > 0
+  ) {
+    y -= 20 // Add spacing before sale extras
+
+    // Section title for sale extras
+    draw('Sale Adjustments', 30, y, 12, true)
+    y -= 14
+
+    for (const saleExtra of queryData[0].sale_extras) {
+      if (saleExtra && typeof saleExtra === 'object') {
+        const price = Number(saleExtra.price || 0)
+        const label = saleExtra.adjustment || 'Adjustment'
+        if (price !== 0 || label !== 'Adjustment') {
+          // Only show if there's a meaningful value
+          drawLineAmount(label, price)
+          grandTotal += price
+        }
+      }
+    }
+
+    y -= 10 // Add spacing after sale extras
+  }
+
+  y -= 20 // Added padding above
+
+  // Create a more elegant footer with better spacing and alignment
+  const footerHeight = 60
+  const footerY = y - footerHeight + 10
+
+  // Draw the footer background
+  page.drawRectangle({
+    x: 24,
+    y: footerY,
+    width: 564,
+    height: footerHeight,
+    color: rgb(0.1, 0.2, 0.35),
+  })
+
+  // Calculate deposit
+  const halfPrice =
+    grandTotal > 1000 ? Math.round(grandTotal * 0.5 * 100) / 100 : grandTotal
+
+  // Format currency - ensure numbers are valid
+  const validGrandTotal = Number.isNaN(grandTotal) ? 0 : grandTotal
+  const validHalfPrice = Number.isNaN(halfPrice) ? 0 : halfPrice
+  const totalFormatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(validGrandTotal)
+  const depositFormatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(validHalfPrice)
+
+  // Center the content vertically in the footer
+  const centerY = footerY + footerHeight / 2 + 5
+
+  // Draw Total on the left
+  draw('Total', 40, centerY, 16, true, rgb(1, 1, 1))
+  draw(totalFormatted, 120, centerY, 16, true, rgb(1, 1, 1))
+
+  // Draw Deposit on the right
+  const depositX = 400
+  draw('Deposit', depositX, centerY, 16, true, rgb(1, 1, 1))
+  draw(depositFormatted, depositX + 80, centerY, 16, true, rgb(1, 1, 1))
+
+  return pdfDoc
 }
 
 function sanitizeFilename(name: string): string {
@@ -438,20 +735,11 @@ export async function loader({ request, params }: ActionFunctionArgs) {
   const faucets = await getFaucets(saleId)
   const queryData = await getData(saleId)
 
-  const roomIds = new Set(queryData.map(q => q.room_uuid))
-  const contractType = queryData[0].company_name
-    ? 'commercialGDIndy'
-    : 'homeownerGDIndy'
-  const { pdfDoc, pdfData, pdfForm } = await getPdf(contractType)
-
   if (queryData.length < 1) {
     return new Response('No data found for this sale', { status: 404 })
   }
-  if (roomIds.size > 3) {
-    return new Response('Current limit is three items', { status: 400 })
-  }
 
-  texts[contractType as keyof typeof texts](pdfForm, queryData, sinks, faucets)
+  const pdfDoc = await buildPdf(queryData, sinks, faucets)
   const pdfBytes = await pdfDoc.save()
 
   const customerName = queryData[0].customer_name || 'Customer'
@@ -460,7 +748,7 @@ export async function loader({ request, params }: ActionFunctionArgs) {
 
   return new Response(pdfBytes, {
     headers: {
-      'Content-Type': pdfData.contentType || 'application/pdf',
+      'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${filename}"`,
     },
   })
