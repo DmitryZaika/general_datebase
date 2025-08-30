@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useQuery } from '@tanstack/react-query'
 import bcrypt from 'bcryptjs'
 import type { RowDataPacket } from 'mysql2'
 import { useForm } from 'react-hook-form'
+import { FaTelegramPlane } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   Form,
+  Link,
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
@@ -40,9 +41,10 @@ interface UserData extends RowDataPacket {
   name: string | null
   email: string | null
   phone_number: string | null
+  telegram_id: boolean
 }
 
-async function getCompanyInfo(): Promise<{ CompanyInfo: { CompanyName: string } }> {
+async function _getCompanyInfo(): Promise<{ CompanyInfo: { CompanyName: string } }> {
   const result = await fetch('/api/quickbooks/company-info')
   if (!result.ok) {
     throw new Error(await result.text())
@@ -109,7 +111,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = await getEmployeeUser(request)
 
     ;[rows] = await db.query<UserData[]>(
-      `SELECT name, email, phone_number FROM users WHERE id = ?`,
+      `SELECT name, email, phone_number, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ?`,
       [user.id],
     )
 
@@ -134,11 +136,6 @@ export default function UserProfile() {
   const isSubmitting = navigation.state !== 'idle'
   const token = useAuthenticityToken()
 
-  const { data } = useQuery({
-    queryKey: ['qbo', 'companyInfo'],
-    queryFn: getCompanyInfo,
-  })
-
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
@@ -150,20 +147,31 @@ export default function UserProfile() {
   })
 
   const fullSubmit = useFullSubmit(form)
+  const userEmail = encodeURIComponent(userData.email)
 
   return (
     <div className='container  py-5'>
       <h1 className='text-2xl  font-bold mb-6 ml-3'>My Account</h1>
+      {!userData.telegram_id && (
+        <Link to={`https://t.me/granitemanager_bot?start=${userEmail}`}>
+          {' '}
+          <Button>
+            <FaTelegramPlane className='mr-2' size={16} />
+            Connect to Telegram Bot
+          </Button>
+        </Link>
+      )}
       <div className='bg-card  rounded-lg shadow p-6 w-full'>
         <h2 className='text-xl font-semibold mb-4'>Personal Information</h2>
-
+        {/* 
         {data ? (
           <p>Logged into: {data?.CompanyInfo?.CompanyName}</p>
         ) : (
           <Button asChild>
             <a>Authorize Quickbooks</a>
           </Button>
-        )}
+        )} */}
+
         <FormProvider {...form}>
           <Form method='post' onSubmit={fullSubmit}>
             <input type='hidden' name='csrf' value={token} />
