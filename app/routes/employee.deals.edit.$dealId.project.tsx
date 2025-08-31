@@ -50,9 +50,9 @@ export default function DealProjectInfo() {
               {row.original.value}
             </span>
             {isMobile && isNameField && (
-              <div className='flex flex-col items-end ml-auto'>
+              <div className='flex flex-col items-end ml-auto '>
                 <VCard
-                  className='border-2 h-6  text-xs !-py-3 rounded-md'
+                  className='border-2 h-6 rounded-md px-2'
                   name={customer.name || ''}
                   phone={customer.phone || ''}
                   email={customer.email || ''}
