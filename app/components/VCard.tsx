@@ -52,7 +52,7 @@ END:VCARD`
       onClick={downloadVCard}
       disabled={isDownloading}
     >
-      {isDownloading ? 'Downloading...' : 'Download VCard'}
+      {isDownloading ? 'Downloading...' : 'Add to Contacts'}
     </Button>
   )
 }

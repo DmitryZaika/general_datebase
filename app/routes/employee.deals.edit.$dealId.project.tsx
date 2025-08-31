@@ -30,24 +30,43 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return { customer: rows[0] }
 }
 
-const columns: ColumnDef<{ key: string; value: string }>[] = [
-  {
-    header: 'Key',
-    accessorKey: 'key',
-  },
-  {
-    header: 'Value',
-    accessorKey: 'value',
-    cell: ({ row }) => (
-      <span className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden'>
-        {row.original.value}
-      </span>
-    ),
-  },
-]
 export default function DealProjectInfo() {
   const { customer } = useLoaderData<typeof loader>()
   const isMobile = useIsMobile()
+  const columns: ColumnDef<{ key: string; value: string }>[] = [
+    {
+      header: 'Key',
+      accessorKey: 'key',
+    },
+    {
+      header: 'Value',
+      accessorKey: 'value',
+      cell: ({ row }) => {
+        const isNameField = row.original.key.toLowerCase() === 'name'
+
+        return (
+          <div className='flex items-center gap-2'>
+            <span className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden'>
+              {row.original.value}
+            </span>
+            {isMobile && isNameField && (
+              <div className='flex flex-col items-end ml-auto'>
+                <VCard
+                  className='border-2 h-6  text-xs !-py-3 rounded-md'
+                  name={customer.name || ''}
+                  phone={customer.phone || ''}
+                  email={customer.email || ''}
+                  company={customer.company_name || ''}
+                  address={customer.address || ''}
+                />
+              </div>
+            )}
+          </div>
+        )
+      },
+    },
+  ]
+
   // Extract attached_file separately to render as image
   const attachedFile = customer.attached_file
   const otherFields = Object.entries(customer)
@@ -59,23 +78,8 @@ export default function DealProjectInfo() {
 
   return (
     <div className='space-y-4'>
-      <div className='flex flex-col'>
-        {isMobile && (
-          <div className='flex flex-col items-end'>
-            <VCard
-              className='border-2'
-              name={customer.name || ''}
-              phone={customer.phone || ''}
-              email={customer.email || ''}
-              company={customer.company_name || ''}
-              address={customer.address || ''}
-            />
-          </div>
-        )}
-
-        <div>
-          <DataTable columns={columns} data={otherFields} noHeader />
-        </div>
+      <div>
+        <DataTable columns={columns} data={otherFields} noHeader />
       </div>
 
       {attachedFile && (
