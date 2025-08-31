@@ -82,6 +82,7 @@
     "react-router": "^7.0.0",
     "react-signature-canvas": "^1.0.7",
     "react-transition-group": "^4.4.5",
+    "recharts": "^3.1.2",
     "remix-hook-form": "^6.1.0",
     "remix-utils": "^8.1.0",
     "shadcn": "^2.4.0-canary.10",
@@ -117,12 +118,12 @@
     "sequelize": "^6.37.5",
     "sequelize-cli": "^6.6.2",
     "tailwindcss": "^4.1.7",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vite": "^6.2.0",
     "vite-plugin-devtools-json": "^0.2.0",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.2.4",
-    "tsx": "^4.19.2"
+    "vitest": "^3.2.4"
   },
   "optionalDependencies": {
     "@esbuild/linux-x64": "0.25.0",

@@ -147,7 +147,7 @@ export default function UserProfile() {
   })
 
   const fullSubmit = useFullSubmit(form)
-  const userEmail = encodeURIComponent(userData.email)
+  const userEmail = encodeURIComponent(userData.email || '')
 
   return (
     <div className='container  py-5'>
