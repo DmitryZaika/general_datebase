@@ -79,7 +79,10 @@ const ChartLegend = React.forwardRef<
 })
 ChartLegend.displayName = 'ChartLegend'
 
-const ChartLegendContent = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => {
+const ChartLegendContent = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => {
   return <div className={cn('flex items-center gap-2', className)} {...props} />
 }
 ChartLegendContent.displayName = 'ChartLegendContent'
@@ -89,6 +92,5 @@ export {
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
-  ChartTooltipContent
+  ChartTooltipContent,
 }
-
