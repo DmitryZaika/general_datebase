@@ -2,7 +2,9 @@ import type { ColumnDef } from '@tanstack/react-table'
 import type { RowDataPacket } from 'mysql2'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { DataTable } from '~/components/ui/data-table'
+import { VCard } from '~/components/VCard'
 import { db } from '~/db.server'
+import { useIsMobile } from '~/hooks/use-mobile'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -45,7 +47,7 @@ const columns: ColumnDef<{ key: string; value: string }>[] = [
 ]
 export default function DealProjectInfo() {
   const { customer } = useLoaderData<typeof loader>()
-
+  const isMobile = useIsMobile()
   // Extract attached_file separately to render as image
   const attachedFile = customer.attached_file
   const otherFields = Object.entries(customer)
@@ -57,8 +59,23 @@ export default function DealProjectInfo() {
 
   return (
     <div className='space-y-4'>
-      <div>
-        <DataTable columns={columns} data={otherFields} noHeader />
+      <div className='flex flex-col'>
+        {isMobile && (
+          <div className='flex flex-col items-end'>
+            <VCard
+              className='border-2'
+              name={customer.name || ''}
+              phone={customer.phone || ''}
+              email={customer.email || ''}
+              company={customer.company_name || ''}
+              address={customer.address || ''}
+            />
+          </div>
+        )}
+
+        <div>
+          <DataTable columns={columns} data={otherFields} noHeader />
+        </div>
       </div>
 
       {attachedFile && (
