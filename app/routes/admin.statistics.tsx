@@ -1,4 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table'
+import { format } from 'date-fns'
+import { CalendarIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import {
   type LoaderFunctionArgs,
@@ -7,10 +9,15 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router'
+import { LeadsWalkInsChartContainer } from '~/components/charts/LeadsWalkInsChartContainer'
 import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
 import { PageLayout } from '~/components/PageLayout'
+import { Button } from '~/components/ui/button'
+import { Calendar } from '~/components/ui/calendar'
 import { DataTable } from '~/components/ui/data-table'
+import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { db } from '~/db.server'
+import { cn } from '~/lib/utils'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 
@@ -142,14 +149,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [user.company_id],
     )
 
+    const customersBySourceWhere: string[] = ['c.company_id = ?']
+    const customersBySourceParams: (string | number)[] = [user.company_id]
+    if (fromDate) {
+      customersBySourceWhere.push('DATE(c.created_date) >= ?')
+      customersBySourceParams.push(fromDate)
+    }
+    if (toDate) {
+      customersBySourceWhere.push('DATE(c.created_date) <= ?')
+      customersBySourceParams.push(toDate)
+    }
+
     const customersBySource = await selectMany<CustomersBySource>(
       db,
       `SELECT source, COUNT(*) AS total
-       FROM customers
-       WHERE company_id = ?
+       FROM customers c
+       WHERE ${customersBySourceWhere.join(' AND ')}
        GROUP BY source
        ORDER BY total DESC`,
-      [user.company_id],
+      customersBySourceParams,
     )
 
     const customersByRepWhere: string[] = ['c.company_id = ?']
@@ -223,8 +241,10 @@ export default function AdminStatistics() {
 
   const navigate = useNavigate()
   const location = useLocation()
-  const [from, setFrom] = useState(fromDate || '')
-  const [to, setTo] = useState(toDate || '')
+  const [from, setFrom] = useState<Date | undefined>(
+    fromDate ? new Date(fromDate) : undefined,
+  )
+  const [to, setTo] = useState<Date | undefined>(toDate ? new Date(toDate) : undefined)
 
   const currency = useMemo(
     () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }),
@@ -330,14 +350,14 @@ export default function AdminStatistics() {
   const handleFiltersSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const params = new URLSearchParams(location.search)
-    if (from) params.set('fromDate', from)
-    if (to) params.set('toDate', to)
+    if (from) params.set('fromDate', format(from, 'yyyy-MM-dd'))
+    if (to) params.set('toDate', format(to, 'yyyy-MM-dd'))
     navigate({ pathname: '/admin/statistics', search: params.toString() })
   }
 
   const handleClear = () => {
-    setFrom('')
-    setTo('')
+    setFrom(undefined)
+    setTo(undefined)
     const params = new URLSearchParams(location.search)
     params.delete('fromDate')
     params.delete('toDate')
@@ -357,35 +377,58 @@ export default function AdminStatistics() {
               <SalesRepsFilter className='-mt-5' />
             </div>
             <div className='flex items-center gap-2'>
-              <input
-                type='date'
-                name='fromDate'
-                value={from}
-                onChange={e => setFrom(e.target.value)}
-                className='border rounded px-2 py-1'
-              />
-              <input
-                type='date'
-                name='toDate'
-                value={to}
-                onChange={e => setTo(e.target.value)}
-                className='border rounded px-2 py-1'
-              />
-              <button
-                type='button'
-                onClick={handleClear}
-                className='px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded'
-              >
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant='outline'
+                    className={cn(
+                      'w-[200px] justify-start text-left font-normal',
+                      !from && 'text-muted-foreground',
+                    )}
+                  >
+                    <CalendarIcon className='mr-2 h-4 w-4' />
+                    {from ? format(from, 'PPP') : <span>Select start date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className='w-auto p-0' align='start'>
+                  <Calendar
+                    mode='single'
+                    selected={from}
+                    onSelect={setFrom}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant='outline'
+                    className={cn(
+                      'w-[200px] justify-start text-left font-normal',
+                      !to && 'text-muted-foreground',
+                    )}
+                  >
+                    <CalendarIcon className='mr-2 h-4 w-4' />
+                    {to ? format(to, 'PPP') : <span>Select end date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className='w-auto p-0' align='start'>
+                  <Calendar mode='single' selected={to} onSelect={setTo} initialFocus />
+                </PopoverContent>
+              </Popover>
+              <Button type='button' variant='outline' onClick={handleClear}>
                 Clear
-              </button>
-              <button
-                type='submit'
-                className='px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded'
-              >
-                Apply
-              </button>
+              </Button>
+              <Button type='submit'>Apply</Button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <div className='mb-8'>
+        <h2 className='text-xl font-semibold mb-4'>Leads and Walk-ins Daily Chart</h2>
+        <div className='bg-white rounded-lg border p-6'>
+          <LeadsWalkInsChartContainer fromDate={fromDate} toDate={toDate} />
         </div>
       </div>
 

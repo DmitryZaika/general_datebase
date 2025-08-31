@@ -1,0 +1,5 @@
+---
+description: Neve use any and 'as ...',  dont add comments 
+globs:
+alwaysApply: true
+---

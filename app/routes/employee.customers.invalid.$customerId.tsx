@@ -63,7 +63,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   ).toString()
 
   await db.execute(
-    'UPDATE customers SET invalid_lead = ?, sales_rep = NULL WHERE id = ?',
+    'UPDATE customers SET invalid_lead = ?, sales_rep = NULL, assigned_date = NOW() WHERE id = ?',
     [mapped, customerId],
   )
   const url = new URL(request.url)
