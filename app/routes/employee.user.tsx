@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import bcrypt from 'bcryptjs'
 import type { RowDataPacket } from 'mysql2'
 import { useForm } from 'react-hook-form'
-import { FaTelegramPlane } from 'react-icons/fa'
+import { FaCopy, FaTelegramPlane } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   Form,
@@ -130,6 +130,33 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return { userData: rows[0], quickBooksUrl }
 }
 
+function TelegramLink({ email }: { email: string }) {
+  const userEmail = encodeURIComponent(email)
+  const commandText = `/start ${email}`
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(commandText)
+  }
+
+  return (
+    <div>
+      <Link to={`https://t.me/granitemanager_bot?start=${userEmail}`}>
+        {' '}
+        <Button>
+          <FaTelegramPlane className='mr-2' size={16} />
+          Connect to Telegram Bot
+        </Button>
+      </Link>
+      <div className='mt-2 flex items-center gap-2 p-2 bg-gray-100 rounded border w-80'>
+        <code className='flex-1 text-sm font-mono'>{commandText}</code>
+        <Button variant='ghost' size='sm' onClick={handleCopy} className='p-1 h-auto'>
+          <FaCopy size={14} />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function UserProfile() {
   const { userData } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
@@ -147,21 +174,15 @@ export default function UserProfile() {
   })
 
   const fullSubmit = useFullSubmit(form)
-  const userEmail = encodeURIComponent(userData.email || '')
 
   return (
     <div className='container  py-5'>
       <h1 className='text-2xl  font-bold mb-6 ml-3'>My Account</h1>
-      {!userData.telegram_id && (
-        <Link to={`https://t.me/granitemanager_bot?start=${userEmail}`}>
-          {' '}
-          <Button>
-            <FaTelegramPlane className='mr-2' size={16} />
-            Connect to Telegram Bot
-          </Button>
-        </Link>
-      )}
+
       <div className='bg-card  rounded-lg shadow p-6 w-full'>
+        {!userData.telegram_id && userData.email && (
+          <TelegramLink email={userData.email} />
+        )}
         <h2 className='text-xl font-semibold mb-4'>Personal Information</h2>
         {/* 
         {data ? (
