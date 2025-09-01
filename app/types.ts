@@ -193,3 +193,12 @@ export interface TabsClassNames {
 }
 
 export type Period = 'day' | 'week' | 'month'
+
+export enum Positions {
+  SalesRep = 1,
+  SalesManager = 2,
+  ShopManager = 3,
+  ShopWorker = 4,
+  Manager = 5,
+  Installer = 6,
+}

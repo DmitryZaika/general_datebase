@@ -1,6 +1,8 @@
 import type { ColumnDef } from '@tanstack/react-table'
 import type { RowDataPacket } from 'mysql2'
+import { useState } from 'react'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { DataTable } from '~/components/ui/data-table'
 import { VCard } from '~/components/VCard'
 import { db } from '~/db.server'
@@ -33,6 +35,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function DealProjectInfo() {
   const { customer } = useLoaderData<typeof loader>()
   const isMobile = useIsMobile()
+  const [currentId, setCurrentId] = useState<number | undefined>(undefined)
+
   const columns: ColumnDef<{ key: string; value: string }>[] = [
     {
       header: 'Key',
@@ -69,6 +73,20 @@ export default function DealProjectInfo() {
 
   // Extract attached_file separately to render as image
   const attachedFile = customer.attached_file
+
+  // Create images array for SuperCarousel
+  const images = attachedFile
+    ? [
+        {
+          id: 1,
+          url: String(attachedFile),
+          name: 'Attached Project File',
+          type: 'project',
+          available: null,
+        },
+      ]
+    : []
+
   const otherFields = Object.entries(customer)
     .filter(([k, v]) => v != null && k !== 'attached_file')
     .map(([k, v]) => ({
@@ -88,21 +106,20 @@ export default function DealProjectInfo() {
           <img
             src={String(attachedFile)}
             alt='Attached project file'
-            className='max-w-full h-auto rounded-lg shadow-lg border'
-            onError={e => {
-              // If image fails to load, show as link instead
-              const target = e.target as HTMLImageElement
-              target.style.display = 'none'
-              const link = document.createElement('a')
-              link.href = String(attachedFile)
-              link.textContent = String(attachedFile)
-              link.target = '_blank'
-              link.className = 'text-blue-600 hover:text-blue-800 underline'
-              target.parentNode?.appendChild(link)
-            }}
+            className='max-w-full h-auto rounded-lg shadow-lg border cursor-pointer'
+            onClick={() => setCurrentId(1)}
           />
         </div>
       )}
+
+      <SuperCarousel
+        type='project'
+        currentId={currentId}
+        setCurrentId={setCurrentId}
+        images={images}
+        userRole='employee'
+        showInfo={false}
+      />
     </div>
   )
 }

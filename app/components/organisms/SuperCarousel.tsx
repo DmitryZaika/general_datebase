@@ -178,12 +178,14 @@ export function SuperCarousel({
   images,
   type,
   userRole,
+  showInfo = true,
 }: {
   images: ImageInput[]
   currentId?: number
   setCurrentId?: (value: number | undefined) => void
   type: string
   userRole?: string
+  showInfo?: boolean
 }) {
   const [api, setApi] = useState<CarouselApi>()
   const _ = useArrowCarousel(api)
@@ -233,7 +235,7 @@ export function SuperCarousel({
                   isOpen={currentId === image.id}
                   setImage={value => setCurrentId?.(value)}
                   image={image}
-                  showInfo={true}
+                  showInfo={showInfo}
                   userRole={userRole}
                 />
               </CarouselItem>

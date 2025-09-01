@@ -66,7 +66,6 @@ const adminColumns: ColumnDef<User>[] = [
 
 export default function Adminusers() {
   const { users } = useLoaderData<typeof loader>()
-
   return (
     <PageLayout title='Users'>
       <Link to={`add`} relative='path'>
