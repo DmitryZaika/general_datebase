@@ -21,8 +21,9 @@ import { FormField } from '~/components/ui/form'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions'
+import { Positions } from '~/types'
 import { csrf } from '~/utils/csrf.server'
-import { getEmployeeUser, login } from '~/utils/session.server'
+import { getEmployeeUser, getUserBySessionId, login } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 const userSchema = z.object({
@@ -66,21 +67,27 @@ export async function action({ request }: ActionFunctionArgs) {
       defaultValues: { ...defaultValues, password: '' },
     }
   }
+
   const session = await getSession(request.headers.get('Cookie'))
   session.set('sessionId', sessionId)
 
+  const user = await getUserBySessionId(sessionId)
+  if (!user) {
+    return {
+      error: 'Failed to create session. Please try again.',
+      defaultValues: { ...defaultValues, password: '' },
+    }
+  }
+
   const [row] = await db.execute<(RowDataPacket & { position: string | null })[]>(
-    `SELECT p.name AS position
-       FROM users u
-       LEFT JOIN positions p ON p.id = u.position_id
-     WHERE u.email = ? LIMIT 1`,
-    [data.email],
+    `SELECT user_id from users_positions where user_id = ? and position_id = ?`,
+    [user.id, Positions.Installer],
   )
-  const position = row?.[0]?.position ?? null
+  const isInstaller = row.length > 0
 
   session.flash('message', toastData('Success', 'Logged in'))
 
-  const redirectPath = position === 'installer' ? '/installers/checklist' : '..'
+  const redirectPath = isInstaller ? '/installers/checklist' : '..'
   return redirect(redirectPath, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })

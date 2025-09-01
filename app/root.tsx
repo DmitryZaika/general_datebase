@@ -118,7 +118,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     )
 
     const [row] = await db.query<(RowDataPacket & { position: string })[]>(
-      `SELECT p.name AS position FROM users u LEFT JOIN positions p ON p.id = u.position_id WHERE u.id = ? LIMIT 1`,
+      `SELECT p.name AS position FROM users u LEFT JOIN users_positions up ON up.user_id = u.id LEFT JOIN positions p ON p.id = up.position_id WHERE u.id = ? AND up.position_id = 6 LIMIT 1`,
       [user.id],
     )
     position = row?.[0]?.position ?? null
@@ -178,7 +178,7 @@ export default function App() {
   }, [message?.nonce])
 
   const basePath = getBase(pathname)
-  const isInstaller = position === 'installer'
+  const isInstaller = position !== null
   const showSidebar = !!basePath && !isLogin && !isInstaller && !isCheckIn
 
   return (

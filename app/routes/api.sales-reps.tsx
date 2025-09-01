@@ -15,7 +15,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     db,
     `SELECT u.id, u.name
      FROM users u
-     JOIN positions p ON u.position_id = p.id
+     JOIN users_positions up ON up.user_id = u.id
+     JOIN positions p ON p.id = up.position_id
      WHERE LOWER(p.name) = 'sales_rep'
        AND u.is_deleted = 0
        AND u.company_id = ?`,
