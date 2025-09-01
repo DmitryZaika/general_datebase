@@ -111,7 +111,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = await getEmployeeUser(request)
 
     ;[rows] = await db.query<UserData[]>(
-      `SELECT name, email, phone_number, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ?`,
+      `SELECT name, email, phone_number, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ? AND is_deleted = 0`,
       [user.id],
     )
 

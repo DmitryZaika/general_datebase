@@ -62,7 +62,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   const user = await selectId<{ name: string }>(
     db,
-    'SELECT name FROM users WHERE id = ?',
+    'SELECT name FROM users WHERE id = ? AND is_deleted = 0',
     userId,
   )
 

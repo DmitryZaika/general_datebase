@@ -106,7 +106,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       JOIN 
         customers c ON s.customer_id = c.id
       JOIN 
-        users u ON s.seller_id = u.id
+        users u ON s.seller_id = u.id AND u.is_deleted = 0
       LEFT JOIN
         slab_inventory si ON s.id = si.sale_id
       LEFT JOIN

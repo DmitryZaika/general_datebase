@@ -93,7 +93,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               COALESCE(SUM(s.price), 0) AS total_revenue,
               COALESCE(AVG(s.price), 0) AS avg_ticket
        FROM sales s
-       JOIN users u ON s.seller_id = u.id
+       JOIN users u ON s.seller_id = u.id AND u.is_deleted = 0
        WHERE ${salesWhere.join(' AND ')}${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY u.id, u.name
        ORDER BY total_revenue DESC`,
@@ -109,7 +109,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               COALESCE(SUM(d.amount), 0) AS total_amount,
               COALESCE(AVG(d.amount), 0) AS avg_amount
        FROM deals d
-       JOIN users u ON d.user_id = u.id
+       JOIN users u ON d.user_id = u.id AND u.is_deleted = 0
        JOIN customers c ON d.customer_id = c.id
        WHERE c.company_id = ? AND d.deleted_at IS NULL${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY u.id, u.name
@@ -125,7 +125,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        FROM deals d
        JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
-       JOIN users u ON d.user_id = u.id
+       JOIN users u ON d.user_id = u.id AND u.is_deleted = 0
        WHERE c.company_id = ? AND d.deleted_at IS NULL${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY l.id, l.name
        ORDER BY l.position ASC`,
@@ -193,7 +193,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               SUM(CASE WHEN c.source = 'user-input' THEN 1 ELSE 0 END) AS manual,
               COUNT(c.id) AS total
        FROM customers c
-       LEFT JOIN users u ON c.sales_rep = u.id
+       LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
        WHERE ${customersByRepWhere.join(' AND ')}
        GROUP BY u.name
        ORDER BY total DESC`,
