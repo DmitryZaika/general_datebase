@@ -196,6 +196,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     `SELECT DISTINCT u.id, u.name, up.position_id 
      FROM users u 
      JOIN users_positions up ON u.id = up.user_id 
+     WHERE u.is_deleted = 0
      WHERE u.company_id = ? AND up.position_id IN (1, 2, 5) 
      ORDER BY u.name ASC`,
     [user.company_id],

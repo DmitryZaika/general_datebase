@@ -145,7 +145,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const user = await selectId<User>(
     db,
-    'SELECT id, name, email, phone_number, company_id, is_admin FROM users WHERE id = ?',
+    'SELECT id, name, email, phone_number, company_id, is_admin FROM users WHERE id = ? AND is_deleted = 0',
     userId,
   )
   if (!user) {
