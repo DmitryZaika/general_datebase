@@ -10,7 +10,7 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -89,76 +89,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 }
 
-// const AddList = ({ setOpen }: { open: boolean; setOpen: (o: boolean) => void }) => {
-//   const wrapperRef = useRef<HTMLDivElement>(null)
-//   const form = useForm<DealListSchema>({
-//     resolver: zodResolver(dealListSchema),
-//     defaultValues: { name: '' },
-//   })
-
-//   useEffect(() => {
-//     function handleClickOutside(e: MouseEvent) {
-//       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-//         setOpen(true)
-//       }
-//     }
-//     document.addEventListener('mousedown', handleClickOutside)
-//     return () => document.removeEventListener('mousedown', handleClickOutside)
-//   }, [setOpen])
-
-//   const fullSubmit = useFullSubmit<DealListSchema>(form)
-
-//   const onValid = () => {
-//     fullSubmit()
-//     setOpen(true)
-//   }
-
-//   return (
-//     <motion.div
-//       key='addlist-panel'
-//       ref={wrapperRef}
-//       initial={{ x: -320, opacity: 0 }}
-//       animate={{ x: 0, opacity: 1 }}
-//       exit={{ x: -320, opacity: 0 }}
-//       transition={{ type: 'spring', stiffness: 260, damping: 25 }}
-//       className='w-[260px] sm:w-[320px] h-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl p-5 space-y-4'
-//     >
-//       <div className='flex items-center justify-between'>
-//         <h2 className='text-lg font-semibold text-zinc-800 dark:text-zinc-100'>
-//           New list
-//         </h2>
-//         <Button
-//           variant='ghost'
-//           type='button'
-//           onClick={() => setOpen(true)}
-//           className='text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-//         >
-//           <X size={18} />
-//         </Button>
-//       </div>
-
-//       <FormProvider {...form}>
-//         <Form id='listForm' onSubmit={form.handleSubmit(onValid)}>
-//           <FormField
-//             control={form.control}
-//             name='name'
-//             render={({ field }) => (
-//               <InputItem field={field} inputAutoFocus placeholder='Enter list name…' />
-//             )}
-//           />
-
-//           <div className='flex justify-end gap-3 pt-1'>
-//             <Button type='button' variant='outline' onClick={() => setOpen(true)}>
-//               Cancel
-//             </Button>
-//             <Button type='submit'>Add list</Button>
-//           </div>
-//         </Form>
-//       </FormProvider>
-//     </motion.div>
-//   )
-// }
-
 export default function EmployeeDeals() {
   const { deals, customers, lists } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
@@ -222,8 +152,18 @@ export default function EmployeeDeals() {
 
   const [board, setBoard] = useState<Record<number, Deal[]>>(initialBoard)
   const [activeId, setActiveId] = useState<number | null>(null)
+  const [highlightDealId, setHighlightDealId] = useState<number | null>(null)
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => setBoard(initialBoard), [JSON.stringify(initialBoard)])
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -340,6 +280,39 @@ export default function EmployeeDeals() {
             const dealId = findDealIdByCustomer(customerId)
             if (dealId) navigate(`edit/${dealId}/delete`)
           }}
+          onSelect={customerId => {
+            const dealId = findDealIdByCustomer(customerId)
+            if (!dealId) return
+
+            // Clear any existing timeout
+            if (highlightTimeoutRef.current) {
+              clearTimeout(highlightTimeoutRef.current)
+            }
+
+            // Temporarily reset highlight to trigger re-render
+            setHighlightDealId(null)
+
+            // Set up scrolling
+            const el = document.getElementById(`deal-${dealId}`)
+            if (el) {
+              el.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+                inline: 'center',
+              })
+            }
+
+            // Set highlight after a brief delay to ensure re-render
+            setTimeout(() => {
+              setHighlightDealId(dealId)
+            }, 10)
+
+            // Clear highlight after 2 seconds
+            highlightTimeoutRef.current = setTimeout(() => {
+              setHighlightDealId(null)
+              highlightTimeoutRef.current = null
+            }, 2010)
+          }}
           resolveId={findDealIdByCustomer}
           noActionsLabel='No Deals'
         />
@@ -351,6 +324,7 @@ export default function EmployeeDeals() {
             title={list.name}
             customers={board[list.id] ?? []}
             id={list.id}
+            highlightedDealId={highlightDealId ?? undefined}
           />
         ))}
         <Outlet />

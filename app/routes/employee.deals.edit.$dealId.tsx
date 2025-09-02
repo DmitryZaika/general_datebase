@@ -124,10 +124,10 @@ export default function DealsEdit() {
           onValueChange={value => navigate(value)}
         >
           <TabsList className='mb-5 grid grid-cols-4'>
+            <TabsTrigger value={`project${location.search}`}>Project</TabsTrigger>
             <TabsTrigger value={`information${location.search}`}>General</TabsTrigger>
             <TabsTrigger value={`images${location.search}`}>Images</TabsTrigger>
             <TabsTrigger value={`documents${location.search}`}>Documents</TabsTrigger>
-            <TabsTrigger value={`project${location.search}`}>Project</TabsTrigger>
           </TabsList>
           <Outlet />
         </Tabs>

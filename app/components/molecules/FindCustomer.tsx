@@ -19,13 +19,13 @@ async function getCustomers(name: string): Promise<Customer[]> {
 
 export function FindCustomer({
   className,
-  disableRowClick = false,
   editBasePath = '/employee/customers',
   deleteBasePath = '/employee/customers',
   buildEditLink,
   buildDeleteLink,
   onEdit,
   onDelete,
+  onSelect,
   resolveId,
   noActionsLabel = 'No Items',
 }: {
@@ -37,6 +37,7 @@ export function FindCustomer({
   buildDeleteLink?: (customerId: number, search: string) => string
   onEdit?: (customerId: number) => void
   onDelete?: (customerId: number) => void
+  onSelect?: (customerId: number) => void
   resolveId?: (customerId: number) => number | undefined
   noActionsLabel?: string
 }) {
@@ -76,11 +77,6 @@ export function FindCustomer({
     }
   }, [])
 
-  const handleResultClick = (customerId: number) => {
-    if (disableRowClick) return
-    navigate(`/employee/customers/view/${customerId}${location.search}`)
-  }
-
   return (
     <div ref={searchRef} className={`relative w-80 mt-2 ${className}`}>
       <div className='relative'>
@@ -102,27 +98,21 @@ export function FindCustomer({
           {displayCustomers.map(customer => (
             <div
               key={customer.id}
-              onClick={
-                disableRowClick ? undefined : () => handleResultClick(customer.id)
-              }
-              className='p-1.5 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center'
-              onAuxClick={
-                disableRowClick
-                  ? undefined
-                  : e => {
-                      if (e.button === 1) {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        window.open(
-                          `/employee/customers/view/${customer.id}${location.search}`,
-                          '_blank',
-                        )
-                      }
-                    }
-              }
+              className='p-1.5 hover:bg-blue-50 border-b border-gray-100 last:border-none flex justify-between items-center'
             >
               <div className='flex-1 flex-row '>
-                <div className='font-medium text-gray-800'>{customer.name}</div>
+                <div
+                  className='font-medium text-gray-800 hover:underline cursor-pointer'
+                  onClick={e => {
+                    e.stopPropagation()
+                    if (onSelect) {
+                      onSelect(customer.id)
+                      setIsInputFocused(false)
+                    }
+                  }}
+                >
+                  {customer.name}
+                </div>
                 <div className='text-sm text-gray-500 flex flex-col '>
                   <p>{customer.email || ''}</p>
                   <p>{customer.phone || ''}</p>
