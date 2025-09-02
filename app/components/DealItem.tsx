@@ -17,6 +17,7 @@ interface DealItemProps {
     due_date?: string | null
   }
   readonly?: boolean
+  highlighted?: boolean
 }
 
 function parseLocal(dateInput: string | null | undefined): Date {
@@ -37,7 +38,11 @@ function getDateColor(dateStr: string | null | undefined, listId: number): strin
   return selected < today ? 'text-red-500' : 'text-gray-500'
 }
 
-export default function DealItem({ deal, readonly = false }: DealItemProps) {
+export default function DealItem({
+  deal,
+  readonly = false,
+  highlighted = false,
+}: DealItemProps) {
   const [localDate, setLocalDate] = useState<string | null>(deal.due_date ?? null)
   const [editAmount, setEditAmount] = useState(false)
   const [editDesc, setEditDesc] = useState(false)
@@ -128,7 +133,8 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3 ${isSaving ? 'opacity-60' : ''}`}
+      id={`deal-${deal.id}`}
+      className={`relative flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3 ${isSaving ? 'opacity-60' : ''} ${highlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}
       {...(!readonly ? attributes : {})}
       {...(!readonly ? listeners : {})}
     >
@@ -152,7 +158,7 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
         </div>
         {!readonly && (
           <Link
-            to={`edit/${deal.id}/information`}
+            to={`edit/${deal.id}/project`}
             className='absolute top-1 right-1 z-20'
             onPointerDown={e => e.stopPropagation()}
           >
