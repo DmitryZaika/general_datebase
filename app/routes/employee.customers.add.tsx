@@ -2,6 +2,7 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
 } from 'react-router'
 import { CustomerForm } from '~/components/pages/CustomerForm'
@@ -19,14 +20,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function CustomersAdd() {
   const { user } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
-
+  const location = useLocation()
   const onSuccess = () => {
-    navigate('..')
+    navigate(`..${location.search}`)
   }
 
   const handleChange = (open: boolean) => {
     if (open === false) {
-      navigate('..')
+      navigate(`..${location.search}`)
     }
   }
 

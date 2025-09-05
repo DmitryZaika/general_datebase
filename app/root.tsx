@@ -161,7 +161,7 @@ export default function App() {
   const isMobile = useIsMobile()
   const isLogin = pathname === '/login'
   const isCheckIn = pathname.includes('/check-in')
-
+  const isExternalMarketingLeads = pathname.includes('/external/marketing/leads')
   useEffect(() => {
     if (message !== null && message !== undefined) {
       toast({
@@ -179,7 +179,8 @@ export default function App() {
 
   const basePath = getBase(pathname)
   const isInstaller = position !== null
-  const showSidebar = !!basePath && !isLogin && !isInstaller && !isCheckIn
+  const showSidebar =
+    !!basePath && !isLogin && !isInstaller && !isCheckIn && !isExternalMarketingLeads
 
   return (
     <html lang='en'>
