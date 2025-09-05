@@ -323,21 +323,23 @@ export default function AdminCustomers() {
               <TabsTrigger value='all'>All Customers</TabsTrigger>
             </TabsList>
           </Tabs>
-          <div className='ml-4 flex items-center gap-2'>
-            <Checkbox
-              id='show_invalid'
-              checked={showInvalid}
-              onCheckedChange={v => {
-                const params = new URLSearchParams(searchParams)
-                if (v) params.set('show_invalid', '1')
-                else params.delete('show_invalid')
-                navigate({ pathname: location.pathname, search: params.toString() })
-              }}
-            />
-            <label htmlFor='show_invalid' className='text-sm'>
-              Invalid leads
-            </label>
-          </div>
+          {tabParam === 'leads' && (
+            <div className='ml-4 flex items-center gap-2'>
+              <Checkbox
+                id='show_invalid'
+                checked={showInvalid}
+                onCheckedChange={v => {
+                  const params = new URLSearchParams(searchParams)
+                  if (v) params.set('show_invalid', '1')
+                  else params.delete('show_invalid')
+                  navigate({ pathname: location.pathname, search: params.toString() })
+                }}
+              />
+              <label htmlFor='show_invalid' className='text-sm'>
+                Invalid leads
+              </label>
+            </div>
+          )}
         </div>
         <div className='flex items-center gap-2'>
           <FindCustomer
