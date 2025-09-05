@@ -57,7 +57,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { error: 'Invalid value' }
   }
 
-  // map known keys to their human-readable values; keep custom values as-is
   const mapped = (
     options.find(o => o.key === invalid_lead)?.value ?? invalid_lead
   ).toString()

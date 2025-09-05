@@ -1,6 +1,5 @@
 import type { ColumnDef } from '@tanstack/react-table'
 import { format } from 'date-fns'
-import { CalendarIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import {
   type LoaderFunctionArgs,
@@ -10,14 +9,11 @@ import {
   useNavigate,
 } from 'react-router'
 import { LeadsWalkInsChartContainer } from '~/components/charts/LeadsWalkInsChartContainer'
+import { DateRangeControls } from '~/components/molecules/DateRangeControls'
 import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
 import { PageLayout } from '~/components/PageLayout'
-import { Button } from '~/components/ui/button'
-import { Calendar } from '~/components/ui/calendar'
 import { DataTable } from '~/components/ui/data-table'
-import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { db } from '~/db.server'
-import { cn } from '~/lib/utils'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 
@@ -376,51 +372,13 @@ export default function AdminStatistics() {
             <div className='flex items-center gap-2'>
               <SalesRepsFilter className='-mt-5' />
             </div>
-            <div className='flex items-center gap-2'>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant='outline'
-                    className={cn(
-                      'w-[200px] justify-start text-left font-normal',
-                      !from && 'text-muted-foreground',
-                    )}
-                  >
-                    <CalendarIcon className='mr-2 h-4 w-4' />
-                    {from ? format(from, 'PPP') : <span>Select start date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className='w-auto p-0' align='start'>
-                  <Calendar
-                    mode='single'
-                    selected={from}
-                    onSelect={setFrom}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant='outline'
-                    className={cn(
-                      'w-[200px] justify-start text-left font-normal',
-                      !to && 'text-muted-foreground',
-                    )}
-                  >
-                    <CalendarIcon className='mr-2 h-4 w-4' />
-                    {to ? format(to, 'PPP') : <span>Select end date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className='w-auto p-0' align='start'>
-                  <Calendar mode='single' selected={to} onSelect={setTo} initialFocus />
-                </PopoverContent>
-              </Popover>
-              <Button type='button' variant='outline' onClick={handleClear}>
-                Clear
-              </Button>
-              <Button type='submit'>Apply</Button>
-            </div>
+            <DateRangeControls
+              from={from}
+              to={to}
+              setFrom={setFrom}
+              setTo={setTo}
+              onClear={handleClear}
+            />
           </form>
         </div>
       </div>

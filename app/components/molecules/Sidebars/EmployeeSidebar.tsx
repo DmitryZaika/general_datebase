@@ -35,7 +35,6 @@ import {
 } from '~/components/ui/sidebar'
 import type { ISupplier } from '~/schemas/suppliers'
 import { getBase } from '~/utils/urlHelpers'
-import { SalesRepsFilter } from '../SalesRepsFilter'
 import { FaucetsFilters } from './FaucetsFilters'
 import { SinksFilters } from './SinksFilters'
 import { StonesFilters } from './StonesFilters'
@@ -170,7 +169,6 @@ const getItems = (
         title: 'Deals',
         url: `/admin/deals`,
         icon: DollarSign,
-        component: () => <SalesRepsFilter />,
       },
       {
         title: 'Transactions',
