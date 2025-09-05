@@ -28,6 +28,7 @@ type DealRow = {
   id: number
   amount: number | null
   description: string | null
+  list_name: string
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -53,10 +54,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const deals = await selectMany<DealRow>(
     db,
-    `SELECT id, amount, description
-     FROM deals
-     WHERE customer_id = ? AND deleted_at IS NULL
-     ORDER BY id DESC`,
+    `SELECT d.id, d.amount, d.description, l.name AS list_name
+     FROM deals d
+     JOIN deals_list l ON l.id = d.list_id
+     WHERE d.customer_id = ? AND d.deleted_at IS NULL AND l.deleted_at IS NULL
+     ORDER BY d.id DESC`,
     [customerId],
   )
 
@@ -105,6 +107,7 @@ export default function CustomerInfoDialog() {
                       <div className='text-sm font-medium'>
                         Amount: $ {Number(d.amount || 0)}
                       </div>
+                      <div className='text-xs text-slate-500'>Stage: {d.list_name}</div>
                       {d.description && (
                         <div className='text-sm text-slate-600 mt-1 whitespace-pre-wrap'>
                           {d.description}
