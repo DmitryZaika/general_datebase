@@ -22,7 +22,7 @@ export interface User {
   company_id: number
 }
 
-interface SessionUser {
+export interface SessionUser {
   id: number
   email: string
   name: string
