@@ -51,6 +51,7 @@ function ImportanceComponent({
     { key: 3, label: 'High' },
     { key: 2, label: 'Medium' },
     { key: 1, label: 'Low' },
+    { key: 4, label: "Didn't cut" },
   ]
 
   const handleChange = async (val: string) => {
@@ -170,6 +171,11 @@ export default function Samples() {
   const getSeverity = (stone: Stone): number => {
     const imp = stone.samples_importance ?? 1
     const amt = stone.samples_amount ?? 0
+
+    if (imp === 4) {
+      return 0
+    }
+
     if (imp === 1) {
       if (amt < 2) return 2
       if (amt < 4) return 1
