@@ -1,4 +1,5 @@
 import type { ColumnDef } from '@tanstack/react-table'
+import { format } from 'date-fns'
 import { useMemo, useState } from 'react'
 import {
   type LoaderFunctionArgs,
@@ -7,6 +8,8 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router'
+import { LeadsWalkInsChartContainer } from '~/components/charts/LeadsWalkInsChartContainer'
+import { DateRangeControls } from '~/components/molecules/DateRangeControls'
 import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
 import { PageLayout } from '~/components/PageLayout'
 import { DataTable } from '~/components/ui/data-table'
@@ -86,7 +89,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               COALESCE(SUM(s.price), 0) AS total_revenue,
               COALESCE(AVG(s.price), 0) AS avg_ticket
        FROM sales s
-       JOIN users u ON s.seller_id = u.id
+       JOIN users u ON s.seller_id = u.id AND u.is_deleted = 0
        WHERE ${salesWhere.join(' AND ')}${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY u.id, u.name
        ORDER BY total_revenue DESC`,
@@ -102,7 +105,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               COALESCE(SUM(d.amount), 0) AS total_amount,
               COALESCE(AVG(d.amount), 0) AS avg_amount
        FROM deals d
-       JOIN users u ON d.user_id = u.id
+       JOIN users u ON d.user_id = u.id AND u.is_deleted = 0
        JOIN customers c ON d.customer_id = c.id
        WHERE c.company_id = ? AND d.deleted_at IS NULL${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY u.id, u.name
@@ -118,7 +121,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        FROM deals d
        JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
-       JOIN users u ON d.user_id = u.id
+       JOIN users u ON d.user_id = u.id AND u.is_deleted = 0
        WHERE c.company_id = ? AND d.deleted_at IS NULL${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY l.id, l.name
        ORDER BY l.position ASC`,
@@ -142,14 +145,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [user.company_id],
     )
 
+    const customersBySourceWhere: string[] = ['c.company_id = ?']
+    const customersBySourceParams: (string | number)[] = [user.company_id]
+    if (fromDate) {
+      customersBySourceWhere.push('DATE(c.created_date) >= ?')
+      customersBySourceParams.push(fromDate)
+    }
+    if (toDate) {
+      customersBySourceWhere.push('DATE(c.created_date) <= ?')
+      customersBySourceParams.push(toDate)
+    }
+
     const customersBySource = await selectMany<CustomersBySource>(
       db,
       `SELECT source, COUNT(*) AS total
-       FROM customers
-       WHERE company_id = ?
+       FROM customers c
+       WHERE ${customersBySourceWhere.join(' AND ')}
        GROUP BY source
        ORDER BY total DESC`,
-      [user.company_id],
+      customersBySourceParams,
     )
 
     const customersByRepWhere: string[] = ['c.company_id = ?']
@@ -175,7 +189,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               SUM(CASE WHEN c.source = 'user-input' THEN 1 ELSE 0 END) AS manual,
               COUNT(c.id) AS total
        FROM customers c
-       LEFT JOIN users u ON c.sales_rep = u.id
+       LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
        WHERE ${customersByRepWhere.join(' AND ')}
        GROUP BY u.name
        ORDER BY total DESC`,
@@ -223,8 +237,10 @@ export default function AdminStatistics() {
 
   const navigate = useNavigate()
   const location = useLocation()
-  const [from, setFrom] = useState(fromDate || '')
-  const [to, setTo] = useState(toDate || '')
+  const [from, setFrom] = useState<Date | undefined>(
+    fromDate ? new Date(fromDate) : undefined,
+  )
+  const [to, setTo] = useState<Date | undefined>(toDate ? new Date(toDate) : undefined)
 
   const currency = useMemo(
     () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }),
@@ -330,14 +346,14 @@ export default function AdminStatistics() {
   const handleFiltersSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const params = new URLSearchParams(location.search)
-    if (from) params.set('fromDate', from)
-    if (to) params.set('toDate', to)
+    if (from) params.set('fromDate', format(from, 'yyyy-MM-dd'))
+    if (to) params.set('toDate', format(to, 'yyyy-MM-dd'))
     navigate({ pathname: '/admin/statistics', search: params.toString() })
   }
 
   const handleClear = () => {
-    setFrom('')
-    setTo('')
+    setFrom(undefined)
+    setTo(undefined)
     const params = new URLSearchParams(location.search)
     params.delete('fromDate')
     params.delete('toDate')
@@ -356,36 +372,21 @@ export default function AdminStatistics() {
             <div className='flex items-center gap-2'>
               <SalesRepsFilter className='-mt-5' />
             </div>
-            <div className='flex items-center gap-2'>
-              <input
-                type='date'
-                name='fromDate'
-                value={from}
-                onChange={e => setFrom(e.target.value)}
-                className='border rounded px-2 py-1'
-              />
-              <input
-                type='date'
-                name='toDate'
-                value={to}
-                onChange={e => setTo(e.target.value)}
-                className='border rounded px-2 py-1'
-              />
-              <button
-                type='button'
-                onClick={handleClear}
-                className='px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded'
-              >
-                Clear
-              </button>
-              <button
-                type='submit'
-                className='px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded'
-              >
-                Apply
-              </button>
-            </div>
+            <DateRangeControls
+              from={from}
+              to={to}
+              setFrom={setFrom}
+              setTo={setTo}
+              onClear={handleClear}
+            />
           </form>
+        </div>
+      </div>
+
+      <div className='mb-8'>
+        <h2 className='text-xl font-semibold mb-4'>Leads and Walk-ins Daily Chart</h2>
+        <div className='bg-white rounded-lg border p-6'>
+          <LeadsWalkInsChartContainer fromDate={fromDate} toDate={toDate} />
         </div>
       </div>
 

@@ -1,5 +1,14 @@
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+} from 'react-router'
 import DealsList from '~/components/DealsList'
+import { FindCustomer } from '~/components/molecules/FindCustomer'
+import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
@@ -64,52 +73,151 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AdminDeals() {
   const { deals, customers, lists } = useLoaderData<typeof loader>()
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  type Deal = {
+    id: number
+    customer_id: number
+    name: string
+    amount?: number | null
+    description?: string | null
+    status?: string | null
+    position?: number
+    list_id: number
+    due_date?: string | null
+  }
+
+  const toDeal = (d: AdminDeal): Deal => {
+    const customer = customers.find(c => c.id === d.customer_id)
+    return {
+      id: d.id,
+      customer_id: d.customer_id,
+      name: customer ? customer.name : `Customer #${d.customer_id}`,
+      amount: d.amount,
+      description: d.description,
+      status: d.status ?? undefined,
+      position: d.position ?? undefined,
+      list_id: d.list_id,
+      due_date: d.due_date
+        ? typeof d.due_date === 'string'
+          ? d.due_date
+          : new Date(d.due_date).toISOString().slice(0, 10)
+        : null,
+    }
+  }
+
+  const sortDeals = (arr: Deal[]) => {
+    const copy = [...arr]
+    copy.sort((a, b) => {
+      const aHas = Boolean(a.due_date)
+      const bHas = Boolean(b.due_date)
+      if (!aHas && !bHas) return 0
+      if (!aHas) return -1
+      if (!bHas) return 1
+      return new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
+    })
+    return copy
+  }
+
+  const initialBoard = useMemo(() => {
+    const board: Record<number, Deal[]> = {}
+    for (const l of lists) board[l.id] = []
+    for (const d of deals) {
+      const deal = toDeal(d)
+      board[deal.list_id] = board[deal.list_id] || []
+      board[deal.list_id].push(deal)
+    }
+    for (const l of lists) board[l.id] = sortDeals(board[l.id])
+    return board
+  }, [JSON.stringify(deals), JSON.stringify(customers), JSON.stringify(lists)])
+
+  const [board, setBoard] = useState<Record<number, Deal[]>>(initialBoard)
+  const [highlightDealId, setHighlightDealId] = useState<number | null>(null)
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    setBoard(initialBoard)
+  }, [JSON.stringify(initialBoard)])
+
+  const findDealIdByCustomer = (customerId: number): number | undefined => {
+    for (const l of lists) {
+      const hit = board[l.id]?.find(d => d.customer_id === customerId)
+      if (hit) return hit.id
+    }
+    return undefined
+  }
 
   return (
-    <div className='flex gap-4'>
-      {lists.map(list => {
-        const listDeals = deals
-          .filter(d => d.list_id === list.id)
-          .map(d => {
-            const customer = customers.find(c => c.id === d.customer_id)
-            return {
-              id: d.id,
-              customer_id: d.customer_id,
-              name: customer ? customer.name : `Customer #${d.customer_id}`,
-              amount: d.amount,
-              description: d.description,
-              status: d.status ?? undefined,
-              position: d.position ?? undefined,
-              list_id: d.list_id,
-              due_date: d.due_date
-                ? typeof d.due_date === 'string'
-                  ? d.due_date
-                  : new Date(d.due_date).toISOString().slice(0, 10)
-                : null,
+    <div className='w-full'>
+      <div className='w-full flex justify-between items-center mb-2'>
+        <SalesRepsFilter />
+        <FindCustomer
+          className='mt-0'
+          onEdit={customerId => {
+            const dealId = findDealIdByCustomer(customerId)
+            if (dealId) navigate(`edit/${dealId}/information${location.search}`)
+          }}
+          onDelete={customerId => {
+            const dealId = findDealIdByCustomer(customerId)
+            if (dealId) navigate(`edit/${dealId}/delete`)
+          }}
+          onSelect={customerId => {
+            const dealId = findDealIdByCustomer(customerId)
+            if (!dealId) return
+
+            if (highlightTimeoutRef.current) {
+              clearTimeout(highlightTimeoutRef.current)
             }
-          })
 
-        listDeals.sort((a, b) => {
-          const aHasDate = Boolean(a.due_date)
-          const bHasDate = Boolean(b.due_date)
-          if (!aHasDate && !bHasDate) return 0
-          if (!aHasDate) return -1
-          if (!bHasDate) return 1
+            setHighlightDealId(null)
+
+            const el = document.getElementById(`deal-${dealId}`)
+            if (el) {
+              el.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+                inline: 'center',
+              })
+            }
+
+            setTimeout(() => {
+              setHighlightDealId(dealId)
+            }, 10)
+
+            highlightTimeoutRef.current = setTimeout(() => {
+              setHighlightDealId(null)
+              highlightTimeoutRef.current = null
+            }, 2010)
+          }}
+          resolveId={findDealIdByCustomer}
+          noActionsLabel='No Deals'
+        />
+      </div>
+      <div className='flex gap-4'>
+        {lists.map(list => {
+          const listDeals = board[list.id] ?? []
+
           return (
-            new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
+            <DealsList
+              key={list.id}
+              title={list.name}
+              customers={listDeals}
+              id={list.id}
+              readonly
+              highlightedDealId={highlightDealId ?? undefined}
+            />
           )
-        })
-
-        return (
-          <DealsList
-            key={list.id}
-            title={list.name}
-            customers={listDeals}
-            id={list.id}
-            readonly
-          />
-        )
-      })}
+        })}
+      </div>
     </div>
   )
 }

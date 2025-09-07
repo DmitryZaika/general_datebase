@@ -53,7 +53,11 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, isThinking }) => 
   </div>
 )
 
-export const Chat = () => {
+interface ChatProps {
+  isAtBottom?: boolean
+}
+
+export function Chat({ isAtBottom = false }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState<string>('')
   const [answer, setAnswer] = useState<string>('')
@@ -95,7 +99,9 @@ export const Chat = () => {
 
   return (
     <Dialog modal={false}>
-      <DialogTrigger className='fixed rounded-full bottom-5 right-5 bg-blue-500 hover:bg-blue-600 duration-200 text-white size-14 flex items-center align-center justify-center cursor-pointer'>
+      <DialogTrigger
+        className={`fixed rounded-full bottom-5 right-5 bg-blue-500 hover:bg-blue-600 text-white size-14 flex items-center align-center justify-center cursor-pointer transition-opacity duration-300 ${isAtBottom ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      >
         <svg
           xmlns='http://www.w3.org/2000/svg'
           fill='none'

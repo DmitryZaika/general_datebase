@@ -11,10 +11,10 @@ export async function action({ request }: ActionFunctionArgs) {
     return data({ error: 'customer_id required' }, { status: 400 })
   }
   try {
-    await db.query(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
-      sales_rep,
-      customer_id,
-    ])
+    await db.query(
+      `UPDATE customers SET sales_rep = ?, assigned_date = NOW() WHERE id = ?`,
+      [sales_rep, customer_id],
+    )
 
     // --- handle deals when assigning a sales rep ---
     if (sales_rep) {
@@ -23,8 +23,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
       // удалить активные сделки этого клиента у прошлого продавца
       await db.execute(
-        'UPDATE deals SET deleted_at = NOW() WHERE customer_id = ? AND user_id <> ? AND deleted_at IS NULL',
-        [customer_id, sales_rep],
+        'UPDATE deals SET user_id = ? WHERE customer_id = ? AND user_id <> ? AND deleted_at IS NULL',
+        [sales_rep, customer_id, sales_rep],
       )
 
       // проверить, есть ли уже активная сделка у нового продавца

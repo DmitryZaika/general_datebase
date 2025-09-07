@@ -103,7 +103,7 @@ function formatSinkList(sinkString: string): string {
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  await getEmployeeUser(request)
+  const user = await getEmployeeUser(request)
   if (!params.stone) {
     return forceRedirectError(request.headers, 'No stone id provided')
   }
@@ -300,7 +300,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     })
   }
 
-  return { slabs, linkedSlabs, stone, saleId }
+  const userPositions = await selectMany<{ position_id: number }>(
+    db,
+    'SELECT position_id FROM users_positions WHERE user_id = ?',
+    [user.id],
+  )
+  const canSell = userPositions.some(up => up.position_id === 1)
+
+  return { slabs, linkedSlabs, stone, saleId, canSell }
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -352,7 +359,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function SlabsModal() {
-  const { slabs, linkedSlabs, stone, saleId } = useLoaderData<typeof loader>()
+  const { slabs, linkedSlabs, stone, saleId, canSell } = useLoaderData<typeof loader>()
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [editingSlab, setEditingSlab] = useState<number | null>(null)
   const [highlightedSlab, setHighlightedSlab] = useState<number | null>(null)
@@ -491,7 +498,7 @@ export default function SlabsModal() {
                 )}
               </div>
 
-              {!isEditing && (
+              {!isEditing && canSell && (
                 <div className='flex gap-2 ml-auto'>
                   {slab.sale_id ? (
                     <Link to={`edit/${slab.sale_id}/${location.search}`}>

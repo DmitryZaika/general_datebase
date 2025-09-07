@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
   Link,
@@ -17,6 +18,8 @@ import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SelectInput } from '~/components/molecules/SelectItem'
 import { PageLayout } from '~/components/PageLayout'
+import { Button } from '~/components/ui/button'
+import { Checkbox } from '~/components/ui/checkbox'
 import { DataTable } from '~/components/ui/data-table'
 import { FormField } from '~/components/ui/form'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
@@ -51,6 +54,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const url = new URL(request.url)
   const salesRepFilter = url.searchParams.get('sales_rep')
+  const includeInvalid = url.searchParams.get('show_invalid') === '1'
 
   const params: number[] = []
   const conditions: string[] = ['c.company_id = ?']
@@ -58,6 +62,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (salesRepFilter) {
     conditions.push('c.sales_rep = ?')
     params.push(Number(salesRepFilter))
+  }
+  if (!includeInvalid) {
+    conditions.push("(c.invalid_lead IS NULL OR c.invalid_lead = '')")
   }
   const where = `WHERE ${conditions.join(' AND ')}`
 
@@ -157,10 +164,10 @@ const customerColumns: ColumnDef<Customer>[] = [
     accessorKey: 'email',
     header: 'Email',
   },
-  {
-    accessorKey: 'address',
-    header: 'Address',
-  },
+  // {
+  //   accessorKey: 'address',
+  //   header: 'Address',
+  // },
   {
     accessorKey: 'sales_rep',
     header: 'Sales Rep',
@@ -225,12 +232,24 @@ function CustomerActions({ customer }: { customer: Customer }) {
 }
 
 export default function AdminCustomers() {
-  const { customers } = useLoaderData<typeof loader>()
+  const { customers } = useLoaderData<{ customers: Customer[] }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
 
+  const [highlightCustomerId, setHighlightCustomerId] = useState<number | null>(null)
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
+    }
+  }, [])
+
   const tabParam = searchParams.get('tab') ?? 'walkin'
+  const showInvalid = searchParams.get('show_invalid') === '1'
+  const pageParam = Number(searchParams.get('page') || '1')
+  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
+  const pageSize = 100
 
   const handleTabChange = (tab: string) => {
     const params = new URLSearchParams(searchParams)
@@ -238,20 +257,60 @@ export default function AdminCustomers() {
     navigate({ pathname: location.pathname, search: params.toString() })
   }
 
-  const filtered = customers.filter(c => {
+  const filtered = customers.filter((c: Customer) => {
     if (tabParam === 'leads') return c.source === 'leads'
     if (tabParam === 'walkin') return c.source === 'check-in'
     if (tabParam === 'all') return true
   })
 
-  let displayed = filtered
+  let fullDisplayed = filtered
   if (tabParam === 'leads' || tabParam === 'walkin') {
-    displayed = [...filtered].sort(
+    fullDisplayed = [...filtered].sort(
       (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
     )
   } else if (tabParam === 'all') {
-    displayed = [...filtered].sort((a, b) => a.name.localeCompare(b.name))
+    fullDisplayed = [...filtered].sort((a, b) => a.name.localeCompare(b.name))
   }
+
+  const totalPages = Math.max(1, Math.ceil(fullDisplayed.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const startIndex = (currentPage - 1) * pageSize
+  const endIndex = startIndex + pageSize
+  let displayed = fullDisplayed.slice(startIndex, endIndex)
+
+  displayed = displayed.map((c: Customer) => ({
+    ...c,
+    className: `${c.className ?? ''} customer-row-${c.id} cursor-pointer ${
+      highlightCustomerId === c.id ? 'ring-2 ring-blue-400 bg-blue-50' : ''
+    }`.trim(),
+    onClick: () => navigate(`info/${c.id}${location.search}`),
+  }))
+
+  useEffect(() => {
+    const highlightParam = searchParams.get('highlight')
+    const id = highlightParam ? Number(highlightParam) : 0
+    if (!id) return
+    // Delay to next paint to ensure rows are rendered
+    setTimeout(() => {
+      const el = document.querySelector(`.customer-row-${id}`) as HTMLElement | null
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setHighlightCustomerId(id)
+        if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
+        highlightTimeoutRef.current = setTimeout(() => {
+          setHighlightCustomerId(null)
+          highlightTimeoutRef.current = null
+        }, 2000)
+      }
+      // Clean highlight param from URL so it doesn't trigger after refresh
+      const params = new URLSearchParams(searchParams)
+      params.delete('highlight')
+      navigate(
+        { pathname: location.pathname, search: params.toString() },
+        { replace: true },
+      )
+    }, 50)
+  }, [searchParams, navigate, location.pathname])
 
   return (
     <PageLayout title='Customers List'>
@@ -264,14 +323,44 @@ export default function AdminCustomers() {
               <TabsTrigger value='all'>All Customers</TabsTrigger>
             </TabsList>
           </Tabs>
+          {tabParam === 'leads' && (
+            <div className='ml-4 flex items-center gap-2'>
+              <Checkbox
+                id='show_invalid'
+                checked={showInvalid}
+                onCheckedChange={v => {
+                  const params = new URLSearchParams(searchParams)
+                  if (v) params.set('show_invalid', '1')
+                  else params.delete('show_invalid')
+                  navigate({ pathname: location.pathname, search: params.toString() })
+                }}
+              />
+              <label htmlFor='show_invalid' className='text-sm'>
+                Invalid leads
+              </label>
+            </div>
+          )}
         </div>
         <div className='flex items-center gap-2'>
-          <FindCustomer />
+          <FindCustomer
+            onSelect={customerId => {
+              const index = fullDisplayed.findIndex(c => c.id === customerId)
+              const targetPage = index >= 0 ? Math.floor(index / pageSize) + 1 : 1
+              const params = new URLSearchParams(searchParams)
+              params.set('page', String(targetPage))
+              params.set('highlight', String(customerId))
+              navigate({ pathname: location.pathname, search: params.toString() })
+            }}
+          />
         </div>
       </div>
       <div className='w-fit'>
         {tabParam === 'all' && (
-          <Link to={`add`} relative='path' className='inline-flex w-fit'>
+          <Link
+            to={`add${location.search}`}
+            relative='path'
+            className='inline-flex w-fit'
+          >
             <LoadingButton loading={false} className='inline-flex items-center'>
               <Plus className='w-4 h-4 mr-1' />
               Add Customer
@@ -279,7 +368,39 @@ export default function AdminCustomers() {
           </Link>
         )}
       </div>
-      <DataTable key={tabParam} columns={customerColumns} data={displayed} />
+      <DataTable
+        key={`${tabParam}-${currentPage}`}
+        columns={customerColumns}
+        data={displayed}
+      />
+      <Outlet />
+      <div className='mt-3 flex items-center justify-center gap-2'>
+        <Button
+          className='px-3 py-1 border rounded disabled:opacity-50'
+          disabled={currentPage <= 1}
+          onClick={() => {
+            const params = new URLSearchParams(searchParams)
+            params.set('page', String(currentPage - 1))
+            navigate({ pathname: location.pathname, search: params.toString() })
+          }}
+        >
+          Prev
+        </Button>
+        <span className='text-sm'>
+          Page {currentPage} / {totalPages}
+        </span>
+        <Button
+          className='px-3 py-1 border rounded disabled:opacity-50'
+          disabled={currentPage >= totalPages}
+          onClick={() => {
+            const params = new URLSearchParams(searchParams)
+            params.set('page', String(currentPage + 1))
+            navigate({ pathname: location.pathname, search: params.toString() })
+          }}
+        >
+          Next
+        </Button>
+      </div>
       <Outlet />
     </PageLayout>
   )

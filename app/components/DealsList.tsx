@@ -19,6 +19,7 @@ interface DealsListProps {
   }[]
   id: number
   readonly?: boolean
+  highlightedDealId?: number
 }
 
 export default function DealsList({
@@ -26,6 +27,7 @@ export default function DealsList({
   customers,
   id,
   readonly = false,
+  highlightedDealId,
 }: DealsListProps) {
   const locked = readonly || [1, 2, 3, 4, 5, 6].includes(id)
   const { setNodeRef } = useDroppable({
@@ -62,7 +64,11 @@ export default function DealsList({
           )}
         </div>
       </CardHeader>
-      <DealsCard customers={customers} readonly={readonly} />
+      <DealsCard
+        customers={customers}
+        readonly={readonly}
+        highlightedDealId={highlightedDealId}
+      />
       {!readonly && (
         <div className='p-3 border-t'>
           <Link to={`add?list_id=${id}`} relative='path'>

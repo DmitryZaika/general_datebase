@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import type { RowDataPacket } from 'mysql2'
 import { posthog } from 'posthog-js'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { LinksFunction, LoaderFunctionArgs } from 'react-router'
 import {
   data,
@@ -118,7 +118,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     )
 
     const [row] = await db.query<(RowDataPacket & { position: string })[]>(
-      `SELECT p.name AS position FROM users u LEFT JOIN positions p ON p.id = u.position_id WHERE u.id = ? LIMIT 1`,
+      `SELECT p.name AS position FROM users u LEFT JOIN users_positions up ON up.user_id = u.id LEFT JOIN positions p ON p.id = up.position_id WHERE u.id = ? AND up.position_id = 6 AND u.is_deleted = 0 LIMIT 1`,
       [user.id],
     )
     position = row?.[0]?.position ?? null
@@ -161,7 +161,22 @@ export default function App() {
   const isMobile = useIsMobile()
   const isLogin = pathname === '/login'
   const isCheckIn = pathname.includes('/check-in')
-
+  const isExternalMarketingLeads = pathname.includes('/external/marketing/leads')
+  const mainRef = useRef<HTMLElement | null>(null)
+  const [isAtBottom, setIsAtBottom] = useState(false)
+  useEffect(() => {
+    const el = mainRef.current
+    if (!el) return
+    const onScroll = () => {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight
+      setIsAtBottom(distance <= 8)
+    }
+    onScroll()
+    el.addEventListener('scroll', onScroll)
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+    }
+  }, [])
   useEffect(() => {
     if (message !== null && message !== undefined) {
       toast({
@@ -178,8 +193,9 @@ export default function App() {
   }, [message?.nonce])
 
   const basePath = getBase(pathname)
-  const isInstaller = position === 'installer'
-  const showSidebar = !!basePath && !isLogin && !isInstaller && !isCheckIn
+  const isInstaller = position !== null
+  const showSidebar =
+    !!basePath && !isLogin && !isInstaller && !isCheckIn && !isExternalMarketingLeads
 
   return (
     <html lang='en'>
@@ -200,7 +216,7 @@ export default function App() {
                 colors={colors}
               />
             )}
-            <main className='h-screen overflow-y-auto bg-gray-100 w-full'>
+            <main ref={mainRef} className='h-screen overflow-y-auto bg-gray-100 w-full'>
               <AuthenticityTokenProvider token={token}>
                 {!isInstaller && (
                   <Header
@@ -219,7 +235,7 @@ export default function App() {
               <ScrollRestoration />
               <Scripts />
               <Posthog />
-              {!isInstaller && user && <Chat />}
+              {!isInstaller && user && <Chat isAtBottom={isAtBottom} />}
               {/* <ScrollToTopButton /> */}
             </main>
           </SidebarProvider>

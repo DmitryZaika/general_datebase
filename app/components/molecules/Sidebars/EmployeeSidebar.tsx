@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Building2,
   Calculator,
   ChevronDown,
@@ -35,7 +36,6 @@ import {
 } from '~/components/ui/sidebar'
 import type { ISupplier } from '~/schemas/suppliers'
 import { getBase } from '~/utils/urlHelpers'
-import { SalesRepsFilter } from '../SalesRepsFilter'
 import { FaucetsFilters } from './FaucetsFilters'
 import { SinksFilters } from './SinksFilters'
 import { StonesFilters } from './StonesFilters'
@@ -127,6 +127,11 @@ const getItems = (
         url: `/${base}/instructions`,
         icon: Lightbulb,
       },
+      {
+        title: 'Teach Mode',
+        url: `/employee/teach-mode`,
+        icon: BookOpen,
+      },
     )
   }
   if (base === 'employee') {
@@ -152,11 +157,11 @@ const getItems = (
       //   url: `/employee/schedule`,
       //   icon: Calendar,
       // },
-      // {
-      //   title: 'Samples',
-      //   url: `/${base}/samples`,
-      //   icon: Package,
-      // },
+      {
+        title: 'Samples',
+        url: `/${base}/samples`,
+        icon: Package,
+      },
       {
         title: 'Checklists',
         url: `/employee/checklists`,
@@ -170,7 +175,6 @@ const getItems = (
         title: 'Deals',
         url: `/admin/deals`,
         icon: DollarSign,
-        component: () => <SalesRepsFilter />,
       },
       {
         title: 'Transactions',
@@ -224,6 +228,7 @@ export function EmployeeSidebar({
   )
 
   const inventoryTitles = ['Stones', 'Sinks', 'Faucets']
+
   const crmTitles = ['Customers', 'Deals', 'Statistic']
   const resourceTitles = [
     'Suppliers',
@@ -231,8 +236,9 @@ export function EmployeeSidebar({
     'Documents',
     'Images',
     'Instructions',
+    'Teach Mode',
   ]
-  const operationTitles = ['Checklists', 'Special Order']
+  const operationTitles = ['Suppliers', 'Checklists', 'Special Order']
 
   const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))
   const crmItems = items.filter(item => crmTitles.includes(item.title))
