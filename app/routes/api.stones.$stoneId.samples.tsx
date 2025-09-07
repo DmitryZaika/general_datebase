@@ -51,7 +51,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   if (importanceStr !== null) {
     const importance = Number(importanceStr)
-    if (![1, 2, 3].includes(importance)) {
+    if (![1, 2, 3, 4].includes(importance)) {
       return new Response(JSON.stringify({ error: 'Invalid importance' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },

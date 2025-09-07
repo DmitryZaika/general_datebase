@@ -157,11 +157,11 @@ const getItems = (
       //   url: `/employee/schedule`,
       //   icon: Calendar,
       // },
-      // {
-      //   title: 'Samples',
-      //   url: `/${base}/samples`,
-      //   icon: Package,
-      // },
+      {
+        title: 'Samples',
+        url: `/${base}/samples`,
+        icon: Package,
+      },
       {
         title: 'Checklists',
         url: `/employee/checklists`,
@@ -236,7 +236,7 @@ export function EmployeeSidebar({
     'Documents',
     'Images',
     'Instructions',
-    'Teach Mode'
+    'Teach Mode',
   ]
   const operationTitles = ['Suppliers', 'Checklists', 'Special Order']
 
