@@ -15,7 +15,10 @@ export const NullableId = z.preprocess(val => {
 export const StringBoolean = z.union([
   z.boolean(),
   z.number().transform(val => val === 1),
-  z.enum(['true', 'false']).transform(val => val === 'true'),
+  z
+    .enum(['true', 'false'])
+    .transform(val => val === 'true')
+    .optional(),
 ])
 
 export const StringOrNumber = z

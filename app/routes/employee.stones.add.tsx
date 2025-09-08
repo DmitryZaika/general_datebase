@@ -1,0 +1,270 @@
+import type { ResultSetHeader } from 'mysql2'
+import {
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useNavigation,
+} from 'react-router'
+import { InputItem } from '~/components/molecules/InputItem'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { MultiPartForm } from '~/components/molecules/MultiPartForm'
+import { SelectInput } from '~/components/molecules/SelectItem'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
+import { db } from '~/db.server'
+import { stoneSchema } from '~/schemas/stones'
+import { commitSession, getSession } from '~/sessions'
+import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
+import { csrf } from '~/utils/csrf.server'
+import { parseMutliForm } from '~/utils/parseMultiForm'
+import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
+import { useCustomOptionalForm } from '~/utils/useCustomForm'
+import { FormField } from '../components/ui/form'
+
+export async function action({ request }: ActionFunctionArgs) {
+  try {
+    await getEmployeeUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
+  try {
+    await csrf.validate(request)
+  } catch {
+    return { error: 'Invalid CSRF token' }
+  }
+
+  const { errors, data } = await parseMutliForm(request, stoneSchema, 'stones')
+  if (errors || !data) {
+    return { errors }
+  }
+
+  const user = await getEmployeeUser(request)
+  const [result] = await db.execute<ResultSetHeader>(
+    `INSERT INTO stones
+     (name, type, finishing, company_id, supplier_id, width, length, cost_per_sqft, retail_price, level)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+    [
+      data.name,
+      data.type,
+      data.finishing,
+      user.company_id,
+      data.supplier_id,
+      data.width || 0,
+      data.length || 0,
+      data.cost_per_sqft || 0,
+      data.retail_price || 0,
+      data.level ?? null,
+    ],
+  )
+
+  const stoneId = result.insertId
+
+  const url = new URL(request.url)
+  const searchParams = url.searchParams
+  const searchString = searchParams.toString()
+  const roomIndex = searchParams.get('roomIndex') || ''
+
+  const session = await getSession(request.headers.get('Cookie'))
+  session.flash('message', toastData('Success', 'Stone added'))
+  const separator = searchString ? '&' : '?'
+  return redirect(
+    `..${searchString}${separator}newStoneId=${stoneId}&newStoneName=${encodeURIComponent(data.name)}&roomIndex=${encodeURIComponent(roomIndex)}`,
+    {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    },
+  )
+}
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  try {
+    const user = await getEmployeeUser(request)
+    const suppliers = await selectMany<{
+      id: number
+      supplier_name: string
+    }>(db, 'SELECT id,  supplier_name FROM suppliers WHERE company_id = ?', [
+      user.company_id,
+    ])
+    const colors = await selectMany<{
+      id: number
+      name: string
+      hex_code: string
+    }>(db, 'SELECT id, name FROM colors ORDER BY name ASC')
+    return { suppliers, colors }
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
+}
+
+export default function EmployeeStonesAdd() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isSubmitting = useNavigation().state !== 'idle'
+  const { suppliers } = useLoaderData<typeof loader>()
+
+  const form = useCustomOptionalForm(stoneSchema, {
+    defaultValues: {
+      finishing: 'polished',
+    },
+  })
+
+  const handleChange = (open: boolean) => {
+    if (open === false) {
+      navigate(`..${location.search}`)
+    }
+  }
+
+  return (
+    <Dialog open={true} onOpenChange={handleChange}>
+      <DialogContent className='sm:max-w-[425px] overflow-y-auto max-h-[95vh]'>
+        <DialogHeader>
+          <DialogTitle>Add Stone</DialogTitle>
+        </DialogHeader>
+        <MultiPartForm form={form}>
+          <FormField
+            control={form.control}
+            name='name'
+            render={({ field }) => (
+              <InputItem
+                inputAutoFocus={true}
+                name={'Name'}
+                placeholder={'Name of the stone'}
+                field={field}
+              />
+            )}
+          />
+          <div className='flex gap-2'>
+            <FormField
+              control={form.control}
+              name='type'
+              render={({ field }) => (
+                <SelectInput
+                  field={field}
+                  placeholder='Type of the Stone'
+                  name='Type'
+                  options={STONE_TYPES.map(item => ({
+                    key: item.toLowerCase(),
+                    value: item,
+                  }))}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='supplier_id'
+              render={({ field }) => (
+                <SelectInput
+                  options={suppliers.map(item => ({
+                    key: item.id.toString(),
+                    value: item.supplier_name,
+                  }))}
+                  name={'Supplier'}
+                  placeholder={'Supplier of the stone'}
+                  field={field}
+                />
+              )}
+            />
+          </div>
+
+          <div className='flex justify-between gap-2'></div>
+
+          <div className='flex gap-2'>
+            <FormField
+              control={form.control}
+              name='length'
+              render={({ field }) => (
+                <InputItem
+                  name={'Length'}
+                  placeholder={'Length of the stone'}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='width'
+              render={({ field }) => (
+                <InputItem
+                  name={'Width'}
+                  placeholder={'Width of the stone'}
+                  field={field}
+                />
+              )}
+            />
+          </div>
+          <div className='flex gap-2'>
+            <FormField
+              control={form.control}
+              name='retail_price'
+              render={({ field }) => (
+                <InputItem
+                  name={'Retail Price'}
+                  placeholder={'Retail Price'}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='cost_per_sqft'
+              render={({ field }) => (
+                <InputItem
+                  name={'Cost Per Sqft'}
+                  placeholder={'Cost Per Sqft'}
+                  field={field}
+                />
+              )}
+            />
+          </div>
+          <div className='flex gap-2'>
+            <FormField
+              control={form.control}
+              name='level'
+              render={({ field }) => (
+                <SelectInput
+                  className='w-1/2'
+                  options={[1, 2, 3, 4, 5, 6, 7].map(item => ({
+                    key: item.toString(),
+                    value: item.toString(),
+                  }))}
+                  name={'Level'}
+                  placeholder={'Level of the stone'}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='finishing'
+              render={({ field }) => (
+                <SelectInput
+                  className='w-1/2'
+                  field={field}
+                  placeholder='Finishing'
+                  name='Finishing'
+                  options={STONE_FINISHES.map(item => ({
+                    key: item.toLowerCase(),
+                    value: item.charAt(0).toUpperCase() + item.slice(1),
+                  }))}
+                />
+              )}
+            />
+          </div>
+
+          <DialogFooter>
+            <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
+          </DialogFooter>
+        </MultiPartForm>
+      </DialogContent>
+    </Dialog>
+  )
+}

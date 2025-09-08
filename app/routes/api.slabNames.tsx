@@ -6,17 +6,10 @@ import { getEmployeeUser } from '~/utils/session.server'
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await getEmployeeUser(request)
 
-  // Parse the query parameters to see if specific slab IDs were requested
   const url = new URL(request.url)
 
-  /*
-    Supported formats:
-      ?ids=1,2,3            (comma-separated list)
-      ?ids=1&ids=2&ids=3    (repeated parameter)
-  */
   let idStrings: string[] = url.searchParams.getAll('ids')
   if (idStrings.length === 1 && idStrings[0]?.includes(',')) {
-    // Handle comma-separated list in a single param
     idStrings = idStrings[0].split(',')
   }
 

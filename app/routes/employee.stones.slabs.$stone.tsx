@@ -498,17 +498,11 @@ export default function SlabsModal() {
                 )}
               </div>
 
-              {!isEditing && canSell && (
+              {!isEditing && canSell && slab.sale_id && (
                 <div className='flex gap-2 ml-auto'>
-                  {slab.sale_id ? (
-                    <Link to={`edit/${slab.sale_id}/${location.search}`}>
-                      <Button type='button'>Edit</Button>
-                    </Link>
-                  ) : (
-                    <Link to={`sell/${slab.id}/${location.search}`} className='ml-auto'>
-                      <Button className='px-4 py-2'>Sell</Button>
-                    </Link>
-                  )}
+                  <Link to={`edit/${slab.sale_id}/${location.search}`}>
+                    <Button type='button'>Edit</Button>
+                  </Link>
                 </div>
               )}
             </div>

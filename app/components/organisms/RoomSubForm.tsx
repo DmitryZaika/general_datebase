@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
+import { Link, useLocation } from 'react-router'
 import {
   DynamicAddition,
   DynamicAdditions,
@@ -88,6 +89,7 @@ export const RoomSubForm = ({
   isEdit?: boolean
 }) => {
   const roomValues = form.watch(`rooms.${index}`)
+  const location = useLocation()
 
   const totalRoomPrice = useMemo(() => {
     const price = roomPrice(roomValues, sink_type, faucet_type)
@@ -143,6 +145,22 @@ export const RoomSubForm = ({
         })
     }
   }, [isEdit, index, stone?.id, stone?.name])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const newStoneId = params.get('newStoneId')
+    const newStoneName = params.get('newStoneName')
+    const roomIndexParam = params.get('roomIndex')
+    if (newStoneId && newStoneName && String(index) === roomIndexParam) {
+      setStone({ id: Number(newStoneId), name: newStoneName, type: '' })
+      params.delete('newStoneId')
+      params.delete('newStoneName')
+      params.delete('roomIndex')
+      const newSearch = params.toString()
+      const url = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`
+      window.history.replaceState({}, '', url)
+    }
+  }, [location.search, index])
 
   const handleSwitchSlab = (slabId: number, isFull: boolean) => {
     form.setValue(
@@ -265,19 +283,33 @@ export const RoomSubForm = ({
           )}
         />
 
-        <StoneSearch
-          stone={stone}
-          setStone={val => {
-            form.setValue(`rooms.${index}.slabs`, [])
-            setStone(val)
-          }}
-          onRetailPriceChange={price => {
-            form.setValue(`rooms.${index}.retail_price`, price)
-            const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
-            const totalPrice = squareFeet * price
-            updateTotalPrice(totalPrice)
-          }}
-        />
+        <div className='flex gap-2 items-center'>
+          <StoneSearch
+            stone={stone}
+            setStone={val => {
+              form.setValue(`rooms.${index}.slabs`, [])
+              setStone(val)
+            }}
+            onRetailPriceChange={price => {
+              form.setValue(`rooms.${index}.retail_price`, price)
+              const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
+              const totalPrice = squareFeet * price
+              updateTotalPrice(totalPrice)
+            }}
+          />
+          <Button asChild variant='outline' size='sm'>
+            <Link
+              to={{
+                pathname: location.pathname.endsWith('/sell')
+                  ? `add`
+                  : `/employee/stones/add`,
+                search: `${location.search}&roomIndex=${index}`,
+              }}
+            >
+              <Plus className='w-4 h-4' />
+            </Link>
+          </Button>
+        </div>
 
         <FormField
           control={form.control}

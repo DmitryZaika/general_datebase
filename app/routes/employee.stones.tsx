@@ -1,7 +1,9 @@
 import { GridIcon, TableIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
+import { Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {
+  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
@@ -279,6 +281,14 @@ export default function Stones() {
               <GridIcon className='mr-1' />
             )}
             {viewMode === 'grid' ? 'Table View' : 'Grid View'}
+          </Button>
+          <Button asChild>
+            <Link to={{ pathname: 'sell', search: location.search }}>Sell</Link>
+          </Button>
+          <Button asChild variant='outline'>
+            <Link to={{ pathname: '/admin/stones/add', search: location.search }}>
+              <Plus className='w-4 h-4 mr-1' /> Add Stone
+            </Link>
           </Button>
         </div>
         <div className='flex-1 flex justify-center md:justify-end md:ml-auto'>
