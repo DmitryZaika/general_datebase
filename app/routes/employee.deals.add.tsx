@@ -25,8 +25,9 @@ import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 export async function action({ request }: ActionFunctionArgs) {
+  let user: User
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -54,9 +55,14 @@ export async function action({ request }: ActionFunctionArgs) {
       data.status,
       data.list_id,
       data.position,
-      data.user_id,
+      user.id,
     ],
   )
+
+  await db.execute(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
+    user.id,
+    data.customer_id,
+  ])
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Deal added successfully'))
