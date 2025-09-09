@@ -47,12 +47,22 @@ export default function DealProjectInfo() {
       accessorKey: 'value',
       cell: ({ row }) => {
         const isNameField = row.original.key.toLowerCase() === 'name'
+        const isPhoneField = row.original.key.toLowerCase() === 'phone'
 
         return (
           <div className='flex items-center gap-2'>
-            <span className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden'>
-              {row.original.value}
-            </span>
+            {isPhoneField ? (
+              <a
+                href={`tel:${String(row.original.value).replace(/[^\\d+]/g, '')}`}
+                className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden'
+              >
+                {row.original.value}
+              </a>
+            ) : (
+              <span className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden'>
+                {row.original.value}
+              </span>
+            )}
             {isMobile && isNameField && (
               <div className='flex flex-col items-end ml-auto '>
                 <VCard
