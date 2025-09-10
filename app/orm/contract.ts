@@ -47,6 +47,13 @@ export class Contract {
       ],
     )
 
+    await db.execute(
+      `UPDATE customers 
+         SET sales_rep = COALESCE(sales_rep, ?)
+       WHERE id = ? AND company_id = ?`,
+      [user.id, this.data.customer_id, user.company_id],
+    )
+
     return salesResult.insertId
   }
 

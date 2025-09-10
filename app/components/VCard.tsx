@@ -14,17 +14,33 @@ export function VCard({ name, phone, email, company, address, className }: VCard
   const [isDownloading, setIsDownloading] = useState(false)
 
   const generateVCard = () => {
-    const vcardContent = `BEGIN:VCARD
-VERSION:3.0
-FN:${name}
-N:${name};;;;
-ORG:${company || ''}
-TEL:${phone}
-EMAIL:${email}
-ADR:;;${address || ''};;;;;
-END:VCARD`
+    const sanitize = (value?: string) => {
+      const str = (value ?? '').toString().trim()
+      if (!str) return ''
+      const low = str.toLowerCase()
+      if (low === 'null' || low === 'undefined') return ''
+      return str
+    }
 
-    return vcardContent
+    const sName = sanitize(name)
+    const sCompany = sanitize(company)
+    const sPhone = sanitize(phone)
+    const sEmail = sanitize(email)
+    const sAddress = sanitize(address)
+
+    const lines = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      `FN:${sName}`,
+      `N:${sName};;;;`,
+      sCompany ? `ORG:${sCompany}` : null,
+      sPhone ? `TEL:${sPhone}` : null,
+      sEmail ? `EMAIL:${sEmail}` : null,
+      sAddress ? `ADR:;;${sAddress};;;;;` : null,
+      'END:VCARD',
+    ].filter(Boolean) as string[]
+
+    return lines.join('\n')
   }
 
   const downloadVCard = () => {
