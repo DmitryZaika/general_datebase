@@ -129,24 +129,32 @@ function SalesRepCell({ customer }: { customer: Customer }) {
 
   return (
     <FormProvider {...form}>
-      <FormField
-        control={form.control}
-        name='rep'
-        render={({ field }) => (
-          <SelectInput
-            name=''
-            placeholder='Select'
-            options={options}
-            field={{
-              ...field,
-              onChange: val => {
-                field.onChange(val)
-                mutation.mutate(val)
-              },
-            }}
-          />
-        )}
-      />
+      <div
+        onClick={e => e.stopPropagation()}
+        onPointerDown={e => e.stopPropagation()}
+        onTouchStart={e => e.stopPropagation()}
+        onMouseDown={e => e.stopPropagation()}
+        onKeyDown={e => e.stopPropagation()}
+      >
+        <FormField
+          control={form.control}
+          name='rep'
+          render={({ field }) => (
+            <SelectInput
+              name=''
+              placeholder='Select'
+              options={options}
+              field={{
+                ...field,
+                onChange: val => {
+                  field.onChange(val)
+                  mutation.mutate(val)
+                },
+              }}
+            />
+          )}
+        />
+      </div>
     </FormProvider>
   )
 }
