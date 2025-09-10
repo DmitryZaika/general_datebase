@@ -72,7 +72,9 @@ export default function DealProjectInfo() {
                   email={customer.email || ''}
                   company={customer.company_name || ''}
                   address={
-                    customer.address || `${customer.city} ${customer.postal_code}` || ''
+                    `${customer.address} ${customer.postal_code}` ||
+                    `${customer.city} ${customer.postal_code}` ||
+                    ''
                   }
                 />
               </div>
