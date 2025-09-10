@@ -53,8 +53,8 @@ export default function DealProjectInfo() {
           <div className='flex items-center gap-2'>
             {isPhoneField ? (
               <a
-                href={`tel:${String(row.original.value).replace(/[^\\d+]/g, '')}`}
-                className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden'
+                href={`tel:${(String(row.original.value || '').match(/[+\d]/g) || []).join('')}`}
+                className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden border-2 border-gray-300 rounded-md px-2'
               >
                 {row.original.value}
               </a>
