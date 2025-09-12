@@ -21,6 +21,7 @@ import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
@@ -44,6 +45,13 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, receivedValues }
   }
 
+  const listRows = await selectMany<{ name: string }>(
+    db,
+    'SELECT name FROM deals_list WHERE id = ? LIMIT 1',
+    [data.list_id],
+  )
+  const initialStatus = listRows[0]?.name || 'new'
+
   await db.execute(
     `INSERT INTO deals
      (customer_id, amount, description, status, list_id, position, user_id)
@@ -52,7 +60,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data.customer_id,
       data.amount,
       data.description,
-      data.status,
+      initialStatus,
       data.list_id,
       data.position,
       user.id,

@@ -1,16 +1,5 @@
 import type { ColumnDef } from '@tanstack/react-table'
 import { data, type LoaderFunctionArgs, useLoaderData } from 'react-router'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import { DealsByStage } from '~/components/DealsByStage'
 import { DateRangeControls } from '~/components/molecules/DateRangeControls'
 import { PageLayout } from '~/components/PageLayout'
@@ -30,6 +19,7 @@ interface Lead {
   // sales_rep: number | null
   // sales_rep_name: string | null
   status?: string
+  lost_reason?: string
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -84,17 +74,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   )
 
   const invalidReasons = await selectMany<{
-    invalid_lead: number
+    too_expensive: number
     out_of_area: number
-    looking_for_unrelated_service: number
+    no_response: number
+    wrong_contact: number
     accident_submission: number
+    unrelated_service: number
+    bought_elsewhere: number
   }>(
     db,
     `SELECT
-           SUM(CASE WHEN c.invalid_lead = 'Invalid Lead' THEN 1 ELSE 0 END) AS invalid_lead,
-           SUM(CASE WHEN c.invalid_lead = 'Out of Area' THEN 1 ELSE 0 END) AS out_of_area,
-           SUM(CASE WHEN c.invalid_lead = 'Looking for unrelated service' THEN 1 ELSE 0 END) AS looking_for_unrelated_service,
-           SUM(CASE WHEN c.invalid_lead = 'Accident submission' THEN 1 ELSE 0 END) AS accident_submission
+           SUM(CASE WHEN c.invalid_lead = 'Too expensive' THEN 1 ELSE 0 END) AS too_expensive,
+           SUM(CASE WHEN c.invalid_lead = 'Out of area' THEN 1 ELSE 0 END) AS out_of_area,
+           SUM(CASE WHEN c.invalid_lead = 'No response' THEN 1 ELSE 0 END) AS no_response,
+           SUM(CASE WHEN c.invalid_lead = 'Wrong number, email, etc.' THEN 1 ELSE 0 END) AS wrong_contact,
+           SUM(CASE WHEN c.invalid_lead = 'Accident submission' THEN 1 ELSE 0 END) AS accident_submission,
+           SUM(CASE WHEN c.invalid_lead = 'Looking for unrelated service' THEN 1 ELSE 0 END) AS unrelated_service,
+           SUM(CASE WHEN c.invalid_lead = 'Bought somewhere else' THEN 1 ELSE 0 END) AS bought_elsewhere
          FROM customers c
          WHERE (c.source = 'leads' OR c.source = 'check-in')
            AND c.invalid_lead IS NOT NULL AND c.invalid_lead <> ''
@@ -114,10 +110,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     toDate,
     invalidStats: invalidStats[0] || { facebook: 0, website: 0, total: 0 },
     invalidReasons: invalidReasons[0] || {
-      invalid_lead: 0,
+      too_expensive: 0,
       out_of_area: 0,
-      looking_for_unrelated_service: 0,
+      no_response: 0,
+      wrong_contact: 0,
       accident_submission: 0,
+      unrelated_service: 0,
+      bought_elsewhere: 0,
     },
   })
 }
@@ -151,11 +150,8 @@ function ExternalMarketingLeads() {
     name: lead.name,
     // phone: lead.phone,
     // email: lead.email,
-    status:
-      dealStatusByCustomer.get(lead.id) &&
-      deals.find(d => d.customer_id === lead.id)?.lost_reason
-        ? deals.find(d => d.customer_id === lead.id)?.lost_reason
-        : (dealStatusByCustomer.get(lead.id) ?? ''),
+    status: dealStatusByCustomer.get(lead.id) ?? '',
+    lost_reason: deals.find(d => d.customer_id === lead.id)?.lost_reason || '',
     amount: deals.find(d => d.customer_id === lead.id)?.amount
       ? `$${deals.find(d => d.customer_id === lead.id)?.amount}`
       : '',
@@ -169,9 +165,64 @@ function ExternalMarketingLeads() {
     // { header: "E-mail", accessorKey: "email" },
     // { header: "Sales Person", accessorKey: "sales_rep_name" },
     { header: 'Status', accessorKey: 'status' },
+    { header: 'Lost reason', accessorKey: 'lost_reason' },
 
     { header: 'Amount', accessorKey: 'amount' },
   ]
+
+  const channelRows = [
+    { name: 'Facebook', count: Number(invalidStats.facebook || 0) },
+    { name: 'Website', count: Number(invalidStats.website || 0) },
+  ]
+  const totalChannel = Number(invalidStats.total || 0)
+  const channelColumns: ColumnDef<{ name: string; count: number }>[] = [
+    { accessorKey: 'name', header: 'Channel' },
+    {
+      accessorKey: 'count',
+      header: 'Leads',
+      cell: ({ row }) => {
+        const c = Number(row.original.count || 0)
+        const pct = totalChannel > 0 ? Math.round((c / totalChannel) * 100) : 0
+        return `${c} (${pct}%)`
+      },
+    },
+  ]
+
+  const reasonRows = [
+    { name: 'Too expensive', count: Number(invalidReasons.too_expensive || 0) },
+    { name: 'Out of area', count: Number(invalidReasons.out_of_area || 0) },
+    { name: 'No response', count: Number(invalidReasons.no_response || 0) },
+    {
+      name: 'Wrong number, email, etc.',
+      count: Number(invalidReasons.wrong_contact || 0),
+    },
+    {
+      name: 'Accident submission',
+      count: Number(invalidReasons.accident_submission || 0),
+    },
+    {
+      name: 'Looking for unrelated service',
+      count: Number(invalidReasons.unrelated_service || 0),
+    },
+    {
+      name: 'Bought somewhere else',
+      count: Number(invalidReasons.bought_elsewhere || 0),
+    },
+  ]
+  const totalReasons = reasonRows.reduce((acc, r) => acc + Number(r.count || 0), 0)
+  const reasonColumns: ColumnDef<{ name: string; count: number }>[] = [
+    { accessorKey: 'name', header: 'Reason' },
+    {
+      accessorKey: 'count',
+      header: 'Leads',
+      cell: ({ row }) => {
+        const c = Number(row.original.count || 0)
+        const pct = totalReasons > 0 ? Math.round((c / totalReasons) * 100) : 0
+        return `${c} (${pct}%)`
+      },
+    },
+  ]
+
   function applyDates(e: React.FormEvent) {
     e.preventDefault()
     const params = new URLSearchParams(window.location.search)
@@ -206,62 +257,13 @@ function ExternalMarketingLeads() {
           />
         </form>
         <div className='mb-6 gap-6 flex flex-row items-stretch'>
-          <div className='w-full h-[360px] max-w-[560px] bg-white border rounded-lg shadow-sm'>
-            <ResponsiveContainer width='100%' height='100%'>
-              <BarChart
-                data={[
-                  { channel: 'Facebook', value: invalidStats.facebook },
-                  { channel: 'Website', value: invalidStats.website },
-                  { channel: 'Total', value: invalidStats.total },
-                ]}
-                margin={{ top: 20, right: 24, left: 12, bottom: 12 }}
-              >
-                <CartesianGrid
-                  strokeDasharray='2 4'
-                  vertical={false}
-                  stroke='#e5e7eb'
-                />
-                <XAxis dataKey='channel' tickLine={false} axisLine={false} />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-                <Legend verticalAlign='bottom' height={24} />
-                <Bar dataKey='value' radius={[6, 6, 0, 0]}>
-                  <Cell fill='#3b82f6' />
-                  <Cell fill='#10b981' />
-                  <Cell fill='#6b7280' />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className='w-full'>
+            <h2 className='text-xl font-semibold mb-2'>Invalid by Channel</h2>
+            <DataTable columns={channelColumns} data={channelRows} />
           </div>
-          <div className='w-full h-[360px] max-w-[560px] bg-white border rounded-lg shadow-sm'>
-            <ResponsiveContainer width='100%' height='100%'>
-              <BarChart
-                data={[
-                  { reason: 'Invalid Lead', count: invalidReasons.invalid_lead },
-                  { reason: 'Out of Area', count: invalidReasons.out_of_area },
-                  {
-                    reason: 'Unrelated service',
-                    count: invalidReasons.looking_for_unrelated_service,
-                  },
-                  {
-                    reason: 'Accident submission',
-                    count: invalidReasons.accident_submission,
-                  },
-                ]}
-                margin={{ top: 20, right: 24, left: 12, bottom: 12 }}
-              >
-                <CartesianGrid
-                  strokeDasharray='2 4'
-                  vertical={false}
-                  stroke='#e5e7eb'
-                />
-                <XAxis dataKey='reason' tickLine={false} axisLine={false} />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-                <Legend verticalAlign='bottom' height={24} />
-                <Bar dataKey='count' radius={[6, 6, 0, 0]} fill='#f59e0b' />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className='w-full'>
+            <h2 className='text-xl font-semibold mb-2'>Invalid Reasons</h2>
+            <DataTable columns={reasonColumns} data={reasonRows} />
           </div>
           <div className='mb-6'>
             <h2 className='text-xl font-semibold mb-2'>Deals by Stage</h2>

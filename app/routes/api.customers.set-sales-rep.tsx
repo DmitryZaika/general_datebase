@@ -44,7 +44,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
         await db.execute(
           'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
-          [customer_id, 'new', listId, nextPos, sales_rep],
+          [customer_id, 'New Customer', listId, nextPos, sales_rep],
         )
       }
     }
