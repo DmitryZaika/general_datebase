@@ -28,8 +28,8 @@ export async function action({ request }: ActionFunctionArgs) {
     for (const { id, list_id, position } of updates) {
       if (!id || list_id === undefined || position === undefined) continue
       await db.execute(
-        'UPDATE deals SET list_id = ?, position = ?, due_date = IF(? IN (4,5), NULL, due_date) WHERE id = ?',
-        [list_id, position, list_id, id],
+        'UPDATE deals SET list_id = ?, position = ?, due_date = IF(? IN (4,5), NULL, due_date), lost_reason = IF(? != 5, NULL, lost_reason) WHERE id = ?',
+        [list_id, position, list_id, list_id, id],
       )
     }
     return Response.json({ success: true })

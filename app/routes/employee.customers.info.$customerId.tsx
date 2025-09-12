@@ -22,6 +22,7 @@ type CustomerInfo = {
   phone: string | null
   address: string | null
   sales_rep_name: string | null
+  source: string | null
 }
 
 type DealRow = {
@@ -45,7 +46,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const customer = await selectId<CustomerInfo>(
     db,
-    `SELECT c.id, c.name, c.email, c.phone, c.address, u.name AS sales_rep_name
+    `SELECT c.id, c.name, c.email, c.phone, c.address, u.name AS sales_rep_name, c.source
      FROM customers c
      LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
      WHERE c.id = ?`,
@@ -93,6 +94,7 @@ export default function CustomerInfoDialog() {
                 <div>Phone: {customer.phone || '-'}</div>
                 <div>Address: {customer.address || '-'}</div>
                 <div>Sales Rep: {customer.sales_rep_name || 'Not assigned'}</div>
+                <div>Source: {customer.source || 'Not assigned'}</div>
               </div>
             </div>
 
