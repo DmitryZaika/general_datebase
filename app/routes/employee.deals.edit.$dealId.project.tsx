@@ -52,12 +52,18 @@ export default function DealProjectInfo() {
         return (
           <div className='flex items-center gap-2'>
             {isPhoneField ? (
-              <a
-                href={`tel:${(String(row.original.value || '').match(/[+\d]/g) || []).join('')}`}
-                className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden border-2 border-gray-300 rounded-md px-2'
-              >
-                {row.original.value}
-              </a>
+              isMobile ? (
+                <a
+                  href={`tel:${(String(row.original.value || '').match(/[+\d]/g) || []).join('')}`}
+                  className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden border-2 border-gray-300 rounded-md px-2'
+                >
+                  {row.original.value}
+                </a>
+              ) : (
+                <span className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden'>
+                  {row.original.value}
+                </span>
+              )
             ) : (
               <span className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden'>
                 {row.original.value}
