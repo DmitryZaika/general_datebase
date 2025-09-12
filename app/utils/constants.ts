@@ -1,5 +1,15 @@
 export const DONE_KEY = '[DONE]035d8eba-9f8c-44c5-a1e0-290d1da033f7[/DONE]'
 
+export const LOST_REASONS = {
+  'Too expensive': 'Too expensive',
+  'Out of area': 'Out of area',
+  'No response': 'No response',
+  'Wrong number, email, etc.': 'Wrong number, email, etc.',
+  'Accident submission': 'Accident submission',
+  'Looking for unrelated service': 'Looking for unrelated service',
+  'Bought somewhere else': 'Bought somewhere else',
+}
+
 export const STONE_TYPES = [
   'granite',
   'quartz',

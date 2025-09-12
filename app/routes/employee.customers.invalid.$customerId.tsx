@@ -21,17 +21,16 @@ import {
 import { FormField } from '~/components/ui/form'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
+import { LOST_REASONS } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { selectId } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
-const options = [
-  { key: 'invalid_lead', value: 'Invalid Lead' },
-  { key: 'out_of_area', value: 'Out of Area' },
-  { key: 'looking_for_unrelated_service', value: 'Looking for unrelated service' },
-  { key: 'accident_submission', value: 'Accident submission' },
-]
+const options = Object.keys(LOST_REASONS).map(key => ({
+  key,
+  value: LOST_REASONS[key as keyof typeof LOST_REASONS],
+}))
 
 const schema = z.object({ invalid_lead: z.string().min(1) })
 
@@ -51,6 +50,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const formData = await request.formData()
   const invalid_lead = String(formData.get('invalid_lead') || '')
+
   try {
     schema.parse({ invalid_lead })
   } catch {
@@ -65,6 +65,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     'UPDATE customers SET invalid_lead = ?, sales_rep = NULL, assigned_date = NOW() WHERE id = ?',
     [mapped, customerId],
   )
+  await db.execute('UPDATE deals SET deleted_at = NOW() WHERE customer_id = ?', [
+    customerId,
+  ])
   const url = new URL(request.url)
   const searchParams = url.searchParams.toString()
   const searchString = searchParams ? `?${searchParams}` : ''

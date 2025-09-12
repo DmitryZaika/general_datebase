@@ -253,7 +253,7 @@ export default function AdminCustomers() {
     }
   }, [])
 
-  const tabParam = searchParams.get('tab') ?? 'walkin'
+  const tabParam = searchParams.get('tab') ?? 'all'
   const showInvalid = searchParams.get('show_invalid') === '1'
   const pageParam = Number(searchParams.get('page') || '1')
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
@@ -326,13 +326,13 @@ export default function AdminCustomers() {
         <div className='flex items-center gap-2'>
           <Tabs value={tabParam} onValueChange={handleTabChange}>
             <TabsList>
+              <TabsTrigger value='all'>All Customers</TabsTrigger>
               <TabsTrigger value='walkin'>Walk-in</TabsTrigger>
               <TabsTrigger value='leads'>Leads</TabsTrigger>
-              <TabsTrigger value='all'>All Customers</TabsTrigger>
             </TabsList>
           </Tabs>
           {tabParam === 'leads' && (
-            <div className='ml-4 flex items-center gap-2'>
+            <div className='ml-4 flex items-center gap-2 cursor-pointer'>
               <Checkbox
                 id='show_invalid'
                 checked={showInvalid}
@@ -343,7 +343,7 @@ export default function AdminCustomers() {
                   navigate({ pathname: location.pathname, search: params.toString() })
                 }}
               />
-              <label htmlFor='show_invalid' className='text-sm'>
+              <label htmlFor='show_invalid' className='text-sm cursor-pointer'>
                 Invalid leads
               </label>
             </div>
