@@ -36,6 +36,7 @@ export interface StoneImage {
   retail_price: number
   cost_per_sqft: number
   available: number
+  samples_amount: number
 }
 
 export type StoneSlim = Omit<Stone, 'retail_price'>

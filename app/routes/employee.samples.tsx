@@ -51,7 +51,7 @@ function ImportanceComponent({
     { key: 3, label: 'High' },
     { key: 2, label: 'Medium' },
     { key: 1, label: 'Low' },
-    { key: 4, label: "Didn't cut" },
+    { key: 4, label: "Hadn't to cut" },
   ]
 
   const handleChange = async (val: string) => {
