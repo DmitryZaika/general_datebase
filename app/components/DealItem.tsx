@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Calendar, GripVertical, Pencil } from 'lucide-react'
+import { Calendar, GripVertical, PaperclipIcon, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher } from 'react-router'
 import { formatMoney, updateNumber } from './functions'
@@ -15,6 +15,7 @@ interface DealItemProps {
     list_id: number
     position?: number | null
     due_date?: string | null
+    images?: string[] | null
   }
   readonly?: boolean
   highlighted?: boolean
@@ -59,7 +60,6 @@ export default function DealItem({
   } | null>(null)
   const fetcher = useFetcher()
 
-  // Keep local date in sync with deal prop changes (e.g., after DnD between lists)
   useEffect(() => {
     setLocalDate(deal.due_date ?? null)
   }, [deal.due_date])
@@ -110,7 +110,6 @@ export default function DealItem({
     }
   }, [editDesc])
 
-  // Detect if description exceeds 4 lines
   useEffect(() => {
     if (editDesc) return
     const el = descDisplayRef.current
@@ -120,7 +119,6 @@ export default function DealItem({
     const computedLineHeight = Number.isFinite(lh) ? lh : 20
     setLineHeightPx(computedLineHeight)
     const maxH = computedLineHeight * 4
-    // Use scrollHeight vs desired max height to decide overflow
     setDescOverflow(el.scrollHeight > maxH + 1)
   }, [deal.description, editDesc])
 
@@ -138,7 +136,6 @@ export default function DealItem({
       {...(!readonly ? attributes : {})}
       {...(!readonly ? listeners : {})}
     >
-      {/* Title row with drag handle and edit icon */}
       <div className='flex items-center w-full gap-2'>
         <div
           className={`flex items-center gap-1 flex-1 ${readonly ? '' : 'cursor-grab'}`}
@@ -209,7 +206,6 @@ export default function DealItem({
         )}
       </div>
 
-      {/* Description inline edit */}
       {editDesc ? (
         <textarea
           className='border rounded p-1  w-full text-sm'
@@ -286,7 +282,6 @@ export default function DealItem({
         )
       )}
 
-      {/* Date section */}
       {pickerCoords && (
         <input
           type='date'
@@ -308,29 +303,34 @@ export default function DealItem({
           autoFocus
         />
       )}
-      {localDate ? (
-        <p
-          className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
-          onClick={e => !readonly && openPicker(e.currentTarget)}
-          onPointerDown={e => e.stopPropagation()}
-          style={{ position: 'relative', zIndex: 20 }}
-        >
-          {formatDisplay(localDate)}
-        </p>
-      ) : (
-        !readonly && (
-          <Button
-            variant='ghost'
-            size='icon'
-            className='h-3 w-3 p-2'
-            onClick={e => openPicker(e.currentTarget)}
+      <div className='flex items-center justify-between gap-2 w-full'>
+        {localDate ? (
+          <p
+            className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
+            onClick={e => !readonly && openPicker(e.currentTarget)}
             onPointerDown={e => e.stopPropagation()}
             style={{ position: 'relative', zIndex: 20 }}
           >
-            <Calendar className={`w-5 h-5 ${getDateColor(localDate, deal.list_id)}`} />
-          </Button>
-        )
-      )}
+            {formatDisplay(localDate)}
+          </p>
+        ) : (
+          !readonly && (
+            <Button
+              variant='ghost'
+              size='icon'
+              className='h-3 w-3 p-2'
+              onClick={e => openPicker(e.currentTarget)}
+              onPointerDown={e => e.stopPropagation()}
+              style={{ position: 'relative', zIndex: 20 }}
+            >
+              <Calendar
+                className={`w-5 h-5 ${getDateColor(localDate, deal.list_id)}`}
+              />
+            </Button>
+          )
+        )}
+        {deal.images && <PaperclipIcon className='w-4 h-4' />}
+      </div>
     </div>
   )
 }

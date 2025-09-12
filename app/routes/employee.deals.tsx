@@ -291,15 +291,12 @@ export default function EmployeeDeals() {
             const dealId = findDealIdByCustomer(customerId)
             if (!dealId) return
 
-            // Clear any existing timeout
             if (highlightTimeoutRef.current) {
               clearTimeout(highlightTimeoutRef.current)
             }
 
-            // Temporarily reset highlight to trigger re-render
             setHighlightDealId(null)
 
-            // Set up scrolling
             const el = document.getElementById(`deal-${dealId}`)
             if (el) {
               el.scrollIntoView({
@@ -309,12 +306,10 @@ export default function EmployeeDeals() {
               })
             }
 
-            // Set highlight after a brief delay to ensure re-render
             setTimeout(() => {
               setHighlightDealId(dealId)
             }, 10)
 
-            // Clear highlight after 2 seconds
             highlightTimeoutRef.current = setTimeout(() => {
               setHighlightDealId(null)
               highlightTimeoutRef.current = null
