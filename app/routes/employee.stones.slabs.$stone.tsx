@@ -251,7 +251,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     })
   }
 
-  // Get parent transactions for slabs with parent_id
   const slabsWithParent: number[] = allSlabs
     .filter(slab => slab.parent_id)
     .map(slab => slab.parent_id) as number[]
@@ -606,10 +605,8 @@ export default function SlabsModal() {
 
   const allSlabs = [...linkedSlabs, ...slabs]
 
-  // Create a map of bundle names to slabs
   const slabsByBundle: Record<string, Slab[]> = {}
 
-  // Group slabs by bundle
   allSlabs.forEach(slab => {
     if (!slabsByBundle[slab.bundle]) {
       slabsByBundle[slab.bundle] = []
@@ -617,9 +614,7 @@ export default function SlabsModal() {
     slabsByBundle[slab.bundle].push(slab)
   })
 
-  // Order the bundle names naturally (Slab 1, Slab 2, etc.)
   const orderedBundles = Object.keys(slabsByBundle).sort((a, b) => {
-    // Extract numbers from bundle names if they exist
     const aMatch = a.match(/(\d+)/)
     const bMatch = b.match(/(\d+)/)
 
@@ -631,26 +626,19 @@ export default function SlabsModal() {
       }
     }
 
-    // Fallback to string comparison
     return a.localeCompare(b)
   })
 
-  // Create final ordered list
   const sortedSlabs: Slab[] = []
 
-  // For each bundle, add all slabs with that bundle name
   orderedBundles.forEach(bundle => {
     const bundleSlabs = slabsByBundle[bundle]
 
-    // Get all parent slabs (no parent_id)
     const parents = bundleSlabs.filter(slab => slab.parent_id === null)
 
-    // For each parent, add the parent first, then its children immediately after
     parents.forEach(parent => {
-      // Add the parent
       sortedSlabs.push(parent)
 
-      // Find and add all children of this parent
       const children = bundleSlabs.filter(slab => slab.parent_id === parent.id)
       sortedSlabs.push(...children)
     })

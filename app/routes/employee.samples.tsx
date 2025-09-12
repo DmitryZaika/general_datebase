@@ -167,7 +167,6 @@ export default function Samples() {
     }
   }, [stones])
 
-  // helper to determine severity: 2 red,1 yellow,0 none
   const getSeverity = (stone: Stone): number => {
     const imp = stone.samples_importance ?? 1
     const amt = stone.samples_amount ?? 0
