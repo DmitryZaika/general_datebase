@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -82,6 +82,21 @@ export function CustomerForm({
       address: '',
     },
   })
+
+  const [dupOpen, setDupOpen] = useState(false)
+  const [dupInfo, setDupInfo] = useState<{
+    name: string
+    sales_rep_name: string | null
+  } | null>(null)
+
+  const phoneValue = form.watch('phone')
+  const emailValue = form.watch('email')
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams()
+    if (phoneValue && phoneValue.trim() !== '') params.set('phone', phoneValue.trim())
+    if (emailValue && emailValue.trim() !== '') params.set('email', emailValue.trim())
+    return params.toString()
+  }, [phoneValue, emailValue])
   useEffect(() => {
     if (data) {
       form.reset({
@@ -91,7 +106,18 @@ export function CustomerForm({
     }
   }, [data])
 
-  const onSubmit = (data: CustomerDialogSchema) => {
+  const onSubmit = async (data: CustomerDialogSchema) => {
+    if (!customerId && queryString) {
+      const res = await fetch(`/api/customers/duplicate-check?${queryString}`)
+      const js = await res.json()
+      const match =
+        Array.isArray(js.matches) && js.matches.length > 0 ? js.matches[0] : null
+      if (match) {
+        setDupInfo({ name: match.name, sales_rep_name: match.sales_rep_name || null })
+        setDupOpen(true)
+        return
+      }
+    }
     mutate({ ...data, company_id: companyId, id: customerId || 0, source })
   }
 
@@ -101,6 +127,18 @@ export function CustomerForm({
         <DialogHeader>
           <DialogTitle>{isLoading ? 'Loading...' : 'Add Customer'}</DialogTitle>
         </DialogHeader>
+        <Dialog open={dupOpen} onOpenChange={setDupOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                <div className='font-bold min-h-10'>
+                  <p className='mb-3'> Customer {dupInfo?.name} already exists </p>
+                  <p> Sales rep: {dupInfo?.sales_rep_name || 'Unassigned'} </p>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
         {isLoading ? (
           <div>Loading...</div>
         ) : (
