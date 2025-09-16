@@ -3,7 +3,13 @@ import { useMutation } from '@tanstack/react-query'
 import { AlertTriangle } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { data, Form, type LoaderFunctionArgs, useLoaderData } from 'react-router'
+import {
+  data,
+  Form,
+  type LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+} from 'react-router'
 import { z } from 'zod'
 import { EmailInput } from '~/components/molecules/EmailInput'
 import { InputItem } from '~/components/molecules/InputItem'
@@ -22,6 +28,7 @@ import {
 import { Label } from '~/components/ui/label'
 import { useToast } from '~/hooks/use-toast'
 import { createCustomerMutation, sourceEnum } from '~/schemas/customers'
+import { getSession } from '~/sessions'
 import {
   FormControl,
   FormField,
@@ -68,14 +75,19 @@ const customerCheckInSchema = z.object({
 type CheckInFormData = z.infer<typeof customerCheckInSchema>
 const resolver = zodResolver(customerCheckInSchema)
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ params, request }: LoaderFunctionArgs) {
   const { companyId } = params
-  return data({ companyId: parseInt(companyId as string) })
+  const session = await getSession(request.headers.get('Cookie'))
+  const activeSession = session.data.sessionId || null
+  if (!activeSession) {
+    return redirect('/login')
+  }
+  return data({ companyId: parseInt(companyId as string), activeSession })
 }
 
 export default function CustomerCheckIn() {
   const { toast } = useToast()
-  const { companyId } = useLoaderData<typeof loader>()
+  const { companyId, activeSession } = useLoaderData<typeof loader>()
 
   const form = useForm<CheckInFormData>({
     resolver,
@@ -191,6 +203,10 @@ export default function CustomerCheckIn() {
           <Form
             onSubmit={form.handleSubmit(async formData => {
               if (queryString) {
+                if (!activeSession) {
+                  toast({ title: 'Need to login', variant: 'destructive' })
+                  return
+                }
                 const res = await fetch(`/api/customers/duplicate-check?${queryString}`)
                 const js = await res.json()
                 const match =
