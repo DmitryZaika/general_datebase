@@ -8,6 +8,7 @@ import {
   Links,
   Meta,
   Outlet,
+  redirect,
   Scripts,
   ScrollRestoration,
   useLoaderData,
@@ -118,10 +119,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
     )
 
     const [row] = await db.query<(RowDataPacket & { position: string })[]>(
-      `SELECT p.name AS position FROM users u LEFT JOIN users_positions up ON up.user_id = u.id LEFT JOIN positions p ON p.id = up.position_id WHERE u.id = ? AND up.position_id = 6 AND u.is_deleted = 0 LIMIT 1`,
+      `SELECT p.name AS position 
+       FROM users u 
+       LEFT JOIN users_positions up ON up.user_id = u.id 
+       LEFT JOIN positions p ON p.id = up.position_id 
+       WHERE u.id = ? AND p.name = 'external_marketing' AND u.is_deleted = 0 
+       LIMIT 1`,
       [user.id],
     )
     position = row?.[0]?.position ?? null
+
+    const url = new URL(request.url)
+    if (position !== null && !url.pathname.startsWith('/external/marketing')) {
+      return redirect('/external/marketing/leads')
+    }
   }
 
   return data(
@@ -161,7 +172,7 @@ export default function App() {
   const isMobile = useIsMobile()
   const isLogin = pathname === '/login'
   const isCheckIn = pathname.includes('/check-in')
-  const isExternalMarketingLeads = pathname.includes('/external/marketing/leads')
+  const isExternalMarketing = pathname.includes('/external/marketing')
   const mainRef = useRef<HTMLElement | null>(null)
   const [isAtBottom, setIsAtBottom] = useState(false)
   useEffect(() => {
@@ -195,7 +206,7 @@ export default function App() {
   const basePath = getBase(pathname)
   const isInstaller = position !== null
   const showSidebar =
-    !!basePath && !isLogin && !isInstaller && !isCheckIn && !isExternalMarketingLeads
+    !!basePath && !isLogin && !isInstaller && !isCheckIn && !isExternalMarketing
 
   return (
     <html lang='en'>
