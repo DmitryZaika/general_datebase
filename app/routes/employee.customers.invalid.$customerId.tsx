@@ -27,10 +27,18 @@ import { selectId } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
-const options = Object.keys(LOST_REASONS).map(key => ({
-  key,
-  value: LOST_REASONS[key as keyof typeof LOST_REASONS],
-}))
+const ALLOWED_INVALID_KEYS = [
+  'Wrong number, email, etc.',
+  'Out of area',
+  'Accident submission',
+]
+
+const options = Object.keys(LOST_REASONS)
+  .filter(key => ALLOWED_INVALID_KEYS.includes(key))
+  .map(key => ({
+    key: String(LOST_REASONS[key as keyof typeof LOST_REASONS]).toLowerCase(),
+    value: LOST_REASONS[key as keyof typeof LOST_REASONS],
+  }))
 
 const schema = z.object({ invalid_lead: z.string().min(1) })
 
@@ -100,9 +108,9 @@ export default function InvalidCustomerDialog() {
   const navigate = useNavigate()
   const location = useLocation()
   const { customer_name, current } = useLoaderData<typeof loader>()
-  const allowedKeys = options.map(o => o.key)
+  const allowedValues = options.map(o => o.value)
   const initialValue =
-    current && allowedKeys.includes(current) ? current : options[0].key
+    current && allowedValues.includes(current) ? current.toLowerCase() : ''
   const form = useForm<{ invalid_lead: string }>({
     resolver: zodResolver(schema),
     defaultValues: { invalid_lead: initialValue },

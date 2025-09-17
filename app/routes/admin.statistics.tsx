@@ -8,7 +8,6 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router'
-import { LeadsWalkInsChartContainer } from '~/components/charts/LeadsWalkInsChartContainer'
 import { DateRangeControls } from '~/components/molecules/DateRangeControls'
 import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
 import { PageLayout } from '~/components/PageLayout'
@@ -31,6 +30,7 @@ type DealsByRep = {
   deals_count: number
   total_amount: number
   avg_amount: number
+  avg_amount_won: number
 }
 
 type DealsByStage = {
@@ -103,7 +103,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       `SELECT u.id AS rep_id, u.name AS rep_name,
               COUNT(d.id) AS deals_count,
               COALESCE(SUM(d.amount), 0) AS total_amount,
-              COALESCE(AVG(d.amount), 0) AS avg_amount
+              COALESCE(AVG(d.amount), 0) AS avg_amount,
+              COALESCE(AVG(CASE WHEN d.list_id = 5 THEN d.amount END), 0) AS avg_amount_won
        FROM deals d
        JOIN users u ON d.user_id = u.id AND u.is_deleted = 0
        JOIN customers c ON d.customer_id = c.id
@@ -190,9 +191,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               COUNT(c.id) AS total
        FROM customers c
        LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
-       WHERE ${customersByRepWhere.join(' AND ')}
+       WHERE ${customersByRepWhere.join(' AND ')} AND (c.invalid_lead IS NULL OR c.invalid_lead = '')
        GROUP BY u.name
-       ORDER BY total DESC`,
+       ORDER BY (u.name IS NULL) ASC, total DESC`,
       customersByRepParams,
     )
 
@@ -224,7 +225,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AdminStatistics() {
   const {
-    salesBySeller,
     dealsByRep,
     dealsByStage,
     lists,
@@ -247,20 +247,20 @@ export default function AdminStatistics() {
     [],
   )
 
-  const salesColumns: ColumnDef<SalesBySeller>[] = [
-    { accessorKey: 'seller_name', header: 'Seller' },
-    { accessorKey: 'sales_count', header: 'Sales' },
-    {
-      accessorKey: 'total_revenue',
-      header: 'Total',
-      cell: ({ row }) => currency.format(row.original.total_revenue || 0),
-    },
-    {
-      accessorKey: 'avg_ticket',
-      header: 'Average',
-      cell: ({ row }) => currency.format(row.original.avg_ticket || 0),
-    },
-  ]
+  // const salesColumns: ColumnDef<SalesBySeller>[] = [
+  //   { accessorKey: 'seller_name', header: 'Seller' },
+  //   { accessorKey: 'sales_count', header: 'Sales' },
+  //   {
+  //     accessorKey: 'total_revenue',
+  //     header: 'Total',
+  //     cell: ({ row }) => currency.format(row.original.total_revenue || 0),
+  //   },
+  //   {
+  //     accessorKey: 'avg_ticket',
+  //     header: 'Average',
+  //     cell: ({ row }) => currency.format(row.original.avg_ticket || 0),
+  //   },
+  // ]
 
   const dealsRepColumns: ColumnDef<DealsByRep>[] = [
     { accessorKey: 'rep_name', header: 'Sales Rep' },
@@ -274,6 +274,15 @@ export default function AdminStatistics() {
       accessorKey: 'avg_amount',
       header: 'Average Amount',
       cell: ({ row }) => currency.format(row.original.avg_amount || 0),
+    },
+    {
+      accessorKey: 'avg_amount_won',
+      header: 'Average Amount Won',
+      cell: ({ row }) => (
+        <span className='inline-block rounded px-2 py-1.5 -mt-2 -mb-2 bg-green-100 text-green-800'>
+          {currency.format(row.original.avg_amount_won || 0)}
+        </span>
+      ),
     },
   ]
 
@@ -383,17 +392,12 @@ export default function AdminStatistics() {
         </div>
       </div>
 
-      <div className='mb-8'>
+      {/* <div className='mb-8'>
         <h2 className='text-xl font-semibold mb-4'>Leads and Walk-ins Daily Chart</h2>
         <div className='bg-white rounded-lg border p-6'>
           <LeadsWalkInsChartContainer fromDate={fromDate} toDate={toDate} />
         </div>
-      </div>
-
-      <div className='mb-8'>
-        <h2 className='text-xl font-semibold mb-2'>Sales by Sellers</h2>
-        <DataTable columns={salesColumns} data={salesBySeller} />
-      </div>
+      </div> */}
 
       <div className='grid grid-cols-1 md:grid-cols-2 gap-8 mb-8'>
         <div>
@@ -418,14 +422,6 @@ export default function AdminStatistics() {
       </div>
 
       <div className='grid grid-cols-1 md:grid-cols-4 gap-4 mt-8'>
-        <div className='border rounded p-4'>
-          <div className='text-sm text-slate-500'>Total Customers</div>
-          <div className='text-2xl font-semibold'>{customersTotals.total}</div>
-        </div>
-        <div className='border rounded p-4'>
-          <div className='text-sm text-slate-500'>Without Sales Rep</div>
-          <div className='text-2xl font-semibold'>{customersTotals.without_rep}</div>
-        </div>
         <div className='border rounded p-4'>
           <div className='text-sm text-slate-500'>Invalid Leads</div>
           <div className='text-2xl font-semibold'>{customersTotals.invalid}</div>

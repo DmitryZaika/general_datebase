@@ -85,18 +85,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }>(
     db,
     `SELECT
-           SUM(CASE WHEN c.invalid_lead = 'Too expensive' THEN 1 ELSE 0 END) AS too_expensive,
-           SUM(CASE WHEN c.invalid_lead = 'Out of area' THEN 1 ELSE 0 END) AS out_of_area,
-           SUM(CASE WHEN c.invalid_lead = 'Never responded' THEN 1 ELSE 0 END) AS never_responded,
-           SUM(CASE WHEN c.invalid_lead = 'Wrong number, email, etc.' THEN 1 ELSE 0 END) AS wrong_contact,
-           SUM(CASE WHEN c.invalid_lead = 'Accident submission' THEN 1 ELSE 0 END) AS accident_submission,
-           SUM(CASE WHEN c.invalid_lead = 'Looking for unrelated service' THEN 1 ELSE 0 END) AS unrelated_service,
-           SUM(CASE WHEN c.invalid_lead = 'Bought somewhere else' THEN 1 ELSE 0 END) AS bought_elsewhere
-           SUM(CASE WHEN c.invalid_lead = 'Stoped responding' THEN 1 ELSE 0 END) AS stopped_responding,
-
+           SUM(CASE WHEN d.lost_reason = 'Too expensive' THEN 1 ELSE 0 END) AS too_expensive,
+           (
+             SUM(CASE WHEN d.lost_reason = 'Out of area' THEN 1 ELSE 0 END)
+             + COUNT(DISTINCT CASE WHEN c.invalid_lead = 'Out of area' THEN c.id END)
+           ) AS out_of_area,
+           SUM(CASE WHEN d.lost_reason = 'Never responded' THEN 1 ELSE 0 END) AS never_responded,
+           (
+             SUM(CASE WHEN d.lost_reason IN ('Wrong number, email, etc.', 'Wrong number, email, etc') THEN 1 ELSE 0 END)
+             + COUNT(DISTINCT CASE WHEN c.invalid_lead IN ('Wrong number, email, etc.', 'Wrong number, email, etc') THEN c.id END)
+           ) AS wrong_contact,
+           SUM(CASE WHEN d.lost_reason = 'Accident submission' THEN 1 ELSE 0 END) AS accident_submission,
+           SUM(CASE WHEN d.lost_reason = 'Looking for unrelated service' THEN 1 ELSE 0 END) AS unrelated_service,
+           SUM(CASE WHEN d.lost_reason = 'Bought somewhere else' THEN 1 ELSE 0 END) AS bought_elsewhere,
+           SUM(CASE WHEN d.lost_reason = 'Stoped responding' THEN 1 ELSE 0 END) AS stopped_responding
          FROM customers c
-         WHERE (c.source = 'leads' OR c.source = 'check-in')
-           AND c.invalid_lead IS NOT NULL AND c.invalid_lead <> ''
+         LEFT JOIN deals d ON d.customer_id = c.id
            ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
            ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}`,
     [

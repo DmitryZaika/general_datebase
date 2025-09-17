@@ -63,7 +63,7 @@ export function SelectInput<TFieldValues extends FieldValues = FieldValues>({
     }
   }, [defaultValue, field, cleanOptions])
 
-  const selectValue = String(field.value ?? '')
+  const selectValue = field.value ? String(field.value) : undefined
 
   return (
     <FormItem className={className}>

@@ -50,7 +50,7 @@ export async function action({ request }: ActionFunctionArgs) {
     'SELECT name FROM deals_list WHERE id = ? LIMIT 1',
     [data.list_id],
   )
-  const initialStatus = listRows[0]?.name || 'new'
+  const initialStatus = listRows[0]?.name || 'New Customer'
 
   await db.execute(
     `INSERT INTO deals
@@ -103,7 +103,7 @@ export default function AddDeal() {
 
   const listIdParam = parseInt(searchParams.get('list_id') || '', 10)
   const hiddenFields: Record<string, string | number | boolean> = {
-    status: 'new',
+    status: 'New Customer',
     position: 1,
     company_id: companyId,
   }
