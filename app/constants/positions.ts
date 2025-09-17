@@ -40,7 +40,7 @@ export const POSITIONS: PositionInfo[] = [
   },
   {
     id: 7,
-    name: 'marketing',
+    name: 'external_marketing',
     displayName: 'Marketing',
   },
 ]

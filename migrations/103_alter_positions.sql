@@ -1,3 +1,3 @@
 INSERT INTO positions (name) 
 VALUES 
-('marketing');
+('external_marketing');
