@@ -11,6 +11,7 @@ import {
 import { DealsByStage } from '~/components/DealsByStage'
 import { DateRangeControls } from '~/components/molecules/DateRangeControls'
 import { PageLayout } from '~/components/PageLayout'
+import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -277,6 +278,14 @@ function ExternalMarketingLeads() {
   )
   const [to, setTo] = useState<Date | undefined>(toDate ? new Date(toDate) : undefined)
 
+  const [page, setPage] = useState(1)
+  const pageSize = 50
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const startIndex = (currentPage - 1) * pageSize
+  const endIndex = startIndex + pageSize
+  const displayedRows = rows.slice(startIndex, endIndex)
+
   return (
     <div>
       <PageLayout title='External Marketing Leads'>
@@ -318,7 +327,26 @@ function ExternalMarketingLeads() {
             />
           </div>
         </div>
-        <DataTable columns={columns} data={rows} />
+        <DataTable columns={columns} data={displayedRows} />
+        <div className='mt-3 flex items-center justify-center gap-2'>
+          <Button
+            className='px-3 py-1 rounded disabled:opacity-50'
+            disabled={currentPage <= 1}
+            onClick={() => setPage(currentPage - 1)}
+          >
+            Prev
+          </Button>
+          <span className='text-sm'>
+            Page {currentPage} / {totalPages}
+          </span>
+          <Button
+            className='px-3 py-1 rounded disabled:opacity-50'
+            disabled={currentPage >= totalPages}
+            onClick={() => setPage(currentPage + 1)}
+          >
+            Next
+          </Button>
+        </div>
       </PageLayout>
     </div>
   )
