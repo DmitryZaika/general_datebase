@@ -76,21 +76,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const invalidReasons = await selectMany<{
     too_expensive: number
     out_of_area: number
-    no_response: number
+    never_responded: number
     wrong_contact: number
     accident_submission: number
     unrelated_service: number
     bought_elsewhere: number
+    stopped_responding: number
   }>(
     db,
     `SELECT
            SUM(CASE WHEN c.invalid_lead = 'Too expensive' THEN 1 ELSE 0 END) AS too_expensive,
            SUM(CASE WHEN c.invalid_lead = 'Out of area' THEN 1 ELSE 0 END) AS out_of_area,
-           SUM(CASE WHEN c.invalid_lead = 'No response' THEN 1 ELSE 0 END) AS no_response,
+           SUM(CASE WHEN c.invalid_lead = 'Never responded' THEN 1 ELSE 0 END) AS never_responded,
            SUM(CASE WHEN c.invalid_lead = 'Wrong number, email, etc.' THEN 1 ELSE 0 END) AS wrong_contact,
            SUM(CASE WHEN c.invalid_lead = 'Accident submission' THEN 1 ELSE 0 END) AS accident_submission,
            SUM(CASE WHEN c.invalid_lead = 'Looking for unrelated service' THEN 1 ELSE 0 END) AS unrelated_service,
            SUM(CASE WHEN c.invalid_lead = 'Bought somewhere else' THEN 1 ELSE 0 END) AS bought_elsewhere
+           SUM(CASE WHEN c.invalid_lead = 'Stoped responding' THEN 1 ELSE 0 END) AS stopped_responding,
+
          FROM customers c
          WHERE (c.source = 'leads' OR c.source = 'check-in')
            AND c.invalid_lead IS NOT NULL AND c.invalid_lead <> ''
@@ -112,11 +115,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     invalidReasons: invalidReasons[0] || {
       too_expensive: 0,
       out_of_area: 0,
-      no_response: 0,
+      never_responded: 0,
       wrong_contact: 0,
       accident_submission: 0,
       unrelated_service: 0,
       bought_elsewhere: 0,
+      stopped_responding: 0,
     },
   })
 }
@@ -191,7 +195,7 @@ function ExternalMarketingLeads() {
   const reasonRows = [
     { name: 'Too expensive', count: Number(invalidReasons.too_expensive || 0) },
     { name: 'Out of area', count: Number(invalidReasons.out_of_area || 0) },
-    { name: 'No response', count: Number(invalidReasons.no_response || 0) },
+    { name: 'Never responded', count: Number(invalidReasons.never_responded || 0) },
     {
       name: 'Wrong number, email, etc.',
       count: Number(invalidReasons.wrong_contact || 0),
@@ -207,6 +211,10 @@ function ExternalMarketingLeads() {
     {
       name: 'Bought somewhere else',
       count: Number(invalidReasons.bought_elsewhere || 0),
+    },
+    {
+      name: 'Stopped responding',
+      count: Number(invalidReasons.stopped_responding || 0),
     },
   ]
   const totalReasons = reasonRows.reduce((acc, r) => acc + Number(r.count || 0), 0)
