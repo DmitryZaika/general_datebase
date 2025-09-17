@@ -16,6 +16,7 @@ interface DealItemProps {
     position?: number | null
     due_date?: string | null
     images?: string[] | null
+    sales_rep?: string | null
   }
   readonly?: boolean
   highlighted?: boolean
@@ -205,6 +206,12 @@ export default function DealItem({
           </p>
         )}
       </div>
+
+      {deal.sales_rep && (
+        <div className='absolute top-1 right-2 text-xs text-gray-500'>
+          {deal.sales_rep}
+        </div>
+      )}
 
       {editDesc ? (
         <textarea

@@ -22,6 +22,8 @@ type AdminDeal = {
   list_id: number
   position: number | null
   due_date: string | null
+  sales_rep: string | null
+  user_id: number | null
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -44,7 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Deals filtered by company (via customers.company_id) and optionally by sales rep
     const dealParams: (string | number)[] = [companyId]
     let dealSql = `
-      SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.list_id, d.position, d.due_date
+      SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.list_id, d.position, d.due_date, u.name AS sales_rep
       FROM deals d
       JOIN customers c ON d.customer_id = c.id
       JOIN users u ON d.user_id = u.id
@@ -86,6 +88,8 @@ export default function AdminDeals() {
     position?: number
     list_id: number
     due_date?: string | null
+    sales_rep?: string | null
+    user_id?: number | null
   }
 
   const toDeal = (d: AdminDeal): Deal => {
@@ -104,6 +108,8 @@ export default function AdminDeals() {
           ? d.due_date
           : new Date(d.due_date).toISOString().slice(0, 10)
         : null,
+      sales_rep: d.sales_rep ?? undefined,
+      user_id: d.user_id ?? undefined,
     }
   }
 
