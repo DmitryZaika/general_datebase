@@ -1,5 +1,13 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { data, type LoaderFunctionArgs, useLoaderData } from 'react-router'
+import { format } from 'date-fns'
+import { useState } from 'react'
+import {
+  data,
+  type LoaderFunctionArgs,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+} from 'react-router'
 import { DealsByStage } from '~/components/DealsByStage'
 import { DateRangeControls } from '~/components/molecules/DateRangeControls'
 import { PageLayout } from '~/components/PageLayout'
@@ -32,7 +40,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     `SELECT c.id, c.name, c.email, c.phone, c.created_date, c.source, c.referral_source, c.sales_rep, u.name AS sales_rep_name
          FROM customers c
          LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
-         WHERE c.source = 'leads' OR c.source = 'check-in'`,
+         WHERE (c.source = 'leads' OR c.source = 'check-in')
+           ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
+           ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}`,
+    [
+      ...([fromDate].filter(Boolean) as string[]),
+      ...([toDate].filter(Boolean) as string[]),
+    ],
   )
 
   const deals = await selectMany<{
@@ -45,7 +59,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     lost_reason: string
   }>(
     db,
-    'SELECT id, customer_id, list_id, amount, description, status, lost_reason FROM deals',
+    `SELECT d.id, d.customer_id, d.list_id, d.amount, d.description, d.status, d.lost_reason
+       FROM deals d
+       JOIN customers c ON d.customer_id = c.id
+       WHERE (c.source = 'leads' OR c.source = 'check-in') AND d.deleted_at IS NULL
+         ${fromDate ? ' AND DATE(d.created_at) >= ?' : ''}
+         ${toDate ? ' AND DATE(d.created_at) <= ?' : ''}`,
+    [
+      ...([fromDate].filter(Boolean) as string[]),
+      ...([toDate].filter(Boolean) as string[]),
+    ],
   )
 
   const lists = await selectMany<{ id: number; name: string; position: number }>(
@@ -101,8 +124,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
            SUM(CASE WHEN d.lost_reason = 'Stoped responding' THEN 1 ELSE 0 END) AS stopped_responding
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id
-           ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
-           ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}`,
+        WHERE (c.source = 'leads' OR c.source = 'check-in')
+          ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
+          ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}`,
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
@@ -235,35 +259,40 @@ function ExternalMarketingLeads() {
     },
   ]
 
+  const navigate = useNavigate()
+  const location = useLocation()
+
   function applyDates(e: React.FormEvent) {
     e.preventDefault()
-    const params = new URLSearchParams(window.location.search)
-    if (_fromValue) params.set('fromDate', _fromValue)
-    if (_toValue) params.set('toDate', _toValue)
-    window.location.href = `${window.location.pathname}?${params.toString()}`
+    const params = new URLSearchParams(location.search)
+    if (from) params.set('fromDate', format(from, 'yyyy-MM-dd'))
+    else params.delete('fromDate')
+    if (to) params.set('toDate', format(to, 'yyyy-MM-dd'))
+    else params.delete('toDate')
+    navigate({ pathname: location.pathname, search: params.toString() })
   }
 
-  let _fromValue = fromDate || ''
-  let _toValue = toDate || ''
+  const [from, setFrom] = useState<Date | undefined>(
+    fromDate ? new Date(fromDate) : undefined,
+  )
+  const [to, setTo] = useState<Date | undefined>(toDate ? new Date(toDate) : undefined)
 
   return (
     <div>
       <PageLayout title='External Marketing Leads'>
         <form onSubmit={applyDates} className='mb-4 flex items-center gap-2'>
           <DateRangeControls
-            from={fromDate ? new Date(fromDate) : undefined}
-            to={toDate ? new Date(toDate) : undefined}
-            setFrom={d => {
-              _fromValue = d ? d.toISOString().slice(0, 10) : ''
-            }}
-            setTo={d => {
-              _toValue = d ? d.toISOString().slice(0, 10) : ''
-            }}
+            from={from}
+            to={to}
+            setFrom={d => setFrom(d)}
+            setTo={d => setTo(d)}
             onClear={() => {
-              const params = new URLSearchParams(window.location.search)
+              setFrom(undefined)
+              setTo(undefined)
+              const params = new URLSearchParams(location.search)
               params.delete('fromDate')
               params.delete('toDate')
-              window.location.href = `${window.location.pathname}?${params.toString()}`
+              navigate({ pathname: location.pathname, search: params.toString() })
             }}
             applyButtonType='submit'
           />
