@@ -4,6 +4,7 @@ import { useState } from 'react'
 import {
   data,
   type LoaderFunctionArgs,
+  Outlet,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -289,6 +290,13 @@ function ExternalMarketingLeads() {
   return (
     <div>
       <PageLayout title='Marketing'>
+        <Button
+          type='button'
+          className='w-fit'
+          onClick={() => navigate('/external/marketing/leads/add_lead')}
+        >
+          Add Lead
+        </Button>
         <form onSubmit={applyDates} className='mb-4 flex items-center gap-2'>
           <DateRangeControls
             from={from}
@@ -348,6 +356,7 @@ function ExternalMarketingLeads() {
           </Button>
         </div>
       </PageLayout>
+      <Outlet />
     </div>
   )
 }
