@@ -16,6 +16,7 @@ interface DealsListProps {
     list_id: number
     position?: number
     due_date?: string | null
+    sales_rep?: string | null
   }[]
   id: number
   readonly?: boolean
