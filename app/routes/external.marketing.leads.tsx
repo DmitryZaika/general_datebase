@@ -288,7 +288,7 @@ function ExternalMarketingLeads() {
 
   return (
     <div>
-      <PageLayout title='External Marketing Leads'>
+      <PageLayout title='Marketing'>
         <form onSubmit={applyDates} className='mb-4 flex items-center gap-2'>
           <DateRangeControls
             from={from}
