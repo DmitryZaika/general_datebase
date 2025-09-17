@@ -38,6 +38,11 @@ export const POSITIONS: PositionInfo[] = [
     name: 'installer',
     displayName: 'Installer',
   },
+  {
+    id: 7,
+    name: 'marketing',
+    displayName: 'Marketing',
+  },
 ]
 
 export const getPositionById = (id: number): PositionInfo | undefined => {
