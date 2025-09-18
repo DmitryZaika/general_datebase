@@ -43,6 +43,11 @@ export const POSITIONS: PositionInfo[] = [
     name: 'external_marketing',
     displayName: 'Marketing',
   },
+  {
+    id: 8,
+    name: 'check-in',
+    displayName: 'Check-In',
+  },
 ]
 
 export const getPositionById = (id: number): PositionInfo | undefined => {

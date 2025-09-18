@@ -202,4 +202,6 @@ export enum Positions {
   ShopWorker = 4,
   Manager = 5,
   Installer = 6,
+  ExternalMarketing = 7,
+  CheckIn = 8,
 }
