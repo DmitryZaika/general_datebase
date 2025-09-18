@@ -156,7 +156,7 @@ export function CustomerForm({
                 name='name'
                 render={({ field }) => (
                   <InputItem
-                    name={'Name'}
+                    name={'Name*'}
                     placeholder={'Name of the customer'}
                     field={field}
                   />

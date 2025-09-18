@@ -36,12 +36,35 @@ export async function action({ request }: ActionFunctionArgs) {
       listsRows.map(l => [l.id, l.name] as [number, string]),
     )
 
+    // prefetch current list_id for all updated deals to detect cross-list moves
+    const ids = updates.map(u => u.id)
+    const currentRows = await selectMany<{ id: number; list_id: number }>(
+      db,
+      `SELECT id, list_id FROM deals WHERE id IN (${ids.map(() => '?').join(',')})`,
+      ids,
+    )
+    const currentListById = new Map<number, number>(
+      currentRows.map(r => [r.id, r.list_id] as [number, number]),
+    )
+
     for (const { id, list_id, position } of updates) {
       if (!id || list_id === undefined || position === undefined) continue
       const statusToSet = listNameById.get(list_id) || ''
+      const prevListId = currentListById.get(id)
+      const movedAcrossLists =
+        prevListId !== undefined && prevListId !== list_id ? 1 : 0
       await db.execute(
-        'UPDATE deals SET list_id = ?, status = ?, position = ?, due_date = IF(? IN (4,5), NULL, due_date), lost_reason = IF(? != 5, NULL, lost_reason) WHERE id = ?',
-        [list_id, statusToSet, position, list_id, list_id, id],
+        'UPDATE deals SET list_id = ?, status = ?, position = ?, due_date = CASE WHEN ? IN (4,5) THEN NULL WHEN ? = 1 THEN NOW() ELSE due_date END, lost_reason = IF(? != 5, NULL, lost_reason), updated_at = CASE WHEN ? = 1 THEN NOW() ELSE updated_at END WHERE id = ?',
+        [
+          list_id,
+          statusToSet,
+          position,
+          list_id,
+          movedAcrossLists,
+          list_id,
+          movedAcrossLists,
+          id,
+        ],
       )
     }
     return Response.json({ success: true })

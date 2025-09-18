@@ -175,7 +175,7 @@ export default function UsersAdd() {
               control={form.control}
               name='name'
               render={({ field }) => (
-                <InputItem name={'User Name'} placeholder={'Name'} field={field} />
+                <InputItem name={'User Name'} placeholder={'Name*'} field={field} />
               )}
             />
 

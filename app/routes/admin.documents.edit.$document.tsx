@@ -133,7 +133,7 @@ export default function DocumentsEdit() {
             name='name'
             render={({ field }) => (
               <InputItem
-                name='Name'
+                name='Name*'
                 placeholder={'Name of the document'}
                 field={field}
               />
