@@ -39,7 +39,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 const adminColumns: ColumnDef<User>[] = [
   {
     accessorKey: 'name',
-    header: 'Name',
+    header: 'Name*',
   },
   {
     accessorKey: 'email',

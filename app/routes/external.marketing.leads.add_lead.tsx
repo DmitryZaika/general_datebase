@@ -100,7 +100,7 @@ export const AddLead = () => {
               render={({ field }) => (
                 <InputItem
                   inputAutoFocus={true}
-                  name={'Name'}
+                  name={'Name*'}
                   placeholder={'Name of the lead'}
                   field={field}
                 />
@@ -122,6 +122,7 @@ export const AddLead = () => {
               render={({ field }) => (
                 <Textarea
                   {...field}
+                  name={'Message*'}
                   placeholder={'Message of the lead'}
                   className={cn(form.formState.errors.message && 'border-red-500')}
                 />

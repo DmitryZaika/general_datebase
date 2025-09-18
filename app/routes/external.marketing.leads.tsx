@@ -14,6 +14,7 @@ import { DateRangeControls } from '~/components/molecules/DateRangeControls'
 import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
+import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -37,12 +38,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url)
   const fromDate = url.searchParams.get('fromDate') || ''
   const toDate = url.searchParams.get('toDate') || ''
+  const view = url.searchParams.get('view') || 'leads'
+
+  const whereSource =
+    view === 'leads'
+      ? "c.source = 'leads'"
+      : view === 'walkins'
+        ? "c.source = 'check-in'"
+        : "(c.source = 'leads' OR c.source = 'check-in')"
+
+  const sourceFilterCase =
+    view === 'total'
+      ? ''
+      : view === 'leads'
+        ? " AND c.source = 'leads'"
+        : " AND c.source = 'check-in'"
   const leads = await selectMany<Lead>(
     db,
     `SELECT c.id, c.name, c.email, c.phone, c.created_date, c.source, c.referral_source, c.sales_rep, u.name AS sales_rep_name
          FROM customers c
          LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
-         WHERE (c.source = 'leads' OR c.source = 'check-in')
+         WHERE ${whereSource}
            ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
            ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}`,
     [
@@ -64,7 +80,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     `SELECT d.id, d.customer_id, d.list_id, d.amount, d.description, d.status, d.lost_reason
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
-       WHERE (c.source = 'leads' OR c.source = 'check-in') AND d.deleted_at IS NULL
+       WHERE ${whereSource} AND d.deleted_at IS NULL
          ${fromDate ? ' AND DATE(d.created_at) >= ?' : ''}
          ${toDate ? ' AND DATE(d.created_at) <= ?' : ''}`,
     [
@@ -85,11 +101,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }>(
     db,
     `SELECT
-           SUM(CASE WHEN c.referral_source = 'facebook-form' AND c.invalid_lead IS NOT NULL AND c.invalid_lead <> '' THEN 1 ELSE 0 END) AS facebook,
-           SUM(CASE WHEN c.referral_source = 'wordpress-form' AND c.invalid_lead IS NOT NULL AND c.invalid_lead <> '' THEN 1 ELSE 0 END) AS website,
+          SUM(CASE WHEN c.referral_source = 'facebook-form' AND c.invalid_lead IS NOT NULL AND c.invalid_lead <> ''${sourceFilterCase} THEN 1 ELSE 0 END) AS facebook,
+          SUM(CASE WHEN c.referral_source = 'wordpress-form' AND c.invalid_lead IS NOT NULL AND c.invalid_lead <> ''${sourceFilterCase} THEN 1 ELSE 0 END) AS website,
            SUM(CASE WHEN c.invalid_lead IS NOT NULL AND c.invalid_lead <> '' THEN 1 ELSE 0 END) AS total
          FROM customers c
-         WHERE (c.source = 'leads' OR c.source = 'check-in')
+        WHERE (c.source = 'leads' OR c.source = 'check-in')
          ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
          ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}`,
     [
@@ -126,7 +142,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
            SUM(CASE WHEN d.lost_reason = 'Stoped responding' THEN 1 ELSE 0 END) AS stopped_responding
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id
-        WHERE (c.source = 'leads' OR c.source = 'check-in')
+       WHERE ${whereSource}
           ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
           ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}`,
     [
@@ -141,6 +157,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     lists,
     fromDate,
     toDate,
+    view,
     invalidStats: invalidStats[0] || { facebook: 0, website: 0, total: 0 },
     invalidReasons: invalidReasons[0] || {
       too_expensive: 0,
@@ -156,7 +173,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 }
 
 function ExternalMarketingLeads() {
-  const { leads, deals, lists, fromDate, toDate, invalidStats, invalidReasons } =
+  const { leads, deals, lists, fromDate, toDate, view, invalidStats, invalidReasons } =
     useLoaderData<typeof loader>()
   const dealStatusByCustomer = new Map<number, string>()
   for (const d of deals) {
@@ -204,11 +221,14 @@ function ExternalMarketingLeads() {
     { header: 'Amount', accessorKey: 'amount' },
   ]
 
+  const facebookCount = Number(invalidStats.facebook || 0)
+  const websiteCount = Number(invalidStats.website || 0)
+  const totalChannel = facebookCount + websiteCount
   const channelRows = [
-    { name: 'Facebook', count: Number(invalidStats.facebook || 0) },
-    { name: 'Website', count: Number(invalidStats.website || 0) },
+    { name: 'Facebook', count: facebookCount },
+    { name: 'Website', count: websiteCount },
+    { name: 'Total', count: totalChannel },
   ]
-  const totalChannel = Number(invalidStats.total || 0)
   const channelColumns: ColumnDef<{ name: string; count: number }>[] = [
     { accessorKey: 'name', header: 'Channel' },
     {
@@ -216,6 +236,9 @@ function ExternalMarketingLeads() {
       header: 'Leads',
       cell: ({ row }) => {
         const c = Number(row.original.count || 0)
+        if (row.original.name === 'Total') {
+          return `${c}`
+        }
         const pct = totalChannel > 0 ? Math.round((c / totalChannel) * 100) : 0
         return `${c} (${pct}%)`
       },
@@ -290,13 +313,13 @@ function ExternalMarketingLeads() {
   return (
     <div>
       <PageLayout title='Marketing'>
-        {/* <Button
+        <Button
           type='button'
           className='w-fit'
           onClick={() => navigate('/external/marketing/leads/add_lead')}
         >
           Add Lead
-        </Button> */}
+        </Button>
         <form onSubmit={applyDates} className='mb-4 flex items-center gap-2'>
           <DateRangeControls
             from={from}
@@ -314,6 +337,23 @@ function ExternalMarketingLeads() {
             applyButtonType='submit'
           />
         </form>
+        <div className='mb-6 w-fit'>
+          <Tabs
+            value={view}
+            onValueChange={val => {
+              const params = new URLSearchParams(location.search)
+              params.set('view', val)
+              navigate({ pathname: location.pathname, search: params.toString() })
+            }}
+            className='mt-4'
+          >
+            <TabsList className='grid w-full grid-cols-3'>
+              <TabsTrigger value='leads'>Leads</TabsTrigger>
+              <TabsTrigger value='walkins'>Walk-ins</TabsTrigger>
+              <TabsTrigger value='total'>Total</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
         <div className='mb-6 gap-6 flex flex-row items-stretch'>
           <div className='w-full'>
             <h2 className='text-xl font-semibold mb-2'>Invalid by Channel</h2>

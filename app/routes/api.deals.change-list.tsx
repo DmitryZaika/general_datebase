@@ -12,7 +12,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!id || !toList) return data({ error: 'bad payload' }, { status: 400 })
 
   await db.execute(
-    'UPDATE deals SET list_id = ?, due_date = IF(? IN (4,5), NULL, due_date) WHERE id = ?',
+    'UPDATE deals SET list_id = ?, due_date = IF(? IN (4,5), NULL, due_date), updated_at = NOW() WHERE id = ?',
     [toList, toList, id],
   )
 
