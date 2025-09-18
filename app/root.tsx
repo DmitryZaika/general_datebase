@@ -118,20 +118,33 @@ export async function loader({ request }: LoaderFunctionArgs) {
       [user.company_id],
     )
 
-    const [row] = await db.query<(RowDataPacket & { position: string })[]>(
+    const [rows] = await db.query<(RowDataPacket & { position: string })[]>(
       `SELECT p.name AS position 
        FROM users u 
        LEFT JOIN users_positions up ON up.user_id = u.id 
        LEFT JOIN positions p ON p.id = up.position_id 
-       WHERE u.id = ? AND p.name = 'external_marketing' AND u.is_deleted = 0 
-       LIMIT 1`,
+       WHERE u.id = ? AND p.name IN ('external_marketing','check-in') AND u.is_deleted = 0`,
       [user.id],
     )
-    position = row?.[0]?.position ?? null
+    const hasCheckIn = Array.isArray(rows) && rows.some(r => r.position === 'check-in')
+    const hasExternalMarketing =
+      Array.isArray(rows) && rows.some(r => r.position === 'external_marketing')
+    position = hasCheckIn
+      ? 'check-in'
+      : hasExternalMarketing
+        ? 'external_marketing'
+        : null
 
     const url = new URL(request.url)
-    if (position !== null && !url.pathname.startsWith('/external/marketing')) {
-      return redirect('/external/marketing/leads')
+    if (hasCheckIn) {
+      const target = `/customer/${user.company_id}/check-in`
+      if (!url.pathname.startsWith(target)) {
+        return redirect(target)
+      }
+    } else if (hasExternalMarketing) {
+      if (!url.pathname.startsWith('/external/marketing')) {
+        return redirect('/external/marketing/leads')
+      }
     }
   }
 
@@ -229,7 +242,7 @@ export default function App() {
             )}
             <main ref={mainRef} className='h-screen overflow-y-auto bg-gray-100 w-full'>
               <AuthenticityTokenProvider token={token}>
-                {!isInstaller && (
+                {!isInstaller && !isCheckIn && (
                   <Header
                     isEmployee={user?.is_employee ?? false}
                     user={user}
