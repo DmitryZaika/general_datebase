@@ -104,7 +104,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               COUNT(d.id) AS deals_count,
               COALESCE(SUM(d.amount), 0) AS total_amount,
               COALESCE(AVG(d.amount), 0) AS avg_amount,
-              COALESCE(AVG(CASE WHEN l.name = 'Closed Won' THEN d.amount END), 0) AS avg_amount_won
+              COALESCE(
+                SUM(CASE WHEN l.name = 'Closed Won' THEN COALESCE(d.amount, 0) ELSE 0 END) /
+                NULLIF(SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END), 0),
+              0) AS avg_amount_won
        FROM deals d
        JOIN users u ON d.user_id = u.id AND u.is_deleted = 0
        JOIN deals_list l ON d.list_id = l.id
