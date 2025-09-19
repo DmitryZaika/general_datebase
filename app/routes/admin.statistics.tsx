@@ -104,9 +104,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               COUNT(d.id) AS deals_count,
               COALESCE(SUM(d.amount), 0) AS total_amount,
               COALESCE(AVG(d.amount), 0) AS avg_amount,
-              COALESCE(AVG(CASE WHEN d.list_id = 5 THEN d.amount END), 0) AS avg_amount_won
+              COALESCE(AVG(CASE WHEN l.name = 'Closed Won' THEN d.amount END), 0) AS avg_amount_won
        FROM deals d
        JOIN users u ON d.user_id = u.id AND u.is_deleted = 0
+       JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
        WHERE c.company_id = ? AND d.deleted_at IS NULL${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY u.id, u.name
