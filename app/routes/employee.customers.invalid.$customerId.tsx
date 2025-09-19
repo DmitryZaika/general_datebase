@@ -70,7 +70,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   ).toString()
 
   await db.execute(
-    'UPDATE customers SET invalid_lead = ?, sales_rep = NULL, assigned_date = NOW() WHERE id = ?',
+    'UPDATE customers SET invalid_lead = ?, sales_rep = NULL, assigned_date = NULL WHERE id = ?',
     [mapped, customerId],
   )
   await db.execute('UPDATE deals SET deleted_at = NOW() WHERE customer_id = ?', [
@@ -108,9 +108,11 @@ export default function InvalidCustomerDialog() {
   const navigate = useNavigate()
   const location = useLocation()
   const { customer_name, current } = useLoaderData<typeof loader>()
-  const allowedValues = options.map(o => o.value)
-  const initialValue =
-    current && allowedValues.includes(current) ? current.toLowerCase() : ''
+  const normalize = (s: string) => s.toLowerCase().replaceAll('.', '').trim()
+  const matched = current
+    ? options.find(o => normalize(o.value) === normalize(current))
+    : undefined
+  const initialValue = matched ? matched.key : ''
   const form = useForm<{ invalid_lead: string }>({
     resolver: zodResolver(schema),
     defaultValues: { invalid_lead: initialValue },
