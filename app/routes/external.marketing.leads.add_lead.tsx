@@ -5,6 +5,7 @@ import {
   Form,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
   useNavigate,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
@@ -26,7 +27,9 @@ import { Textarea } from '~/components/ui/textarea'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { cn } from '~/lib/utils'
+import { sourceEnum } from '~/schemas/customers'
 import { commitSession, getSession } from '~/sessions'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 const leadSchema = z.object({
@@ -35,23 +38,29 @@ const leadSchema = z.object({
   phone: z.string().min(1, 'Phone is required'),
   message: z.string().min(1, 'Message is required'),
   address: z.string().optional(),
+  source: z.enum(sourceEnum),
+  company_id: z.coerce.number().min(1, 'Company ID is required'),
 })
 
 type FormData = z.infer<typeof leadSchema>
 const resolver = zodResolver(leadSchema)
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
-    request,
-    resolver,
-  )
-  if (errors) {
-    return { errors, receivedValues }
+  try {
+    const user = await getEmployeeUser(request)
+    return { user }
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
   }
-  return { data }
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  let user: User
+  try {
+    user = await getEmployeeUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
     resolver,
@@ -60,8 +69,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { errors, receivedValues }
   }
   await db.execute(
-    `INSERT INTO customers (name, email, phone, your_message, address) VALUES (?, ?, ?, ?, ?)`,
-    [data.name, data.email, data.phone, data.message, data.address],
+    `INSERT INTO customers (name, email, phone, your_message, address, source, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.name,
+      data.email,
+      data.phone,
+      data.message,
+      data.address,
+      'leads',
+      user.company_id,
+    ],
   )
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Lead added'))
@@ -70,6 +87,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export const AddLead = () => {
   const navigate = useNavigate()
+  const { user } = useLoaderData<typeof loader>()
   const handleChange = (open: boolean) => {
     if (open === false) {
       navigate('..')
@@ -83,6 +101,8 @@ export const AddLead = () => {
       phone: '',
       message: '',
       address: '',
+      source: 'leads',
+      company_id: user.company_id,
     },
   })
   const fullSubmit = useFullSubmit(form)
