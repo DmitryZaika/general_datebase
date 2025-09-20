@@ -31,6 +31,7 @@ interface Lead {
   // sales_rep_name: string | null
   status?: string
   lost_reason?: string
+  invalid_lead: string | null
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -55,7 +56,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         : " AND c.source = 'check-in'"
   const leads = await selectMany<Lead>(
     db,
-    `SELECT c.id, c.name, c.email, c.phone, c.created_date, c.source, c.referral_source, c.sales_rep, u.name AS sales_rep_name
+    `SELECT c.id, c.name, c.email, c.phone, c.created_date, c.source, c.referral_source, c.sales_rep, u.name AS sales_rep_name, c.invalid_lead
          FROM customers c
          LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
          WHERE ${whereSource}
@@ -201,11 +202,18 @@ function ExternalMarketingLeads() {
     name: lead.name,
     // phone: lead.phone,
     // email: lead.email,
-    status: dealStatusByCustomer.get(lead.id) ?? '',
-    lost_reason: deals.find(d => d.customer_id === lead.id)?.lost_reason || '',
+    status:
+      lead.invalid_lead && lead.invalid_lead !== ''
+        ? 'Invalid'
+        : (dealStatusByCustomer.get(lead.id) ?? ''),
+    lost_reason:
+      lead.invalid_lead && lead.invalid_lead !== ''
+        ? lead.invalid_lead
+        : deals.find(d => d.customer_id === lead.id)?.lost_reason || '',
     amount: deals.find(d => d.customer_id === lead.id)?.amount
       ? `$${deals.find(d => d.customer_id === lead.id)?.amount}`
       : '',
+    invalid_lead: lead.invalid_lead ?? null,
   }))
   const columns: ColumnDef<Lead>[] = [
     { header: 'Date', accessorKey: 'created_date' },
