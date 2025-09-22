@@ -31,6 +31,7 @@ const ALLOWED_INVALID_KEYS = [
   'Wrong number, email, etc.',
   'Out of area',
   'Accident submission',
+  'Looking for unrelated service',
 ]
 
 const options = Object.keys(LOST_REASONS)
