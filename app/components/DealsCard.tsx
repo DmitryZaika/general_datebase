@@ -15,6 +15,7 @@ interface ExtendedCustomer {
   list_id: number
   position?: number
   due_date?: string | null
+  has_images?: boolean
 }
 
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
