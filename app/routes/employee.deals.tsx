@@ -78,19 +78,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        WHERE deleted_at IS NULL AND user_id = ?`,
       [user.id],
     )
+    const imagesCounts = await selectMany<{ deal_id: number; count: number }>(
+      db,
+      'SELECT deal_id, COUNT(*) as count FROM deals_images GROUP BY deal_id',
+    )
+    const imagesMap: Record<number, boolean> = {}
+    for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
     const customers = await selectMany<{ id: number; name: string }>(
       db,
       'SELECT id, name FROM customers WHERE company_id = ?',
       [user.company_id],
     )
-    return { deals, customers, lists }
+    return { deals, customers, lists, imagesMap }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export default function EmployeeDeals() {
-  const { deals, customers, lists } = useLoaderData<typeof loader>()
+  const { deals, customers, lists, imagesMap } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -104,6 +110,7 @@ export default function EmployeeDeals() {
     position?: number
     list_id: number
     due_date?: string | null
+    has_images?: boolean
   }
 
   const toDeal = (d: FullDeal): Deal => {
@@ -122,6 +129,7 @@ export default function EmployeeDeals() {
           ? d.due_date
           : new Date(d.due_date).toISOString().slice(0, 10)
         : null,
+      has_images: imagesMap?.[d.id] || false,
     }
   }
 

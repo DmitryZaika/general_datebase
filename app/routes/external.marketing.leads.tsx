@@ -10,6 +10,7 @@ import {
   useNavigate,
 } from 'react-router'
 import { DealsByStage } from '~/components/DealsByStage'
+import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { DateRangeControls } from '~/components/molecules/DateRangeControls'
 import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
@@ -227,6 +228,22 @@ function ExternalMarketingLeads() {
     { header: 'Lost reason', accessorKey: 'lost_reason' },
 
     { header: 'Amount', accessorKey: 'amount' },
+    {
+      id: 'actions',
+      meta: {
+        className: 'w-[50px]',
+      },
+      cell: ({ row }) => {
+        return (
+          <ActionDropdown
+            actions={{
+              edit: `edit/${row.original.id}`,
+              delete: `delete/${row.original.id}`,
+            }}
+          />
+        )
+      },
+    },
   ]
 
   const facebookCount = Number(invalidStats.facebook || 0)
