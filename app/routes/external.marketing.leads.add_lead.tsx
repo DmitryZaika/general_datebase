@@ -29,7 +29,7 @@ import { commitSession, getSession } from '~/sessions'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
-import { useCustomForm } from '~/utils/useCustomForm'
+import { useCustomOptionalForm } from '~/utils/useCustomForm'
 
 const LAMBDA_URL = process.env.LAMBDA_URL || ''
 
@@ -86,11 +86,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     source: 'leads',
     company_id: user.company_id,
     referral_source: data.referral_source,
-    file: data.file,
+    file: data.file || '',
   }
 
   const response = await fetch(
-    `${`${LAMBDA_URL}/v1/webhooks/new-lead-form/${user.company_id}`}`,
+    `${`${LAMBDA_URL}v1/webhooks/new-lead-form/${user.company_id}`}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -116,7 +116,7 @@ export const AddLead = () => {
       navigate('..')
     }
   }
-  const form = useCustomForm(leadSchema, {
+  const form = useCustomOptionalForm(leadSchema, {
     defaultValues: {
       source: 'leads',
       your_message: '',
