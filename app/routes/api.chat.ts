@@ -37,7 +37,6 @@ async function newContext(
   company_id: number,
   query: string,
 ): Promise<{ history: Message[]; id: number | undefined }> {
-  console.log('IM NEW')
   const instructions = await selectMany<InstructionSlim>(
     db,
     'SELECT id, title, rich_text from instructions WHERE company_id = ?',
