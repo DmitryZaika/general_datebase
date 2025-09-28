@@ -224,12 +224,7 @@ export default function App() {
   const basePath = getBase(pathname)
   const isInstaller = position !== null
   const showSidebar =
-    !!basePath &&
-    !isLogin &&
-    !isInstaller &&
-    !isCheckIn &&
-    !isExternalMarketing &&
-    !isDraw
+    !!basePath && !isLogin && !isInstaller && !isCheckIn && !isExternalMarketing
 
   return (
     <html lang='en'>
@@ -241,7 +236,7 @@ export default function App() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <SidebarProvider defaultOpen={showSidebar}>
+          <SidebarProvider defaultOpen={showSidebar && !isDraw}>
             {showSidebar && (
               <EmployeeSidebar
                 suppliers={stoneSuppliers}
