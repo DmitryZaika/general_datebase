@@ -53,7 +53,7 @@ export const PhoneInput = <T extends FieldValues, V extends Path<T>>({
 
   return (
     <InputItem
-      name='Phone*'
+      name='Phone'
       placeholder='123-456-7890'
       type='tel'
       field={{
