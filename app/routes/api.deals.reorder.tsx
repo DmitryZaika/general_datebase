@@ -36,31 +36,43 @@ export async function action({ request }: ActionFunctionArgs) {
       listsRows.map(l => [l.id, l.name] as [number, string]),
     )
 
-    // prefetch current list_id for all updated deals to detect cross-list moves
+    // prefetch current list_id and due_date for all updated deals to detect cross-list moves
     const ids = updates.map(u => u.id)
-    const currentRows = await selectMany<{ id: number; list_id: number }>(
+    const currentRows = await selectMany<{
+      id: number
+      list_id: number
+      due_date: string | null
+    }>(
       db,
-      `SELECT id, list_id FROM deals WHERE id IN (${ids.map(() => '?').join(',')})`,
+      `SELECT id, list_id, due_date FROM deals WHERE id IN (${ids.map(() => '?').join(',')})`,
       ids,
     )
     const currentListById = new Map<number, number>(
       currentRows.map(r => [r.id, r.list_id] as [number, number]),
+    )
+    const currentDueDateById = new Map<number, string | null>(
+      currentRows.map(r => [r.id, r.due_date] as [number, string | null]),
     )
 
     for (const { id, list_id, position } of updates) {
       if (!id || list_id === undefined || position === undefined) continue
       const statusToSet = listNameById.get(list_id) || ''
       const prevListId = currentListById.get(id)
+      const currentDueDate = currentDueDateById.get(id)
       const movedAcrossLists =
         prevListId !== undefined && prevListId !== list_id ? 1 : 0
+      const shouldSetNow =
+        movedAcrossLists === 1 && list_id === 1 && currentDueDate === null
+
       await db.execute(
-        'UPDATE deals SET list_id = ?, status = ?, position = ?, due_date = CASE WHEN ? IN (4,5) THEN NULL WHEN ? = 1 THEN NOW() ELSE due_date END, lost_reason = IF(? != 5, NULL, lost_reason), updated_at = CASE WHEN ? = 1 THEN NOW() ELSE updated_at END WHERE id = ?',
+        'UPDATE deals SET list_id = ?, status = ?, position = ?, due_date = CASE WHEN ? IN (4,5) THEN NULL WHEN ? = 1 AND ? THEN NOW() ELSE due_date END, lost_reason = IF(? != 5, NULL, lost_reason), updated_at = CASE WHEN ? = 1 THEN NOW() ELSE updated_at END WHERE id = ?',
         [
           list_id,
           statusToSet,
           position,
           list_id,
-          movedAcrossLists,
+          shouldSetNow,
+          shouldSetNow,
           list_id,
           movedAcrossLists,
           id,

@@ -7,10 +7,20 @@ import type { Customer } from '~/types'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 
+function detectSearchType(term: string): 'name' | 'phone' | 'email' {
+  const value = term.trim()
+  if (!value) return 'name'
+  if (value.includes('@')) return 'email'
+  const digits = value.replace(/\D/g, '')
+  if (digits.length >= 4) return 'phone'
+  return 'name'
+}
+
 async function getCustomers(name: string): Promise<Customer[]> {
   if (!name) return []
+  const searchType = detectSearchType(name)
   const response = await fetch(
-    `/api/customers/search?term=${encodeURIComponent(name)}&searchType=name`,
+    `/api/customers/search?term=${encodeURIComponent(name)}&searchType=${searchType}`,
   )
   if (!response.ok) return []
   const data = await response.json()

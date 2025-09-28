@@ -16,6 +16,7 @@ interface DealItemProps {
     position?: number | null
     due_date?: string | null
     images?: string[] | null
+    has_images?: boolean
     sales_rep?: string | null
   }
   readonly?: boolean
@@ -336,7 +337,15 @@ export default function DealItem({
             </Button>
           )
         )}
-        {deal.images && <PaperclipIcon className='w-4 h-4' />}
+        {deal.has_images && (
+          <Link
+            to={`edit/${deal.id}/images`}
+            className='text-slate-500 hover:text-black'
+            onPointerDown={e => e.stopPropagation()}
+          >
+            <PaperclipIcon className='w-4 h-4' />
+          </Link>
+        )}
       </div>
     </div>
   )
