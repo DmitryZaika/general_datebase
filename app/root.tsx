@@ -16,7 +16,11 @@ import {
 } from 'react-router'
 import { AuthenticityTokenProvider } from 'remix-utils/csrf/react'
 import { EmployeeSidebar } from '~/components/molecules/Sidebars/EmployeeSidebar'
-import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar'
+import {
+  OriginalSidebarTrigger,
+  SidebarProvider,
+  SidebarTrigger,
+} from '~/components/ui/sidebar'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import type { ISupplier } from '~/schemas/suppliers'
@@ -81,7 +85,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const colors = await selectMany<{ id: number; name: string; hex_code: string }>(
     db,
-    `SELECT c.id, c.name, c.hex_code 
+    `SELECT c.id, c.name, c.hex_code
       FROM colors c
       ORDER BY c.name ASC`,
     [],
@@ -90,7 +94,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (user) {
     stoneSuppliers = await selectMany<ISupplier>(
       db,
-      `SELECT s.id, s.supplier_name 
+      `SELECT s.id, s.supplier_name
        FROM suppliers s
        INNER JOIN stones st ON s.id = st.supplier_id
        WHERE s.company_id = ?
@@ -100,7 +104,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     sinkSuppliers = await selectMany<ISupplier>(
       db,
-      `SELECT s.id, s.supplier_name 
+      `SELECT s.id, s.supplier_name
        FROM suppliers s
        INNER JOIN sink_type sk ON s.id = sk.supplier_id
        WHERE s.company_id = ?
@@ -110,7 +114,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     faucetSuppliers = await selectMany<ISupplier>(
       db,
-      `SELECT s.id, s.supplier_name 
+      `SELECT s.id, s.supplier_name
        FROM suppliers s
        INNER JOIN faucet_type ft ON s.id = ft.supplier_id
        WHERE s.company_id = ?
@@ -119,10 +123,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     )
 
     const [rows] = await db.query<(RowDataPacket & { position: string })[]>(
-      `SELECT p.name AS position 
-       FROM users u 
-       LEFT JOIN users_positions up ON up.user_id = u.id 
-       LEFT JOIN positions p ON p.id = up.position_id 
+      `SELECT p.name AS position
+       FROM users u
+       LEFT JOIN users_positions up ON up.user_id = u.id
+       LEFT JOIN positions p ON p.id = up.position_id
        WHERE u.id = ? AND p.name IN ('external_marketing','check-in') AND u.is_deleted = 0`,
       [user.id],
     )
@@ -184,6 +188,7 @@ export default function App() {
   const { toast } = useToast()
   const isMobile = useIsMobile()
   const isLogin = pathname === '/login'
+  const isDraw = pathname.startsWith('/employee/draw')
   const isCheckIn = pathname.includes('/check-in')
   const isExternalMarketing = pathname.includes('/external/marketing')
   const mainRef = useRef<HTMLElement | null>(null)
@@ -219,7 +224,12 @@ export default function App() {
   const basePath = getBase(pathname)
   const isInstaller = position !== null
   const showSidebar =
-    !!basePath && !isLogin && !isInstaller && !isCheckIn && !isExternalMarketing
+    !!basePath &&
+    !isLogin &&
+    !isInstaller &&
+    !isCheckIn &&
+    !isExternalMarketing &&
+    !isDraw
 
   return (
     <html lang='en'>
@@ -231,7 +241,7 @@ export default function App() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <SidebarProvider open={showSidebar}>
+          <SidebarProvider defaultOpen={showSidebar}>
             {showSidebar && (
               <EmployeeSidebar
                 suppliers={stoneSuppliers}
@@ -252,6 +262,7 @@ export default function App() {
                 )}
                 <div className='relative'>
                   {isMobile && !isCheckIn && <SidebarTrigger />}
+                  {!isMobile && !isCheckIn && <OriginalSidebarTrigger />}
                   <Outlet />
                 </div>
               </AuthenticityTokenProvider>
