@@ -27,7 +27,9 @@ export default function EmployeeDraw() {
   return (
     <PageLayout title={`Draw ${quote.quote_name}`}>
       <div className='flex flex-col gap-4'>
-        <DrawableCanvas />
+        <div className='w-full flex-1'>
+          <DrawableCanvas />
+        </div>
       </div>
     </PageLayout>
   )
