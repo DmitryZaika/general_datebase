@@ -62,6 +62,9 @@ export default function DealItem({
   } | null>(null)
   const fetcher = useFetcher()
 
+  const hasImages =
+    (Array.isArray(deal.images) && deal.images.length > 0) || Boolean(deal.has_images)
+
   useEffect(() => {
     setLocalDate(deal.due_date ?? null)
   }, [deal.due_date])
@@ -337,7 +340,7 @@ export default function DealItem({
             </Button>
           )
         )}
-        {deal.has_images && (
+        {hasImages && (
           <Link
             to={`edit/${deal.id}/images`}
             className='text-slate-500 hover:text-black'
