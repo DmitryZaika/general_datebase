@@ -89,39 +89,39 @@ export async function action({ request }: ActionFunctionArgs) {
 
   // Ensure the current authenticated user (installer/admin) is captured for the checklist entry
   let installerId: number
+  let companyId: number
   try {
     const user = await getEmployeeUser(request)
     installerId = user.id
+    companyId = user.company_id
   } catch (_error) {
     return { error: 'Unauthorized' }
   }
 
-  try {
-    await db.execute(
-      `INSERT INTO checklists (
+  await db.execute(
+    `INSERT INTO checklists (
         customer_id, installer_id, customer_name, installation_address,
         material_correct, seams_satisfaction, appliances_fit, backsplashes_correct,
-        edges_correct, holes_drilled, cleanup_completed, comments, signature
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        formData.customer_id || null,
-        installerId,
-        formData.customer_name,
-        formData.installation_address,
-        convertCheckboxToBoolean(formData.material_correct),
-        convertCheckboxToBoolean(formData.seams_satisfaction),
-        convertCheckboxToBoolean(formData.appliances_fit),
-        convertCheckboxToBoolean(formData.backsplashes_correct),
-        convertCheckboxToBoolean(formData.edges_correct),
-        convertCheckboxToBoolean(formData.holes_drilled),
-        convertCheckboxToBoolean(formData.cleanup_completed),
-        formData.comments || null,
-        formData.signature,
-      ],
-    )
-  } catch {
-    return { error: 'Database save failed' }
-  }
+        edges_correct, holes_drilled, cleanup_completed, comments, signature, 
+        company_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      formData.customer_id || null,
+      installerId,
+      formData.customer_name,
+      formData.installation_address,
+      convertCheckboxToBoolean(formData.material_correct),
+      convertCheckboxToBoolean(formData.seams_satisfaction),
+      convertCheckboxToBoolean(formData.appliances_fit),
+      convertCheckboxToBoolean(formData.backsplashes_correct),
+      convertCheckboxToBoolean(formData.edges_correct),
+      convertCheckboxToBoolean(formData.holes_drilled),
+      convertCheckboxToBoolean(formData.cleanup_completed),
+      formData.comments || null,
+      formData.signature,
+      companyId,
+    ],
+  )
 
   // Flash success
   const session = await getSession(request.headers.get('Cookie'))
