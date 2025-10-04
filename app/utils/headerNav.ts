@@ -1,8 +1,9 @@
 import type { Location } from 'react-router'
 
 export const getMirroredUrl = (isAdminPage: boolean, location: Location) => {
-  const segments = location.pathname.split('/').filter(Boolean)
-  const search = location.search || ''
+  const pathname = location?.pathname || ''
+  const segments = pathname.split('/').filter(Boolean)
+  const search = location?.search || ''
 
   if (segments.length >= 2 && segments[0] === 'customer' && segments[2] === 'stones') {
     return `/admin/stones${search}`
@@ -28,6 +29,7 @@ export const getMirroredUrl = (isAdminPage: boolean, location: Location) => {
     'images',
     'deals',
     'transactions',
+    'teach-mode',
   ]
 
   if (supportedSections.includes(currentSection)) {

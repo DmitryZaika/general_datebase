@@ -356,33 +356,20 @@
 // }
 
 import * as React from 'react'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { type ActionFunctionArgs, type LoaderFunctionArgs, redirect, useActionData, useLoaderData, useNavigation, useSubmit } from 'react-router'
+import { Button } from '~/components/ui/button'
 import { db } from '~/db.server'
 import type { InstructionSlim } from '~/types'
-import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
+import { DONE_KEY } from '~/utils/constants'
+import {
+  getEmployeeUser,
+  type SessionUser
+} from '~/utils/session.server'
 import { selectMany } from '../utils/queryHelpers'
 
 interface InstructionMedium extends InstructionSlim {
   parent_id: number
   after_id: number
-}
-
-interface Question {
-  id: number
-  text: string
-  instruction_id: number
-  question_type: 'MC' | 'TF'
-  created_date: string
-  updated_date: string
-}
-
-interface AnswerChoice {
-  id: number
-  question_id: number
-  text: string
-  is_correct: boolean
-  created_date: string
-  updated_date: string
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -398,44 +385,135 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     'SELECT id, title, parent_id, after_id, rich_text from instructions WHERE company_id = ?',
     [user.company_id],
   )
+  return { instructions }
+}
 
-  // Fetch questions for this company
-  const questions = await selectMany<Question>(
-    db,
-    'SELECT id, text, instruction_id, question_type, created_date, updated_date FROM questions WHERE company_id = ? ORDER BY created_date DESC',
-    [user.company_id],
-  )
+export const action = async ({ request }: ActionFunctionArgs) => {
+  let user: SessionUser
+  try {
+    user = await getEmployeeUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
 
-  // Fetch answer choices for all questions
-  const answerChoices = await selectMany<AnswerChoice>(
-    db,
-    'SELECT id, question_id, text, is_correct, created_date, updated_date FROM answer_choices WHERE question_id IN (SELECT id FROM questions WHERE company_id = ?) ORDER BY question_id, id',
-    [user.company_id],
-  )
+  const formData = await request.formData()
+  const questionText = formData.get('questionText') as string
+  const options = JSON.parse(formData.get('options') as string) as string[]
+  const correctAnswer = formData.get('correctAnswer') as string
+  const instructionId = parseInt(formData.get('instructionId') as string)
 
-  return { instructions, questions, answerChoices }
+  if (!questionText || !options || !correctAnswer || !instructionId) {
+    return { error: 'Missing required question data' }
+  }
+
+  // Validate that the instruction exists
+  try {
+    const [instructionCheck] = await db.execute(
+      'SELECT id FROM instructions WHERE id = ? AND company_id = ?',
+      [instructionId, user.company_id]
+    )
+    
+    if (!instructionCheck || (instructionCheck as any).length === 0) {
+      return { error: 'Invalid instruction ID or instruction does not belong to your company' }
+    }
+  } catch (error) {
+    console.error('Error validating instruction:', error)
+    return { error: 'Error validating instruction' }
+  }
+
+  try {
+    console.log('Attempting to save question:', {
+      questionText,
+      instructionId,
+      companyId: user.company_id,
+      options,
+      correctAnswer
+    })
+
+    // Check if tables exist
+    try {
+      await db.execute('SELECT 1 FROM questions LIMIT 1')
+      await db.execute('SELECT 1 FROM answer_choices LIMIT 1')
+      console.log('Tables exist, proceeding with insert')
+    } catch (tableError) {
+      console.error('Table check failed:', tableError)
+      return { error: `Database tables not found. Please ensure the questions and answer_choices tables exist. Error: ${tableError instanceof Error ? tableError.message : 'Unknown error'}` }
+    }
+
+    // Insert the question
+    const [questionResult] = await db.execute(
+      'INSERT INTO questions (text, instruction_id, question_type, company_id) VALUES (?, ?, ?, ?)',
+      [questionText, instructionId, 'MC', user.company_id]
+    )
+
+    const questionId = (questionResult as any).insertId
+    console.log('Question inserted with ID:', questionId)
+
+    // Insert answer choices
+    for (const option of options) {
+      const isCorrect = option === correctAnswer
+      console.log('Inserting answer choice:', { option, isCorrect, questionId })
+      await db.execute(
+        'INSERT INTO answer_choices (question_id, text, is_correct) VALUES (?, ?, ?)',
+        [questionId, option, isCorrect]
+      )
+    }
+
+    console.log('Question and answers saved successfully')
+    return { success: true, questionId, instructionId }
+  } catch (error) {
+    console.error('Error saving question:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
+    return { error: `Failed to save question: ${error instanceof Error ? error.message : 'Unknown error'}` }
+  }
 }
 
 export default function TeachMode() {
-  const { instructions, questions, answerChoices } = useLoaderData() as { 
-    instructions: InstructionMedium[]
-    questions: Question[]
-    answerChoices: AnswerChoice[]
-  }
+  const { instructions } = useLoaderData() as { instructions: InstructionMedium[] }
+  const actionData = useActionData<{ success?: boolean; error?: string; questionId?: number; instructionId?: number }>()
+  const navigation = useNavigation()
+  const submit = useSubmit()
 
   const [expanded, setExpanded] = React.useState<Record<number, boolean>>({})
-  const [selectedAnswers, setSelectedAnswers] = React.useState<Record<number, string>>({})
-  const [submittedQuestions, setSubmittedQuestions] = React.useState<Set<number>>(new Set())
+  const [savedQuestions, setSavedQuestions] = React.useState<Set<number>>(new Set())
 
-  // Group answer choices by question ID
-  const answerChoicesByQuestion = React.useMemo(() => {
-    const grouped = new Map<number, AnswerChoice[]>()
-    for (const choice of answerChoices) {
-      const existing = grouped.get(choice.question_id) || []
-      grouped.set(choice.question_id, [...existing, choice])
-    }
-    return grouped
-  }, [answerChoices])
+  type NodeState = {
+    text: string
+    loading: boolean
+    saving: boolean
+  }
+
+  const [nodeStates, setNodeStates] = React.useState<Record<number, NodeState>>({})
+
+  const setNodeLoading = (id: number, loading: boolean) =>
+    setNodeStates(prev => ({
+      ...prev,
+      [id]: { ...(prev[id] || { text: '', loading: false, saving: false }), loading },
+    }))
+
+  const setNodeSaving = (id: number, saving: boolean) =>
+    setNodeStates(prev => ({
+      ...prev,
+      [id]: { ...(prev[id] || { text: '', loading: false, saving: false }), saving },
+    }))
+
+  const setNodeText = (id: number, text: string) =>
+    setNodeStates(prev => ({
+      ...prev,
+      [id]: { ...(prev[id] || { text: '', loading: false, saving: false }), text },
+    }))
+
+  const appendNodeText = (id: number, delta: string) =>
+    setNodeStates(prev => {
+      const current = prev[id] || { text: '', loading: false, saving: false }
+      return {
+        ...prev,
+        [id]: { ...current, text: current.text + delta },
+      }
+    })
 
   const parentKey = (pid: number | null) => (pid && pid !== 0 ? pid : null)
 
@@ -515,33 +593,6 @@ export default function TeachMode() {
     title: { fontWeight: 700, margin: 0 } as React.CSSProperties,
   }
 
-  const handleAnswerSelect = (questionId: number, answerText: string) => {
-    setSelectedAnswers(prev => ({
-      ...prev,
-      [questionId]: answerText,
-    }))
-  }
-
-  const handleSubmitAnswer = (questionId: number) => {
-    if (!selectedAnswers[questionId]) {
-      alert('Please select an answer first')
-      return
-    }
-    setSubmittedQuestions(prev => new Set([...prev, questionId]))
-  }
-
-  const getCorrectAnswer = (questionId: number): string | null => {
-    const choices = answerChoicesByQuestion.get(questionId) || []
-    const correctChoice = choices.find(choice => choice.is_correct)
-    return correctChoice?.text || null
-  }
-
-  const isAnswerCorrect = (questionId: number): boolean => {
-    const selectedAnswer = selectedAnswers[questionId]
-    const correctAnswer = getCorrectAnswer(questionId)
-    return selectedAnswer === correctAnswer
-  }
-
   const InstructionNode: React.FC<{ node: InstructionMedium; depth: number }> = ({
     node,
     depth,
@@ -549,6 +600,145 @@ export default function TeachMode() {
     const children = childrenOf(node.id)
     const hasChildren = children.length > 0
     const isOpen = expanded[node.id] ?? false
+
+    const text = nodeStates[node.id]?.text ?? ''
+    const loadingMCQ = nodeStates[node.id]?.loading ?? false
+
+    function cleanJSON(value: string) {
+      if (value === '') return null
+      try {
+        return JSON.parse(value)
+      } catch (error) {
+        return null
+      }
+    }
+
+    const getInstructionContent = () => {
+      const cleanText = node.rich_text
+        ?.replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+      return {
+        title: node.title,
+        content: cleanText || node.title,
+      }
+    }
+
+    const handleGenerate = async (e?: React.MouseEvent) => {
+      if (e) e.stopPropagation()
+      if (loadingMCQ) return
+
+      setNodeLoading(node.id, true)
+      setNodeText(node.id, '')
+
+      const content = getInstructionContent()
+
+      if (!content) {
+        alert('No instruction content available to generate questions from')
+        setNodeLoading(node.id, false)
+        return
+      }
+
+      const prompt = `You are a question generator. You MUST return JSON ALWAYS. You will return a JSON object with the following keys: "question", "options", and "answer".
+
+Based on the following educational content, create a multiple choice question:
+
+Title: ${content.title}
+Content: ${content.content}
+
+Guidelines:
+- Create a question that tests understanding of the key concepts from this content
+- Provide 4 plausible answer options
+- Make sure only one option is correct
+- The question should be clear and educational
+
+Return ONLY valid JSON in this exact format:
+{
+  "question": "Your question here?",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "answer": "The correct option"
+}
+
+Examples of good questions:
+{
+  "question": "What is the main topic discussed in this content?",
+  "options": ["Topic A", "Topic B", "Topic C", "Topic D"],
+  "answer": "Topic B"
+}
+
+Now generate a question based on the provided content.`
+
+      const query = encodeURIComponent(prompt)
+      const sse = new EventSource(`/api/chat?query=${query}&isNew=true`)
+
+      sse.addEventListener('message', event => {
+        if (event.data === DONE_KEY) {
+          sse.close()
+          setNodeLoading(node.id, false)
+        } else {
+          appendNodeText(node.id, event.data)
+        }
+      })
+
+      sse.addEventListener('error', () => {
+        sse.close()
+        setNodeLoading(node.id, false)
+      })
+    }
+
+    const values = cleanJSON(text)
+    const isSaving = nodeStates[node.id]?.saving ?? false
+    const isSaved = savedQuestions.has(node.id)
+
+    const handleSaveQuestion = async () => {
+      if (!values || !values.question || !values.options || !values.answer) {
+        alert('No question data to save')
+        return
+      }
+
+      setNodeSaving(node.id, true)
+
+      try {
+        const formData = new FormData()
+        formData.append('questionText', values.question)
+        formData.append('options', JSON.stringify(values.options))
+        formData.append('correctAnswer', values.answer)
+        formData.append('instructionId', node.id.toString())
+
+        // Use a direct API call to avoid React Router navigation issues
+        const response = await fetch('/admin/teach-mode', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Accept': 'application/json',
+          },
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success) {
+            setSavedQuestions(prev => new Set([...prev, node.id]))
+          } else {
+            console.log("FIX THIS LATER 1")
+            // alert(result.error || 'Failed to save question')
+          }
+        } else {
+          // If response is not ok, try to get error message
+          const text = await response.text()
+          console.error('Server response:', text)
+          alert('Failed to save question. Please check console for details.')
+        }
+      } catch (error) {
+        console.error('Error saving question:', error)
+        console.log("FIX THIS LATER 2")
+        // alert('Failed to save question')
+      } finally {
+        setNodeSaving(node.id, false)
+      }
+    }
+
+
 
     return (
       <div style={styles.item(depth)}>
@@ -562,6 +752,14 @@ export default function TeachMode() {
             <span style={styles.arrow} />
           )}
           <p style={styles.title}>{node.title ?? '(no title)'}</p>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => handleGenerate()}
+            style={{ marginLeft: 10 }}
+          >
+            Generate Question
+          </Button>
         </div>
         <div dangerouslySetInnerHTML={{ __html: node.rich_text }} />
         {hasChildren && isOpen && (
@@ -571,144 +769,87 @@ export default function TeachMode() {
             ))}
           </div>
         )}
-      </div>
-    )
-  }
-
-  const QuestionComponent: React.FC<{ question: Question }> = ({ question }) => {
-    const choices = answerChoicesByQuestion.get(question.id) || []
-    const selectedAnswer = selectedAnswers[question.id]
-    const isSubmitted = submittedQuestions.has(question.id)
-    const isCorrect = isAnswerCorrect(question.id)
-    const correctAnswer = getCorrectAnswer(question.id)
-
-    return (
-      <div
-        style={{
-          border: '2px solid #888',
-          borderRadius: 8,
-          padding: 20,
-          marginBottom: 20,
-          backgroundColor: '#fff',
-        }}
-      >
-        <h3 style={{ marginBottom: 15, color: '#333' }}>{question.text}</h3>
-        
-        {choices.map((choice, index) => (
-          <div key={choice.id} style={{ marginBottom: 10 }}>
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                cursor: isSubmitted ? 'default' : 'pointer',
-                padding: 8,
-                borderRadius: 4,
-                backgroundColor: isSubmitted && choice.is_correct ? '#d4edda' : 
-                               isSubmitted && selectedAnswer === choice.text && !choice.is_correct ? '#f8d7da' :
-                               'transparent',
-                border: isSubmitted && choice.is_correct ? '1px solid #c3e6cb' :
-                       isSubmitted && selectedAnswer === choice.text && !choice.is_correct ? '1px solid #f5c6cb' :
-                       '1px solid transparent',
-              }}
-            >
-              <input
-                type="radio"
-                name={`question-${question.id}`}
-                value={choice.text}
-                checked={selectedAnswer === choice.text}
-                onChange={() => handleAnswerSelect(question.id, choice.text)}
-                disabled={isSubmitted}
-                style={{ marginRight: 10 }}
-              />
-              <span style={{ fontSize: '1rem' }}>{choice.text}</span>
-              {isSubmitted && choice.is_correct && (
-                <span style={{ marginLeft: 'auto', color: '#28a745', fontWeight: 'bold' }}>
-                  ✓ Correct
-                </span>
-              )}
-            </label>
+        {loadingMCQ && (
+          <div style={{ marginTop: 10, color: '#666' }}>
+            <p>Creating a question from this instruction...</p>
           </div>
-        ))}
-
-        <div style={{ marginTop: 15, display: 'flex', gap: 10 }}>
-          <button
-            onClick={() => handleSubmitAnswer(question.id)}
-            disabled={!selectedAnswer || isSubmitted}
+        )}
+        {text && !values && (
+          <div
             style={{
-              padding: '8px 16px',
-              backgroundColor: isSubmitted ? '#6c757d' : '#007bff',
-              color: 'white',
-              border: 'none',
+              marginTop: 10,
+              padding: 10,
+              backgroundColor: '#f5f5f5',
               borderRadius: 4,
-              cursor: isSubmitted ? 'not-allowed' : 'pointer',
             }}
           >
-            {isSubmitted ? 'Submitted' : 'Submit Answer'}
-          </button>
-          
-          {isSubmitted && (
-            <div
+            <p>Raw response: {text}</p>
+          </div>
+        )}
+        {actionData?.error && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: 10,
+              backgroundColor: '#f8d7da',
+              border: '1px solid #f5c6cb',
+              borderRadius: 4,
+              color: '#721c24',
+            }}
+          >
+            Error: {actionData.error}
+          </div>
+        )}
+        {values !== null && (
+          <div
+            className='mt-5 p-5'
+            style={{
+              border: '2px solid #888',
+              borderRadius: 8,
+              marginTop: 20,
+            }}
+          >
+            <h2 style={{ marginBottom: 15 }}>{values.question}</h2>
+            {values.options?.map((answer: string, index: number) => (
+              <div key={index} style={{ marginBottom: 8 }}>
+                {answer}
+                {answer === values.answer ? <strong> (correct answer)</strong> : ''}
+              </div>
+            ))}
+
+            <Button
+              onClick={handleSaveQuestion}
+              disabled={isSaving || isSaved}
               style={{
-                padding: 10,
-                borderRadius: 4,
-                backgroundColor: isCorrect ? '#d4edda' : '#f8d7da',
-                border: isCorrect ? '1px solid #c3e6cb' : '1px solid #f5c6cb',
-                color: isCorrect ? '#155724' : '#721c24',
-                flex: 1,
+                marginTop: 15,
+                marginRight: 10,
+                backgroundColor: isSaved ? '#28a745' : undefined,
+                color: isSaved ? 'white' : undefined,
               }}
             >
-              <strong>
-                {isCorrect ? '✅ Correct! Well done!' : `❌ Incorrect. The correct answer is: ${correctAnswer}`}
-              </strong>
-            </div>
-          )}
-        </div>
+              {isSaving ? 'Saving...' : isSaved ? 'Saved ✓' : 'Save Question'}
+            </Button>
+            <Button
+              onClick={() => handleGenerate()}
+              style={{
+                marginTop: 15,
+              }}
+            >
+              Generate New Question
+            </Button>
+          </div>
+        )}
       </div>
     )
   }
 
   return (
     <div style={{ padding: 20 }}>
-      {/* Instructions Section */}
-      <div style={{ marginBottom: 40 }}>
-        <h2 style={{ marginBottom: 20, color: '#333', borderBottom: '2px solid #007bff', paddingBottom: 10 }}>
-          Training Instructions
-        </h2>
-        {roots.map(root => (
-          <div key={root.id} style={styles.rootBox}>
-            <InstructionNode node={root} depth={0} />
-          </div>
-        ))}
-      </div>
-
-      {/* Questions Section */}
-      {questions.length > 0 && (
-        <div>
-          <h2 style={{ marginBottom: 20, color: '#333', borderBottom: '2px solid #28a745', paddingBottom: 10 }}>
-            Practice Questions ({questions.length})
-          </h2>
-          <p style={{ marginBottom: 20, color: '#666', fontStyle: 'italic' }}>
-            Test your knowledge with these questions based on the training materials above.
-          </p>
-          {questions.map(question => (
-            <QuestionComponent key={question.id} question={question} />
-          ))}
+      {roots.map(root => (
+        <div key={root.id} style={styles.rootBox}>
+          <InstructionNode node={root} depth={0} />
         </div>
-      )}
-
-      {questions.length === 0 && (
-        <div style={{ 
-          textAlign: 'center', 
-          padding: 40, 
-          color: '#666',
-          backgroundColor: '#f8f9fa',
-          borderRadius: 8,
-          border: '1px solid #dee2e6'
-        }}>
-          <h3 style={{ marginBottom: 10 }}>No Questions Available</h3>
-          <p>Questions will appear here once your administrator creates them based on the training materials.</p>
-        </div>
-      )}
+      ))}
     </div>
   )
 }
