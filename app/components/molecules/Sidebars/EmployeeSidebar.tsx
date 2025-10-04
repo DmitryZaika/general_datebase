@@ -130,7 +130,7 @@ const getItems = (
       },
       {
         title: 'Teach Mode',
-        url: `/employee/teach-mode`,
+        url: `/${base}/teach-mode`,
         icon: BookOpen,
       },
     )
@@ -225,8 +225,21 @@ export function EmployeeSidebar({
   )
 
   const inventoryTitles = ['Stones', 'Sinks', 'Faucets']
+<<<<<<< Updated upstream
   const crmTitles = ['Customers', 'Deals']
   const resourceTitles = ['Supports', 'Documents', 'Images', 'Instructions', 'Teach Mode']
+=======
+
+  const crmTitles = ['Customers', 'Deals', 'Statistic']
+  const resourceTitles = [
+    'Suppliers',
+    'Supports',
+    'Documents',
+    'Images',
+    'Instructions',
+    'Teach Mode',
+  ]
+>>>>>>> Stashed changes
   const operationTitles = ['Suppliers', 'Checklists', 'Special Order']
 
   const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))
