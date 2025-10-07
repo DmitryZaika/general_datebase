@@ -70,7 +70,7 @@ function convertCheckboxToBoolean(value: string | undefined): boolean {
 // -------------
 // Action
 // -------------
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await csrf.validate(request)
   } catch (_error) {
@@ -87,7 +87,6 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, receivedValues }
   }
 
-  // Ensure the current authenticated user (installer/admin) is captured for the checklist entry
   let installerId: number
   let companyId: number
   try {
@@ -95,6 +94,14 @@ export async function action({ request }: ActionFunctionArgs) {
     installerId = user.id
     companyId = user.company_id
   } catch (_error) {
+    return { error: 'Unauthorized' }
+  }
+
+  const paramCompanyId = Number(params.companyId)
+  if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+    return { error: 'Invalid company id' }
+  }
+  if (paramCompanyId !== companyId) {
     return { error: 'Unauthorized' }
   }
 
@@ -138,11 +145,17 @@ export async function action({ request }: ActionFunctionArgs) {
 // -------------
 // Loader (auth)
 // -------------
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
     const user = await getEmployeeUser(request)
-    const companyId = user.company_id
-    return { user, companyId }
+    const paramCompanyId = Number(params.companyId)
+    if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+      return redirect(`/login?error=invalid_company_id`)
+    }
+    if (paramCompanyId !== user.company_id) {
+      return redirect(`/installers/${user.company_id}/checklist`)
+    }
+    return { user, companyId: user.company_id }
   } catch (_error) {
     return redirect(`/login?error=${_error}`)
   }
