@@ -55,22 +55,36 @@ const leadSchema = z.object({
   referral_source: z.enum(referralSourceEnum).optional(),
 })
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let user: User
   try {
     user = await getEmployeeUser(request)
+    const paramCompanyId = Number(params.companyId)
+    if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+      return redirect(`/login?error=invalid_company_id`)
+    }
+    if (paramCompanyId !== user.company_id) {
+      return redirect(`/external/marketing/${user.company_id}/leads/add_lead`)
+    }
     return { user }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {
   let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
+  }
+  const paramCompanyId = Number(params.companyId)
+  if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+    return redirect(`/login?error=invalid_company_id`)
+  }
+  if (paramCompanyId !== user.company_id) {
+    return redirect(`/external/marketing/${user.company_id}/leads`)
   }
   const { errors, data } = await parseMutliForm(request, leadSchema, 'leads')
   if (errors || !data) {

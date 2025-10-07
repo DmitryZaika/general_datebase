@@ -87,7 +87,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   session.flash('message', toastData('Success', 'Logged in'))
 
-  const redirectPath = isInstaller ? '/installers/checklist' : '..'
+  const redirectPath = isInstaller ? `/installers/${user.company_id}/checklist` : '..'
   return redirect(redirectPath, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
@@ -101,7 +101,7 @@ export default function Login() {
     resolver: zodResolver(userSchema),
     defaultValues: actionData?.defaultValues || { email: '', password: '' },
   })
-  const fullSubmit = useFullSubmit(form)
+  const fullSubmit = useFullSubmit(form, undefined, 'POST', undefined, true)
   const isSubmitting = navigation.state !== 'idle'
 
   return (
