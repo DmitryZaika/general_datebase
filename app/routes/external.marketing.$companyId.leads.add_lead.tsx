@@ -93,8 +93,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const body = {
     name: data.name,
-    email: data.email ?? null,
-    phone: data.phone ?? null,
+    email: data.email,
+    phone: data.phone,
     your_message: data.your_message,
     address: data.address,
     source: 'leads',
