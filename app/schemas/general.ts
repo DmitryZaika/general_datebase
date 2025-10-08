@@ -34,3 +34,11 @@ export const StringBoolV2 = z.preprocess(val => {
     return true
   }
 }, z.boolean().optional())
+
+export const NullableString = z.preprocess(value => {
+  if (value === undefined || value === null) return null
+  const str = String(value).trim()
+  if (str === '' || str.toLowerCase() === 'null' || str.toLowerCase() === 'undefined')
+    return null
+  return str
+}, z.string().nullable())
