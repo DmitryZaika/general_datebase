@@ -95,14 +95,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     name: data.name,
     email: data.email ?? null,
     phone: data.phone ?? null,
-    your_message:
-      typeof data.your_message === 'string' && data.your_message.trim() !== ''
-        ? data.your_message
-        : null,
-    address:
-      typeof data.address === 'string' && data.address.trim() !== ''
-        ? data.address
-        : null,
+    your_message: data.your_message,
+    address: data.address,
     source: 'leads',
     company_id: user.company_id,
     referral_source: data.referral_source ?? null,
@@ -141,6 +135,8 @@ export const AddLead = () => {
       source: 'leads',
       your_message: '',
       address: '',
+      email: '',
+      phone: '',
     },
   })
   return (
