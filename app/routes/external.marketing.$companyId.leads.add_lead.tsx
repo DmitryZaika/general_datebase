@@ -93,13 +93,19 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const body = {
     name: data.name,
-    email: data.email || null,
-    phone: data.phone || null,
-    your_message: data.your_message,
-    address: data.address,
+    email: data.email ?? null,
+    phone: data.phone ?? null,
+    your_message:
+      typeof data.your_message === 'string' && data.your_message.trim() !== ''
+        ? data.your_message
+        : null,
+    address:
+      typeof data.address === 'string' && data.address.trim() !== ''
+        ? data.address
+        : null,
     source: 'leads',
     company_id: user.company_id,
-    referral_source: data.referral_source,
+    referral_source: data.referral_source ?? null,
     file: data.file || '',
   }
 
