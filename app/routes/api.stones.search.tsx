@@ -2,15 +2,27 @@ import { data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import type { StoneSearchResult } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const [, searchParams] = request.url.split('?')
   const cleanParams = new URLSearchParams(searchParams)
   const searchTerm = cleanParams.get('name')
   const showSoldOut = cleanParams.get('show_sold_out') === 'true'
+  const companyIdParam = cleanParams.get('company_id')
+  let companyId = companyIdParam ? Number(companyIdParam) : NaN
 
   if (!searchTerm) {
     return Response.json({ stones: [] })
+  }
+
+  if (!Number.isFinite(companyId) || companyId <= 0) {
+    try {
+      const user = await getEmployeeUser(request)
+      companyId = user.company_id
+    } catch (_error) {
+      return Response.json({ stones: [] })
+    }
   }
 
   let query = `SELECT s.id, s.type, s.width, s.length, s.name, s.url, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount,
@@ -19,6 +31,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     FROM stones s
     LEFT JOIN slab_inventory AS si ON si.stone_id = s.id
     WHERE UPPER(s.name) LIKE UPPER(?)
+    AND s.company_id = ?
     AND s.is_display = 1
     GROUP BY s.id, s.type, s.name, s.url, s.width, s.length, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount`
 
@@ -37,6 +50,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const stones = await selectMany<StoneSearchResult>(db, query, [
     `%${searchTerm}%`,
+    companyId,
     `${searchTerm}%`,
     `% ${searchTerm} %`,
   ])

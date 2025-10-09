@@ -276,18 +276,15 @@ export default function App() {
             )}
             <main ref={mainRef} className='h-screen overflow-y-auto bg-gray-100 w-full'>
               <AuthenticityTokenProvider token={token}>
-                {isExternalMarketing ? (
+                {isExternalMarketing || isCheckIn || isInstallerRoute ? (
                   <MarketingHeader />
                 ) : (
-                  !isInstallerRoute &&
-                  !isCheckIn && (
-                    <Header
-                      isEmployee={user?.is_employee ?? false}
-                      user={user}
-                      isAdmin={user?.is_admin ?? false}
-                      isSuperUser={user?.is_superuser ?? false}
-                    />
-                  )
+                  <Header
+                    isEmployee={user?.is_employee ?? false}
+                    user={user}
+                    isAdmin={user?.is_admin ?? false}
+                    isSuperUser={user?.is_superuser ?? false}
+                  />
                 )}
                 <div className='relative'>
                   {!!user?.id &&
