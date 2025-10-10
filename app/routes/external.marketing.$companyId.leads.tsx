@@ -5,6 +5,7 @@ import {
   data,
   type LoaderFunctionArgs,
   Outlet,
+  redirect,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -35,8 +36,20 @@ interface Lead {
   invalid_lead: string | null
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await getEmployeeUser(request)
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  let paramCompanyId: number | undefined
+  try {
+    const user = await getEmployeeUser(request)
+    paramCompanyId = Number(params.companyId)
+    if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+      return redirect('/login?error=invalid_company_id')
+    }
+    if (paramCompanyId !== user.company_id) {
+      return redirect(`/external/marketing/${user.company_id}/leads`)
+    }
+  } catch {
+    return redirect('/login')
+  }
   const url = new URL(request.url)
   const fromDate = url.searchParams.get('fromDate') || ''
   const toDate = url.searchParams.get('toDate') || ''
@@ -62,10 +75,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
          WHERE ${whereSource}
            ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
-           ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}`,
+           ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
+           AND c.company_id = ?`,
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
+      paramCompanyId as number,
     ],
   )
 
@@ -84,10 +99,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        JOIN customers c ON d.customer_id = c.id
        WHERE ${whereSource} AND d.deleted_at IS NULL
          ${fromDate ? ' AND DATE(d.created_at) >= ?' : ''}
-         ${toDate ? ' AND DATE(d.created_at) <= ?' : ''}`,
+         ${toDate ? ' AND DATE(d.created_at) <= ?' : ''}
+         AND c.company_id = ?`,
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
+      paramCompanyId as number,
     ],
   )
 
@@ -109,10 +126,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          FROM customers c
         WHERE (c.source = 'leads' OR c.source = 'check-in')
          ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
-         ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}`,
+         ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
+         AND c.company_id = ?`,
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
+      paramCompanyId as number,
     ],
   )
 
@@ -144,16 +163,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
            SUM(CASE WHEN d.lost_reason = 'Stoped responding' THEN 1 ELSE 0 END) AS stopped_responding
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id
-       WHERE ${whereSource}
-          ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
-          ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}`,
+      WHERE ${whereSource}
+         ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
+         ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
+         AND c.company_id = ?`,
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
+      paramCompanyId as number,
     ],
   )
 
   return data({
+    companyId: paramCompanyId as number,
     leads,
     deals,
     lists,
@@ -175,8 +197,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 }
 
 function ExternalMarketingLeads() {
-  const { leads, deals, lists, fromDate, toDate, view, invalidStats, invalidReasons } =
-    useLoaderData<typeof loader>()
+  const {
+    companyId,
+    leads,
+    deals,
+    lists,
+    fromDate,
+    toDate,
+    view,
+    invalidStats,
+    invalidReasons,
+  } = useLoaderData<typeof loader>()
   const dealStatusByCustomer = new Map<number, string>()
   for (const d of deals) {
     if (!dealStatusByCustomer.has(d.customer_id))
@@ -341,7 +372,7 @@ function ExternalMarketingLeads() {
         <Button
           type='button'
           className='w-fit'
-          onClick={() => navigate('/external/marketing/leads/add_lead')}
+          onClick={() => navigate(`/external/marketing/${companyId}/leads/add_lead`)}
         >
           Add Lead
         </Button>

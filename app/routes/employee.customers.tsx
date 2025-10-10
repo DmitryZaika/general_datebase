@@ -277,7 +277,9 @@ export default function AdminCustomers() {
       (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
     )
   } else if (tabParam === 'all') {
-    fullDisplayed = [...filtered].sort((a, b) => a.name.localeCompare(b.name))
+    fullDisplayed = [...filtered].sort((a, b) =>
+      (a.name ?? '').localeCompare(b.name ?? ''),
+    )
   }
 
   const totalPages = Math.max(1, Math.ceil(fullDisplayed.length / pageSize))

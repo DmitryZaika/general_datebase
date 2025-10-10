@@ -7,8 +7,17 @@ import { getEmployeeUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
 export async function action({ params, request }: ActionFunctionArgs) {
+  let companyId = 0
   try {
-    await getEmployeeUser(request)
+    const user = await getEmployeeUser(request)
+    const paramCompanyId = Number(params.companyId)
+    if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+      return redirect(`/login?error=invalid_company_id`)
+    }
+    if (paramCompanyId !== user.company_id) {
+      return redirect(`/external/marketing/${user.company_id}/leads`)
+    }
+    companyId = user.company_id
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -26,7 +35,10 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
 
   try {
-    await db.execute(`DELETE FROM customers WHERE id = ?`, [leadId])
+    await db.execute(`DELETE FROM customers WHERE id = ? AND company_id = ?`, [
+      leadId,
+      companyId,
+    ])
   } catch {
     return { error: 'Failed to delete lead' }
   }

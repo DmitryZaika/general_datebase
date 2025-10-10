@@ -3,7 +3,7 @@ import { useState } from 'react'
 import type { Path, UseFormReturn } from 'react-hook-form'
 import { Button } from '~/components/ui/button'
 import type { TCustomerSchema } from '~/schemas/sales'
-import { CUSTOMER_ITEMS, EDGE_TYPES, HARDCODED_IGNORES } from '~/utils/constants'
+import { BASE_PRICES, CUSTOMER_ITEMS, HARDCODED_IGNORES } from '~/utils/constants'
 import { replaceUnderscoresWithSpaces } from '~/utils/words'
 import { FormField } from '../ui/form'
 import { InputItem } from './InputItem'
@@ -57,7 +57,8 @@ const DynamicControl = ({
 
   if (
     target === 'edge_price' &&
-    typeof EDGE_TYPES[current as keyof typeof EDGE_TYPES] !== 'function'
+    typeof BASE_PRICES.edge_type[current as keyof typeof BASE_PRICES.edge_type] !==
+      'function'
   ) {
     return null
   }

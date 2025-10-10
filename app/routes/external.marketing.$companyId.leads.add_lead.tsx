@@ -25,6 +25,7 @@ import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
 import { cn } from '~/lib/utils'
 import { sourceEnum } from '~/schemas/customers'
+import { NullableString } from '~/schemas/general'
 import { commitSession, getSession } from '~/sessions'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { getEmployeeUser, type User } from '~/utils/session.server'
@@ -47,30 +48,44 @@ const referralSourceEnum = [
 
 const leadSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  email: z.string().optional(),
-  phone: z.string().optional(),
-  your_message: z.string().optional(),
-  address: z.string().optional(),
+  email: NullableString,
+  phone: NullableString,
+  your_message: NullableString,
+  address: NullableString,
   source: z.enum(sourceEnum),
   referral_source: z.enum(referralSourceEnum).optional(),
 })
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let user: User
   try {
     user = await getEmployeeUser(request)
+    const paramCompanyId = Number(params.companyId)
+    if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+      return redirect(`/login?error=invalid_company_id`)
+    }
+    if (paramCompanyId !== user.company_id) {
+      return redirect(`/external/marketing/${user.company_id}/leads/add_lead`)
+    }
     return { user }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {
   let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
+  }
+  const paramCompanyId = Number(params.companyId)
+  if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+    return redirect(`/login?error=invalid_company_id`)
+  }
+  if (paramCompanyId !== user.company_id) {
+    return redirect(`/external/marketing/${user.company_id}/leads`)
   }
   const { errors, data } = await parseMutliForm(request, leadSchema, 'leads')
   if (errors || !data) {
@@ -85,7 +100,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     address: data.address,
     source: 'leads',
     company_id: user.company_id,
-    referral_source: data.referral_source,
+    referral_source: data.referral_source ?? null,
     file: data.file || '',
   }
 
@@ -121,6 +136,8 @@ export const AddLead = () => {
       source: 'leads',
       your_message: '',
       address: '',
+      email: '',
+      phone: '',
     },
   })
   return (
@@ -160,6 +177,7 @@ export const AddLead = () => {
               render={({ field }) => (
                 <Textarea
                   {...field}
+                  value={field.value ?? ''}
                   name={'Message'}
                   placeholder={'Message of the lead'}
                   className={cn(form.formState.errors.your_message && 'border-red-500')}

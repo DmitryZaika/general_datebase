@@ -4,7 +4,6 @@ import { Button } from '~/components/ui/button'
 import type { HeaderProps } from '~/types'
 import { getCustomerUrl, getMirroredUrl } from '~/utils/headerNav'
 import { LinkButton } from '../molecules/LinkButton'
-import { Notification } from '../molecules/Notification'
 import { TodoList } from '../organisms/TodoList'
 
 interface HeaderDesktopProps extends HeaderProps {
@@ -62,7 +61,7 @@ export function HeaderDesktop({
       </nav>
 
       <div className='flex items-center gap-2'>
-        <Notification className='relative z-10 mr-20' />
+        {/* <Notification className='relative z-10 mr-20' /> */}
         <TodoList />
       </div>
 
