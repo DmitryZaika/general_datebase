@@ -29,6 +29,7 @@ import { Label } from '~/components/ui/label'
 import { useToast } from '~/hooks/use-toast'
 import { createCustomerMutation, sourceEnum } from '~/schemas/customers'
 import { getSession } from '~/sessions'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 import {
   FormControl,
   FormField,
@@ -76,13 +77,22 @@ type CheckInFormData = z.infer<typeof customerCheckInSchema>
 const resolver = zodResolver(customerCheckInSchema)
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
-  const { companyId } = params
   const session = await getSession(request.headers.get('Cookie'))
-  const activeSession = session.data.sessionId || null
-  if (!activeSession) {
+  let user: User
+  try {
+    user = await getEmployeeUser(request)
+  } catch (_error) {
     return redirect('/login')
   }
-  return data({ companyId: parseInt(companyId as string), activeSession })
+  const paramCompanyId = Number(params.companyId)
+  if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+    return redirect('/login')
+  }
+  if (paramCompanyId !== user.company_id) {
+    return redirect(`/customer/${user.company_id}/check-in`)
+  }
+  const activeSession = session.data.sessionId || null
+  return data({ companyId: paramCompanyId, activeSession })
 }
 
 export default function CustomerCheckIn() {

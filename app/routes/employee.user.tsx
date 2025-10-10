@@ -132,7 +132,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 function TelegramLink({ email }: { email: string }) {
   const userEmail = encodeURIComponent(email)
-  const commandText = `/start ${email}`
+  const commandText = `/email ${email}`
 
   const handleCopy = () => {
     navigator.clipboard.writeText(commandText)

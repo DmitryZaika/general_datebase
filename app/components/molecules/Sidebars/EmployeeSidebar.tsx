@@ -238,7 +238,7 @@ export function EmployeeSidebar({
     'Instructions',
     'Teach Mode',
   ]
-  const operationTitles = ['Suppliers', 'Checklists', 'Special Order']
+  const operationTitles = ['Checklists', 'Special Order']
 
   const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))
   const crmItems = items.filter(item => crmTitles.includes(item.title))
