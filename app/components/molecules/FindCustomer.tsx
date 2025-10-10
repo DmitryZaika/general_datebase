@@ -63,17 +63,7 @@ export function FindCustomer({
     enabled: !!searchTerm,
   })
 
-  const displayCustomers = useMemo(() => {
-    const seen = new Set<string>()
-    const result: Customer[] = []
-    for (const c of customers) {
-      const key = (c.name || '').trim().toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      result.push(c)
-    }
-    return result
-  }, [customers])
+  const displayCustomers = useMemo(() => customers, [customers])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
