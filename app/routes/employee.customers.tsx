@@ -163,6 +163,11 @@ const customerColumns: ColumnDef<Customer>[] = [
   {
     accessorKey: 'name',
     header: 'Name of customer',
+    cell: ({ row }: { row: Row<Customer> }) => {
+      const name = row.original.name || ''
+      const short = name.length > 20 ? `${name.slice(0, 20)}...` : name
+      return <span title={name}>{short}</span>
+    },
   },
   {
     accessorKey: 'phone',
@@ -268,11 +273,12 @@ export default function AdminCustomers() {
   const filtered = customers.filter((c: Customer) => {
     if (tabParam === 'leads') return c.source === 'leads'
     if (tabParam === 'walkin') return c.source === 'check-in'
+    if (tabParam === 'call-in') return c.source === 'call-in'
     if (tabParam === 'all') return true
   })
 
   let fullDisplayed = filtered
-  if (tabParam === 'leads' || tabParam === 'walkin') {
+  if (tabParam === 'leads' || tabParam === 'walkin' || tabParam === 'call-in') {
     fullDisplayed = [...filtered].sort(
       (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
     )
@@ -331,6 +337,7 @@ export default function AdminCustomers() {
               <TabsTrigger value='all'>All Customers</TabsTrigger>
               <TabsTrigger value='walkin'>Walk-in</TabsTrigger>
               <TabsTrigger value='leads'>Leads</TabsTrigger>
+              <TabsTrigger value='call-in'>Call-In</TabsTrigger>
             </TabsList>
           </Tabs>
           {tabParam === 'leads' && (

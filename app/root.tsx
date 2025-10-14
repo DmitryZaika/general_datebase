@@ -164,10 +164,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       if (!url.pathname.startsWith(target)) {
         return redirect(target)
       }
-    } else if (hasExternalMarketing) {
-      if (!url.pathname.startsWith(`/external/marketing/${user.company_id}`)) {
-        return redirect(`/external/marketing/${user.company_id}/leads`)
-      }
     }
   }
 
@@ -209,9 +205,7 @@ export default function App() {
   const isLogin = pathname === '/login'
   const isDraw = pathname.startsWith('/employee/draw')
   const isCheckIn = pathname.includes('/check-in')
-  const isExternalMarketing = pathname.includes(
-    `/external/marketing/${user?.company_id}`,
-  )
+  const isExternalMarketing = pathname.includes(`/external/marketing/`)
   const isInstallerRoute = pathname.startsWith('/installers')
   const mainRef = useRef<HTMLElement | null>(null)
   const [isAtBottom, setIsAtBottom] = useState(false)

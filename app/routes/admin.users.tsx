@@ -72,11 +72,12 @@ const adminColumns: ColumnDef<User>[] = [
   {
     id: 'actions',
     cell: ({ row }) => {
+      const location = useLocation()
       return (
         <ActionDropdown
           actions={{
-            edit: `edit/${row.original.id}`,
-            delete: `delete/${row.original.id}`,
+            edit: `edit/${row.original.id}${location.search}`,
+            delete: `delete/${row.original.id}${location.search}`,
           }}
         />
       )

@@ -17,11 +17,12 @@ import {
   type CustomerDialogSchema,
   createCustomerMutation,
   customerDialogSchema,
-  type sourceEnum,
+  sourceEnum,
   updateCustomerMutation,
 } from '~/schemas/customers'
 import { EmailInput } from '../molecules/EmailInput'
 import { PhoneInput } from '../molecules/PhoneInput'
+import { SelectInput } from '../molecules/SelectItem'
 import { AddressInput } from '../organisms/AddressInput'
 import { Switch } from '../ui/switch'
 
@@ -32,7 +33,7 @@ interface CustomerFormProps {
   onSuccess: (value: number, name: string) => void
   companyId: number
   customerId?: number
-  source: (typeof sourceEnum)[number]
+  source?: (typeof sourceEnum)[number]
 }
 
 const getCustomerInfo = async (customerId: number) => {
@@ -44,6 +45,7 @@ const getCustomerInfo = async (customerId: number) => {
     phone: data.customer.phone,
     address: data.customer.address ?? '',
     company_name: data.customer.company_name,
+    source: data.customer.source,
   }
 }
 
@@ -80,6 +82,7 @@ export function CustomerForm({
     defaultValues: {
       email: '',
       address: '',
+      source,
     },
   })
 
@@ -102,6 +105,7 @@ export function CustomerForm({
       form.reset({
         ...data,
         builder: Boolean(data.company_name && data.company_name.trim() !== ''),
+        source: data.source ?? source,
       })
     }
   }, [data])
@@ -118,7 +122,7 @@ export function CustomerForm({
         return
       }
     }
-    mutate({ ...data, company_id: companyId, id: customerId || 0, source })
+    mutate({ ...data, company_id: companyId, id: customerId || 0 })
   }
 
   return (
@@ -174,6 +178,32 @@ export function CustomerForm({
               />
 
               <AddressInput form={form} field='address' type='billing' />
+              <FormField
+                control={form.control}
+                name='source'
+                render={({ field }) => {
+                  const baseOptions = sourceEnum
+                    .filter(s => s !== 'user-input' && s !== 'check-list')
+                    .map(s => ({
+                      key: s,
+                      value: s.charAt(0).toUpperCase() + s.slice(1),
+                    }))
+                  const current = form.getValues('source')
+                  const hasCurrent = baseOptions.some(o => o.key === current)
+                  const options = hasCurrent
+                    ? baseOptions
+                    : current
+                      ? [
+                          {
+                            key: current,
+                            value: current.charAt(0).toUpperCase() + current.slice(1),
+                          },
+                          ...baseOptions,
+                        ]
+                      : baseOptions
+                  return <SelectInput field={field} options={options} name='Source' />
+                }}
+              />
               <div className='flex items-center space-x-2 my-2'>
                 <FormField
                   control={form.control}

@@ -3,6 +3,7 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
 } from 'react-router'
 import { DeleteRow } from '~/components/pages/DeleteRow'
@@ -74,10 +75,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 export default function DeleteUser() {
   const navigate = useNavigate()
   const { name } = useLoaderData<typeof loader>()
-
+  const location = useLocation()
   const handleChange = (open: boolean) => {
     if (!open) {
-      navigate('..')
+      navigate(`..${location.search}`)
     }
   }
   return (

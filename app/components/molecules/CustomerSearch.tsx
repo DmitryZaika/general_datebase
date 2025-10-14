@@ -9,6 +9,7 @@ import { Button } from '../ui/button'
 import { Command, CommandGroup, CommandItem } from '../ui/command'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { RawSelect } from './RawSelect'
 
 const selectOptions = ['name', 'phone', 'email'] as const
@@ -68,14 +69,12 @@ const CustomerManager = ({
   setSearchTerm,
   setName,
   companyId,
-  source,
   onCustomerChange,
 }: {
   selectedCustomer: number | undefined
   setSearchTerm: (term: string | null) => void
   setName: (name: string | null) => void
   companyId: number
-  source: (typeof sourceEnum)[number]
   onCustomerChange: (customerId: number) => void
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false)
@@ -111,7 +110,18 @@ const CustomerManager = ({
           currentCustomer &&
           ((currentCustomer.email ?? '') === '' ||
             (currentCustomer.address ?? '') === '') && (
-            <AlertCircle className='absolute -top-3 -right-3 h-6 w-6 text-red-600' />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className='absolute -top-3 -right-3 z-10 cursor-help pointer-events-auto'>
+                    <AlertCircle className='h-6 w-6 text-red-600' />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side='top' sideOffset={6}>
+                  Missing customer info
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
       </Button>
       {isOpen && (
@@ -120,7 +130,6 @@ const CustomerManager = ({
           onSuccess={handleSuccess}
           companyId={companyId}
           customerId={selectedCustomer || undefined}
-          source={source}
         />
       )}
     </>
@@ -276,7 +285,6 @@ export function CustomerSearch({
           setSearchTerm={setSearchTerm}
           setName={setName}
           companyId={companyId}
-          source={source}
           onCustomerChange={onCustomerChange}
         />
       )}

@@ -36,7 +36,6 @@ export default function CustomersAdd() {
       handleChange={handleChange}
       onSuccess={onSuccess}
       companyId={user.company_id}
-      source='user-input'
     />
   )
 }
