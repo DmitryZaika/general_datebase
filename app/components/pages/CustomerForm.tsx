@@ -34,6 +34,7 @@ interface CustomerFormProps {
   companyId: number
   customerId?: number
   source?: (typeof sourceEnum)[number]
+  initialName?: string
 }
 
 const getCustomerInfo = async (customerId: number) => {
@@ -55,6 +56,7 @@ export function CustomerForm({
   companyId,
   customerId,
   source,
+  initialName,
 }: CustomerFormProps) {
   const { toast: toastFn } = useToast()
   const successToast = (message: string) =>
@@ -80,6 +82,7 @@ export function CustomerForm({
   const form = useForm<CustomerDialogSchema>({
     resolver,
     defaultValues: {
+      name: initialName || '',
       email: '',
       address: '',
       source,

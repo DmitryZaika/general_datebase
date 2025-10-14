@@ -69,12 +69,16 @@ const CustomerManager = ({
   setSearchTerm,
   setName,
   companyId,
+  source,
+  currentText,
   onCustomerChange,
 }: {
   selectedCustomer: number | undefined
   setSearchTerm: (term: string | null) => void
   setName: (name: string | null) => void
   companyId: number
+  source: (typeof sourceEnum)[number]
+  currentText: string | null
   onCustomerChange: (customerId: number) => void
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false)
@@ -130,6 +134,8 @@ const CustomerManager = ({
           onSuccess={handleSuccess}
           companyId={companyId}
           customerId={selectedCustomer || undefined}
+          source={source}
+          initialName={currentText ?? undefined}
         />
       )}
     </>
@@ -285,6 +291,8 @@ export function CustomerSearch({
           setSearchTerm={setSearchTerm}
           setName={setName}
           companyId={companyId}
+          source={source}
+          currentText={searchTerm ?? name}
           onCustomerChange={onCustomerChange}
         />
       )}
