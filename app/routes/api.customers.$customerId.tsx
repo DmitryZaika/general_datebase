@@ -24,7 +24,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     // Get customer details
     const [customer] = await db.query<(Customer & RowDataPacket)[]>(
-      `SELECT id, name, address, phone, email, company_name 
+      `SELECT id, name, address, phone, email, company_name, source 
        FROM customers 
        WHERE id = ? AND company_id = ?`,
       [customerId, user.company_id],

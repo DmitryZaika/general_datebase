@@ -39,7 +39,6 @@ export default function CustomersEdit() {
       onSuccess={onSuccess}
       companyId={user.company_id}
       customerId={customerId}
-      source='user-input'
     />
   )
 }

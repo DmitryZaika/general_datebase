@@ -32,6 +32,10 @@ export interface SessionUser {
   company_id: number
 }
 
+export interface SessionUserNew extends Omit<SessionUser, 'company_id'> {
+  company_ids: number[]
+}
+
 function getExpirationDate(expiration: number): string {
   const now = new Date()
   const expirationDate = new Date(now.getTime() + expiration * 1000)
@@ -95,6 +99,30 @@ async function getUser(sessionId: string): Promise<SessionUser | undefined> {
   return rows[0]
 }
 
+async function getUserByPositions(
+  sessionId: string,
+  companyId: number,
+  positions: number[],
+): Promise<SessionUserNew | undefined> {
+  const [rows] = await db.query<SessionUserNew[] & RowDataPacket[]>(
+    `SELECT users.id, users.email, users.name, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
+     JOIN users_positions ON users_positions.user_id = users.id
+     JOIN sessions ON sessions.user_id = users.id
+     WHERE sessions.id = ?
+       AND sessions.expiration_date > CURRENT_TIMESTAMP
+       AND sessions.is_deleted = 0
+       AND users.is_deleted = 0
+       AND users_positions.position_id IN (?)
+       AND users_positions.company_id = ?`,
+
+    [sessionId, positions, companyId],
+  )
+  if (rows.length < 1) {
+    return undefined
+  }
+  return rows[0]
+}
+
 async function handlePermissions(
   request: Request,
   validUser: (value: SessionUser) => boolean,
@@ -115,6 +143,25 @@ async function handlePermissions(
   return user
 }
 
+async function handlePermissionsNew(
+  request: Request,
+  companyId: number,
+  positions: number[],
+): Promise<SessionUserNew> {
+  const cookie = request.headers.get('Cookie')
+  const session = await getSession(cookie)
+  const sessionId = session.get('sessionId')
+  if (sessionId === undefined) {
+    throw new TypeError('Session ID cannot be undefined')
+  }
+  const user = await getUserByPositions(sessionId, companyId, positions)
+  if (user === undefined) {
+    throw new TypeError('Could not find session')
+  }
+
+  return user
+}
+
 export async function getAdminUser(request: Request): Promise<SessionUser> {
   return await handlePermissions(request, user => user.is_admin || user.is_superuser)
 }
@@ -124,6 +171,13 @@ export async function getEmployeeUser(request: Request): Promise<SessionUser> {
     request,
     user => user.is_employee || user.is_admin || user.is_superuser,
   )
+}
+
+export async function getMarketingUser(
+  request: Request,
+  companyId: number,
+): Promise<SessionUserNew> {
+  return await handlePermissionsNew(request, companyId, [7])
 }
 
 export async function getSuperUser(request: Request): Promise<SessionUser> {

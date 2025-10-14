@@ -2,6 +2,7 @@ import type { ResultSetHeader } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
+import { getEmployeeUser } from '~/utils/session.server'
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
@@ -11,11 +12,13 @@ export async function action({ request }: ActionFunctionArgs) {
     )
   }
 
+  const user = await getEmployeeUser(request)
+
   const userData = await request.json()
   const validatedData = customerSignupSchema.parse(userData)
 
   const [result] = await db.execute<ResultSetHeader>(
-    `INSERT INTO customers (name, phone, email, address, referral_source, source, company_id, company_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO customers (name, phone, email, address, referral_source, source, company_id, company_name, sales_rep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       validatedData.name,
       validatedData.phone || null,
@@ -25,6 +28,7 @@ export async function action({ request }: ActionFunctionArgs) {
       validatedData.source,
       validatedData.company_id,
       validatedData.company_name || null,
+      user.id,
     ],
   )
 

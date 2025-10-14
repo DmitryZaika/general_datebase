@@ -28,7 +28,7 @@ import { sourceEnum } from '~/schemas/customers'
 import { NullableString } from '~/schemas/general'
 import { commitSession, getSession } from '~/sessions'
 import { parseMutliForm } from '~/utils/parseMultiForm'
-import { getEmployeeUser, type User } from '~/utils/session.server'
+import { getMarketingUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 import { useCustomOptionalForm } from '~/utils/useCustomForm'
 
@@ -57,35 +57,26 @@ const leadSchema = z.object({
 })
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  let user: User
+  const companyId = Number(params.companyId)
+  if (!Number.isFinite(companyId) || companyId <= 0) {
+    return redirect(`/login?error=invalid_company_id`)
+  }
   try {
-    user = await getEmployeeUser(request)
-    const paramCompanyId = Number(params.companyId)
-    if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
-      return redirect(`/login?error=invalid_company_id`)
-    }
-    if (paramCompanyId !== user.company_id) {
-      return redirect(`/external/marketing/${user.company_id}/leads/add_lead`)
-    }
-    return { user }
+    await getMarketingUser(request, companyId)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  let user: User
-  try {
-    user = await getEmployeeUser(request)
-  } catch (error) {
-    return redirect(`/login?error=${error}`)
-  }
   const paramCompanyId = Number(params.companyId)
   if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
     return redirect(`/login?error=invalid_company_id`)
   }
-  if (paramCompanyId !== user.company_id) {
-    return redirect(`/external/marketing/${user.company_id}/leads`)
+  try {
+    await getMarketingUser(request, paramCompanyId)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
   }
   const { errors, data } = await parseMutliForm(request, leadSchema, 'leads')
   if (errors || !data) {
@@ -99,13 +90,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     your_message: data.your_message,
     address: data.address,
     source: 'leads',
-    company_id: user.company_id,
+    company_id: paramCompanyId,
     referral_source: data.referral_source ?? null,
     file: data.file || '',
   }
 
   const response = await fetch(
-    `${`${LAMBDA_URL}v1/webhooks/new-lead-form/${user.company_id}`}`,
+    `${`${LAMBDA_URL}v1/webhooks/new-lead-form/${paramCompanyId}`}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

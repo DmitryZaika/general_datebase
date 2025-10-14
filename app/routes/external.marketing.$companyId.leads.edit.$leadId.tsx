@@ -30,7 +30,7 @@ import { cn } from '~/lib/utils'
 import { sourceEnum } from '~/schemas/customers'
 import { commitSession, getSession } from '~/sessions'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getMarketingUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 const leadSchema = z.object({
@@ -47,15 +47,13 @@ type FormData = z.infer<typeof leadSchema>
 const resolver = zodResolver(leadSchema)
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const paramCompanyId = Number(params.companyId)
+  if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+    return redirect(`/login?error=invalid_company_id`)
+  }
   try {
-    const user = await getEmployeeUser(request)
-    const paramCompanyId = Number(params.companyId)
-    if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
-      return redirect(`/login?error=invalid_company_id`)
-    }
-    if (paramCompanyId !== user.company_id) {
-      return redirect(`/external/marketing/${user.company_id}/leads`)
-    }
+    await getMarketingUser(request, paramCompanyId)
+
     const leadId = parseInt(params.leadId || '0')
 
     if (!leadId) {
@@ -74,7 +72,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }>(
       db,
       'SELECT id, name, email, phone, address, source, your_message FROM customers WHERE id = ? AND company_id = ?',
-      [leadId, user.company_id],
+      [leadId, paramCompanyId],
     )
     const lead = leads[0]
 
@@ -82,24 +80,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       throw new Error('Lead not found')
     }
 
-    return { user, lead }
+    return { lead }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  let companyId = 0
+  const paramCompanyId = Number(params.companyId)
+  if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+    return redirect(`/login?error=invalid_company_id`)
+  }
   try {
-    const user = await getEmployeeUser(request)
-    const paramCompanyId = Number(params.companyId)
-    if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
-      return redirect(`/login?error=invalid_company_id`)
-    }
-    if (paramCompanyId !== user.company_id) {
-      return redirect(`/external/marketing/${user.company_id}/leads`)
-    }
-    companyId = user.company_id
+    await getMarketingUser(request, paramCompanyId)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -124,7 +117,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         data.address || null,
         data.your_message || null,
         leadId,
-        companyId,
+        paramCompanyId,
       ],
     )
   } catch {

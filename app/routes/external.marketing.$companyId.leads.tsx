@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { format } from 'date-fns'
 import { useState } from 'react'
@@ -13,13 +14,19 @@ import {
 import { DealsByStage } from '~/components/DealsByStage'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { DateRangeControls } from '~/components/molecules/DateRangeControls'
+import { RawObjectSelect } from '~/components/molecules/RawSelect'
 import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getMarketingUser } from '~/utils/session.server'
+
+interface Company {
+  id: number
+  name: string
+}
 
 interface Lead {
   id: number
@@ -37,16 +44,12 @@ interface Lead {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  let paramCompanyId: number | undefined
+  const companyId = Number(params.companyId)
+  if (Number.isNaN(companyId) || !Number.isFinite(companyId) || companyId <= 0) {
+    return redirect('/login?error=invalid_company_id')
+  }
   try {
-    const user = await getEmployeeUser(request)
-    paramCompanyId = Number(params.companyId)
-    if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
-      return redirect('/login?error=invalid_company_id')
-    }
-    if (paramCompanyId !== user.company_id) {
-      return redirect(`/external/marketing/${user.company_id}/leads`)
-    }
+    await getMarketingUser(request, companyId)
   } catch {
     return redirect('/login')
   }
@@ -80,7 +83,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
-      paramCompanyId as number,
+      companyId,
     ],
   )
 
@@ -104,7 +107,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
-      paramCompanyId as number,
+      companyId,
     ],
   )
 
@@ -131,7 +134,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
-      paramCompanyId as number,
+      companyId,
     ],
   )
 
@@ -170,12 +173,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
-      paramCompanyId as number,
+      companyId,
     ],
   )
 
   return data({
-    companyId: paramCompanyId as number,
+    companyId,
     leads,
     deals,
     lists,
@@ -196,6 +199,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   })
 }
 
+async function fetchCompanies(): Promise<Company[]> {
+  const res = await fetch(`/api/user/allCompanies`)
+  if (!res.ok) throw new Error('Failed to fetch companies')
+  const json = await res.json()
+  return json.companies
+}
+
 function ExternalMarketingLeads() {
   const {
     companyId,
@@ -213,6 +223,13 @@ function ExternalMarketingLeads() {
     if (!dealStatusByCustomer.has(d.customer_id))
       dealStatusByCustomer.set(d.customer_id, d.status)
   }
+
+  const { data: companies = [] } = useQuery({
+    queryKey: ['companies'],
+    queryFn: fetchCompanies,
+  })
+
+  const cleanCompanies = companies.map(c => ({ key: c.id.toString(), value: c.name }))
 
   const rows: Lead[] = leads.map(lead => ({
     id: lead.id,
@@ -357,7 +374,6 @@ function ExternalMarketingLeads() {
     fromDate ? new Date(fromDate) : undefined,
   )
   const [to, setTo] = useState<Date | undefined>(toDate ? new Date(toDate) : undefined)
-
   const [page, setPage] = useState(1)
   const pageSize = 50
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
@@ -369,6 +385,18 @@ function ExternalMarketingLeads() {
   return (
     <div>
       <PageLayout title='Marketing'>
+        <div className='w-fit mb-2'>
+          {companies.length > 1 && (
+            <RawObjectSelect
+              label='Company'
+              options={cleanCompanies}
+              value={companyId.toString()}
+              onChange={key => {
+                navigate(`/external/marketing/${key}/leads`)
+              }}
+            />
+          )}
+        </div>
         <Button
           type='button'
           className='w-fit'

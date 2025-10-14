@@ -8,6 +8,7 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
@@ -57,6 +58,20 @@ const userschema = z.object({
     z.array(z.coerce.number()),
     z.coerce.number().transform(val => [val]),
   ]),
+  marketing_company_ids: z
+    .union([
+      z.string().transform(val => {
+        if (!val) return []
+        return val
+          .split(',')
+          .map(id => parseInt(id.trim()))
+          .filter(id => !Number.isNaN(id))
+      }),
+      z.array(z.coerce.number()),
+      z.coerce.number().transform(val => [val]),
+    ])
+    .optional()
+    .default([]),
   is_admin: z.boolean(),
 })
 
@@ -102,16 +117,32 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   await db.execute('DELETE FROM users_positions WHERE user_id = ?', [userId])
 
-  for (const positionId of data.positions) {
-    await db.execute(
-      'INSERT INTO users_positions (user_id, position_id) VALUES (?, ?)',
-      [userId, positionId],
-    )
+  const uniquePositions = [...new Set(data.positions)]
+  const uniqueMarketingCompanies = [...new Set(data.marketing_company_ids ?? [])]
+
+  for (const positionId of uniquePositions) {
+    if (positionId === 7) {
+      const companies =
+        uniqueMarketingCompanies.length > 0
+          ? uniqueMarketingCompanies
+          : [data.company_id]
+      for (const companyId of companies) {
+        await db.execute(
+          'INSERT INTO users_positions (user_id, position_id, company_id) VALUES (?, ?, ?)',
+          [userId, positionId, companyId],
+        )
+      }
+    } else {
+      await db.execute(
+        'INSERT INTO users_positions (user_id, position_id, company_id) VALUES (?, ?, ?)',
+        [userId, positionId, data.company_id],
+      )
+    }
   }
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'User updated'))
-  return redirect('..', {
+  return redirect(`..`, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }
@@ -158,6 +189,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     [userId],
   )
 
+  const marketingCompanies = await selectMany<{ company_id: number }>(
+    db,
+    'SELECT company_id FROM users_positions WHERE user_id = ? AND position_id = 7',
+    [userId],
+  )
+
   const companies = await selectMany<Company>(db, 'SELECT id, name FROM company')
   const positions = POSITIONS.map(p => ({
     key: p.id,
@@ -169,17 +206,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     userPositions: userPositions.map(up => up.position_id),
     companies: companies.map(c => ({ key: c.id, value: c.name })),
     positions: positions,
+    marketingCompanyIds: marketingCompanies.map(mc => mc.company_id),
   }
 }
 
 export default function User() {
+  const location = useLocation()
   const navigate = useNavigate()
-  const { user, userPositions, companies, positions } = useLoaderData<{
-    user: User
-    userPositions: number[]
-    companies: Array<{ key: number; value: string }>
-    positions: Array<{ key: number; value: string }>
-  }>()
+  const { user, userPositions, companies, positions, marketingCompanyIds } =
+    useLoaderData<{
+      user: User
+      userPositions: number[]
+      companies: Array<{ key: number; value: string }>
+      positions: Array<{ key: number; value: string }>
+      marketingCompanyIds: number[]
+    }>()
 
   const token = useAuthenticityToken()
   const form = useForm<FormData>({
@@ -190,14 +231,16 @@ export default function User() {
       email: user.email || '',
       company_id: user.company_id,
       positions: userPositions,
+      marketing_company_ids: marketingCompanyIds,
       is_admin: user.is_admin === 1,
     },
   })
 
   const fullSubmit = useFullSubmit(form)
+  const isSubmitting = form.formState.isSubmitting
   const handleChange = (open: boolean) => {
     if (!open) {
-      navigate('..')
+      navigate(`..${location.search}`)
     }
   }
 
@@ -305,9 +348,50 @@ export default function User() {
                   </div>
                 )}
               />
+              {form.watch('positions').includes(7) && (
+                <div className='col-span-2 border-t pt-2 mt-2'>
+                  <div className='text-sm font-medium mb-2'>
+                    External Marketing Companies
+                  </div>
+                  {companies.map(company => (
+                    <FormField
+                      key={company.key}
+                      control={form.control}
+                      name='marketing_company_ids'
+                      render={({ field }) => (
+                        <div className='flex items-center space-x-2'>
+                          <Switch
+                            id={`marketing-company-${company.key}`}
+                            checked={field.value.includes(company.key)}
+                            onCheckedChange={checked => {
+                              if (checked) {
+                                field.onChange([...field.value, company.key])
+                              } else {
+                                field.onChange(
+                                  field.value.filter(
+                                    (id: number) => id !== company.key,
+                                  ),
+                                )
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`marketing-company-${company.key}`}
+                            className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
+                          >
+                            {company.value}
+                          </label>
+                        </div>
+                      )}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
             <DialogFooter>
-              <Button type='submit'>Save</Button>
+              <Button type='submit' disabled={isSubmitting}>
+                Save
+              </Button>
             </DialogFooter>
           </Form>
         </FormProvider>
