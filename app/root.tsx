@@ -165,6 +165,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
         return redirect(target)
       }
     }
+
+    // Auto-redirect Marketing users to their External Marketing page
+    if (hasExternalMarketing) {
+      const marketingTarget = `/external/marketing/${user.company_id}/leads`
+      if (!url.pathname.startsWith('/external/marketing/')) {
+        return redirect(marketingTarget)
+      }
+    }
   }
 
   return data(
