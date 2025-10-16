@@ -82,7 +82,8 @@ export async function action({ request }: ActionFunctionArgs) {
       WHERE 
         (after_id = ? OR (after_id IS NULL AND ? IS NULL))
         AND id != ?
-        AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL));`
+        AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL))
+        AND company_id = ?;`
   await db.execute(query, [
     insertId,
     data.after_id,
@@ -90,6 +91,7 @@ export async function action({ request }: ActionFunctionArgs) {
     insertId,
     parentId,
     parentId,
+    user.company_id,
   ])
 
   const session = await getSession(request.headers.get('Cookie'))
@@ -106,9 +108,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
+  const user = await getAdminUser(request)
   const instructions = await selectMany<InstructionsBasic>(
     db,
-    'SELECT id, parent_id, title FROM instructions',
+    'SELECT id, parent_id, title FROM instructions WHERE company_id = ?',
+    [user.company_id],
   )
   if (!instructions) {
     return { instructions: [] }

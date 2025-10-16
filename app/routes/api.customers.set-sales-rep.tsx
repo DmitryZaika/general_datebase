@@ -11,26 +11,42 @@ export async function action({ request }: ActionFunctionArgs) {
     return data({ error: 'customer_id required' }, { status: 400 })
   }
   try {
-    await db.query(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
-      sales_rep,
-      customer_id,
-    ])
+    await db.query(
+      `UPDATE customers SET sales_rep = ?, assigned_date = NOW() WHERE id = ?`,
+      [sales_rep, customer_id],
+    )
 
-    // --- auto add to New Customers list of assigned user ---
+    // --- handle deals when assigning a sales rep ---
     if (sales_rep) {
       // глобальный список "New Customers" имеет id = 1
       const listId = 1
 
-      // следующая позиция в списке
-      const [posRow] = await db.query(
-        'SELECT COALESCE(MAX(position),0)+1 AS next FROM deals WHERE list_id = ? AND deleted_at IS NULL',
-        [listId],
+      // удалить активные сделки этого клиента у прошлого продавца
+      await db.execute(
+        'UPDATE deals SET user_id = ? WHERE customer_id = ? AND user_id <> ? AND deleted_at IS NULL',
+        [sales_rep, customer_id, sales_rep],
       )
 
-      await db.execute(
-        'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
-        [customer_id, 'new', 1, posRow, sales_rep],
+      // проверить, есть ли уже активная сделка у нового продавца
+      const [existingRows] = await db.query(
+        'SELECT id FROM deals WHERE customer_id = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1',
+        [customer_id, sales_rep],
       )
+      const hasExisting = (existingRows as Array<{ id: number }>).length > 0
+
+      if (!hasExisting) {
+        // следующая позиция в списке
+        const [posRows] = await db.query(
+          'SELECT COALESCE(MAX(position),0)+1 AS next FROM deals WHERE list_id = ? AND deleted_at IS NULL',
+          [listId],
+        )
+        const nextPos = (posRows as Array<{ next: number }>)[0]?.next ?? 1
+
+        await db.execute(
+          'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
+          [customer_id, 'New Customer', listId, nextPos, sales_rep],
+        )
+      }
     }
 
     if (sales_rep) {

@@ -1,5 +1,4 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import type { RowDataPacket } from 'mysql2'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
@@ -21,8 +20,15 @@ import { FormField } from '~/components/ui/form'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions'
+import { Positions } from '~/types'
 import { csrf } from '~/utils/csrf.server'
-import { getEmployeeUser, login } from '~/utils/session.server'
+import { selectMany } from '~/utils/queryHelpers'
+import {
+  getEmployeeUser,
+  getUserBySessionId,
+  login,
+  type SessionUser,
+} from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 const userSchema = z.object({
@@ -42,6 +48,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { searchParams } = new URL(request.url)
   const error = searchParams.get('error')
   return { error }
+}
+
+async function getRedirectPath(user: SessionUser): Promise<string> {
+  const positions = await selectMany<{ position_id: number }>(
+    db,
+    `SELECT position_id from users_positions where user_id = ?`,
+    [user.id],
+  )
+  if (positions.length === 0) return '..'
+  if (positions.length > 1) return '..'
+  if (positions[0].position_id === Positions.Installer)
+    return `/installers/${user.company_id}/checklist`
+  if (positions[0].position_id === Positions.ExternalMarketing)
+    return `/external/marketing/${user.company_id}/leads`
+  return '..'
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -66,21 +87,21 @@ export async function action({ request }: ActionFunctionArgs) {
       defaultValues: { ...defaultValues, password: '' },
     }
   }
+
   const session = await getSession(request.headers.get('Cookie'))
   session.set('sessionId', sessionId)
 
-  const [row] = await db.execute<(RowDataPacket & { position: string | null })[]>(
-    `SELECT p.name AS position
-       FROM users u
-       LEFT JOIN positions p ON p.id = u.position_id
-     WHERE u.email = ? LIMIT 1`,
-    [data.email],
-  )
-  const position = row?.[0]?.position ?? null
+  const user = await getUserBySessionId(sessionId)
+  if (!user) {
+    return {
+      error: 'Failed to create session. Please try again.',
+      defaultValues: { ...defaultValues, password: '' },
+    }
+  }
 
   session.flash('message', toastData('Success', 'Logged in'))
 
-  const redirectPath = position === 'installer' ? '/installers/checklist' : '..'
+  const redirectPath = await getRedirectPath(user)
   return redirect(redirectPath, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
@@ -94,7 +115,7 @@ export default function Login() {
     resolver: zodResolver(userSchema),
     defaultValues: actionData?.defaultValues || { email: '', password: '' },
   })
-  const fullSubmit = useFullSubmit(form)
+  const fullSubmit = useFullSubmit(form, undefined, 'POST', undefined, true)
   const isSubmitting = navigation.state !== 'idle'
 
   return (

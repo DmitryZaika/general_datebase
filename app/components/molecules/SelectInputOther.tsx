@@ -39,7 +39,9 @@ export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>
 }: SelectInputOtherProps<TFieldValues>) {
   const fullOptions = [...options, { key: 'other', value: 'Other' }]
   const asList = fullOptions.map(({ key }) => key)
-  const [isOtherSelected, setIsOtherSelected] = useState(!asList.includes(field.value))
+  const [isOtherSelected, setIsOtherSelected] = useState(
+    field.value ? !asList.includes(field.value) : false,
+  )
 
   const handleValueChange = (value: string) => {
     if (value === 'other') {
@@ -64,6 +66,7 @@ export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>
         {isOtherSelected ? (
           <Input
             placeholder='Enter custom value'
+            name={field.name}
             value={field.value}
             onChange={field.onChange}
             disabled={disabled}
@@ -72,7 +75,7 @@ export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>
           />
         ) : (
           <Select
-            value={field.value || defaultValue}
+            value={field.value || defaultValue || ''}
             onValueChange={handleValueChange}
             disabled={disabled}
           >
@@ -86,6 +89,8 @@ export function SelectInputOther<TFieldValues extends FieldValues = FieldValues>
                 </SelectItem>
               ))}
             </SelectContent>
+            {/* Hidden input to submit value with native form submit */}
+            <input type='hidden' name={field.name} value={field.value || ''} />
           </Select>
         )}
       </FormControl>

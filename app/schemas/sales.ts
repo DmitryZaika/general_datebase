@@ -10,11 +10,13 @@ export const slabOptionsSchema = z.object({
 const sinkOptionsSchema = z.object({
   id: z.coerce.number().optional(),
   type_id: z.coerce.number(),
+  price: z.coerce.number(),
 })
 
 const faucetOptionsSchema = z.object({
   id: z.coerce.number().optional(),
   type_id: z.coerce.number(),
+  price: z.coerce.number(),
 })
 
 export const extrasSchema = z.record(
@@ -39,6 +41,7 @@ export const EXTRA_DEFAULTS = {
 export const roomSchema = z.object({
   room: z.string().default('kitchen'),
   room_id: z.string().default(uuidv7),
+  stone_id: z.coerce.number().optional(),
   sink_type: z.array(sinkOptionsSchema).default([]),
   faucet_type: z.array(faucetOptionsSchema).default([]),
   backsplash: z.string().default('no'),
@@ -65,11 +68,15 @@ export const finalExtrasSchema = z.object({
 export type TFullExtrasSchema = z.infer<typeof finalExtrasSchema>[]
 
 export const customerSchema = z.object({
-  customer_id: z.coerce.number().nullish(),
+  customer_id: z.coerce
+    .number({
+      required_error: 'Please add a customer',
+      invalid_type_error: 'Please add a customer',
+    })
+    .min(1, 'Please add a customer'),
   seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
   project_address: z.string().optional(),
   notes_to_sale: StringOrNumber,
-
   price: z.coerce.number().default(0),
   company_name: z.string().nullable().optional(),
   rooms: z.array(roomSchema).default([]),

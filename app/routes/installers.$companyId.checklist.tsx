@@ -7,12 +7,11 @@ import {
   Form,
   type LoaderFunctionArgs,
   redirect,
-  useLoaderData,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
-import { CustomerSearch } from '~/components/molecules/CustomerSearch'
+import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SignatureInput, type SigRef } from '~/components/molecules/SignatureInput'
 import { AddressInput } from '~/components/organisms/AddressInput'
@@ -31,7 +30,7 @@ import { toastData } from '~/utils/toastHelpers'
 // ----------------------
 const checklistSchema = z.object({
   customer_name: z.string().min(1, 'Required'),
-  installation_address: z.string().min(1, 'Required'),
+  installation_address: z.coerce.string().min(1, 'Required'),
   material_correct: z.union([z.literal('on'), z.literal('')]).optional(),
   seams_satisfaction: z.union([z.literal('on'), z.literal('')]).optional(),
   appliances_fit: z.union([z.literal('on'), z.literal('')]).optional(),
@@ -71,7 +70,7 @@ function convertCheckboxToBoolean(value: string | undefined): boolean {
 // -------------
 // Action
 // -------------
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await csrf.validate(request)
   } catch (_error) {
@@ -88,41 +87,48 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, receivedValues }
   }
 
-  // Ensure the current authenticated user (installer/admin) is captured for the checklist entry
   let installerId: number
+  let companyId: number
   try {
     const user = await getEmployeeUser(request)
     installerId = user.id
+    companyId = user.company_id
   } catch (_error) {
     return { error: 'Unauthorized' }
   }
 
-  try {
-    await db.execute(
-      `INSERT INTO checklists (
+  const paramCompanyId = Number(params.companyId)
+  if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+    return { error: 'Invalid company id' }
+  }
+  if (paramCompanyId !== companyId) {
+    return { error: 'Unauthorized' }
+  }
+
+  await db.execute(
+    `INSERT INTO checklists (
         customer_id, installer_id, customer_name, installation_address,
         material_correct, seams_satisfaction, appliances_fit, backsplashes_correct,
-        edges_correct, holes_drilled, cleanup_completed, comments, signature
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        formData.customer_id || null,
-        installerId,
-        formData.customer_name,
-        formData.installation_address,
-        convertCheckboxToBoolean(formData.material_correct),
-        convertCheckboxToBoolean(formData.seams_satisfaction),
-        convertCheckboxToBoolean(formData.appliances_fit),
-        convertCheckboxToBoolean(formData.backsplashes_correct),
-        convertCheckboxToBoolean(formData.edges_correct),
-        convertCheckboxToBoolean(formData.holes_drilled),
-        convertCheckboxToBoolean(formData.cleanup_completed),
-        formData.comments || null,
-        formData.signature,
-      ],
-    )
-  } catch {
-    return { error: 'Database save failed' }
-  }
+        edges_correct, holes_drilled, cleanup_completed, comments, signature, 
+        company_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      formData.customer_id || null,
+      installerId,
+      formData.customer_name,
+      formData.installation_address,
+      convertCheckboxToBoolean(formData.material_correct),
+      convertCheckboxToBoolean(formData.seams_satisfaction),
+      convertCheckboxToBoolean(formData.appliances_fit),
+      convertCheckboxToBoolean(formData.backsplashes_correct),
+      convertCheckboxToBoolean(formData.edges_correct),
+      convertCheckboxToBoolean(formData.holes_drilled),
+      convertCheckboxToBoolean(formData.cleanup_completed),
+      formData.comments || null,
+      formData.signature,
+      companyId,
+    ],
+  )
 
   // Flash success
   const session = await getSession(request.headers.get('Cookie'))
@@ -139,11 +145,17 @@ export async function action({ request }: ActionFunctionArgs) {
 // -------------
 // Loader (auth)
 // -------------
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
     const user = await getEmployeeUser(request)
-    const companyId = user.company_id
-    return { user, companyId }
+    const paramCompanyId = Number(params.companyId)
+    if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+      return redirect(`/login?error=invalid_company_id`)
+    }
+    if (paramCompanyId !== user.company_id) {
+      return redirect(`/installers/${user.company_id}/checklist`)
+    }
+    return { user, companyId: user.company_id }
   } catch (_error) {
     return redirect(`/login?error=${_error}`)
   }
@@ -155,7 +167,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AdminChecklists() {
   const token = useAuthenticityToken()
   const sigRef = useRef<SigRef>(null)
-  const { companyId } = useLoaderData<typeof loader>()
+  // const { companyId } = useLoaderData<typeof loader>()
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
@@ -184,7 +196,6 @@ export default function AdminChecklists() {
       sigRef.current?.clear()
     }
   }, [fetcher.state, fetcher.data, form])
-
   return (
     <div className='flex justify-center py-10'>
       <div className='w-full max-w-xl border rounded-md bg-white p-8 shadow-sm'>
@@ -199,7 +210,7 @@ export default function AdminChecklists() {
         <FormProvider {...form}>
           <Form method='post' onSubmit={fullSubmit}>
             <input type='hidden' name='csrf' value={token} />
-            <CustomerSearch
+            {/* <CustomerSearch
               onCustomerChange={value => form.setValue('customer_id', value ?? null)}
               selectedCustomer={form.watch('customer_id') ?? undefined}
               companyId={companyId}
@@ -208,6 +219,13 @@ export default function AdminChecklists() {
               setError={error =>
                 form.setError('customer_id', { message: error ?? undefined })
               }
+            /> */}
+            <FormField
+              control={form.control}
+              name='customer_name'
+              render={({ field }) => (
+                <InputItem name='Customer Name' placeholder='Customer' field={field} />
+              )}
             />
             <AddressInput form={form} field='installation_address' type='project' />
             <div className='my-4 space-y-2'>

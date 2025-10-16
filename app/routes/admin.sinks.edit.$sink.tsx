@@ -275,7 +275,7 @@ function SinkInformation({
               options={[
                 'Stainless 18 gauge',
                 'Stainless 16 gauge',
-                'Granite Composite',
+                'Composite',
                 'Ceramic',
                 'Farm House',
               ]}

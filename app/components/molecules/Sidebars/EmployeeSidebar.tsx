@@ -36,7 +36,6 @@ import {
 } from '~/components/ui/sidebar'
 import type { ISupplier } from '~/schemas/suppliers'
 import { getBase } from '~/utils/urlHelpers'
-import { SalesRepsFilter } from '../SalesRepsFilter'
 import { FaucetsFilters } from './FaucetsFilters'
 import { SinksFilters } from './SinksFilters'
 import { StonesFilters } from './StonesFilters'
@@ -158,11 +157,11 @@ const getItems = (
       //   url: `/employee/schedule`,
       //   icon: Calendar,
       // },
-      // {
-      //   title: 'Samples',
-      //   url: `/${base}/samples`,
-      //   icon: Package,
-      // },
+      {
+        title: 'Samples',
+        url: `/${base}/samples`,
+        icon: Package,
+      },
       {
         title: 'Checklists',
         url: `/employee/checklists`,
@@ -176,7 +175,6 @@ const getItems = (
         title: 'Deals',
         url: `/admin/deals`,
         icon: DollarSign,
-        component: () => <SalesRepsFilter />,
       },
       {
         title: 'Transactions',
@@ -192,6 +190,11 @@ const getItems = (
         title: 'User Panel',
         url: `/admin/users`,
         icon: Users,
+      },
+      {
+        title: 'Statistic',
+        url: `/admin/statistics`,
+        icon: DollarSign,
       },
     )
   }
@@ -225,10 +228,6 @@ export function EmployeeSidebar({
   )
 
   const inventoryTitles = ['Stones', 'Sinks', 'Faucets']
-<<<<<<< Updated upstream
-  const crmTitles = ['Customers', 'Deals']
-  const resourceTitles = ['Supports', 'Documents', 'Images', 'Instructions', 'Teach Mode']
-=======
 
   const crmTitles = ['Customers', 'Deals', 'Statistic']
   const resourceTitles = [
@@ -239,7 +238,6 @@ export function EmployeeSidebar({
     'Instructions',
     'Teach Mode',
   ]
->>>>>>> Stashed changes
   const operationTitles = ['Suppliers', 'Checklists', 'Special Order']
 
   const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))

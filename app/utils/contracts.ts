@@ -3,8 +3,8 @@ import type { Faucet, Sink } from '~/types'
 
 export const roomPrice = (
   room: TCustomerSchema['rooms'][number],
-  sink_type: Sink[],
-  faucet_type: Faucet[],
+  _sink_type: Sink[],
+  _faucet_type: Faucet[],
 ) => {
   let total = (room.square_feet || 0) * (room.retail_price || 0)
   for (const extra of Object.values(room.extras)) {
@@ -19,13 +19,9 @@ export const roomPrice = (
     }[typeof extra as 'number' | 'string' | 'object']
   }
 
-  for (const sink of room.sink_type) {
-    total += Number(sink_type.find(s => s.id === sink.type_id)?.retail_price || 0)
-  }
+  total += room.sink_type.reduce((acc, sink) => acc + Number(sink.price), 0)
+  total += room.faucet_type.reduce((acc, faucet) => acc + Number(faucet.price), 0)
 
-  for (const faucet of room.faucet_type) {
-    total += Number(faucet_type.find(f => f.id === faucet.type_id)?.retail_price || 0)
-  }
   return total
 }
 

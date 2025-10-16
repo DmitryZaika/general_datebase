@@ -4,7 +4,7 @@ import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { cn } from '~/lib/utils'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 interface ChecklistItem {
   id: number
@@ -23,8 +23,9 @@ interface ChecklistItem {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  let user: User
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -46,10 +47,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       u.name as installer_name
     FROM checklists c
     LEFT JOIN users u ON c.installer_id = u.id
+    WHERE c.company_id = ?
     ORDER BY c.created_at DESC
   `
 
-  const items = await selectMany<ChecklistItem>(db, query)
+  const items = await selectMany<ChecklistItem>(db, query, [user.company_id])
   return { items }
 }
 

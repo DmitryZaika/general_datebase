@@ -1,15 +1,21 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { RowDataPacket } from 'mysql2'
-import { useState } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
+  Outlet,
   redirect,
-  useLoaderData,
+  useLocation,
   useNavigate,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import DealsForm from '~/components/DealsForm'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions'
@@ -98,23 +104,34 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return { dealId, companyId: user.company_id, deal, user_id: user.id }
 }
 
-export default function DealEdit() {
+export default function DealsEdit() {
   const navigate = useNavigate()
-  const [open, setOpen] = useState(true)
-  const { companyId, dealId, deal, user_id } = useLoaderData<typeof loader>()
-  const handleOpenChange = (o: boolean) => {
-    setOpen(o)
-    if (!o) navigate('..')
+  const location = useLocation()
+  const handleChange = (open: boolean) => {
+    if (!open) {
+      navigate(`..${location.search}`)
+    }
   }
 
   return (
-    <DealsForm
-      open={open}
-      onOpenChange={handleOpenChange}
-      companyId={companyId}
-      dealId={dealId}
-      initial={deal}
-      user_id={user_id}
-    />
+    <Dialog open={true} onOpenChange={handleChange}>
+      <DialogContent className='sm:max-w-[500px] overflow-auto flex flex-col justify-baseline min-h-[390px] max-h-[95vh] p-5'>
+        <DialogHeader>
+          <DialogTitle>Edit Deal</DialogTitle>
+        </DialogHeader>
+        <Tabs
+          value={location.pathname.split('/').pop()}
+          onValueChange={value => navigate(value)}
+        >
+          <TabsList className='mb-5 grid grid-cols-4'>
+            <TabsTrigger value={`project${location.search}`}>Project</TabsTrigger>
+            <TabsTrigger value={`information${location.search}`}>General</TabsTrigger>
+            <TabsTrigger value={`images${location.search}`}>Images</TabsTrigger>
+            <TabsTrigger value={`documents${location.search}`}>Documents</TabsTrigger>
+          </TabsList>
+          <Outlet />
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   )
 }

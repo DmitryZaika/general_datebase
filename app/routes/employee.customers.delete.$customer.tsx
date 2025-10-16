@@ -3,6 +3,7 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
 } from 'react-router'
 import { DeleteRow } from '~/components/pages/DeleteRow'
@@ -38,9 +39,13 @@ export async function action({ params, request }: ActionFunctionArgs) {
     return { error: 'Failed to delete customer' }
   }
 
+  const url = new URL(request.url)
+  const searchParams = url.searchParams.toString()
+  const searchString = searchParams ? `?${searchParams}` : ''
+
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Customer deleted'))
-  return redirect('..', {
+  return redirect(`..${searchString}`, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }
@@ -74,10 +79,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 export default function CustomerDelete() {
   const navigate = useNavigate()
   const { customer_name } = useLoaderData<typeof loader>()
-
+  const location = useLocation()
   const handleChange = (open: boolean) => {
     if (open === false) {
-      navigate('..')
+      navigate(`..${location.search}`)
     }
   }
   return (

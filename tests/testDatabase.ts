@@ -160,8 +160,8 @@ export class TestDataFactory {
     return {
       room: 'kitchen',
       room_id: 'dcdd9054-dadd-431d-a861-d0639f70f67b',
-      sink_type: [{ id: 1, type_id: 1 }],
-      faucet_type: [{ id: 1, type_id: 1 }],
+      sink_type: [{ id: 1, type_id: 1, price: 0 }],
+      faucet_type: [{ id: 1, type_id: 1, price: 0 }],
       backsplash: 'No',
       square_feet: 25,
       retail_price: 2500,

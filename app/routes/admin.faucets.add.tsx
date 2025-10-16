@@ -126,7 +126,7 @@ export default function FaucetsAdd() {
             render={({ field }) => (
               <InputItem
                 inputAutoFocus={true}
-                name={'Name'}
+                name={'Name*'}
                 placeholder={'Name of the faucet'}
                 field={field}
               />
