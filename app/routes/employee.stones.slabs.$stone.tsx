@@ -644,7 +644,10 @@ export default function SlabsModal() {
     })
   })
 
-  const uniqueSlabs = sortedSlabs
+  // Ensure slabs that reference a missing parent (orphans) are still shown
+  const addedIds = new Set(sortedSlabs.map(s => s.id))
+  const orphanSlabs = allSlabs.filter(s => !addedIds.has(s.id))
+  const uniqueSlabs = [...sortedSlabs, ...orphanSlabs]
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
