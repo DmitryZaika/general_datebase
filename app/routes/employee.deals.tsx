@@ -10,16 +10,19 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
+  useLocation,
+  useNavigate,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import DealsList from '~/components/DealsList'
+import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions'
@@ -75,89 +78,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        WHERE deleted_at IS NULL AND user_id = ?`,
       [user.id],
     )
+    const imagesCounts = await selectMany<{ deal_id: number; count: number }>(
+      db,
+      'SELECT deal_id, COUNT(*) as count FROM deals_images GROUP BY deal_id',
+    )
+    const imagesMap: Record<number, boolean> = {}
+    for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
     const customers = await selectMany<{ id: number; name: string }>(
       db,
       'SELECT id, name FROM customers WHERE company_id = ?',
       [user.company_id],
     )
-    return { deals, customers, lists }
+    return { deals, customers, lists, imagesMap }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
-// const AddList = ({ setOpen }: { open: boolean; setOpen: (o: boolean) => void }) => {
-//   const wrapperRef = useRef<HTMLDivElement>(null)
-//   const form = useForm<DealListSchema>({
-//     resolver: zodResolver(dealListSchema),
-//     defaultValues: { name: '' },
-//   })
-
-//   useEffect(() => {
-//     function handleClickOutside(e: MouseEvent) {
-//       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-//         setOpen(true)
-//       }
-//     }
-//     document.addEventListener('mousedown', handleClickOutside)
-//     return () => document.removeEventListener('mousedown', handleClickOutside)
-//   }, [setOpen])
-
-//   const fullSubmit = useFullSubmit<DealListSchema>(form)
-
-//   const onValid = () => {
-//     fullSubmit()
-//     setOpen(true)
-//   }
-
-//   return (
-//     <motion.div
-//       key='addlist-panel'
-//       ref={wrapperRef}
-//       initial={{ x: -320, opacity: 0 }}
-//       animate={{ x: 0, opacity: 1 }}
-//       exit={{ x: -320, opacity: 0 }}
-//       transition={{ type: 'spring', stiffness: 260, damping: 25 }}
-//       className='w-[260px] sm:w-[320px] h-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl p-5 space-y-4'
-//     >
-//       <div className='flex items-center justify-between'>
-//         <h2 className='text-lg font-semibold text-zinc-800 dark:text-zinc-100'>
-//           New list
-//         </h2>
-//         <Button
-//           variant='ghost'
-//           type='button'
-//           onClick={() => setOpen(true)}
-//           className='text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-//         >
-//           <X size={18} />
-//         </Button>
-//       </div>
-
-//       <FormProvider {...form}>
-//         <Form id='listForm' onSubmit={form.handleSubmit(onValid)}>
-//           <FormField
-//             control={form.control}
-//             name='name'
-//             render={({ field }) => (
-//               <InputItem field={field} inputAutoFocus placeholder='Enter list name…' />
-//             )}
-//           />
-
-//           <div className='flex justify-end gap-3 pt-1'>
-//             <Button type='button' variant='outline' onClick={() => setOpen(true)}>
-//               Cancel
-//             </Button>
-//             <Button type='submit'>Add list</Button>
-//           </div>
-//         </Form>
-//       </FormProvider>
-//     </motion.div>
-//   )
-// }
-
 export default function EmployeeDeals() {
-  const { deals, customers, lists } = useLoaderData<typeof loader>()
+  const { deals, customers, lists, imagesMap } = useLoaderData<typeof loader>()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   type Deal = {
     id: number
@@ -169,6 +110,7 @@ export default function EmployeeDeals() {
     position?: number
     list_id: number
     due_date?: string | null
+    has_images?: boolean
   }
 
   const toDeal = (d: FullDeal): Deal => {
@@ -187,6 +129,7 @@ export default function EmployeeDeals() {
           ? d.due_date
           : new Date(d.due_date).toISOString().slice(0, 10)
         : null,
+      has_images: imagesMap?.[d.id] || false,
     }
   }
 
@@ -217,8 +160,18 @@ export default function EmployeeDeals() {
 
   const [board, setBoard] = useState<Record<number, Deal[]>>(initialBoard)
   const [activeId, setActiveId] = useState<number | null>(null)
+  const [highlightDealId, setHighlightDealId] = useState<number | null>(null)
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => setBoard(initialBoard), [JSON.stringify(initialBoard)])
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -239,6 +192,14 @@ export default function EmployeeDeals() {
     for (const l of lists) {
       const hit = board[l.id]?.find(d => d.id === dealId)
       if (hit) return hit
+    }
+    return undefined
+  }
+
+  const findDealIdByCustomer = (customerId: number): number | undefined => {
+    for (const l of lists) {
+      const hit = board[l.id]?.find(d => d.customer_id === customerId)
+      if (hit) return hit.id
     }
     return undefined
   }
@@ -281,7 +242,12 @@ export default function EmployeeDeals() {
       const toArr = [...(copy[toListId] || [])]
       const idx = fromArr.findIndex(d => d.id === activeId)
       if (idx === -1) return prev
-      const moved = { ...fromArr[idx], list_id: toListId }
+      const shouldClearDate = toListId === 4 || toListId === 5
+      const moved = {
+        ...fromArr[idx],
+        list_id: toListId,
+        due_date: shouldClearDate ? null : fromArr[idx].due_date,
+      }
       fromArr.splice(idx, 1)
       toArr.push(moved)
       copy[fromListId] = sortDeals(fromArr)
@@ -297,6 +263,13 @@ export default function EmployeeDeals() {
       }),
     })
     setActiveId(null)
+
+    if (toListId === 5) {
+      const fromPos = findDeal(activeId)?.position ?? 0
+      navigate(
+        `reason?dealId=${activeId}&fromListId=${fromListId}&fromPos=${fromPos}${location.search}`,
+      )
+    }
   }
 
   return (
@@ -311,6 +284,49 @@ export default function EmployeeDeals() {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
+      <div className='w-full flex justify-end mb-2'>
+        <FindCustomer
+          disableRowClick
+          onEdit={customerId => {
+            const dealId = findDealIdByCustomer(customerId)
+            if (dealId) navigate(`edit/${dealId}/information${location.search}`)
+          }}
+          onDelete={customerId => {
+            const dealId = findDealIdByCustomer(customerId)
+            if (dealId) navigate(`edit/${dealId}/delete`)
+          }}
+          onSelect={customerId => {
+            const dealId = findDealIdByCustomer(customerId)
+            if (!dealId) return
+
+            if (highlightTimeoutRef.current) {
+              clearTimeout(highlightTimeoutRef.current)
+            }
+
+            setHighlightDealId(null)
+
+            const el = document.getElementById(`deal-${dealId}`)
+            if (el) {
+              el.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+                inline: 'center',
+              })
+            }
+
+            setTimeout(() => {
+              setHighlightDealId(dealId)
+            }, 10)
+
+            highlightTimeoutRef.current = setTimeout(() => {
+              setHighlightDealId(null)
+              highlightTimeoutRef.current = null
+            }, 2010)
+          }}
+          resolveId={findDealIdByCustomer}
+          noActionsLabel='No Deals'
+        />
+      </div>
       <div className='flex  gap-4'>
         {lists.map(list => (
           <DealsList
@@ -318,6 +334,7 @@ export default function EmployeeDeals() {
             title={list.name}
             customers={board[list.id] ?? []}
             id={list.id}
+            highlightedDealId={highlightDealId ?? undefined}
           />
         ))}
         <Outlet />
@@ -343,6 +360,7 @@ export default function EmployeeDeals() {
             })()
           : null}
       </DragOverlay>
+      <Outlet />
     </DndContext>
   )
 }

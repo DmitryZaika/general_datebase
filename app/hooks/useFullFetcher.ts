@@ -10,23 +10,23 @@ export function useFullFetcher<TFieldValues extends FieldValues = FieldValues>(
   const fetcher = useFetcher()
   const token = useAuthenticityToken()
 
-  const cleanData = (data: object) => {
-    return Object.fromEntries(
-      Object.entries(data).map(([key, value]) => [
-        key,
-        value === undefined ? null : value,
-      ]),
-    )
+  const toFormData = (data: Record<string, unknown>) => {
+    const fd = new FormData()
+    for (const [key, value] of Object.entries(data)) {
+      if (value === undefined || value === null) continue
+      fd.append(key, String(value))
+    }
+    return fd
   }
 
   const fullSubmit = form.handleSubmit(async data => {
-    const sanitizedData = cleanData(data)
-    sanitizedData.csrf = token
+    const payload = { ...data, csrf: token } as Record<string, unknown>
+    const formData = toFormData(payload)
 
-    await fetcher.submit(sanitizedData, {
+    await fetcher.submit(formData, {
       method: method,
       action: action,
-      encType: 'application/x-www-form-urlencoded',
+      encType: 'multipart/form-data',
     })
   })
 

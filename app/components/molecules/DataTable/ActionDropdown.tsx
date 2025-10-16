@@ -16,6 +16,11 @@ interface IProps {
   label?: string
   className?: string
   wrapperClassName?: string
+  onItemClick?: (
+    action: string,
+    link: string,
+    e: React.MouseEvent,
+  ) => boolean | undefined
 }
 
 export const ActionDropdown = ({
@@ -24,6 +29,7 @@ export const ActionDropdown = ({
   label = 'Actions',
   className,
   wrapperClassName,
+  onItemClick,
 }: IProps) => {
   const [open, setOpen] = useState(false)
 
@@ -51,7 +57,13 @@ export const ActionDropdown = ({
               <Link
                 to={link}
                 target={asBlank ? '_blank' : '_self'}
-                onClick={e => e.stopPropagation()}
+                onClick={e => {
+                  const result = onItemClick?.(action, link, e)
+                  if (result === false) {
+                    e.preventDefault()
+                  }
+                  e.stopPropagation()
+                }}
               >
                 {action.charAt(0).toUpperCase() + action.slice(1)}
               </Link>

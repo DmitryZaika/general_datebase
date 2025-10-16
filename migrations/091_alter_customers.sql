@@ -1,0 +1,1 @@
+ALTER TABLE customers ADD COLUMN invalid_lead varchar(255) DEFAULT NULL;

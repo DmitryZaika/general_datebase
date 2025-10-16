@@ -1,5 +1,16 @@
 export const DONE_KEY = '[DONE]035d8eba-9f8c-44c5-a1e0-290d1da033f7[/DONE]'
 
+export const LOST_REASONS = {
+  'Too expensive': 'Too expensive',
+  'Out of area': 'Out of area',
+  'Never responded': 'Never responded',
+  'Wrong number, email, etc.': 'Wrong number, email, etc.',
+  'Accident submission': 'Accident submission',
+  'Looking for unrelated service': 'Looking for unrelated service',
+  'Bought somewhere else': 'Bought somewhere else',
+  'Stopped responding': 'Stopped responding',
+}
+
 export const STONE_TYPES = [
   'granite',
   'quartz',
@@ -57,21 +68,19 @@ export const BASE_PRICES = {
     grill: 200,
     'n/a': 0,
   },
-}
-
-const OVERSIZE_PIECE = {
-  '20+ sqft': 200,
-  '40+ sqft': 400,
-  '50+ sqft': 500,
-}
-
-export const EDGE_TYPES = {
-  flat: 0,
-  eased: 100,
-  '1/4_bevel': 200,
-  '1/2_bevel': 200,
-  ogee: ({ linearFeet }: { linearFeet: number }) => linearFeet * 25,
-  bullnose: ({ linearFeet }: { linearFeet: number }) => linearFeet * 18,
+  oversize_piece: {
+    '20+ sqft': 200,
+    '40+ sqft': 400,
+    '50+ sqft': 500,
+  },
+  edge_type: {
+    flat: 0,
+    eased: 100,
+    '1/4_bevel': 200,
+    '1/2_bevel': 200,
+    ogee: ({ linearFeet }: { linearFeet: number }) => linearFeet * 25,
+    bullnose: ({ linearFeet }: { linearFeet: number }) => linearFeet * 18,
+  },
 }
 
 export const CUSTOMER_ITEMS = {
@@ -80,9 +89,9 @@ export const CUSTOMER_ITEMS = {
     priceFn: ({ miles }: Record<string, number>) => miles * 4,
   },
   oversize_piece: {
-    sqft: OVERSIZE_PIECE,
+    sqft: BASE_PRICES.oversize_piece,
     priceFn: ({ sqft }: Record<string, number | string>) =>
-      OVERSIZE_PIECE[sqft as keyof typeof OVERSIZE_PIECE],
+      BASE_PRICES.oversize_piece[sqft as keyof typeof BASE_PRICES.oversize_piece],
   },
   mitter_edge_price: {
     amount: 'number',
@@ -101,10 +110,11 @@ export const CUSTOMER_ITEMS = {
     priceFn: ({ price }: Record<string, number>) => price,
   },
   edge_price: {
-    edge_type: EDGE_TYPES,
+    edge_type: BASE_PRICES.edge_type,
     linear_feet: 'number',
     priceFn: ({ edge_type, linear_feet }: Record<string, number | string>) => {
-      const edgeType = EDGE_TYPES[edge_type as keyof typeof EDGE_TYPES]
+      const edgeType =
+        BASE_PRICES.edge_type[edge_type as keyof typeof BASE_PRICES.edge_type]
       if (typeof edgeType === 'function') {
         return edgeType({ linearFeet: Number(linear_feet) })
       }

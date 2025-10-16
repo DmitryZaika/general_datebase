@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Calendar, GripVertical, Pencil } from 'lucide-react'
+import { Calendar, GripVertical, PaperclipIcon, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher } from 'react-router'
 import { formatMoney, updateNumber } from './functions'
@@ -15,8 +15,12 @@ interface DealItemProps {
     list_id: number
     position?: number | null
     due_date?: string | null
+    images?: string[] | null
+    has_images?: boolean
+    sales_rep?: string | null
   }
   readonly?: boolean
+  highlighted?: boolean
 }
 
 function parseLocal(dateInput: string | null | undefined): Date {
@@ -37,7 +41,11 @@ function getDateColor(dateStr: string | null | undefined, listId: number): strin
   return selected < today ? 'text-red-500' : 'text-gray-500'
 }
 
-export default function DealItem({ deal, readonly = false }: DealItemProps) {
+export default function DealItem({
+  deal,
+  readonly = false,
+  highlighted = false,
+}: DealItemProps) {
   const [localDate, setLocalDate] = useState<string | null>(deal.due_date ?? null)
   const [editAmount, setEditAmount] = useState(false)
   const [editDesc, setEditDesc] = useState(false)
@@ -53,6 +61,13 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
     left: number
   } | null>(null)
   const fetcher = useFetcher()
+
+  const hasImages =
+    (Array.isArray(deal.images) && deal.images.length > 0) || Boolean(deal.has_images)
+
+  useEffect(() => {
+    setLocalDate(deal.due_date ?? null)
+  }, [deal.due_date])
 
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: deal.id,
@@ -100,7 +115,6 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
     }
   }, [editDesc])
 
-  // Detect if description exceeds 4 lines
   useEffect(() => {
     if (editDesc) return
     const el = descDisplayRef.current
@@ -110,7 +124,6 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
     const computedLineHeight = Number.isFinite(lh) ? lh : 20
     setLineHeightPx(computedLineHeight)
     const maxH = computedLineHeight * 4
-    // Use scrollHeight vs desired max height to decide overflow
     setDescOverflow(el.scrollHeight > maxH + 1)
   }, [deal.description, editDesc])
 
@@ -123,14 +136,14 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3 ${isSaving ? 'opacity-60' : ''}`}
+      id={`deal-${deal.id}`}
+      className={`relative flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3 ${isSaving ? 'opacity-60' : ''} ${highlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}
       {...(!readonly ? attributes : {})}
       {...(!readonly ? listeners : {})}
     >
-      {/* Title row with drag handle and edit icon */}
       <div className='flex items-center w-full gap-2'>
         <div
-          className={`flex items-center gap-2 flex-1 ${readonly ? '' : 'cursor-grab'}`}
+          className={`flex items-center gap-1 flex-1 ${readonly ? '' : 'cursor-grab'}`}
         >
           {!readonly && (
             <button
@@ -147,7 +160,7 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
         </div>
         {!readonly && (
           <Link
-            to={`edit/${deal.id}`}
+            to={`edit/${deal.id}/project`}
             className='absolute top-1 right-1 z-20'
             onPointerDown={e => e.stopPropagation()}
           >
@@ -198,7 +211,12 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
         )}
       </div>
 
-      {/* Description inline edit */}
+      {deal.sales_rep && (
+        <div className='absolute top-1 right-2 text-xs text-gray-500'>
+          {deal.sales_rep}
+        </div>
+      )}
+
       {editDesc ? (
         <textarea
           className='border rounded p-1  w-full text-sm'
@@ -275,7 +293,6 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
         )
       )}
 
-      {/* Date section */}
       {pickerCoords && (
         <input
           type='date'
@@ -297,29 +314,42 @@ export default function DealItem({ deal, readonly = false }: DealItemProps) {
           autoFocus
         />
       )}
-      {localDate ? (
-        <p
-          className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
-          onClick={e => !readonly && openPicker(e.currentTarget)}
-          onPointerDown={e => e.stopPropagation()}
-          style={{ position: 'relative', zIndex: 20 }}
-        >
-          {formatDisplay(localDate)}
-        </p>
-      ) : (
-        !readonly && (
-          <Button
-            variant='ghost'
-            size='icon'
-            className='h-3 w-3 p-2'
-            onClick={e => openPicker(e.currentTarget)}
+      <div className='flex items-center justify-between gap-2 w-full'>
+        {localDate ? (
+          <p
+            className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
+            onClick={e => !readonly && openPicker(e.currentTarget)}
             onPointerDown={e => e.stopPropagation()}
             style={{ position: 'relative', zIndex: 20 }}
           >
-            <Calendar className={`w-5 h-5 ${getDateColor(localDate, deal.list_id)}`} />
-          </Button>
-        )
-      )}
+            {formatDisplay(localDate)}
+          </p>
+        ) : (
+          !readonly && (
+            <Button
+              variant='ghost'
+              size='icon'
+              className='h-3 w-3 p-2'
+              onClick={e => openPicker(e.currentTarget)}
+              onPointerDown={e => e.stopPropagation()}
+              style={{ position: 'relative', zIndex: 20 }}
+            >
+              <Calendar
+                className={`w-5 h-5 ${getDateColor(localDate, deal.list_id)}`}
+              />
+            </Button>
+          )
+        )}
+        {hasImages && (
+          <Link
+            to={`edit/${deal.id}/images`}
+            className='text-slate-500 hover:text-black'
+            onPointerDown={e => e.stopPropagation()}
+          >
+            <PaperclipIcon className='w-4 h-4' />
+          </Link>
+        )}
+      </div>
     </div>
   )
 }

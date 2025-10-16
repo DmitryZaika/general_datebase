@@ -32,6 +32,13 @@ import type { Faucet, Sink } from '~/types'
 import { roomPrice } from '~/utils/contracts'
 import { CustomerSearch } from '../molecules/CustomerSearch'
 import { FullDynamicAdditions } from '../molecules/DynamicAdditions'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select'
 
 const resolver = zodResolver(customerSchema)
 
@@ -61,6 +68,14 @@ const fetchFaucetType = async (): Promise<Faucet[]> => {
   return data
 }
 
+type Seller = { id: number; name: string }
+const fetchSalesReps = async (): Promise<Seller[]> => {
+  const res = await fetch('/api/sales-reps')
+  if (!res.ok) throw new Error('Failed to fetch sales reps')
+  const json = await res.json()
+  return json.users ?? []
+}
+
 export function ContractForm({ startings, saleId, companyId }: IContractFormProps) {
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state !== 'idle'
@@ -72,6 +87,11 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
   const { data: faucet_type = [] } = useQuery({
     queryKey: ['faucet_type'],
     queryFn: fetchFaucetType,
+  })
+  const { data: sellers = [] } = useQuery({
+    queryKey: ['sales-reps', companyId],
+    queryFn: fetchSalesReps,
+    enabled: Boolean(saleId),
   })
   const [sameAddress, setSameAddress] = useState(true)
 
@@ -132,7 +152,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
     JSON.stringify(faucet_type),
     JSON.stringify(extrasValues),
   ])
-  form.setValue('price', totalRoomPrice)
+  form.setValue('price', Math.round(totalRoomPrice * 100) / 100)
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -145,9 +165,14 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
             <AuthenticityTokenInput />
             <div className=''>
               <CustomerSearch
-                onCustomerChange={value => form.setValue('customer_id', value ?? null)}
+                onCustomerChange={value =>
+                  form.setValue(
+                    'customer_id',
+                    value ?? (undefined as unknown as number),
+                  )
+                }
                 companyId={companyId}
-                source='user-input'
+                source={'user-input'}
                 selectedCustomer={form.watch('customer_id') ?? undefined}
                 error={form.formState.errors.customer_id?.message}
                 setError={error =>
@@ -166,14 +191,40 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
               {!sameAddress && (
                 <AddressInput form={form} field='project_address' type='project' />
               )}
+              {saleId && (
+                <FormField
+                  control={form.control}
+                  name='seller_id'
+                  render={({ field }) => (
+                    <div className='mb-2 w-3/4'>
+                      <Select
+                        value={field.value ? String(field.value) : ''}
+                        onValueChange={val => field.onChange(Number(val))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder='Select a seller' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sellers.map(s => (
+                            <SelectItem key={s.id} value={String(s.id)}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                />
+              )}
 
-              {form.watch('rooms').map((_room, index) => (
+              {form.watch('rooms').map((room, index) => (
                 <RoomSubForm
-                  key={index}
+                  key={room.room_id}
                   form={form}
                   index={index}
                   sink_type={sink_type}
                   faucet_type={faucet_type}
+                  isEdit={Boolean(saleId)}
                 />
               ))}
 

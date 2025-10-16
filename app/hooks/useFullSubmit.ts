@@ -7,6 +7,7 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
   action: undefined | string = undefined,
   method: 'POST' | 'DELETE' = 'POST',
   handleData?: (data: TFieldValues) => void,
+  navigateOnSubmit: boolean = false,
 ) {
   const submit = useSubmit()
   const token = useAuthenticityToken()
@@ -29,11 +30,11 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
       const sanitizedData = cleanData(data)
       sanitizedData.csrf = token
 
-      submit(sanitizedData, {
+      return submit(sanitizedData, {
         method: method,
         action: action,
         encType: 'application/x-www-form-urlencoded',
-        navigate: false,
+        navigate: navigateOnSubmit,
       })
     },
     () => {

@@ -139,7 +139,9 @@ export function StoneSearch({
               <div className='flex-1 flex-row '>
                 <div className='font-medium text-gray-800'>
                   {stone.name}
-                  {stone.available === 0 && (
+                  {(mode === 'samples'
+                    ? Number(stone.samples_amount ?? 0) <= 0
+                    : stone.available === 0) && (
                     <span className='ml-2 text-xs font-bold text-red-500'>
                       Out of Stock
                     </span>

@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { FormProvider, type UseFormReturn, useForm } from 'react-hook-form'
-import { Form, Link, Outlet, useSearchParams } from 'react-router'
+import { Form, Link } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { CustomerSearch } from '~/components/molecules/CustomerSearch'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
@@ -8,15 +8,8 @@ import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { InputItem } from './molecules/InputItem'
 import { LoadingButton } from './molecules/LoadingButton'
 import { Button } from './ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog'
+import { DialogFooter } from './ui/dialog'
 import { FormField } from './ui/form'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 
 function MainComponent({
   form,
@@ -30,9 +23,11 @@ function MainComponent({
   return (
     <>
       <CustomerSearch
-        onCustomerChange={value => form.setValue('customer_id', value ?? null)}
+        onCustomerChange={value =>
+          form.setValue('customer_id', value ?? (undefined as unknown as number))
+        }
         companyId={companyId}
-        source='user-input'
+        source={'user-input'}
         selectedCustomer={form.watch('customer_id') ?? undefined}
         error={form.formState.errors.customer_id?.message}
         setError={error =>
@@ -68,16 +63,12 @@ function MainComponent({
 
 export function DealsForm({
   initial,
-  open,
-  onOpenChange,
   hiddenFields = {},
   companyId,
   dealId,
   user_id,
 }: {
   initial?: Partial<DealsDialogSchema>
-  open: boolean
-  onOpenChange: (open: boolean) => void
   hiddenFields?: Record<string, string | number | boolean>
   companyId: number
   dealId?: number
@@ -88,81 +79,38 @@ export function DealsForm({
     defaultValues: { ...hiddenFields, ...(initial || {}), user_id },
   })
   const fullSubmit = useFullSubmit(form)
-  const [searchParams, setSearchParams] = useSearchParams()
-  const tab = searchParams.get('tab') || 'main'
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{dealId ? 'Edit Deal' : 'Create Deal'}</DialogTitle>
-        </DialogHeader>
+    <FormProvider {...form}>
+      <Form id='dealForm' method='post' onSubmit={fullSubmit}>
+        <AuthenticityTokenInput />
 
-        <FormProvider {...form}>
-          <Form id='dealForm' method='post' onSubmit={fullSubmit}>
-            <AuthenticityTokenInput />
+        {Object.entries(hiddenFields).map(([k, v]) => (
+          <input type='hidden' name={k} value={String(v)} key={k} />
+        ))}
 
-            {Object.entries(hiddenFields).map(([k, v]) => (
-              <input type='hidden' name={k} value={String(v)} key={k} />
-            ))}
+        <MainComponent form={form} companyId={companyId} dealId={dealId} />
 
-            <Tabs
-              defaultValue='main'
-              className='mt-2'
-              value={tab}
-              onValueChange={value => setSearchParams({ tab: value })}
-            >
-              <TabsList className='grid w-full grid-cols-4'>
-                <TabsTrigger value='main'>Main Info</TabsTrigger>
-                <TabsTrigger value='images'>Images</TabsTrigger>
-                <TabsTrigger value='documents'>Documents</TabsTrigger>
-                <TabsTrigger value='project'>Project Info</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value='main' className='space-y-2'>
-                <MainComponent form={form} companyId={companyId} dealId={dealId} />
-              </TabsContent>
-
-              <TabsContent value='images'>
-                <div className='text-sm text-gray-500'>
-                  Upload images will be available after creating the deal.
-                </div>
-              </TabsContent>
-
-              <TabsContent value='documents'>
-                <div className='text-sm text-gray-500'>
-                  Attach documents will be available after creating the deal.
-                </div>
-              </TabsContent>
-
-              <TabsContent value='project'>
-                <div className='text-sm text-gray-500'>Project info coming soon.</div>
-              </TabsContent>
-            </Tabs>
-
-            <DialogFooter>
-              <div className='flex justify-between gap-2 w-full'>
-                {dealId && (
-                  <div className='flex justify-start'>
-                    <Link to={`delete`} relative='path'>
-                      <Button variant='destructive' type='button' className='mb-4'>
-                        Delete
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-                <div className='flex justify-end w-full'>
-                  <LoadingButton loading={false} type='submit'>
-                    {dealId ? 'Save' : 'Create'}
-                  </LoadingButton>
-                </div>
+        <DialogFooter>
+          <div className='flex justify-between gap-2 w-full'>
+            {dealId && (
+              <div className='flex justify-start'>
+                <Link to={`../delete`} relative='path'>
+                  <Button variant='destructive' type='button' className='mb-4'>
+                    Delete
+                  </Button>
+                </Link>
               </div>
-            </DialogFooter>
-          </Form>
-        </FormProvider>
-      </DialogContent>
-      <Outlet />
-    </Dialog>
+            )}
+            <div className='flex justify-end w-full'>
+              <LoadingButton loading={false} type='submit'>
+                {dealId ? 'Save' : 'Create'}
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogFooter>
+      </Form>
+    </FormProvider>
   )
 }
 

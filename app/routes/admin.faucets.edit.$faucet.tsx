@@ -242,7 +242,7 @@ function FaucetInformation({
         control={form.control}
         name='name'
         render={({ field }) => (
-          <InputItem name='Name' placeholder='Faucet name' field={field} />
+          <InputItem name='Name*' placeholder='Faucet name' field={field} />
         )}
       />
       <div className='flex gap-2'>

@@ -43,7 +43,7 @@ export default function DeleteDeal() {
   const navigate = useNavigate()
   const handleChange = (open: boolean) => {
     if (!open) {
-      navigate(`..${window.location.search}`)
+      navigate(`../information${window.location.search}`)
     }
   }
 

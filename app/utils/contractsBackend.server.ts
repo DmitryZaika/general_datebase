@@ -46,6 +46,7 @@ interface Slab {
 interface Sink {
   type_id: number
   id: number
+  price: number
 }
 
 interface FullSink extends Sink {
@@ -104,12 +105,12 @@ const getSinks = async (slabIds: number[]): Promise<Record<number, Sink[]>> => {
   const sinkMap: Record<number, Sink[]> = {}
   const sinkRows = await selectMany<FullSink>(
     db,
-    `SELECT slab_id, id, sink_type_id as type_id FROM sinks WHERE slab_id IN (${placeholders}) AND is_deleted = 0`,
+    `SELECT slab_id, id, price, sink_type_id as type_id FROM sinks WHERE slab_id IN (${placeholders}) AND is_deleted = 0`,
     slabIds,
   )
   sinkRows.forEach(row => {
     if (!sinkMap[row.slab_id]) sinkMap[row.slab_id] = []
-    sinkMap[row.slab_id].push({ id: row.id, type_id: row.type_id })
+    sinkMap[row.slab_id].push({ id: row.id, type_id: row.type_id, price: row.price })
   })
   return sinkMap
 }
@@ -120,13 +121,13 @@ const getFaucets = async (slabIds: number[]): Promise<Record<number, Sink[]>> =>
   const faucetMap: Record<number, Sink[]> = {}
   const faucetRows = await selectMany<FullSink>(
     db,
-    `SELECT slab_id, id, faucet_type_id as type_id FROM faucets WHERE slab_id IN (${placeholders}) AND is_deleted = 0`,
+    `SELECT slab_id, id, price, faucet_type_id as type_id FROM faucets WHERE slab_id IN (${placeholders}) AND is_deleted = 0`,
     slabIds,
   )
 
   faucetRows.forEach(row => {
     if (!faucetMap[row.slab_id]) faucetMap[row.slab_id] = []
-    faucetMap[row.slab_id].push({ id: row.id, type_id: row.type_id })
+    faucetMap[row.slab_id].push({ id: row.id, type_id: row.type_id, price: row.price })
   })
   return faucetMap
 }

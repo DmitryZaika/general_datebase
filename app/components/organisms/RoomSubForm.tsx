@@ -79,11 +79,13 @@ export const RoomSubForm = ({
   index,
   sink_type,
   faucet_type,
+  isEdit,
 }: {
   form: UseFormReturn<TCustomerSchema>
   index: number
   sink_type: Sink[]
   faucet_type: Faucet[]
+  isEdit?: boolean
 }) => {
   const roomValues = form.watch(`rooms.${index}`)
 
@@ -107,7 +109,7 @@ export const RoomSubForm = ({
     if (slabIds.length > 0) {
       getStone(slabIds[0]).then(setStone)
     }
-  }, [])
+  }, [JSON.stringify(slabIds)])
 
   const { data: slabMap } = useQuery({
     queryKey: ['slabMap', slabIds],
@@ -115,6 +117,15 @@ export const RoomSubForm = ({
   })
 
   useEffect(() => {
+    const rp = form.getValues(`rooms.${index}.retail_price`) || 0
+    const sqft = form.getValues(`rooms.${index}.square_feet`) || 0
+    if (rp > 0 && sqft > 0) {
+      updateTotalPrice(sqft * rp)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isEdit) return
     if (stone?.name) {
       fetch(`/api/stones/search?name=${encodeURIComponent(stone?.name)}`)
         .then(response => response.json())
@@ -131,7 +142,7 @@ export const RoomSubForm = ({
           }
         })
     }
-  }, [index, stone?.id, stone?.name])
+  }, [isEdit, index, stone?.id, stone?.name])
 
   const handleSwitchSlab = (slabId: number, isFull: boolean) => {
     form.setValue(
@@ -337,7 +348,9 @@ export const RoomSubForm = ({
       </div>
 
       <div className='flex flex-col gap-2 mt-2'>
-        <DynamicAddition target='edge_price' form={form} index={index} />
+        <div className='border border-gray-200 rounded-md pt-2 px-2 flex gap-2'>
+          <DynamicAddition target='edge_price' form={form} index={index} />
+        </div>
 
         <div className='border border-gray-200 rounded-md p-2 flex gap-2'>
           <FormField
@@ -608,7 +621,18 @@ export const RoomSubForm = ({
                 </div>
                 <div className='flex items-center space-x-2'>
                   <div className='px-2 py-1 rounded-md text-sm bg-blue-100 text-blue-800'>
-                    ${sink_type.find(s => s.id === sink.type_id)?.retail_price}
+                    <FormField
+                      control={form.control}
+                      name={`rooms.${index}.sink_type.${sinkIndex}.price`}
+                      render={({ field }) => (
+                        <InputItem
+                          name={'Price'}
+                          placeholder={'Enter Price'}
+                          field={field}
+                          formClassName='mb-0'
+                        />
+                      )}
+                    />
                   </div>
                   <Button
                     type='button'
@@ -653,7 +677,18 @@ export const RoomSubForm = ({
                   </div>
                   <div className='flex items-center space-x-2'>
                     <div className='px-2 py-1 rounded-md text-sm bg-green-100 text-green-800'>
-                      ${faucet_type.find(f => f.id === faucet.type_id)?.retail_price}
+                      <FormField
+                        control={form.control}
+                        name={`rooms.${index}.faucet_type.${faucetIndex}.price`}
+                        render={({ field }) => (
+                          <InputItem
+                            name={'Price'}
+                            placeholder={'Enter Price'}
+                            field={field}
+                            formClassName='mb-0'
+                          />
+                        )}
+                      />
                     </div>
                     <Button
                       type='button'

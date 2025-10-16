@@ -1,5 +1,13 @@
 import { useState } from 'react'
+import type { LoaderFunctionArgs } from 'react-router'
+import { useLoaderData } from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
+import { getEmployeeUser } from '~/utils/session.server'
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const user = await getEmployeeUser(request)
+  return { company_id: user.company_id }
+}
 
 export default function SpecialOrder() {
   const [price, setPrice] = useState<number | undefined>()
@@ -7,7 +15,13 @@ export default function SpecialOrder() {
   const [length, setLength] = useState<number | undefined>()
   const [slabs, setSlabs] = useState(1)
   const [deliveryCost, setDeliveryCost] = useState<number | undefined>()
-  const taxRate = 0.07
+  const { company_id } = useLoaderData<typeof loader>()
+  // Set tax rate: 0.07 if company_id === 1, 0.08 if company_id === 3
+  function getTaxRate(company_id: number | undefined) {
+    if (company_id === 1) return 0.07
+    if (company_id === 3) return 0.08
+    return 0 // default or handle as needed
+  }
 
   const minusSlab = () => {
     if (slabs > 1) {
@@ -18,7 +32,8 @@ export default function SpecialOrder() {
   function calculateTotal() {
     const areaPerSlab = ((width || 0) * (length || 0)) / 144
     const totalSquareFeet = areaPerSlab * slabs
-    const materialCost = areaPerSlab * (price || 0) * slabs * (1 + taxRate)
+    const materialCost =
+      areaPerSlab * (price || 0) * slabs * (1 + getTaxRate(company_id))
     const totalCost = materialCost + (deliveryCost || 0)
     const costPerSqftWithDelivery = totalSquareFeet ? totalCost / totalSquareFeet : 0
 
@@ -60,22 +75,22 @@ export default function SpecialOrder() {
       <div className='flex gap-2'>
         <input
           type='number'
-          id='width'
-          placeholder='Width (inches)'
+          id='length'
+          placeholder='Length (inches)'
           min='0'
-          value={width === undefined ? '' : width}
-          onChange={e => setWidth(parseFloat(e.target.value))}
+          value={length === undefined ? '' : length}
+          onChange={e => setLength(parseFloat(e.target.value))}
           step='1'
           className='w-1/2 p-2 border border-gray-300 rounded-md text-base'
           onWheel={e => e.preventDefault()}
         />
         <input
           type='number'
-          id='length'
-          placeholder='Length (inches)'
+          id='width'
+          placeholder='Width (inches)'
           min='0'
-          value={length === undefined ? '' : length}
-          onChange={e => setLength(parseFloat(e.target.value))}
+          value={width === undefined ? '' : width}
+          onChange={e => setWidth(parseFloat(e.target.value))}
           step='1'
           className='w-1/2 p-2 border border-gray-300 rounded-md text-base'
           onWheel={e => e.preventDefault()}

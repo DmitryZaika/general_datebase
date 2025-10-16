@@ -36,6 +36,7 @@ export interface StoneImage {
   retail_price: number
   cost_per_sqft: number
   available: number
+  samples_amount: number
 }
 
 export type StoneSlim = Omit<Stone, 'retail_price'>
@@ -193,3 +194,14 @@ export interface TabsClassNames {
 }
 
 export type Period = 'day' | 'week' | 'month'
+
+export enum Positions {
+  SalesRep = 1,
+  SalesManager = 2,
+  ShopManager = 3,
+  ShopWorker = 4,
+  Manager = 5,
+  Installer = 6,
+  ExternalMarketing = 7,
+  CheckIn = 8,
+}

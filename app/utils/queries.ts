@@ -47,8 +47,15 @@ export const stoneQueryBuilder = async (
     stones.finishing,
     stones.samples_amount,
     stones.samples_importance,
-    COUNT(DISTINCT CASE WHEN slab_inventory.id IS NOT NULL AND (slab_inventory.cut_date IS NULL) THEN slab_inventory.id ELSE NULL END) AS amount,
-    CAST(SUM(CASE WHEN slab_inventory.id IS NOT NULL AND slab_inventory.sale_id IS NULL AND slab_inventory.cut_date IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available
+    COUNT(DISTINCT CASE 
+      WHEN slab_inventory.id IS NOT NULL 
+        AND slab_inventory.cut_date IS NULL 
+      THEN slab_inventory.id ELSE NULL END) AS amount,
+    CAST(SUM(CASE 
+      WHEN slab_inventory.id IS NOT NULL 
+        AND slab_inventory.sale_id IS NULL 
+        AND slab_inventory.cut_date IS NULL 
+      THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM stones
   LEFT JOIN slab_inventory ON slab_inventory.stone_id = stones.id AND slab_inventory.cut_date IS NULL
   `

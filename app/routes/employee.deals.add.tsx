@@ -3,23 +3,32 @@ import { useState } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
+  Outlet,
   redirect,
   useLoaderData,
   useNavigate,
   useSearchParams,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import { DealsForm } from '~/components/DealsForm'
+import DealsForm from '~/components/DealsForm'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 export async function action({ request }: ActionFunctionArgs) {
+  let user: User
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -36,6 +45,13 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors, receivedValues }
   }
 
+  const listRows = await selectMany<{ name: string }>(
+    db,
+    'SELECT name FROM deals_list WHERE id = ? LIMIT 1',
+    [data.list_id],
+  )
+  const initialStatus = listRows[0]?.name || 'New Customer'
+
   await db.execute(
     `INSERT INTO deals
      (customer_id, amount, description, status, list_id, position, user_id)
@@ -44,12 +60,17 @@ export async function action({ request }: ActionFunctionArgs) {
       data.customer_id,
       data.amount,
       data.description,
-      data.status,
+      initialStatus,
       data.list_id,
       data.position,
-      data.user_id,
+      user.id,
     ],
   )
+
+  await db.execute(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
+    user.id,
+    data.customer_id,
+  ])
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Deal added successfully'))
@@ -82,7 +103,7 @@ export default function AddDeal() {
 
   const listIdParam = parseInt(searchParams.get('list_id') || '', 10)
   const hiddenFields: Record<string, string | number | boolean> = {
-    status: 'new',
+    status: 'New Customer',
     position: 1,
     company_id: companyId,
   }
@@ -91,12 +112,19 @@ export default function AddDeal() {
   }
 
   return (
-    <DealsForm
-      companyId={companyId}
-      user_id={user_id}
-      open={open}
-      onOpenChange={handleOpenChange}
-      hiddenFields={hiddenFields}
-    />
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create Deal</DialogTitle>
+        </DialogHeader>
+
+        <DealsForm
+          companyId={companyId}
+          user_id={user_id}
+          hiddenFields={hiddenFields}
+        />
+      </DialogContent>
+      <Outlet />
+    </Dialog>
   )
 }

@@ -1,13 +1,14 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import type { RowDataPacket } from 'mysql2'
 import { posthog } from 'posthog-js'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { LinksFunction, LoaderFunctionArgs } from 'react-router'
 import {
   data,
   Links,
   Meta,
   Outlet,
+  redirect,
   Scripts,
   ScrollRestoration,
   useLoaderData,
@@ -15,7 +16,11 @@ import {
 } from 'react-router'
 import { AuthenticityTokenProvider } from 'remix-utils/csrf/react'
 import { EmployeeSidebar } from '~/components/molecules/Sidebars/EmployeeSidebar'
-import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar'
+import {
+  OriginalSidebarTrigger,
+  SidebarProvider,
+  SidebarTrigger,
+} from '~/components/ui/sidebar'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import type { ISupplier } from '~/schemas/suppliers'
@@ -23,12 +28,13 @@ import { csrf } from '~/utils/csrf.server'
 import { getBase } from '~/utils/urlHelpers'
 import { Header } from './components/Header'
 import { Chat } from './components/organisms/Chat'
+import { MarketingHeader } from './components/organisms/MarketingHeader'
 import { Toaster } from './components/ui/toaster'
 import { useToast } from './hooks/use-toast'
 import { commitSession, getSession } from './sessions'
 import './tailwind.css'
 import { queryClient } from './utils/api'
-import { selectMany } from './utils/queryHelpers'
+import { selectId, selectMany } from './utils/queryHelpers'
 import { getUserBySessionId } from './utils/session.server'
 import type { ToastMessage } from './utils/toastHelpers'
 
@@ -42,6 +48,15 @@ export const links: LinksFunction = () => [
   {
     rel: 'stylesheet',
     href: 'https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap',
+  },
+  {
+    rel: 'icon',
+    href: 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/Granite-manager-icon.png',
+    type: 'image/png',
+  },
+  {
+    rel: 'apple-touch-icon',
+    href: 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/Granite-manager-icon.png',
   },
 ]
 
@@ -69,8 +84,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const message: ToastMessage | null = session.get('message') || null
 
   let user = null
+  let companyName: string | null = null
   if (activeSession) {
     user = (await getUserBySessionId(activeSession)) || null
+    if (user) {
+      const company = await selectId<{ name: string }>(
+        db,
+        'SELECT name FROM company WHERE id = ?',
+        user.company_id,
+      )
+      companyName = company?.name ?? null
+    }
   }
 
   let stoneSuppliers: ISupplier[] | undefined
@@ -80,7 +104,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const colors = await selectMany<{ id: number; name: string; hex_code: string }>(
     db,
-    `SELECT c.id, c.name, c.hex_code 
+    `SELECT c.id, c.name, c.hex_code
       FROM colors c
       ORDER BY c.name ASC`,
     [],
@@ -89,7 +113,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (user) {
     stoneSuppliers = await selectMany<ISupplier>(
       db,
-      `SELECT s.id, s.supplier_name 
+      `SELECT s.id, s.supplier_name
        FROM suppliers s
        INNER JOIN stones st ON s.id = st.supplier_id
        WHERE s.company_id = ?
@@ -99,7 +123,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     sinkSuppliers = await selectMany<ISupplier>(
       db,
-      `SELECT s.id, s.supplier_name 
+      `SELECT s.id, s.supplier_name
        FROM suppliers s
        INNER JOIN sink_type sk ON s.id = sk.supplier_id
        WHERE s.company_id = ?
@@ -109,7 +133,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     faucetSuppliers = await selectMany<ISupplier>(
       db,
-      `SELECT s.id, s.supplier_name 
+      `SELECT s.id, s.supplier_name
        FROM suppliers s
        INNER JOIN faucet_type ft ON s.id = ft.supplier_id
        WHERE s.company_id = ?
@@ -117,11 +141,30 @@ export async function loader({ request }: LoaderFunctionArgs) {
       [user.company_id],
     )
 
-    const [row] = await db.query<(RowDataPacket & { position: string })[]>(
-      `SELECT p.name AS position FROM users u LEFT JOIN positions p ON p.id = u.position_id WHERE u.id = ? LIMIT 1`,
+    const [rows] = await db.query<(RowDataPacket & { position: string })[]>(
+      `SELECT p.name AS position
+       FROM users u
+       LEFT JOIN users_positions up ON up.user_id = u.id
+       LEFT JOIN positions p ON p.id = up.position_id
+       WHERE u.id = ? AND p.name IN ('external_marketing','check-in') AND u.is_deleted = 0`,
       [user.id],
     )
-    position = row?.[0]?.position ?? null
+    const hasCheckIn = Array.isArray(rows) && rows.some(r => r.position === 'check-in')
+    const hasExternalMarketing =
+      Array.isArray(rows) && rows.some(r => r.position === 'external_marketing')
+    position = hasCheckIn
+      ? 'check-in'
+      : hasExternalMarketing
+        ? 'external_marketing'
+        : null
+
+    const url = new URL(request.url)
+    if (hasCheckIn) {
+      const target = `/customer/${user.company_id}/check-in`
+      if (!url.pathname.startsWith(target)) {
+        return redirect(target)
+      }
+    }
   }
 
   return data(
@@ -129,6 +172,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       message,
       token,
       user,
+      companyName,
       stoneSuppliers,
       sinkSuppliers,
       faucetSuppliers,
@@ -154,14 +198,30 @@ export default function App() {
     sinkSuppliers,
     faucetSuppliers,
     colors,
-    position,
   } = useLoaderData<typeof loader>()
   const { pathname } = useLocation()
   const { toast } = useToast()
   const isMobile = useIsMobile()
   const isLogin = pathname === '/login'
+  const isDraw = pathname.startsWith('/employee/draw')
   const isCheckIn = pathname.includes('/check-in')
-
+  const isExternalMarketing = pathname.includes(`/external/marketing/`)
+  const isInstallerRoute = pathname.startsWith('/installers')
+  const mainRef = useRef<HTMLElement | null>(null)
+  const [isAtBottom, setIsAtBottom] = useState(false)
+  useEffect(() => {
+    const el = mainRef.current
+    if (!el) return
+    const onScroll = () => {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight
+      setIsAtBottom(distance <= 8)
+    }
+    onScroll()
+    el.addEventListener('scroll', onScroll)
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+    }
+  }, [])
   useEffect(() => {
     if (message !== null && message !== undefined) {
       toast({
@@ -178,8 +238,13 @@ export default function App() {
   }, [message?.nonce])
 
   const basePath = getBase(pathname)
-  const isInstaller = position === 'installer'
-  const showSidebar = !!basePath && !isLogin && !isInstaller && !isCheckIn
+  const showSidebar =
+    !!basePath &&
+    !isLogin &&
+    !isInstallerRoute &&
+    !isCheckIn &&
+    !isExternalMarketing &&
+    !isDraw
 
   return (
     <html lang='en'>
@@ -191,7 +256,10 @@ export default function App() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <SidebarProvider open={showSidebar}>
+          <SidebarProvider
+            key={showSidebar ? 'show' : 'hide'}
+            defaultOpen={showSidebar}
+          >
             {showSidebar && (
               <EmployeeSidebar
                 suppliers={stoneSuppliers}
@@ -200,9 +268,11 @@ export default function App() {
                 colors={colors}
               />
             )}
-            <main className='h-screen overflow-y-auto bg-gray-100 w-full'>
+            <main ref={mainRef} className='h-screen overflow-y-auto bg-gray-100 w-full'>
               <AuthenticityTokenProvider token={token}>
-                {!isInstaller && (
+                {isExternalMarketing || isCheckIn || isInstallerRoute ? (
+                  <MarketingHeader />
+                ) : (
                   <Header
                     isEmployee={user?.is_employee ?? false}
                     user={user}
@@ -211,7 +281,16 @@ export default function App() {
                   />
                 )}
                 <div className='relative'>
-                  {isMobile && !isCheckIn && <SidebarTrigger />}
+                  {!!user?.id &&
+                    isMobile &&
+                    !isCheckIn &&
+                    !isExternalMarketing &&
+                    !isInstallerRoute && <SidebarTrigger />}
+                  {!!user?.id &&
+                    !isMobile &&
+                    !isCheckIn &&
+                    !isExternalMarketing &&
+                    !isInstallerRoute && <OriginalSidebarTrigger />}
                   <Outlet />
                 </div>
               </AuthenticityTokenProvider>
@@ -219,7 +298,9 @@ export default function App() {
               <ScrollRestoration />
               <Scripts />
               <Posthog />
-              {!isInstaller && user && <Chat />}
+              {!isInstallerRoute && !isCheckIn && user && (
+                <Chat isAtBottom={isAtBottom} />
+              )}
               {/* <ScrollToTopButton /> */}
             </main>
           </SidebarProvider>
