@@ -76,7 +76,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     `SELECT c.id, c.name, c.email, c.phone, c.created_date, c.source, c.referral_source, c.sales_rep, u.name AS sales_rep_name, c.invalid_lead
          FROM customers c
          LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
-         WHERE ${whereSource}
+         WHERE ${whereSource} AND c.deleted_at IS NULL
            ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
            ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
            AND c.company_id = ?`,
@@ -127,7 +127,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           SUM(CASE WHEN c.referral_source = 'wordpress-form' AND c.invalid_lead IS NOT NULL AND c.invalid_lead <> ''${sourceFilterCase} THEN 1 ELSE 0 END) AS website,
            SUM(CASE WHEN c.invalid_lead IS NOT NULL AND c.invalid_lead <> '' THEN 1 ELSE 0 END) AS total
          FROM customers c
-        WHERE (c.source = 'leads' OR c.source = 'check-in')
+        WHERE (c.source = 'leads' OR c.source = 'check-in') AND c.deleted_at IS NULL
          ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
          ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
          AND c.company_id = ?`,
@@ -166,7 +166,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
            SUM(CASE WHEN d.lost_reason = 'Stoped responding' THEN 1 ELSE 0 END) AS stopped_responding
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id
-      WHERE ${whereSource}
+      WHERE ${whereSource} AND c.deleted_at IS NULL
          ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
          ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
          AND c.company_id = ?`,

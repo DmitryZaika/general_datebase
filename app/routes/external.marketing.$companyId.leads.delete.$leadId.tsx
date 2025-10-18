@@ -29,10 +29,10 @@ export async function action({ params, request }: ActionFunctionArgs) {
     return { lead_name: undefined }
   }
   try {
-    await db.execute(`DELETE FROM customers WHERE id = ? AND company_id = ?`, [
-      leadId,
-      paramCompanyId,
-    ])
+    await db.execute(
+      `UPDATE customers SET deleted_at = NOW() WHERE id = ? AND company_id = ?`,
+      [leadId, paramCompanyId],
+    )
   } catch {
     return { error: 'Failed to delete lead' }
   }
