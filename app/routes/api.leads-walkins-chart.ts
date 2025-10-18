@@ -10,7 +10,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const fromDate = url.searchParams.get('fromDate')
     const toDate = url.searchParams.get('toDate')
 
-    let whereClause = 'WHERE c.company_id = ?'
+    let whereClause = 'WHERE c.company_id = ? AND c.deleted_at IS NULL'
     const params: (string | number)[] = [user.company_id]
 
     if (fromDate) {
@@ -38,8 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     )
 
     return data({ chartData })
-  } catch (error) {
-    console.error('Error fetching leads/walk-ins chart data:', error)
+  } catch {
     return data({ chartData: [] })
   }
 }

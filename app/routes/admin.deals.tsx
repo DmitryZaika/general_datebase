@@ -61,7 +61,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Customers for names
     const customers = await selectMany<{ id: number; name: string }>(
       db,
-      'SELECT id, name FROM customers WHERE company_id = ?',
+      'SELECT id, name FROM customers WHERE company_id = ? AND deleted_at IS NULL',
       [companyId],
     )
 
