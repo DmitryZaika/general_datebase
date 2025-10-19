@@ -34,7 +34,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       db,
       `SELECT id, name, address, phone, email, company_name
        FROM customers
-       WHERE company_id = ?
+       WHERE company_id = ? AND deleted_at IS NULL
          AND ?? LIKE ?
        ORDER BY
          CASE
