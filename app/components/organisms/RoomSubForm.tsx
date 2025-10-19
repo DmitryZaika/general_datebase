@@ -80,12 +80,14 @@ export const RoomSubForm = ({
   sink_type,
   faucet_type,
   isEdit,
+  companyId,
 }: {
   form: UseFormReturn<TCustomerSchema>
   index: number
   sink_type: Sink[]
   faucet_type: Faucet[]
   isEdit?: boolean
+  companyId: number
 }) => {
   const roomValues = form.watch(`rooms.${index}`)
 
@@ -266,6 +268,7 @@ export const RoomSubForm = ({
         />
 
         <StoneSearch
+          companyId={companyId}
           stone={stone}
           setStone={val => {
             form.setValue(`rooms.${index}.slabs`, [])

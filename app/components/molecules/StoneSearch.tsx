@@ -11,6 +11,7 @@ import { SuperCarousel } from '../organisms/SuperCarousel'
 type UserRole = 'employee' | 'admin' | 'customer'
 
 interface StoneSearchProps {
+  companyId: number
   userRole: UserRole
   className?: string
   mode?: 'default' | 'samples'
@@ -31,10 +32,14 @@ const highlightStyles = `
   }
 `
 
-const getStones = async (name: string, userRole: UserRole): Promise<StoneImage[]> => {
+const getStones = async (
+  name: string,
+  userRole: UserRole,
+  companyId: number,
+): Promise<StoneImage[]> => {
   const showSoldOut = userRole === 'admin' || userRole === 'employee'
   const response = await fetch(
-    `/api/stones/search?name=${encodeURIComponent(name)}&show_sold_out=${showSoldOut}`,
+    `/api/stones/search/${companyId}?name=${encodeURIComponent(name)}&show_sold_out=${showSoldOut}`,
   )
   const data = await response.json()
   return data?.stones || []
@@ -45,6 +50,7 @@ export function StoneSearch({
   className,
   mode = 'default',
   onMinus,
+  companyId,
 }: StoneSearchProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [isInputFocused, setIsInputFocused] = useState(false)
@@ -55,7 +61,7 @@ export function StoneSearch({
   const [doneStoneId, setDoneStoneId] = useState<number | null>(null)
   const { data } = useQuery({
     queryKey: ['stones', 'search', searchTerm, userRole],
-    queryFn: () => getStones(searchTerm, userRole),
+    queryFn: () => getStones(searchTerm, userRole, companyId),
     enabled: !!searchTerm,
   })
 
