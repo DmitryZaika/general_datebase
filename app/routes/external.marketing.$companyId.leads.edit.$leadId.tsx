@@ -71,7 +71,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       your_message: string
     }>(
       db,
-      'SELECT id, name, email, phone, address, source, your_message FROM customers WHERE id = ? AND company_id = ?',
+      'SELECT id, name, email, phone, address, source, your_message FROM customers WHERE id = ? AND company_id = ? AND deleted_at IS NULL',
       [leadId, paramCompanyId],
     )
     const lead = leads[0]

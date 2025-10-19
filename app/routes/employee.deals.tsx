@@ -86,7 +86,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
     const customers = await selectMany<{ id: number; name: string }>(
       db,
-      'SELECT id, name FROM customers WHERE company_id = ?',
+      'SELECT id, name FROM customers WHERE company_id = ? AND deleted_at IS NULL',
       [user.company_id],
     )
     return { deals, customers, lists, imagesMap }

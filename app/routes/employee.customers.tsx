@@ -57,7 +57,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const includeInvalid = url.searchParams.get('show_invalid') === '1'
 
   const params: number[] = []
-  const conditions: string[] = ['c.company_id = ?']
+  const conditions: string[] = ['c.deleted_at IS NULL', 'c.company_id = ?']
   params.push(user.company_id)
   if (salesRepFilter) {
     conditions.push('c.sales_rep = ?')
