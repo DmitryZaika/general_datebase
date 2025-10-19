@@ -37,7 +37,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const filters = stoneFilterSchema.parse(cleanParams(queryParams))
   const stones = await stoneQueryBuilder(filters, user.company_id, true)
 
-  return { stones }
+  return { stones, companyId: user.company_id }
 }
 
 function StoneTable({ stones }: { stones: Stone[] }) {
@@ -164,7 +164,7 @@ function StoneTable({ stones }: { stones: Stone[] }) {
 }
 
 export default function AdminStones() {
-  const { stones } = useLoaderData<typeof loader>()
+  const { stones, companyId } = useLoaderData<typeof loader>()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigation = useNavigation()
   const navigate = useNavigate()
@@ -253,7 +253,7 @@ export default function AdminStones() {
           </Link>
         </div>
         <div className='flex-1 flex justify-center md:justify-end '>
-          <StoneSearch userRole='admin' />
+          <StoneSearch userRole='admin' companyId={companyId} />
         </div>
       </div>
 

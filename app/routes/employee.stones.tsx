@@ -36,7 +36,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const queryParams = new URLSearchParams(searchParams)
   const filters = stoneFilterSchema.parse(cleanParams(queryParams))
   const stones = await stoneQueryBuilder(filters, user.company_id)
-  return { stones }
+  return { stones, companyId: user.company_id }
 }
 
 function InteractiveCard({
@@ -129,7 +129,7 @@ function InteractiveCard({
 }
 
 export default function Stones() {
-  const { stones } = useLoaderData<typeof loader>()
+  const { stones, companyId } = useLoaderData<typeof loader>()
   const [searchParams, setSearchParams] = useSearchParams()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones)
@@ -282,7 +282,7 @@ export default function Stones() {
           </Button>
         </div>
         <div className='flex-1 flex justify-center md:justify-end md:ml-auto'>
-          <StoneSearch userRole='employee' />
+          <StoneSearch userRole='employee' companyId={companyId} />
         </div>
       </div>
 
