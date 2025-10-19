@@ -30,7 +30,7 @@ interface Question {
   company_id: number
   created_by_user_id: number | null
   is_visible_to_employees: boolean
-  is_deleted: boolean
+  deleted_at: string | null
   created_date: string
   updated_date: string
 }
@@ -40,7 +40,7 @@ interface AnswerChoice {
   question_id: number
   text: string
   is_correct: boolean
-  is_deleted: boolean
+  deleted_at: string | null
   created_date: string
   updated_date: string
 }
@@ -61,16 +61,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const questions = await selectMany<Question>(
     db,
-    `SELECT id, text, instruction_id, question_type, company_id, created_by_user_id, is_visible_to_employees, is_deleted, created_date, updated_date
+    `SELECT id, text, instruction_id, question_type, company_id, created_by_user_id, is_visible_to_employees, deleted_at, created_date, updated_date
      FROM questions
-     WHERE company_id = ? AND is_deleted = FALSE
+     WHERE company_id = ? AND deleted_at IS NULL
      ORDER BY created_date DESC`,
     [user.company_id],
   )
 
   const answerChoices = await selectMany<AnswerChoice>(
     db,
-    'SELECT id, question_id, text, is_correct, is_deleted, created_date, updated_date FROM answer_choices WHERE question_id IN (SELECT id FROM questions WHERE company_id = ?) AND is_deleted = FALSE ORDER BY question_id, id',
+    'SELECT id, question_id, text, is_correct, deleted_at, created_date, updated_date FROM answer_choices WHERE question_id IN (SELECT id FROM questions WHERE company_id = ?) AND deleted_at IS NULL ORDER BY question_id, id',
     [user.company_id],
   )
 
@@ -156,7 +156,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (option.is_deleted) {
           if (option.id && option.id > 0) {
             await db.execute(
-              'UPDATE answer_choices SET is_deleted = TRUE, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND question_id = ?',
+              'UPDATE answer_choices SET deleted_at = CURRENT_TIMESTAMP, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND question_id = ?',
               [option.id, questionId],
             )
           }
@@ -185,6 +185,39 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         error: `Failed to edit question: ${error instanceof Error ? error.message : 'Unknown error'}`,
       }
     }
+  } else if (intent === 'delete-question') {
+    const questionId = parseInt(formData.get('questionId') as string)
+
+    if (isNaN(questionId)) {
+      return { error: 'Invalid question ID' }
+    }
+
+    try {
+      // Validate question exists
+      const [questionCheck] = await db.execute(
+        'SELECT id FROM questions WHERE id = ? AND company_id = ?',
+        [questionId, user.company_id],
+      )
+
+      if (!questionCheck || (questionCheck as any).length === 0) {
+        return {
+          error: 'Invalid question ID or question does not belong to your company',
+        }
+      }
+
+      // Mark question as deleted
+      await db.execute(
+        'UPDATE questions SET deleted_at = CURRENT_TIMESTAMP, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND company_id = ?',
+        [questionId, user.company_id],
+      )
+
+      return { success: true, questionId }
+    } catch (error) {
+      console.error('Error deleting question:', error)
+      return {
+        error: `Failed to delete question: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      }
+    }
   } else {
     // Original save question logic
     const questionText = formData.get('questionText') as string
@@ -193,8 +226,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const correctAnswer = formData.get('correctAnswer') as string
     const instructionId = parseInt(formData.get('instructionId') as string)
 
-    if (!questionText || !options || !correctAnswer || !instructionId) {
-      return { error: 'Missing required question data' }
+    if (
+      !questionText ||
+      !options ||
+      options.length < 2 ||
+      !correctAnswer ||
+      !instructionId
+    ) {
+      return { error: 'Missing required question data or insufficient answer choices' }
     }
 
     try {
@@ -442,11 +481,12 @@ Guidelines for diversity:
 - The options should be realistic and not obviously wrong — make them sound believable
 - Only ONE option should be correct
 - The question should feel natural and not formulaic
+- Provide at least 4 options, but more are allowed if appropriate
 
 Return ONLY valid JSON in this format, with no extra text:
 {
   "question": "Your question here?",
-  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "options": ["Option A", "Option B", "Option C", "Option D", ...],
   "answer": "The correct option exactly as written in options"
 }
 
@@ -684,6 +724,19 @@ Now generate a **unique and varied** multiple choice question based on the conte
       setIsEditing(false)
     }
 
+    const handleDeleteQuestion = () => {
+      if (
+        window.confirm(
+          'Are you sure you want to delete this question? This action cannot be undone.',
+        )
+      ) {
+        const formData = new FormData()
+        formData.append('intent', 'delete-question')
+        formData.append('questionId', question.id.toString())
+        submit(formData, { method: 'post' })
+      }
+    }
+
     const handleVisibilityToggle = (checked: boolean) => {
       const formData = new FormData()
       formData.append('intent', 'toggle-visibility')
@@ -764,6 +817,9 @@ Now generate a **unique and varied** multiple choice question based on the conte
               <Button onClick={handleSaveChanges}>Save Changes</Button>
               <Button variant='outline' onClick={handleDiscardChanges}>
                 Discard Changes
+              </Button>
+              <Button variant='destructive' onClick={handleDeleteQuestion}>
+                Delete Question
               </Button>
             </div>
           </>
