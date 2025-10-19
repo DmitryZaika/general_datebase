@@ -46,7 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db,
     `SELECT id, text, instruction_id, question_type, created_date, updated_date
      FROM questions
-     WHERE company_id = ? AND is_visible_to_employees = TRUE AND is_deleted = FALSE
+     WHERE company_id = ? AND is_visible_to_employees = TRUE AND deleted_at IS NULL
      ORDER BY created_date DESC`,
     [user.company_id],
   )
@@ -54,7 +54,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Fetch answer choices for all questions
   const answerChoices = await selectMany<AnswerChoice>(
     db,
-    'SELECT id, question_id, text, is_correct, created_date, updated_date FROM answer_choices WHERE question_id IN (SELECT id FROM questions WHERE company_id = ?) AND is_deleted = FALSE ORDER BY question_id, id',
+    'SELECT id, question_id, text, is_correct, created_date, updated_date FROM answer_choices WHERE question_id IN (SELECT id FROM questions WHERE company_id = ?) AND deleted_at IS NULL ORDER BY question_id, id',
     [user.company_id],
   )
 
