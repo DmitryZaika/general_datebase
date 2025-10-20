@@ -17,6 +17,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const userData = await request.json()
   const validatedData = customerSignupSchema.parse(userData)
 
+  const salesRep = validatedData.source === 'check-in' ? null : user.id
+
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO customers (name, phone, email, address, referral_source, source, company_id, company_name, sales_rep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -28,7 +30,7 @@ export async function action({ request }: ActionFunctionArgs) {
       validatedData.source,
       validatedData.company_id,
       validatedData.company_name || null,
-      user.id,
+      salesRep,
     ],
   )
 
