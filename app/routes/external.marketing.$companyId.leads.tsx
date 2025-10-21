@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { format } from 'date-fns'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   data,
   type LoaderFunctionArgs,
@@ -14,6 +14,7 @@ import {
 import { DealsByStage } from '~/components/DealsByStage'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { DateRangeControls } from '~/components/molecules/DateRangeControls'
+import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { RawObjectSelect } from '~/components/molecules/RawSelect'
 import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
@@ -41,6 +42,7 @@ interface Lead {
   status?: string
   lost_reason?: string
   invalid_lead: string | null
+  className?: string
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -57,6 +59,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const fromDate = url.searchParams.get('fromDate') || ''
   const toDate = url.searchParams.get('toDate') || ''
   const view = url.searchParams.get('view') || 'leads'
+  const channel = (url.searchParams.get('channel') || 'all').toLowerCase()
+
+  const referralFilter =
+    channel === 'facebook'
+      ? " AND c.referral_source = 'facebook-form'"
+      : channel === 'website'
+        ? " AND c.referral_source = 'wordpress-form'"
+        : ''
 
   const whereSource =
     view === 'leads'
@@ -79,7 +89,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
          WHERE ${whereSource} AND c.deleted_at IS NULL
            ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
            ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
-           AND c.company_id = ?`,
+           AND c.company_id = ?${referralFilter}`,
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
@@ -103,7 +113,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
        WHERE ${whereSource} AND d.deleted_at IS NULL
          ${fromDate ? ' AND DATE(d.created_at) >= ?' : ''}
          ${toDate ? ' AND DATE(d.created_at) <= ?' : ''}
-         AND c.company_id = ?`,
+         AND c.company_id = ?${referralFilter}`,
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
@@ -130,7 +140,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         WHERE (c.source = 'leads' OR c.source = 'check-in') AND c.deleted_at IS NULL
          ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
          ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
-         AND c.company_id = ?`,
+         AND c.company_id = ?${referralFilter}`,
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
@@ -169,7 +179,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       WHERE ${whereSource} AND c.deleted_at IS NULL
          ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
          ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
-         AND c.company_id = ?`,
+         AND c.company_id = ?${referralFilter}`,
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
@@ -185,6 +195,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     fromDate,
     toDate,
     view,
+    channel,
     invalidStats: invalidStats[0] || { facebook: 0, website: 0, total: 0 },
     invalidReasons: invalidReasons[0] || {
       too_expensive: 0,
@@ -215,6 +226,7 @@ function ExternalMarketingLeads() {
     fromDate,
     toDate,
     view,
+    channel,
     invalidStats,
     invalidReasons,
   } = useLoaderData<typeof loader>()
@@ -382,6 +394,45 @@ function ExternalMarketingLeads() {
   const endIndex = startIndex + pageSize
   const displayedRows = rows.slice(startIndex, endIndex)
 
+  const [highlightLeadId, setHighlightLeadId] = useState<number | null>(null)
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const highlightParam = params.get('highlight')
+    const id = highlightParam ? Number(highlightParam) : 0
+    if (!id) return
+    setTimeout(() => {
+      const el = document.querySelector(`.lead-row-${id}`) as HTMLElement | null
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setHighlightLeadId(id)
+        if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
+        highlightTimeoutRef.current = setTimeout(() => {
+          setHighlightLeadId(null)
+        }, 2000)
+      }
+      const clean = new URLSearchParams(location.search)
+      clean.delete('highlight')
+      navigate(
+        { pathname: location.pathname, search: clean.toString() },
+        { replace: true },
+      )
+    }, 50)
+  }, [location.search, navigate, location.pathname])
+
+  const displayed: Lead[] = displayedRows.map(lead => ({
+    ...lead,
+    className:
+      `lead-row-${lead.id} ${highlightLeadId === lead.id ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`.trim(),
+  }))
+
   return (
     <div>
       <PageLayout title='Marketing'>
@@ -427,6 +478,7 @@ function ExternalMarketingLeads() {
             onValueChange={val => {
               const params = new URLSearchParams(location.search)
               params.set('view', val)
+              if (val === 'walkins' || val === 'total') params.delete('channel')
               navigate({ pathname: location.pathname, search: params.toString() })
             }}
             className='mt-4'
@@ -435,6 +487,26 @@ function ExternalMarketingLeads() {
               <TabsTrigger value='leads'>Leads</TabsTrigger>
               <TabsTrigger value='walkins'>Walk-ins</TabsTrigger>
               <TabsTrigger value='total'>Total</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Tabs
+            value={channel}
+            onValueChange={val => {
+              const params = new URLSearchParams(location.search)
+              params.set('channel', val)
+              navigate({ pathname: location.pathname, search: params.toString() })
+            }}
+            className='mt-2'
+          >
+            <TabsList className='grid w-full grid-cols-3'>
+              <TabsTrigger value='all'>All</TabsTrigger>
+              {view === 'leads' && (
+                <>
+                  {' '}
+                  <TabsTrigger value='facebook'>Facebook</TabsTrigger>
+                  <TabsTrigger value='website'>Website</TabsTrigger>
+                </>
+              )}
             </TabsList>
           </Tabs>
         </div>
@@ -459,7 +531,29 @@ function ExternalMarketingLeads() {
             />
           </div>
         </div>
-        <DataTable columns={columns} data={displayedRows} />
+        <div className='flex items-center gap-2 justify-end'>
+          <FindCustomer
+            buildSearchUrl={(term, searchType) =>
+              `/external/api/customers/search/${companyId}?term=${encodeURIComponent(term)}&searchType=${searchType}`
+            }
+            buildEditLink={(id, search) =>
+              `/external/marketing/${companyId}/leads/edit/${id}${search}`
+            }
+            buildDeleteLink={(id, search) =>
+              `/external/marketing/${companyId}/leads/delete/${id}${search}`
+            }
+            onSelect={customerId => {
+              const index = rows.findIndex(r => r.id === customerId)
+              const targetPage = index >= 0 ? Math.floor(index / pageSize) + 1 : 1
+              setPage(targetPage)
+              const params = new URLSearchParams(location.search)
+              params.set('company_id', companyId.toString())
+              params.set('highlight', String(customerId))
+              navigate({ pathname: location.pathname, search: params.toString() })
+            }}
+          />
+        </div>
+        <DataTable columns={columns} data={displayed} />
         <div className='mt-3 flex items-center justify-center gap-2'>
           <Button
             className='px-3 py-1 rounded disabled:opacity-50'
