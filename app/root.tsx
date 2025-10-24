@@ -16,11 +16,7 @@ import {
 } from 'react-router'
 import { AuthenticityTokenProvider } from 'remix-utils/csrf/react'
 import { EmployeeSidebar } from '~/components/molecules/Sidebars/EmployeeSidebar'
-import {
-  OriginalSidebarTrigger,
-  SidebarProvider,
-  SidebarTrigger,
-} from '~/components/ui/sidebar'
+import { SidebarProvider } from '~/components/ui/sidebar'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import type { ISupplier } from '~/schemas/suppliers'
@@ -37,6 +33,7 @@ import { queryClient } from './utils/api'
 import { selectId, selectMany } from './utils/queryHelpers'
 import { getUserBySessionId } from './utils/session.server'
 import type { ToastMessage } from './utils/toastHelpers'
+import { SidebarToggle } from './components/SidebarToggle'
 
 export const links: LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -289,16 +286,12 @@ export default function App() {
                   />
                 )}
                 <div className='relative'>
-                  {!!user?.id &&
-                    isMobile &&
-                    !isCheckIn &&
-                    !isExternalMarketing &&
-                    !isInstallerRoute && <SidebarTrigger />}
-                  {!!user?.id &&
-                    !isMobile &&
-                    !isCheckIn &&
-                    !isExternalMarketing &&
-                    !isInstallerRoute && <OriginalSidebarTrigger />}
+                  <SidebarToggle
+                    isMobile={isMobile}
+                    isCheckIn={isCheckIn}
+                    isExternalMarketing={isExternalMarketing}
+                    isInstallerRoute={isInstallerRoute}
+                  />
                   <Outlet />
                 </div>
               </AuthenticityTokenProvider>
