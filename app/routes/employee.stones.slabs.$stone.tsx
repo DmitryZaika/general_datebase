@@ -368,7 +368,6 @@ export default function SlabsModal() {
 
   useEffect(() => {
     if (saleId && saleId !== 'null' && saleId !== '') {
-      window.open(`/api/pdf/${saleId}`, '_blank')
       const searchParams = new URLSearchParams(location.search)
       searchParams.delete('saleId')
       const newSearch = searchParams.toString()
