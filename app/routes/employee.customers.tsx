@@ -45,7 +45,7 @@ interface Customer {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user: { company_id: number }
+  let user: { company_id: number; is_admin: boolean }
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
@@ -88,6 +88,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }))
   return {
     customers: processed,
+    isAdmin: user.is_admin,
   }
 }
 
@@ -206,9 +207,10 @@ function CustomerActions({ customer }: { customer: Customer }) {
   const { toast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
+  const { isAdmin } = useLoaderData<{ isAdmin: boolean }>()
   const actions: Record<string, string> = {
     edit: `edit/${customer.id}${location.search}`,
-    delete: `delete/${customer.id}${location.search}`,
+    ...(isAdmin ? { delete: `delete/${customer.id}${location.search}` } : {}),
     invalid: `invalid/${customer.id}${location.search}`,
   }
 

@@ -14,6 +14,7 @@ import {
   useNavigate,
   useNavigation,
 } from 'react-router'
+import { AuthenticityTokenInput, useAuthenticityToken } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -524,6 +525,7 @@ function SlabEdit({ slab }: { slab: SaleSlab }) {
   return (
     <FormProvider {...form}>
       <Form id='customerForm' method='post' className='flex items-center gap-2'>
+        <AuthenticityTokenInput />
         <input type='hidden' name='id' value={slab.id} />
         <input type='hidden' name='intent' value='slab-update' />
         <FormField
@@ -555,6 +557,7 @@ function SinkEdit({ sink }: { sink: SaleSink }) {
   return (
     <FormProvider {...form}>
       <Form method='post' className='flex items-center gap-2 -mb-6'>
+        <AuthenticityTokenInput />
         <input type='hidden' name='id' value={sink.id} />
         <input type='hidden' name='intent' value='sink-update' />
         <FormField
@@ -588,6 +591,7 @@ function SinkAdd({ availableSinks }: { availableSinks: Sink[] }) {
   return (
     <FormProvider {...form}>
       <Form method='post'>
+        <AuthenticityTokenInput />
         <input type='hidden' name='intent' value='sink-add' />
         <div className='grid grid-cols-6 gap-2'>
           <div className='col-span-3'>
@@ -669,6 +673,7 @@ function SaleInfoEdit({
   const [showCreateCustomer, setShowCreateCustomer] = useState(false)
   const [customerName, setCustomerName] = useState(sale.customer_name)
   const fetcher = useFetcher()
+  const csrfToken = useAuthenticityToken()
   const customerForm = useForm<CustomerFormData>({
     resolver: customerResolver,
     defaultValues: {
@@ -680,6 +685,7 @@ function SaleInfoEdit({
     const formData = new FormData()
     formData.append('intent', 'create-customer')
     formData.append('customer_name', data.customer_name)
+    formData.append('csrf', csrfToken)
     fetcher.submit(formData, { method: 'post' })
     setShowCreateCustomer(false)
     customerForm.reset()
@@ -694,6 +700,7 @@ function SaleInfoEdit({
   return (
     <div className='mb-6'>
       <Form method='post'>
+        <AuthenticityTokenInput />
         <input type='hidden' name='intent' value='sale-info-update' />
 
         <div className='grid grid-cols-2 gap-3'>
@@ -792,6 +799,7 @@ function SaleInfoEdit({
             </Button>
 
             <Form method='post'>
+              <AuthenticityTokenInput />
               <input type='hidden' name='intent' value='sale-unsell' />
               <Button type='submit' variant='destructive'>
                 Confirm Unsell
