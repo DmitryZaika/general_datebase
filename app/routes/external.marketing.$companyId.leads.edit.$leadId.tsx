@@ -29,8 +29,8 @@ import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { cn } from '~/lib/utils'
 import { sourceEnum } from '~/schemas/customers'
 import { commitSession, getSession } from '~/sessions'
-import { selectId } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { selectMany } from '~/utils/queryHelpers'
+import { getMarketingUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 const leadSchema = z.object({
@@ -47,8 +47,13 @@ type FormData = z.infer<typeof leadSchema>
 const resolver = zodResolver(leadSchema)
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const paramCompanyId = Number(params.companyId)
+  if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+    return redirect(`/login?error=invalid_company_id`)
+  }
   try {
-    const user = await getEmployeeUser(request)
+    await getMarketingUser(request, paramCompanyId)
+
     const leadId = parseInt(params.leadId || '0')
 
     if (!leadId) {
@@ -56,7 +61,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
 
     // Fetch lead data from database
-    const lead = await selectId<{
+    const leads = await selectMany<{
       id: number
       name: string
       email: string
@@ -66,23 +71,28 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       your_message: string
     }>(
       db,
-      'SELECT id, name, email, phone, address, source, your_message FROM customers WHERE id = ?',
-      leadId,
+      'SELECT id, name, email, phone, address, source, your_message FROM customers WHERE id = ? AND company_id = ? AND deleted_at IS NULL',
+      [leadId, paramCompanyId],
     )
+    const lead = leads[0]
 
     if (!lead) {
       throw new Error('Lead not found')
     }
 
-    return { user, lead }
+    return { lead }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
+  const paramCompanyId = Number(params.companyId)
+  if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+    return redirect(`/login?error=invalid_company_id`)
+  }
   try {
-    await getEmployeeUser(request)
+    await getMarketingUser(request, paramCompanyId)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -99,7 +109,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   try {
     await db.execute(
-      'UPDATE customers SET name = ?, email = ?, phone = ?, address = ?, your_message = ? WHERE id = ?',
+      'UPDATE customers SET name = ?, email = ?, phone = ?, address = ?, your_message = ? WHERE id = ? AND company_id = ?',
       [
         data.name,
         data.email || null,
@@ -107,6 +117,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         data.address || null,
         data.your_message || null,
         leadId,
+        paramCompanyId,
       ],
     )
   } catch {

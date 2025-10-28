@@ -24,14 +24,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   )
 
   try {
+    // Include both direct slabs and linked slabs from other stones
     let query = `
       SELECT id, bundle
       FROM slab_inventory
-      WHERE stone_id = ?
+      WHERE (
+        stone_id = ?
+        OR stone_id IN (
+          SELECT source_stone_id FROM stone_slab_links WHERE stone_id = ?
+        )
+      )
       AND sale_id IS NULL
+      AND cut_date IS NULL
     `
 
-    const queryParams = [stoneId]
+    const queryParams = [stoneId, stoneId]
 
     if (excludeSlabIds.length > 0) {
       query += ' AND id NOT IN (?)'

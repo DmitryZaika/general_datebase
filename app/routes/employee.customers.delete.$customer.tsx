@@ -34,7 +34,9 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
 
   try {
-    await db.execute(`DELETE FROM customers WHERE id = ?`, [customerId])
+    await db.execute(`UPDATE customers SET deleted_at = NOW() WHERE id = ?`, [
+      customerId,
+    ])
   } catch {
     return { error: 'Failed to delete customer' }
   }
@@ -63,7 +65,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   const customer = await selectId<{ name: string }>(
     db,
-    'select name from customers WHERE id = ?',
+    'select name from customers WHERE id = ? AND deleted_at IS NULL',
     customerId,
   )
 

@@ -46,7 +46,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     hex_code: string
   }>(db, 'SELECT id, name, hex_code FROM colors ORDER BY name ASC')
 
-  return { stones, colors }
+  return { stones, colors, companyId: Number(params.company) }
 }
 
 interface InteractiveCardProps {
@@ -119,7 +119,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
 }
 
 export default function Stones() {
-  const { stones } = useLoaderData<typeof loader>()
+  const { stones, companyId } = useLoaderData<typeof loader>()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const [_, setActiveType] = useState<string | undefined>(undefined)
 
@@ -144,7 +144,7 @@ export default function Stones() {
   return (
     <>
       <div className='flex justify-center sm:justify-end'>
-        <StoneSearch userRole='customer' />
+        <StoneSearch userRole='customer' companyId={companyId} />
       </div>
 
       <ModuleList>

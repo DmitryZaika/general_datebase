@@ -3,11 +3,17 @@ import { db } from '~/db.server'
 import type { StoneSearchResult } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {
   const [, searchParams] = request.url.split('?')
   const cleanParams = new URLSearchParams(searchParams)
   const searchTerm = cleanParams.get('name')
   const showSoldOut = cleanParams.get('show_sold_out') === 'true'
+
+  const companyId = Number(params.companyId)
+
+  if (Number.isNaN(companyId) || companyId <= 0) {
+    return Response.json({ stones: [] })
+  }
 
   if (!searchTerm) {
     return Response.json({ stones: [] })
@@ -19,6 +25,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     FROM stones s
     LEFT JOIN slab_inventory AS si ON si.stone_id = s.id
     WHERE UPPER(s.name) LIKE UPPER(?)
+    AND s.company_id = ?
     AND s.is_display = 1
     GROUP BY s.id, s.type, s.name, s.url, s.width, s.length, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount`
 
@@ -37,6 +44,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const stones = await selectMany<StoneSearchResult>(db, query, [
     `%${searchTerm}%`,
+    companyId,
     `${searchTerm}%`,
     `% ${searchTerm} %`,
   ])

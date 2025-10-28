@@ -16,21 +16,11 @@ function detectSearchType(term: string): 'name' | 'phone' | 'email' {
   return 'name'
 }
 
-async function getCustomers(name: string): Promise<Customer[]> {
-  if (!name) return []
-  const searchType = detectSearchType(name)
-  const response = await fetch(
-    `/api/customers/search?term=${encodeURIComponent(name)}&searchType=${searchType}`,
-  )
-  if (!response.ok) return []
-  const data = await response.json()
-  return data?.customers || []
-}
-
 export function FindCustomer({
   className,
   editBasePath = '/employee/customers',
   deleteBasePath = '/employee/customers',
+  buildSearchUrl,
   buildEditLink,
   buildDeleteLink,
   onEdit,
@@ -43,6 +33,7 @@ export function FindCustomer({
   disableRowClick?: boolean
   editBasePath?: string
   deleteBasePath?: string
+  buildSearchUrl?: (term: string, searchType: 'name' | 'phone' | 'email') => string
   buildEditLink?: (customerId: number, search: string) => string
   buildDeleteLink?: (customerId: number, search: string) => string
   onEdit?: (customerId: number) => void
@@ -57,23 +48,30 @@ export function FindCustomer({
   const navigate = useNavigate()
   const location = useLocation()
   const { toast } = useToast()
-  const { data: customers = [] } = useQuery({
-    queryKey: ['customers', 'search', searchTerm],
-    queryFn: () => getCustomers(searchTerm),
+  const { data: customers = [] } = useQuery<Customer[]>({
+    queryKey: ['customers', 'search', searchTerm, location.pathname],
+    queryFn: async (): Promise<Customer[]> => {
+      if (!searchTerm) {
+        const empty: Customer[] = []
+        return empty
+      }
+      const searchType = detectSearchType(searchTerm)
+      const url = buildSearchUrl
+        ? buildSearchUrl(searchTerm, searchType)
+        : `/api/customers/search?term=${encodeURIComponent(searchTerm)}&searchType=${searchType}`
+      const response = await fetch(url)
+      if (!response.ok) {
+        const empty: Customer[] = []
+        return empty
+      }
+      const data = await response.json()
+      const list: Customer[] = data?.customers || []
+      return list
+    },
     enabled: !!searchTerm,
   })
 
-  const displayCustomers = useMemo(() => {
-    const seen = new Set<string>()
-    const result: Customer[] = []
-    for (const c of customers) {
-      const key = (c.name || '').trim().toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      result.push(c)
-    }
-    return result
-  }, [customers])
+  const displayCustomers = useMemo(() => customers, [customers])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

@@ -9,6 +9,7 @@ import { Button } from '../ui/button'
 import { Command, CommandGroup, CommandItem } from '../ui/command'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { RawSelect } from './RawSelect'
 
 const selectOptions = ['name', 'phone', 'email'] as const
@@ -69,6 +70,7 @@ const CustomerManager = ({
   setName,
   companyId,
   source,
+  currentText,
   onCustomerChange,
 }: {
   selectedCustomer: number | undefined
@@ -76,6 +78,7 @@ const CustomerManager = ({
   setName: (name: string | null) => void
   companyId: number
   source: (typeof sourceEnum)[number]
+  currentText: string | null
   onCustomerChange: (customerId: number) => void
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false)
@@ -111,7 +114,18 @@ const CustomerManager = ({
           currentCustomer &&
           ((currentCustomer.email ?? '') === '' ||
             (currentCustomer.address ?? '') === '') && (
-            <AlertCircle className='absolute -top-3 -right-3 h-6 w-6 text-red-600' />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className='absolute -top-3 -right-3 z-10 cursor-help pointer-events-auto'>
+                    <AlertCircle className='h-6 w-6 text-red-600' />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side='top' sideOffset={6}>
+                  Missing customer info
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
       </Button>
       {isOpen && (
@@ -121,6 +135,7 @@ const CustomerManager = ({
           companyId={companyId}
           customerId={selectedCustomer || undefined}
           source={source}
+          initialName={currentText ?? undefined}
         />
       )}
     </>
@@ -277,6 +292,7 @@ export function CustomerSearch({
           setName={setName}
           companyId={companyId}
           source={source}
+          currentText={searchTerm ?? name}
           onCustomerChange={onCustomerChange}
         />
       )}

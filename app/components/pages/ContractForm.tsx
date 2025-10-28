@@ -172,7 +172,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
                   )
                 }
                 companyId={companyId}
-                source='user-input'
+                source={'user-input'}
                 selectedCustomer={form.watch('customer_id') ?? undefined}
                 error={form.formState.errors.customer_id?.message}
                 setError={error =>
@@ -219,6 +219,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
 
               {form.watch('rooms').map((room, index) => (
                 <RoomSubForm
+                  companyId={companyId}
                   key={room.room_id}
                   form={form}
                   index={index}

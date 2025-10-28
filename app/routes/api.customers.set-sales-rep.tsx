@@ -12,7 +12,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   try {
     await db.query(
-      `UPDATE customers SET sales_rep = ?, assigned_date = NOW() WHERE id = ?`,
+      `UPDATE customers SET sales_rep = ?, assigned_date = NOW() WHERE id = ? AND deleted_at IS NULL`,
       [sales_rep, customer_id],
     )
 
@@ -54,7 +54,7 @@ export async function action({ request }: ActionFunctionArgs) {
         `INSERT INTO notifications (user_id, customer_id, message, due_at)
 				 SELECT ?, id, CONCAT('Please text ', name), created_date + INTERVAL 24 HOUR
 				 FROM customers
-				 WHERE id = ?
+				 WHERE id = ? AND deleted_at IS NULL
 				   AND NOT EXISTS (
 				     SELECT 1
 				     FROM notifications n
@@ -66,7 +66,7 @@ export async function action({ request }: ActionFunctionArgs) {
         `INSERT INTO notifications (user_id, customer_id, message, due_at)
 				 SELECT ?, id, CONCAT('Please check the customer ', name), created_date + INTERVAL 72 HOUR
 				 FROM customers
-				 WHERE id = ?
+				 WHERE id = ? AND deleted_at IS NULL
 				   AND NOT EXISTS (
 				     SELECT 1 FROM notifications n
 				     WHERE n.user_id = ? AND n.customer_id = ? AND n.is_done = 0 AND n.message LIKE 'Please check%'

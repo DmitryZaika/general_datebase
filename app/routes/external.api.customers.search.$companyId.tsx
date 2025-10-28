@@ -3,15 +3,24 @@ import z from 'zod'
 import { db } from '~/db.server'
 import type { Customer } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getMarketingUser } from '~/utils/session.server'
 
-export const customerSchema = z.object({
+const customerSchema = z.object({
   term: z.string(),
   searchType: z.enum(['name', 'phone', 'email']).default('name'),
 })
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await getEmployeeUser(request)
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const companyId = Number(params.companyId)
+  if (!Number.isFinite(companyId) || companyId <= 0) {
+    return data({ customers: [] })
+  }
+  try {
+    await getMarketingUser(request, companyId)
+  } catch {
+    return data({ customers: [] }, { status: 401 })
+  }
+
   const url = new URL(request.url)
   const customerData = {
     term: url.searchParams.get('term'),
@@ -38,13 +47,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
          AND ?? LIKE ?
        ORDER BY
          CASE
-           WHEN ?? LIKE ? THEN 0   /* prefix */
-           WHEN ?? LIKE ? THEN 1   /* word  */
+           WHEN ?? LIKE ? THEN 0
+           WHEN ?? LIKE ? THEN 1
            ELSE 2
          END,
          name ASC
        LIMIT 5`,
-      [user.company_id, searchType, like, searchType, prefixLike, searchType, wordLike],
+      [companyId, searchType, like, searchType, prefixLike, searchType, wordLike],
     )
 
     return data({ customers })

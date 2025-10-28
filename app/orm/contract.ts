@@ -15,7 +15,7 @@ export class Contract {
 
   private async getCustomerAddress(user: User) {
     const [rows] = await db.query<RowDataPacket[]>(
-      `SELECT address FROM customers WHERE id = ? AND company_id = ? LIMIT 1`,
+      `SELECT address FROM customers WHERE id = ? AND company_id = ? AND deleted_at IS NULL LIMIT 1`,
       [this.data.customer_id, user.company_id],
     )
     return rows[0]?.address ?? ''

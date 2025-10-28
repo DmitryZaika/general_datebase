@@ -107,14 +107,18 @@ export async function action({ request }: ActionFunctionArgs) {
 
   for (const positionId of data.positions) {
     await db.execute(
-      'INSERT INTO users_positions (user_id, position_id) VALUES (?, ?)',
-      [userId, positionId],
+      'INSERT INTO users_positions (user_id, position_id, company_id) VALUES (?, ?, ?)',
+      [userId, positionId, data.company_id],
     )
   }
 
+  const url = new URL(request.url)
+  const searchParams = url.searchParams.toString()
+  const searchString = searchParams ? `?${searchParams}` : ''
+
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'user added'))
-  return redirect('..', {
+  return redirect(`..${searchString}`, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }

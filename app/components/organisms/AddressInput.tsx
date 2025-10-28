@@ -38,7 +38,7 @@ async function completeAddress(q: string): Promise<
 }
 
 export type StringPath<T extends FieldValues> = {
-  [K in Path<T>]: PathValue<T, K> extends string | undefined ? K : never
+  [K in Path<T>]: PathValue<T, K> extends string | null | undefined ? K : never
 }[Path<T>]
 
 type Props<T extends FieldValues> = {

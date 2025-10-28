@@ -45,7 +45,7 @@ interface Customer {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user: { company_id: number }
+  let user: { company_id: number; is_admin: boolean }
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
@@ -57,7 +57,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const includeInvalid = url.searchParams.get('show_invalid') === '1'
 
   const params: number[] = []
-  const conditions: string[] = ['c.company_id = ?']
+  const conditions: string[] = ['c.deleted_at IS NULL', 'c.company_id = ?']
   params.push(user.company_id)
   if (salesRepFilter) {
     conditions.push('c.sales_rep = ?')
@@ -88,6 +88,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }))
   return {
     customers: processed,
+    isAdmin: user.is_admin,
   }
 }
 
@@ -163,6 +164,11 @@ const customerColumns: ColumnDef<Customer>[] = [
   {
     accessorKey: 'name',
     header: 'Name of customer',
+    cell: ({ row }: { row: Row<Customer> }) => {
+      const name = row.original.name || ''
+      const short = name.length > 20 ? `${name.slice(0, 20)}...` : name
+      return <span title={name}>{short}</span>
+    },
   },
   {
     accessorKey: 'phone',
@@ -201,9 +207,10 @@ function CustomerActions({ customer }: { customer: Customer }) {
   const { toast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
+  const { isAdmin } = useLoaderData<{ isAdmin: boolean }>()
   const actions: Record<string, string> = {
     edit: `edit/${customer.id}${location.search}`,
-    delete: `delete/${customer.id}${location.search}`,
+    ...(isAdmin ? { delete: `delete/${customer.id}${location.search}` } : {}),
     invalid: `invalid/${customer.id}${location.search}`,
   }
 
@@ -268,16 +275,19 @@ export default function AdminCustomers() {
   const filtered = customers.filter((c: Customer) => {
     if (tabParam === 'leads') return c.source === 'leads'
     if (tabParam === 'walkin') return c.source === 'check-in'
+    if (tabParam === 'call-in') return c.source === 'call-in'
     if (tabParam === 'all') return true
   })
 
   let fullDisplayed = filtered
-  if (tabParam === 'leads' || tabParam === 'walkin') {
+  if (tabParam === 'leads' || tabParam === 'walkin' || tabParam === 'call-in') {
     fullDisplayed = [...filtered].sort(
       (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
     )
   } else if (tabParam === 'all') {
-    fullDisplayed = [...filtered].sort((a, b) => a.name.localeCompare(b.name))
+    fullDisplayed = [...filtered].sort((a, b) =>
+      (a.name ?? '').localeCompare(b.name ?? ''),
+    )
   }
 
   const totalPages = Math.max(1, Math.ceil(fullDisplayed.length / pageSize))
@@ -329,6 +339,7 @@ export default function AdminCustomers() {
               <TabsTrigger value='all'>All Customers</TabsTrigger>
               <TabsTrigger value='walkin'>Walk-in</TabsTrigger>
               <TabsTrigger value='leads'>Leads</TabsTrigger>
+              <TabsTrigger value='call-in'>Call-In</TabsTrigger>
             </TabsList>
           </Tabs>
           {tabParam === 'leads' && (
