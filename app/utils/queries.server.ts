@@ -32,15 +32,15 @@ export const stoneQueryBuilder = async (
 ): Promise<Stone[]> => {
   const params: (string | number)[] = [companyId]
   let query = `
-  SELECT 
-    stones.id, 
-    stones.name, 
-    stones.type, 
-    stones.url, 
-    stones.is_display, 
-    stones.length, 
+  SELECT
+    stones.id,
+    stones.name,
+    stones.type,
+    stones.url,
+    stones.is_display,
+    stones.length,
     stones.width,
-    stones.created_date, 
+    stones.created_date,
     stones.on_sale,
     stones.retail_price,
     stones.cost_per_sqft,
@@ -48,17 +48,22 @@ export const stoneQueryBuilder = async (
     stones.finishing,
     stones.samples_amount,
     stones.samples_importance,
-    COUNT(DISTINCT CASE 
-      WHEN slab_inventory.id IS NOT NULL 
-        AND slab_inventory.cut_date IS NULL 
+    COUNT(DISTINCT CASE
+      WHEN slab_inventory.id IS NOT NULL
+        AND slab_inventory.cut_date IS NULL
       THEN slab_inventory.id ELSE NULL END) AS amount,
-    CAST(SUM(CASE 
-      WHEN slab_inventory.id IS NOT NULL 
-        AND slab_inventory.sale_id IS NULL 
-        AND slab_inventory.cut_date IS NULL 
+    CAST(SUM(CASE
+      WHEN slab_inventory.id IS NOT NULL
+        AND slab_inventory.sale_id IS NULL
+        AND slab_inventory.cut_date IS NULL
       THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM stones
-  LEFT JOIN slab_inventory ON slab_inventory.stone_id = stones.id AND slab_inventory.cut_date IS NULL
+  LEFT JOIN slab_inventory ON (
+    slab_inventory.stone_id = stones.id
+    OR slab_inventory.stone_id IN (
+      SELECT source_stone_id FROM stone_slab_links WHERE stone_id = stones.id
+    )
+  ) AND slab_inventory.cut_date IS NULL
   `
 
   query += `WHERE stones.company_id = ?`

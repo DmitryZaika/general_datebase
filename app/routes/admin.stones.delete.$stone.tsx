@@ -39,6 +39,41 @@ export async function action({ params, request }: ActionFunctionArgs) {
     deleteFile(stone.url)
   }
 
+  // Delete all slab links where this stone is used as source
+  await db.execute(
+    `DELETE FROM stone_slab_links WHERE source_stone_id = ?`,
+    [stoneId],
+  )
+
+  // Delete all slab links where this stone is the target
+  await db.execute(
+    `DELETE FROM stone_slab_links WHERE stone_id = ?`,
+    [stoneId],
+  )
+
+  // Get all slab images that need to be deleted from S3
+  const slabsResult = await db.execute(
+    `SELECT url FROM slab_inventory WHERE stone_id = ? AND url IS NOT NULL`,
+    [stoneId],
+  )
+
+  // Delete slab images from S3
+  const slabs = slabsResult[0] as Array<{ url: string }>
+  if (slabs && slabs.length > 0) {
+    for (const slab of slabs) {
+      if (slab.url) {
+        deleteFile(slab.url)
+      }
+    }
+  }
+
+  // Delete all slabs belonging to this stone
+  await db.execute(
+    `DELETE FROM slab_inventory WHERE stone_id = ?`,
+    [stoneId],
+  )
+
+  // Delete the stone itself
   await db.execute(`DELETE FROM stones WHERE id = ?`, [stoneId])
 
   const url = new URL(request.url)
