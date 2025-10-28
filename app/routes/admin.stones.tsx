@@ -13,7 +13,6 @@ import {
   useLocation,
   useNavigate,
   useNavigation,
-  useSearchParams,
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
@@ -22,7 +21,7 @@ import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
-import { cleanParams } from '~/hooks/use-safe-search-params'
+import { cleanParams, useSafeSearchParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
 import { getAdminUser } from '~/utils/session.server'
@@ -30,11 +29,18 @@ import { capitalizeFirstLetter } from '~/utils/words'
 
 type ViewMode = 'grid' | 'table'
 
+const VIEW_MODE = {
+  GRID: 'grid',
+  TABLE: 'table',
+} as const
+
+const DEFAULT_VIEW_MODE: ViewMode = VIEW_MODE.GRID
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request)
-  const [, searchParams] = request.url.split('?')
-  const queryParams = new URLSearchParams(searchParams)
-  const filters = stoneFilterSchema.parse(cleanParams(queryParams))
+  const url = new URL(request.url)
+  const cleanedParams = cleanParams(url.searchParams)
+  const filters = stoneFilterSchema.parse(cleanedParams)
   const stones = await stoneQueryBuilder(filters, user.company_id, true)
 
   return { stones, companyId: user.company_id }
@@ -43,11 +49,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 function StoneTable({ stones }: { stones: Stone[] }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
 
   const getEditUrl = (stoneId: number) => {
-    const currentParams = new URLSearchParams(searchParams)
-    return `edit/${stoneId}/information?${currentParams.toString()}`
+    return `edit/${stoneId}/information${location.search}`
   }
 
   const handleRowClick = (stoneId: number) => {
@@ -165,16 +169,15 @@ function StoneTable({ stones }: { stones: Stone[] }) {
 
 export default function AdminStones() {
   const { stones, companyId } = useLoaderData<typeof loader>()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSafeSearchParams(stoneFilterSchema)
   const navigation = useNavigation()
   const navigate = useNavigate()
   const [isAddingStone, setIsAddingStone] = useState(false)
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones)
   const location = useLocation()
 
-  // Получаем viewMode из URL или используем "grid" по умолчанию
-  const initialViewMode = (searchParams.get('viewMode') as ViewMode) || 'grid'
-  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode)
+  // Получаем viewMode из searchParams
+  const viewMode: ViewMode = searchParams.viewMode || DEFAULT_VIEW_MODE
 
   useEffect(() => {
     const inStock = stones.filter(
@@ -207,20 +210,15 @@ export default function AdminStones() {
   }
 
   const getEditUrl = (stoneId: number) => {
-    const currentParams = new URLSearchParams(searchParams)
-    return `edit/${stoneId}/information?${currentParams.toString()}`
+    return `edit/${stoneId}/information${location.search}`
   }
 
-  const toggleViewMode = () => {
-    const newViewMode = viewMode === 'grid' ? 'table' : 'grid'
-
-    // Обновить состояние
-    setViewMode(newViewMode)
+  const toggleViewMode = (): void => {
+    const newViewMode: ViewMode =
+      viewMode === VIEW_MODE.GRID ? VIEW_MODE.TABLE : VIEW_MODE.GRID
 
     // Обновить URL параметры
-    const newParams = new URLSearchParams(searchParams)
-    newParams.set('viewMode', newViewMode)
-    setSearchParams(newParams)
+    setSearchParams({ ...searchParams, viewMode: newViewMode })
   }
 
   return (
@@ -231,14 +229,16 @@ export default function AdminStones() {
             variant='outline'
             onClick={toggleViewMode}
             className='ml-2'
-            title={viewMode === 'grid' ? 'Switch to Table View' : 'Switch to Grid View'}
+            title={
+              viewMode === VIEW_MODE.GRID ? 'Switch to Table View' : 'Switch to Grid View'
+            }
           >
-            {viewMode === 'grid' ? (
+            {viewMode === VIEW_MODE.GRID ? (
               <TableIcon className='mr-1' />
             ) : (
               <GridIcon className='mr-1' />
             )}
-            {viewMode === 'grid' ? 'Table View' : 'Grid View'}
+            {viewMode === VIEW_MODE.GRID ? 'Table View' : 'Grid View'}
           </Button>
 
           <Link
@@ -258,7 +258,7 @@ export default function AdminStones() {
       </div>
 
       <div>
-        {viewMode === 'grid' ? (
+        {viewMode === VIEW_MODE.GRID ? (
           <ModuleList>
             {sortedStones.map(stone => {
               const displayedAmount = stone.amount > 0 ? stone.amount : '—'
