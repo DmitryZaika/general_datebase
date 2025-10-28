@@ -16,11 +16,7 @@ import {
 } from 'react-router'
 import { AuthenticityTokenProvider } from 'remix-utils/csrf/react'
 import { EmployeeSidebar } from '~/components/molecules/Sidebars/EmployeeSidebar'
-import {
-  OriginalSidebarTrigger,
-  SidebarProvider,
-  SidebarTrigger,
-} from '~/components/ui/sidebar'
+import { SidebarProvider } from '~/components/ui/sidebar'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import type { ISupplier } from '~/schemas/suppliers'
@@ -28,14 +24,16 @@ import { csrf } from '~/utils/csrf.server'
 import { getBase } from '~/utils/urlHelpers'
 import { Header } from './components/Header'
 import { Chat } from './components/organisms/Chat'
+import { MarketingHeader } from './components/organisms/MarketingHeader'
 import { Toaster } from './components/ui/toaster'
 import { useToast } from './hooks/use-toast'
 import { commitSession, getSession } from './sessions'
 import './tailwind.css'
 import { queryClient } from './utils/api'
-import { selectMany } from './utils/queryHelpers'
+import { selectId, selectMany } from './utils/queryHelpers'
 import { getUserBySessionId } from './utils/session.server'
 import type { ToastMessage } from './utils/toastHelpers'
+import { SidebarToggle } from './components/SidebarToggle'
 
 export const links: LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -47,6 +45,15 @@ export const links: LinksFunction = () => [
   {
     rel: 'stylesheet',
     href: 'https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap',
+  },
+  {
+    rel: 'icon',
+    href: 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/Granite-manager-icon.png',
+    type: 'image/png',
+  },
+  {
+    rel: 'apple-touch-icon',
+    href: 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/Granite-manager-icon.png',
   },
 ]
 
@@ -74,8 +81,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const message: ToastMessage | null = session.get('message') || null
 
   let user = null
+  let companyName: string | null = null
   if (activeSession) {
     user = (await getUserBySessionId(activeSession)) || null
+    if (user) {
+      const company = await selectId<{ name: string }>(
+        db,
+        'SELECT name FROM company WHERE id = ?',
+        user.company_id,
+      )
+      companyName = company?.name ?? null
+    }
   }
 
   let stoneSuppliers: ISupplier[] | undefined
@@ -145,9 +161,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
       if (!url.pathname.startsWith(target)) {
         return redirect(target)
       }
-    } else if (hasExternalMarketing) {
-      if (!url.pathname.startsWith('/external/marketing')) {
-        return redirect('/external/marketing/leads')
+    }
+
+    // Auto-redirect Marketing users to their External Marketing page
+    if (hasExternalMarketing) {
+      const marketingTarget = `/external/marketing/${user.company_id}/leads`
+      if (!url.pathname.startsWith('/external/marketing/')) {
+        return redirect(marketingTarget)
       }
     }
   }
@@ -157,6 +177,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       message,
       token,
       user,
+      companyName,
       stoneSuppliers,
       sinkSuppliers,
       faucetSuppliers,
@@ -182,7 +203,6 @@ export default function App() {
     sinkSuppliers,
     faucetSuppliers,
     colors,
-    position,
   } = useLoaderData<typeof loader>()
   const { pathname } = useLocation()
   const { toast } = useToast()
@@ -190,7 +210,8 @@ export default function App() {
   const isLogin = pathname === '/login'
   const isDraw = pathname.startsWith('/employee/draw')
   const isCheckIn = pathname.includes('/check-in')
-  const isExternalMarketing = pathname.includes('/external/marketing')
+  const isExternalMarketing = pathname.includes(`/external/marketing/`)
+  const isInstallerRoute = pathname.startsWith('/installers')
   const mainRef = useRef<HTMLElement | null>(null)
   const [isAtBottom, setIsAtBottom] = useState(false)
   useEffect(() => {
@@ -222,9 +243,12 @@ export default function App() {
   }, [message?.nonce])
 
   const basePath = getBase(pathname)
-  const isInstaller = position !== null
   const showSidebar =
-    !!basePath && !isLogin && !isInstaller && !isCheckIn && !isExternalMarketing
+    !!basePath &&
+    !isLogin &&
+    !isInstallerRoute &&
+    !isCheckIn &&
+    !isExternalMarketing &&
 
   return (
     <html lang='en'>
@@ -236,7 +260,10 @@ export default function App() {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <SidebarProvider defaultOpen={showSidebar && !isDraw}>
+          <SidebarProvider
+            key={showSidebar ? 'show' : 'hide'}
+            defaultOpen={showSidebar && !isDraw}
+          >
             {showSidebar && (
               <EmployeeSidebar
                 suppliers={stoneSuppliers}
@@ -247,7 +274,9 @@ export default function App() {
             )}
             <main ref={mainRef} className='h-screen overflow-y-auto bg-gray-100 w-full'>
               <AuthenticityTokenProvider token={token}>
-                {!isInstaller && !isCheckIn && (
+                {isExternalMarketing || isCheckIn || isInstallerRoute ? (
+                  <MarketingHeader />
+                ) : (
                   <Header
                     isEmployee={user?.is_employee ?? false}
                     user={user}
@@ -256,8 +285,12 @@ export default function App() {
                   />
                 )}
                 <div className='relative'>
-                  {isMobile && !isCheckIn && <SidebarTrigger />}
-                  {!isMobile && !isCheckIn && <OriginalSidebarTrigger />}
+                  <SidebarToggle
+                    isMobile={isMobile}
+                    isCheckIn={isCheckIn}
+                    isExternalMarketing={isExternalMarketing}
+                    isInstallerRoute={isInstallerRoute}
+                  />
                   <Outlet />
                 </div>
               </AuthenticityTokenProvider>
@@ -265,7 +298,9 @@ export default function App() {
               <ScrollRestoration />
               <Scripts />
               <Posthog />
-              {!isInstaller && user && <Chat isAtBottom={isAtBottom} />}
+              {!isInstallerRoute && !isCheckIn && user && (
+                <Chat isAtBottom={isAtBottom} />
+              )}
               {/* <ScrollToTopButton /> */}
             </main>
           </SidebarProvider>

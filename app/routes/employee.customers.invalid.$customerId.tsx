@@ -99,7 +99,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const row = await selectId<{ name: string; invalid_lead: string | null }>(
     db,
-    'SELECT name, invalid_lead FROM customers WHERE id = ?',
+    'SELECT name, invalid_lead FROM customers WHERE id = ? AND deleted_at IS NULL',
     customerId,
   )
   return { customer_name: row?.name, current: row?.invalid_lead ?? '' }

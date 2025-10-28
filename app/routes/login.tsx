@@ -1,5 +1,4 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import type { RowDataPacket } from 'mysql2'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
@@ -23,7 +22,13 @@ import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions'
 import { Positions } from '~/types'
 import { csrf } from '~/utils/csrf.server'
-import { getEmployeeUser, getUserBySessionId, login } from '~/utils/session.server'
+import { selectMany } from '~/utils/queryHelpers'
+import {
+  getEmployeeUser,
+  getUserBySessionId,
+  login,
+  type SessionUser,
+} from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
 const userSchema = z.object({
@@ -43,6 +48,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { searchParams } = new URL(request.url)
   const error = searchParams.get('error')
   return { error }
+}
+
+async function getRedirectPath(user: SessionUser): Promise<string> {
+  const positions = await selectMany<{ position_id: number }>(
+    db,
+    `SELECT position_id from users_positions where user_id = ?`,
+    [user.id],
+  )
+  if (positions.length === 0) return '..'
+  if (positions.length > 1) return '..'
+  if (positions[0].position_id === Positions.Installer)
+    return `/installers/${user.company_id}/checklist`
+  if (positions[0].position_id === Positions.ExternalMarketing)
+    return `/external/marketing/${user.company_id}/leads`
+  return '..'
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -79,15 +99,9 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  const [row] = await db.execute<(RowDataPacket & { position: string | null })[]>(
-    `SELECT user_id from users_positions where user_id = ? and position_id = ?`,
-    [user.id, Positions.Installer],
-  )
-  const isInstaller = row.length > 0
-
   session.flash('message', toastData('Success', 'Logged in'))
 
-  const redirectPath = isInstaller ? '/installers/checklist' : '..'
+  const redirectPath = await getRedirectPath(user)
   return redirect(redirectPath, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
@@ -101,7 +115,7 @@ export default function Login() {
     resolver: zodResolver(userSchema),
     defaultValues: actionData?.defaultValues || { email: '', password: '' },
   })
-  const fullSubmit = useFullSubmit(form)
+  const fullSubmit = useFullSubmit(form, undefined, 'POST', undefined, true)
   const isSubmitting = navigation.state !== 'idle'
 
   return (

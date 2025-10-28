@@ -1,5 +1,6 @@
 // app/routes/todoList.ts
 
+import type { RowDataPacket } from 'mysql2'
 import type { ActionFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { todoListSchema } from '~/schemas/general'
@@ -25,13 +26,32 @@ const updateDoneAction = async (
   isDone: boolean,
   userId: number,
 ): Promise<void> => {
-  await db.execute(
-    `UPDATE todolist
-     SET is_done = ?
-     WHERE id = ?
-     AND user_id = ?;`,
-    [isDone, todoId, userId],
-  )
+  if (isDone) {
+    // Move completed todo to the bottom by setting position to max+1 for the user
+    const [rows] = await db.query<(RowDataPacket & { maxPos: number })[]>(
+      `SELECT COALESCE(MAX(position), -1) AS maxPos FROM todolist WHERE user_id = ?`,
+      [userId],
+    )
+    const maxPos = Array.isArray(rows) && rows.length > 0 ? rows[0].maxPos : -1
+    const newPos = (Number.isFinite(maxPos) ? maxPos : -1) + 1
+
+    await db.execute(
+      `UPDATE todolist
+       SET is_done = ?, position = ?
+       WHERE id = ?
+       AND user_id = ?;`,
+      [isDone, newPos, todoId, userId],
+    )
+  } else {
+    // Only toggle the flag; keep current ordering
+    await db.execute(
+      `UPDATE todolist
+       SET is_done = ?
+       WHERE id = ?
+       AND user_id = ?;`,
+      [isDone, todoId, userId],
+    )
+  }
 }
 
 const deleteAction = async (todoId: number, userId: number): Promise<void> => {

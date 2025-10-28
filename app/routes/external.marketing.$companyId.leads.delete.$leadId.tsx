@@ -3,12 +3,16 @@ import { DeleteRow } from '~/components/pages/DeleteRow'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getMarketingUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers'
 
 export async function action({ params, request }: ActionFunctionArgs) {
+  const paramCompanyId = Number(params.companyId)
+  if (!Number.isFinite(paramCompanyId) || paramCompanyId <= 0) {
+    return redirect(`/login?error=invalid_company_id`)
+  }
   try {
-    await getEmployeeUser(request)
+    await getMarketingUser(request, paramCompanyId)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -24,9 +28,11 @@ export async function action({ params, request }: ActionFunctionArgs) {
   if (!leadId) {
     return { lead_name: undefined }
   }
-
   try {
-    await db.execute(`DELETE FROM customers WHERE id = ?`, [leadId])
+    await db.execute(
+      `UPDATE customers SET deleted_at = NOW() WHERE id = ? AND company_id = ?`,
+      [leadId, paramCompanyId],
+    )
   } catch {
     return { error: 'Failed to delete lead' }
   }

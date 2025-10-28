@@ -1,3 +1,4 @@
+import type { RowDataPacket } from 'mysql2'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -15,10 +16,18 @@ export async function action({ request }: ActionFunctionArgs) {
   const raw = await request.json()
   const data = todoListSchema.parse(raw)
 
-  await db.execute(`INSERT INTO todolist (rich_text, user_id) VALUES (?, ?);`, [
-    data.rich_text,
-    user.id,
-  ])
+  // Insert new todos at the TOP by assigning position = min-1
+  const [rows] = await db.query<(RowDataPacket & { minPos: number })[]>(
+    `SELECT COALESCE(MIN(position), 0) AS minPos FROM todolist WHERE user_id = ?`,
+    [user.id],
+  )
+  const minPos = Array.isArray(rows) && rows.length > 0 ? rows[0].minPos : 0
+  const newPos = (Number.isFinite(minPos) ? minPos : 0) - 1
+
+  await db.execute(
+    `INSERT INTO todolist (rich_text, user_id, position) VALUES (?, ?, ?);`,
+    [data.rich_text, user.id, newPos],
+  )
   return Response.json({ success: true })
 }
 

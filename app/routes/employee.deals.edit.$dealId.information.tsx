@@ -15,7 +15,7 @@ import { csrf } from '~/utils/csrf.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers'
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await getEmployeeUser(request)
   } catch (error) {
@@ -33,8 +33,10 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors) {
     return { errors, receivedValues }
   }
-  const url = new URL(request.url)
-  const dealId = Number(url.pathname.split('/').pop())
+  const dealId = parseInt(params.dealId || '', 10)
+  if (Number.isNaN(dealId)) {
+    return { error: 'Invalid deal id' }
+  }
 
   await db.execute(
     `UPDATE deals

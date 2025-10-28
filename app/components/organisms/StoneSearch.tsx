@@ -5,9 +5,9 @@ import type { StoneSearchResult, StoneSlim } from '~/types'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 
-const fetchAvailableStones = async (query: string = '') => {
+const fetchAvailableStones = async (companyId: number, query: string = '') => {
   const response = await fetch(
-    `/api/stones/search?name=${encodeURIComponent(query)}&unsold_only=true`,
+    `/api/stones/search/${companyId}?name=${encodeURIComponent(query)}&unsold_only=true`,
   )
   if (!response.ok) {
     throw new Error('Failed to fetch slabs')
@@ -27,16 +27,18 @@ export const StoneSearch = ({
   stone,
   setStone,
   onRetailPriceChange,
+  companyId,
 }: {
   stone: StoneSlim | undefined
   setStone: (value: StoneSlim | undefined) => void
   onRetailPriceChange?: (price: number) => void
+  companyId: number
 }) => {
   const [searchValue, setSearchValue] = useState(stone?.name || undefined)
   const [show, setShow] = useState(!stone?.name)
   const { data, isLoading } = useQuery({
     queryKey: ['availableStones', searchValue],
-    queryFn: () => fetchAvailableStones(searchValue),
+    queryFn: () => fetchAvailableStones(companyId, searchValue),
     enabled: !!searchValue,
   })
 

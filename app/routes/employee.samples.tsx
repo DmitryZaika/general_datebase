@@ -32,7 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const queryParams = new URLSearchParams(searchParams)
   const filters = stoneFilterSchema.parse(cleanParams(queryParams))
   const stones = await stoneQueryBuilder(filters, user.company_id)
-  return { stones }
+  return { stones, companyId: user.company_id }
 }
 
 function ImportanceComponent({
@@ -51,7 +51,7 @@ function ImportanceComponent({
     { key: 3, label: 'High' },
     { key: 2, label: 'Medium' },
     { key: 1, label: 'Low' },
-    { key: 4, label: "Hadn't to cut" },
+    { key: 4, label: "Hadn't cut" },
   ]
 
   const handleChange = async (val: string) => {
@@ -136,7 +136,7 @@ function AmountComponent({
 }
 
 export default function Samples() {
-  const { stones } = useLoaderData<typeof loader>()
+  const { stones, companyId } = useLoaderData<typeof loader>()
   const [_, setCurrentId] = useState<number | undefined>(undefined)
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones)
   const [colorSort, setColorSort] = useState<boolean>(false)
@@ -345,6 +345,7 @@ export default function Samples() {
       <div className='flex justify-between flex-wrap items-center items-end mb-2 gap-2'>
         <div className='flex-1 flex justify-center md:justify-end md:ml-auto'>
           <StoneSearch
+            companyId={companyId}
             userRole='employee'
             mode='samples'
             onMinus={stoneId => {

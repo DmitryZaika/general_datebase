@@ -1,6 +1,5 @@
 import { Link, useLoaderData, useLocation, useNavigation } from 'react-router'
 import type { HeaderProps } from '~/types'
-import { Notification } from '../molecules/Notification'
 import { TodoList } from '../organisms/TodoList'
 
 interface HeaderMobileProps extends HeaderProps {
@@ -235,7 +234,7 @@ export function HeaderMobile({
         </a>
       </div>
       <div className='flex items-center gap-2'>
-        <Notification />
+        {/* <Notification /> */}
         <TodoList />
       </div>
       <BurgerMenu user={user} isAdmin={isAdmin} isSuperUser={isSuperUser}></BurgerMenu>

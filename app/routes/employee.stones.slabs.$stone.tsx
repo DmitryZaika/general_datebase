@@ -368,7 +368,7 @@ export default function SlabsModal() {
 
   useEffect(() => {
     if (saleId && saleId !== 'null' && saleId !== '') {
-      window.open(`/api/pdf/${saleId}`, '_blank')
+      // window.open(`/api/pdf/${saleId}`, '_blank')   // TODO: uncomment this when the PDF is ready
       const searchParams = new URLSearchParams(location.search)
       searchParams.delete('saleId')
       const newSearch = searchParams.toString()
@@ -644,7 +644,10 @@ export default function SlabsModal() {
     })
   })
 
-  const uniqueSlabs = sortedSlabs
+  // Ensure slabs that reference a missing parent (orphans) are still shown
+  const addedIds = new Set(sortedSlabs.map(s => s.id))
+  const orphanSlabs = allSlabs.filter(s => !addedIds.has(s.id))
+  const uniqueSlabs = [...sortedSlabs, ...orphanSlabs]
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>

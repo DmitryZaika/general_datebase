@@ -179,7 +179,7 @@ export default function SuppliersAdd() {
               )}
             />
             <DialogFooter>
-              <LoadingButton loading={!isSubmitting}>Add Stone</LoadingButton>
+              <LoadingButton loading={!isSubmitting}>Add supplier</LoadingButton>
             </DialogFooter>
           </Form>
         </FormProvider>
