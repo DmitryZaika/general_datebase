@@ -20,12 +20,13 @@ export async function action({ request }: ActionFunctionArgs) {
   const salesRep = validatedData.source === 'check-in' ? null : user.id
 
   const [result] = await db.execute<ResultSetHeader>(
-    `INSERT INTO customers (name, phone, email, address, referral_source, source, company_id, company_name, sales_rep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO customers (name, phone, email, address, your_message, referral_source, source, company_id, company_name, sales_rep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       validatedData.name,
       validatedData.phone || null,
       validatedData.email || null,
       validatedData.address || null,
+      validatedData.your_message || null,
       validatedData.referral_source || null,
       validatedData.source,
       validatedData.company_id,
