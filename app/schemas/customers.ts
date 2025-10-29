@@ -17,6 +17,7 @@ export const customerSignupSchema = z.object({
   phone: z.string().optional(),
   email: z.string().optional(),
   address: z.string().optional(),
+  your_message: z.string().optional(),
   company_name: z.string().nullish(),
   referral_source: z
     .enum([
@@ -67,6 +68,7 @@ export const customerDialogSchema = z.object({
   email: z.union([z.string().email(), z.literal('')]),
   phone: z.union([z.coerce.string().min(10), z.literal('')]),
   address: z.string().optional(),
+  your_message: z.string().optional(),
   builder: z.boolean().default(false),
   company_name: z.string().nullish(),
   source: z.enum(sourceEnum),

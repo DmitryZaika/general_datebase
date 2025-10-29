@@ -25,6 +25,7 @@ import { PhoneInput } from '../molecules/PhoneInput'
 import { SelectInput } from '../molecules/SelectItem'
 import { AddressInput } from '../organisms/AddressInput'
 import { Switch } from '../ui/switch'
+import { Textarea } from '../ui/textarea'
 
 const resolver = zodResolver(customerDialogSchema)
 
@@ -47,6 +48,7 @@ const getCustomerInfo = async (customerId: number) => {
     address: data.customer.address ?? '',
     company_name: data.customer.company_name,
     source: data.customer.source,
+    your_message: data.customer.your_message ?? '',
   }
 }
 
@@ -86,6 +88,7 @@ export function CustomerForm({
       email: '',
       address: '',
       source,
+      your_message: '',
     },
   })
 
@@ -234,6 +237,17 @@ export function CustomerForm({
                   field={form.register('company_name')}
                 />
               )}
+              <FormField
+                control={form.control}
+                name='your_message'
+                render={({ field }) => (
+                  <Textarea
+                    {...field}
+                    value={(field.value as string) ?? ''}
+                    name='Notes'
+                  />
+                )}
+              />
               <DialogFooter>
                 <LoadingButton loading={isPending}>Submit</LoadingButton>
               </DialogFooter>
