@@ -25,6 +25,7 @@ import { getBase } from '~/utils/urlHelpers'
 import { Header } from './components/Header'
 import { Chat } from './components/organisms/Chat'
 import { MarketingHeader } from './components/organisms/MarketingHeader'
+import { SidebarToggle } from './components/SidebarToggle'
 import { Toaster } from './components/ui/toaster'
 import { useToast } from './hooks/use-toast'
 import { commitSession, getSession } from './sessions'
@@ -33,7 +34,6 @@ import { queryClient } from './utils/api'
 import { selectId, selectMany } from './utils/queryHelpers'
 import { getUserBySessionId } from './utils/session.server'
 import type { ToastMessage } from './utils/toastHelpers'
-import { SidebarToggle } from './components/SidebarToggle'
 
 export const links: LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -244,11 +244,7 @@ export default function App() {
 
   const basePath = getBase(pathname)
   const showSidebar =
-    !!basePath &&
-    !isLogin &&
-    !isInstallerRoute &&
-    !isCheckIn &&
-    !isExternalMarketing &&
+    !!basePath && !isLogin && !isInstallerRoute && !isCheckIn && !isExternalMarketing
 
   return (
     <html lang='en'>
