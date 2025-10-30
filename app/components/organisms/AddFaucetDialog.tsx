@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import type { TCustomerSchema } from '~/schemas/sales'
 import type { Faucet } from '~/types'
@@ -33,6 +33,18 @@ export const AddFaucetDialog = ({
 }) => {
   const [selectedFaucet, setSelectedFaucet] = useState<number>()
 
+  // Get already selected faucet type IDs from all rooms to filter them out
+  const selectedFaucetTypeIds = useMemo(() => {
+    const allRooms = form.getValues('rooms') || []
+    const allSelectedFaucets = allRooms.flatMap(room => room.faucet_type || [])
+    return new Set(allSelectedFaucets.map(faucet => faucet.type_id))
+  }, [form.watch('rooms')])
+
+  // Filter out already selected faucets
+  const availableFaucets = useMemo(() => {
+    return faucet_type.filter(faucet => !selectedFaucetTypeIds.has(faucet.id))
+  }, [faucet_type, selectedFaucetTypeIds])
+
   const handleAddFaucet = () => {
     if (!selectedFaucet) {
       return
@@ -55,7 +67,7 @@ export const AddFaucetDialog = ({
           <DialogTitle>Add Faucet</DialogTitle>
         </DialogHeader>
         <div className='space-y-4'>
-          {faucet_type.length === 0 ? (
+          {availableFaucets.length === 0 ? (
             <div className='text-center py-4 text-gray-500'>
               No available faucets found
             </div>
@@ -68,7 +80,7 @@ export const AddFaucetDialog = ({
                 <SelectValue placeholder='Select a faucet' />
               </SelectTrigger>
               <SelectContent>
-                {faucet_type.map(faucet => (
+                {availableFaucets.map(faucet => (
                   <SelectItem key={faucet.id} value={faucet.id.toString()}>
                     {faucet.name} - ${faucet.retail_price}
                   </SelectItem>
