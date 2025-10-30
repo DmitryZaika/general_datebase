@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import type { TCustomerSchema } from '~/schemas/sales'
 import type { Sink } from '~/types'
@@ -33,6 +33,18 @@ export const AddSinkDialog = ({
 }) => {
   const [selectedSink, setSelectedSink] = useState<number>()
 
+  // Get already selected sink type IDs from all rooms to filter them out
+  const selectedSinkTypeIds = useMemo(() => {
+    const allRooms = form.getValues('rooms') || []
+    const allSelectedSinks = allRooms.flatMap(room => room.sink_type || [])
+    return new Set(allSelectedSinks.map(sink => sink.type_id))
+  }, [form.watch('rooms')])
+
+  // Filter out already selected sinks
+  const availableSinks = useMemo(() => {
+    return sink_type.filter(sink => !selectedSinkTypeIds.has(sink.id))
+  }, [sink_type, selectedSinkTypeIds])
+
   const handleAddSink = () => {
     if (!selectedSink) {
       return
@@ -54,7 +66,7 @@ export const AddSinkDialog = ({
           <DialogTitle>Add Sink</DialogTitle>
         </DialogHeader>
         <div className='space-y-4'>
-          {sink_type.length === 0 ? (
+          {availableSinks.length === 0 ? (
             <div className='text-center py-4 text-gray-500'>
               No available sinks found
             </div>
@@ -67,7 +79,7 @@ export const AddSinkDialog = ({
                 <SelectValue placeholder='Select a sink' />
               </SelectTrigger>
               <SelectContent>
-                {sink_type.map(sink => (
+                {availableSinks.map(sink => (
                   <SelectItem key={sink.id} value={sink.id.toString()}>
                     {sink.name} - ${sink.retail_price}
                   </SelectItem>
