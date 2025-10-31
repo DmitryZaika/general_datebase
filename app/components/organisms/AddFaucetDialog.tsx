@@ -33,8 +33,6 @@ export const AddFaucetDialog = ({
 }) => {
   const [selectedFaucet, setSelectedFaucet] = useState<number>()
 
-  // Calculate directly without useMemo to get fresh data on every render
-  // This ensures the dialog always shows current state when opened
   const allRooms = form.getValues('rooms') || []
   const allSelectedFaucets = allRooms.flatMap(room => room.faucet_type || [])
 
