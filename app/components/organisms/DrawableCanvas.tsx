@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Button } from '~/components/ui/button'
+import { useMemo, useState } from 'react';
+import { Button } from '~/components/ui/button';
 
 type Point = { x: number; y: number }
 
@@ -7,93 +7,84 @@ interface DrawableCanvasProps {
   onSubmit?: (paths: Point[][]) => void
 }
 
-type Rect = { left: number; right: number; top: number; bottom: number }
+type Shape = Point[]
 
-const FIXED_HEIGHT = 200
+function CompletedShapes({ shapes }: { shapes: Shape[] }) {
+  return (
+    <>
+      {shapes.map((shape, i) => (
+        <polygon
+          key={`p-${i}`}
+          points={shape.map(p => `${p.x},${p.y}`).join(' ')}
+          fill='rgba(59,130,246,0.15)'
+          stroke='#3b82f6'
+          strokeWidth={2}
+        />
+      ))}
+    </>
+  )
+}
+
+const toLocal = (e: React.MouseEvent<SVGSVGElement, MouseEvent>, offsetX: number = 0, offsetY: number = 0) => {
+  const rect = e.currentTarget.getBoundingClientRect()
+  return { x: e.clientX - rect.left + offsetX, y: e.clientY - rect.top + offsetY }
+}
 
 function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
-  const [shapes, setShapes] = useState<Rect[]>([])
-  const [start, setStart] = useState<Point | null>(null)
-  const [hoverX, setHoverX] = useState<number | null>(null)
+  const [shapes, setShapes] = useState<Shape[]>([])
+  const [currentShape, setCurrentShape] = useState<Shape>([])
+  const [hover, setHover] = useState<Point | null>(null)
 
   const handleReset = () => {
     setShapes([])
-    setStart(null)
-    setHoverX(null)
-  }
-
-  const handleSubmit = () => {
-    if (!onSubmit) return
-    const polys: Point[][] = shapes.map((r: Rect) => [
-      { x: r.left, y: r.top },
-      { x: r.right, y: r.top },
-      { x: r.right, y: r.bottom },
-      { x: r.left, y: r.bottom },
-    ])
-    onSubmit(polys)
-  }
-
-  const toLocal = (e: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    setCurrentShape([])
+    setHover(null)
   }
 
   const handleMove: React.MouseEventHandler<SVGSVGElement> = e => {
-    if (!start) return
+    if (currentShape.length === 0) return
     const p = toLocal(e)
-    setHoverX(p.x)
+    setHover(p)
   }
 
   const handleClick: React.MouseEventHandler<SVGSVGElement> = e => {
     const p = toLocal(e)
-    if (!start) {
-      setStart(p)
-      setHoverX(p.x)
-      return
-    }
-    const left = Math.min(start.x, p.x)
-    const right = Math.max(start.x, p.x)
-    const top = start.y
-    const bottom = start.y + FIXED_HEIGHT
-    setShapes([...shapes, { left, right, top, bottom }])
-    setStart(null)
-    setHoverX(null)
+    setCurrentShape([...currentShape, p])
   }
 
-  const preview: Rect | null = useMemo(() => {
-    if (!start || hoverX === null) return null
-    const left = Math.min(start.x, hoverX)
-    const right = Math.max(start.x, hoverX)
-    return { left, right, top: start.y, bottom: start.y + FIXED_HEIGHT }
-  }, [start, hoverX])
+  const handleDoubleClick: React.MouseEventHandler<SVGSVGElement> = () => {
+    if (currentShape.length >= 3) {
+      setShapes([...shapes, currentShape])
+      setCurrentShape([])
+      setHover(null)
+    }
+  }
+
+  const handleSubmit = () => {
+    if (!onSubmit) return
+    onSubmit(shapes)
+  }
+
+  const previewPoints: Point[] = useMemo(() => {
+    if (currentShape.length === 0) return []
+    if (!hover) return currentShape
+    return [...currentShape, hover]
+  }, [currentShape, hover])
 
   return (
     <div className='fixed inset-0 bg-white'>
       <svg
-        className='w-[200px] h-[200px] cursor-crosshair'
+        className='w-[1000px] h-[500px] cursor-crosshair border-2 border-green-500 ml-24 mt-24'
         onMouseMove={handleMove}
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
       >
         <g>
-          {shapes.map((r: Rect, i: number) => (
-            <rect
-              key={`r-${i}`}
-              x={r.left}
-              y={r.top}
-              width={r.right - r.left}
-              height={r.bottom - r.top}
-              fill='rgba(59,130,246,0.15)'
-              stroke='#3b82f6'
-              strokeWidth={2}
-            />
-          ))}
-          {preview ? (
-            <rect
-              x={preview.left}
-              y={preview.top}
-              width={preview.right - preview.left}
-              height={preview.bottom - preview.top}
-              fill='rgba(96,165,250,0.15)'
+          <CompletedShapes shapes={shapes} />
+          {previewPoints.length > 0 ? (
+            <polyline
+              points={previewPoints.map(p => `${p.x},${p.y}`).join(' ')}
+              fill='none'
               stroke='#60a5fa'
               strokeWidth={2}
             />
@@ -110,4 +101,5 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
   )
 }
 
-export { DrawableCanvas }
+export { DrawableCanvas };
+

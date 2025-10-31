@@ -113,7 +113,6 @@ export default function EmployeeQuotesAdd() {
     setOpen(false)
     navigate('..')
   }
-  console.log(form.getValues())
   const fullSubmit = useFullSubmit(form)
   return (
     <Dialog open={open} onOpenChange={handleClose}>
