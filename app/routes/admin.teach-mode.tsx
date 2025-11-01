@@ -187,30 +187,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   } else if (intent === 'delete-question') {
     const questionId = parseInt(formData.get('questionId') as string)
-
     if (isNaN(questionId)) {
       return { error: 'Invalid question ID' }
     }
-
     try {
       // Validate question exists
       const [questionCheck] = await db.execute(
         'SELECT id FROM questions WHERE id = ? AND company_id = ?',
         [questionId, user.company_id],
       )
-
       if (!questionCheck || (questionCheck as any).length === 0) {
         return {
           error: 'Invalid question ID or question does not belong to your company',
         }
       }
-
       // Mark question as deleted
       await db.execute(
         'UPDATE questions SET deleted_at = CURRENT_TIMESTAMP, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND company_id = ?',
         [questionId, user.company_id],
       )
-
       return { success: true, questionId }
     } catch (error) {
       console.error('Error deleting question:', error)
@@ -218,8 +213,57 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         error: `Failed to delete question: ${error instanceof Error ? error.message : 'Unknown error'}`,
       }
     }
+  } else if (intent === 'create-question') {
+    const questionText = formData.get('questionText') as string
+    const options = JSON.parse(formData.get('options') as string) as {
+      id: number | null
+      text: string
+      is_correct: boolean
+      is_deleted?: boolean
+    }[]
+    const correctAnswerId = parseInt(formData.get('correctAnswerId') as string)
+
+    if (!questionText || !options || options.length === 0 || isNaN(correctAnswerId)) {
+      return { error: 'Missing required question data for create' }
+    }
+
+    const validOptions = options.filter(
+      opt => !opt.is_deleted && opt.text.trim() !== '',
+    )
+    if (validOptions.length < 2) {
+      return { error: 'At least two non-empty answer choices are required' }
+    }
+
+    if (!correctAnswerId || !validOptions.some(opt => opt.id === correctAnswerId)) {
+      return { error: 'Please select a valid correct answer' }
+    }
+
+    try {
+      const [questionResult] = await db.execute(
+        'INSERT INTO questions (text, instruction_id, question_type, company_id) VALUES (?, NULL, ?, ?)',
+        [questionText, 'MC', user.company_id],
+      )
+
+      const questionId = (questionResult as any).insertId
+
+      // Handle answer choices (all new since creating)
+      for (const option of options) {
+        if (option.is_deleted || option.text.trim() === '') continue
+        await db.execute(
+          'INSERT INTO answer_choices (question_id, text, is_correct) VALUES (?, ?, ?)',
+          [questionId, option.text, option.id === correctAnswerId ? 1 : 0],
+        )
+      }
+
+      return { success: true, questionId }
+    } catch (error) {
+      console.error('Error creating question:', error)
+      return {
+        error: `Failed to create question: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      }
+    }
   } else {
-    // Original save question logic
+    // Original save question logic (for generated questions)
     const questionText = formData.get('questionText') as string
     const optionsString = formData.get('options') as string
     const options = optionsString.split(',').map(s => s.trim())
@@ -296,6 +340,7 @@ export default function TeachMode() {
 
   const [expanded, setExpanded] = React.useState<Record<number, boolean>>({})
   const [savedQuestions, setSavedQuestions] = React.useState<Set<number>>(new Set())
+  const [showManualEntry, setShowManualEntry] = React.useState(false)
 
   type NodeState = {
     text: string
@@ -622,6 +667,156 @@ Now generate a **unique and varied** multiple choice question based on the conte
     )
   }
 
+  const ManualQuestionEntry = () => {
+    const [editedQuestionText, setEditedQuestionText] = React.useState('')
+    const [editedChoices, setEditedChoices] = React.useState<
+      { id: number | null; text: string; is_correct: boolean; is_deleted?: boolean }[]
+    >([])
+    const [correctAnswerId, setCorrectAnswerId] = React.useState<number | null>(null)
+
+    const handleQuestionTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setEditedQuestionText(e.target.value)
+    }
+
+    const handleChoiceTextChange = (
+      id: number | null,
+      e: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+      setEditedChoices(prev =>
+        prev.map(choice =>
+          choice.id === id ? { ...choice, text: e.target.value } : choice,
+        ),
+      )
+    }
+
+    const handleCorrectAnswerChange = (id: number | null) => {
+      setCorrectAnswerId(id)
+    }
+
+    const handleAddChoice = () => {
+      const newId = Math.min(...editedChoices.map(c => c.id || 0), 0) - 1
+      setEditedChoices(prev => [...prev, { id: newId, text: '', is_correct: false }])
+    }
+
+    const handleDeleteChoice = (id: number | null) => {
+      if (editedChoices.filter(c => !c.is_deleted).length <= 2) {
+        alert('Cannot delete: At least two answer choices are required.')
+        return
+      }
+      setEditedChoices(prev =>
+        prev.map(choice =>
+          choice.id === id ? { ...choice, is_deleted: true } : choice,
+        ),
+      )
+      if (correctAnswerId === id) {
+        setCorrectAnswerId(null)
+      }
+    }
+
+    const handleSave = () => {
+      const validChoices = editedChoices.filter(
+        c => !c.is_deleted && c.text.trim() !== '',
+      )
+      if (validChoices.length < 2) {
+        alert('At least two non-empty answer choices are required.')
+        return
+      }
+      if (!correctAnswerId || !validChoices.some(c => c.id === correctAnswerId)) {
+        alert('Please select a correct answer.')
+        return
+      }
+      const formData = new FormData()
+      formData.append('intent', 'create-question')
+      formData.append('questionText', editedQuestionText)
+      formData.append('options', JSON.stringify(editedChoices))
+      formData.append('correctAnswerId', (correctAnswerId ?? '').toString())
+      submit(formData, { method: 'post' })
+      setShowManualEntry(false) // Close the manual entry after save
+    }
+
+    const handleCancel = () => {
+      setShowManualEntry(false)
+    }
+
+    return (
+      <div
+        style={{
+          border: '2px solid #888',
+          borderRadius: 8,
+          padding: 20,
+          marginBottom: 20,
+          backgroundColor: '#fff',
+        }}
+      >
+        <h3 style={{ marginBottom: 15, color: '#333' }}>Manual Question Entry</h3>
+        <input
+          type='text'
+          value={editedQuestionText}
+          onChange={handleQuestionTextChange}
+          placeholder='Enter question text'
+          style={{
+            width: '100%',
+            padding: 8,
+            marginBottom: 15,
+            borderRadius: 4,
+            border: '1px solid #ccc',
+          }}
+        />
+        {editedChoices.map(
+          choice =>
+            !choice.is_deleted && (
+              <div
+                key={choice.id || `new-${Math.abs(choice.id || 0)}`}
+                style={{ marginBottom: 10, display: 'flex', alignItems: 'center' }}
+              >
+                <input
+                  type='text'
+                  value={choice.text}
+                  onChange={e => handleChoiceTextChange(choice.id, e)}
+                  placeholder='Enter answer choice'
+                  style={{
+                    flex: 1,
+                    padding: 8,
+                    borderRadius: 4,
+                    border: '1px solid #ccc',
+                    marginRight: 10,
+                  }}
+                />
+                <input
+                  type='radio'
+                  name={`correct-answer-manual`}
+                  checked={correctAnswerId === choice.id}
+                  onChange={() => handleCorrectAnswerChange(choice.id)}
+                />
+                <span style={{ marginLeft: 5, marginRight: 10 }}>Correct</span>
+                <Button
+                  variant='destructive'
+                  size='sm'
+                  onClick={() => handleDeleteChoice(choice.id)}
+                >
+                  Delete
+                </Button>
+              </div>
+            ),
+        )}
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={handleAddChoice}
+          style={{ marginBottom: 15 }}
+        >
+          Add Answer Choice
+        </Button>
+        <div style={{ display: 'flex', gap: 10, marginTop: 15 }}>
+          <Button onClick={handleSave}>Save Question</Button>
+          <Button variant='outline' onClick={handleCancel}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   const AdminQuestionComponent: React.FC<{
     question: Question
     choices: AnswerChoice[]
@@ -859,6 +1054,12 @@ Now generate a **unique and varied** multiple choice question based on the conte
           <InstructionNode node={root} depth={0} />
         </div>
       ))}
+      <div style={{ marginTop: 20, marginBottom: 20 }}>
+        <Button onClick={() => setShowManualEntry(!showManualEntry)}>
+          {showManualEntry ? 'Cancel Manual Entry' : 'Add Manual Question'}
+        </Button>
+        {showManualEntry && <ManualQuestionEntry />}
+      </div>
       <div style={{ marginTop: 40 }}>
         <h2
           style={{

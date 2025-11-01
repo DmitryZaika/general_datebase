@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { Button } from '~/components/ui/button'
 import { db } from '~/db.server'
 import type { InstructionSlim } from '~/types'
 import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
@@ -69,12 +70,16 @@ export default function TeachMode() {
   }
 
   const [expanded, setExpanded] = React.useState<Record<number, boolean>>({})
+  const [isAssessmentStarted, setIsAssessmentStarted] = React.useState(false)
+  const [shuffledQuestions, setShuffledQuestions] = React.useState<Question[]>([])
+  const [shuffledChoicesByQuestion, setShuffledChoicesByQuestion] = React.useState<
+    Record<number, AnswerChoice[]>
+  >({})
   const [selectedAnswers, setSelectedAnswers] = React.useState<Record<number, string>>(
     {},
   )
-  const [submittedQuestions, setSubmittedQuestions] = React.useState<Set<number>>(
-    new Set(),
-  )
+  const [isSubmitted, setIsSubmitted] = React.useState(false)
+  const [score, setScore] = React.useState(0)
 
   // Group answer choices by question ID
   const answerChoicesByQuestion = React.useMemo(() => {
@@ -164,19 +169,55 @@ export default function TeachMode() {
     title: { fontWeight: 700, margin: 0 } as React.CSSProperties,
   }
 
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      const temp = shuffled[i]
+      shuffled[i] = shuffled[j]
+      shuffled[j] = temp
+    }
+    return shuffled
+  }
+
+  const startAssessment = () => {
+    const shuffledQs = shuffleArray(questions)
+    const shuffledChoices: Record<number, AnswerChoice[]> = {}
+    shuffledQs.forEach(q => {
+      const originalChoices = answerChoicesByQuestion.get(q.id) || []
+      shuffledChoices[q.id] = shuffleArray(originalChoices)
+    })
+    setShuffledQuestions(shuffledQs)
+    setShuffledChoicesByQuestion(shuffledChoices)
+    setSelectedAnswers({})
+    setIsSubmitted(false)
+    setIsAssessmentStarted(true)
+  }
+
   const handleAnswerSelect = (questionId: number, answerText: string) => {
+    if (isSubmitted) return
     setSelectedAnswers(prev => ({
       ...prev,
       [questionId]: answerText,
     }))
   }
 
-  const handleSubmitAnswer = (questionId: number) => {
-    if (!selectedAnswers[questionId]) {
-      alert('Please select an answer first')
-      return
+  const submitAssessment = () => {
+    const unanswered = shuffledQuestions.length - Object.keys(selectedAnswers).length
+    if (unanswered > 0) {
+      const confirmed = window.confirm(
+        `You have ${unanswered} unanswered question${unanswered === 1 ? '' : 's'}.\n\nClick OK to submit anyway, or Cancel to return to the assessment.`,
+      )
+      if (!confirmed) return
     }
-    setSubmittedQuestions(prev => new Set([...prev, questionId]))
+    let correctCount = 0
+    shuffledQuestions.forEach(q => {
+      const selected = selectedAnswers[q.id]
+      const correct = getCorrectAnswer(q.id)
+      if (selected === correct) correctCount++
+    })
+    setScore(Math.round((correctCount / shuffledQuestions.length) * 100))
+    setIsSubmitted(true)
   }
 
   const getCorrectAnswer = (questionId: number): string | null => {
@@ -224,10 +265,12 @@ export default function TeachMode() {
     )
   }
 
-  const QuestionComponent: React.FC<{ question: Question }> = ({ question }) => {
-    const choices = answerChoicesByQuestion.get(question.id) || []
+  const QuestionComponent: React.FC<{ question: Question; index: number }> = ({
+    question,
+    index,
+  }) => {
+    const choices = shuffledChoicesByQuestion[question.id] || []
     const selectedAnswer = selectedAnswers[question.id]
-    const isSubmitted = submittedQuestions.has(question.id)
     const isCorrect = isAnswerCorrect(question.id)
     const correctAnswer = getCorrectAnswer(question.id)
 
@@ -241,91 +284,82 @@ export default function TeachMode() {
           backgroundColor: '#fff',
         }}
       >
-        <h3 style={{ marginBottom: 15, color: '#333' }}>{question.text}</h3>
+        <h3
+          style={{ marginBottom: 15, color: '#333' }}
+        >{`${index + 1}. ${question.text}`}</h3>
 
-        {choices.map(choice => (
-          <div key={choice.id} style={{ marginBottom: 10 }}>
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                cursor: isSubmitted ? 'default' : 'pointer',
-                padding: 8,
-                borderRadius: 4,
-                backgroundColor:
-                  isSubmitted && choice.is_correct
-                    ? '#d4edda'
-                    : isSubmitted &&
-                        selectedAnswer === choice.text &&
-                        !choice.is_correct
-                      ? '#f8d7da'
-                      : 'transparent',
-                border:
-                  isSubmitted && choice.is_correct
-                    ? '1px solid #c3e6cb'
-                    : isSubmitted &&
-                        selectedAnswer === choice.text &&
-                        !choice.is_correct
-                      ? '1px solid #f5c6cb'
-                      : '1px solid transparent',
-              }}
-            >
-              <input
-                type='radio'
-                name={`question-${question.id}`}
-                value={choice.text}
-                checked={selectedAnswer === choice.text}
-                onChange={() => handleAnswerSelect(question.id, choice.text)}
-                disabled={isSubmitted}
-                style={{ marginRight: 10 }}
-              />
-              <span style={{ fontSize: '1rem' }}>{choice.text}</span>
-              {isSubmitted && choice.is_correct ? (
-                <span
-                  style={{ marginLeft: 'auto', color: '#28a745', fontWeight: 'bold' }}
-                >
-                  ✓ Correct
-                </span>
-              ) : null}
-            </label>
-          </div>
-        ))}
+        {choices.map(choice => {
+          const isThisCorrect = choice.is_correct
+          const isThisSelected = selectedAnswer === choice.text
 
-        <div style={{ marginTop: 15, display: 'flex', gap: 10 }}>
-          <button
-            onClick={() => handleSubmitAnswer(question.id)}
-            disabled={!selectedAnswer || isSubmitted}
+          return (
+            <div key={choice.id} style={{ marginBottom: 10 }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: isSubmitted ? 'default' : 'pointer',
+                  padding: 8,
+                  borderRadius: 4,
+                  backgroundColor:
+                    isSubmitted && isThisCorrect
+                      ? '#d4edda'
+                      : isSubmitted && isThisSelected && !isThisCorrect
+                        ? '#f8d7da'
+                        : 'transparent',
+                  border:
+                    isSubmitted && isThisCorrect
+                      ? '1px solid #c3e6cb'
+                      : isSubmitted && isThisSelected && !isThisCorrect
+                        ? '1px solid #f5c6cb'
+                        : '1px solid transparent',
+                  minHeight: '40px',
+                }}
+                onClick={e => {
+                  e.preventDefault()
+                  handleAnswerSelect(question.id, choice.text)
+                }}
+              >
+                <input
+                  type='radio'
+                  name={`question-${question.id}`}
+                  value={choice.text}
+                  checked={isThisSelected}
+                  onChange={() => {}}
+                  disabled={isSubmitted}
+                  style={{ marginRight: 10, pointerEvents: 'none' }}
+                />
+                <span style={{ fontSize: '1rem' }}>{choice.text}</span>
+                {isSubmitted && isThisCorrect ? (
+                  <span
+                    style={{ marginLeft: 'auto', color: '#28a745', fontWeight: 'bold' }}
+                  >
+                    ✓ Correct
+                  </span>
+                ) : null}
+              </label>
+            </div>
+          )
+        })}
+
+        {isSubmitted && (
+          <div
             style={{
-              padding: '8px 16px',
-              backgroundColor: isSubmitted ? '#6c757d' : '#007bff',
-              color: 'white',
-              border: 'none',
+              marginTop: 15,
+              padding: 10,
               borderRadius: 4,
-              cursor: isSubmitted ? 'not-allowed' : 'pointer',
+              backgroundColor: isCorrect ? '#d4edda' : '#f8d7da',
+              border: isCorrect ? '1px solid #c3e6cb' : '1px solid #f5c6cb',
+              color: isCorrect ? '#155724' : '#721c24',
             }}
           >
-            {isSubmitted ? 'Submitted' : 'Submit Answer'}
-          </button>
-
-          {isSubmitted && (
-            <div
-              style={{
-                padding: 10,
-                borderRadius: 4,
-                backgroundColor: isCorrect ? '#d4edda' : '#f8d7da',
-                border: isCorrect ? '1px solid #c3e6cb' : '1px solid #f5c6cb',
-                color: isCorrect ? '#155724' : '#721c24',
-                flex: 1,
-              }}
-            >
-              <strong>
-                {isCorrect
-                  ? '✅ Correct! Well done!'
-                  : `❌ Incorrect. The correct answer is: ${correctAnswer}`}
-              </strong>
-            </div>
-          )}
-        </div>
+            <strong>
+              {isCorrect
+                ? '✅ Correct!'
+                : `❌ Incorrect. The correct answer is: ${correctAnswer}`}
+            </strong>
+          </div>
+        )}
       </div>
     )
   }
@@ -351,7 +385,7 @@ export default function TeachMode() {
         ))}
       </div>
 
-      {/* Questions Section */}
+      {/* Assessment Section */}
       {questions.length > 0 && (
         <div>
           <h2
@@ -362,15 +396,47 @@ export default function TeachMode() {
               paddingBottom: 10,
             }}
           >
-            Practice Questions ({questions.length})
+            Practice Assessment
           </h2>
           <p style={{ marginBottom: 20, color: '#666', fontStyle: 'italic' }}>
             Test your knowledge with these questions based on the training materials
             above.
           </p>
-          {questions.map(question => (
-            <QuestionComponent key={question.id} question={question} />
-          ))}
+          {!isAssessmentStarted ? (
+            <Button onClick={startAssessment}>Start Assessment</Button>
+          ) : !isSubmitted ? (
+            <>
+              {shuffledQuestions.map((question, index) => (
+                <QuestionComponent
+                  key={question.id}
+                  question={question}
+                  index={index}
+                />
+              ))}
+              <Button onClick={submitAssessment}>Submit Assessment</Button>
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px',
+                  marginBottom: 20,
+                }}
+              >
+                <h3 style={{ margin: 0, color: '#333' }}>Your Score: {score}%</h3>
+                <Button onClick={startAssessment}>Take Assessment Again</Button>
+              </div>
+              {shuffledQuestions.map((question, index) => (
+                <QuestionComponent
+                  key={question.id}
+                  question={question}
+                  index={index}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
 
