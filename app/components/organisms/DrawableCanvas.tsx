@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '~/components/ui/button';
+
+const FIXED_HEIGHT = 200;
 
 type Point = { x: number; y: number }
 
@@ -33,31 +35,38 @@ const toLocal = (e: React.MouseEvent<SVGSVGElement, MouseEvent>, offsetX: number
 function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
   const [shapes, setShapes] = useState<Shape[]>([])
   const [currentShape, setCurrentShape] = useState<Shape>([])
-  const [hover, setHover] = useState<Point | null>(null)
+  const [level, setLevel] = useState<number>(1)
 
   const handleReset = () => {
     setShapes([])
     setCurrentShape([])
-    setHover(null)
+  }
+
+
+  const handleDragStart: React.MouseEventHandler<SVGSVGElement> = e => {
+      const top = toLocal(e, 0, - (FIXED_HEIGHT / 2))
+      const bottom = toLocal(e, 0, FIXED_HEIGHT / 2)
+      setCurrentShape([top, bottom])
   }
 
   const handleMove: React.MouseEventHandler<SVGSVGElement> = e => {
     if (currentShape.length === 0) return
-    const p = toLocal(e)
-    setHover(p)
-  }
-
-  const handleClick: React.MouseEventHandler<SVGSVGElement> = e => {
-    const p = toLocal(e)
-    setCurrentShape([...currentShape, p])
-  }
-
-  const handleDoubleClick: React.MouseEventHandler<SVGSVGElement> = () => {
-    if (currentShape.length >= 3) {
-      setShapes([...shapes, currentShape])
-      setCurrentShape([])
-      setHover(null)
+    const top = toLocal(e, 0, - (FIXED_HEIGHT / 2))
+    const bottom = toLocal(e, 0, FIXED_HEIGHT / 2)
+    let inner: Point[];
+    if (currentShape.length === level * 2) {
+      inner = currentShape
+    } else {
+      inner = currentShape.slice(1, -1)
     }
+    top.y = inner[0].y
+    bottom.y = inner[1].y
+    setCurrentShape([top, ...inner, bottom])
+  }
+
+  const handleDragEnd: React.MouseEventHandler<SVGSVGElement> = e => {
+    setShapes((shapes) => [...shapes, currentShape])
+    setCurrentShape([])
   }
 
   const handleSubmit = () => {
@@ -65,25 +74,19 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
     onSubmit(shapes)
   }
 
-  const previewPoints: Point[] = useMemo(() => {
-    if (currentShape.length === 0) return []
-    if (!hover) return currentShape
-    return [...currentShape, hover]
-  }, [currentShape, hover])
-
   return (
     <div className='fixed inset-0 bg-white'>
       <svg
         className='w-[1000px] h-[500px] cursor-crosshair border-2 border-green-500 ml-24 mt-24'
         onMouseMove={handleMove}
-        onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
+        onMouseDown={handleDragStart}
+        onMouseUp={handleDragEnd}
       >
         <g>
           <CompletedShapes shapes={shapes} />
-          {previewPoints.length > 0 ? (
+          {currentShape.length > 0 ? (
             <polyline
-              points={previewPoints.map(p => `${p.x},${p.y}`).join(' ')}
+              points={currentShape.map(p => `${p.x},${p.y}`).join(' ')}
               fill='none'
               stroke='#60a5fa'
               strokeWidth={2}
