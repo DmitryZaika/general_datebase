@@ -54,7 +54,9 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
   }
 
   const handleTurnPoint = (idx: number, item: Point, length: number, above: boolean, ascending: boolean) => {
-    const toChange = !above ? idx === 0 : (idx === length - 1);
+    console.log(above, ascending)
+    const complex = ascending === above ? !above : above
+    const toChange = complex ? idx === 0 : (idx === length - 1);
     if (!toChange) return item
     if (level % 2 === 1) {
       return { ...item, x: item.x  + (ascending ? FIXED_HEIGHT : -FIXED_HEIGHT) }
@@ -75,17 +77,11 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
     setCurrentShape(newShape)
   }
 
-  const isInBounds = (current: Point, inner: Point[]) => {
-    const bounds = level % 2 === 1 ? [inner[0].y, inner[inner.length - 1].y] : [inner[inner.length - 1].x, inner[0].x]
-    bounds.sort((a, b) => a - b)
-    const currentCoord = level % 2 === 1 ? current.y : current.x
-    const threshold = Math.min(currentCoord - bounds[0], bounds[1]  - currentCoord)
-    return threshold >= -TURN_THRESHOLD
-  }
-
-  const isInOldBounds = (current: Point, inner: Point[]) => {
-    const oldLevel = level - 1
-    const bounds = oldLevel % 2 === 1 ? [inner[1].y, inner[inner.length - 2].y] : [inner[inner.length - 2].x, inner[1].x]
+  const isInBounds = (current: Point, inner: Point[], depth: number) => {
+    const oldLevel = level - depth
+    const first = inner[0 + depth]
+    const last = inner[inner.length - 1 - depth]
+    const bounds = oldLevel % 2 === 1 ? [first.y, last.y] : [first.x, last.x]
     bounds.sort((a, b) => a - b)
     const currentCoord = oldLevel % 2 === 1 ? current.y : current.x
     const threshold = Math.min(currentCoord - bounds[0], bounds[1]  - currentCoord)
@@ -103,10 +99,10 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
       inner = currentShape.slice(1, -1)
     }
 
-    if (inner.length > 3 && isInOldBounds(current, inner)) {
+    if (inner.length > 3 && isInBounds(current, inner, 1)) {
       inner = inner.slice(1, -1)
       setLevel(Level => Level - 1)
-    } else if (inner.length > 0 && !isInBounds(current, inner)) {
+    } else if (inner.length > 0 && !isInBounds(current, inner, 0)) {
       handleTurn(current)
       return
     }
@@ -114,7 +110,7 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
     let top, bottom: Point
     if (level % 2 === 1) {
       top = { ...current, y: inner[0].y }
-      bottom = { ...current, y: inner[1].y }
+      bottom = { ...current, y: inner[inner.length - 1].y }
     } else {
       top = { ...current, x: inner[0].x }
       bottom = { ...current, x: inner[inner.length - 1].x }
