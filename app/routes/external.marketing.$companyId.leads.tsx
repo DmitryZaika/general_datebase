@@ -451,7 +451,7 @@ function ExternalMarketingLeads() {
         <Button
           type='button'
           className='w-fit'
-          onClick={() => navigate(`/external/marketing/${companyId}/leads/add_lead`)}
+          onClick={() => navigate(`/external/marketing/${companyId}/leads/add-lead`)}
         >
           Add Lead
         </Button>
