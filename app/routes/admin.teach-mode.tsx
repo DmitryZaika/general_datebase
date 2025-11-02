@@ -1,6 +1,7 @@
 import * as React from 'react'
 import {
   type ActionFunctionArgs,
+  data,
   Form,
   type LoaderFunctionArgs,
   redirect,
@@ -12,9 +13,11 @@ import {
 import { Button } from '~/components/ui/button'
 import { Switch } from '~/components/ui/switch'
 import { db } from '~/db.server'
+import { useToast } from '~/hooks/use-toast'
 import type { InstructionSlim } from '~/types'
 import { DONE_KEY } from '~/utils/constants'
 import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers'
 import { selectMany } from '../utils/queryHelpers'
 
 interface InstructionMedium extends InstructionSlim {
@@ -133,7 +136,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     try {
-      // Validate question exists
       const [questionCheck] = await db.execute(
         'SELECT id FROM questions WHERE id = ? AND company_id = ?',
         [questionId, user.company_id],
@@ -145,13 +147,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
       }
 
-      // Update question text
       await db.execute(
         'UPDATE questions SET text = ?, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND company_id = ?',
         [questionText, questionId, user.company_id],
       )
 
-      // Handle answer choices
       for (const option of options) {
         if (option.is_deleted) {
           if (option.id && option.id > 0) {
@@ -164,13 +164,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         if (option.id && option.id > 0) {
-          // Update existing answer choice
           await db.execute(
             'UPDATE answer_choices SET text = ?, is_correct = ?, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND question_id = ?',
             [option.text, option.id === correctAnswerId ? 1 : 0, option.id, questionId],
           )
         } else {
-          // Insert new answer choice
           await db.execute(
             'INSERT INTO answer_choices (question_id, text, is_correct) VALUES (?, ?, ?)',
             [questionId, option.text, option.id === correctAnswerId ? 1 : 0],
@@ -191,7 +189,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return { error: 'Invalid question ID' }
     }
     try {
-      // Validate question exists
       const [questionCheck] = await db.execute(
         'SELECT id FROM questions WHERE id = ? AND company_id = ?',
         [questionId, user.company_id],
@@ -201,7 +198,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           error: 'Invalid question ID or question does not belong to your company',
         }
       }
-      // Mark question as deleted
       await db.execute(
         'UPDATE questions SET deleted_at = CURRENT_TIMESTAMP, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND company_id = ?',
         [questionId, user.company_id],
@@ -246,7 +242,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       const questionId = (questionResult as any).insertId
 
-      // Handle answer choices (all new since creating)
       for (const option of options) {
         if (option.is_deleted || option.text.trim() === '') continue
         await db.execute(
@@ -263,7 +258,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
     }
   } else {
-    // Original save question logic (for generated questions)
     const questionText = formData.get('questionText') as string
     const optionsString = formData.get('options') as string
     const options = optionsString.split(',').map(s => s.trim())
@@ -286,7 +280,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         [instructionId, user.company_id],
       )
 
-      if (!instructionCheck || (instructionCheck as any).length === 0) {
+      if (!instructionCheck || instructionCheck.length === 0) {
         return {
           error:
             'Invalid instruction ID or instruction does not belong to your company',
@@ -298,7 +292,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         [questionText, instructionId, 'MC', user.company_id],
       )
 
-      const questionId = (questionResult as any).insertId
+      const questionId = questionResult.insertId
       for (const option of options) {
         const isCorrect = option === correctAnswer
         await db.execute(
@@ -331,6 +325,17 @@ export default function TeachMode() {
   }>()
   const submit = useSubmit()
   const revalidator = useRevalidator()
+  const { toast } = useToast()
+
+  React.useEffect(() => {
+    if (actionData?.success) {
+      toast({
+        title: 'Success',
+        description: 'Question saved successfully',
+        variant: 'success',
+      })
+    }
+  }, [actionData?.success])
 
   React.useEffect(() => {
     if (actionData?.success && revalidator.state === 'idle') {
@@ -340,7 +345,16 @@ export default function TeachMode() {
 
   const [expanded, setExpanded] = React.useState<Record<number, boolean>>({})
   const [savedQuestions, setSavedQuestions] = React.useState<Set<number>>(new Set())
+  const [rejectedQuestions, setRejectedQuestions] = React.useState<Set<number>>(
+    new Set(),
+  )
   const [showManualEntry, setShowManualEntry] = React.useState(false)
+
+  React.useEffect(() => {
+    if (actionData?.success && actionData?.instructionId) {
+      setSavedQuestions(prev => new Set(prev).add(actionData.instructionId!))
+    }
+  }, [actionData])
 
   type NodeState = {
     text: string
@@ -500,6 +514,18 @@ export default function TeachMode() {
       if (e) e.stopPropagation()
       if (loadingMCQ) return
 
+      setSavedQuestions(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(node.id)
+        return newSet
+      })
+
+      setRejectedQuestions(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(node.id)
+        return newSet
+      })
+
       setNodeLoading(node.id, true)
       setNodeText(node.id, '')
 
@@ -558,6 +584,23 @@ Now generate a **unique and varied** multiple choice question based on the conte
     const values = cleanJSON(text)
     const isSaving = nodeStates[node.id]?.saving ?? false
     const isSaved = savedQuestions.has(node.id)
+    const isRejected = rejectedQuestions.has(node.id)
+
+    const handleSaveQuestion = (e: React.FormEvent) => {
+      e.preventDefault()
+      if (isSaved) return
+
+      setNodeSaving(node.id, true)
+      const form = e.target as HTMLFormElement
+      const formData = new FormData(form)
+      submit(formData, { method: 'post' })
+
+      setTimeout(() => setNodeSaving(node.id, false), 500)
+    }
+
+    const handleRejectQuestion = () => {
+      setRejectedQuestions(prev => new Set(prev).add(node.id))
+    }
 
     return (
       <div style={styles.item(depth)}>
@@ -574,7 +617,10 @@ Now generate a **unique and varied** multiple choice question based on the conte
           <Button
             variant='outline'
             size='sm'
-            onClick={() => handleGenerate()}
+            onClick={e => {
+              e.stopPropagation()
+              handleGenerate()
+            }}
             style={{ marginLeft: 10 }}
           >
             Generate Question
@@ -626,8 +672,28 @@ Now generate a **unique and varied** multiple choice question based on the conte
               border: '2px solid #888',
               borderRadius: 8,
               marginTop: 20,
+              position: 'relative',
+              display: isRejected ? 'none' : 'block',
             }}
           >
+            <button
+              onClick={handleRejectQuestion}
+              style={{
+                position: 'absolute',
+                top: 10,
+                right: 10,
+                background: 'transparent',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#888',
+                lineHeight: 1,
+                padding: '0 5px',
+              }}
+              title='Reject question'
+            >
+              ×
+            </button>
             <h2 style={{ marginBottom: 15 }}>{values.question}</h2>
             {values.options?.map((answer: string, index: number) => (
               <div key={index} style={{ marginBottom: 8 }}>
@@ -635,7 +701,7 @@ Now generate a **unique and varied** multiple choice question based on the conte
                 {answer === values.answer ? <strong> (correct answer)</strong> : ''}
               </div>
             ))}
-            <Form method='post'>
+            <Form method='post' onSubmit={handleSaveQuestion}>
               <input type='hidden' name='questionText' value={values.question} />
               <input type='hidden' name='options' value={values.options} />
               <input type='hidden' name='correctAnswer' value={values.answer} />
@@ -648,9 +714,15 @@ Now generate a **unique and varied** multiple choice question based on the conte
                   marginRight: 10,
                   backgroundColor: isSaved ? '#28a745' : undefined,
                   color: isSaved ? 'white' : undefined,
+                  cursor: isSaved ? 'not-allowed' : 'pointer',
+                  opacity: isSaved ? 0.9 : 1,
                 }}
               >
-                {isSaving ? 'Saving...' : isSaved ? 'Saved ✓' : 'Save Question'}
+                {isSaving
+                  ? 'Saving...'
+                  : isSaved
+                    ? 'Question Saved ✓'
+                    : 'Save Question'}
               </Button>
             </Form>
             <Button
@@ -731,7 +803,7 @@ Now generate a **unique and varied** multiple choice question based on the conte
       formData.append('options', JSON.stringify(editedChoices))
       formData.append('correctAnswerId', (correctAnswerId ?? '').toString())
       submit(formData, { method: 'post' })
-      setShowManualEntry(false) // Close the manual entry after save
+      setShowManualEntry(false)
     }
 
     const handleCancel = () => {
