@@ -38,6 +38,31 @@ interface CustomerFormProps {
   initialName?: string
 }
 
+type SourceOptions = {
+  key: (typeof sourceEnum)[number]
+  value: string
+}
+
+function getSourceOptions(
+  current: (typeof sourceEnum)[number] | undefined,
+): SourceOptions[] {
+  const baseOptions: SourceOptions[] = sourceEnum
+    .filter(s => s !== 'user-input' && s !== 'check-list')
+    .map(s => ({
+      key: s,
+      value: s.charAt(0).toUpperCase() + s.slice(1),
+    }))
+  if (!current) return baseOptions
+  const hasCurrent = baseOptions.some(o => o.key === current)
+  if (!hasCurrent) return baseOptions
+  if (baseOptions.filter(o => o.key === current).length !== 0) return baseOptions
+  baseOptions.push({
+    key: current,
+    value: current.charAt(0).toUpperCase() + current.slice(1),
+  })
+  return baseOptions
+}
+
 const getCustomerInfo = async (customerId: number) => {
   const response = await fetch(`/api/customers/${customerId}`)
   const data = await response.json()
@@ -111,8 +136,8 @@ export function CustomerForm({
       form.reset({
         ...data,
         builder: Boolean(data.company_name && data.company_name.trim() !== ''),
-        source: data.source ?? source,
       })
+      data.source && form.setValue('source', data.source)
     }
   }, [data])
 
@@ -131,11 +156,14 @@ export function CustomerForm({
     mutate({ ...data, company_id: companyId, id: customerId || 0 })
   }
 
+  const dialogTitle = customerId ? 'Edit Customer' : 'Add Customer'
+  const sourceOptions = getSourceOptions(form.watch('source'))
+
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isLoading ? 'Loading...' : 'Add Customer'}</DialogTitle>
+          <DialogTitle>{isLoading ? 'Loading...' : dialogTitle}</DialogTitle>
         </DialogHeader>
         <Dialog open={dupOpen} onOpenChange={setDupOpen}>
           <DialogContent>
@@ -187,28 +215,9 @@ export function CustomerForm({
               <FormField
                 control={form.control}
                 name='source'
-                render={({ field }) => {
-                  const baseOptions = sourceEnum
-                    .filter(s => s !== 'user-input' && s !== 'check-list')
-                    .map(s => ({
-                      key: s,
-                      value: s.charAt(0).toUpperCase() + s.slice(1),
-                    }))
-                  const current = form.getValues('source')
-                  const hasCurrent = baseOptions.some(o => o.key === current)
-                  const options = hasCurrent
-                    ? baseOptions
-                    : current
-                      ? [
-                          {
-                            key: current,
-                            value: current.charAt(0).toUpperCase() + current.slice(1),
-                          },
-                          ...baseOptions,
-                        ]
-                      : baseOptions
-                  return <SelectInput field={field} options={options} name='Source' />
-                }}
+                render={({ field }) => (
+                  <SelectInput field={field} options={sourceOptions} name='Source' />
+                )}
               />
               <div className='flex items-center space-x-2 my-2'>
                 <FormField
