@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Button } from '~/components/ui/button'
+import { useState } from 'react';
+import { Button } from '~/components/ui/button';
 
 const FIXED_HEIGHT = 100
 
@@ -47,6 +47,7 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
   const [shapes, setShapes] = useState<Shape[]>([])
   const [currentShape, setCurrentShape] = useState<Shape>([])
   const [level, setLevel] = useState<number>(1)
+  const [turned, setTurned] = useState<boolean>(false)
 
   const handleReset = () => {
     setShapes([])
@@ -61,22 +62,45 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
 
   const handleTurn = (current: Point) => {
     console.log('turn')
+    setLevel(Level => Level + 1)
+    const last = currentShape.length - 1
+    const newShape = currentShape.map((item, idx) => idx === last ?{ x: item.x - FIXED_HEIGHT, y: item.y} : item)
+    const finalShape = [{ x: currentShape[0].x, y: current.y}, ...newShape, { x: currentShape[last].x, y: current.y}]
+    setCurrentShape(finalShape)
+  }
+
+  const isInBounds = (current: Point, inner: Point[]) => {
+    console.log(level)
+    if (level % 2 === 1) return (current.y > inner[0].y && current.y < inner[inner.length - 1].y)
+    return (current.y > inner[inner.length - 1].y && current.y < inner[0].y)
   }
 
   const handleMove: React.MouseEventHandler<SVGSVGElement> = e => {
     if (currentShape.length === 0) return
-    const current = toLocal(e)
+    const current = toLocal(e);
+
     let inner: Point[]
     if (currentShape.length === level * 2) {
       inner = currentShape
     } else {
       inner = currentShape.slice(1, -1)
     }
-    if (current.y < inner[0].y || current.y > inner[1].y) {
+
+    if (inner.length > 0 && !isInBounds(current, inner) && !turned) {
+      console.log('not in bounds')
       handleTurn(current)
+      setTurned(true)
+      return
     }
-    const top = { ...current, y: inner[0].y }
-    const bottom = { ...current, y: inner[1].y }
+
+    let top, bottom: Point
+    if (level % 2 === 1) {
+      top = { ...current, y: inner[0].y }
+      bottom = { ...current, y: inner[1].y }
+    } else {
+      top = { ...current, x: inner[0].x }
+      bottom = { ...current, x: inner[inner.length - 1].x }
+    }
     setCurrentShape([top, ...inner, bottom])
   }
 
@@ -108,6 +132,19 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
               strokeWidth={2}
             />
           ) : null}
+          {currentShape.length > 0
+            ? currentShape.map((p, idx) => (
+                <text
+                  key={`pt-${idx}`}
+                  x={p.x + 6}
+                  y={p.y - 6}
+                  className='text-[12px] text-gray-800 select-none'
+                  fill='currentColor'
+                >
+                  {idx}
+                </text>
+              ))
+            : null}
         </g>
       </svg>
       <div className='absolute left-3 bottom-3 flex items-center gap-2'>
@@ -120,4 +157,5 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
   )
 }
 
-export { DrawableCanvas }
+export { DrawableCanvas };
+
