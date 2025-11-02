@@ -2,18 +2,12 @@ import { useState } from 'react';
 import { Button } from '~/components/ui/button';
 
 const FIXED_HEIGHT = 100
+const TURN_THRESHOLD = 50
 
 type Point = { x: number; y: number }
 
 interface DrawableCanvasProps {
   onSubmit?: (paths: Point[][]) => void
-}
-
-enum Direction {
-  UP,
-  DOWN,
-  LEFT,
-  RIGHT,
 }
 
 type Shape = Point[]
@@ -47,7 +41,6 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
   const [shapes, setShapes] = useState<Shape[]>([])
   const [currentShape, setCurrentShape] = useState<Shape>([])
   const [level, setLevel] = useState<number>(1)
-  const [turned, setTurned] = useState<boolean>(false)
 
   const handleReset = () => {
     setShapes([])
@@ -60,19 +53,42 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
     setCurrentShape([top, bottom])
   }
 
+  const handleTurnPoint = (idx: number, item: Point, length: number, above: boolean) => {
+    const toChange = !above ? idx === 0 : (idx === length - 1);
+    if (!toChange) return item
+    if (level % 2 === 1) {
+      return { ...item, x: item.x  - FIXED_HEIGHT }
+    }
+    return { ...item, y: item.y + (above ? FIXED_HEIGHT : -FIXED_HEIGHT) }
+  }
+
   const handleTurn = (current: Point) => {
-    console.log('turn')
     setLevel(Level => Level + 1)
-    const last = currentShape.length - 1
-    const newShape = currentShape.map((item, idx) => idx === last ?{ x: item.x - FIXED_HEIGHT, y: item.y} : item)
-    const finalShape = [{ x: currentShape[0].x, y: current.y}, ...newShape, { x: currentShape[last].x, y: current.y}]
-    setCurrentShape(finalShape)
+    const first = currentShape[0]
+    const last = currentShape[currentShape.length - 1]
+    const points = level % 2 === 1 ? [first.y, last.y] : [first.x, last.x]
+    const currentCoord = level % 2 === 1 ? current.y : current.x
+    const above = currentCoord > points[0]
+    const newShape = currentShape.map((item, idx, arr) => handleTurnPoint(idx, item, arr.length, above))
+    // const finalShape = [{ x: first.x, y: current.y}, ...newShape, { x: last.x, y: current.y}]
+    setCurrentShape(newShape)
   }
 
   const isInBounds = (current: Point, inner: Point[]) => {
-    console.log(level)
-    if (level % 2 === 1) return (current.y > inner[0].y && current.y < inner[inner.length - 1].y)
-    return (current.y > inner[inner.length - 1].y && current.y < inner[0].y)
+    const bounds = level % 2 === 1 ? [inner[0].y, inner[inner.length - 1].y] : [inner[inner.length - 1].x, inner[0].x]
+    bounds.sort((a, b) => a - b)
+    const currentCoord = level % 2 === 1 ? current.y : current.x
+    const threshold = Math.min(currentCoord - bounds[0], bounds[1]  - currentCoord)
+    return threshold >= -TURN_THRESHOLD
+  }
+
+  const isInOldBounds = (current: Point, inner: Point[]) => {
+    const oldLevel = level - 1
+    const bounds = oldLevel % 2 === 1 ? [inner[1].y, inner[inner.length - 2].y] : [inner[inner.length - 2].x, inner[1].x]
+    bounds.sort((a, b) => a - b)
+    const currentCoord = oldLevel % 2 === 1 ? current.y : current.x
+    const threshold = Math.min(currentCoord - bounds[0], bounds[1]  - currentCoord)
+    return threshold >= -TURN_THRESHOLD
   }
 
   const handleMove: React.MouseEventHandler<SVGSVGElement> = e => {
@@ -86,10 +102,11 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
       inner = currentShape.slice(1, -1)
     }
 
-    if (inner.length > 0 && !isInBounds(current, inner) && !turned) {
-      console.log('not in bounds')
+    if (inner.length > 3 && isInOldBounds(current, inner)) {
+      inner = inner.slice(1, -1)
+      setLevel(Level => Level - 1)
+    } else if (inner.length > 0 && !isInBounds(current, inner)) {
       handleTurn(current)
-      setTurned(true)
       return
     }
 
