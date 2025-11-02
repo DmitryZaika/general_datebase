@@ -24,7 +24,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     // Get customer details
     const [customer] = await db.query<(Customer & RowDataPacket)[]>(
-      `SELECT id, name, address, phone, email, company_name, source 
+      `SELECT id, name, address, phone, email, company_name, source, your_message 
        FROM customers 
        WHERE id = ? AND company_id = ? AND deleted_at IS NULL`,
       [customerId, user.company_id],
@@ -54,12 +54,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const validatedData = customerSignupSchema.parse(userData)
 
   await db.execute<ResultSetHeader>(
-    `UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, referral_source = ?, source = ?, company_id = ?, company_name = ? WHERE id = ?`,
+    `UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, your_message = ?, referral_source = ?, source = ?, company_id = ?, company_name = ? WHERE id = ?`,
     [
       validatedData.name,
       validatedData.phone || null,
       validatedData.email || null,
       validatedData.address || null,
+      validatedData.your_message || null,
       validatedData.referral_source || null,
       validatedData.source,
       validatedData.company_id,
