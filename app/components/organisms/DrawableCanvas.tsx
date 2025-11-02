@@ -1,12 +1,19 @@
-import { useState } from 'react';
-import { Button } from '~/components/ui/button';
+import { useState } from 'react'
+import { Button } from '~/components/ui/button'
 
-const FIXED_HEIGHT = 100;
+const FIXED_HEIGHT = 100
 
 type Point = { x: number; y: number }
 
 interface DrawableCanvasProps {
   onSubmit?: (paths: Point[][]) => void
+}
+
+enum Direction {
+  UP,
+  DOWN,
+  LEFT,
+  RIGHT,
 }
 
 type Shape = Point[]
@@ -27,7 +34,11 @@ function CompletedShapes({ shapes }: { shapes: Shape[] }) {
   )
 }
 
-const toLocal = (e: React.MouseEvent<SVGSVGElement, MouseEvent>, offsetX: number = 0, offsetY: number = 0) => {
+const toLocal = (
+  e: React.MouseEvent<SVGSVGElement, MouseEvent>,
+  offsetX: number = 0,
+  offsetY: number = 0,
+) => {
   const rect = e.currentTarget.getBoundingClientRect()
   return { x: e.clientX - rect.left + offsetX, y: e.clientY - rect.top + offsetY }
 }
@@ -42,21 +53,27 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
     setCurrentShape([])
   }
 
-
   const handleDragStart: React.MouseEventHandler<SVGSVGElement> = e => {
-      const top = toLocal(e, 0, - (FIXED_HEIGHT / 2))
-      const bottom = toLocal(e, 0, FIXED_HEIGHT / 2)
-      setCurrentShape([top, bottom])
+    const top = toLocal(e, 0, -(FIXED_HEIGHT / 2))
+    const bottom = toLocal(e, 0, FIXED_HEIGHT / 2)
+    setCurrentShape([top, bottom])
+  }
+
+  const handleTurn = (current: Point) => {
+    console.log('turn')
   }
 
   const handleMove: React.MouseEventHandler<SVGSVGElement> = e => {
     if (currentShape.length === 0) return
     const current = toLocal(e)
-    let inner: Point[];
+    let inner: Point[]
     if (currentShape.length === level * 2) {
       inner = currentShape
     } else {
       inner = currentShape.slice(1, -1)
+    }
+    if (current.y < inner[0].y || current.y > inner[1].y) {
+      handleTurn(current)
     }
     const top = { ...current, y: inner[0].y }
     const bottom = { ...current, y: inner[1].y }
@@ -64,7 +81,7 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
   }
 
   const handleDragEnd: React.MouseEventHandler<SVGSVGElement> = e => {
-    setShapes((shapes) => [...shapes, currentShape])
+    setShapes(shapes => [...shapes, currentShape])
     setCurrentShape([])
   }
 
@@ -103,5 +120,4 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
   )
 }
 
-export { DrawableCanvas };
-
+export { DrawableCanvas }
