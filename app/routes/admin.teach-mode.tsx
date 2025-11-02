@@ -1,7 +1,6 @@
 import * as React from 'react'
 import {
   type ActionFunctionArgs,
-  data,
   Form,
   type LoaderFunctionArgs,
   redirect,
@@ -136,6 +135,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     try {
+      // Validate question exists
       const [questionCheck] = await db.execute(
         'SELECT id FROM questions WHERE id = ? AND company_id = ?',
         [questionId, user.company_id],
@@ -147,11 +147,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
       }
 
+      // Update question text
       await db.execute(
         'UPDATE questions SET text = ?, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND company_id = ?',
         [questionText, questionId, user.company_id],
       )
 
+      // Handle answer choices
       for (const option of options) {
         if (option.is_deleted) {
           if (option.id && option.id > 0) {
@@ -164,11 +166,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         if (option.id && option.id > 0) {
+          // Update existing answer choice
           await db.execute(
             'UPDATE answer_choices SET text = ?, is_correct = ?, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND question_id = ?',
             [option.text, option.id === correctAnswerId ? 1 : 0, option.id, questionId],
           )
         } else {
+          // Insert new answer choice
           await db.execute(
             'INSERT INTO answer_choices (question_id, text, is_correct) VALUES (?, ?, ?)',
             [questionId, option.text, option.id === correctAnswerId ? 1 : 0],
@@ -185,23 +189,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   } else if (intent === 'delete-question') {
     const questionId = parseInt(formData.get('questionId') as string)
+
     if (isNaN(questionId)) {
       return { error: 'Invalid question ID' }
     }
+
     try {
+      // Validate question exists
       const [questionCheck] = await db.execute(
         'SELECT id FROM questions WHERE id = ? AND company_id = ?',
         [questionId, user.company_id],
       )
+
       if (!questionCheck || (questionCheck as any).length === 0) {
         return {
           error: 'Invalid question ID or question does not belong to your company',
         }
       }
+
+      // Mark question as deleted
       await db.execute(
         'UPDATE questions SET deleted_at = CURRENT_TIMESTAMP, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND company_id = ?',
         [questionId, user.company_id],
       )
+
       return { success: true, questionId }
     } catch (error) {
       console.error('Error deleting question:', error)
@@ -209,101 +220,84 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         error: `Failed to delete question: ${error instanceof Error ? error.message : 'Unknown error'}`,
       }
     }
-  } else if (intent === 'create-question') {
-    const questionText = formData.get('questionText') as string
-    const options = JSON.parse(formData.get('options') as string) as {
-      id: number | null
-      text: string
-      is_correct: boolean
-      is_deleted?: boolean
-    }[]
-    const correctAnswerId = parseInt(formData.get('correctAnswerId') as string)
-
-    if (!questionText || !options || options.length === 0 || isNaN(correctAnswerId)) {
-      return { error: 'Missing required question data for create' }
-    }
-
-    const validOptions = options.filter(
-      opt => !opt.is_deleted && opt.text.trim() !== '',
-    )
-    if (validOptions.length < 2) {
-      return { error: 'At least two non-empty answer choices are required' }
-    }
-
-    if (!correctAnswerId || !validOptions.some(opt => opt.id === correctAnswerId)) {
-      return { error: 'Please select a valid correct answer' }
-    }
-
-    try {
-      const [questionResult] = await db.execute(
-        'INSERT INTO questions (text, instruction_id, question_type, company_id) VALUES (?, NULL, ?, ?)',
-        [questionText, 'MC', user.company_id],
-      )
-
-      const questionId = (questionResult as any).insertId
-
-      for (const option of options) {
-        if (option.is_deleted || option.text.trim() === '') continue
-        await db.execute(
-          'INSERT INTO answer_choices (question_id, text, is_correct) VALUES (?, ?, ?)',
-          [questionId, option.text, option.id === correctAnswerId ? 1 : 0],
-        )
-      }
-
-      return { success: true, questionId }
-    } catch (error) {
-      console.error('Error creating question:', error)
-      return {
-        error: `Failed to create question: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      }
-    }
   } else {
+    // Original save question logic
     const questionText = formData.get('questionText') as string
     const optionsString = formData.get('options') as string
     const options = optionsString.split(',').map(s => s.trim())
     const correctAnswer = formData.get('correctAnswer') as string
     const instructionId = parseInt(formData.get('instructionId') as string)
 
-    if (
-      !questionText ||
-      !options ||
-      options.length < 2 ||
-      !correctAnswer ||
-      !instructionId
-    ) {
-      return { error: 'Missing required question data or insufficient answer choices' }
+    if (!questionText || !options || !correctAnswer || !instructionId) {
+      return { error: 'Missing required question data' }
     }
 
+    // Validate that the instruction exists
     try {
       const [instructionCheck] = await db.execute(
         'SELECT id FROM instructions WHERE id = ? AND company_id = ?',
         [instructionId, user.company_id],
       )
 
-      if (!instructionCheck || instructionCheck.length === 0) {
+      if (!instructionCheck || (instructionCheck as any).length === 0) {
         return {
           error:
             'Invalid instruction ID or instruction does not belong to your company',
         }
       }
+    } catch (error) {
+      console.error('Error validating instruction:', error)
+      return { error: 'Error validating instruction' }
+    }
 
+    try {
+      console.log('Attempting to save question:', {
+        questionText,
+        instructionId,
+        companyId: user.company_id,
+        options,
+        correctAnswer,
+      })
+
+      // Check if tables exist
+      try {
+        await db.execute('SELECT 1 FROM questions LIMIT 1')
+        await db.execute('SELECT 1 FROM answer_choices LIMIT 1')
+        console.log('Tables exist, proceeding with insert')
+      } catch (tableError) {
+        console.error('Table check failed:', tableError)
+        return {
+          error: `Database tables not found. Please ensure the questions and answer_choices tables exist. Error: ${tableError instanceof Error ? tableError.message : 'Unknown error'}`,
+        }
+      }
+
+      // Insert the question
       const [questionResult] = await db.execute(
         'INSERT INTO questions (text, instruction_id, question_type, company_id) VALUES (?, ?, ?, ?)',
         [questionText, instructionId, 'MC', user.company_id],
       )
 
-      const questionId = questionResult.insertId
+      const questionId = (questionResult as any).insertId
+      console.log('Question inserted with ID:', questionId)
+
+      // Insert answer choices
       for (const option of options) {
         const isCorrect = option === correctAnswer
+        console.log('Inserting answer choice:', { option, isCorrect, questionId })
         await db.execute(
           'INSERT INTO answer_choices (question_id, text, is_correct) VALUES (?, ?, ?)',
           [questionId, option, isCorrect],
         )
       }
 
+      console.log('Question and answers saved successfully')
       return { success: true, questionId, instructionId }
     } catch (error) {
       console.error('Error saving question:', error)
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      })
       return {
         error: `Failed to save question: ${error instanceof Error ? error.message : 'Unknown error'}`,
       }
@@ -326,62 +320,61 @@ export default function TeachMode() {
   const submit = useSubmit()
   const revalidator = useRevalidator()
   const { toast } = useToast()
-
+  const lastActionDataRef = React.useRef<typeof actionData>(null)
   React.useEffect(() => {
+    // Only process if actionData has actually changed
+    if (actionData === lastActionDataRef.current) return
+    lastActionDataRef.current = actionData
     if (actionData?.success) {
       toast({
         title: 'Success',
-        description: 'Question saved successfully',
+        description: 'Questions Modified Successfully',
         variant: 'success',
       })
+      if (revalidator.state === 'idle') {
+        revalidator.revalidate()
+      }
+    } else if (actionData?.error) {
+      toast({
+        title: 'Error',
+        description: actionData.error,
+        variant: 'destructive',
+      })
     }
-  }, [actionData?.success])
-
-  React.useEffect(() => {
-    if (actionData?.success && revalidator.state === 'idle') {
-      revalidator.revalidate()
-    }
-  }, [actionData, revalidator])
-
+  }, [actionData, revalidator, toast])
   const [expanded, setExpanded] = React.useState<Record<number, boolean>>({})
   const [savedQuestions, setSavedQuestions] = React.useState<Set<number>>(new Set())
   const [rejectedQuestions, setRejectedQuestions] = React.useState<Set<number>>(
     new Set(),
   )
   const [showManualEntry, setShowManualEntry] = React.useState(false)
-
+  const [editingQuestions, setEditingQuestions] = React.useState<Set<number>>(new Set())
   React.useEffect(() => {
     if (actionData?.success && actionData?.instructionId) {
       setSavedQuestions(prev => new Set(prev).add(actionData.instructionId!))
     }
   }, [actionData])
-
   type NodeState = {
     text: string
     loading: boolean
     saving: boolean
   }
-
   const [nodeStates, setNodeStates] = React.useState<Record<number, NodeState>>({})
-
   const setNodeLoading = (id: number, loading: boolean) =>
     setNodeStates(prev => ({
       ...prev,
       [id]: { ...(prev[id] || { text: '', loading: false, saving: false }), loading },
     }))
-
   const setNodeSaving = (id: number, saving: boolean) =>
     setNodeStates(prev => ({
       ...prev,
       [id]: { ...(prev[id] || { text: '', loading: false, saving: false }), saving },
     }))
-
   const setNodeText = (id: number, text: string) =>
     setNodeStates(prev => ({
       ...prev,
       [id]: { ...(prev[id] || { text: '', loading: false, saving: false }), text },
     }))
-
   const appendNodeText = (id: number, delta: string) =>
     setNodeStates(prev => {
       const current = prev[id] || { text: '', loading: false, saving: false }
@@ -390,7 +383,6 @@ export default function TeachMode() {
         [id]: { ...current, text: current.text + delta },
       }
     })
-
   const answerChoicesByQuestion = React.useMemo(() => {
     const grouped = new Map<number, AnswerChoice[]>()
     for (const choice of answerChoices) {
@@ -399,9 +391,7 @@ export default function TeachMode() {
     }
     return grouped
   }, [answerChoices])
-
   const parentKey = (pid: number | null) => (pid && pid !== 0 ? pid : null)
-
   const siblingsByParent = React.useMemo(() => {
     const map = new Map<number | null, InstructionMedium[]>()
     for (const i of instructions) {
@@ -412,17 +402,14 @@ export default function TeachMode() {
     }
     return map
   }, [instructions])
-
   const orderSiblings = React.useCallback((list: InstructionMedium[]) => {
     if (list.length <= 1) return list.slice()
     const idSet = new Set(list.map(i => i.id))
     const head = list.find(i => !i.after_id || !idSet.has(i.after_id)) ?? null
     if (!head) return list.slice().sort((a, b) => a.id - b.id)
-
     const result: InstructionMedium[] = []
     const visited = new Set<number>()
     let current: InstructionMedium | null = head
-
     while (current && !visited.has(current.id)) {
       result.push(current)
       visited.add(current.id)
@@ -431,21 +418,16 @@ export default function TeachMode() {
           i => i.after_id === result[result.length - 1].id && !visited.has(i.id),
         ) ?? null
     }
-
     const leftovers = list.filter(i => !visited.has(i.id)).sort((a, b) => a.id - b.id)
     return result.concat(leftovers)
   }, [])
-
   const childrenOf = React.useCallback(
     (pid: number | null) => orderSiblings(siblingsByParent.get(parentKey(pid)) ?? []),
     [orderSiblings, siblingsByParent],
   )
-
   const roots = childrenOf(null)
-
   const toggleExpand = (id: number) =>
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
-
   const styles = {
     rootBox: {
       border: '2px solid #333',
@@ -477,7 +459,6 @@ export default function TeachMode() {
     } as React.CSSProperties,
     title: { fontWeight: 700, margin: 0 } as React.CSSProperties,
   }
-
   const InstructionNode: React.FC<{ node: InstructionMedium; depth: number }> = ({
     node,
     depth,
@@ -485,10 +466,8 @@ export default function TeachMode() {
     const children = childrenOf(node.id)
     const hasChildren = children.length > 0
     const isOpen = expanded[node.id] ?? false
-
     const text = nodeStates[node.id]?.text ?? ''
     const loadingMCQ = nodeStates[node.id]?.loading ?? false
-
     function cleanJSON(value: string) {
       if (value === '') return null
       try {
@@ -497,55 +476,42 @@ export default function TeachMode() {
         return null
       }
     }
-
     const getInstructionContent = () => {
       const cleanText = node.rich_text
         ?.replace(/<[^>]*>/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
-
       return {
         title: node.title,
         content: cleanText || node.title,
       }
     }
-
     const handleGenerate = async (e?: React.MouseEvent) => {
       if (e) e.stopPropagation()
       if (loadingMCQ) return
-
       setSavedQuestions(prev => {
         const newSet = new Set(prev)
         newSet.delete(node.id)
         return newSet
       })
-
       setRejectedQuestions(prev => {
         const newSet = new Set(prev)
         newSet.delete(node.id)
         return newSet
       })
-
       setNodeLoading(node.id, true)
       setNodeText(node.id, '')
-
       const content = getInstructionContent()
-
       if (!content) {
         alert('No instruction content available to generate questions from')
         setNodeLoading(node.id, false)
         return
       }
-
       const prompt = `You are a creative and varied question generator. You MUST return ONLY valid JSON. Never wrap it in code blocks or explanations.
-
 Return a JSON object with exactly these keys: "question", "options", and "answer".
-
 Based on the following educational content, create a multiple choice question:
-
 Title: ${content.title}
 Content: ${content.content}
-
 Guidelines for diversity:
 - Vary the style of the question each time (scenario-based, cause/effect, "what could happen if...", "which of the following statements...", etc.)
 - Avoid reusing the same phrasing or structure as previous questions
@@ -553,19 +519,15 @@ Guidelines for diversity:
 - Only ONE option should be correct
 - The question should feel natural and not formulaic
 - Provide at least 4 options, but more are allowed if appropriate
-
 Return ONLY valid JSON in this format, with no extra text:
 {
   "question": "Your question here?",
   "options": ["Option A", "Option B", "Option C", "Option D", ...],
   "answer": "The correct option exactly as written in options"
 }
-
 Now generate a **unique and varied** multiple choice question based on the content above.`
-
       const query = encodeURIComponent(prompt)
       const sse = new EventSource(`/api/chat?query=${query}&isNew=true`)
-
       sse.addEventListener('message', event => {
         if (event.data === DONE_KEY) {
           sse.close()
@@ -574,34 +536,27 @@ Now generate a **unique and varied** multiple choice question based on the conte
           appendNodeText(node.id, event.data)
         }
       })
-
       sse.addEventListener('error', () => {
         sse.close()
         setNodeLoading(node.id, false)
       })
     }
-
     const values = cleanJSON(text)
     const isSaving = nodeStates[node.id]?.saving ?? false
     const isSaved = savedQuestions.has(node.id)
     const isRejected = rejectedQuestions.has(node.id)
-
     const handleSaveQuestion = (e: React.FormEvent) => {
       e.preventDefault()
       if (isSaved) return
-
       setNodeSaving(node.id, true)
       const form = e.target as HTMLFormElement
       const formData = new FormData(form)
       submit(formData, { method: 'post' })
-
       setTimeout(() => setNodeSaving(node.id, false), 500)
     }
-
     const handleRejectQuestion = () => {
       setRejectedQuestions(prev => new Set(prev).add(node.id))
     }
-
     return (
       <div style={styles.item(depth)}>
         <div
@@ -660,6 +615,7 @@ Now generate a **unique and varied** multiple choice question based on the conte
               border: '1px solid #f5c6cb',
               borderRadius: 4,
               color: '#721c24',
+              display: 'none',
             }}
           >
             Error: {actionData.error}
@@ -738,18 +694,15 @@ Now generate a **unique and varied** multiple choice question based on the conte
       </div>
     )
   }
-
   const ManualQuestionEntry = () => {
     const [editedQuestionText, setEditedQuestionText] = React.useState('')
     const [editedChoices, setEditedChoices] = React.useState<
       { id: number | null; text: string; is_correct: boolean; is_deleted?: boolean }[]
     >([])
     const [correctAnswerId, setCorrectAnswerId] = React.useState<number | null>(null)
-
     const handleQuestionTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setEditedQuestionText(e.target.value)
     }
-
     const handleChoiceTextChange = (
       id: number | null,
       e: React.ChangeEvent<HTMLInputElement>,
@@ -760,16 +713,13 @@ Now generate a **unique and varied** multiple choice question based on the conte
         ),
       )
     }
-
     const handleCorrectAnswerChange = (id: number | null) => {
       setCorrectAnswerId(id)
     }
-
     const handleAddChoice = () => {
       const newId = Math.min(...editedChoices.map(c => c.id || 0), 0) - 1
       setEditedChoices(prev => [...prev, { id: newId, text: '', is_correct: false }])
     }
-
     const handleDeleteChoice = (id: number | null) => {
       if (editedChoices.filter(c => !c.is_deleted).length <= 2) {
         alert('Cannot delete: At least two answer choices are required.')
@@ -784,7 +734,6 @@ Now generate a **unique and varied** multiple choice question based on the conte
         setCorrectAnswerId(null)
       }
     }
-
     const handleSave = () => {
       const validChoices = editedChoices.filter(
         c => !c.is_deleted && c.text.trim() !== '',
@@ -803,13 +752,11 @@ Now generate a **unique and varied** multiple choice question based on the conte
       formData.append('options', JSON.stringify(editedChoices))
       formData.append('correctAnswerId', (correctAnswerId ?? '').toString())
       submit(formData, { method: 'post' })
-      setShowManualEntry(false)
+      setShowManualEntry(true) // Keep open after save
     }
-
     const handleCancel = () => {
       setShowManualEntry(false)
     }
-
     return (
       <div
         style={{
@@ -888,12 +835,10 @@ Now generate a **unique and varied** multiple choice question based on the conte
       </div>
     )
   }
-
   const AdminQuestionComponent: React.FC<{
     question: Question
     choices: AnswerChoice[]
   }> = ({ question, choices }) => {
-    const [isEditing, setIsEditing] = React.useState(false)
     const [editedQuestionText, setEditedQuestionText] = React.useState(question.text)
     const [editedChoices, setEditedChoices] = React.useState<
       { id: number | null; text: string; is_correct: boolean; is_deleted?: boolean }[]
@@ -907,29 +852,32 @@ Now generate a **unique and varied** multiple choice question based on the conte
     const [correctAnswerId, setCorrectAnswerId] = React.useState<number | null>(
       choices.find(choice => choice.is_correct)?.id || null,
     )
-
     React.useEffect(() => {
-      if (!isEditing) {
-        setEditedQuestionText(question.text)
-        setEditedChoices(
-          choices.map(choice => ({
-            id: choice.id,
-            text: choice.text,
-            is_correct: choice.is_correct,
-          })),
-        )
-        setCorrectAnswerId(choices.find(choice => choice.is_correct)?.id || null)
-      }
-    }, [question.text, choices, isEditing])
-
+      setEditedQuestionText(question.text)
+      setEditedChoices(
+        choices.map(choice => ({
+          id: choice.id,
+          text: choice.text,
+          is_correct: choice.is_correct,
+        })),
+      )
+      setCorrectAnswerId(choices.find(choice => choice.is_correct)?.id || null)
+    }, [question.text, choices])
+    const isEditing = editingQuestions.has(question.id)
     const handleEditToggle = () => {
-      setIsEditing(!isEditing)
+      setEditingQuestions(prev => {
+        const newSet = new Set(prev)
+        if (newSet.has(question.id)) {
+          newSet.delete(question.id)
+        } else {
+          newSet.add(question.id)
+        }
+        return newSet
+      })
     }
-
     const handleQuestionTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setEditedQuestionText(e.target.value)
     }
-
     const handleChoiceTextChange = (
       id: number | null,
       e: React.ChangeEvent<HTMLInputElement>,
@@ -940,16 +888,13 @@ Now generate a **unique and varied** multiple choice question based on the conte
         ),
       )
     }
-
     const handleCorrectAnswerChange = (id: number | null) => {
       setCorrectAnswerId(id)
     }
-
     const handleAddChoice = () => {
       const newId = Math.min(...editedChoices.map(c => c.id || 0), 0) - 1
       setEditedChoices(prev => [...prev, { id: newId, text: '', is_correct: false }])
     }
-
     const handleDeleteChoice = (id: number | null) => {
       if (editedChoices.filter(c => !c.is_deleted).length <= 2) {
         alert('Cannot delete: At least two answer choices are required.')
@@ -964,7 +909,6 @@ Now generate a **unique and varied** multiple choice question based on the conte
         setCorrectAnswerId(null)
       }
     }
-
     const handleSaveChanges = () => {
       const validChoices = editedChoices.filter(
         c => !c.is_deleted && c.text.trim() !== '',
@@ -984,13 +928,15 @@ Now generate a **unique and varied** multiple choice question based on the conte
       formData.append('options', JSON.stringify(editedChoices))
       formData.append('correctAnswerId', (correctAnswerId ?? '').toString())
       submit(formData, { method: 'post' })
-      setIsEditing(false)
+      // Remove setIsEditing(false) to keep the menu open
     }
-
     const handleDiscardChanges = () => {
-      setIsEditing(false)
+      setEditingQuestions(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(question.id)
+        return newSet
+      })
     }
-
     const handleDeleteQuestion = () => {
       if (
         window.confirm(
@@ -1003,7 +949,6 @@ Now generate a **unique and varied** multiple choice question based on the conte
         submit(formData, { method: 'post' })
       }
     }
-
     const handleVisibilityToggle = (checked: boolean) => {
       const formData = new FormData()
       formData.append('intent', 'toggle-visibility')
@@ -1011,7 +956,6 @@ Now generate a **unique and varied** multiple choice question based on the conte
       formData.append('visible', checked.toString())
       submit(formData, { method: 'post' })
     }
-
     return (
       <div
         style={{
@@ -1118,7 +1062,6 @@ Now generate a **unique and varied** multiple choice question based on the conte
       </div>
     )
   }
-
   return (
     <div style={{ padding: 20 }}>
       {roots.map(root => (
@@ -1152,6 +1095,7 @@ Now generate a **unique and varied** multiple choice question based on the conte
               border: '1px solid #f5c6cb',
               borderRadius: 4,
               color: '#721c24',
+              display: 'none',
             }}
           >
             Error: {actionData.error}
