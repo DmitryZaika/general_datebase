@@ -1,0 +1,105 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: my-remix-app:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: "production"
+      # DATABASE_URL: ${DATABASE_URL}
+    expose:
+      - "3000"
+    # ВАЖНО: не зависим от nginx, чтобы не было цикла
+    # depends_on: [nginx]  # удалено
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - certbot-webroot:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+    depends_on:
+      - app
+
+  # Одноразовая инициализация сертификата
+  certbot_init:
+    image: certbot/certbot:latest
+    profiles: ["init"]
+    entrypoint: /bin/sh
+    volumes:
+      - certbot-webroot:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+    command: -c "certbot certonly --webroot -w /var/www/certbot \
+      -d granite-manager.com \
+      --email you@example.com --agree-tos --no-eff-email"
+
+  # Периодическое продление
+  certbot_renew:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    volumes:
+      - certbot-webroot:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+    command: >
+      sh -c 'while :; do
+               certbot renew --webroot -w /var/www/certbot --quiet &&
+               date > /etc/letsencrypt/.last_renew;
+               sleep 12h;
+             done'
+
+  # Релоад nginx по изменению сертификатов
+  nginx_reloader:
+    image: alpine:latest
+    restart: unless-stopped
+    depends_on:
+      - nginx
+      - certbot_renew
+    pid: "service:nginx"
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+    command: >
+      sh -c "apk add --no-cache inotify-tools >/dev/null 2>&1;
+             touch /etc/letsencrypt/.last_renew;
+             while inotifywait -e modify,close_write,move,create,delete -r /etc/letsencrypt; do
+               echo '[nginx_reloader] certs changed -> reload nginx';
+               kill -HUP 1 || true;
+             done"
+
+  # BONUS: авто-деплой по обновлениям main (в отдельном профиле)
+  git_watcher:
+    profiles: ["auto-deploy"]
+    image: docker:27-cli
+    restart: unless-stopped
+    working_dir: /workspace
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/workspace
+    environment:
+      BRANCH: ${BRANCH:-main}
+    command: >
+      sh -c '
+        apk add --no-cache git >/dev/null 2>&1;
+        git fetch origin $$BRANCH;
+        LAST="";
+        while :; do
+          NEW=$$(git ls-remote origin refs/heads/$$BRANCH | awk "{print $$1}");
+          if [ "$$NEW" != "$$LAST" ] && [ -n "$$NEW" ]; then
+            echo "[git_watcher] New commit on $$BRANCH: $$NEW. Pull & rebuild...";
+            git fetch origin $$BRANCH && git reset --hard origin/$$BRANCH;
+            docker compose build app && docker compose up -d --no-deps app;
+            LAST="$$NEW";
+          fi
+          sleep 300;
+        done
+      '
+
+volumes:
+  letsencrypt:
+  certbot-webroot:
