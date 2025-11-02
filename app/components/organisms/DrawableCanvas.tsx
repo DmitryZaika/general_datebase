@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '~/components/ui/button';
 
-const FIXED_HEIGHT = 200;
+const FIXED_HEIGHT = 100;
 
 type Point = { x: number; y: number }
 
@@ -51,16 +51,15 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
 
   const handleMove: React.MouseEventHandler<SVGSVGElement> = e => {
     if (currentShape.length === 0) return
-    const top = toLocal(e, 0, - (FIXED_HEIGHT / 2))
-    const bottom = toLocal(e, 0, FIXED_HEIGHT / 2)
+    const current = toLocal(e)
     let inner: Point[];
     if (currentShape.length === level * 2) {
       inner = currentShape
     } else {
       inner = currentShape.slice(1, -1)
     }
-    top.y = inner[0].y
-    bottom.y = inner[1].y
+    const top = { ...current, y: inner[0].y }
+    const bottom = { ...current, y: inner[1].y }
     setCurrentShape([top, ...inner, bottom])
   }
 
@@ -77,7 +76,7 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
   return (
     <div className='fixed inset-0 bg-white'>
       <svg
-        className='w-[1000px] h-[500px] cursor-crosshair border-2 border-green-500 ml-24 mt-24'
+        className='w-[95%] h-[80%] cursor-crosshair border-2 border-green-500 ml-4 mt-4'
         onMouseMove={handleMove}
         onMouseDown={handleDragStart}
         onMouseUp={handleDragEnd}
