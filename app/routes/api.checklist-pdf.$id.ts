@@ -57,6 +57,7 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
   let cursorY = height - 60
 
   // Draw logo if exists
+  // asdas
   let logoBytes: Uint8Array | undefined
   try {
     const logoUrl =
