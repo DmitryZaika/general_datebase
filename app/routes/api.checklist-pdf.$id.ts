@@ -7,6 +7,7 @@ interface ChecklistData {
   id: number
   customer_name: string
   installation_address: string
+  company_id: number
   material_correct: boolean
   seams_satisfaction: boolean
   appliances_fit: boolean
@@ -59,13 +60,15 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
   let logoBytes: Uint8Array | undefined
   try {
     const logoUrl =
-      'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo.png.png'
+      data.company_id === 1
+        ? 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo.png.png'
+        : 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/photo_2025-11-03_17-53-06.png'
     const response = await fetch(logoUrl)
     if (!response.ok) throw new Error('logo fetch failed')
     const arrBuf = await response.arrayBuffer()
     logoBytes = new Uint8Array(arrBuf)
     const logoImage = await pdfDoc.embedPng(logoBytes)
-    const logoDims = logoImage.scale(0.075)
+    const logoDims = logoImage.scale(0.125)
     page.drawImage(logoImage, {
       x: (width - logoDims.width) / 2,
       y: height - logoDims.height - 20,
@@ -188,7 +191,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
   // Fetch the checklist data from the database
   const checklist = await selectId<ChecklistData>(
     db,
-    `SELECT id, customer_name, installation_address, material_correct, seams_satisfaction, 
+    `SELECT id, customer_name, installation_address, company_id, material_correct, seams_satisfaction, 
      appliances_fit, backsplashes_correct, edges_correct, holes_drilled, 
      cleanup_completed, comments, signature 
      FROM checklists WHERE id = ?`,
