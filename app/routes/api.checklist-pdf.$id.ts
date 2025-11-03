@@ -68,7 +68,7 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
     const arrBuf = await response.arrayBuffer()
     logoBytes = new Uint8Array(arrBuf)
     const logoImage = await pdfDoc.embedPng(logoBytes)
-    const logoDims = logoImage.scale(0.125)
+    const logoDims = logoImage.scale(data.company_id === 1 ? 0.075 : 0.125)
     page.drawImage(logoImage, {
       x: (width - logoDims.width) / 2,
       y: height - logoDims.height - 20,
