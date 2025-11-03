@@ -7,6 +7,7 @@ import {
   Form,
   type LoaderFunctionArgs,
   redirect,
+  useLoaderData,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
@@ -167,8 +168,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function AdminChecklists() {
   const token = useAuthenticityToken()
   const sigRef = useRef<SigRef>(null)
-  // const { companyId } = useLoaderData<typeof loader>()
-  const form = useForm<FormData>({
+  const { companyId } = useLoaderData<{ companyId: number }>()
+  const form = useForm<FormData>({  
     resolver,
     defaultValues: {
       customer_name: '',
@@ -196,13 +197,14 @@ export default function AdminChecklists() {
       sigRef.current?.clear()
     }
   }, [fetcher.state, fetcher.data, form])
+  console.log(companyId)
   return (
     <div className='flex justify-center py-10'>
       <div className='w-full max-w-xl border rounded-md bg-white p-8 shadow-sm'>
         <img
-          src='https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp'
+          src={companyId === 1 ? 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo.png.png' : 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/photo_2025-11-03_17-53-06.jpg'}
           alt='Logo'
-          className='mx-auto mb-4 h-16 object-contain'
+          className='mx-auto mb-4 h-46 object-contain'
         />
         <h1 className='mb-6 text-center text-2xl font-semibold'>
           Post-installation check list
