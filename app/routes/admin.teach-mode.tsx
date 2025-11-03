@@ -1194,18 +1194,210 @@ export const AdminQuestionComponent = ({
   )
 }
 
+interface InstructionNodeProps {
+  node: InstructionMedium
+  depth: number
+  childrenOf: (id: number | null) => InstructionMedium[]
+  expanded: Record<number, boolean>
+  toggleExpand: (id: number) => void
+  nodeStates: NodeStates
+  setNodeLoading: (id: number, loading: boolean) => void
+  setNodeText: (id: number, text: string) => void
+  appendNodeText: (id: number, delta: string) => void
+  setNodeSaving: (id: number, saving: boolean) => void
+  setSavedQuestions: React.Dispatch<React.SetStateAction<Set<number>>>
+  setRejectedQuestions: React.Dispatch<React.SetStateAction<Set<number>>>
+  savedQuestions: Set<number>
+  rejectedQuestions: Set<number>
+  submit: SubmitFunction
+}
+
+const InstructionNode: React.FC<InstructionNodeProps> = ({
+  node,
+  depth,
+  childrenOf,
+  expanded,
+  toggleExpand,
+  nodeStates,
+  setNodeLoading,
+  setNodeText,
+  appendNodeText,
+  setNodeSaving,
+  setSavedQuestions,
+  setRejectedQuestions,
+  savedQuestions,
+  rejectedQuestions,
+  submit,
+}) => {
+  const children = childrenOf(node.id)
+  const hasChildren = children.length > 0
+  const isOpen = expanded[node.id] ?? false
+
+  const {
+    text,
+    values,
+    loadingMCQ,
+    isSaving,
+    isSaved,
+    isRejected,
+    handleGenerate,
+    handleSaveQuestion,
+    handleRejectQuestion,
+  } = useInstructionNode({
+    node,
+    setNodeLoading,
+    setNodeText,
+    appendNodeText,
+    setNodeSaving,
+    setSavedQuestions,
+    setRejectedQuestions,
+    nodeStates,
+    submit,
+    savedQuestions,
+    rejectedQuestions,
+  })
+
+  return (
+    <div style={styles.item(depth)}>
+      <div style={styles.titleRow} onClick={() => hasChildren && toggleExpand(node.id)}>
+        {hasChildren ? (
+          <span style={styles.arrow}>{isOpen ? '▼' : '▶'}</span>
+        ) : (
+          <span style={styles.arrow} />
+        )}
+        <p style={styles.title}>{node.title ?? '(no title)'}</p>
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={e => {
+            e.stopPropagation()
+            handleGenerate()
+          }}
+          style={{ marginLeft: 10 }}
+        >
+          Generate Question
+        </Button>
+      </div>
+      <div dangerouslySetInnerHTML={{ __html: node.rich_text }} />
+      {hasChildren && isOpen && (
+        <div>
+          {children.map(child => (
+            <InstructionNode
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              childrenOf={childrenOf}
+              expanded={expanded}
+              toggleExpand={toggleExpand}
+              nodeStates={nodeStates}
+              setNodeLoading={setNodeLoading}
+              setNodeText={setNodeText}
+              appendNodeText={appendNodeText}
+              setNodeSaving={setNodeSaving}
+              setSavedQuestions={setSavedQuestions}
+              setRejectedQuestions={setRejectedQuestions}
+              savedQuestions={savedQuestions}
+              rejectedQuestions={rejectedQuestions}
+              submit={submit}
+            />
+          ))}
+        </div>
+      )}
+      {loadingMCQ && (
+        <div style={{ marginTop: 10, color: '#666' }}>
+          <p>Creating a question from this instruction...</p>
+        </div>
+      )}
+      {text && !values && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 10,
+            backgroundColor: '#f5f5f5',
+            borderRadius: 4,
+          }}
+        >
+          <p>Raw response: {text}</p>
+        </div>
+      )}
+      {values !== null && (
+        <div
+          className='mt-5 p-5'
+          style={{
+            border: '2px solid #888',
+            borderRadius: 8,
+            marginTop: 20,
+            position: 'relative',
+            display: isRejected ? 'none' : 'block',
+          }}
+        >
+          <button
+            onClick={handleRejectQuestion}
+            style={{
+              position: 'absolute',
+              top: 10,
+              right: 10,
+              background: 'transparent',
+              border: 'none',
+              fontSize: '24px',
+              cursor: 'pointer',
+              color: '#888',
+              lineHeight: 1,
+              padding: '0 5px',
+            }}
+            title='Reject question'
+          >
+            ×
+          </button>
+          <h2 style={{ marginBottom: 15 }}>{values.question}</h2>
+
+          {values.options?.map((answer: string, index: number) => {
+            const isCorrect = answer === values.answer
+            return (
+              <div key={index} style={{ marginBottom: 8 }}>
+                {answer}
+                {isCorrect && <strong> (correct answer)</strong>}
+              </div>
+            )
+          })}
+
+          <Form method='post' onSubmit={handleSaveQuestion}>
+            <input type='hidden' name='questionText' value={values.question} />
+            <input type='hidden' name='options' value={values.options} />
+            <input type='hidden' name='correctAnswer' value={values.answer} />
+            <input type='hidden' name='instructionId' value={node.id.toString()} />
+            <Button
+              type='submit'
+              disabled={isSaving || isSaved}
+              style={{
+                marginTop: 15,
+                marginRight: 10,
+                backgroundColor: isSaved ? '#28a745' : undefined,
+                color: isSaved ? 'white' : undefined,
+                cursor: isSaved ? 'not-allowed' : 'pointer',
+                opacity: isSaved ? 0.9 : 1,
+              }}
+            >
+              {isSaving ? 'Saving...' : isSaved ? 'Question Saved ✓' : 'Save Question'}
+            </Button>
+          </Form>
+          <Button
+            onClick={() => handleGenerate()}
+            style={{
+              marginTop: 15,
+            }}
+          >
+            Generate New Question
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function TeachMode() {
-  const { instructions, questions, answerChoices } = useLoaderData() as {
-    instructions: InstructionMedium[]
-    questions: Question[]
-    answerChoices: AnswerChoice[]
-  }
-  const actionData = useActionData<{
-    success?: boolean
-    error?: string
-    questionId?: number
-    instructionId?: number
-  }>()
+  const { instructions, questions, answerChoices } = useLoaderData()
+  const actionData = useActionData()
   const submit = useSubmit()
   const revalidator = useRevalidator()
   const { toast } = useToast()
@@ -1219,180 +1411,37 @@ export default function TeachMode() {
   const [showManualEntry, setShowManualEntry] = React.useState(false)
 
   useUpdateSavedQuestions(actionData, setSavedQuestions)
+
   const { nodeStates, setNodeLoading, setNodeSaving, setNodeText, appendNodeText } =
     useNodeStates()
-
   const answerChoicesByQuestion = useAnswerChoicesByQuestion(answerChoices)
   const { childrenOf, roots } = useInstructionTree(instructions)
   const { expanded, toggleExpand } = useExpandedState()
-
-  const InstructionNode: React.FC<{ node: InstructionMedium; depth: number }> = ({
-    node,
-    depth,
-  }) => {
-    const children = childrenOf(node.id)
-    const hasChildren = children.length > 0
-    const isOpen = expanded[node.id] ?? false
-
-    const {
-      text,
-      values,
-      loadingMCQ,
-      isSaving,
-      isSaved,
-      isRejected,
-      handleGenerate,
-      handleSaveQuestion,
-      handleRejectQuestion,
-    } = useInstructionNode({
-      node,
-      setNodeLoading,
-      setNodeText,
-      appendNodeText,
-      setNodeSaving,
-      setSavedQuestions,
-      setRejectedQuestions,
-      nodeStates,
-      submit,
-      savedQuestions,
-      rejectedQuestions,
-    })
-
-    return (
-      <div style={styles.item(depth)}>
-        <div
-          style={styles.titleRow}
-          onClick={() => hasChildren && toggleExpand(node.id)}
-        >
-          {hasChildren ? (
-            <span style={styles.arrow}>{isOpen ? '▼' : '▶'}</span>
-          ) : (
-            <span style={styles.arrow} />
-          )}
-          <p style={styles.title}>{node.title ?? '(no title)'}</p>
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={e => {
-              e.stopPropagation()
-              handleGenerate()
-            }}
-            style={{ marginLeft: 10 }}
-          >
-            Generate Question
-          </Button>
-        </div>
-        <div dangerouslySetInnerHTML={{ __html: node.rich_text }} />
-        {hasChildren && isOpen && (
-          <div>
-            {children.map(child => (
-              <InstructionNode key={child.id} node={child} depth={depth + 1} />
-            ))}
-          </div>
-        )}
-        {loadingMCQ && (
-          <div style={{ marginTop: 10, color: '#666' }}>
-            <p>Creating a question from this instruction...</p>
-          </div>
-        )}
-        {text && !values && (
-          <div
-            style={{
-              marginTop: 10,
-              padding: 10,
-              backgroundColor: '#f5f5f5',
-              borderRadius: 4,
-            }}
-          >
-            <p>Raw response: {text}</p>
-          </div>
-        )}
-        {values !== null && (
-          <div
-            className='mt-5 p-5'
-            style={{
-              border: '2px solid #888',
-              borderRadius: 8,
-              marginTop: 20,
-              position: 'relative',
-              display: isRejected ? 'none' : 'block',
-            }}
-          >
-            <button
-              onClick={handleRejectQuestion}
-              style={{
-                position: 'absolute',
-                top: 10,
-                right: 10,
-                background: 'transparent',
-                border: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                color: '#888',
-                lineHeight: 1,
-                padding: '0 5px',
-              }}
-              title='Reject question'
-            >
-              ×
-            </button>
-            <h2 style={{ marginBottom: 15 }}>{values.question}</h2>
-
-            {values.options?.map((answer: string, index: number) => {
-              const isCorrect = answer === values.answer
-              return (
-                <div key={index} style={{ marginBottom: 8 }}>
-                  {answer}
-                  {isCorrect && <strong> (correct answer)</strong>}
-                </div>
-              )
-            })}
-
-            <Form method='post' onSubmit={handleSaveQuestion}>
-              <input type='hidden' name='questionText' value={values.question} />
-              <input type='hidden' name='options' value={values.options} />
-              <input type='hidden' name='correctAnswer' value={values.answer} />
-              <input type='hidden' name='instructionId' value={node.id.toString()} />
-              <Button
-                type='submit'
-                disabled={isSaving || isSaved}
-                style={{
-                  marginTop: 15,
-                  marginRight: 10,
-                  backgroundColor: isSaved ? '#28a745' : undefined,
-                  color: isSaved ? 'white' : undefined,
-                  cursor: isSaved ? 'not-allowed' : 'pointer',
-                  opacity: isSaved ? 0.9 : 1,
-                }}
-              >
-                {isSaving
-                  ? 'Saving...'
-                  : isSaved
-                    ? 'Question Saved ✓'
-                    : 'Save Question'}
-              </Button>
-            </Form>
-            <Button
-              onClick={() => handleGenerate()}
-              style={{
-                marginTop: 15,
-              }}
-            >
-              Generate New Question
-            </Button>
-          </div>
-        )}
-      </div>
-    )
-  }
 
   return (
     <div style={{ padding: 20 }}>
       {roots.map(root => (
         <div key={root.id} style={styles.rootBox}>
-          <InstructionNode node={root} depth={0} />
+          <InstructionNode
+            node={root}
+            depth={0}
+            childrenOf={childrenOf}
+            expanded={expanded}
+            toggleExpand={toggleExpand}
+            nodeStates={nodeStates}
+            setNodeLoading={setNodeLoading}
+            setNodeText={setNodeText}
+            appendNodeText={appendNodeText}
+            setNodeSaving={setNodeSaving}
+            setSavedQuestions={setSavedQuestions}
+            setRejectedQuestions={setRejectedQuestions}
+            savedQuestions={savedQuestions}
+            rejectedQuestions={rejectedQuestions}
+            submit={submit}
+          />
         </div>
       ))}
+
       <div style={{ marginTop: 20, marginBottom: 20 }}>
         <Button onClick={() => setShowManualEntry(!showManualEntry)}>
           {showManualEntry ? 'Cancel Manual Entry' : 'Add Manual Question'}
@@ -1404,41 +1453,17 @@ export default function TeachMode() {
           />
         )}
       </div>
+
       <div style={{ marginTop: 40 }}>
-        <h2
-          style={{
-            marginBottom: 20,
-            color: '#333',
-            borderBottom: '2px solid #28a745',
-            paddingBottom: 10,
-          }}
-        >
-          All Questions ({questions.length})
-        </h2>
-        {questions.length > 0 ? (
-          questions.map(question => (
-            <AdminQuestionComponent
-              key={question.id}
-              question={question}
-              choices={answerChoicesByQuestion.get(question.id) || []}
-              submit={submit}
-            />
-          ))
-        ) : (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: 40,
-              color: '#666',
-              backgroundColor: '#f8f9fa',
-              borderRadius: 8,
-              border: '1px solid #dee2e6',
-            }}
-          >
-            <h3 style={{ marginBottom: 10 }}>No Questions Available</h3>
-            <p>No questions have been added yet.</p>
-          </div>
-        )}
+        <h2>All Questions ({questions.length})</h2>
+        {questions.map(question => (
+          <AdminQuestionComponent
+            key={question.id}
+            question={question}
+            choices={answerChoicesByQuestion.get(question.id) || []}
+            submit={submit}
+          />
+        ))}
       </div>
     </div>
   )
