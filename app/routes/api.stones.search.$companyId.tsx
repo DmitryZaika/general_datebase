@@ -23,7 +23,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
             CAST(SUM(CASE WHEN si.id IS NOT NULL AND si.sale_id IS NULL AND si.cut_date IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available,
             CAST(COUNT(si.id) AS UNSIGNED) AS amount
     FROM stones s
-    LEFT JOIN slab_inventory AS si ON si.stone_id = s.id
+    LEFT JOIN slab_inventory AS si ON (
+      si.stone_id = s.id
+      OR si.stone_id IN (
+        SELECT source_stone_id
+        FROM stone_slab_links
+        WHERE stone_id = s.id
+      )
+    )
     WHERE UPPER(s.name) LIKE UPPER(?)
     AND s.company_id = ?
     AND s.is_display = 1
