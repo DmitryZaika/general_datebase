@@ -168,6 +168,18 @@ export class Contract {
   }
 
   protected async sellSink(slabId: number, sinkTypeId: number, price: number) {
+    // Check if there's an available sink of this type
+    const [available] = await db.execute<RowDataPacket[]>(
+      `SELECT id FROM sinks WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+      [sinkTypeId],
+    )
+
+    if (!available || available.length === 0) {
+      throw new Error(
+        `No available sinks of type ${sinkTypeId}. Cannot complete the sale.`,
+      )
+    }
+
     await db.execute(
       `UPDATE sinks SET slab_id = ? , price = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 ORDER BY id LIMIT 1`,
       [slabId, price, sinkTypeId],
@@ -181,6 +193,18 @@ export class Contract {
   }
 
   protected async sellFaucet(slabId: number, faucetTypeId: number, price: number) {
+    // Check if there's an available faucet of this type
+    const [available] = await db.execute<RowDataPacket[]>(
+      `SELECT id FROM faucets WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+      [faucetTypeId],
+    )
+
+    if (!available || available.length === 0) {
+      throw new Error(
+        `No available faucets of type ${faucetTypeId}. Cannot complete the sale.`,
+      )
+    }
+
     await db.execute(
       `UPDATE faucets SET slab_id = ? , price = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 ORDER BY id LIMIT 1`,
       [slabId, price, faucetTypeId],

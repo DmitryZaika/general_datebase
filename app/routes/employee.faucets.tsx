@@ -19,6 +19,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getEmployeeUser(request)
   const [, searchParams] = request.url.split('?')
   const queryParams = new URLSearchParams(searchParams)
+
+  // Always show all faucets (including out of stock) for inventory visibility
+  if (!queryParams.has('show_sold_out')) {
+    queryParams.set('show_sold_out', 'true')
+  }
+
   const filters = faucetFilterSchema.parse(cleanParams(queryParams))
 
   const faucets = await faucetQueryBuilder(filters, user.company_id)

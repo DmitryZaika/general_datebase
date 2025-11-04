@@ -71,8 +71,24 @@ export async function action({ request, params }: ActionFunctionArgs) {
       )
     }
   }
+
   const contract = new Contract(data)
-  await contract.sell(user)
+
+  try {
+    await contract.sell(user)
+  } catch (error) {
+    const session = await getSession(request.headers.get('Cookie'))
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to complete sale'
+    session.flash('message', toastData('Error', errorMessage, 'destructive'))
+
+    return routerData(
+      { errors: { _errors: [errorMessage] } },
+      {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      },
+    )
+  }
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Sale completed successfully'))

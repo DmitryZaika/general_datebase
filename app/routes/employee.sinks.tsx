@@ -19,6 +19,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getEmployeeUser(request)
   const [, searchParams] = request.url.split('?')
   const queryParams = new URLSearchParams(searchParams)
+
+  // Always show all sinks (including out of stock) for inventory visibility
+  if (!queryParams.has('show_sold_out')) {
+    queryParams.set('show_sold_out', 'true')
+  }
+
   const filters = sinkFilterSchema.parse(cleanParams(queryParams))
 
   const sinks = await sinkQueryBuilder(filters, user.company_id)
