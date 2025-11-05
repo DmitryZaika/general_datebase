@@ -53,29 +53,28 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
     setCurrentShape([top, bottom])
   }
 
-  const handleTurnPoint = (idx: number, item: Point, length: number, above: boolean, ascending: boolean) => {
-    console.log(above, ascending)
-    const complex = ascending === above ? !above : above
-    const toChange = complex ? idx === 0 : (idx === length - 1);
-    if (!toChange) return item
+  const handleTurnPoint = (idx: number, item: Point, length: number, changeFirst: boolean, isRight: boolean, isUp: boolean) => {
+    const isTarget = changeFirst ? idx === 0 : idx === length - 1
+    if (!isTarget) return item
     if (level % 2 === 1) {
-      return { ...item, x: item.x  + (ascending ? FIXED_HEIGHT : -FIXED_HEIGHT) }
+      return { ...item, x: item.x + (isRight ? FIXED_HEIGHT : -FIXED_HEIGHT) }
     }
-    return { ...item, y: item.y + (ascending ? FIXED_HEIGHT : -FIXED_HEIGHT) }
+    return { ...item, y: item.y + (isUp ? -FIXED_HEIGHT : FIXED_HEIGHT) }
   }
 
   const handleTurn = (current: Point) => {
     setLevel(Level => Level + 1)
     const first = currentShape[0]
     const second = currentShape[1]
-    const ascending = level % 2 === 1 ? second.x > first.x : second.y > first.y
     const last = currentShape[currentShape.length - 1]
-    const points = level % 2 === 1 ? [first.y, last.y] : [first.x, last.x]
-    const currentCoord = level % 2 === 1 ? current.y : current.x
-    const above = currentCoord > points[0]
-    const newShape = currentShape.map((item, idx, arr) => handleTurnPoint(idx, item, arr.length, above, ascending))
+    const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
+    const changeFirst = dist(current, first) < dist(current, last)
+    const isRight = second.x > first.x
+    const isUp = second.y < first.y
+    const newShape = currentShape.map((item, idx, arr) => handleTurnPoint(idx, item, arr.length, changeFirst, isRight, isUp))
     setCurrentShape(newShape)
   }
+  
 
   const isInBounds = (current: Point, inner: Point[], depth: number) => {
     const oldLevel = level - depth
@@ -91,7 +90,6 @@ function DrawableCanvas({ onSubmit }: DrawableCanvasProps) {
   const handleMove: React.MouseEventHandler<SVGSVGElement> = e => {
     if (currentShape.length === 0) return
     const current = toLocal(e);
-
     let inner: Point[]
     if (currentShape.length === level * 2) {
       inner = currentShape
