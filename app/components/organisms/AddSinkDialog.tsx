@@ -33,10 +33,35 @@ export const AddSinkDialog = ({
 }) => {
   const [selectedSink, setSelectedSink] = useState<number>()
 
+  const allRooms = form.getValues('rooms') || []
+  const allSelectedSinks = allRooms.flatMap(room => room.sink_type || [])
+
+  // Count how many of each sink type are already selected
+  const selectedSinkCounts = new Map<number, number>()
+  allSelectedSinks.forEach(sink => {
+    selectedSinkCounts.set(sink.type_id, (selectedSinkCounts.get(sink.type_id) || 0) + 1)
+  })
+
+  // Calculate remaining available for each sink type
+  const sinksWithRemaining = sink_type
+    .map(sink => {
+      const totalAvailable = Number(sink.sink_count) || 0
+      const alreadySelected = selectedSinkCounts.get(sink.id) || 0
+      const remaining = totalAvailable - alreadySelected
+
+      return {
+        ...sink,
+        remaining,
+      }
+    })
+    .filter(sink => sink.remaining > 0) // Only show sinks with availability
+
   const handleAddSink = () => {
     if (!selectedSink) {
       return
     }
+
+    // Add sink to form
     form.setValue(`rooms.${roomIndex}.sink_type`, [
       ...(form.getValues(`rooms.${roomIndex}.sink_type`) || []),
       {
@@ -44,17 +69,26 @@ export const AddSinkDialog = ({
         price: sink_type.find(s => s.id === selectedSink)?.retail_price || 0,
       },
     ])
+
+    setSelectedSink(undefined)
     setShow(false)
   }
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      setSelectedSink(undefined) // Reset selection when closing
+    }
+    setShow(open)
+  }
+
   return (
-    <Dialog open={show} onOpenChange={setShow}>
+    <Dialog open={show} onOpenChange={handleOpenChange}>
       <DialogContent className='sm:max-w-[425px]'>
         <DialogHeader>
           <DialogTitle>Add Sink</DialogTitle>
         </DialogHeader>
         <div className='space-y-4'>
-          {sink_type.length === 0 ? (
+          {sinksWithRemaining.length === 0 ? (
             <div className='text-center py-4 text-gray-500'>
               No available sinks found
             </div>
@@ -67,9 +101,9 @@ export const AddSinkDialog = ({
                 <SelectValue placeholder='Select a sink' />
               </SelectTrigger>
               <SelectContent>
-                {sink_type.map(sink => (
+                {sinksWithRemaining.map(sink => (
                   <SelectItem key={sink.id} value={sink.id.toString()}>
-                    {sink.name} - ${sink.retail_price}
+                    {sink.name} - ${sink.retail_price} (avail: {sink.remaining})
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -57,7 +57,12 @@ export const stoneQueryBuilder = async (
         AND slab_inventory.cut_date IS NULL 
       THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM stones
-  LEFT JOIN slab_inventory ON slab_inventory.stone_id = stones.id AND slab_inventory.cut_date IS NULL
+  LEFT JOIN slab_inventory ON (
+    slab_inventory.stone_id = stones.id
+    OR slab_inventory.stone_id IN (
+      SELECT source_stone_id FROM stone_slab_links WHERE stone_id = stones.id
+    )
+  ) AND slab_inventory.cut_date IS NULL
   `
 
   query += `WHERE stones.company_id = ?`

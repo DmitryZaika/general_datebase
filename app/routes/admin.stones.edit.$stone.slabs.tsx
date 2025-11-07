@@ -70,6 +70,9 @@ interface LinkedSlabsGroupProps {
 
 interface LinkSlabsDialogProps {
   allStones: Array<{ id: number; name: string }>
+  currentStoneId: number
+  linkedStoneIds: number[]
+  reverseLinkedStoneIds: number[]
   isOpen: boolean
   onClose: () => void
 }
@@ -215,7 +218,14 @@ function LinkedSlabsGroup({ slabs, onBundleUpdate }: LinkedSlabsGroupProps) {
   )
 }
 
-function LinkSlabsDialog({ allStones, isOpen, onClose }: LinkSlabsDialogProps) {
+function LinkSlabsDialog({
+  allStones,
+  currentStoneId,
+  linkedStoneIds,
+  reverseLinkedStoneIds,
+  isOpen,
+  onClose
+}: LinkSlabsDialogProps) {
   const [selectedStoneId, setSelectedStoneId] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const navigation = useNavigation()
@@ -230,14 +240,26 @@ function LinkSlabsDialog({ allStones, isOpen, onClose }: LinkSlabsDialogProps) {
   }, [isOpen])
 
   useEffect(() => {
-    if (actionData?.success && navigation.state === 'idle') {
+    if (actionData?.success && actionData?.action === 'link_slabs' && navigation.state === 'idle') {
       onClose()
     }
   }, [actionData, navigation.state, onClose])
 
-  const filteredStones = allStones.filter(stone =>
-    stone.name.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const filteredStones = allStones.filter(stone => {
+    // Filter by search term
+    const matchesSearch = stone.name.toLowerCase().includes(searchTerm.toLowerCase())
+
+    // Exclude current stone
+    if (stone.id === currentStoneId) return false
+
+    // Exclude already linked stones
+    if (linkedStoneIds.includes(stone.id)) return false
+
+    // Exclude stones with reverse link
+    if (reverseLinkedStoneIds.includes(stone.id)) return false
+
+    return matchesSearch
+  })
 
   return (
     <Dialog
@@ -662,7 +684,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           }
 
           await db.execute(
-            `INSERT INTO stone_slab_links (stone_id, source_stone_id) 
+            `INSERT INTO stone_slab_links (stone_id, source_stone_id)
              VALUES (?, ?)`,
             [stoneId, fromStoneId],
           )
@@ -670,7 +692,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           const session = await getSession(request.headers.get('Cookie'))
           session.flash('message', toastData('Success', 'Slabs linked successfully'))
           return data(
-            { success: true },
+            { success: true, action: 'link_slabs' },
             {
               headers: { 'Set-Cookie': await commitSession(session) },
             },
@@ -770,12 +792,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     stoneId,
   ])
 
+  // Get linked stone IDs (stones that current stone links TO)
+  const linkedStoneIds = await selectMany<{ source_stone_id: number }>(
+    db,
+    `SELECT source_stone_id FROM stone_slab_links WHERE stone_id = ?`,
+    [stoneId],
+  )
+
+  // Get reverse linked stone IDs (stones that link TO current stone)
+  const reverseLinkedStoneIds = await selectMany<{ stone_id: number }>(
+    db,
+    `SELECT stone_id FROM stone_slab_links WHERE source_stone_id = ?`,
+    [stoneId],
+  )
+
   // Load all stones for linking
   const allStones = await selectMany<{ id: number; name: string }>(
     db,
-    `SELECT DISTINCT s.id, s.name 
+    `SELECT DISTINCT s.id, s.name
      FROM stones s
-     WHERE s.id != ? 
+     WHERE s.id != ?
      AND EXISTS (
        SELECT 1 FROM slab_inventory si WHERE si.stone_id = s.id AND si.cut_date IS NULL
      )
@@ -842,12 +878,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     stone,
     allStones,
     linkedSlabs,
+    linkedStoneIds: linkedStoneIds.map(link => link.source_stone_id),
+    reverseLinkedStoneIds: reverseLinkedStoneIds.map(link => link.stone_id),
   }
 }
 
 // Main component
 export default function EditStoneSlabs() {
-  const { slabs, stone, allStones, linkedSlabs } = useLoaderData<typeof loader>()
+  const { slabs, stone, allStones, linkedSlabs, linkedStoneIds, reverseLinkedStoneIds } =
+    useLoaderData<typeof loader>()
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
@@ -1014,6 +1053,9 @@ export default function EditStoneSlabs() {
 
       <LinkSlabsDialog
         allStones={allStones}
+        currentStoneId={stone.id}
+        linkedStoneIds={linkedStoneIds}
+        reverseLinkedStoneIds={reverseLinkedStoneIds}
         isOpen={showLinkDialog}
         onClose={() => setShowLinkDialog(false)}
       />
