@@ -20,7 +20,10 @@ import { Checkbox } from '~/components/ui/checkbox'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
 import { db } from '~/db.server'
+import { useToast } from '~/hooks/use-toast'
 import { useFullFetcher } from '~/hooks/useFullFetcher'
+import { useOfflineSubmit } from '~/hooks/useOfflineSubmit'
+import { useRegisterSW } from '~/hooks/useRegisterSW'
 import { commitSession, getSession } from '~/sessions'
 import { csrf } from '~/utils/csrf.server'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -166,6 +169,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 // Component
 // -------------
 export default function AdminChecklists() {
+  useRegisterSW()
   const token = useAuthenticityToken()
   const sigRef = useRef<SigRef>(null)
   const { companyId } = useLoaderData<{ companyId: number }>()
@@ -189,6 +193,19 @@ export default function AdminChecklists() {
 
   const { fullSubmit, fetcher } = useFullFetcher(form)
   const isSubmitting = fetcher.state !== 'idle'
+  const { toast } = useToast()
+  const handleOfflineSubmit = useOfflineSubmit({
+    onQueued: () =>
+      toast({
+        title: 'Saved offline',
+        description: 'We will send it automatically when the internet is available.',
+      }),
+    onFlushed: () =>
+      toast({
+        title: 'Sent',
+        description: 'Offline queue sent.',
+      }),
+  })
 
   // reset form after successful submit
   useEffect(() => {
@@ -197,7 +214,6 @@ export default function AdminChecklists() {
       sigRef.current?.clear()
     }
   }, [fetcher.state, fetcher.data, form])
-  console.log(companyId)
   return (
     <div className='flex justify-center py-10'>
       <div className='w-full max-w-xl border rounded-md bg-white p-8 shadow-sm'>
@@ -210,7 +226,15 @@ export default function AdminChecklists() {
           Post-installation check list
         </h1>
         <FormProvider {...form}>
-          <Form method='post' onSubmit={fullSubmit}>
+          <Form
+            method='post'
+            onSubmit={e => {
+              if (navigator.onLine) {
+                return fullSubmit(e)
+              }
+              return handleOfflineSubmit(e)
+            }}
+          >
             <input type='hidden' name='csrf' value={token} />
             {/* <CustomerSearch
               onCustomerChange={value => form.setValue('customer_id', value ?? null)}
