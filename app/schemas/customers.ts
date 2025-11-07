@@ -65,8 +65,8 @@ export const updateCustomer = async (id: number, data: CustomerSignupSchema) => 
 
 export const customerDialogSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  email: z.union([z.string().email(), z.literal('')]),
-  phone: z.union([z.coerce.string().min(10), z.literal('')]),
+  email: z.string().optional(),
+  phone: z.string().optional(),
   address: z.string().optional(),
   your_message: z.string().optional(),
   builder: z.boolean().default(false),
