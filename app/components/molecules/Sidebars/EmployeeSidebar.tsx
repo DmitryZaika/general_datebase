@@ -62,7 +62,7 @@ const getItems = (
   colors?: { id: number; name: string; hex_code: string }[] | undefined,
   sinkSuppliers?: ISupplier[] | undefined,
   faucetSuppliers?: ISupplier[] | undefined,
-  companyId: number | string = 1,
+  companyId?: number | string,
 ) => {
   const isCustomerRoute = base === 'customer'
   const finalList: ISidebarItem[] = [
@@ -209,11 +209,13 @@ export function EmployeeSidebar({
 }: IProps) {
   const location = useLocation()
   const base = getBase(location.pathname)
+  const isCustomerRoute = location.pathname.startsWith('/customer/')
   const data = useLoaderData<{ user: { company_id: number } | null }>()
-  const companyId = data?.user?.company_id || 1
-
-  const isCustomerRoute = typeof base === 'string' && base.startsWith('customer/')
-
+  const companyIdFromUrl = isCustomerRoute
+    ? location.pathname.split('/').filter(Boolean)[1]
+    : undefined
+  const companyId = companyIdFromUrl || data?.user?.company_id 
+console.log(isCustomerRoute)
   const itemsBase = isCustomerRoute
     ? 'customer'
     : (base as 'employee' | 'admin' | 'customer')

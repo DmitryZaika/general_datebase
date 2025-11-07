@@ -20,8 +20,14 @@ export function HeaderDesktop({
   const isAdminPage = location.pathname.startsWith('/admin')
   const isCustomerPage = location.pathname.startsWith('/customer')
   const data = useLoaderData<{ user: { company_id: number } | null }>()
-  const companyId = data?.user?.company_id || 1
+  const companyId = isCustomerPage
+    ? location.pathname.split('/').filter(Boolean)[1]
+    : data?.user?.company_id
 
+  const customerSwitchUrl =
+    companyId === undefined
+      ? '/employee/stones'
+      : getCustomerUrl(isCustomerPage, location, companyId)
   return (
     <header
       className={clsx('flex-row items-center   gap-0 justify-between  p-3 ', className)}
@@ -50,7 +56,7 @@ export function HeaderDesktop({
             </Link>
           )
         ) : null}
-        <Link to={getCustomerUrl(isCustomerPage, location, companyId)}>
+        <Link to={customerSwitchUrl}>
           <LinkButton className='select-none'>
             {isCustomerPage ? 'Employee' : 'Customer'}
           </LinkButton>

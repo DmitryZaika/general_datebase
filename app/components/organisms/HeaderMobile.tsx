@@ -84,7 +84,9 @@ export function BurgerMenu({
   const [isRoleSwitching, setIsRoleSwitching] = useState(false)
   const [isCustomerSwitching, setIsCustomerSwitching] = useState(false)
   const data = useLoaderData<{ user: { company_id: number } | null }>()
-  const companyId = data?.user?.company_id || 1
+  const companyId = isCustomerPage
+    ? location.pathname.split('/').filter(Boolean)[1]
+    : data?.user?.company_id
 
   useEffect(() => {
     if (navigation.state === 'idle') {
@@ -95,7 +97,7 @@ export function BurgerMenu({
 
   const targetPath = getMirroredUrl(location.pathname, location.search)
 
-  const getCustomerUrl = () => {
+  const buildCustomerUrl = () => {
     // Если переходим из admin/stones в customer/:company/stones, сохраняем фильтры
     if (!isCustomerPage && location.pathname.startsWith('/admin/stones')) {
       return `/customer/${companyId}/stones${location.search}`
@@ -187,7 +189,7 @@ export function BurgerMenu({
                 )
               ) : null}
               <BurgerLink
-                to={getCustomerUrl()}
+                to={buildCustomerUrl()}
                 setOpen={setOpen}
                 onClick={handleCustomerSwitchClick}
               >

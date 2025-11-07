@@ -109,11 +109,11 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
           </div>
         </div>
       )}
-      {isNew && (
+      {/* {isNew && (
         <div className='absolute top-0 right-0 bg-green-500 text-white px-2 py-1 rounded-bl text-sm font-bold'>
           New Color
         </div>
-      )}
+      )} */}
     </div>
   )
 }
