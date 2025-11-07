@@ -159,20 +159,22 @@ export async function sinkQueryBuilder(
   }
 
   const query = `
-    SELECT 
-      sink_type.id, 
-      sink_type.name, 
-      sink_type.type, 
-      sink_type.url, 
-      sink_type.is_display, 
-      sink_type.length, 
-      sink_type.width, 
-      COUNT(sinks.id) AS available, 
-      sink_type.supplier_id, 
-      sink_type.retail_price, 
+    SELECT
+      sink_type.id,
+      sink_type.name,
+      sink_type.type,
+      sink_type.url,
+      sink_type.is_display,
+      sink_type.length,
+      sink_type.width,
+      COUNT(sinks.id) AS available,
+      sink_type.supplier_id,
+      sink_type.retail_price,
       sink_type.cost
     FROM sink_type
-    LEFT JOIN sinks ON sinks.sink_type_id = sink_type.id AND sinks.is_deleted = 0
+    LEFT JOIN sinks ON sinks.sink_type_id = sink_type.id
+      AND sinks.is_deleted = 0
+      AND sinks.slab_id IS NULL
     ${whereClause}
     GROUP BY
       sink_type.id,
@@ -226,18 +228,20 @@ export async function faucetQueryBuilder(
   }
 
   const query = `
-    SELECT 
-      faucet_type.id, 
-      faucet_type.name, 
-      faucet_type.type, 
-      faucet_type.url, 
-      faucet_type.is_display, 
-      COUNT(faucets.id) AS available, 
-      faucet_type.supplier_id, 
-      faucet_type.retail_price, 
+    SELECT
+      faucet_type.id,
+      faucet_type.name,
+      faucet_type.type,
+      faucet_type.url,
+      faucet_type.is_display,
+      COUNT(faucets.id) AS available,
+      faucet_type.supplier_id,
+      faucet_type.retail_price,
       faucet_type.cost
     FROM faucet_type
-    LEFT JOIN faucets ON faucets.faucet_type_id = faucet_type.id AND faucets.is_deleted = 0
+    LEFT JOIN faucets ON faucets.faucet_type_id = faucet_type.id
+      AND faucets.is_deleted = 0
+      AND faucets.slab_id IS NULL
     ${whereClause}
     GROUP BY
       faucet_type.id,
