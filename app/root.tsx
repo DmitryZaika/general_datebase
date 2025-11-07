@@ -25,6 +25,7 @@ import { getBase } from '~/utils/urlHelpers'
 import { Header } from './components/Header'
 import { Chat } from './components/organisms/Chat'
 import { MarketingHeader } from './components/organisms/MarketingHeader'
+import { SidebarToggle } from './components/SidebarToggle'
 import { Toaster } from './components/ui/toaster'
 import { useToast } from './hooks/use-toast'
 import { commitSession, getSession } from './sessions'
@@ -33,7 +34,6 @@ import { queryClient } from './utils/api'
 import { selectId, selectMany } from './utils/queryHelpers'
 import { getUserBySessionId } from './utils/session.server'
 import type { ToastMessage } from './utils/toastHelpers'
-import { SidebarToggle } from './components/SidebarToggle'
 
 export const links: LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -143,12 +143,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
        FROM users u
        LEFT JOIN users_positions up ON up.user_id = u.id
        LEFT JOIN positions p ON p.id = up.position_id
-       WHERE u.id = ? AND p.name IN ('external_marketing','check-in') AND u.is_deleted = 0`,
+       WHERE u.id = ? AND p.name IN ('external_marketing','check-in','installer') AND u.is_deleted = 0`,
       [user.id],
     )
     const hasCheckIn = Array.isArray(rows) && rows.some(r => r.position === 'check-in')
     const hasExternalMarketing =
       Array.isArray(rows) && rows.some(r => r.position === 'external_marketing')
+    const hasInstaller = Array.isArray(rows) && rows.some(r => r.position === 'installer')
     position = hasCheckIn
       ? 'check-in'
       : hasExternalMarketing
@@ -156,6 +157,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
         : null
 
     const url = new URL(request.url)
+    // Installer users: always redirect to their checklist
+    if (hasInstaller) {
+      const installerTarget = `/installers/${user.company_id}/checklist`
+      if (!url.pathname.startsWith('/installers/')) {
+        return redirect(installerTarget)
+      }
+    }
+
     if (hasCheckIn) {
       const target = `/customer/${user.company_id}/check-in`
       if (!url.pathname.startsWith(target)) {
