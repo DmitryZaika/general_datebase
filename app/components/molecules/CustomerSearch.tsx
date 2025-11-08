@@ -57,11 +57,12 @@ const fetchCustomers = async (customerName: string, searchType: SelectOption) =>
   return data.customers
 }
 
-async function fetchCustomerById(customerId: number) {
+async function fetchCustomerById(customerId: number): Promise<Customer | null> {
   const res = await fetch(`/api/customers/${customerId}`)
+  console.log(res.json())
   if (!res.ok) return null
   const json = await res.json()
-  return json.customer as Customer | null
+  return json.customer
 }
 
 const CustomerManager = ({

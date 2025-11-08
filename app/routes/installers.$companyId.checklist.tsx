@@ -195,8 +195,21 @@ export default function AdminChecklists() {
     if (fetcher.state === 'idle' && fetcher.data?.success) {
       form.reset()
       sigRef.current?.clear()
+      localStorage.removeItem('checklistData')
     }
   }, [fetcher.state, fetcher.data, form])
+
+  useEffect(() => {
+    const savedData = localStorage.getItem('checklistData')
+    console.log(savedData)
+    if (savedData) {
+      form.reset(JSON.parse(savedData))
+    }
+  }, [])
+
+  const watchValues = form.watch()
+
+
   console.log(companyId)
   return (
     <div className='flex justify-center py-10'>
@@ -210,7 +223,9 @@ export default function AdminChecklists() {
           Post-installation check list
         </h1>
         <FormProvider {...form}>
-          <Form method='post' onSubmit={fullSubmit}>
+          <Form method='post' onSubmit={fullSubmit} onChange={() => {
+            localStorage.setItem('checklistData', JSON.stringify(watchValues))
+          }}>
             <input type='hidden' name='csrf' value={token} />
             {/* <CustomerSearch
               onCustomerChange={value => form.setValue('customer_id', value ?? null)}
