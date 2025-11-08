@@ -215,7 +215,6 @@ export function EmployeeSidebar({
     ? location.pathname.split('/').filter(Boolean)[1]
     : undefined
   const companyId = companyIdFromUrl || data?.user?.company_id 
-console.log(isCustomerRoute)
   const itemsBase = isCustomerRoute
     ? 'customer'
     : (base as 'employee' | 'admin' | 'customer')
