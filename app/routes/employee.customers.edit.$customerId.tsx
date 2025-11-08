@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import {
   type LoaderFunctionArgs,
   redirect,
@@ -5,23 +6,47 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router'
+import { v4 as uuidv4 } from 'uuid'
 import { CustomerForm } from '~/components/pages/CustomerForm'
-import { getEmployeeUser } from '~/utils/session.server'
+import type { CustomerDialogSchema } from '~/schemas/customers'
+import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const customerId = parseInt(params.customerId || '0')
-  try {
-    const user = await getEmployeeUser(request)
-    return { user, customerId }
-  } catch (error) {
-    return redirect(`/login?error=${error}`)
+const getCustomerInfo = async (customerId: number): Promise<CustomerDialogSchema> => {
+  const response = await fetch(`/api/customers/${customerId}`)
+  const data = await response.json()
+  return {
+    name: data.customer.name,
+    email: data.customer.email ?? '',
+    phone: data.customer.phone,
+    address: data.customer.address ?? '',
+    company_name: data.customer.company_name,
+    source: data.customer.source,
+    your_message: data.customer.your_message ?? '',
+    builder: !!data.customer.company_name,
   }
 }
 
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  const customerId = parseInt(params.customerId || '0')
+  let user: SessionUser
+  try {
+    user = await getEmployeeUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
+  return { user, customerId, nonce: uuidv4() }
+}
+
 export default function CustomersEdit() {
-  const { user, customerId } = useLoaderData<typeof loader>()
+  const { user, customerId, nonce } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
+
+  const { data } = useQuery({
+    queryKey: ['customer', customerId, nonce],
+    queryFn: () => getCustomerInfo(customerId || 0),
+    enabled: !!customerId,
+  })
 
   const onSuccess = () => {
     navigate(`..${location.search}`)
@@ -32,6 +57,9 @@ export default function CustomersEdit() {
       navigate(`..${location.search}`)
     }
   }
+  if (data === undefined) {
+    return null
+  }
 
   return (
     <CustomerForm
@@ -39,6 +67,7 @@ export default function CustomersEdit() {
       onSuccess={onSuccess}
       companyId={user.company_id}
       customerId={customerId}
+      oldData={data}
     />
   )
 }
