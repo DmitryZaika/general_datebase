@@ -1,10 +1,10 @@
 // load-customers-csv.js
 
-import dotenv from 'dotenv'
-import mysql from 'mysql2/promise'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import dotenv from 'dotenv'
+import mysql from 'mysql2/promise'
 
 dotenv.config()
 
@@ -49,7 +49,7 @@ function normalizeDateKeepTime(s) {
 
   // dd.mm.yyyy [time]
   let m = t.match(
-    /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/
+    /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/,
   )
   if (m) {
     const dd = m[1].padStart(2, '0')
@@ -150,7 +150,7 @@ async function loadExistingIdentifiers({ companyId = 1 } = {}) {
     // Если нужно ограничивать по компании — оставляем WHERE company_id = ?
     const [rows] = await conn.query(
       `SELECT phone, email FROM customers WHERE company_id = ?`,
-      [companyId]
+      [companyId],
     )
 
     const existingPhones = new Set()
@@ -205,22 +205,20 @@ function filterDuplicates(data, existingPhones, existingEmails) {
 }
 
 async function saveData(data) {
- 
   const sql = `
     INSERT INTO customers
       (created_date, name, phone, email, address, sales_rep, company_id, source)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `
- 
+
   const conn = await db.getConnection()
- 
+
   let _inserted = 0
-  
+
   try {
     await conn.beginTransaction()
-  
-    for (const r of data) {
 
+    for (const r of data) {
       await conn.execute(sql, [
         r.created_date,
         r.name,
@@ -231,22 +229,21 @@ async function saveData(data) {
         1,
         'leads',
       ])
-    
+
       _inserted++
     }
-  
+
     await conn.commit()
-  
   } catch (e) {
     await conn.rollback()
-    
+
     throw e
   } finally {
     conn.release()
-    
+
     await db.end()
   }
- 
+
   return _inserted
 }
 
@@ -259,16 +256,18 @@ const cleanData = convertData(rawData)
 // biome-ignore lint/suspicious/noConsole: for tests
 console.log('customers cleanData count', cleanData.length)
 
-const { existingPhones, existingEmails } = await loadExistingIdentifiers({ companyId: 1 })
+const { existingPhones, existingEmails } = await loadExistingIdentifiers({
+  companyId: 1,
+})
 const { filtered, skippedDuplicates, skippedNoContact } = filterDuplicates(
   cleanData,
   existingPhones,
-  existingEmails
+  existingEmails,
 )
 
 // biome-ignore lint/suspicious/noConsole: for tests
 console.log(
-  `filtered to insert: ${filtered.length} (skipped duplicates: ${skippedDuplicates}, skipped no phone+email: ${skippedNoContact})`
+  `filtered to insert: ${filtered.length} (skipped duplicates: ${skippedDuplicates}, skipped no phone+email: ${skippedNoContact})`,
 )
 
 const inserted = await saveData(filtered)

@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -36,6 +36,7 @@ interface CustomerFormProps {
   customerId?: number
   source?: (typeof sourceEnum)[number]
   initialName?: string
+  oldData?: CustomerDialogSchema
 }
 
 type SourceOptions = {
@@ -63,20 +64,6 @@ function getSourceOptions(
   return baseOptions
 }
 
-const getCustomerInfo = async (customerId: number) => {
-  const response = await fetch(`/api/customers/${customerId}`)
-  const data = await response.json()
-  return {
-    name: data.customer.name,
-    email: data.customer.email ?? '',
-    phone: data.customer.phone,
-    address: data.customer.address ?? '',
-    company_name: data.customer.company_name,
-    source: data.customer.source,
-    your_message: data.customer.your_message ?? '',
-  }
-}
-
 export function CustomerForm({
   handleChange,
   onSuccess,
@@ -84,6 +71,7 @@ export function CustomerForm({
   customerId,
   source,
   initialName,
+  oldData,
 }: CustomerFormProps) {
   const { toast: toastFn } = useToast()
   const successToast = (message: string) =>
@@ -100,15 +88,10 @@ export function CustomerForm({
     ? updateCustomerMutation(toastFn, handleSuccess)
     : createCustomerMutation(toastFn, handleSuccess)
   const { mutate, isPending } = useMutation(mutateObject)
-  const { data, isLoading } = useQuery({
-    queryKey: ['customer', customerId],
-    queryFn: () => getCustomerInfo(customerId || 0),
-    enabled: !!customerId,
-  })
 
   const form = useForm<CustomerDialogSchema>({
     resolver,
-    defaultValues: {
+    defaultValues: oldData ?? {
       name: initialName || '',
       email: '',
       address: '',
@@ -131,15 +114,6 @@ export function CustomerForm({
     if (emailValue && emailValue.trim() !== '') params.set('email', emailValue.trim())
     return params.toString()
   }, [phoneValue, emailValue])
-  useEffect(() => {
-    if (data) {
-      form.reset({
-        ...data,
-        builder: Boolean(data.company_name && data.company_name.trim() !== ''),
-      })
-      data.source && form.setValue('source', data.source)
-    }
-  }, [data])
 
   const onSubmit = async (data: CustomerDialogSchema) => {
     if (!customerId && queryString) {
@@ -163,7 +137,7 @@ export function CustomerForm({
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isLoading ? 'Loading...' : dialogTitle}</DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
         <Dialog open={dupOpen} onOpenChange={setDupOpen}>
           <DialogContent>
@@ -177,92 +151,88 @@ export function CustomerForm({
             </DialogHeader>
           </DialogContent>
         </Dialog>
-        {isLoading ? (
-          <div>Loading...</div>
-        ) : (
-          <FormProvider {...form}>
-            <form
-              id='customerForm'
-              onSubmit={e => {
-                e.preventDefault()
-                e.stopPropagation()
-                form.handleSubmit(onSubmit)()
-              }}
-            >
-              <FormField
-                control={form.control}
-                name='name'
-                render={({ field }) => (
-                  <InputItem
-                    name={'Name*'}
-                    placeholder={'Name of the customer'}
-                    field={field}
-                  />
-                )}
-              />
-              <FormField
-                control={form.control}
-                name='email'
-                render={({ field }) => <EmailInput field={field} />}
-              />
-              <FormField
-                control={form.control}
-                name='phone'
-                render={({ field }) => <PhoneInput field={field} />}
-              />
-
-              <AddressInput form={form} field='address' type='billing' />
-              <FormField
-                control={form.control}
-                name='source'
-                render={({ field }) => (
-                  <SelectInput field={field} options={sourceOptions} name='Source' />
-                )}
-              />
-              <div className='flex items-center space-x-2 my-2'>
-                <FormField
-                  control={form.control}
-                  name='builder'
-                  render={({ field }) => (
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={value => {
-                        field.onChange(value)
-                        if (!value) {
-                          form.setValue('company_name', '')
-                        }
-                      }}
-                      id='builder_switch'
-                      label='Builder'
-                      className=''
-                    />
-                  )}
-                />
-              </div>
-              {form.watch('builder') && (
+        <FormProvider {...form}>
+          <form
+            id='customerForm'
+            onSubmit={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              form.handleSubmit(onSubmit)()
+            }}
+          >
+            <FormField
+              control={form.control}
+              name='name'
+              render={({ field }) => (
                 <InputItem
-                  name='Company Name'
-                  placeholder='Company Name'
-                  field={form.register('company_name')}
+                  name={'Name*'}
+                  placeholder={'Name of the customer'}
+                  field={field}
                 />
               )}
+            />
+            <FormField
+              control={form.control}
+              name='email'
+              render={({ field }) => <EmailInput field={field} />}
+            />
+            <FormField
+              control={form.control}
+              name='phone'
+              render={({ field }) => <PhoneInput field={field} />}
+            />
+
+            <AddressInput form={form} field='address' type='billing' />
+            <FormField
+              control={form.control}
+              name='source'
+              render={({ field }) => (
+                <SelectInput field={field} options={sourceOptions} name='Source' />
+              )}
+            />
+            <div className='flex items-center space-x-2 my-2'>
               <FormField
                 control={form.control}
-                name='your_message'
+                name='builder'
                 render={({ field }) => (
-                  <Textarea
-                    {...field}
-                    value={(field.value as string) ?? ''}
-                    name='Notes'
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={value => {
+                      field.onChange(value)
+                      if (!value) {
+                        form.setValue('company_name', '')
+                      }
+                    }}
+                    id='builder_switch'
+                    label='Builder'
+                    className=''
                   />
                 )}
               />
-              <DialogFooter>
-                <LoadingButton loading={isPending}>Submit</LoadingButton>
-              </DialogFooter>
-            </form>
-          </FormProvider>
-        )}
+            </div>
+            {form.watch('builder') && (
+              <InputItem
+                name='Company Name'
+                placeholder='Company Name'
+                field={form.register('company_name')}
+              />
+            )}
+            <FormField
+              control={form.control}
+              name='your_message'
+              render={({ field }) => (
+                <Textarea
+                  {...field}
+                  value={(field.value as string) ?? ''}
+                  name='Notes'
+                />
+              )}
+            />
+            <DialogFooter>
+              <LoadingButton loading={isPending}>Submit</LoadingButton>
+            </DialogFooter>
+          </form>
+        </FormProvider>
       </DialogContent>
     </Dialog>
   )
