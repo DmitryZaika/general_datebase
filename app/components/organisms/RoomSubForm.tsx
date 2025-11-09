@@ -108,10 +108,28 @@ export const RoomSubForm = ({
   const [stone, setStone] = useState<StoneSlim | undefined>()
 
   useEffect(() => {
+    let isMounted = true
+
     if (slabIds.length > 0) {
-      getStone(slabIds[0]).then(setStone)
+      getStone(slabIds[0]).then((stone) => {
+        if (isMounted) setStone(stone)
+      })
+    } else {
+      // If current room has no slabs, try to get stone from first room
+      const allRooms = form.getValues('rooms')
+      const firstRoomWithSlabs = allRooms.find(room => room.slabs.length > 0)
+      if (firstRoomWithSlabs && firstRoomWithSlabs.slabs.length > 0) {
+        getStone(firstRoomWithSlabs.slabs[0].id).then((stone) => {
+          if (isMounted) setStone(stone)
+        })
+      }
     }
-  }, [JSON.stringify(slabIds)])
+
+    return () => {
+      isMounted = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slabIds.length, slabIds[0]])
 
   const { data: slabMap } = useQuery({
     queryKey: ['slabMap', slabIds],
