@@ -4,6 +4,7 @@ import * as React from 'react'
 import {
   type ActionFunctionArgs,
   Form,
+  Link,
   type LoaderFunctionArgs,
   redirect,
   type SubmitFunction,
@@ -446,7 +447,10 @@ function useManualQuestion(
   const [editedQuestionText, setEditedQuestionText] = React.useState('')
   const [editedChoices, setEditedChoices] = React.useState<
     { id: number | null; text: string; is_correct: boolean; is_deleted?: boolean }[]
-  >([])
+  >([
+    { id: -1, text: '', is_correct: false },
+    { id: -2, text: '', is_correct: false },
+  ])
   const [correctAnswerId, setCorrectAnswerId] = React.useState<number | null>(null)
 
   const handleQuestionTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1442,10 +1446,32 @@ export default function TeachMode() {
         </div>
       ))}
 
+      {/* ---------- ACTION BAR + MANUAL EDITOR ---------- */}
       <div style={{ marginTop: 20, marginBottom: 20 }}>
-        <Button onClick={() => setShowManualEntry(!showManualEntry)}>
-          {showManualEntry ? 'Cancel Manual Entry' : 'Add Manual Question'}
-        </Button>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 16,
+            alignItems: 'center',
+            marginBottom: showManualEntry ? 16 : 0,
+          }}
+        >
+          <Button onClick={() => setShowManualEntry(!showManualEntry)}>
+            {showManualEntry ? 'Cancel Manual Entry' : 'Add Manual Question'}
+          </Button>
+
+          <Link
+            to='/admin/employee-progress'
+            style={{ textDecoration: 'none' }}
+            onClick={() => console.log('Checking Progress')}
+          >
+            <Button variant='outline' style={{ width: '100%' }}>
+              View Employee Progress
+            </Button>
+          </Link>
+        </div>
+
         {showManualEntry && (
           <ManualQuestionEntry
             submit={submit}
