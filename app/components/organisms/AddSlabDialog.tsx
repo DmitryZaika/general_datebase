@@ -54,12 +54,14 @@ export const AddSlabDialog = ({
   type SlabState = { id: number; bundle: string } | undefined
   const [selectedSlab, setSelectedSlab] = useState<SlabState>()
 
-  const allRooms = form.watch('rooms')
-  const addedSlabIds = allRooms.flatMap(room => room.slabs.map(slab => slab.id))
+  // Only exclude slabs that are already in the CURRENT room
+  // Allow the same slab to be selected for different rooms
+  const currentRoomSlabs = form.watch(`rooms.${roomIndex}.slabs`)
+  const currentRoomSlabIds = currentRoomSlabs.map(slab => slab.id)
 
   const { data = [] } = useQuery({
-    queryKey: ['slabs', stoneId, addedSlabIds],
-    queryFn: () => getSlabs(stoneId, addedSlabIds),
+    queryKey: ['slabs', stoneId, JSON.stringify(currentRoomSlabIds)],
+    queryFn: () => getSlabs(stoneId, currentRoomSlabIds),
     enabled: !!stoneId && show,
   })
 
@@ -74,6 +76,7 @@ export const AddSlabDialog = ({
         is_full: false,
       },
     ])
+    setSelectedSlab(undefined)
     setShow(false)
   }
 
