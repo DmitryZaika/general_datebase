@@ -1,7 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { Suspense } from 'react'
-import { Button } from '~/components/ui/button'
-import { FormItem, FormLabel, FormMessage } from '~/components/ui/form'
+"use client";
+import React, { Suspense, useEffect } from 'react';
+import SignatureCanvas from 'react-signature-canvas';
+import { Button } from '~/components/ui/button';
+import { FormItem, FormLabel, FormMessage } from '~/components/ui/form';
 
 interface RHFField {
   onChange: (value: unknown) => void
@@ -10,7 +11,8 @@ interface RHFField {
 
 export interface SigRef {
   isEmpty: () => boolean
-  getTrimmedCanvas: () => { toDataURL: (format: string) => string }
+  getCanvas: () => { toDataURL: (format: string) => string }
+  fromDataURL: (base64String: string, options: any) => void
   clear: () => void
 }
 
@@ -20,52 +22,13 @@ interface Props {
   sigRef: React.RefObject<SigRef | null>
 }
 
-interface ModType {
-  default:
-    | React.ComponentType<{
-        ref: React.RefObject<unknown>
-        penColor: string
-        backgroundColor: string
-        canvasProps: { width: number; height: number; className: string }
-        onEnd: () => void
-      }>
-    | {
-        SignatureCanvas: React.LazyExoticComponent<
-          React.ComponentType<{
-            ref: React.RefObject<unknown>
-            penColor: string
-            backgroundColor: string
-            canvasProps: { width: number; height: number; className: string }
-            onEnd: () => void
-          }>
-        >
-      }
-  SignatureCanvas: React.ComponentType<{
-    ref: React.RefObject<unknown>
-    penColor: string
-    backgroundColor: string
-    canvasProps: { width: number; height: number; className: string }
-    onEnd: () => void
-  }>
-}
-
-const SigCanvasLazy = React.lazy(() =>
-  import('react-signature-canvas').then((mod: ModType) => {
-    const C =
-      typeof mod.default === 'function'
-        ? mod.default
-        : typeof mod.SignatureCanvas === 'function'
-          ? mod.SignatureCanvas
-          : (mod.default?.SignatureCanvas ?? mod)
-    return { default: C }
-  }),
-)
-
 export const SignatureInput = ({ field, name = 'Signature', sigRef }: Props) => {
   const handleEnd = () => {
-    const url = sigRef.current?.isEmpty()
-      ? ''
-      : sigRef.current?.getTrimmedCanvas().toDataURL('image/png')
+    if (sigRef.current?.isEmpty()) {
+      field.onChange('')
+      return
+    }
+    const url = sigRef.current?.getCanvas().toDataURL('image/png')
     field.onChange(url)
   }
 
@@ -74,26 +37,27 @@ export const SignatureInput = ({ field, name = 'Signature', sigRef }: Props) => 
     field.onChange('')
   }
 
+  useEffect(() => {
+    if (field.value && sigRef.current?.isEmpty() && typeof field.value === 'string') {
+      sigRef.current?.fromDataURL(field.value, {width: 500, height: 150})
+    }
+  }, [field.value, sigRef.current])
+
   return (
     <FormItem>
       <FormLabel>{name}</FormLabel>
       <div className='border rounded-md h-[150px] w-full flex items-center justify-center bg-white'>
-        {typeof window !== 'undefined' ? (
-          <Suspense fallback={<span className='text-sm text-gray-400'>Loading…</span>}>
-            {/* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */}
-            {(() => {
-              return (
-                <SigCanvasLazy
-                  ref={sigRef}
-                  penColor='black'
-                  backgroundColor='transparent'
-                  canvasProps={{ width: 500, height: 150, className: 'w-full' }}
-                  onEnd={handleEnd}
-                />
-              )
-            })()}
+        {typeof window === 'undefined' ? <span className='text-sm text-gray-400'>Loading…</span> : (
+          <Suspense fallback={<span className='text-sm text-gray-400'>Loading…</span>}> 
+        <SignatureCanvas
+            ref={sigRef}
+            penColor='black'
+            backgroundColor='transparent'
+            canvasProps={{ width: 500, height: 150, className: 'w-full' }}
+            onEnd={handleEnd}
+          />
           </Suspense>
-        ) : null}
+        )}
       </div>
       <Button
         type='button'
