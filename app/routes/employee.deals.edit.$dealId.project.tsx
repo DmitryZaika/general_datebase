@@ -20,7 +20,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     `SELECT c.name, c.email, c.phone, c.address, c.city, c.state, c.postal_code, c.company_name,
             c.remodal_type, c.project_size, c.contact_time, c.remove_and_dispose, c.improve_offer, c.sink,
             c.when_start, c.details, c.compaign_name, c.adset_name, c.ad_name, c.backsplash, c.kitchen_stove,
-            c.your_message, c.attached_file, c.qbo_id, c.notes
+            c.your_message, c.attached_file, c.qbo_id, c.notes, c.source
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
       WHERE d.id = ? AND c.company_id = ?`,

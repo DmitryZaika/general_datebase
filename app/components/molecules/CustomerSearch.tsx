@@ -59,7 +59,6 @@ const fetchCustomers = async (customerName: string, searchType: SelectOption) =>
 
 async function fetchCustomerById(customerId: number): Promise<Customer | null> {
   const res = await fetch(`/api/customers/${customerId}`)
-  console.log(res.json())
   if (!res.ok) return null
   const json = await res.json()
   return json.customer
