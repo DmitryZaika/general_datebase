@@ -22,13 +22,13 @@ import {
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { faucetSchema } from '~/schemas/faucets'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { FAUCET_TYPES } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 import { useCustomForm } from '~/utils/useCustomForm'
 import { FormField } from '../components/ui/form'
 
@@ -51,7 +51,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const user = await getAdminUser(request)
   try {
     await db.execute<mysql.ResultSetHeader>(
-      `INSERT INTO faucet_type (name, type, url, company_id, is_display, is_deleted, supplier_id, retail_price, cost) 
+      `INSERT INTO faucet_type (name, type, url, company_id, is_display, is_deleted, supplier_id, retail_price, cost)
          VALUES (?, ?, ?, ?, ?, false, ?, ?, ?);`,
       [
         data.name,

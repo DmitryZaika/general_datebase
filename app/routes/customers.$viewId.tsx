@@ -13,10 +13,10 @@ import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { getStripe } from '~/utils/getStripe'
 import { selectMany } from '~/utils/queryHelpers'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 const paramsSchema = z.object({
   viewId: z.string().uuid('View ID must be a valid UUID'),
@@ -40,7 +40,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const sales = await selectMany<Sale>(
     db,
-    `SELECT 
+    `SELECT
             s.id,
             s.sale_date,
             s.price,

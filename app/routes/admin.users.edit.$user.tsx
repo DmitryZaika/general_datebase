@@ -36,11 +36,11 @@ import {
 import { POSITIONS } from '~/constants/positions'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 const userschema = z.object({
   name: z.string().min(1),

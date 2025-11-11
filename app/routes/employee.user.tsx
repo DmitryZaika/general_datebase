@@ -21,11 +21,11 @@ import { Button } from '~/components/ui/button'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { getQboUrl } from '~/utils/quickbooks.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 const userSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -184,7 +184,7 @@ export default function UserProfile() {
           <TelegramLink email={userData.email} />
         )}
         <h2 className='text-xl font-semibold mb-4'>Personal Information</h2>
-        {/* 
+        {/*
         {data ? (
           <p>Logged into: {data?.CompanyInfo?.CompanyName}</p>
         ) : (

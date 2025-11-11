@@ -29,11 +29,11 @@ import { FormField, FormProvider } from '~/components/ui/form'
 import { Switch } from '~/components/ui/switch'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 interface SaleDetails {
   id: number
@@ -114,11 +114,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     if (data.sink) {
       const [availableSinks] = await db.execute<RowDataPacket[]>(
-        `SELECT s.id, st.retail_price 
+        `SELECT s.id, st.retail_price
          FROM sinks s
          JOIN sink_type st ON s.sink_type_id = st.id
-         WHERE st.id = ? 
-         AND s.sale_id IS NULL 
+         WHERE st.id = ?
+         AND s.sale_id IS NULL
          AND s.is_deleted = 0
          LIMIT 1`,
         [data.sink],
@@ -171,8 +171,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       } else {
         // If not selling the full slab, create a copy of the slab
         await db.execute<ResultSetHeader>(
-          `INSERT INTO slab_inventory 
-           (stone_id, bundle, length, width, url, parent_id, notes, square_feet, sale_id) 
+          `INSERT INTO slab_inventory
+           (stone_id, bundle, length, width, url, parent_id, notes, square_feet, sale_id)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             slabCheck[0].stone_id,
@@ -222,8 +222,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }>(
       db,
       `SELECT s.id, c.name as customer_name, s.sale_date
-       FROM sales s 
-       JOIN customers c ON s.customer_id = c.id 
+       FROM sales s
+       JOIN customers c ON s.customer_id = c.id
        WHERE s.id = ?`,
       parseInt(saleId, 10),
     )
@@ -268,14 +268,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
     const sinks = await selectMany<Sink>(
       db,
-      `SELECT DISTINCT st.id, st.name, st.type 
+      `SELECT DISTINCT st.id, st.name, st.type
        FROM sink_type st
        WHERE st.company_id = ?
        AND EXISTS (
-         SELECT 1 
-         FROM sinks s 
+         SELECT 1
+         FROM sinks s
          WHERE s.sink_type_id = st.id
-         AND s.slab_id IS NULL 
+         AND s.slab_id IS NULL
          AND s.is_deleted = 0
        )
        ORDER BY st.name ASC`,

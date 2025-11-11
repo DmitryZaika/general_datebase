@@ -1,13 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
-import {
-  Form,
-  redirect,
-  useLoaderData,
-  type LoaderFunctionArgs
-} from 'react-router'
-import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
+import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SignatureInput, type SigRef } from '~/components/molecules/SignatureInput'
@@ -15,10 +9,9 @@ import { AddressInput } from '~/components/organisms/AddressInput'
 import { Checkbox } from '~/components/ui/checkbox'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
-import { ChecklistFormData, checklistResolver } from '~/schemas/checklist'
+import { useToast } from '~/hooks/use-toast'
+import { type ChecklistFormData, checklistResolver } from '~/schemas/checklist'
 import { getEmployeeUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
-
 
 // Static checklist labels mapped to form keys (defined after FormData type)
 const checklistItems: Array<[keyof ChecklistFormData, string]> = [
@@ -52,33 +45,38 @@ const submitChecklist = async (formData: ChecklistFormData, companyId: number) =
     method: 'POST',
     body: JSON.stringify(formData),
   })
-  return response.json()
+  if (!response.ok) throw Error(`Invalid status code: ${response.status}`)
+  const data = await response.json()
+  if ('errors' in data) {
+    throw Error(data.errors)
+  }
+  return data
 }
 
 const defaultValues: ChecklistFormData = {
-    customer_name: '',
-    customer_id: null,
-    installation_address: '',
-    material_correct: '',
-    seams_satisfaction: '',
-    appliances_fit: '',
-    backsplashes_correct: '',
-    edges_correct: '',
-    holes_drilled: '',
-    cleanup_completed: '',
-    comments: '',
-    signature: '',
-  }
+  customer_name: '',
+  customer_id: null,
+  installation_address: '',
+  material_correct: '',
+  seams_satisfaction: '',
+  appliances_fit: '',
+  backsplashes_correct: '',
+  edges_correct: '',
+  holes_drilled: '',
+  cleanup_completed: '',
+  comments: '',
+  signature: '',
+}
 
 export default function AdminChecklists() {
   const sigRef = useRef<SigRef>(null)
   const { companyId } = useLoaderData<{ companyId: number }>()
-  const form = useForm<ChecklistFormData>({  
+  const form = useForm<ChecklistFormData>({
     resolver: checklistResolver,
-    defaultValues
+    defaultValues,
   })
   const localStorageLockedRef = useRef<boolean>(false)
-
+  const { toast } = useToast()
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (data: ChecklistFormData) => {
@@ -89,8 +87,19 @@ export default function AdminChecklists() {
       localStorage.setItem('checklistData', JSON.stringify(defaultValues))
       form.reset(defaultValues)
       sigRef.current?.clear()
-      toastData('Success', 'Checklist saved to database')
-      },
+      toast({
+        title: 'Success',
+        description: 'Checklist saved to database',
+        variant: 'success',
+      })
+    },
+    onError: () => {
+      toast({
+        title: 'Failure',
+        description: 'Checklist could not be saved to database',
+        variant: 'destructive',
+      })
+    },
   })
 
   useEffect(() => {
@@ -99,7 +108,6 @@ export default function AdminChecklists() {
       form.reset(JSON.parse(savedData))
     }
   }, [])
-
 
   const watchValues = form.watch()
 
@@ -117,12 +125,15 @@ export default function AdminChecklists() {
     mutate(data)
   }
 
-
   return (
     <div className='flex justify-center py-10'>
       <div className='w-full max-w-xl border rounded-md bg-white p-8 shadow-sm'>
         <img
-          src={companyId === 1 ? 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo.png.png' : 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/photo_2025-11-03_17-53-06.jpg'}
+          src={
+            companyId === 1
+              ? 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo.png.png'
+              : 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/photo_2025-11-03_17-53-06.jpg'
+          }
           alt='Logo'
           className='mx-auto mb-4 h-46 object-contain'
         />
@@ -130,8 +141,13 @@ export default function AdminChecklists() {
           Post-installation check list
         </h1>
         <FormProvider {...form}>
-          <Form method='post' onSubmit={form.handleSubmit(handleSubmit)} >
-          <AuthenticityTokenInput />
+          <form
+            method='post'
+            onSubmit={e => {
+              e.preventDefault()
+              form.handleSubmit(handleSubmit)(e)
+            }}
+          >
             {/* <CustomerSearch
               onCustomerChange={value => form.setValue('customer_id', value ?? null)}
               selectedCustomer={form.watch('customer_id') ?? undefined}
@@ -183,7 +199,6 @@ export default function AdminChecklists() {
               )}
             />
 
-            {/* Signature canvas */}
             <FormField
               control={form.control}
               name='signature'
@@ -198,8 +213,7 @@ export default function AdminChecklists() {
             <div className='mt-6 flex justify-center'>
               <LoadingButton loading={isPending}>Submit</LoadingButton>
             </div>
-          </Form>
-      
+          </form>
         </FormProvider>
       </div>
     </div>

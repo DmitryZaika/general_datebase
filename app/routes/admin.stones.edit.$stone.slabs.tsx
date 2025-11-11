@@ -28,14 +28,14 @@ import {
 import { FormField } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
 import { printAllSlabsQRCodes, type SlabData } from '~/utils/slabQRCode'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 import { useCustomOptionalForm } from '~/utils/useCustomForm'
 
 // Form schema
@@ -224,7 +224,7 @@ function LinkSlabsDialog({
   linkedStoneIds,
   reverseLinkedStoneIds,
   isOpen,
-  onClose
+  onClose,
 }: LinkSlabsDialogProps) {
   const [selectedStoneId, setSelectedStoneId] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -240,7 +240,11 @@ function LinkSlabsDialog({
   }, [isOpen])
 
   useEffect(() => {
-    if (actionData?.success && actionData?.action === 'link_slabs' && navigation.state === 'idle') {
+    if (
+      actionData?.success &&
+      actionData?.action === 'link_slabs' &&
+      navigation.state === 'idle'
+    ) {
       onClose()
     }
   }, [actionData, navigation.state, onClose])
@@ -627,7 +631,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       if (unlinkSourceId) {
         await db.execute(
-          `DELETE FROM stone_slab_links 
+          `DELETE FROM stone_slab_links
            WHERE stone_id = ? AND source_stone_id = ?`,
           [stoneId, unlinkSourceId],
         )
@@ -838,8 +842,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     source_stone_name: string
   }>(
     db,
-    `SELECT 
-         stone_slab_links.source_stone_id, 
+    `SELECT
+         stone_slab_links.source_stone_id,
          s.name as source_stone_name
        FROM stone_slab_links
        JOIN stones s ON stone_slab_links.source_stone_id = s.id
@@ -859,9 +863,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       length: number
     }>(
       db,
-      `SELECT 
+      `SELECT
            id, bundle, url, width, length
-         FROM slab_inventory 
+         FROM slab_inventory
          WHERE stone_id = ? AND cut_date IS NULL`,
       [link.source_stone_id],
     )
@@ -885,8 +889,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 // Main component
 export default function EditStoneSlabs() {
-  const { slabs, stone, allStones, linkedSlabs, linkedStoneIds, reverseLinkedStoneIds } =
-    useLoaderData<typeof loader>()
+  const {
+    slabs,
+    stone,
+    allStones,
+    linkedSlabs,
+    linkedStoneIds,
+    reverseLinkedStoneIds,
+  } = useLoaderData<typeof loader>()
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)

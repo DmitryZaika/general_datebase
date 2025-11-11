@@ -28,7 +28,7 @@ import {
 import { Label } from '~/components/ui/label'
 import { useToast } from '~/hooks/use-toast'
 import { createCustomerMutation, sourceEnum } from '~/schemas/customers'
-import { getSession } from '~/sessions'
+import { getSession } from '~/sessions.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import {
   FormControl,

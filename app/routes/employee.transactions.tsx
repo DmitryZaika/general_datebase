@@ -41,10 +41,10 @@ import {
 } from '~/components/ui/select'
 import { Switch } from '~/components/ui/switch'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 interface Transaction {
   id: number
@@ -95,7 +95,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const status = url.searchParams.get('status') || 'in_progress'
 
     let query = `
-      SELECT 
+      SELECT
         s.id,
         s.sale_date,
         c.name as customer_name,
@@ -110,11 +110,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         MAX(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as any_cut,
         COUNT(si.id) as total_slabs,
         SUM(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as cut_slabs
-      FROM 
+      FROM
         sales s
-      JOIN 
+      JOIN
         customers c ON s.customer_id = c.id
-      JOIN 
+      JOIN
         users u ON s.seller_id = u.id
       LEFT JOIN
         slab_inventory si ON s.id = si.sale_id
@@ -151,7 +151,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     query += `
       GROUP BY
         s.id, s.sale_date, c.name, u.name
-      ORDER BY 
+      ORDER BY
         s.sale_date DESC
     `
 
@@ -164,31 +164,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const sinkDetails = await selectMany<SinkInfo>(
       db,
-      `SELECT 
-         sales.id as sale_id, 
+      `SELECT
+         sales.id as sale_id,
          GROUP_CONCAT(st.name SEPARATOR ', ') as sink_types
-       FROM 
-         sales 
-       JOIN 
+       FROM
+         sales
+       JOIN
          slab_inventory si ON sales.id = si.sale_id
-       JOIN 
+       JOIN
          sinks sk ON si.id = sk.slab_id
-       JOIN 
+       JOIN
          sink_type st ON sk.sink_type_id = st.id
        WHERE
          sales.company_id = ?
-       GROUP BY 
+       GROUP BY
          sales.id
-       ORDER BY 
+       ORDER BY
          sales.id`,
       [companyId],
     )
 
     const allSalesReps = await selectMany<{ name: string }>(
       db,
-      `SELECT DISTINCT users.name 
-       FROM users 
-       JOIN sales ON users.id = sales.seller_id 
+      `SELECT DISTINCT users.name
+       FROM users
+       JOIN sales ON users.id = sales.seller_id
        WHERE sales.company_id = ?`,
       [companyId],
     )

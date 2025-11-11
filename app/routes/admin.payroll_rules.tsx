@@ -13,10 +13,10 @@ import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { PageLayout } from '~/components/PageLayout'
 import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 interface PayrollRule {
   id: number
@@ -35,16 +35,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const companyId = user.company_id
 
     const query = `
-      SELECT 
-        id, 
+      SELECT
+        id,
         name,
         amount,
         type
-      FROM 
+      FROM
         payroll
       WHERE
         company_id = ?
-      ORDER BY 
+      ORDER BY
         name ASC
     `
 

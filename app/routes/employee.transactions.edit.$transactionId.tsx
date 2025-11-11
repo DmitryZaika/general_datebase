@@ -15,7 +15,7 @@ import {
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import { forceRedirectError } from '~/utils/toastHelpers'
+import { forceRedirectError } from '~/utils/toastHelpers.server'
 
 interface SaleDetails {
   id: number
@@ -92,8 +92,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const sales = await selectMany<SaleDetails>(
     db,
-    `SELECT 
-      s.id, s.customer_id, c.name as customer_name, 
+    `SELECT
+      s.id, s.customer_id, c.name as customer_name,
       s.sale_date, s.seller_id, u.name as seller_name
      FROM sales s
      JOIN customers c ON s.customer_id = c.id
@@ -113,8 +113,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const slabs = await selectMany<SaleSlab>(
     db,
-    `SELECT 
-      slab_inventory.id, slab_inventory.stone_id, slab_inventory.bundle, stones.name as stone_name, 
+    `SELECT
+      slab_inventory.id, slab_inventory.stone_id, slab_inventory.bundle, stones.name as stone_name,
       slab_inventory.cut_date, slab_inventory.notes, slab_inventory.square_feet
      FROM slab_inventory
      JOIN stones ON slab_inventory.stone_id = stones.id
@@ -125,7 +125,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const sinks = await selectMany<SaleSink>(
     db,
-    `SELECT 
+    `SELECT
       sinks.id, sinks.sink_type_id, sink_type.name, sinks.price, sinks.is_deleted
      FROM sinks
      JOIN sink_type ON sinks.sink_type_id = sink_type.id

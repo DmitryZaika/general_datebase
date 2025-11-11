@@ -28,10 +28,10 @@ import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { cn } from '~/lib/utils'
 import { sourceEnum } from '~/schemas/customers'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getMarketingUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 const leadSchema = z.object({
   name: z.string().min(1, 'Name is required'),
