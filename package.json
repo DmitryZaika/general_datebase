@@ -88,6 +88,7 @@
     "remix-hook-form": "^6.1.0",
     "remix-utils": "^8.1.0",
     "shadcn": "^2.4.0-canary.10",
+    "sharp": "^0.34.5",
     "stripe": "^18.2.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",

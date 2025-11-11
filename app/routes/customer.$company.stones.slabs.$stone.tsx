@@ -7,9 +7,9 @@ import {
 } from 'react-router'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '~/components/ui/dialog'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 interface Slab {
   id: number

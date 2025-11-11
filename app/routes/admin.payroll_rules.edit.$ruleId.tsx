@@ -27,10 +27,10 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 interface PayrollRule {
   id: number
@@ -125,8 +125,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     // Update the payroll rule
     await db.execute(
-      `UPDATE payroll 
-       SET name = ?, amount = ?, type = ? 
+      `UPDATE payroll
+       SET name = ?, amount = ?, type = ?
        WHERE id = ? AND company_id = ?`,
       [name, amount, type, ruleId, user.company_id],
     )

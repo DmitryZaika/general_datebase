@@ -30,11 +30,11 @@ import {
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 interface SaleDetails {
   id: number
@@ -131,8 +131,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const sales = await selectMany<SaleDetails>(
     db,
-    `SELECT 
-        s.id, s.customer_id, c.name as customer_name, 
+    `SELECT
+        s.id, s.customer_id, c.name as customer_name,
         s.sale_date, s.seller_id, u.name as seller_name
        FROM sales s
        JOIN customers c ON s.customer_id = c.id
@@ -152,8 +152,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const slabs = await selectMany<SaleSlab>(
     db,
-    `SELECT 
-        slab_inventory.id, slab_inventory.stone_id, slab_inventory.bundle, stones.name as stone_name, 
+    `SELECT
+        slab_inventory.id, slab_inventory.stone_id, slab_inventory.bundle, stones.name as stone_name,
         slab_inventory.cut_date, slab_inventory.notes, slab_inventory.square_feet
        FROM slab_inventory
        JOIN stones ON slab_inventory.stone_id = stones.id
@@ -164,7 +164,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const sinks = await selectMany<SaleSink>(
     db,
-    `SELECT 
+    `SELECT
         sinks.id, sinks.sink_type_id, sink_type.name, sinks.price, sinks.is_deleted
        FROM sinks
        JOIN sink_type ON sinks.sink_type_id = sink_type.id
@@ -179,9 +179,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     `SELECT id, name, type, retail_price
        FROM sink_type
        WHERE company_id = ? AND EXISTS (
-           SELECT 1 
-           FROM sinks 
-           WHERE sinks.sink_type_id = sink_type.id 
+           SELECT 1
+           FROM sinks
+           WHERE sinks.sink_type_id = sink_type.id
            AND sinks.is_deleted = 0
        )
        ORDER BY name ASC`,
@@ -194,11 +194,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     position_id: number
   }>(
     db,
-    `SELECT DISTINCT u.id, u.name, up.position_id 
-     FROM users u 
-     JOIN users_positions up ON u.id = up.user_id 
+    `SELECT DISTINCT u.id, u.name, up.position_id
+     FROM users u
+     JOIN users_positions up ON u.id = up.user_id
      WHERE u.is_deleted = 0
-     WHERE u.company_id = ? AND up.position_id IN (1, 2, 5) 
+     WHERE u.company_id = ? AND up.position_id IN (1, 2, 5)
      ORDER BY u.name ASC`,
     [user.company_id],
   )
@@ -291,9 +291,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
           // Delete all unsold slabs with the same bundle in the same stone
           await db.execute(
-            `DELETE FROM slab_inventory 
-               WHERE bundle = ? 
-               AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '') 
+            `DELETE FROM slab_inventory
+               WHERE bundle = ?
+               AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '')
                AND stone_id = ?`,
             [bundle, stoneId],
           )
@@ -302,8 +302,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       // Unsell remaining slabs
       await db.execute(
-        `UPDATE slab_inventory 
-           SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL 
+        `UPDATE slab_inventory
+           SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL
            WHERE sale_id = ?`,
         [saleId],
       )
@@ -318,14 +318,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const slabIdList = slabIdsForSinks.map(row => row.id)
         for (const slabId of slabIdList) {
           await db.execute(
-            `UPDATE sinks 
-             SET slab_id = NULL, price = NULL, is_deleted = 0 
+            `UPDATE sinks
+             SET slab_id = NULL, price = NULL, is_deleted = 0
              WHERE slab_id = ?`,
             [slabId],
           )
           await db.execute(
-            `UPDATE faucets 
-             SET slab_id = NULL, price = NULL, is_deleted = 0 
+            `UPDATE faucets
+             SET slab_id = NULL, price = NULL, is_deleted = 0
              WHERE slab_id = ?`,
             [slabId],
           )
@@ -422,8 +422,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const notes = formData.get('notes') as string
       const squareFeet = parseFloat(formData.get('square_feet') as string) || null
       await db.execute(
-        `UPDATE slab_inventory 
-           SET notes = ?, square_feet = ? 
+        `UPDATE slab_inventory
+           SET notes = ?, square_feet = ?
            WHERE id = ?`,
         [notes, squareFeet, slabId],
       )

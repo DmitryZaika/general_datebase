@@ -8,12 +8,12 @@ import {
 } from 'react-router'
 import { DeleteRow } from '~/components/pages/DeleteRow'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { selectId } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
@@ -40,16 +40,10 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
 
   // Delete all slab links where this stone is used as source
-  await db.execute(
-    `DELETE FROM stone_slab_links WHERE source_stone_id = ?`,
-    [stoneId],
-  )
+  await db.execute(`DELETE FROM stone_slab_links WHERE source_stone_id = ?`, [stoneId])
 
   // Delete all slab links where this stone is the target
-  await db.execute(
-    `DELETE FROM stone_slab_links WHERE stone_id = ?`,
-    [stoneId],
-  )
+  await db.execute(`DELETE FROM stone_slab_links WHERE stone_id = ?`, [stoneId])
 
   // Get all slab images that need to be deleted from S3
   const slabsResult = await db.execute(
@@ -68,10 +62,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
 
   // Delete all slabs belonging to this stone
-  await db.execute(
-    `DELETE FROM slab_inventory WHERE stone_id = ?`,
-    [stoneId],
-  )
+  await db.execute(`DELETE FROM slab_inventory WHERE stone_id = ?`, [stoneId])
 
   // Delete the stone itself
   await db.execute(`DELETE FROM stones WHERE id = ?`, [stoneId])

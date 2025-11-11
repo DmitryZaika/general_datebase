@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 import type { RowDataPacket } from 'mysql2'
 import { v4 as uuidv4 } from 'uuid'
 import { db } from '~/db.server'
-import { getSession } from '~/sessions'
+import { getSession } from '~/sessions.server'
 
 interface LoginUser {
   id: number

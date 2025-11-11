@@ -22,12 +22,12 @@ import {
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { sinkSchema } from '~/schemas/sinks'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 import { useCustomForm } from '~/utils/useCustomForm'
 import { FormField } from '../components/ui/form'
 
@@ -50,7 +50,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const user = await getAdminUser(request)
   try {
     await db.execute<mysql.ResultSetHeader>(
-      `INSERT INTO sink_type (name, type, url, company_id, is_display, is_deleted, supplier_id, width, length, depth, retail_price, cost) 
+      `INSERT INTO sink_type (name, type, url, company_id, is_display, is_deleted, supplier_id, width, length, depth, retail_price, cost)
          VALUES (?, ?, ?, ?, ?, false, ?, ?, ?, 0, ?, ?);`,
       [
         data.name,

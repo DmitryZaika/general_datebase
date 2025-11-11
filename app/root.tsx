@@ -19,6 +19,7 @@ import { EmployeeSidebar } from '~/components/molecules/Sidebars/EmployeeSidebar
 import { SidebarProvider } from '~/components/ui/sidebar'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
+import { useToast } from '~/hooks/use-toast'
 import type { ISupplier } from '~/schemas/suppliers'
 import { csrf } from '~/utils/csrf.server'
 import { getBase } from '~/utils/urlHelpers'
@@ -27,13 +28,12 @@ import { Chat } from './components/organisms/Chat'
 import { MarketingHeader } from './components/organisms/MarketingHeader'
 import { SidebarToggle } from './components/SidebarToggle'
 import { Toaster } from './components/ui/toaster'
-import { useToast } from './hooks/use-toast'
-import { commitSession, getSession } from './sessions'
+import { commitSession, getSession } from './sessions.server'
 import './tailwind.css'
-import { queryClient } from './utils/api'
-import { selectId, selectMany } from './utils/queryHelpers'
-import { getUserBySessionId } from './utils/session.server'
-import type { ToastMessage } from './utils/toastHelpers'
+import { queryClient } from '~/utils/api'
+import { selectId, selectMany } from '~/utils/queryHelpers'
+import { getUserBySessionId } from '~/utils/session.server'
+import type { ToastMessage } from '~/utils/toastHelpers.server'
 
 export const links: LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -149,7 +149,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const hasCheckIn = Array.isArray(rows) && rows.some(r => r.position === 'check-in')
     const hasExternalMarketing =
       Array.isArray(rows) && rows.some(r => r.position === 'external_marketing')
-    const hasInstaller = Array.isArray(rows) && rows.some(r => r.position === 'installer')
+    const hasInstaller =
+      Array.isArray(rows) && rows.some(r => r.position === 'installer')
     position = hasCheckIn
       ? 'check-in'
       : hasExternalMarketing

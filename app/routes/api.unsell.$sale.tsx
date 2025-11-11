@@ -2,7 +2,7 @@ import { type ActionFunctionArgs, data } from 'react-router'
 
 import { Contract } from '~/orm/contract'
 import { getEmployeeUser } from '~/utils/session.server'
-import { forceRedirectError } from '~/utils/toastHelpers'
+import { forceRedirectError } from '~/utils/toastHelpers.server'
 
 export async function action({ params, request }: ActionFunctionArgs) {
   await getEmployeeUser(request)

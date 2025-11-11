@@ -10,11 +10,11 @@ import { getValidatedFormData } from 'remix-hook-form'
 import { ContractForm } from '~/components/pages/ContractForm'
 import { Contract } from '~/orm/contract'
 import { customerSchema, type TCustomerSchema } from '~/schemas/sales'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { getCustomerSchemaFromSaleId } from '~/utils/contractsBackend.server'
 import { csrf } from '~/utils/csrf.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 const resolver = zodResolver(customerSchema)
 

@@ -25,11 +25,11 @@ import DealsList from '~/components/DealsList'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 type FullDeal = DealsDialogSchema & {
   id: number

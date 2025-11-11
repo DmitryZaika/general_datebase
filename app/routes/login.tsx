@@ -19,7 +19,7 @@ import { DialogFooter } from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { Positions } from '~/types'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -29,7 +29,7 @@ import {
   login,
   type SessionUser,
 } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 const userSchema = z.object({
   email: z.string().email(),

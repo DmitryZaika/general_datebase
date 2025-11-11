@@ -21,11 +21,11 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 interface SlabDetails {
   id: number
@@ -73,9 +73,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const slabs = await selectMany<SlabDetails>(
     db,
-    `SELECT 
-      slab_inventory.id, slab_inventory.stone_id, slab_inventory.bundle, 
-      stones.name as stone_name, slab_inventory.cut_date, 
+    `SELECT
+      slab_inventory.id, slab_inventory.stone_id, slab_inventory.bundle,
+      stones.name as stone_name, slab_inventory.cut_date,
       slab_inventory.notes, slab_inventory.square_feet,
       slab_inventory.length, slab_inventory.width, slab_inventory.sale_id
      FROM slab_inventory
@@ -164,8 +164,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     let insertId = null
     if (!effectiveNoLeftovers) {
       const [insertResult] = await db.execute<RowDataPacket[] & { insertId: number }>(
-        `INSERT INTO slab_inventory 
-        (stone_id, bundle, length, width, parent_id, sale_id, url) 
+        `INSERT INTO slab_inventory
+        (stone_id, bundle, length, width, parent_id, sale_id, url)
         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           actualStoneId,
@@ -182,8 +182,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       if (!addAnother) {
         await db.execute(
-          `UPDATE slab_inventory 
-           SET sale_id = NULL, notes = NULL 
+          `UPDATE slab_inventory
+           SET sale_id = NULL, notes = NULL
            WHERE parent_id = ? AND id != ? AND sale_id IS NULL`,
           [slabIdNum, insertId],
         )
@@ -191,7 +191,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     const [remainingSlabsResult] = await db.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) as count FROM slab_inventory 
+      `SELECT COUNT(*) as count FROM slab_inventory
        WHERE sale_id = ? AND cut_date IS NULL`,
       [saleIdNum],
     )

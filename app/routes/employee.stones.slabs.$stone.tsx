@@ -24,10 +24,10 @@ import {
   TooltipTrigger,
 } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 interface Slab {
   id: number
@@ -138,8 +138,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     source_stone_name: string
   }>(
     db,
-    `SELECT 
-         stone_slab_links.source_stone_id, 
+    `SELECT
+         stone_slab_links.source_stone_id,
          s.name as source_stone_name
        FROM stone_slab_links
        JOIN stones s ON stone_slab_links.source_stone_id = s.id
@@ -152,9 +152,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   for (const link of stoneLinks) {
     const linkedStoneSlabs = await selectMany<Slab>(
       db,
-      `SELECT 
+      `SELECT
            id, bundle, url, sale_id, width, length, cut_date, parent_id
-         FROM slab_inventory 
+         FROM slab_inventory
          WHERE stone_id = ? AND cut_date IS NULL`,
       [link.source_stone_id],
     )
@@ -174,7 +174,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const placeholders = soldSlabIds.map(() => '?').join(',')
 
     const sqlQuery = `
-      SELECT 
+      SELECT
         slab_inventory.id as slab_id,
         sales.id as sale_id,
         sales.sale_date,
@@ -190,15 +190,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           JOIN slab_inventory si ON sinks.slab_id = si.id
           WHERE si.sale_id = sales.id
         ) as sink_names
-      FROM 
+      FROM
         sales
-      LEFT JOIN 
+      LEFT JOIN
         customers ON sales.customer_id = customers.id
-      LEFT JOIN 
+      LEFT JOIN
         users ON sales.seller_id = users.id
-      JOIN 
+      JOIN
         slab_inventory ON sales.id = slab_inventory.sale_id
-      WHERE 
+      WHERE
         slab_inventory.id IN (${placeholders})
       ORDER BY
         slab_inventory.id DESC
@@ -259,19 +259,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const parentPlaceholders = slabsWithParent.map(() => '?').join(',')
 
     const parentSqlQuery = `
-      SELECT 
+      SELECT
         slab_inventory.id as slab_id,
         COALESCE(customers.name, 'Unknown Customer') as customer_name,
         COALESCE(users.name, 'Unknown Seller') as seller_name
-      FROM 
+      FROM
         sales
-      LEFT JOIN 
+      LEFT JOIN
         customers ON sales.customer_id = customers.id
-      LEFT JOIN 
+      LEFT JOIN
         users ON sales.seller_id = users.id
-      JOIN 
+      JOIN
         slab_inventory ON sales.id = slab_inventory.sale_id
-      WHERE 
+      WHERE
         slab_inventory.id IN (${parentPlaceholders})
     `
 

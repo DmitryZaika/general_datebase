@@ -16,10 +16,10 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 interface Transaction {
   id: number
@@ -136,9 +136,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
         // Delete all unsold slabs with the same bundle in the same stone
         await db.execute(
-          `DELETE FROM slab_inventory 
-           WHERE bundle = ? 
-           AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '') 
+          `DELETE FROM slab_inventory
+           WHERE bundle = ?
+           AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '')
            AND stone_id = ?`,
           [bundle, stoneId],
         )
@@ -147,8 +147,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     // Unsell remaining slabs
     await db.execute(
-      `UPDATE slab_inventory 
-       SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL 
+      `UPDATE slab_inventory
+       SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL
        WHERE sale_id = ?`,
       [transactionId],
     )
@@ -163,14 +163,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const slabIdList = slabIdsForItems.map(row => row.id)
       for (const slabId of slabIdList) {
         await db.execute(
-          `UPDATE sinks 
-           SET slab_id = NULL, price = NULL, is_deleted = 0 
+          `UPDATE sinks
+           SET slab_id = NULL, price = NULL, is_deleted = 0
            WHERE slab_id = ?`,
           [slabId],
         )
         await db.execute(
-          `UPDATE faucets 
-           SET slab_id = NULL, price = NULL, is_deleted = 0 
+          `UPDATE faucets
+           SET slab_id = NULL, price = NULL, is_deleted = 0
            WHERE slab_id = ?`,
           [slabId],
         )

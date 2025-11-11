@@ -18,11 +18,11 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 
 import { csrf } from '~/utils/csrf.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

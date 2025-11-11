@@ -4,7 +4,7 @@ import { eventStream } from 'remix-utils/sse/server'
 import { db } from '~/db.server'
 import type { InstructionSlim } from '~/types'
 import { DONE_KEY } from '~/utils/constants'
-import { getSession } from '../sessions'
+import { getSession } from '../sessions.server'
 import { selectMany } from '../utils/queryHelpers'
 import { getUserBySessionId } from '../utils/session.server'
 
