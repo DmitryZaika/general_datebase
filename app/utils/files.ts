@@ -1,6 +1,6 @@
 import { fileTypeFromBuffer } from 'file-type'
 import mime from 'mime-types'
-import sharp from 'sharp'
+
 
 // --- Белый список и утилиты ---
 
@@ -55,8 +55,4 @@ export async function detectMime(
   // Фолбэк по расширению
   const byExt = normalizeMime(mime.lookup(filename) || null)
   return byExt
-}
-
-export async function compressImage(original: Buffer<ArrayBufferLike>) {
-  return await sharp(original).rotate().resize(480, 320, { fit: 'fill' }).toBuffer()
 }

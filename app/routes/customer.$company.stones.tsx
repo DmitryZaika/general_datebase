@@ -7,6 +7,7 @@ import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { db } from '~/db.server'
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
+import { withIconSuffix } from '~/utils/files'
 import { stoneQueryBuilder } from '~/utils/queries.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { capitalizeFirstLetter } from '~/utils/words'
@@ -23,6 +24,10 @@ interface Stone {
   amount: number | null
   on_sale: boolean | number
   created_date: string
+}
+
+function getStoneUrl(original: string | null) {
+  return original ? withIconSuffix(original) : '/placeholder.png'
 }
 
 function sortStones(a: Stone, b: Stone) {
@@ -95,7 +100,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
         title={stone.name}
       >
         <img
-          src={stone.url || '/placeholder.png'}
+          src={getStoneUrl(stone.url)}
           alt={stone.name || 'Stone Image'}
           className='object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
           loading='lazy'
