@@ -19,6 +19,7 @@ import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
+import { withIconSuffix } from '~/utils/files'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
 import { getEmployeeUser } from '~/utils/session.server'
 import { capitalizeFirstLetter } from '~/utils/words'
@@ -39,6 +40,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { stones, companyId: user.company_id }
 }
 
+function getStoneUrl(original: string | null) {
+  return original ? withIconSuffix(original) : '/placeholder.png'
+}
+
 function InteractiveCard({
   stone,
   setCurrentId,
@@ -48,10 +53,8 @@ function InteractiveCard({
   stoneType: string
 }) {
   const displayedAmount = stone.amount > 0 ? stone.amount : '—'
-  const createdDate = new Date(stone.created_date)
   const threeWeeksAgo = new Date()
   threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 30)
-  const isNew = createdDate > threeWeeksAgo
   const isOnSale = !!stone.on_sale
   const navigate = useNavigate()
   const location = useLocation()
@@ -92,9 +95,7 @@ function InteractiveCard({
         itemId={stone.id}
         fieldList={{
           Available: `${stone.available} / ${displayedAmount}`,
-
           Type: capitalizeFirstLetter(stone.type),
-
           Price:
             stone.retail_price === 0
               ? ` By slab $${stone.cost_per_sqft} sqft`
@@ -104,7 +105,7 @@ function InteractiveCard({
       >
         <div onClick={e => e.stopPropagation()}>
           <img
-            src={stone.url || '/placeholder.png'}
+            src={getStoneUrl(stone.url)}
             alt={stone.name || 'Stone Image'}
             className='object-cover w-full h-40 border-2 border-gray-300 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
             loading='lazy'
@@ -189,7 +190,7 @@ export default function Stones() {
             }}
           >
             <img
-              src={stone.url || '/placeholder.png'}
+              src={getStoneUrl(stone.url)}
               alt={stone.name}
               className='object-cover w-full h-full'
             />
