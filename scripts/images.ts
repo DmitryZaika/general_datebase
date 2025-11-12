@@ -167,9 +167,12 @@ async function main() {
       'https://granite-database.s3.us-east-2.amazonaws.com/',
       '',
     )
-    await processAndUploadImage(cleanFile, withIconSuffix(cleanFile))
-    console.log(`Processed ${file} to ${withIconSuffix(file)}`)
-    break
+    try {
+      await processAndUploadImage(cleanFile, withIconSuffix(cleanFile))
+      console.log(`Processed ${file} to ${withIconSuffix(file)}`)
+    } catch (error) {
+      console.error(`Error processing ${file}: ${error}`)
+    }
   }
 }
 
