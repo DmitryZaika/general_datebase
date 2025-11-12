@@ -3,7 +3,8 @@ import pkg from '@aws-sdk/client-s3'
 import dotenv from 'dotenv'
 import type { RowDataPacket } from 'mysql2'
 import mysql from 'mysql2/promise'
-import { compressImage, withIconSuffix } from '~/utils/files'
+import { withIconSuffix } from '~/utils/files'
+import { compressImage } from '~/utils/files.server'
 
 const { S3Client, ListObjectsV2Command } = pkg
 
