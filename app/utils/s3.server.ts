@@ -145,9 +145,6 @@ export const s3UploadHandler = async (
   const finalname = `${folder}/${base}${ext}`
   const iconName = withIconSuffix(finalname)
 
-  // Грузим оригинал с корректным Content-Type
-  const contentType =
-    detectedMime || mime.lookup(finalname) || 'application/octet-stream'
   const originalUrl = await uploadStreamToS3(bufferToAsyncIterable(buffer), finalname)
 
   // Решаем, делать ли иконку
@@ -155,8 +152,7 @@ export const s3UploadHandler = async (
   const isAllowed = normalized ? ALLOWED_IMAGE_MIME.has(normalized) : false
 
   if (!isAllowed) {
-    console.warn(`Skip icon: unsupported mime "${detectedMime ?? 'unknown'}"`)
-    return { original: originalUrl }
+    return originalUrl
   }
 
   // Пытаемся сделать иконку через sharp; если не получится — не падаем, просто вернём оригинал
@@ -166,11 +162,11 @@ export const s3UploadHandler = async (
       .resize(240, 160, { fit: 'fill' })
       .toBuffer()
 
-    const iconUrl = await uploadStreamToS3(bufferToAsyncIterable(iconBuffer), iconName)
-    return { original: originalUrl, icon: iconUrl }
-  } catch (err) {
-    console.warn(`Icon generation failed for ${normalized}: ${(err as Error).message}`)
-    return { original: originalUrl }
+    await uploadStreamToS3(bufferToAsyncIterable(iconBuffer), iconName)
+    return originalUrl
+  } catch {
+    // console.warn(`Icon generation failed for ${normalized}: ${(err as Error).message}`)
+    return originalUrl
   }
 }
 

@@ -23,9 +23,14 @@ import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { cleanParams, useSafeSearchParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
+import { withIconSuffix } from '~/utils/files'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
 import { getAdminUser } from '~/utils/session.server'
 import { capitalizeFirstLetter } from '~/utils/words'
+
+function getStoneUrl(original: string | null) {
+  return original ? withIconSuffix(original) : '/placeholder.png'
+}
 
 type ViewMode = 'grid' | 'table'
 
@@ -70,7 +75,7 @@ function StoneTable({ stones }: { stones: Stone[] }) {
         return (
           <div className='w-12 h-12 overflow-hidden relative cursor-pointer'>
             <img
-              src={stone.url || '/placeholder.png'}
+              src={getStoneUrl(stone.url)}
               alt={stone.name}
               className='object-cover w-full h-full'
             />
@@ -159,7 +164,7 @@ function StoneTable({ stones }: { stones: Stone[] }) {
       columns={columns}
       data={stones.map(stone => ({
         ...stone,
-        className: `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200 
+        className: `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200
                    hover:shadow-md ${stone.is_display ? '' : 'opacity-60'}`,
         onClick: () => handleRowClick(stone.id),
       }))}
@@ -220,7 +225,6 @@ export default function AdminStones() {
     // Обновить URL параметры
     setSearchParams({ ...searchParams, viewMode: newViewMode })
   }
-
   return (
     <>
       <div className='flex justify-between flex-wrap items-center items-end mb-2'>
@@ -230,7 +234,9 @@ export default function AdminStones() {
             onClick={toggleViewMode}
             className='ml-2'
             title={
-              viewMode === VIEW_MODE.GRID ? 'Switch to Table View' : 'Switch to Grid View'
+              viewMode === VIEW_MODE.GRID
+                ? 'Switch to Table View'
+                : 'Switch to Grid View'
             }
           >
             {viewMode === VIEW_MODE.GRID ? (
@@ -285,7 +291,7 @@ export default function AdminStones() {
                   >
                     <div className='relative'>
                       <img
-                        src={stone.url || '/placeholder.png'}
+                        src={getStoneUrl(stone.url)}
                         alt={stone.name || 'Stone Image'}
                         className='object-cover w-full h-40 rounded select-none'
                         loading='lazy'
