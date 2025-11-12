@@ -12,10 +12,10 @@ import { Upload } from '@aws-sdk/lib-storage'
 import type { FileUpload } from '@mjackson/form-data-parser'
 import { writeAsyncIterableToWritable } from '@react-router/node'
 import mime from 'mime-types'
-import sharp from 'sharp'
 import { v4 as uuidv4 } from 'uuid'
 import {
   ALLOWED_IMAGE_MIME,
+  compressImage,
   detectMime,
   normalizeMime,
   withIconSuffix,
@@ -157,10 +157,7 @@ export const s3UploadHandler = async (
 
   // Пытаемся сделать иконку через sharp; если не получится — не падаем, просто вернём оригинал
   try {
-    const iconBuffer = await sharp(buffer)
-      .rotate()
-      .resize(240, 160, { fit: 'fill' })
-      .toBuffer()
+    const iconBuffer = await compressImage(buffer)
 
     await uploadStreamToS3(bufferToAsyncIterable(iconBuffer), iconName)
     return originalUrl
