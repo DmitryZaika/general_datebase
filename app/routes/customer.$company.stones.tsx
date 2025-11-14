@@ -89,6 +89,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
           </div>
         </div>
       )}
+      {/* TODO: Add slabs link */}
       <ImageCard
         type='slabs'
         itemId={stone.id}
