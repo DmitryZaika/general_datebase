@@ -3,7 +3,8 @@ import pkg from '@aws-sdk/client-s3'
 import dotenv from 'dotenv'
 import type { RowDataPacket } from 'mysql2'
 import mysql from 'mysql2/promise'
-import { compressImage, withIconSuffix } from '~/utils/files'
+import { withIconSuffix } from '~/utils/files'
+import { compressImage } from '~/utils/files.server'
 
 const { S3Client, ListObjectsV2Command } = pkg
 
@@ -167,9 +168,12 @@ async function main() {
       'https://granite-database.s3.us-east-2.amazonaws.com/',
       '',
     )
-    await processAndUploadImage(cleanFile, withIconSuffix(cleanFile))
-    console.log(`Processed ${file} to ${withIconSuffix(file)}`)
-    break
+    try {
+      await processAndUploadImage(cleanFile, withIconSuffix(cleanFile))
+      console.log(`Processed ${file} to ${withIconSuffix(file)}`)
+    } catch (error) {
+      console.error(`Error processing ${file}: ${error}`)
+    }
   }
 }
 
