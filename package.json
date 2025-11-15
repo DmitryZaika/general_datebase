@@ -15,7 +15,8 @@
     "prod-kill": "kill -9 $(lsof -t -i:3000)",
     "load-data": "node scripts/load-stones-csv.js",
     "test": "vitest",
-    "shrink-images": "tsx scripts/images.ts"
+    "shrink-images": "tsx scripts/images.ts",
+    "send-email": "tsx scripts/send-email.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.717.0",
