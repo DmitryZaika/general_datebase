@@ -1,3 +1,7 @@
+// ============================================================================
+// Type Definitions & Schema
+// ============================================================================
+
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { RowDataPacket } from 'mysql2'
 import { useState } from 'react'
@@ -49,6 +53,10 @@ import { csrf } from '~/utils/csrf.server'
 import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
+/**
+ * Zod schema for email form validation
+ * Ensures email format, subject, and body are valid before submission
+ */
 const emailSchema = z.object({
   to: z.string().email(),
   subject: z.string().min(1, 'Subject is required'),
@@ -58,14 +66,138 @@ const emailSchema = z.object({
 type FormData = z.infer<typeof emailSchema>
 const resolver = zodResolver(emailSchema)
 
+/**
+ * Email template types available in the system
+ */
+type TemplateType = 'first-contact' | 'follow-up' | 'reply' | ''
+
+/**
+ * AI email generation request parameters
+ */
+interface AIEmailRequest {
+  emailCategory:
+    | 'first-contact'
+    | 'follow-up'
+    | 'reply'
+    | 'promotional'
+    | 'thank-you'
+    | 'feedback-request'
+    | 'referral'
+  recipientName: string
+  recipientCompany?: string
+  recipientRole?: string
+  relationshipStage?: 'lead' | 'customer' | 'past-customer' | 'prospect'
+  formality?: 'formal' | 'neutral' | 'casual'
+  tone?: 'friendly' | 'persuasive' | 'empathetic' | 'urgent'
+  verboseness?: 'concise' | 'detailed'
+  language?: string
+  desiredContent?: string
+  previousMessages?: string[]
+  urgencyLevel?: 'low' | 'medium' | 'high'
+  senderName?: string
+  senderCompany?: string
+  senderPosition?: string
+  senderPhoneNumber?: string
+  senderEmail?: string
+}
+
+/**
+ * User data structure from authentication
+ */
+interface EmployeeUser {
+  id: number
+  email: string
+  name?: string | null
+  phone_number?: string
+  company_id?: number
+  position_id?: number
+}
+
+/**
+ * Sender information for AI email generation
+ */
+interface SenderInfo {
+  senderName?: string
+  senderCompany?: string
+  senderPosition?: string
+  senderPhoneNumber?: string
+  senderEmail?: string
+}
+
+/**
+ * Zod schema for AI email generation form
+ */
+const aiEmailSchema = z.object({
+  emailCategory: z.enum([
+    'first-contact',
+    'follow-up',
+    'reply',
+    'promotional',
+    'thank-you',
+    'feedback-request',
+    'referral',
+  ]),
+  recipientName: z.string().min(1, 'Recipient name is required'),
+  recipientCompany: z.string().optional(),
+  recipientRole: z.string().optional(),
+  relationshipStage: z
+    .enum(['lead', 'customer', 'past-customer', 'prospect'])
+    .optional(),
+  formality: z.enum(['formal', 'neutral', 'casual']).optional(),
+  tone: z.enum(['friendly', 'persuasive', 'empathetic', 'urgent']).optional(),
+  verboseness: z.enum(['concise', 'detailed']).optional(),
+  language: z.string().optional(),
+  desiredContent: z.string().optional(),
+  previousMessages: z.array(z.string()).optional(),
+  urgencyLevel: z.enum(['low', 'medium', 'high']).optional(),
+  senderName: z.string().optional(),
+  senderCompany: z.string().optional(),
+  senderPosition: z.string().optional(),
+  senderPhoneNumber: z.string().optional(),
+  senderEmail: z.string().email().optional(),
+})
+
+type AIEmailFormData = z.infer<typeof aiEmailSchema>
+
+/**
+ * AI email generation response structure
+ */
+interface AIEmailResponse {
+  subject?: string
+  bodyText?: string
+}
+
+// ============================================================================
+// Server-Side Action Handler
+// ============================================================================
+
+/**
+ * Handles email submission and database logging
+ *
+ * @param request - Incoming HTTP request
+ * @param params - Route parameters containing dealId
+ * @returns Redirect response with success/error toast
+ *
+ * Process:
+ * 1. Authenticate user
+ * 2. Validate CSRF token
+ * 3. Validate form data
+ * 4. Send email via email service
+ * 5. Log email in database for audit trail
+ * 6. Redirect to history page with success message
+ */
 export async function action({ request, params }: ActionFunctionArgs) {
+  const session = await getSession(request.headers.get('Cookie'))
+
+  // Authenticate user - redirect to login if not authenticated
   let user
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
-  const session = await getSession(request.headers.get('Cookie'))
+
+  // Validate CSRF token to prevent cross-site request forgery
   try {
     await csrf.validate(request)
   } catch {
@@ -75,11 +207,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     })
   }
 
+  // Extract and validate deal ID from route params
   if (!params.dealId) {
     throw new Error('Deal ID is missing')
   }
   const dealId = parseInt(params.dealId, 10)
 
+  // Validate form data against schema
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
     resolver,
@@ -87,8 +221,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors) {
     return { errors, receivedValues }
   }
+
+  // Send email and log to database
   try {
     await sendEmail(data)
+
+    // Store email in database with deal context for audit trail
     await db.execute(
       `INSERT INTO emails (user_id, subject, body)
        VALUES (?, ?, ?)`,
@@ -100,24 +238,44 @@ export async function action({ request, params }: ActionFunctionArgs) {
       headers: { 'Set-Cookie': await commitSession(session) },
     })
   }
+
+  // Redirect to history page with success message
   session.flash('message', toastData('Success', 'Email sent'))
   return redirect('../history', {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }
 
+// ============================================================================
+// Server-Side Loader
+// ============================================================================
+
+/**
+ * Loads customer email address and sender information associated with the deal
+ *
+ * @param request - Incoming HTTP request
+ * @param params - Route parameters containing dealId
+ * @returns Customer email address and sender information
+ *
+ * Retrieves the customer's email from the database by joining
+ * deals and customers tables. Also fetches sender info for AI generation.
+ */
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  // Authenticate user
+  let user: EmployeeUser
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
+
+  // Validate deal ID parameter
   if (!params.dealId) {
     throw new Error('Deal ID is missing')
   }
-
   const dealId = parseInt(params.dealId, 10)
 
+  // Fetch customer email associated with this deal
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT c.email
        FROM deals d
@@ -125,20 +283,681 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       WHERE d.id = ? AND d.deleted_at IS NULL`,
     [dealId],
   )
+
+  // Redirect to deals list if deal not found
   if (!rows || rows.length === 0) {
     return redirect('/employee/deals')
   }
-  return { email: rows[0].email || '' }
+
+  // Fetch sender information from user data
+  const senderInfo = await getSenderInfo(user)
+
+  return {
+    email: rows[0].email || '',
+    senderInfo,
+  }
 }
 
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Fetches sender information from database based on user data
+ *
+ * @param user - Authenticated employee user
+ * @returns Promise resolving to sender information
+ *
+ * Looks up company name and position name from their respective tables
+ * using foreign keys from the user object
+ */
+async function getSenderInfo(user: EmployeeUser): Promise<SenderInfo> {
+  console.log('[getSenderInfo] Starting with user:', user)
+
+  const senderInfo: SenderInfo = {}
+
+  // Add name if available
+  if (user.name) {
+    senderInfo.senderName = user.name
+    console.log('[getSenderInfo] Added name:', user.name)
+  } else {
+    console.log('[getSenderInfo] No name found in user object')
+  }
+
+  // Add email if available
+  if (user.email) {
+    senderInfo.senderEmail = user.email
+    console.log('[getSenderInfo] Added email:', user.email)
+  }
+
+  // Add phone number if available
+  if (user.phone_number) {
+    senderInfo.senderPhoneNumber = user.phone_number
+    console.log('[getSenderInfo] Added phone:', user.phone_number)
+  }
+
+  // Fetch company name if company_id exists
+  if (user.company_id) {
+    try {
+      console.log('[getSenderInfo] Fetching company for company_id:', user.company_id)
+      const [companyRows] = await db.execute<RowDataPacket[]>(
+        'SELECT name FROM company WHERE id = ?',
+        [user.company_id],
+      )
+      console.log('[getSenderInfo] Company query result:', companyRows)
+      if (companyRows && companyRows.length > 0 && companyRows[0].name) {
+        senderInfo.senderCompany = companyRows[0].name
+        console.log('[getSenderInfo] Added company:', companyRows[0].name)
+      }
+    } catch (error) {
+      console.error('[getSenderInfo] Error fetching company:', error)
+    }
+  }
+
+  // Fetch position name if position_id exists
+  if (user.position_id) {
+    try {
+      console.log(
+        '[getSenderInfo] Fetching position for position_id:',
+        user.position_id,
+      )
+      const [positionRows] = await db.execute<RowDataPacket[]>(
+        'SELECT name FROM positions WHERE id = ?',
+        [user.position_id],
+      )
+      console.log('[getSenderInfo] Position query result:', positionRows)
+      if (positionRows && positionRows.length > 0 && positionRows[0].name) {
+        senderInfo.senderPosition = positionRows[0].name
+        console.log('[getSenderInfo] Added position:', positionRows[0].name)
+      }
+    } catch (error) {
+      console.error('[getSenderInfo] Error fetching position:', error)
+    }
+  } else {
+    console.log('[getSenderInfo] No position_id found in user object')
+  }
+
+  console.log('[getSenderInfo] Final senderInfo:', senderInfo)
+  return senderInfo
+}
+
+/**
+ * Generates AI-powered email content using the API with real-time streaming
+ *
+ * @param formData - User-provided AI generation parameters
+ * @param senderInfo - Sender information from database
+ * @param onStreamSubject - Callback for streaming subject
+ * @param onStreamBody - Callback for streaming body
+ * @returns Promise resolving to AI-generated email content
+ * @throws Error if API request fails
+ */
+async function generateAIEmail(
+  formData: AIEmailFormData,
+  senderInfo: SenderInfo,
+  onStreamSubject?: (text: string) => void,
+  onStreamBody?: (text: string) => void,
+): Promise<AIEmailResponse> {
+  console.log('[generateAIEmail] Starting with formData:', formData)
+  console.log('[generateAIEmail] SenderInfo:', senderInfo)
+
+  // Build request payload, excluding empty strings and undefined values
+  const requestPayload: Partial<AIEmailRequest> = {
+    emailCategory: formData.emailCategory,
+    recipientName: formData.recipientName,
+  }
+
+  // Only add optional fields if they have non-empty values
+  if (formData.recipientCompany && formData.recipientCompany.trim()) {
+    requestPayload.recipientCompany = formData.recipientCompany
+  }
+  if (formData.recipientRole && formData.recipientRole.trim()) {
+    requestPayload.recipientRole = formData.recipientRole
+  }
+  if (formData.relationshipStage) {
+    requestPayload.relationshipStage = formData.relationshipStage
+  }
+  if (formData.formality) {
+    requestPayload.formality = formData.formality
+  }
+  if (formData.tone) {
+    requestPayload.tone = formData.tone
+  }
+  if (formData.verboseness) {
+    requestPayload.verboseness = formData.verboseness
+  }
+  if (formData.language && formData.language.trim()) {
+    requestPayload.language = formData.language
+  }
+  if (formData.desiredContent && formData.desiredContent.trim()) {
+    requestPayload.desiredContent = formData.desiredContent
+  }
+  if (formData.urgencyLevel) {
+    requestPayload.urgencyLevel = formData.urgencyLevel
+  }
+
+  // Add sender info fields if they exist
+  if (senderInfo.senderName && senderInfo.senderName.trim()) {
+    requestPayload.senderName = senderInfo.senderName
+  }
+  if (senderInfo.senderEmail && senderInfo.senderEmail.trim()) {
+    requestPayload.senderEmail = senderInfo.senderEmail
+  }
+  if (senderInfo.senderCompany && senderInfo.senderCompany.trim()) {
+    requestPayload.senderCompany = senderInfo.senderCompany
+  }
+  if (senderInfo.senderPosition && senderInfo.senderPosition.trim()) {
+    requestPayload.senderPosition = senderInfo.senderPosition
+  }
+  if (senderInfo.senderPhoneNumber && senderInfo.senderPhoneNumber.trim()) {
+    requestPayload.senderPhoneNumber = senderInfo.senderPhoneNumber
+  }
+
+  console.log(
+    '[generateAIEmail] Request payload:',
+    JSON.stringify(requestPayload, null, 2),
+  )
+
+  const response = await fetch('/api/aiRecommend/email', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestPayload),
+  })
+
+  console.log('[generateAIEmail] Response status:', response.status)
+  console.log('[generateAIEmail] Response ok:', response.ok)
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('[generateAIEmail] Error response:', errorText)
+    throw new Error(`Failed to generate AI email: ${response.status} ${errorText}`)
+  }
+
+  // Handle streaming response
+  if (response.body) {
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let fullText = ''
+    let isInBody = false
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+
+              if (data.error) {
+                throw new Error(data.error)
+              }
+
+              if (data.content) {
+                fullText += data.content
+
+                // Check if we've hit the body separator
+                if (fullText.includes('---BODY---')) {
+                  isInBody = true
+                  const parts = fullText.split('---BODY---')
+                  const subject = parts[0].trim()
+                  const body = parts[1] || ''
+
+                  if (onStreamSubject) {
+                    onStreamSubject(subject)
+                  }
+                  if (onStreamBody) {
+                    onStreamBody(body.trim())
+                  }
+                } else if (isInBody) {
+                  // We're in the body section
+                  const parts = fullText.split('---BODY---')
+                  const body = parts[1] || ''
+                  if (onStreamBody) {
+                    onStreamBody(body.trim())
+                  }
+                } else {
+                  // Still in subject
+                  if (onStreamSubject) {
+                    onStreamSubject(fullText.trim())
+                  }
+                }
+              }
+
+              if (data.done) {
+                console.log('[generateAIEmail] Streaming complete')
+              }
+            } catch (parseError) {
+              console.error('[generateAIEmail] Parse error:', parseError)
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[generateAIEmail] Streaming error:', error)
+      throw error
+    }
+
+    // Parse the final result
+    const parts = fullText.split('---BODY---')
+    const subject = parts[0]?.trim() || ''
+    const bodyText = parts[1]?.trim() || ''
+
+    console.log('[generateAIEmail] Final result:', { subject, bodyText })
+    return { subject, bodyText }
+  }
+
+  throw new Error('No response body')
+}
+
+// ============================================================================
+// Component: AI Assistant Menu
+// ============================================================================
+
+interface AIAssistantMenuProps {
+  aiForm: ReturnType<typeof useForm<AIEmailFormData>>
+  onGenerate: () => void
+  isGenerating: boolean
+}
+
+/**
+ * Comprehensive AI email generation form with all customization options
+ * Allows users to specify recipient details, tone, style, and content preferences
+ */
+function AIAssistantMenu({ aiForm, onGenerate, isGenerating }: AIAssistantMenuProps) {
+  return (
+    <div className='flex flex-col gap-4 p-4 border rounded-lg bg-gray-50'>
+      <h3 className='font-semibold text-sm'>AI Email Assistant</h3>
+
+      <FormProvider {...aiForm}>
+        <div className='grid grid-cols-2 gap-3'>
+          {/* Email Category */}
+          <FormField
+            control={aiForm.control}
+            name='emailCategory'
+            render={({ field }) => (
+              <FormItem className='space-y-1 mb-2'>
+                <FormLabel>Category *</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Select category' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value='first-contact'>First Contact</SelectItem>
+                    <SelectItem value='follow-up'>Follow-up</SelectItem>
+                    <SelectItem value='reply'>Reply</SelectItem>
+                    <SelectItem value='promotional'>Promotional</SelectItem>
+                    <SelectItem value='thank-you'>Thank You</SelectItem>
+                    <SelectItem value='feedback-request'>Feedback Request</SelectItem>
+                    <SelectItem value='referral'>Referral</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Recipient Name */}
+          <FormField
+            control={aiForm.control}
+            name='recipientName'
+            render={({ field }) => (
+              <FormItem className='space-y-1 mb-2'>
+                <FormLabel>Recipient Name *</FormLabel>
+                <FormControl>
+                  <input
+                    {...field}
+                    className='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
+                    placeholder='John Doe'
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Recipient Company */}
+          <FormField
+            control={aiForm.control}
+            name='recipientCompany'
+            render={({ field }) => (
+              <FormItem className='space-y-1 mb-2'>
+                <FormLabel>Company</FormLabel>
+                <FormControl>
+                  <input
+                    {...field}
+                    className='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
+                    placeholder='Acme Corp'
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Recipient Role */}
+          <FormField
+            control={aiForm.control}
+            name='recipientRole'
+            render={({ field }) => (
+              <FormItem className='space-y-1 mb-2'>
+                <FormLabel>Role</FormLabel>
+                <FormControl>
+                  <input
+                    {...field}
+                    className='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
+                    placeholder='Purchasing Manager'
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Relationship Stage */}
+          <FormField
+            control={aiForm.control}
+            name='relationshipStage'
+            render={({ field }) => (
+              <FormItem className='space-y-1 mb-2'>
+                <FormLabel>Relationship Stage</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Select stage' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value='lead'>Lead</SelectItem>
+                    <SelectItem value='customer'>Customer</SelectItem>
+                    <SelectItem value='past-customer'>Past Customer</SelectItem>
+                    <SelectItem value='prospect'>Prospect</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Formality */}
+          <FormField
+            control={aiForm.control}
+            name='formality'
+            render={({ field }) => (
+              <FormItem className='space-y-1 mb-2'>
+                <FormLabel>Formality</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Select formality' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value='formal'>Formal</SelectItem>
+                    <SelectItem value='neutral'>Neutral</SelectItem>
+                    <SelectItem value='casual'>Casual</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Tone */}
+          <FormField
+            control={aiForm.control}
+            name='tone'
+            render={({ field }) => (
+              <FormItem className='space-y-1 mb-2'>
+                <FormLabel>Tone</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Select tone' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value='friendly'>Friendly</SelectItem>
+                    <SelectItem value='persuasive'>Persuasive</SelectItem>
+                    <SelectItem value='empathetic'>Empathetic</SelectItem>
+                    <SelectItem value='urgent'>Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Verboseness */}
+          <FormField
+            control={aiForm.control}
+            name='verboseness'
+            render={({ field }) => (
+              <FormItem className='space-y-1 mb-2'>
+                <FormLabel>Verboseness</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Select verboseness' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value='concise'>Concise</SelectItem>
+                    <SelectItem value='detailed'>Detailed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Language */}
+          <FormField
+            control={aiForm.control}
+            name='language'
+            render={({ field }) => (
+              <FormItem className='space-y-1 mb-2'>
+                <FormLabel>Language</FormLabel>
+                <FormControl>
+                  <input
+                    {...field}
+                    className='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
+                    placeholder='English'
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Urgency Level */}
+          <FormField
+            control={aiForm.control}
+            name='urgencyLevel'
+            render={({ field }) => (
+              <FormItem className='space-y-1 mb-2'>
+                <FormLabel>Urgency Level</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Select urgency' />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value='low'>Low</SelectItem>
+                    <SelectItem value='medium'>Medium</SelectItem>
+                    <SelectItem value='high'>High</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Desired Content */}
+        <FormField
+          control={aiForm.control}
+          name='desiredContent'
+          render={({ field }) => (
+            <FormItem className='space-y-1 mb-2'>
+              <FormLabel>Desired Content</FormLabel>
+              <FormControl>
+                <Textarea
+                  {...field}
+                  placeholder='Describe what you want the email to cover...'
+                  className='min-h-[80px]'
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Generate Button */}
+        <LoadingButton
+          type='button'
+          loading={isGenerating}
+          onClick={onGenerate}
+          className='w-full'
+        >
+          Generate Email with AI
+        </LoadingButton>
+      </FormProvider>
+    </div>
+  )
+}
+
+// ============================================================================
+// Component: Template Selector
+// ============================================================================
+
+interface TemplateSelectorProps {
+  selectedTemplate: string
+  onTemplateSelect: (value: string) => void
+}
+
+/**
+ * Dropdown selector for choosing email templates
+ * Includes generate button to apply AI-generated content
+ */
+function TemplateSelector({
+  selectedTemplate,
+  onTemplateSelect,
+  onGenerate,
+  isGenerating,
+}: TemplateSelectorProps) {
+  return (
+    <div className='flex gap-2'>
+      <Select value={selectedTemplate} onValueChange={onTemplateSelect}>
+        <SelectTrigger className='w-[250px]'>
+          <SelectValue placeholder='Select template' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='first-contact'>First contact</SelectItem>
+          <SelectItem value='follow-up'>Follow-up</SelectItem>
+          <SelectItem value='reply'>Reply</SelectItem>
+        </SelectContent>
+      </Select>
+      <LoadingButton type='button' loading={isGenerating} onClick={onGenerate}>
+        Generate
+      </LoadingButton>
+    </div>
+  )
+}
+
+// ============================================================================
+// Component: Email Form Fields
+// ============================================================================
+
+interface EmailFormFieldsProps {
+  form: ReturnType<typeof useForm<FormData>>
+}
+
+/**
+ * Form fields for email composition: To, Subject, and Body
+ * Organized as a reusable component for better modularity
+ */
+function EmailFormFields({ form }: EmailFormFieldsProps) {
+  return (
+    <div className='flex-1 space-y-4'>
+      {/* Recipient Email Field */}
+      <FormField
+        control={form.control}
+        name='to'
+        render={({ field }) => (
+          <InputItem
+            name='To'
+            field={field}
+            placeholder='recipient@example.com'
+            disabled={false}
+          />
+        )}
+      />
+
+      {/* Subject Line Field */}
+      <FormField
+        control={form.control}
+        name='subject'
+        render={({ field }) => (
+          <InputItem name='Subject' field={field} placeholder='Email subject' />
+        )}
+      />
+
+      {/* Email Body Field */}
+      <FormField
+        control={form.control}
+        name='text'
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Body</FormLabel>
+            <FormControl>
+              <Textarea placeholder='Email body' className='min-h-[200px]' {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </div>
+  )
+}
+
+// ============================================================================
+// Main Component: Deal Email Dialog
+// ============================================================================
+
+/**
+ * Main dialog component for composing and sending emails within a deal context
+ *
+ * Features:
+ * - Pre-populated recipient from deal's customer
+ * - Template selection for common email types
+ * - AI-powered email generation
+ * - Form validation and error handling
+ * - CSRF protection
+ * - Email audit trail in database
+ */
 export default function DealEmailDialog() {
+  // Router hooks for navigation
   const navigate = useNavigate()
   const location = useLocation()
-  const [showSelect, setShowSelect] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('')
-  const { email } = useLoaderData<typeof loader>()
+
+  // Local state management
+  const [showAIMenu, setShowAIMenu] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  // Data from loader and action
+  const { email, senderInfo } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
-  
+
+  // Initialize email form with react-hook-form
   const form = useForm<FormData>({
     resolver,
     defaultValues: {
@@ -148,34 +967,128 @@ export default function DealEmailDialog() {
     },
   })
 
-  const handleTemplateSelect = (value: string) => {
-    setSelectedTemplate(value)
-    
-    if (value === 'first-contact') {
-      form.setValue('subject', 'First contact')
-      form.setValue('text', 'Hi,\n\nI wanted to follow up on our recent conversation regarding your project.\n\nPlease let me know if you have any questions.\n\nBest regards')
-    } else if (value === 'follow-up') {
-      form.setValue('subject', 'Follow-up')
-      form.setValue('text', 'Hi,\n\nThank you for your interest. Please find attached the quote for your project.\n\nLet me know if you have any questions.\n\nBest regards')
-    } else if (value === 'reply') {
-      form.setValue('subject', 'Reply')
-      form.setValue('text', 'Hi,\n\nI wanted to give you an update on your project status.\n\nEverything is progressing well.\n\nBest regards')
-    }
-  }
-  
+  // Initialize AI form with sender info from loader
+  const aiForm = useForm<AIEmailFormData>({
+    resolver: zodResolver(aiEmailSchema),
+    defaultValues: {
+      emailCategory: 'first-contact',
+      recipientName: '',
+      recipientCompany: '',
+      recipientRole: '',
+      relationshipStage: 'prospect',
+      formality: 'neutral',
+      tone: 'friendly',
+      verboseness: 'detailed',
+      language: 'English',
+      desiredContent: '',
+      urgencyLevel: 'medium',
+      senderName: senderInfo.senderName,
+      senderCompany: senderInfo.senderCompany || '',
+      senderPosition: senderInfo.senderPosition || '',
+      senderPhoneNumber: senderInfo.senderPhoneNumber || '',
+      senderEmail: senderInfo.senderEmail || '',
+    },
+  })
+
+  // Form submission handler with full page reload
   const fullSubmit = useFullSubmit(form)
 
+  /**
+   * Handles dialog close - navigates back to project view
+   */
   const handleChange = (open: boolean) => {
     if (!open) {
       navigate(`../project${location.search}`)
     }
   }
 
-  const generateWithAI = () => {
-    console.log('generateWithAI')
+  /**
+   * Generates email content using AI based on form inputs
+   * Updates email form fields with AI-generated subject and body
+   * Shows error alert if generation fails
+   */
+  /**
+   * Generates email content using AI based on form inputs
+   * Updates email form fields with AI-generated subject and body
+   * Shows error alert if generation fails
+   */
+  const handleGenerateWithAI = async () => {
+    console.log('[handleGenerateWithAI] Starting generation...')
+
+    const isValid = await aiForm.trigger()
+    console.log('[handleGenerateWithAI] Form validation result:', isValid)
+
+    if (!isValid) {
+      console.log(
+        '[handleGenerateWithAI] Validation failed, errors:',
+        aiForm.formState.errors,
+      )
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      const aiFormData = aiForm.getValues()
+      console.log('[handleGenerateWithAI] AI form data:', aiFormData)
+
+      const senderInfoForRequest: SenderInfo = {}
+
+      if (aiFormData.senderName) {
+        senderInfoForRequest.senderName = aiFormData.senderName
+      }
+      if (aiFormData.senderEmail) {
+        senderInfoForRequest.senderEmail = aiFormData.senderEmail
+      }
+      if (aiFormData.senderCompany) {
+        senderInfoForRequest.senderCompany = aiFormData.senderCompany
+      }
+      if (aiFormData.senderPosition) {
+        senderInfoForRequest.senderPosition = aiFormData.senderPosition
+      }
+      if (aiFormData.senderPhoneNumber) {
+        senderInfoForRequest.senderPhoneNumber = aiFormData.senderPhoneNumber
+      }
+
+      console.log(
+        '[handleGenerateWithAI] Sender info for request:',
+        senderInfoForRequest,
+      )
+
+      // Clear existing values before streaming
+      form.setValue('subject', '')
+      form.setValue('text', '')
+
+      await generateAIEmail(
+        aiFormData,
+        senderInfoForRequest,
+        subject => {
+          // Stream subject in real-time
+          form.setValue('subject', subject)
+        },
+        body => {
+          // Stream body in real-time
+          form.setValue('text', body)
+        },
+      )
+
+      console.log('[handleGenerateWithAI] Successfully completed streaming')
+    } catch (error) {
+      console.error('[handleGenerateWithAI] Error:', error)
+      alert(
+        `Failed to generate AI email: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+    } finally {
+      setIsGenerating(false)
+      console.log('[handleGenerateWithAI] Generation complete')
+    }
   }
 
-
+  /**
+   * Toggles visibility of AI assistant menu
+   */
+  const handleToggleAIMenu = () => {
+    setShowAIMenu(!showAIMenu)
+  }
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -183,76 +1096,43 @@ export default function DealEmailDialog() {
         <DialogHeader>
           <DialogTitle>Send Email</DialogTitle>
         </DialogHeader>
+
         <FormProvider {...form}>
-          <Form onSubmit={fullSubmit} className='flex-1 flex flex-col'>
+          <form onSubmit={fullSubmit} className='flex-1 flex flex-col'>
+            {/* CSRF Token for security */}
             <AuthenticityTokenInput />
-            <div className='flex-1 space-y-4'>
-              <FormField
-                control={form.control}
-                name='to'
-                render={({ field }) => (
-                  <InputItem
-                    name='To'
-                    field={field}
-                    placeholder='recipient@example.com'
-                    disabled={true}
-                  />
-                )}
-              />
-              <FormField
-                control={form.control}
-                name='subject'
-                render={({ field }) => (
-                  <InputItem name='Subject' field={field} placeholder='Email subject' />
-                )}
-              />
-              <FormField
-                control={form.control}
-                name='text'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Body</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder='Email body'
-                        className='min-h-[200px]'
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
+            {/* Email form fields */}
+            <EmailFormFields form={form} />
+
+            {/* Action buttons above AI Assistant Menu */}
+            <div className='mt-4 flex justify-between gap-2 w-full'>
+              {/* AI Assistant toggle button */}
+              <Button
+                type='button'
+                onClick={handleToggleAIMenu}
+                variant={showAIMenu ? 'secondary' : 'default'}
+              >
+                {showAIMenu ? 'Hide' : 'Toggle'} AI Assistant Menu
+              </Button>
+
+              {/* Submit button */}
+              <Button type='submit'>Send Email</Button>
             </div>
-      
-            <DialogFooter className='mt-4 flex gap-2'>
-              <div className="flex justify-between gap-2 w-full">
-              {
-                showSelect ? (
-                  <div className="flex gap-2">
-                        <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
-                    <SelectTrigger className='w-[250px]'>
-                      <SelectValue placeholder='Select template' />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value='first-contact'>First contact</SelectItem>
-                      <SelectItem value='follow-up'>Follow-up</SelectItem>
-                      <SelectItem value='reply'>Reply</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <LoadingButton type='button' loading={false} onClick={() => generateWithAI()}>Generate</LoadingButton>
-                  </div>
-                ) : (
-                  <Button type='button' onClick={() => setShowSelect(true)}>Generate with AI</Button>
-                )
-              }
-              <Button type='submit' >Send Email</Button>
-              </div>
-            </DialogFooter>
-          </Form>
+          </form>
         </FormProvider>
+
+        {/* AI Assistant Menu - shown when toggled, OUTSIDE the main form */}
+        {showAIMenu && (
+          <div className='mt-4'>
+            <AIAssistantMenu
+              aiForm={aiForm}
+              onGenerate={handleGenerateWithAI}
+              isGenerating={isGenerating}
+            />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )
 }
-
