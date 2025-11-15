@@ -28,7 +28,7 @@ export async function sendEmail({ to, from, subject, html, text }: SendEmail) {
   if (html) body.Html = { Data: html, Charset: 'UTF-8' }
   if (text) body.Text = { Data: text, Charset: 'UTF-8' }
 
-  await ses.send(
+  return await ses.send(
     new SendEmailCommand({
       Destination: { ToAddresses: [to] },
       Source: from || 'noreply@granite-manager.com',
