@@ -49,7 +49,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
            ELSE 2
          END,
          c.name ASC
-       LIMIT 50`,
+       LIMIT 20`,
       [
         user.id,
         user.company_id,
