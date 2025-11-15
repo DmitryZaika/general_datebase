@@ -32,19 +32,35 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     const customers = await selectMany<Customer>(
       db,
-      `SELECT id, name, address, phone, email, company_name
-       FROM customers
-       WHERE company_id = ? AND deleted_at IS NULL
+      `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.email, c.company_name
+       FROM customers c
+       LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
+       WHERE c.company_id = ? AND c.deleted_at IS NULL
          AND ?? LIKE ?
        ORDER BY
+         CASE
+           WHEN d.id IS NOT NULL THEN 0
+           WHEN c.sales_rep = ? THEN 1
+           ELSE 2
+         END,
          CASE
            WHEN ?? LIKE ? THEN 0   /* prefix */
            WHEN ?? LIKE ? THEN 1   /* word  */
            ELSE 2
          END,
-         name ASC
-       LIMIT 5`,
-      [user.company_id, searchType, like, searchType, prefixLike, searchType, wordLike],
+         c.name ASC
+       LIMIT 50`,
+      [
+        user.id,
+        user.company_id,
+        searchType,
+        like,
+        user.id,
+        searchType,
+        prefixLike,
+        searchType,
+        wordLike,
+      ],
     )
 
     return data({ customers })
