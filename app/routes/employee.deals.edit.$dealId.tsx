@@ -1,14 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { EnvelopeClosedIcon } from '@radix-ui/react-icons'
 import type { RowDataPacket } from 'mysql2'
 import {
   type ActionFunctionArgs,
+  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLocation,
-  useNavigate,
+  useNavigate
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
+import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -116,18 +119,20 @@ export default function DealsEdit() {
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className='sm:max-w-[500px] overflow-auto flex flex-col justify-baseline min-h-[390px] max-h-[95vh] p-5'>
-        <DialogHeader>
-          <DialogTitle>Edit Deal</DialogTitle>
+        <DialogHeader> 
+          <DialogTitle>Edit Deal</DialogTitle>  
+          <Link to={`email${location.search}`}><Button variant='ghost' aria-label='Email' size='icon' className='text-2xl'><EnvelopeClosedIcon /></Button></Link>
         </DialogHeader>
         <Tabs
           value={location.pathname.split('/').pop()}
           onValueChange={value => navigate(value)}
         >
-          <TabsList className='mb-5 grid grid-cols-4'>
+          <TabsList className='mb-5 grid grid-cols-5'>
             <TabsTrigger value={`project${location.search}`}>Project</TabsTrigger>
             <TabsTrigger value={`information${location.search}`}>General</TabsTrigger>
             <TabsTrigger value={`images${location.search}`}>Images</TabsTrigger>
             <TabsTrigger value={`documents${location.search}`}>Documents</TabsTrigger>
+            <TabsTrigger value={`history${location.search}`}>Email</TabsTrigger>
           </TabsList>
           <Outlet />
         </Tabs>
