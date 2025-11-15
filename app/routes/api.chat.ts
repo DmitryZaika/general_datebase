@@ -17,15 +17,40 @@ interface Message {
   content: string
 }
 
+const instructionsCache = new Map<
+  number,
+  { data: InstructionSlim[]; updatedAt: number }
+>()
+
+async function getInstructions(company_id: number): Promise<InstructionSlim[]> {
+  const cached = instructionsCache.get(company_id)
+  const now = Date.now()
+  if (cached && now - cached.updatedAt < 60_000) {
+    return cached.data
+  }
+  const instructions = await selectMany<InstructionSlim>(
+    db,
+    'SELECT id, title, rich_text from instructions WHERE company_id = ?',
+    [company_id],
+  )
+  instructionsCache.set(company_id, { data: instructions, updatedAt: now })
+  return instructions
+}
+
 async function getContext(
   user_id: number,
   query: string,
 ): Promise<{ messages: Message[]; id: number }> {
   const history = await selectMany<{ history: Message[]; id: number }>(
     db,
-    'SELECT id, history from chat_history WHERE user_id = ?',
+    'SELECT id, history from chat_history WHERE user_id = ? ORDER BY id DESC LIMIT 1',
     [user_id],
   )
+
+  if (history.length === 0) {
+    const messages: Message[] = [{ role: 'user', content: query }]
+    return { messages, id: 0 }
+  }
 
   const currentConvo = history[0].history
   currentConvo.push({ role: 'user', content: query })
@@ -37,14 +62,10 @@ async function newContext(
   company_id: number,
   query: string,
 ): Promise<{ history: Message[]; id: number | undefined }> {
-  const instructions = await selectMany<InstructionSlim>(
-    db,
-    'SELECT id, title, rich_text from instructions WHERE company_id = ?',
-    [company_id],
-  )
+  const instructions = await getInstructions(company_id)
   const chatHistory = await selectMany<{ id: number }>(
     db,
-    'SELECT id from chat_history WHERE user_id = ?',
+    'SELECT id from chat_history WHERE user_id = ? ORDER BY id DESC LIMIT 1',
     [user_id],
   )
 
@@ -119,23 +140,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4.1-mini-2025-04-14',
+    model: "gpt-5-mini",
     messages: messages,
-    temperature: 1.3,
-    max_tokens: 1024,
+    max_completion_tokens: 1024,
     stream: true,
   })
 
   return eventStream(
     request.signal,
     function setup(send) {
-      // Используем SSE комментарии для заполнения буфера
-      // Комментарии начинаются с ':' и не отображаются клиенту
-      for (let i = 0; i < 30; i++) {
-        send({ event: 'ping', data: '' })
-      }
-
-      // Информационное сообщение отправляем как комментарий (не будет видно пользователю)
       send({ event: 'info', data: 'Connecting to AI...' })
 
       ;(async () => {
@@ -143,11 +156,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
         try {
           for await (const chunk of response) {
-            const message = chunk.choices[0].delta.content
-            if (message) {
-              send({ data: message })
-              answer += message
-            }
+            const delta = chunk.choices?.[0]?.delta
+            const message = delta?.content
+
+            if (!delta) continue
+            if (!message) continue
+
+            send({ data: message })
+            answer += message
           }
 
           send({ data: DONE_KEY })
