@@ -125,14 +125,14 @@ export default function DealsEdit() {
         </DialogHeader>
         <Tabs
           value={location.pathname.split('/').pop()}
-          onValueChange={value => navigate(value)}
+          onValueChange={value => navigate(`${value}${location.search}`)}
         >
           <TabsList className='mb-5 grid grid-cols-5'>
-            <TabsTrigger value={`project${location.search}`}>Project</TabsTrigger>
-            <TabsTrigger value={`information${location.search}`}>General</TabsTrigger>
-            <TabsTrigger value={`images${location.search}`}>Images</TabsTrigger>
-            <TabsTrigger value={`documents${location.search}`}>Documents</TabsTrigger>
-            <TabsTrigger value={`history${location.search}`}>Email</TabsTrigger>
+            <TabsTrigger value='project'>Project</TabsTrigger>
+            <TabsTrigger value='information'>General</TabsTrigger>
+            <TabsTrigger value='images'>Images</TabsTrigger>
+            <TabsTrigger value='documents'>Documents</TabsTrigger>
+            <TabsTrigger value='history'>Email</TabsTrigger>
           </TabsList>
           <Outlet />
         </Tabs>
