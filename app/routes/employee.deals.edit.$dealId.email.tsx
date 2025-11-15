@@ -90,9 +90,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await sendEmail(data)
     await db.execute(
-      `INSERT INTO emails (user_id, subject, body)
-       VALUES (?, ?, ?)`,
-      [user.id, `[Deal #${dealId}] [To: ${data.to}] ${data.subject}`, data.text],
+      `INSERT INTO emails (user_id, subject, body, message_id)
+       VALUES (?, ?, ?, ?)`,
+      [user.id, data.subject, data.text, dealId],
     )
   } catch {
     session.flash('message', toastData('Error', 'Failed to send email'))
