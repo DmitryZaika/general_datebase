@@ -5,6 +5,44 @@ import type { Customer } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
+function levenshtein(a: string, b: string) {
+  if (a === b) return 0
+  const aLen = a.length
+  const bLen = b.length
+  if (aLen === 0) return bLen
+  if (bLen === 0) return aLen
+  const dp: number[] = []
+  for (let i = 0; i <= bLen; i++) dp[i] = i
+  for (let i = 1; i <= aLen; i++) {
+    let prev = dp[0]
+    dp[0] = i
+    for (let j = 1; j <= bLen; j++) {
+      const temp = dp[j]
+      if (a[i - 1] === b[j - 1]) {
+        dp[j] = prev
+      } else {
+        const min = dp[j] < dp[j - 1] ? dp[j] : dp[j - 1]
+        dp[j] = (prev < min ? prev : min) + 1
+      }
+      prev = temp
+    }
+  }
+  return dp[bLen]
+}
+
+function matchesNameFuzzy(name: string, term: string) {
+  const normalizedName = name.toLowerCase()
+  const normalizedTerm = term.toLowerCase().trim()
+  if (!normalizedTerm) return true
+  const termWords = normalizedTerm.split(/\s+/).filter(w => w.length > 0)
+  if (termWords.length === 0) return true
+  const nameWords = normalizedName.split(/\s+/).filter(w => w.length > 0)
+  return termWords.every(tw => {
+    if (normalizedName.includes(tw)) return true
+    return nameWords.some(nw => levenshtein(nw, tw) <= 1)
+  })
+}
+
 export const customerSchema = z.object({
   term: z.string(),
   searchType: z.enum(['name', 'phone', 'email']).default('name'),
@@ -36,13 +74,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
       const words = term.trim().split(/\s+/).filter(w => w.length > 0)
 
       let nameCondition = 'c.name LIKE ?'
-      const nameParams: string[] = [like]
+      const nameParams: string[] = []
 
       if (words.length > 1) {
         const parts = words.map(() => 'c.name LIKE ?').join(' AND ')
         nameCondition = `(c.name LIKE ? OR (${parts}))`
-        const wordParams = words.map(w => `%${w}%`)
-        nameParams.splice(0, nameParams.length, like, ...wordParams)
+        const wordParams = words.map(w => {
+          const base = w.length >= 3 ? w.slice(0, 3) : w
+          return `%${base}%`
+        })
+        nameParams.push(`%${words[0].length >= 3 ? words[0].slice(0, 3) : words[0]}%`, ...wordParams)
+      } else {
+        const base = term.trim()
+        const short = base.length >= 3 ? base.slice(0, 3) : base
+        nameParams.push(`%${short}%`)
       }
 
       customers = await selectMany<Customer>(
@@ -100,6 +145,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
           wordLike,
         ],
       )
+    }
+
+    if (searchType === 'name') {
+      customers = customers.filter(c => matchesNameFuzzy(c.name, term))
     }
 
     return data({ customers })
