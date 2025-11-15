@@ -8,20 +8,13 @@ import {
     redirect,
     useActionData,
     useLoaderData,
-    useLocation,
-    useNavigate,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
+import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { InputItem } from '~/components/molecules/InputItem'
 import { Button } from '~/components/ui/button'
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '~/components/ui/dialog'
+import { DialogFooter } from '~/components/ui/dialog'
 import {
     FormControl,
     FormField,
@@ -48,9 +41,10 @@ const emailSchema = z.object({
 type FormData = z.infer<typeof emailSchema>
 const resolver = zodResolver(emailSchema)
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {
+  let user
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -59,10 +53,15 @@ export async function action({ request }: ActionFunctionArgs) {
     await csrf.validate(request)
   } catch {
     session.flash('message', toastData('Error', 'Invalid CSRF token'))
-    return redirect('..', {
+    return redirect('.', {
       headers: { 'Set-Cookie': await commitSession(session) },
     })
   }
+
+  if (!params.dealId) {
+    throw new Error('Deal ID is missing')
+  }
+  const dealId = parseInt(params.dealId, 10)
 
   const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
     request,
@@ -73,14 +72,19 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   try {
     await sendEmail(data)
+    await db.execute(
+      `INSERT INTO emails (user_id, subject, body)
+       VALUES (?, ?, ?)`,
+      [user.id, `[Deal #${dealId}] [To: ${data.to}] ${data.subject}`, data.text],
+    )
   } catch {
     session.flash('message', toastData('Error', 'Failed to send email'))
-    return redirect('..', {
+    return redirect('.', {
       headers: { 'Set-Cookie': await commitSession(session) },
     })
   }
   session.flash('message', toastData('Success', 'Email sent'))
-  return redirect('..', {
+  return redirect('../history', {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }
@@ -111,8 +115,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 }
 
 export default function DealEmailDialog() {
-  const navigate = useNavigate()
-  const location = useLocation()
   const { email } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
   
@@ -127,65 +129,53 @@ export default function DealEmailDialog() {
   
   const fullSubmit = useFullSubmit(form)
 
-  const handleChange = (open: boolean) => {
-    if (!open) {
-      navigate(`../project${location.search}`)
-    }
-  }
-
   return (
-    <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[600px] overflow-auto flex flex-col min-h-[400px] max-h-[95vh] p-5'>
-        <DialogHeader>
-          <DialogTitle>Send Email</DialogTitle>
-        </DialogHeader>
-        <FormProvider {...form}>
-          <Form onSubmit={fullSubmit} className='flex-1 flex flex-col'>
-            <div className='flex-1 space-y-4'>
-              <FormField
-                control={form.control}
-                name='to'
-                render={({ field }) => (
-                  <InputItem
-                    name='To'
-                    field={field}
-                    placeholder='recipient@example.com'
-                    disabled={true}
+    <FormProvider {...form}>
+      <Form onSubmit={fullSubmit} className='flex-1 flex flex-col'>
+        <AuthenticityTokenInput />
+        <div className='flex-1 space-y-4'>
+          <FormField
+            control={form.control}
+            name='to'
+            render={({ field }) => (
+              <InputItem
+                name='To'
+                field={field}
+                placeholder='recipient@example.com'
+                disabled={true}
+              />
+            )}
+          />
+          <FormField
+            control={form.control}
+            name='subject'
+            render={({ field }) => (
+              <InputItem name='Subject' field={field} placeholder='Email subject' />
+            )}
+          />
+          <FormField
+            control={form.control}
+            name='text'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Body</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder='Email body'
+                    className='min-h-[200px]'
+                    {...field}
                   />
-                )}
-              />
-              <FormField
-                control={form.control}
-                name='subject'
-                render={({ field }) => (
-                  <InputItem name='Subject' field={field} placeholder='Email subject' />
-                )}
-              />
-              <FormField
-                control={form.control}
-                name='text'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Body</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder='Email body'
-                        className='min-h-[200px]'
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <DialogFooter className='mt-4'>
-              <Button type='submit'>Send Email</Button>
-            </DialogFooter>
-          </Form>
-        </FormProvider>
-      </DialogContent>
-    </Dialog>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <DialogFooter className='mt-4'>
+          <Button type='submit'>Send Email</Button>
+        </DialogFooter>
+      </Form>
+    </FormProvider>
   )
 }
 
