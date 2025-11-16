@@ -7,6 +7,6 @@ CREATE TABLE emails (
     sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP DEFAULT NULL,
     message_id INT NOT NULL,
-    tracking_id VARCHAR(36) NOT NULL,
+    tracking_id VARCHAR(36) NOT NULL UNIQUE,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
