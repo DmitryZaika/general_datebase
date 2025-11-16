@@ -1,13 +1,15 @@
+import { ColumnDef, Row } from '@tanstack/react-table'
 import type { RowDataPacket } from 'mysql2'
 import {
-  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
   useLocation,
+  useNavigate
 } from 'react-router'
-import { Button } from '~/components/ui/button'
+import { Badge } from '~/components/ui/badge'
+import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -56,51 +58,38 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return { emails }
 }
 
+const DateCell = ({ row }: { row: Row<EmailHistory> }) => {
+  const date = new Date(row.original.sent_at)
+  const cleanDate = date.toLocaleDateString('en-US', {
+    month: 'short',
+      day: 'numeric',
+    })
+  return <div><Badge variant='primary'>0</Badge><span className='text-xs ml-2'>{cleanDate}</span></div>
+}
+
+const customerColumns: ColumnDef<EmailHistory>[] = [
+  { accessorKey: 'sent_at', header: 'Date', cell: DateCell },
+  {
+    accessorKey: 'subject',
+    header: 'Subject',
+    cell: ({ row }: { row: Row<EmailHistory> }) => {
+      return row.original.subject
+    },
+  },
+
+]
+
 export default function DealEmailHistory() {
   const { emails } = useLoaderData<typeof loader>()
+  const navigate = useNavigate()
   const location = useLocation()
+  const handleRowClick = (emailId: number) => {
+    navigate(`chat/${location.search}`)
+  }
 
   return (
     <>
-      <div className='space-y-4'>
-        <h2 className='text-xl font-bold'>Email History</h2>
-        {emails.length === 0 ? (
-          <p className='text-gray-500'>No emails sent yet.</p>
-        ) : (
-          <div className='flex flex-col gap-2'>
-            <div className='flex items-center justify-between px-3 py-2 text-sm font-semibold text-zinc-700 border-b'>
-              <span className='w-20'>Date</span>
-              <span className='flex-1 max-w-[200px] text-center'>Subject</span>
-              <span className='flex-1 max-w-[200px] text-right'>Body</span>
-            </div>
-            {emails.map(email => {
-              const date = new Date(email.sent_at)
-              const dateString = date.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-              })
-
-              return (
-                <Link
-                  key={email.id}
-                  to={`chat${location.search}`}
-                  className='flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-zinc-100'
-                >
-                  <span className='text-zinc-600 w-20'>{dateString}</span>
-
-                  <span className='flex-1 max-w-[200px] text-center truncate'>
-                    {email.subject}
-                  </span>
-                  <span className='flex-1 max-w-[200px] text-right truncate'>
-                    {email.body.slice(0, 50)}...
-                  </span>
-                </Link>
-              )
-            })}
-            <Link className='w-full' to={`../email${location.search}`}><Button className='w-full'>Send Email</Button></Link>
-          </div>
-        )}
-      </div>
+          <DataTable columns={customerColumns} data={emails} onRowClick={(email: EmailHistory) => handleRowClick(email.id)} rowClassName={(email: EmailHistory) => 'cursor-pointer'} />
       <Outlet />
     </>
   )
