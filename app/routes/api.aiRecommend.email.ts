@@ -19,37 +19,24 @@ export const generateSchema = z.object({
     'referral',
   ]),
   recipientName: z.string().min(1, 'Recipient name is required'),
-  recipientCompany: z.string().optional(),
-  recipientRole: z.string().optional(),
-  relationshipStage: z
-    .enum(['lead', 'customer', 'past-customer', 'prospect'])
-    .optional(),
   formality: z.enum(['formal', 'neutral', 'casual']).optional(),
   tone: z.enum(['friendly', 'persuasive', 'empathetic', 'urgent']).optional(),
   verboseness: z.enum(['concise', 'detailed']).optional(),
-  language: z.string().optional(),
   desiredContent: z.string().optional(),
   previousMessages: z.array(z.string()).optional(),
   urgencyLevel: z.enum(['low', 'medium', 'high']).optional(),
   // --- sender fields ---
   senderName: z.string().optional(),
   senderCompany: z.string().optional(),
-  senderPosition: z.string().optional(),
-  senderPhoneNumber: z.string().optional(),
-  senderEmail: z.string().email().optional(),
 })
 
 function generate_user_message(cleanData: z.infer<typeof generateSchema>) {
   const {
     emailCategory = 'first-contact',
     recipientName = 'the recipient',
-    recipientCompany,
-    recipientRole,
-    relationshipStage,
     formality = 'neutral',
     tone = 'friendly',
     verboseness = 'concise',
-    language = 'English',
     desiredContent,
     previousMessages,
     urgencyLevel = 'medium',
@@ -60,20 +47,30 @@ function generate_user_message(cleanData: z.infer<typeof generateSchema>) {
     senderEmail,
   } = cleanData
 
-  let message = `Write a ${verboseness}, ${formality}, ${tone} sales email in ${language}. `
+  // Explicit length/structure enforcement
+  let lengthInstructions = ''
+  switch (verboseness) {
+    case 'concise':
+      lengthInstructions =
+        'Keep the entire email very brief. Focus only on essential information and keep the email short.'
+      break
+    case 'detailed':
+      lengthInstructions =
+        'Provide a comprehensive email with helpful context, elaboration, and clear next steps. Include descriptive detail and compelling explanations.'
+      break
+  }
+
+  let message = `Write a ${formality}, ${tone} sales email. `
   message += `Email type: ${emailCategory}. `
-  message += `Recipient: ${recipientName}`
-  if (recipientCompany) message += ` from ${recipientCompany}`
-  if (recipientRole) message += ` (${recipientRole})`
-  message += '. '
-  if (relationshipStage) message += `Relationship stage: ${relationshipStage}. `
+  message += `Verboseness: ${verboseness}. ${lengthInstructions} `
+  message += `Recipient: ${recipientName}. `
   if (desiredContent) message += `Include this content: ${desiredContent}. `
   if (previousMessages && previousMessages.length > 0) {
     message += `Previous messages: ${previousMessages.join(' | ')}. `
   }
   message += `Urgency level: ${urgencyLevel}. `
 
-  // Include sender info, but only if provided
+  // Include sender info only if provided
   const senderParts: string[] = []
   if (senderName) senderParts.push(senderName)
   if (senderPosition) senderParts.push(senderPosition)
@@ -82,11 +79,14 @@ function generate_user_message(cleanData: z.infer<typeof generateSchema>) {
   if (senderEmail) senderParts.push(`Email: ${senderEmail}`)
 
   if (senderParts.length > 0) {
-    message += `The email should be sent from: ${senderParts.join(' • ')}. `
+    message += `The email should be written as coming from: ${senderParts.join(' • ')}. `
   }
 
-  // Modified prompt for streaming
-  message += `First provide ONLY the subject line (no label, just the subject text). Then on a new line write "---BODY---". Then provide the email body with professional signature.`
+  // Output structure instructions (NO signature)
+  message +=
+    `First provide ONLY the subject line (no label, just the subject text). ` +
+    `Then on a new line write "---BODY---". ` +
+    `Then provide the email body. Do not include any signature, sign-off, or sender information at the end; I will add the signature manually.`
 
   return message
 }
@@ -119,12 +119,65 @@ export async function action({ request }: ActionFunctionArgs) {
 
   // OpenAI request with streaming
   const systemPrompt = `
-  You are an expert sales email assistant.
-  Your goal is to generate professional, persuasive, and realistic sales emails that could be sent immediately.
-  Use all provided recipient and sender information.
-  If any sender information is missing, simply omit it from the email and signature. Do not make up values.
-  Follow the user's formatting instructions exactly.
-  Do not include placeholders, brackets, or any extra commentary.
+  You are an expert sales email assistant. Your purpose is to generate professional, persuasive, and realistically usable emails. Always follow the user’s formatting instructions exactly. Do not add commentary, labels, placeholders, or a signature. The application will insert the signature separately.
+
+  Use all provided sender and recipient information. If any sender details are missing, simply omit them. Never invent names, companies, phone numbers, or facts.
+
+  EMAIL CATEGORY DEFINITIONS
+
+  FIRST-CONTACT
+  Used when the recipient already reached out through another channel. Tone: warm and helpful. Purpose: acknowledge their request, introduce yourself, and ask for a convenient time to talk.
+  Examples:
+  • “Good morning, [Name]! This is [Sender] from [Company]. Thanks for reaching out about new countertops…”
+  • “Hi [Name], I saw your request come in and wanted to introduce myself…”
+
+  FOLLOW-UP
+  Used when someone has shown interest or received a quote but hasn’t responded. Tone: polite and low-pressure. Purpose: check in, re-open conversation, and offer support.
+  Examples:
+  • “Hi [Name], just checking in to see if you're still considering new countertops…”
+  • “Hi [Name], I wanted to follow up on your quote and see if you had any questions…”
+
+  REPLY
+  Used to respond directly to the recipient’s message. Tone: responsive and clear.
+  Examples:
+  • “Thanks for your question about quartz colors…”
+  • “I appreciate your message. Yes, we can schedule the measurement this week…”
+
+  PROMOTIONAL
+  Used for offers or specials. Tone: upbeat and value-focused.
+  Examples:
+  • “We’re offering a limited-time discount on quartz countertops…”
+  • “We just launched new materials that might be perfect for your project…”
+
+  THANK-YOU
+  Used to express appreciation for a visit, call, inquiry, or purchase. Tone: warm and courteous.
+  Examples:
+  • “Thank you for stopping by our showroom today…”
+  • “Thanks for taking the time to speak with me earlier…”
+
+  FEEDBACK-REQUEST
+  Used to request a review or general feedback. Tone: appreciative and concise.
+  Examples:
+  • “When you have a moment, could you share feedback about your project experience?”
+  • “Your input means a lot to us…”
+
+  REFERRAL
+  Used to request or acknowledge referrals. Tone: friendly and non-pushy.
+  Examples:
+  • “If you know anyone planning countertop work, I’d be grateful if you passed along my info.”
+  • “Happy to help anyone you think could benefit from our services.”
+
+  GENERAL RULES
+  • Match the requested tone, formality, and verboseness.
+  • Never include a signature or contact block.
+  • Do not invent details.
+  • Avoid placeholders or brackets in your output. Write full, natural sentences.
+  • Follow the output structure exactly:
+    1. Provide ONLY the subject line (no “Subject:” prefix).
+    2. Next line: ---BODY---
+    3. Then the email body (no signature).
+
+  You generate emails that are clean, professional, and ready to use immediately.
   `
 
   try {
@@ -138,7 +191,7 @@ export async function action({ request }: ActionFunctionArgs) {
         try {
           // Use OpenAI streaming API
           const completion = await client.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'gpt-4.1-mini-2025-04-14',
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userMessage },
