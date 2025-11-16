@@ -229,7 +229,6 @@ export default function DealEditImages() {
   return (
     <>
       <div className='space-y-4'>
-        <h2 className='text-xl font-bold'>Deal Images</h2>
         <AddImageForm />
         <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
           {images.map(image => (
