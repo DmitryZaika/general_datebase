@@ -13,7 +13,7 @@ import {
   useActionData,
   useLoaderData,
   useLocation,
-  useNavigate
+  useNavigate,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
@@ -25,7 +25,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from '~/components/ui/dialog'
 import {
   FormControl,
@@ -407,17 +407,8 @@ async function generateAIEmail(
   if (senderInfo.senderName && senderInfo.senderName.trim()) {
     requestPayload.senderName = senderInfo.senderName
   }
-  if (senderInfo.senderEmail && senderInfo.senderEmail.trim()) {
-    requestPayload.senderEmail = senderInfo.senderEmail
-  }
   if (senderInfo.senderCompany && senderInfo.senderCompany.trim()) {
     requestPayload.senderCompany = senderInfo.senderCompany
-  }
-  if (senderInfo.senderPosition && senderInfo.senderPosition.trim()) {
-    requestPayload.senderPosition = senderInfo.senderPosition
-  }
-  if (senderInfo.senderPhoneNumber && senderInfo.senderPhoneNumber.trim()) {
-    requestPayload.senderPhoneNumber = senderInfo.senderPhoneNumber
   }
 
   console.log(
@@ -672,10 +663,10 @@ function AIAssistantMenu({ aiForm, onGenerate, isGenerating }: AIAssistantMenuPr
           name='desiredContent'
           render={({ field }) => (
             <InputItem
-            name={'Desired Content'}
-            placeholder={'Describe what you want the email to cover...'}
-            field={field}
-          />
+              name={'Desired Content'}
+              placeholder={'Describe what you want the email to cover...'}
+              field={field}
+            />
           )}
         />
       </FormProvider>
@@ -935,16 +926,17 @@ export default function DealEmailDialog() {
                 {showAIMenu ? 'Hide' : 'Toggle'} AI Assistant Menu
               </Button>
               <LoadingButton
-          type='button'
-          loading={isGenerating}
-          onClick={handleGenerateWithAI}
-        >
-          Generate
-        </LoadingButton>
-
+                type='button'
+                loading={isGenerating}
+                onClick={handleGenerateWithAI}
+              >
+                Generate
+              </LoadingButton>
 
               {/* Submit button */}
-              <Button type='submit' className='ml-auto'>Send Email</Button>
+              <Button type='submit' className='ml-auto'>
+                Send Email
+              </Button>
             </div>
           </form>
         </FormProvider>
