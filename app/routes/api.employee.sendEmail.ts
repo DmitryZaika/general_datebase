@@ -1,3 +1,4 @@
+import type { SendEmailCommandOutput } from '@aws-sdk/client-ses'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { z } from 'zod'
 import { db } from '~/db.server'
@@ -20,7 +21,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const raw = await request.json()
   const cleaned = customerSchema.parse(raw)
 
-  let info
+  let info: SendEmailCommandOutput
   try {
     info = await sendEmail({
       to: cleaned.to,
@@ -28,9 +29,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       subject: cleaned.subject,
       text: cleaned.body,
     })
-    console.log(info)
   } catch (error) {
-    const message = error.message
+    const message = (error as { message?: string }).message || 'Unknown error'
     if (message.includes('Email address is not verified.')) {
       return data({ error: 'Invalid email address' }, { status: 400 })
     }
@@ -38,6 +38,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const messageId = info.MessageId
+
+  await db.execute(
+    `INSERT INTO emails (user_id, subject, body, message_id)
+     VALUES (?, ?, ?, ?)`,
+    [user.id, cleaned.subject, cleaned.body, messageId],
+  )
 
   return data({ ok: true })
 }
