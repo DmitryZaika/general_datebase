@@ -1,9 +1,19 @@
 import type { SendEmailCommandOutput } from '@aws-sdk/client-ses'
 import { type ActionFunctionArgs, data } from 'react-router'
+import { v4 as uuidv4 } from 'uuid'
 import { z } from 'zod'
 import { db } from '~/db.server'
 import { sendEmail } from '~/lib/email.server'
 import { getEmployeeUser } from '~/utils/session.server'
+
+const baseUrl = 'https://cawv6iwjgxpk5fj2fchs6vc5vq0bycwp.lambda-url.us-east-2.on.aws'
+const getReadReceiptUrl = (messageId: string) => {
+  return `${baseUrl}/ses/read-receipt/${messageId}`
+}
+
+const getReadReceiptHtml = (messageId: string) => {
+  return `<img src="${getReadReceiptUrl(messageId)}" width="1" height="1" />`
+}
 
 export const customerSchema = z.object({
   to: z.string().email(),
@@ -12,14 +22,13 @@ export const customerSchema = z.object({
 })
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  if (request.method !== 'POST')
-    return data({ error: 'Method not allowed' }, { status: 405 })
-
   const user = await getEmployeeUser(request).catch(() => null)
   if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
 
   const raw = await request.json()
   const cleaned = customerSchema.parse(raw)
+
+  const uuid = uuidv4()
 
   let info: SendEmailCommandOutput
   try {
@@ -28,6 +37,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       from: user.email,
       subject: cleaned.subject,
       text: cleaned.body,
+      html: getReadReceiptHtml(uuid),
     })
   } catch (error) {
     const message = (error as { message?: string }).message || 'Unknown error'
@@ -40,9 +50,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const messageId = info.MessageId
 
   await db.execute(
-    `INSERT INTO emails (user_id, subject, body, message_id)
-     VALUES (?, ?, ?, ?)`,
-    [user.id, cleaned.subject, cleaned.body, messageId],
+    `INSERT INTO emails (user_id, subject, body, message_id, tracking_id)
+     VALUES (?, ?, ?, ?, ?)`,
+    [user.id, cleaned.subject, cleaned.body, messageId, uuid],
   )
 
   return data({ ok: true })
