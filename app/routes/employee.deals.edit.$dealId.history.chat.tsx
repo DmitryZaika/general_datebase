@@ -145,7 +145,6 @@ export default function EmailChatDialog() {
                       <SelectValue placeholder='Select template' />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value='first-contact'>First contact</SelectItem>
                       <SelectItem value='follow-up'>Follow-up</SelectItem>
                       <SelectItem value='reply'>Reply</SelectItem>
                     </SelectContent>
