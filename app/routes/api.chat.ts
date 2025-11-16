@@ -2,9 +2,9 @@ import OpenAI from 'openai'
 import type { LoaderFunctionArgs } from 'react-router'
 import { eventStream } from 'remix-utils/sse/server'
 import { db } from '~/db.server'
-import { getSession } from '~/sessions.server'
 import type { InstructionSlim } from '~/types'
 import { DONE_KEY } from '~/utils/constants'
+import { getSession } from '../sessions.server'
 import { selectMany } from '../utils/queryHelpers'
 import { getUserBySessionId } from '../utils/session.server'
 
@@ -17,40 +17,15 @@ interface Message {
   content: string
 }
 
-const instructionsCache = new Map<
-  number,
-  { data: InstructionSlim[]; updatedAt: number }
->()
-
-async function getInstructions(company_id: number): Promise<InstructionSlim[]> {
-  const cached = instructionsCache.get(company_id)
-  const now = Date.now()
-  if (cached && now - cached.updatedAt < 60_000) {
-    return cached.data
-  }
-  const instructions = await selectMany<InstructionSlim>(
-    db,
-    'SELECT id, title, rich_text from instructions WHERE company_id = ?',
-    [company_id],
-  )
-  instructionsCache.set(company_id, { data: instructions, updatedAt: now })
-  return instructions
-}
-
 async function getContext(
   user_id: number,
   query: string,
 ): Promise<{ messages: Message[]; id: number }> {
   const history = await selectMany<{ history: Message[]; id: number }>(
     db,
-    'SELECT id, history from chat_history WHERE user_id = ? ORDER BY id DESC LIMIT 1',
+    'SELECT id, history from chat_history WHERE user_id = ?',
     [user_id],
   )
-
-  if (history.length === 0) {
-    const messages: Message[] = [{ role: 'user', content: query }]
-    return { messages, id: 0 }
-  }
 
   const currentConvo = history[0].history
   currentConvo.push({ role: 'user', content: query })
@@ -62,10 +37,14 @@ async function newContext(
   company_id: number,
   query: string,
 ): Promise<{ history: Message[]; id: number | undefined }> {
-  const instructions = await getInstructions(company_id)
+  const instructions = await selectMany<InstructionSlim>(
+    db,
+    'SELECT id, title, rich_text from instructions WHERE company_id = ?',
+    [company_id],
+  )
   const chatHistory = await selectMany<{ id: number }>(
     db,
-    'SELECT id from chat_history WHERE user_id = ? ORDER BY id DESC LIMIT 1',
+    'SELECT id from chat_history WHERE user_id = ?',
     [user_id],
   )
 
@@ -140,15 +119,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+    model: 'gpt-4.1-mini-2025-04-14',
     messages: messages,
-    max_completion_tokens: 1024,
+    temperature: 1.1,
+    max_tokens: 1024,
     stream: true,
   })
 
   return eventStream(
     request.signal,
     function setup(send) {
+      // Используем SSE комментарии для заполнения буфера
+      // Комментарии начинаются с ':' и не отображаются клиенту
+      for (let i = 0; i < 30; i++) {
+        send({ event: 'ping', data: '' })
+      }
+
+      // Информационное сообщение отправляем как комментарий (не будет видно пользователю)
       send({ event: 'info', data: 'Connecting to AI...' })
 
       ;(async () => {
@@ -156,14 +143,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
         try {
           for await (const chunk of response) {
-            const delta = chunk.choices?.[0]?.delta
-            const message = delta?.content
-
-            if (!delta) continue
-            if (!message) continue
-
-            send({ data: message })
-            answer += message
+            const message = chunk.choices[0].delta.content
+            if (message) {
+              send({ data: message })
+              answer += message
+            }
           }
 
           send({ data: DONE_KEY })
