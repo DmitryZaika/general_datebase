@@ -18,7 +18,7 @@ const getReadReceiptHtml = (messageId: string) => {
 export const customerSchema = z.object({
   to: z.string().email(),
   subject: z.string().min(1).max(100),
-  body: z.string().min(1).max(1000),
+  body: z.string().min(1).max(10000),
 })
 
 export const action = async ({ request }: ActionFunctionArgs) => {
