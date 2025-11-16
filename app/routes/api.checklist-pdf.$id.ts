@@ -55,7 +55,6 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
   let cursorY = height - 60
-console.log(data.company_id)
   // Draw logo if exists
   // asdas
   let logoBytes: Uint8Array | undefined
