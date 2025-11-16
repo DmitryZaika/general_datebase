@@ -48,6 +48,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       ORDER BY e.sent_at DESC`,
   )
 
+  const [readCounts] = await db.execute<RowDataPacket[]>(
+    `SELECT e.id, COUNT(*) AS count
+       FROM emails e
+       JOIN email_reads er ON e.tracking_id = er.tracking_id
+      WHERE e.deleted_at IS NULL
+      GROUP BY e.id`,
+  )
+
   const emails: EmailHistory[] = (rows || []).map(row => ({
     id: row.id,
     subject: row.subject,
@@ -55,16 +63,17 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     sent_at: row.sent_at,
   }))
 
-  return { emails }
+  return { emails, readCounts }
 }
 
 const DateCell = ({ row }: { row: Row<EmailHistory> }) => {
+  const { readCounts } = useLoaderData<typeof loader>()
   const date = new Date(row.original.sent_at)
   const cleanDate = date.toLocaleDateString('en-US', {
     month: 'short',
       day: 'numeric',
     })
-  return <div><Badge variant='primary'>0</Badge><span className='text-xs ml-2'>{cleanDate}</span></div>
+  return <div><Badge variant='primary'>{readCounts?.find((count: RowDataPacket) => count.id === row.original.id)?.count ?? 0}</Badge><span className='text-xs ml-2'>{cleanDate}</span></div>
 }
 
 const customerColumns: ColumnDef<EmailHistory>[] = [
