@@ -19,15 +19,9 @@ export const generateSchema = z.object({
     'referral',
   ]),
   recipientName: z.string().min(1, 'Recipient name is required'),
-  recipientCompany: z.string().optional(),
-  recipientRole: z.string().optional(),
-  relationshipStage: z
-    .enum(['lead', 'customer', 'past-customer', 'prospect'])
-    .optional(),
   formality: z.enum(['formal', 'neutral', 'casual']).optional(),
   tone: z.enum(['friendly', 'persuasive', 'empathetic', 'urgent']).optional(),
   verboseness: z.enum(['concise', 'detailed']).optional(),
-  language: z.string().optional(),
   desiredContent: z.string().optional(),
   previousMessages: z.array(z.string()).optional(),
   urgencyLevel: z.enum(['low', 'medium', 'high']).optional(),
@@ -43,13 +37,9 @@ function generate_user_message(cleanData: z.infer<typeof generateSchema>) {
   const {
     emailCategory = 'first-contact',
     recipientName = 'the recipient',
-    recipientCompany,
-    recipientRole,
-    relationshipStage,
     formality = 'neutral',
     tone = 'friendly',
     verboseness = 'concise',
-    language = 'English',
     desiredContent,
     previousMessages,
     urgencyLevel = 'medium',
@@ -60,13 +50,10 @@ function generate_user_message(cleanData: z.infer<typeof generateSchema>) {
     senderEmail,
   } = cleanData
 
-  let message = `Write a ${verboseness}, ${formality}, ${tone} sales email in ${language}. `
+  let message = `Write a ${verboseness}, ${formality}, ${tone} sales email. `
   message += `Email type: ${emailCategory}. `
   message += `Recipient: ${recipientName}`
-  if (recipientCompany) message += ` from ${recipientCompany}`
-  if (recipientRole) message += ` (${recipientRole})`
   message += '. '
-  if (relationshipStage) message += `Relationship stage: ${relationshipStage}. `
   if (desiredContent) message += `Include this content: ${desiredContent}. `
   if (previousMessages && previousMessages.length > 0) {
     message += `Previous messages: ${previousMessages.join(' | ')}. `
