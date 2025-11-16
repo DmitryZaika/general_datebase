@@ -138,7 +138,7 @@ export async function action({ request }: ActionFunctionArgs) {
         try {
           // Use OpenAI streaming API
           const completion = await client.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'gpt-4.1-mini-2025-04-14',
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userMessage },
