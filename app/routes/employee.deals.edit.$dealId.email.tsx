@@ -8,7 +8,6 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
-  Form,
   type LoaderFunctionArgs,
   redirect,
   useActionData,
@@ -25,7 +24,6 @@ import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
@@ -84,15 +82,10 @@ interface AIEmailRequest {
     | 'feedback-request'
     | 'referral'
   recipientName: string
-  recipientCompany?: string
-  recipientRole?: string
-  relationshipStage?: 'lead' | 'customer' | 'past-customer' | 'prospect'
   formality?: 'formal' | 'neutral' | 'casual'
   tone?: 'friendly' | 'persuasive' | 'empathetic' | 'urgent'
   verboseness?: 'concise' | 'detailed'
-  language?: string
   desiredContent?: string
-  previousMessages?: string[]
   urgencyLevel?: 'low' | 'medium' | 'high'
   senderName?: string
   senderCompany?: string
@@ -137,24 +130,11 @@ const aiEmailSchema = z.object({
     'feedback-request',
     'referral',
   ]),
-  recipientName: z.string().min(1, 'Recipient name is required'),
-  recipientCompany: z.string().optional(),
-  recipientRole: z.string().optional(),
-  relationshipStage: z
-    .enum(['lead', 'customer', 'past-customer', 'prospect'])
-    .optional(),
   formality: z.enum(['formal', 'neutral', 'casual']).optional(),
   tone: z.enum(['friendly', 'persuasive', 'empathetic', 'urgent']).optional(),
   verboseness: z.enum(['concise', 'detailed']).optional(),
-  language: z.string().optional(),
   desiredContent: z.string().optional(),
-  previousMessages: z.array(z.string()).optional(),
   urgencyLevel: z.enum(['low', 'medium', 'high']).optional(),
-  senderName: z.string().optional(),
-  senderCompany: z.string().optional(),
-  senderPosition: z.string().optional(),
-  senderPhoneNumber: z.string().optional(),
-  senderEmail: z.string().email().optional(),
 })
 
 type AIEmailFormData = z.infer<typeof aiEmailSchema>
@@ -277,7 +257,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   // Fetch customer email associated with this deal
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT c.email
+    `SELECT c.email, c.name
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
       WHERE d.id = ? AND d.deleted_at IS NULL`,
@@ -294,6 +274,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   return {
     email: rows[0].email || '',
+    customerName: rows[0].name || '',
     senderInfo,
   }
 }
@@ -394,6 +375,7 @@ async function getSenderInfo(user: EmployeeUser): Promise<SenderInfo> {
 async function generateAIEmail(
   formData: AIEmailFormData,
   senderInfo: SenderInfo,
+  recipientName: string,
   onStreamSubject?: (text: string) => void,
   onStreamBody?: (text: string) => void,
 ): Promise<AIEmailResponse> {
@@ -403,18 +385,7 @@ async function generateAIEmail(
   // Build request payload, excluding empty strings and undefined values
   const requestPayload: Partial<AIEmailRequest> = {
     emailCategory: formData.emailCategory,
-    recipientName: formData.recipientName,
-  }
-
-  // Only add optional fields if they have non-empty values
-  if (formData.recipientCompany && formData.recipientCompany.trim()) {
-    requestPayload.recipientCompany = formData.recipientCompany
-  }
-  if (formData.recipientRole && formData.recipientRole.trim()) {
-    requestPayload.recipientRole = formData.recipientRole
-  }
-  if (formData.relationshipStage) {
-    requestPayload.relationshipStage = formData.relationshipStage
+    recipientName: recipientName || 'Customer',
   }
   if (formData.formality) {
     requestPayload.formality = formData.formality
@@ -424,9 +395,6 @@ async function generateAIEmail(
   }
   if (formData.verboseness) {
     requestPayload.verboseness = formData.verboseness
-  }
-  if (formData.language && formData.language.trim()) {
-    requestPayload.language = formData.language
   }
   if (formData.desiredContent && formData.desiredContent.trim()) {
     requestPayload.desiredContent = formData.desiredContent
@@ -439,17 +407,8 @@ async function generateAIEmail(
   if (senderInfo.senderName && senderInfo.senderName.trim()) {
     requestPayload.senderName = senderInfo.senderName
   }
-  if (senderInfo.senderEmail && senderInfo.senderEmail.trim()) {
-    requestPayload.senderEmail = senderInfo.senderEmail
-  }
   if (senderInfo.senderCompany && senderInfo.senderCompany.trim()) {
     requestPayload.senderCompany = senderInfo.senderCompany
-  }
-  if (senderInfo.senderPosition && senderInfo.senderPosition.trim()) {
-    requestPayload.senderPosition = senderInfo.senderPosition
-  }
-  if (senderInfo.senderPhoneNumber && senderInfo.senderPhoneNumber.trim()) {
-    requestPayload.senderPhoneNumber = senderInfo.senderPhoneNumber
   }
 
   console.log(
@@ -604,88 +563,6 @@ function AIAssistantMenu({ aiForm, onGenerate, isGenerating }: AIAssistantMenuPr
             )}
           />
 
-          {/* Recipient Name */}
-          <FormField
-            control={aiForm.control}
-            name='recipientName'
-            render={({ field }) => (
-              <FormItem className='space-y-1 mb-2'>
-                <FormLabel>Recipient Name *</FormLabel>
-                <FormControl>
-                  <input
-                    {...field}
-                    className='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
-                    placeholder='John Doe'
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Recipient Company */}
-          <FormField
-            control={aiForm.control}
-            name='recipientCompany'
-            render={({ field }) => (
-              <FormItem className='space-y-1 mb-2'>
-                <FormLabel>Company</FormLabel>
-                <FormControl>
-                  <input
-                    {...field}
-                    className='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
-                    placeholder='Acme Corp'
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Recipient Role */}
-          <FormField
-            control={aiForm.control}
-            name='recipientRole'
-            render={({ field }) => (
-              <FormItem className='space-y-1 mb-2'>
-                <FormLabel>Role</FormLabel>
-                <FormControl>
-                  <input
-                    {...field}
-                    className='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
-                    placeholder='Purchasing Manager'
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Relationship Stage */}
-          <FormField
-            control={aiForm.control}
-            name='relationshipStage'
-            render={({ field }) => (
-              <FormItem className='space-y-1 mb-2'>
-                <FormLabel>Relationship Stage</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder='Select stage' />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value='lead'>Lead</SelectItem>
-                    <SelectItem value='customer'>Customer</SelectItem>
-                    <SelectItem value='past-customer'>Past Customer</SelectItem>
-                    <SelectItem value='prospect'>Prospect</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
           {/* Formality */}
           <FormField
             control={aiForm.control}
@@ -757,26 +634,6 @@ function AIAssistantMenu({ aiForm, onGenerate, isGenerating }: AIAssistantMenuPr
               </FormItem>
             )}
           />
-
-          {/* Language */}
-          <FormField
-            control={aiForm.control}
-            name='language'
-            render={({ field }) => (
-              <FormItem className='space-y-1 mb-2'>
-                <FormLabel>Language</FormLabel>
-                <FormControl>
-                  <input
-                    {...field}
-                    className='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm'
-                    placeholder='English'
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
           {/* Urgency Level */}
           <FormField
             control={aiForm.control}
@@ -801,35 +658,17 @@ function AIAssistantMenu({ aiForm, onGenerate, isGenerating }: AIAssistantMenuPr
             )}
           />
         </div>
-
-        {/* Desired Content */}
         <FormField
           control={aiForm.control}
           name='desiredContent'
           render={({ field }) => (
-            <FormItem className='space-y-1 mb-2'>
-              <FormLabel>Desired Content</FormLabel>
-              <FormControl>
-                <Textarea
-                  {...field}
-                  placeholder='Describe what you want the email to cover...'
-                  className='min-h-[80px]'
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+            <InputItem
+              name={'Desired Content'}
+              placeholder={'Describe what you want the email to cover...'}
+              field={field}
+            />
           )}
         />
-
-        {/* Generate Button */}
-        <LoadingButton
-          type='button'
-          loading={isGenerating}
-          onClick={onGenerate}
-          className='w-full'
-        >
-          Generate Email with AI
-        </LoadingButton>
       </FormProvider>
     </div>
   )
@@ -842,6 +681,8 @@ function AIAssistantMenu({ aiForm, onGenerate, isGenerating }: AIAssistantMenuPr
 interface TemplateSelectorProps {
   selectedTemplate: string
   onTemplateSelect: (value: string) => void
+  onGenerate: () => void
+  isGenerating: boolean
 }
 
 /**
@@ -954,7 +795,7 @@ export default function DealEmailDialog() {
   const [isGenerating, setIsGenerating] = useState(false)
 
   // Data from loader and action
-  const { email, senderInfo } = useLoaderData<typeof loader>()
+  const { email, senderInfo, customerName } = useLoaderData<typeof loader>()
   const actionData = useActionData<typeof action>()
 
   // Initialize email form with react-hook-form
@@ -972,21 +813,11 @@ export default function DealEmailDialog() {
     resolver: zodResolver(aiEmailSchema),
     defaultValues: {
       emailCategory: 'first-contact',
-      recipientName: '',
-      recipientCompany: '',
-      recipientRole: '',
-      relationshipStage: 'prospect',
       formality: 'neutral',
       tone: 'friendly',
       verboseness: 'detailed',
-      language: 'English',
       desiredContent: '',
       urgencyLevel: 'medium',
-      senderName: senderInfo.senderName,
-      senderCompany: senderInfo.senderCompany || '',
-      senderPosition: senderInfo.senderPosition || '',
-      senderPhoneNumber: senderInfo.senderPhoneNumber || '',
-      senderEmail: senderInfo.senderEmail || '',
     },
   })
 
@@ -1030,29 +861,7 @@ export default function DealEmailDialog() {
     try {
       const aiFormData = aiForm.getValues()
       console.log('[handleGenerateWithAI] AI form data:', aiFormData)
-
-      const senderInfoForRequest: SenderInfo = {}
-
-      if (aiFormData.senderName) {
-        senderInfoForRequest.senderName = aiFormData.senderName
-      }
-      if (aiFormData.senderEmail) {
-        senderInfoForRequest.senderEmail = aiFormData.senderEmail
-      }
-      if (aiFormData.senderCompany) {
-        senderInfoForRequest.senderCompany = aiFormData.senderCompany
-      }
-      if (aiFormData.senderPosition) {
-        senderInfoForRequest.senderPosition = aiFormData.senderPosition
-      }
-      if (aiFormData.senderPhoneNumber) {
-        senderInfoForRequest.senderPhoneNumber = aiFormData.senderPhoneNumber
-      }
-
-      console.log(
-        '[handleGenerateWithAI] Sender info for request:',
-        senderInfoForRequest,
-      )
+      console.log('[handleGenerateWithAI] Sender info for request:', senderInfo)
 
       // Clear existing values before streaming
       form.setValue('subject', '')
@@ -1060,7 +869,8 @@ export default function DealEmailDialog() {
 
       await generateAIEmail(
         aiFormData,
-        senderInfoForRequest,
+        senderInfo,
+        customerName || 'Customer',
         subject => {
           // Stream subject in real-time
           form.setValue('subject', subject)
@@ -1115,9 +925,18 @@ export default function DealEmailDialog() {
               >
                 {showAIMenu ? 'Hide' : 'Toggle'} AI Assistant Menu
               </Button>
+              <LoadingButton
+                type='button'
+                loading={isGenerating}
+                onClick={handleGenerateWithAI}
+              >
+                Generate
+              </LoadingButton>
 
               {/* Submit button */}
-              <Button type='submit'>Send Email</Button>
+              <Button type='submit' className='ml-auto'>
+                Send Email
+              </Button>
             </div>
           </form>
         </FormProvider>
