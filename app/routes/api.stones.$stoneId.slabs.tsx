@@ -26,7 +26,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     // Include both direct slabs and linked slabs from other stones
     let query = `
-      SELECT id, bundle
+      SELECT id, bundle, is_leftover
       FROM slab_inventory
       WHERE (
         stone_id = ?
@@ -45,13 +45,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       queryParams.push(excludeSlabIds)
     }
 
-    const slabs = await selectMany<{ id: number; bundle: string }>(
+    const slabs = await selectMany<{ id: number; bundle: string; is_leftover: number }>(
       db,
       query,
       queryParams,
     )
+    
+    const slabsWithLO = slabs.map(slab => ({
+      ...slab,
+      is_leftover: Boolean(slab.is_leftover),
+    }))
 
-    return data({ slabs })
+    return data({ slabs: slabsWithLO })
   } catch {
     return new Response(JSON.stringify({ error: 'Failed to fetch slabs' }), {
       status: 500,

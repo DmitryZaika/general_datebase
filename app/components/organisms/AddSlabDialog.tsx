@@ -25,6 +25,7 @@ async function getSlabs(
   {
     id: number
     bundle: string
+    is_leftover: boolean
   }[]
 > {
   const cleanParam = encodeURIComponent(JSON.stringify(slabIds))
@@ -51,7 +52,7 @@ export const AddSlabDialog = ({
   stoneId: number
   roomIndex: number
 }) => {
-  type SlabState = { id: number; bundle: string } | undefined
+  type SlabState = { id: number; bundle: string; is_leftover: boolean } | undefined
   const [selectedSlab, setSelectedSlab] = useState<SlabState>()
 
   // Only exclude slabs that are already in the CURRENT room
@@ -104,7 +105,14 @@ export const AddSlabDialog = ({
               <SelectContent>
                 {data.map(slab => (
                   <SelectItem key={slab.id} value={slab.bundle}>
-                    {slab.bundle}
+                    <div className='flex items-center gap-2'>
+                      <span>{slab.bundle}</span>
+                      {slab.is_leftover && (
+                        <span className='px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-800 font-medium'>
+                          Leftover
+                        </span>
+                      )}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>

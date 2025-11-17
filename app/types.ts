@@ -39,7 +39,12 @@ export interface StoneImage {
   samples_amount: number
 }
 
-export type StoneSlim = Omit<Stone, 'retail_price'>
+export interface StoneSlim {
+  id: number
+  type: string
+  name: string
+  retail_price?: number
+}
 
 export interface Faucet {
   id: number
