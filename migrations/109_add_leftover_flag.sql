@@ -1,0 +1,1 @@
+ALTER TABLE slab_inventory ADD COLUMN is_leftover BOOLEAN DEFAULT FALSE;
