@@ -12,7 +12,7 @@ const getReadReceiptUrl = (messageId: string) => {
 }
 
 const getReadReceiptHtml = (messageId: string) => {
-  return `<img src="${getReadReceiptUrl(messageId)}" width="1" height="1" />`
+  return `<img src="${getReadReceiptUrl(messageId)}" />`
 }
 
 export const customerSchema = z.object({
@@ -36,8 +36,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       to: cleaned.to,
       from: user.email,
       subject: cleaned.subject,
-      text: cleaned.body,
-      html: getReadReceiptHtml(uuid),
+      // text: cleaned.body,
+      html: cleaned.body,
+      configurationSet: 'email-tracking-set',
     })
   } catch (error) {
     const message = (error as { message?: string }).message || 'Unknown error'
