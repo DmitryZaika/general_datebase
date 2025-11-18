@@ -580,7 +580,7 @@ export default function DealEmailDialog() {
       emailCategory: 'first-contact',
       formality: 'neutral',
       tone: 'friendly',
-      verboseness: 'detailed',
+      verboseness: 'concise',
       desiredContent: '',
       urgencyLevel: 'medium',
     },

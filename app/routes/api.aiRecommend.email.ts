@@ -101,6 +101,7 @@ const SYSTEM_PROMPT = `
   Examples:
   • “Good morning, [Name]! This is [Sender] from [Company]. Thanks for reaching out about new countertops…”
   • “Hi [Name], I saw your request come in and wanted to introduce myself…”
+  Hey [Name], this is [Sender], with [Company]. You asked us to call you back. Looks like you responded to our ad on [Social Media] about updating your kitchen. Are you currently available to provide me with more information about your project?
 
   FOLLOW-UP
   Used when someone has shown interest or received a quote but hasn’t responded. Tone: polite and low-pressure. Purpose: check in, re-open conversation, and offer support.
@@ -173,9 +174,9 @@ function formatSenderInfo(info: UserInfo): string {
   if (info.company) parts.push(info.company)
 
   return parts.length
-    ? `You are writing the email from the perspective of ${parts.join(
+    ? `Introduce my self as ${parts.join(
         ' at ',
-      )}, but DO NOT include a signature or name in the email. `
+      )} use only the first name of the customer. Dont use signature.`
     : ''
 }
 
