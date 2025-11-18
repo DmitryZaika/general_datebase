@@ -35,9 +35,13 @@ export function HeaderDesktop({
       <div className='logo'>
         <a className='flex justify-center' href='/'>
           <img
-            src='https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp'
+            src={
+              Number(companyId) === 4
+                ? 'https://gmqtops.com/wp-content/uploads/2023/01/logo-b.png'
+                : 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp'
+            }
             alt='Logo'
-            className='h-12 md:h-16 object-contain'
+            className={ Number(companyId) === 4 ? 'h-12 md:h-16 object-contain mr-4' : 'h-12 md:h-16 object-contain' }
           />
         </a>
       </div>

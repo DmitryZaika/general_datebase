@@ -132,7 +132,11 @@ export default function AdminChecklists() {
           src={
             companyId === 1
               ? 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo.png.png'
-              : 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/photo_2025-11-03_17-53-06.jpg'
+              : companyId === 3
+                ? 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/photo_2025-11-03_17-53-06.jpg'
+                : companyId === 4
+                  ? 'https://gmqtops.com/wp-content/uploads/2023/01/logo-b.png'
+                  : ''
           }
           alt='Logo'
           className='mx-auto mb-4 h-46 object-contain'
