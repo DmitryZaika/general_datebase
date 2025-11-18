@@ -1,13 +1,70 @@
+// Refactored, modular, and well‑commented implementation
+
+import type { RowDataPacket } from 'mysql2'
 import OpenAI from 'openai'
 import type { ActionFunctionArgs } from 'react-router'
 import { z } from 'zod'
+import { db } from '~/db.server'
 import { getEmployeeUser } from '~/utils/session.server'
+
+// ============================================================================
+// OPENAI CLIENT
+// ============================================================================
 
 const client = new OpenAI({
   apiKey: process.env.OPEN_AI_SECRET_KEY,
 })
 
-// --- Zod schema ---
+// ============================================================================
+// TYPES
+// ============================================================================
+
+/** Basic lead details used within prompt construction */
+export interface LeadInfo {
+  leadMessage?: string
+  remodelType?: string
+  referralSource?: string
+  customerName?: string
+  customerCompany?: string // <-- NEW
+}
+
+/** Lightweight user info parsed from full User object */
+export interface UserInfo {
+  name: string
+  company?: string
+}
+
+/** Extract only the fields you want to expose to the prompt builder */
+export async function getUserInfo(user: {
+  name: string
+  company_id?: number
+}): Promise<UserInfo> {
+  let companyName: string | undefined
+
+  if (user.company_id) {
+    try {
+      const [rows] = await db.execute<RowDataPacket[]>(
+        `SELECT name FROM company WHERE id = ? LIMIT 1`,
+        [user.company_id],
+      )
+      if (rows?.length) {
+        companyName = rows[0].name
+      }
+    } catch (err) {
+      console.error('Failed to load company info:', err)
+    }
+  }
+
+  return {
+    name: user.name,
+    company: companyName,
+  }
+}
+
+// ============================================================================
+// VALIDATION SCHEMA
+// ============================================================================
+
 export const generateSchema = z.object({
   emailCategory: z.enum([
     'first-contact',
@@ -18,107 +75,21 @@ export const generateSchema = z.object({
     'feedback-request',
     'referral',
   ]),
-  recipientName: z.string().min(1, 'Recipient name is required'),
+  dealId: z.number(),
   formality: z.enum(['formal', 'neutral', 'casual']).optional(),
   tone: z.enum(['friendly', 'persuasive', 'empathetic', 'urgent']).optional(),
   verboseness: z.enum(['concise', 'detailed']).optional(),
-  desiredContent: z.string().optional(),
-  previousMessages: z.array(z.string()).optional(),
   urgencyLevel: z.enum(['low', 'medium', 'high']).optional(),
-  // --- sender fields ---
-  senderName: z.string().optional(),
-  senderCompany: z.string().optional(),
+  desiredContent: z.string().optional(),
 })
 
-function generate_user_message(cleanData: z.infer<typeof generateSchema>) {
-  const {
-    emailCategory = 'first-contact',
-    recipientName = 'the recipient',
-    formality = 'neutral',
-    tone = 'friendly',
-    verboseness = 'concise',
-    desiredContent,
-    previousMessages,
-    urgencyLevel = 'medium',
-    senderName,
-    senderCompany,
-    senderPosition,
-    senderPhoneNumber,
-    senderEmail,
-  } = cleanData
+export type EmailGenerationParams = z.infer<typeof generateSchema>
 
-  // Explicit length/structure enforcement
-  let lengthInstructions = ''
-  switch (verboseness) {
-    case 'concise':
-      lengthInstructions =
-        'Keep the entire email very brief. Focus only on essential information and keep the email short.'
-      break
-    case 'detailed':
-      lengthInstructions =
-        'Provide a comprehensive email with helpful context, elaboration, and clear next steps. Include descriptive detail and compelling explanations.'
-      break
-  }
+// ============================================================================
+// SYSTEM PROMPT
+// ============================================================================
 
-  let message = `Write a ${formality}, ${tone} sales email. `
-  message += `Email type: ${emailCategory}. `
-  message += `Verboseness: ${verboseness}. ${lengthInstructions} `
-  message += `Recipient: ${recipientName}. `
-  if (desiredContent) message += `Include this content: ${desiredContent}. `
-  if (previousMessages && previousMessages.length > 0) {
-    message += `Previous messages: ${previousMessages.join(' | ')}. `
-  }
-  message += `Urgency level: ${urgencyLevel}. `
-
-  // Include sender info only if provided
-  const senderParts: string[] = []
-  if (senderName) senderParts.push(senderName)
-  if (senderPosition) senderParts.push(senderPosition)
-  if (senderCompany) senderParts.push(senderCompany)
-  if (senderPhoneNumber) senderParts.push(`Phone: ${senderPhoneNumber}`)
-  if (senderEmail) senderParts.push(`Email: ${senderEmail}`)
-
-  if (senderParts.length > 0) {
-    message += `The email should be written as coming from: ${senderParts.join(' • ')}. `
-  }
-
-  // Output structure instructions (NO signature)
-  message +=
-    `First provide ONLY the subject line (no label, just the subject text). ` +
-    `Then on a new line write "---BODY---". ` +
-    `Then provide the email body. Do not include any signature, sign-off, or sender information at the end; I will add the signature manually.`
-
-  return message
-}
-
-// --- API action with streaming support ---
-export async function action({ request }: ActionFunctionArgs) {
-  // Authorize user
-  try {
-    await getEmployeeUser(request)
-  } catch (error) {
-    console.error('Auth error:', error)
-    return new Response(JSON.stringify({ error: 'Failed to authorize' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  // Parse request data
-  let cleanData
-  try {
-    const requestData = await request.json()
-    cleanData = generateSchema.parse(requestData)
-  } catch (error) {
-    console.error('Parse error:', error)
-    return new Response(JSON.stringify({ error: 'Invalid request data' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  // OpenAI request with streaming
-  const systemPrompt = `
+const SYSTEM_PROMPT = `
   You are an expert sales email assistant. Your purpose is to generate professional, persuasive, and realistically usable emails. Always follow the user’s formatting instructions exactly. Do not add commentary, labels, placeholders, or a signature. The application will insert the signature separately.
 
   Use all provided sender and recipient information. If any sender details are missing, simply omit them. Never invent names, companies, phone numbers, or facts.
@@ -180,47 +151,205 @@ export async function action({ request }: ActionFunctionArgs) {
   You generate emails that are clean, professional, and ready to use immediately.
   `
 
-  try {
-    const userMessage = generate_user_message(cleanData)
+// ============================================================================
+// UTILITIES
+// ============================================================================
 
-    // Create a ReadableStream for Server-Sent Events
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder()
+/**
+ * Generates length-guidance text used by the model.
+ */
+function getLengthInstructions(level: 'concise' | 'detailed'): string {
+  return level === 'concise'
+    ? 'Keep the entire email very brief. Focus only on essential information and keep the email short.'
+    : 'Provide a comprehensive email with elaboration, context, and helpful detail.'
+}
 
-        try {
-          // Use OpenAI streaming API
-          const completion = await client.chat.completions.create({
-            model: 'gpt-4.1-mini-2025-04-14',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userMessage },
-            ],
-            stream: true,
-          })
+/**
+ * Converts sender details into a readable fragment for AI conditioning.
+ */
+function formatSenderInfo(info: UserInfo): string {
+  const parts = []
+  if (info.name) parts.push(info.name)
+  if (info.company) parts.push(info.company)
 
-          for await (const chunk of completion) {
-            const content = chunk.choices[0]?.delta?.content || ''
-            if (content) {
-              // Send each chunk as SSE
-              const data = JSON.stringify({ content })
-              controller.enqueue(encoder.encode(`data: ${data}\n\n`))
-            }
+  return parts.length
+    ? `You are writing the email from the perspective of ${parts.join(
+        ' at ',
+      )}, but DO NOT include a signature or name in the email. `
+    : ''
+}
+
+/**
+ * Retrieves lead fields needed for content generation.
+ */
+export async function getLeadInfoByDeal(dealId: number): Promise<LeadInfo> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `
+       SELECT
+         c.name AS customerName,
+         c.company_name AS customerCompany,   -- <-- NEW
+         c.details,
+         c.your_message,
+         c.referral_source,
+         c.remodal_type
+       FROM deals d
+       JOIN customers c ON d.customer_id = c.id
+       WHERE d.id = ? AND d.deleted_at IS NULL
+     `,
+    [dealId],
+  )
+
+  if (!rows?.length) return {}
+
+  const row = rows[0]
+  return {
+    customerName: row.customerName || undefined,
+    customerCompany: row.customerCompany || undefined, // <-- NEW
+    leadMessage: row.details || row.your_message || undefined,
+    remodelType: row.remodal_type || undefined,
+    referralSource: row.referral_source || undefined,
+  }
+}
+
+// ============================================================================
+// PROMPT CONSTRUCTION
+// ============================================================================
+
+/**
+ * Builds the final text message sent to the model.
+ */
+export function buildUserPrompt(
+  params: EmailGenerationParams,
+  lead: LeadInfo,
+  userInfo: UserInfo,
+): string {
+  const {
+    emailCategory,
+    formality = 'neutral',
+    tone = 'friendly',
+    verboseness = 'concise',
+    urgencyLevel = 'medium',
+    desiredContent,
+  } = params
+
+  const { customerName, leadMessage, remodelType, referralSource, customerCompany } =
+    lead
+
+  let prompt = `Write a ${formality}, ${tone} sales email. `
+  prompt += `Email type: ${emailCategory}. `
+  prompt += `Verboseness: ${verboseness}. ${getLengthInstructions(verboseness)} `
+  prompt += `Urgency level: ${urgencyLevel}. `
+
+  // Incorporate lead details into the instruction
+  if (customerName) {
+    prompt += `Address the recipient by their name: ${customerName}. `
+  }
+  if (customerCompany) {
+    prompt += `Mention the customer's company: ${customerCompany}. `
+  }
+  if (leadMessage) {
+    prompt += `Acknowledge how the lead originally came in: ${leadMessage}. `
+  }
+  if (referralSource) {
+    prompt += `Mention the referral source (e.g., Facebook, phone, etc): ${referralSource}. `
+  }
+  if (remodelType) {
+    prompt += `Reference the project type they are interested in: ${remodelType}. `
+  }
+
+  if (desiredContent) {
+    prompt += `Include this content: ${desiredContent}. `
+  }
+
+  prompt += formatSenderInfo(userInfo)
+
+  prompt += `First provide ONLY the subject line. Then newline: ---BODY---. Then write the body. Do NOT include any signature, sender name, sender title, sender company, or closing phrase such as “Best,” “Thanks,” “Regards,” or similar. The system will insert the signature manually.`
+
+  console.log(prompt)
+  return prompt
+}
+
+// ============================================================================
+// STREAMING
+// ============================================================================
+
+async function createStreamingResponse(
+  params: EmailGenerationParams,
+  userInfo: UserInfo,
+): Promise<ReadableStream> {
+  const lead = await getLeadInfoByDeal(params.dealId)
+  const userPrompt = buildUserPrompt(params, lead, userInfo)
+
+  return new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder()
+
+      try {
+        const completion = await client.chat.completions.create({
+          model: 'gpt-4.1-mini-2025-04-14',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+          stream: true,
+        })
+
+        for await (const chunk of completion) {
+          const content = chunk.choices[0]?.delta?.content || ''
+          if (content) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ content })}\n\n`),
+            )
           }
-
-          // Send completion signal
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`),
-          )
-          controller.close()
-        } catch (error) {
-          console.error('Streaming error:', error)
-          const errorData = JSON.stringify({ error: 'Streaming failed' })
-          controller.enqueue(encoder.encode(`data: ${errorData}\n\n`))
-          controller.close()
         }
-      },
-    })
+
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`),
+        )
+        controller.close()
+      } catch (err) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ error: 'Streaming failed' })}\n\n`),
+        )
+        controller.close()
+      }
+    },
+  })
+}
+
+// ============================================================================
+// ERRORS
+// ============================================================================
+
+function createErrorResponse(message: string, status: number): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+// ============================================================================
+// ROUTE HANDLER
+// ============================================================================
+
+export async function action({ request }: ActionFunctionArgs) {
+  let user
+  try {
+    user = await getEmployeeUser(request)
+  } catch {
+    return createErrorResponse('Failed to authorize', 401)
+  }
+
+  let params: EmailGenerationParams
+  try {
+    params = generateSchema.parse(await request.json())
+  } catch {
+    return createErrorResponse('Invalid request data', 400)
+  }
+
+  try {
+    const userInfo = await getUserInfo(user)
+    const stream = await createStreamingResponse(params, userInfo)
 
     return new Response(stream, {
       headers: {
@@ -229,11 +358,7 @@ export async function action({ request }: ActionFunctionArgs) {
         Connection: 'keep-alive',
       },
     })
-  } catch (error) {
-    console.error('OpenAI error:', error)
-    return new Response(JSON.stringify({ error: 'Failed to generate response' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+  } catch {
+    return createErrorResponse('Failed to generate response', 500)
   }
 }
