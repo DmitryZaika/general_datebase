@@ -20,7 +20,6 @@ import { getValidatedFormData } from 'remix-hook-form'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 
-// UI Components
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
@@ -589,7 +588,7 @@ export default function DealEmailDialog() {
   const fullSubmit = useFullSubmit(form)
 
   const handleDialogClose = (open: boolean) => {
-    if (!open) navigate(`../project${location.search}`)
+    if (!open) navigate(`../${location.search}`)
   }
 
   const handleGenerateWithAI = async () => {
