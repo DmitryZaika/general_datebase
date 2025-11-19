@@ -1,9 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { EnvelopeClosedIcon } from '@radix-ui/react-icons'
 import type { RowDataPacket } from 'mysql2'
 import {
   type ActionFunctionArgs,
-  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
@@ -11,7 +9,6 @@ import {
   useNavigate
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -121,7 +118,6 @@ export default function DealsEdit() {
       <DialogContent className='sm:max-w-[500px] overflow-auto flex flex-col justify-baseline min-h-[390px] max-h-[95vh] p-5'>
         <DialogHeader> 
           <DialogTitle>Edit Deal</DialogTitle>  
-          <Link to={`email${location.search}`}><Button variant='ghost' aria-label='Email' size='icon' className='text-2xl'><EnvelopeClosedIcon /></Button></Link>
         </DialogHeader>
         <Tabs
           value={location.pathname.split('/').pop()}
