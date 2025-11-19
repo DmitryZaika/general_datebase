@@ -1,8 +1,11 @@
+import { EnvelopeClosedIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
+import { MapIcon } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useState } from 'react'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { Link, type LoaderFunctionArgs, Outlet, redirect, useLoaderData, useLocation } from 'react-router'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
+import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { VCard } from '~/components/VCard'
 import { db } from '~/db.server'
@@ -36,7 +39,7 @@ export default function DealProjectInfo() {
   const { customer } = useLoaderData<typeof loader>()
   const isMobile = useIsMobile()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
-
+  const location = useLocation()
   const columns: ColumnDef<{ key: string; value: string }>[] = [
     {
       header: 'Key',
@@ -48,6 +51,17 @@ export default function DealProjectInfo() {
       cell: ({ row }) => {
         const isNameField = row.original.key.toLowerCase() === 'name'
         const isPhoneField = row.original.key.toLowerCase() === 'phone'
+        const isEmailField = row.original.key.toLowerCase() === 'email'
+        const isAddressField = row.original.key.toLowerCase() === 'address'
+
+        const handleAddressClick = () => {
+          const address = String(row.original.value || '')
+          if (!address) return
+          const url =
+            'https://www.google.com/maps/search/?api=1&query=' +
+            encodeURIComponent(address)
+          window.open(url, '_blank', 'noopener,noreferrer')
+        }
 
         return (
           <div className='flex items-center gap-2'>
@@ -64,6 +78,33 @@ export default function DealProjectInfo() {
                   {row.original.value}
                 </span>
               )
+            ) : isEmailField ? (
+              <>
+                <Link
+                  to={`email${location.search}`}
+                  className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden border-2 border-gray-300 rounded-md px-2'
+                >
+                {row.original.value}
+                </Link>
+                <Link to={`email${location.search}`}>
+                  <Button
+                    variant='ghost'
+                    aria-label='Email'
+                    size='icon'
+                    className='text-2xl'
+                  >
+                    <EnvelopeClosedIcon />
+                  </Button>
+                </Link>
+              </>
+            ) : isAddressField ? (
+              <button
+                type='button'
+                className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden border-2 border-gray-300 rounded-md px-2 text-left cursor-pointer'
+                onClick={handleAddressClick}
+              >
+                {row.original.value}
+              </button>
             ) : (
               <span className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden'>
                 {row.original.value}
@@ -83,6 +124,19 @@ export default function DealProjectInfo() {
                     ''
                   }
                 />
+              </div>
+            )}
+            {isAddressField && (
+              <div className='flex flex-col items-end ml-auto '>
+                <Button
+                  variant='ghost'
+                  aria-label='Map'
+                  size='icon'
+                  className='text-2xl'
+                  onClick={handleAddressClick}
+                >
+                  <MapIcon />
+                </Button>
               </div>
             )}
           </div>
@@ -119,6 +173,8 @@ export default function DealProjectInfo() {
       <div>
         <DataTable columns={columns} data={otherFields} noHeader />
       </div>
+
+      <Outlet />
 
       {attachedFile && (
         <div className='mt-6'>
