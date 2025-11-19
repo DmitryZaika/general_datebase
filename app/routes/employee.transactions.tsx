@@ -91,7 +91,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url)
 
     const searchTerm = url.searchParams.get('search') || ''
-    const salesRep = url.searchParams.get('salesRep') || user.name
+    const salesRep = url.searchParams.get('salesRep') || 'All'
     const status = url.searchParams.get('status') || 'in_progress'
 
     let query = `

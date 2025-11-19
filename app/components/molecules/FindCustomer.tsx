@@ -43,6 +43,7 @@ export function FindCustomer({
   noActionsLabel?: string
 }) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [visibleCount, setVisibleCount] = useState(5)
   const [isInputFocused, setIsInputFocused] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
@@ -71,7 +72,14 @@ export function FindCustomer({
     enabled: !!searchTerm,
   })
 
-  const displayCustomers = useMemo(() => customers, [customers])
+  const displayCustomers = useMemo(
+    () => customers.slice(0, visibleCount),
+    [customers, visibleCount],
+  )
+
+  useEffect(() => {
+    setVisibleCount(5)
+  }, [searchTerm])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -101,7 +109,7 @@ export function FindCustomer({
         </div>
       </div>
 
-      {isInputFocused && displayCustomers.length > 0 && (
+      {isInputFocused && customers.length > 0 && (
         <div className='absolute z-50 w-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'>
           {displayCustomers.map(customer => (
             <div
@@ -191,6 +199,20 @@ export function FindCustomer({
               </div>
             </div>
           ))}
+          {customers.length > visibleCount && (
+            <div className='p-2 flex justify-center'>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={e => {
+                  e.stopPropagation()
+                  setVisibleCount(prev => prev + 5)
+                }}
+              >
+                Show more
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

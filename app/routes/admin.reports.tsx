@@ -13,7 +13,7 @@ import {
 import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, User } from '~/utils/session.server'
 
 interface SlabReport {
   id: number
@@ -45,8 +45,9 @@ function formatDate(dateString: string | null) {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  let user: User
   try {
-    await getAdminUser(request)
+    user = await getAdminUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -60,12 +61,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const suppliers = await selectMany<{ id: number; name: string }>(
     db,
-    `SELECT id, supplier_name as name FROM suppliers ORDER BY supplier_name ASC`,
+    `SELECT id, supplier_name as name FROM suppliers WHERE company_id = ? ORDER BY supplier_name ASC`,
+    [user.company_id],
   )
 
   const stones = await selectMany<{ id: number; name: string }>(
     db,
-    `SELECT id, name FROM stones ORDER BY name ASC`,
+    `SELECT id, name FROM stones WHERE company_id = ? ORDER BY name ASC`,
+    [user.company_id],
   )
 
   let slabs: SlabReport[] = []
@@ -98,7 +101,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         WHERE 
           slab_inventory.cut_date IS NOT NULL
           AND slab_inventory.parent_id IS NULL
+          AND stones.company_id = ?
+          AND suppliers.company_id = ?
       `
+      queryParams.push(user.company_id, user.company_id)
 
       if (fromDate) {
         query += ` AND DATE(slab_inventory.cut_date) >= ?`
