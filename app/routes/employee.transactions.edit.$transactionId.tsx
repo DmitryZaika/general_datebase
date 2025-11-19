@@ -1,5 +1,7 @@
 import {
+  type ActionFunctionArgs,
   type LoaderFunctionArgs,
+  Form,
   Outlet,
   useLoaderData,
   useLocation,
@@ -142,6 +144,58 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 }
 
+export async function action({ request, params }: ActionFunctionArgs) {
+  const user = await getEmployeeUser(request)
+  if (!params.transactionId) {
+    return forceRedirectError(request.headers, 'No transaction ID provided')
+  }
+
+  const saleId = parseInt(params.transactionId, 10)
+  if (Number.isNaN(saleId)) {
+    return forceRedirectError(request.headers, 'Invalid transaction ID format')
+  }
+
+  const formData = await request.formData()
+  const intent = formData.get('intent')
+  if (intent !== 'cut-slab') {
+    return null
+  }
+
+  const slabIdValue = formData.get('slabId')
+  const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+  if (!slabId || !Number.isFinite(slabId)) {
+    return null
+  }
+
+  const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
+    db,
+    `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+    [slabId, saleId],
+  )
+
+  if (slabs.length === 0) {
+    return null
+  }
+
+  if (slabs[0].cut_date === null) {
+    await db.execute(`UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`, [
+      slabId,
+    ])
+  }
+
+  const remaining = await selectMany<{ count: number }>(
+    db,
+    `SELECT COUNT(*) as count FROM slab_inventory WHERE sale_id = ? AND cut_date IS NULL`,
+    [saleId],
+  )
+
+  const remainingCount = remaining[0]?.count ?? 0
+  const status = remainingCount > 0 ? 'partially cut' : 'cut'
+  await db.execute(`UPDATE sales SET status = ? WHERE id = ?`, [status, saleId])
+
+  return null
+}
+
 export default function ViewTransaction() {
   const { sale, slabs, sinks } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
@@ -164,16 +218,16 @@ export default function ViewTransaction() {
 
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
-      <DialogContent className='max-w-4xl'>
+      <DialogContent className='min-w-[500px] max-w-6xl'>
         <DialogHeader>
           <DialogTitle>Transaction Details</DialogTitle>
         </DialogHeader>
 
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-6 py-4'>
-          <div className='space-y-4'>
-            <div>
+        <div className='flex flex-col gap-6 py-4'>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+            <div className='border rounded-md p-4'>
               <h3 className='text-lg font-semibold mb-2'>Sale Information</h3>
-              <div className='grid grid-cols-2 gap-y-2'>
+              <div className='grid grid-cols-2 gap-y-2 text-sm'>
                 <div className='font-medium'>Customer:</div>
                 <div>{sale.customer_name}</div>
 
@@ -185,82 +239,10 @@ export default function ViewTransaction() {
               </div>
             </div>
 
-            <div>
-              <h3 className='text-lg font-semibold mb-2'>Slabs</h3>
-              {slabs.length === 0 ? (
-                <p className='text-gray-500'>No slabs in this transaction</p>
-              ) : (
-                <div className='border rounded-md'>
-                  <table className='min-w-full divide-y divide-gray-200'>
-                    <thead className='bg-gray-50'>
-                      <tr>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Bundle
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Stone
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          SF
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Status
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Notes
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className='bg-white divide-y divide-gray-200'>
-                      {slabs.map(slab => (
-                        <tr key={slab.id}>
-                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
-                            {slab.bundle}
-                          </td>
-                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
-                            {slab.stone_name}
-                          </td>
-                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
-                            {slab.square_feet || 'N/A'}
-                          </td>
-                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                slab.cut_date
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-green-100 text-green-800'
-                              }`}
-                            >
-                              {slab.cut_date ? 'Cut' : 'Uncut'}
-                            </span>
-                          </td>
-                          <td className='px-4 py-2 text-sm max-w-[150px] break-words'>
-                            {slab.notes || '-'}
-                          </td>
-                        </tr>
-                      ))}
-                      {totalSquareFeet > 0 && (
-                        <tr className='bg-gray-50'>
-                          <td colSpan={2} className='px-4 py-2 text-sm font-medium'>
-                            Total Square Feet:
-                          </td>
-                          <td colSpan={3} className='px-4 py-2 text-sm font-medium'>
-                            {Number(totalSquareFeet).toFixed(2)}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className='space-y-4'>
-            <div>
+            <div className='border rounded-md p-4'>
               <h3 className='text-lg font-semibold mb-2'>Sinks</h3>
               {sinks.length === 0 ? (
-                <p className='text-gray-500'>No sinks in this transaction</p>
+                <p className='text-sm text-gray-500'>No sinks in this transaction</p>
               ) : (
                 <div className='border rounded-md'>
                   <table className='min-w-full divide-y divide-gray-200'>
@@ -290,6 +272,98 @@ export default function ViewTransaction() {
                           <td className='px-4 py-2 text-sm font-medium'>Total:</td>
                           <td className='px-4 py-2 text-sm font-medium'>
                             {formatCurrency(totalSinkPrice)}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className='flex justify-center'>
+            <div className='w-full'>
+              <h3 className='text-lg font-semibold mb-2'>Slabs</h3>
+              {slabs.length === 0 ? (
+                <p className='text-gray-500'>No slabs in this transaction</p>
+              ) : (
+                <div className='border h-full rounded-md shadow-sm w-full overflow-hidden'>
+                  <table className='min-w-full h-full divide-y divide-gray-200'>
+                    <thead className='bg-gray-50'>
+                      <tr>
+                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                          Bundle
+                        </th>
+                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                          Stone
+                        </th>
+                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                          SF
+                        </th>
+                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                          Status
+                        </th>
+                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                          Notes
+                        </th>
+                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                          Cut Date
+                        </th>
+                        <th className='px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className='bg-white divide-y divide-gray-200'>
+                      {slabs.map(slab => (
+                        <tr key={slab.id}>
+                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
+                            {slab.bundle}
+                          </td>
+                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
+                            {slab.stone_name}
+                          </td>
+                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
+                            {slab.square_feet || 'N/A'}
+                          </td>
+                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                slab.cut_date
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}
+                            >
+                              {slab.cut_date ? 'Cut' : 'Uncut'}
+                            </span>
+                          </td>
+                          <td className='px-4 py-2 text-sm max-w-[150px] break-words'>
+                            {slab.notes || '-'}
+                          </td>
+                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
+                            {slab.cut_date ? formatDate(slab.cut_date) : '-'}
+                          </td>
+                          <td className='px-4 py-2 whitespace-nowrap text-right text-sm'>
+                            {!slab.cut_date && (
+                              <Form method='post'>
+                                <input type='hidden' name='intent' value='cut-slab' />
+                                <input type='hidden' name='slabId' value={String(slab.id)} />
+                                <Button type='submit' size='sm' variant='outline'>
+                                  Cut
+                                </Button>
+                              </Form>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {totalSquareFeet > 0 && (
+                        <tr className='bg-gray-50'>
+                          <td colSpan={2} className='px-4 py-2 text-sm font-medium'>
+                            Total Square Feet:
+                          </td>
+                          <td colSpan={5} className='px-4 py-2 text-sm font-medium'>
+                            {Number(totalSquareFeet).toFixed(2)}
                           </td>
                         </tr>
                       )}
