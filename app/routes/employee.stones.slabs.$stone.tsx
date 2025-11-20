@@ -38,6 +38,7 @@ interface Slab {
   length: number
   cut_date: string | null
   parent_id: number | null
+  is_leftover: boolean
   source_stone_id?: number
   source_stone_name?: string
   transaction?: {
@@ -125,11 +126,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return forceRedirectError(request.headers, 'No stone found for given ID')
   }
 
-  const slabs = await selectMany<Slab>(
+  const slabsRaw = await selectMany<Omit<Slab, 'is_leftover'> & { is_leftover: number }>(
     db,
-    'SELECT id, bundle, url, sale_id, width, length, cut_date, parent_id FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL',
+    'SELECT id, bundle, url, sale_id, width, length, cut_date, parent_id, is_leftover FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL',
     [stoneId],
   )
+
+  const slabs: Slab[] = slabsRaw.map(slab => ({
+    ...slab,
+    is_leftover: Boolean(slab.is_leftover),
+  }))
 
   let linkedSlabs: Slab[] = []
 
@@ -150,14 +156,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   )
 
   for (const link of stoneLinks) {
-    const linkedStoneSlabs = await selectMany<Slab>(
+    const linkedStoneSlabsRaw = await selectMany<Omit<Slab, 'is_leftover'> & { is_leftover: number }>(
       db,
       `SELECT
-           id, bundle, url, sale_id, width, length, cut_date, parent_id
+           id, bundle, url, sale_id, width, length, cut_date, parent_id, is_leftover
          FROM slab_inventory
          WHERE stone_id = ? AND cut_date IS NULL`,
       [link.source_stone_id],
     )
+
+    const linkedStoneSlabs: Slab[] = linkedStoneSlabsRaw.map(slab => ({
+      ...slab,
+      is_leftover: Boolean(slab.is_leftover),
+    }))
 
     linkedStoneSlabs.forEach(slab => {
       slab.source_stone_id = link.source_stone_id
@@ -449,17 +460,24 @@ export default function SlabsModal() {
                 }}
               />
 
-              <span
-                className={`font-semibold whitespace-nowrap ${
-                  slab.sale_id
-                    ? 'text-red-900'
-                    : hasParent
-                      ? 'text-yellow-800'
-                      : 'text-gray-800'
-                }`}
-              >
-                {slab.bundle}
-              </span>
+              <div className='flex items-center gap-2'>
+                <span
+                  className={`font-semibold whitespace-nowrap ${
+                    slab.sale_id
+                      ? 'text-red-900'
+                      : hasParent
+                        ? 'text-yellow-800'
+                        : 'text-gray-800'
+                  }`}
+                >
+                  {slab.bundle}
+                </span>
+                {slab.is_leftover && (
+                  <span className='px-2 py-0.5 rounded-md text-xs bg-purple-100 text-purple-800 font-medium'>
+                    Leftover
+                  </span>
+                )}
+              </div>
 
               <div className='flex items-center gap-2 w-full'>
                 {isEditing ? (

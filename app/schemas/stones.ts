@@ -18,6 +18,32 @@ export const stoneSchema = z.object({
   finishing: z.enum(STONE_FINISHES),
 })
 
+const quickAddStoneBaseSchema = {
+  name: z.string().min(1, 'Name is required'),
+  retail_price: z.coerce.number().positive('Price is required'),
+  length: z.coerce.number().positive('Length is required'),
+  width: z.coerce.number().positive('Width is required'),
+  type: z.enum(STONE_TYPES).optional(),
+  company_id: z.number(),
+}
+
+export const quickAddStoneSchema = z.discriminatedUnion('leftover', [
+  z.object({
+    ...quickAddStoneBaseSchema,
+    leftover: z.literal(true),
+  }),
+  z.object({
+    ...quickAddStoneBaseSchema,
+    leftover: z.literal(false),
+    bundle: z.string().min(1, 'Bundle number is required'),
+  }),
+])
+
+export type TQuickAddStoneSchema = z.infer<typeof quickAddStoneSchema>
+
+export type TLeftoverStone = Extract<TQuickAddStoneSchema, { leftover: true }>
+export type TRegularStone = Extract<TQuickAddStoneSchema, { leftover: false }>
+
 export const stoneFilterSchema = z.object({
   type: z.array(z.enum(STONE_TYPES)).default([]),
   show_sold_out: z

@@ -2,6 +2,7 @@ import { GridIcon, TableIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useEffect, useState } from 'react'
 import {
+  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
@@ -281,6 +282,10 @@ export default function Stones() {
             )}
             {viewMode === 'grid' ? 'Table View' : 'Grid View'}
           </Button>
+
+          <Link to={`sell-slab${location.search}`}>
+            <Button variant='default'>Sell Slab</Button>
+          </Link>
         </div>
         <div className='flex-1 flex justify-center md:justify-end md:ml-auto'>
           <StoneSearch userRole='employee' companyId={companyId} />

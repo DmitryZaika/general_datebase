@@ -24,7 +24,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     .map(s => Number(s.trim()))
     .filter(n => Number.isInteger(n) && n > 0)
 
-  let sql = `SELECT slab_inventory.id, slab_inventory.bundle FROM slab_inventory
+  let sql = `SELECT slab_inventory.id, slab_inventory.bundle, slab_inventory.is_leftover FROM slab_inventory
   JOIN stones ON slab_inventory.stone_id = stones.id
   WHERE stones.company_id = ?`
   const params: (number | string)[] = [user.company_id]
@@ -37,8 +37,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const slabNames = await selectMany<{
     id: number
-    name: string
+    bundle: string
+    is_leftover: number
   }>(db, sql, params)
 
-  return data({ slabNames })
+  const slabNamesWithLO = slabNames.map(slab => ({
+    ...slab,
+    is_leftover: Boolean(slab.is_leftover),
+  }))
+
+  return data({ slabNames: slabNamesWithLO })
 }

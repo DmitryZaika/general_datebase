@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { X } from 'lucide-react'
-import { useState } from 'react'
+import { Plus, X } from 'lucide-react'
+import { useCallback, useDeferredValue, useState } from 'react'
 import type { StoneSearchResult, StoneSlim } from '~/types'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
+import { AddStoneQuickDialog } from './AddStoneQuickDialog'
 
 const fetchAvailableStones = async (companyId: number, query: string = '') => {
   const response = await fetch(
@@ -28,18 +29,31 @@ export const StoneSearch = ({
   setStone,
   onRetailPriceChange,
   companyId,
+  allowQuickAdd = false,
+  onStoneCreated,
 }: {
   stone: StoneSlim | undefined
   setStone: (value: StoneSlim | undefined) => void
   onRetailPriceChange?: (price: number) => void
   companyId: number
+  allowQuickAdd?: boolean
+  onStoneCreated?: (stone: StoneSlim, slabId?: number) => void
 }) => {
-  const [searchValue, setSearchValue] = useState(stone?.name || undefined)
+  const [inputValue, setInputValue] = useState(stone?.name || '')
   const [show, setShow] = useState(!stone?.name)
+  const [showAddStoneDialog, setShowAddStoneDialog] = useState(false)
+
+  const deferredQuery = useDeferredValue(inputValue)
+
+  const handleValueChange = (value: string) => {
+    setInputValue(value)
+    if (!show) setShow(true)
+  }
+
   const { data, isLoading } = useQuery({
-    queryKey: ['availableStones', searchValue],
-    queryFn: () => fetchAvailableStones(companyId, searchValue),
-    enabled: !!searchValue,
+    queryKey: ['availableStones', companyId, deferredQuery],
+    queryFn: () => fetchAvailableStones(companyId, deferredQuery),
+    enabled: !!deferredQuery,
   })
 
   const handleStoneSelect = (stone: { id: number; name: string }) => {
@@ -54,49 +68,73 @@ export const StoneSearch = ({
       onRetailPriceChange(selectedStone.retail_price || 0)
     }
 
-    setSearchValue(stone.name)
+    setInputValue(stone.name)
     setShow(false)
-  }
-
-  const handleValueChange = (value: string) => {
-    setSearchValue(value)
-    if (show === false) {
-      setShow(true)
-    }
   }
 
   const handleRemoveStone = () => {
     setStone(undefined)
-    setSearchValue('')
+    setInputValue('')
     setShow(false)
   }
+
+  const handleNewStoneCreated = useCallback(
+    (newStone: StoneSlim, slabId?: number) => {
+      if (onStoneCreated) {
+        onStoneCreated(newStone, slabId)
+      }
+
+      setStone(newStone)
+
+      if (onRetailPriceChange && newStone.retail_price) {
+        onRetailPriceChange(newStone.retail_price)
+      }
+
+      setInputValue(newStone.name)
+      setShow(false)
+    },
+    [setStone, onRetailPriceChange, onStoneCreated],
+  )
 
   return (
     <div className='space-y-2'>
       <label className='text-sm font-medium'>Stone</label>
 
-      <div className='relative'>
-        {stone && (
+      <div className='flex gap-2'>
+        <div className='relative flex-1'>
+          {stone && (
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={handleRemoveStone}
+              className='absolute h-6 w-6 -top-4 right-0 z-10 text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 '
+            >
+              <X className='h-3 w-3' />
+            </Button>
+          )}
+          <Input
+            placeholder='Search stone colors...'
+            value={stone?.name || inputValue}
+            disabled={!!stone?.name}
+            onChange={e => handleValueChange(e.target.value)}
+            className='w-full'
+          />
+          {isLoading && (
+            <div className='absolute right-8 top-2'>
+              <div className='animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent'></div>
+            </div>
+          )}
+        </div>
+        {allowQuickAdd && !stone && (
           <Button
-            variant='ghost'
+            type='button'
+            variant='outline'
             size='sm'
-            onClick={handleRemoveStone}
-            className='absolute h-6 w-6 -top-4 right-0 z-10 text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 '
+            onClick={() => setShowAddStoneDialog(true)}
+            className='h-9 w-9 p-0'
           >
-            <X className='h-3 w-3' />
+            <Plus className='h-4 w-4' />
           </Button>
-        )}
-        <Input
-          placeholder='Search stone colors...'
-          value={searchValue || stone?.name || ''}
-          disabled={!!stone?.name}
-          onChange={e => handleValueChange(e.target.value)}
-          className='w-full'
-        />
-        {isLoading && (
-          <div className='absolute right-8 top-2'>
-            <div className='animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent'></div>
-          </div>
         )}
       </div>
 
@@ -116,6 +154,12 @@ export const StoneSearch = ({
           </ul>
         </div>
       )}
+      <AddStoneQuickDialog
+        show={showAddStoneDialog}
+        setShow={setShowAddStoneDialog}
+        companyId={companyId}
+        onStoneCreated={handleNewStoneCreated}
+      />
     </div>
   )
 }

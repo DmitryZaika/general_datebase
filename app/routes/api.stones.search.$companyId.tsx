@@ -36,7 +36,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     AND s.is_display = 1
     GROUP BY s.id, s.type, s.name, s.url, s.width, s.length, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount`
 
-  if (!showSoldOut) {
+  // Only filter by availability if explicitly requested (showSoldOut=false)
+  // When unsold_only=true (from StoneSearch), show all stones including those without slabs
+  if (!showSoldOut && !cleanParams.get('unsold_only')) {
     query += `\nHAVING available > 0`
   }
 

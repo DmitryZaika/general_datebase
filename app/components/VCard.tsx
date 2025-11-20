@@ -18,7 +18,13 @@ type VCardFields = {
   address: string
 }
 
-const fieldKeys: Array<keyof VCardFields> = ['name', 'phone', 'email', 'company', 'address']
+const fieldKeys: Array<keyof VCardFields> = [
+  'name',
+  'phone',
+  'email',
+  'company',
+  'address',
+]
 
 export function VCard({ name, phone, email, company, address, className }: VCardProps) {
   const [isDownloading, setIsDownloading] = useState(false)
@@ -68,15 +74,37 @@ export function VCard({ name, phone, email, company, address, className }: VCard
     return ua.toLowerCase().includes('telegram')
   }
 
-  const openServerDownload = (fields: VCardFields, fileName: string) => {
+  const buildServerUrl = (fields: VCardFields, fileName: string) => {
     const params = new URLSearchParams()
     params.set('filename', fileName)
     fieldKeys.forEach(key => {
       const value = fields[key]
       if (value) params.set(key, value)
     })
-    const url = `/api/vcard?${params.toString()}`
-    window.open(url, '_blank', 'noopener,noreferrer')
+    return `/api/vcard?${params.toString()}`
+  }
+
+  const openServerDownload = (fields: VCardFields, fileName: string) => {
+    const url = buildServerUrl(fields, fileName)
+    if (typeof document === 'undefined') {
+      if (typeof window !== 'undefined') {
+        window.location.href = url
+      }
+      return
+    }
+    const iframe = document.createElement('iframe')
+    iframe.style.display = 'none'
+    const remove = () => {
+      if (iframe.parentNode) {
+        iframe.parentNode.removeChild(iframe)
+      }
+    }
+    iframe.addEventListener('load', () => {
+      setTimeout(remove, 500)
+    })
+    document.body.appendChild(iframe)
+    iframe.src = url
+    setTimeout(remove, 15000)
   }
 
   const downloadVCard = () => {
