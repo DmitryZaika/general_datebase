@@ -10,49 +10,93 @@ type VCardProps = {
   className?: string
 }
 
+type VCardFields = {
+  name: string
+  phone: string
+  email: string
+  company: string
+  address: string
+}
+
+const fieldKeys: Array<keyof VCardFields> = ['name', 'phone', 'email', 'company', 'address']
+
 export function VCard({ name, phone, email, company, address, className }: VCardProps) {
   const [isDownloading, setIsDownloading] = useState(false)
 
-  const generateVCard = () => {
-    const sanitize = (value?: string) => {
-      const str = (value ?? '').toString().trim()
-      if (!str) return ''
-      const low = str.toLowerCase()
-      if (low === 'null' || low === 'undefined') return ''
-      return str
-    }
+  const sanitize = (value?: string) => {
+    const str = (value ?? '').toString().trim()
+    if (!str) return ''
+    const low = str.toLowerCase()
+    if (low === 'null' || low === 'undefined') return ''
+    return str
+  }
 
-    const sName = sanitize(name)
-    const sCompany = sanitize(company)
-    const sPhone = sanitize(phone)
-    const sEmail = sanitize(email)
-    const sAddress = sanitize(address)
+  const getFields = (): VCardFields => ({
+    name: sanitize(name),
+    phone: sanitize(phone),
+    email: sanitize(email),
+    company: sanitize(company),
+    address: sanitize(address),
+  })
 
-    const lines = [
+  const generateVCard = (fields: VCardFields) => {
+    const lines: string[] = [
       'BEGIN:VCARD',
       'VERSION:3.0',
-      `FN:${sName}`,
-      `N:${sName};;;;`,
-      sCompany ? `ORG:${sCompany}` : null,
-      sPhone ? `TEL:${sPhone}` : null,
-      sEmail ? `EMAIL:${sEmail}` : null,
-      sAddress ? `ADR:;;${sAddress};;;;;` : null,
-      'END:VCARD',
-    ].filter(Boolean) as string[]
+      `FN:${fields.name}`,
+      `N:${fields.name};;;;`,
+    ]
 
-    return lines.join('\n')
+    if (fields.company) lines.push(`ORG:${fields.company}`)
+    if (fields.phone) lines.push(`TEL:${fields.phone}`)
+    if (fields.email) lines.push(`EMAIL:${fields.email}`)
+    if (fields.address) lines.push(`ADR:;;${fields.address};;;;;`)
+    lines.push('END:VCARD')
+
+    return lines.join('\r\n') + '\r\n'
+  }
+
+  const buildFileName = (value: string) => {
+    const base = value || 'contact'
+    const sanitized = base.replace(/[^\w.-]+/g, '_')
+    return sanitized.toLowerCase().endsWith('.vcf') ? sanitized : `${sanitized}.vcf`
+  }
+
+  const isTelegramBrowser = () => {
+    if (typeof navigator === 'undefined') return false
+    const ua = navigator.userAgent || ''
+    return ua.toLowerCase().includes('telegram')
+  }
+
+  const openServerDownload = (fields: VCardFields, fileName: string) => {
+    const params = new URLSearchParams()
+    params.set('filename', fileName)
+    fieldKeys.forEach(key => {
+      const value = fields[key]
+      if (value) params.set(key, value)
+    })
+    const url = `/api/vcard?${params.toString()}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const downloadVCard = () => {
     setIsDownloading(true)
+    const fields = getFields()
+    const fileName = buildFileName(fields.name)
 
-    const vcardContent = generateVCard()
-    const blob = new Blob([vcardContent], { type: 'text/vcard' })
+    if (isTelegramBrowser()) {
+      openServerDownload(fields, fileName)
+      setTimeout(() => setIsDownloading(false), 1000)
+      return
+    }
+
+    const vcardContent = generateVCard(fields)
+    const blob = new Blob([vcardContent], { type: 'text/vcard;charset=utf-8' })
     const url = window.URL.createObjectURL(blob)
 
     const link = document.createElement('a')
     link.href = url
-    link.download = `${name.replace(/\s+/g, '_')}.vcf`
+    link.download = fileName
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -72,3 +116,4 @@ export function VCard({ name, phone, email, company, address, className }: VCard
     </Button>
   )
 }
+
