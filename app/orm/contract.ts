@@ -32,7 +32,7 @@ export class Contract {
   protected async createSale(user: User) {
     const totalSquareFeet = await this.calculateTotalSquareFeet()
     const [salesResult] = await db.execute<ResultSetHeader>(
-      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price, project_address, extras) 
+      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price, project_address, extras)
                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL, ?, ?, ?)`,
 
       [
@@ -48,7 +48,7 @@ export class Contract {
     )
 
     await db.execute(
-      `UPDATE customers 
+      `UPDATE customers
          SET sales_rep = COALESCE(sales_rep, ?)
        WHERE id = ? AND company_id = ?`,
       [user.id, this.data.customer_id, user.company_id],
@@ -92,7 +92,7 @@ export class Contract {
     }
     const totalSquareFeet = await this.calculateTotalSquareFeet()
     await db.execute(
-      `UPDATE sales 
+      `UPDATE sales
          SET customer_id = ?,
              seller_id = COALESCE(?, seller_id),
              notes = ?,
@@ -274,8 +274,8 @@ export class Contract {
     const slabReplacementMap = new Map<string, number>() // roomIndex-slabIndex -> new slabId
 
     // Count slab usage across all rooms
-    this.data.rooms.forEach((room) => {
-      room.slabs.forEach((slab) => {
+    this.data.rooms.forEach(room => {
+      room.slabs.forEach(slab => {
         const count = slabUsageMap.get(slab.id) || 0
         slabUsageMap.set(slab.id, count + 1)
       })
@@ -317,12 +317,13 @@ export class Contract {
       const room = this.data.rooms[roomIndex]
 
       if (room.slabs.length === 0) {
-        throw new Error(`Room ${roomIndex + 1} has no slabs. At least one slab is required per room.`)
+        throw new Error(
+          `Room ${roomIndex + 1} has no slabs. At least one slab is required per room.`,
+        )
       }
 
       const firstSlab = room.slabs[0]
-      const firstSlabId =
-        slabReplacementMap.get(`${roomIndex}-0`) || firstSlab.id
+      const firstSlabId = slabReplacementMap.get(`${roomIndex}-0`) || firstSlab.id
 
       for (let slabIndex = 0; slabIndex < room.slabs.length; slabIndex++) {
         const slab = room.slabs[slabIndex]
@@ -385,8 +386,8 @@ export class Contract {
     const slabReplacementMap = new Map<string, number>() // roomIndex-slabIndex -> new slabId
 
     // Count slab usage across all rooms
-    this.data.rooms.forEach((room) => {
-      room.slabs.forEach((slab) => {
+    this.data.rooms.forEach(room => {
+      room.slabs.forEach(slab => {
         const count = slabUsageMap.get(slab.id) || 0
         slabUsageMap.set(slab.id, count + 1)
       })
@@ -428,12 +429,13 @@ export class Contract {
       const room = this.data.rooms[roomIndex]
 
       if (room.slabs.length === 0) {
-        throw new Error(`Room ${roomIndex + 1} has no slabs. At least one slab is required per room.`)
+        throw new Error(
+          `Room ${roomIndex + 1} has no slabs. At least one slab is required per room.`,
+        )
       }
 
       const firstSlab = room.slabs[0]
-      const firstSlabId =
-        slabReplacementMap.get(`${roomIndex}-0`) || firstSlab.id
+      const firstSlabId = slabReplacementMap.get(`${roomIndex}-0`) || firstSlab.id
 
       for (let slabIndex = 0; slabIndex < room.slabs.length; slabIndex++) {
         const slab = room.slabs[slabIndex]

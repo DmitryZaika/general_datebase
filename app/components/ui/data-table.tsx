@@ -6,7 +6,6 @@ import {
   type SortingState,
   useReactTable,
 } from '@tanstack/react-table'
-import type React from 'react'
 import { useState } from 'react'
 
 import {
@@ -22,23 +21,23 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   noHeader?: boolean
+  onRowClick?: (row: TData) => void
+  rowClassName?: string | ((row: TData) => string)
 }
 
-function hasTableRowExtras(value: unknown): value is {
-  className?: string
-  onClick?: (e: React.MouseEvent<HTMLTableRowElement>) => void
-} {
-  if (value === null || typeof value !== 'object') return false
-  const obj = value as Record<string, unknown>
-  const classNameOk = obj.className === undefined || typeof obj.className === 'string'
-  const onClickOk = obj.onClick === undefined || typeof obj.onClick === 'function'
-  return classNameOk && onClickOk
+function getRowClassName<TData>(row: TData, rowClassName?: string | ((row: TData) => string)): string {
+  if (typeof rowClassName === 'function') {
+    return rowClassName(row)
+  }
+  return rowClassName ?? ''
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
   noHeader = false,
+  onRowClick,
+  rowClassName,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
   const table = useReactTable({
@@ -81,29 +80,20 @@ export function DataTable<TData, TValue>({
         )}
         <TableBody>
           {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map(row =>
-              (() => {
-                const extras = hasTableRowExtras(row.original)
-                  ? row.original
-                  : undefined
-                return (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && 'selected'}
-                    className={extras?.className}
-                    onClick={e => {
-                      extras?.onClick?.(e)
-                    }}
-                  >
-                    {row.getVisibleCells().map(cell => (
-                      <TableCell key={cell.id} className='whitespace-nowrap pl-4'>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                )
-              })(),
-            )
+            table.getRowModel().rows.map(row => (
+              <TableRow
+                key={row.id}
+                data-state={row.getIsSelected() && 'selected'}
+                className={getRowClassName(row.original, rowClassName)}
+                onClick={() => onRowClick?.(row.original)}
+              >
+                {row.getVisibleCells().map(cell => (
+                  <TableCell key={cell.id} className='whitespace-nowrap pl-4'>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
           ) : (
             <TableRow>
               <TableCell colSpan={columns.length} className='h-24 text-center'>

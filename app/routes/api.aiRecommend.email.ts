@@ -1,0 +1,365 @@
+// Refactored, modular, and well‑commented implementation
+
+import type { RowDataPacket } from 'mysql2'
+import OpenAI from 'openai'
+import type { ActionFunctionArgs } from 'react-router'
+import { z } from 'zod'
+import { db } from '~/db.server'
+import { getEmployeeUser } from '~/utils/session.server'
+
+// ============================================================================
+// OPENAI CLIENT
+// ============================================================================
+
+const client = new OpenAI({
+  apiKey: process.env.OPEN_AI_SECRET_KEY,
+})
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+/** Basic lead details used within prompt construction */
+export interface LeadInfo {
+  leadMessage?: string
+  remodelType?: string
+  referralSource?: string
+  customerName?: string
+  customerCompany?: string // <-- NEW
+}
+
+/** Lightweight user info parsed from full User object */
+export interface UserInfo {
+  name: string
+  company?: string
+}
+
+/** Extract only the fields you want to expose to the prompt builder */
+export async function getUserInfo(user: {
+  name: string
+  company_id?: number
+}): Promise<UserInfo> {
+  let companyName: string | undefined
+
+  if (user.company_id) {
+    try {
+      const [rows] = await db.execute<RowDataPacket[]>(
+        `SELECT name FROM company WHERE id = ? LIMIT 1`,
+        [user.company_id],
+      )
+      if (rows?.length) {
+        companyName = rows[0].name
+      }
+    } catch (err) {
+      console.error('Failed to load company info:', err)
+    }
+  }
+
+  return {
+    name: user.name,
+    company: companyName,
+  }
+}
+
+// ============================================================================
+// VALIDATION SCHEMA
+// ============================================================================
+
+export const generateSchema = z.object({
+  emailCategory: z.enum([
+    'first-contact',
+    'follow-up',
+    'reply',
+    'promotional',
+    'thank-you',
+    'feedback-request',
+    'referral',
+  ]),
+  dealId: z.number(),
+  formality: z.enum(['formal', 'neutral', 'casual']).optional(),
+  tone: z.enum(['friendly', 'persuasive', 'empathetic', 'urgent']).optional(),
+  verboseness: z.enum(['concise', 'detailed']).optional(),
+  urgencyLevel: z.enum(['low', 'medium', 'high']).optional(),
+  desiredContent: z.string().optional(),
+})
+
+export type EmailGenerationParams = z.infer<typeof generateSchema>
+
+// ============================================================================
+// SYSTEM PROMPT
+// ============================================================================
+
+const SYSTEM_PROMPT = `
+  You are an expert sales email assistant. Your purpose is to generate professional, persuasive, and realistically usable emails. Always follow the user’s formatting instructions exactly. Do not add commentary, labels, placeholders, or a signature. The application will insert the signature separately.
+
+  Use all provided sender and recipient information. If any sender details are missing, simply omit them. Never invent names, companies, phone numbers, or facts.
+
+  EMAIL CATEGORY DEFINITIONS
+
+  FIRST-CONTACT
+  Used when the recipient already reached out through another channel. Tone: warm and helpful. Purpose: acknowledge their request, introduce yourself, and ask for a convenient time to talk.
+  Examples:
+  • “Good morning, [Name]! This is [Sender] from [Company]. Thanks for reaching out about new countertops…”
+  • “Hi [Name], I saw your request come in and wanted to introduce myself…”
+  Hey [Name], this is [Sender], with [Company]. You asked us to call you back. Looks like you responded to our ad on [Social Media] about updating your kitchen. Are you currently available to provide me with more information about your project?
+
+  FOLLOW-UP
+  Used when someone has shown interest or received a quote but hasn’t responded. Tone: polite and low-pressure. Purpose: check in, re-open conversation, and offer support.
+  Examples:
+  • “Hi [Name], just checking in to see if you're still considering new countertops…”
+  • “Hi [Name], I wanted to follow up on your quote and see if you had any questions…”
+
+  REPLY
+  Used to respond directly to the recipient’s message. Tone: responsive and clear.
+  Examples:
+  • “Thanks for your question about quartz colors…”
+  • “I appreciate your message. Yes, we can schedule the measurement this week…”
+
+  PROMOTIONAL
+  Used for offers or specials. Tone: upbeat and value-focused.
+  Examples:
+  • “We’re offering a limited-time discount on quartz countertops…”
+  • “We just launched new materials that might be perfect for your project…”
+
+  THANK-YOU
+  Used to express appreciation for a visit, call, inquiry, or purchase. Tone: warm and courteous.
+  Examples:
+  • “Thank you for stopping by our showroom today…”
+  • “Thanks for taking the time to speak with me earlier…”
+
+  FEEDBACK-REQUEST
+  Used to request a review or general feedback. Tone: appreciative and concise.
+  Examples:
+  • “When you have a moment, could you share feedback about your project experience?”
+  • “Your input means a lot to us…”
+
+  REFERRAL
+  Used to request or acknowledge referrals. Tone: friendly and non-pushy.
+  Examples:
+  • “If you know anyone planning countertop work, I’d be grateful if you passed along my info.”
+  • “Happy to help anyone you think could benefit from our services.”
+
+  GENERAL RULES
+  • Match the requested tone, formality, and verboseness.
+  • Never include a signature or contact block.
+  • Do not invent details.
+  • Avoid placeholders or brackets in your output. Write full, natural sentences.
+  • Follow the output structure exactly:
+    1. Provide ONLY the subject line (no “Subject:” prefix).
+    2. Next line: ---BODY---
+    3. Then the email body (no signature).
+
+  You generate emails that are clean, professional, and ready to use immediately.
+  `
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+/**
+ * Generates length-guidance text used by the model.
+ */
+function getLengthInstructions(level: 'concise' | 'detailed'): string {
+  return level === 'concise'
+    ? 'Keep the entire email very brief. Focus only on essential information and keep the email short.'
+    : 'Provide a comprehensive email with elaboration, context, and helpful detail.'
+}
+
+/**
+ * Converts sender details into a readable fragment for AI conditioning.
+ */
+function formatSenderInfo(info: UserInfo): string {
+  const parts = []
+  if (info.name) parts.push(info.name)
+  if (info.company) parts.push(info.company)
+
+  return parts.length
+    ? `Introduce my self as ${parts.join(
+        ' at ',
+      )} use only the first name of the customer. Dont use signature.`
+    : ''
+}
+
+/**
+ * Retrieves lead fields needed for content generation.
+ */
+export async function getLeadInfoByDeal(dealId: number): Promise<LeadInfo> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `
+       SELECT
+         c.name AS customerName,
+         c.company_name AS customerCompany,   -- <-- NEW
+         c.details,
+         c.your_message,
+         c.referral_source,
+         c.remodal_type
+       FROM deals d
+       JOIN customers c ON d.customer_id = c.id
+       WHERE d.id = ? AND d.deleted_at IS NULL
+     `,
+    [dealId],
+  )
+
+  if (!rows?.length) return {}
+
+  const row = rows[0]
+  return {
+    customerName: row.customerName || undefined,
+    customerCompany: row.customerCompany || undefined, // <-- NEW
+    leadMessage: row.details || row.your_message || undefined,
+    remodelType: row.remodal_type || undefined,
+    referralSource: row.referral_source || undefined,
+  }
+}
+
+// ============================================================================
+// PROMPT CONSTRUCTION
+// ============================================================================
+
+/**
+ * Builds the final text message sent to the model.
+ */
+export function buildUserPrompt(
+  params: EmailGenerationParams,
+  lead: LeadInfo,
+  userInfo: UserInfo,
+): string {
+  const {
+    emailCategory,
+    formality = 'neutral',
+    tone = 'friendly',
+    verboseness = 'concise',
+    urgencyLevel = 'medium',
+    desiredContent,
+  } = params
+
+  const { customerName, leadMessage, remodelType, referralSource, customerCompany } =
+    lead
+
+  let prompt = `Write a ${formality}, ${tone} sales email. `
+  prompt += `Email type: ${emailCategory}. `
+  prompt += `Verboseness: ${verboseness}. ${getLengthInstructions(verboseness)} `
+  prompt += `Urgency level: ${urgencyLevel}. `
+
+  // Incorporate lead details into the instruction
+  if (customerName) {
+    prompt += `Address the recipient by their name: ${customerName}. `
+  }
+  if (customerCompany) {
+    prompt += `Mention the customer's company: ${customerCompany}. `
+  }
+  if (leadMessage) {
+    prompt += `Acknowledge how the lead originally came in: ${leadMessage}. `
+  }
+  if (referralSource) {
+    prompt += `Mention the referral source (e.g., Facebook, phone, etc): ${referralSource}. `
+  }
+  if (remodelType) {
+    prompt += `Reference the project type they are interested in: ${remodelType}. `
+  }
+
+  if (desiredContent) {
+    prompt += `Include this content: ${desiredContent}. `
+  }
+
+  prompt += formatSenderInfo(userInfo)
+
+  prompt += `First provide ONLY the subject line. Then newline: ---BODY---. Then write the body. Do NOT include any signature, sender name, sender title, sender company, or closing phrase such as “Best,” “Thanks,” “Regards,” or similar. The system will insert the signature manually.`
+
+  console.log(prompt)
+  return prompt
+}
+
+// ============================================================================
+// STREAMING
+// ============================================================================
+
+async function createStreamingResponse(
+  params: EmailGenerationParams,
+  userInfo: UserInfo,
+): Promise<ReadableStream> {
+  const lead = await getLeadInfoByDeal(params.dealId)
+  const userPrompt = buildUserPrompt(params, lead, userInfo)
+
+  return new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder()
+
+      try {
+        const completion = await client.chat.completions.create({
+          model: 'gpt-4.1-mini-2025-04-14',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+          stream: true,
+        })
+
+        for await (const chunk of completion) {
+          const content = chunk.choices[0]?.delta?.content || ''
+          if (content) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ content })}\n\n`),
+            )
+          }
+        }
+
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`),
+        )
+        controller.close()
+      } catch (err) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ error: 'Streaming failed' })}\n\n`),
+        )
+        controller.close()
+      }
+    },
+  })
+}
+
+// ============================================================================
+// ERRORS
+// ============================================================================
+
+function createErrorResponse(message: string, status: number): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+// ============================================================================
+// ROUTE HANDLER
+// ============================================================================
+
+export async function action({ request }: ActionFunctionArgs) {
+  let user
+  try {
+    user = await getEmployeeUser(request)
+  } catch {
+    return createErrorResponse('Failed to authorize', 401)
+  }
+
+  let params: EmailGenerationParams
+  try {
+    params = generateSchema.parse(await request.json())
+  } catch {
+    return createErrorResponse('Invalid request data', 400)
+  }
+
+  try {
+    const userInfo = await getUserInfo(user)
+    const stream = await createStreamingResponse(params, userInfo)
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    })
+  } catch {
+    return createErrorResponse('Failed to generate response', 500)
+  }
+}
