@@ -162,12 +162,10 @@ function StoneTable({ stones }: { stones: Stone[] }) {
   return (
     <DataTable
       columns={columns}
-      data={stones.map(stone => ({
-        ...stone,
-        className: `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200
-                   hover:shadow-md ${stone.is_display ? '' : 'opacity-60'}`,
-        onClick: () => handleRowClick(stone.id),
-      }))}
+      onRowClick={(stone: Stone) => handleRowClick(stone.id)}
+      rowClassName={(stone: Stone) => `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200
+                   hover:shadow-md ${stone?.is_display ? '' : 'opacity-60'}`}
+      data={stones}
     />
   )
 }
