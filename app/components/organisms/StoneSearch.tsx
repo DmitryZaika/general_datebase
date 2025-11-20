@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import debounce from 'lodash.debounce'
 import { Plus, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useState } from 'react'
 import type { StoneSearchResult, StoneSlim } from '~/types'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -40,33 +39,21 @@ export const StoneSearch = ({
   allowQuickAdd?: boolean
   onStoneCreated?: (stone: StoneSlim, slabId?: number) => void
 }) => {
-  const [searchValue, setSearchValue] = useState(stone?.name || '')
+  const [inputValue, setInputValue] = useState(stone?.name || '')
   const [show, setShow] = useState(!stone?.name)
   const [showAddStoneDialog, setShowAddStoneDialog] = useState(false)
 
-  const debouncedSetSearchValue = useMemo(
-    () =>
-      debounce((value: string) => {
-        setSearchValue(value)
-      }, 300),
-    [],
-  )
-
-  useEffect(() => {
-    return () => {
-      debouncedSetSearchValue.cancel()
-    }
-  }, [debouncedSetSearchValue])
+  const deferredQuery = useDeferredValue(inputValue)
 
   const handleValueChange = (value: string) => {
-    debouncedSetSearchValue(value)
+    setInputValue(value)
     if (!show) setShow(true)
   }
 
   const { data, isLoading } = useQuery({
-    queryKey: ['availableStones', companyId, searchValue],
-    queryFn: () => fetchAvailableStones(companyId, searchValue),
-    enabled: !!searchValue,
+    queryKey: ['availableStones', companyId, deferredQuery],
+    queryFn: () => fetchAvailableStones(companyId, deferredQuery),
+    enabled: !!deferredQuery,
   })
 
   const handleStoneSelect = (stone: { id: number; name: string }) => {
@@ -81,13 +68,13 @@ export const StoneSearch = ({
       onRetailPriceChange(selectedStone.retail_price || 0)
     }
 
-    setSearchValue(stone.name)
+    setInputValue(stone.name)
     setShow(false)
   }
 
   const handleRemoveStone = () => {
     setStone(undefined)
-    setSearchValue('')
+    setInputValue('')
     setShow(false)
   }
 
@@ -103,7 +90,7 @@ export const StoneSearch = ({
         onRetailPriceChange(newStone.retail_price)
       }
 
-      setSearchValue(newStone.name)
+      setInputValue(newStone.name)
       setShow(false)
     },
     [setStone, onRetailPriceChange, onStoneCreated],
@@ -127,7 +114,7 @@ export const StoneSearch = ({
           )}
           <Input
             placeholder='Search stone colors...'
-            value={searchValue || stone?.name || ''}
+            value={stone?.name || inputValue}
             disabled={!!stone?.name}
             onChange={e => handleValueChange(e.target.value)}
             className='w-full'
