@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Info } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { quickAddStoneSchema, type TQuickAddStoneSchema } from '~/schemas/stones'
+import { quickAddStoneSchema } from '~/schemas/stones'
 import type { StoneSlim } from '~/types'
 import { STONE_TYPES } from '~/utils/constants'
 import { InputItem } from '../molecules/InputItem'
@@ -19,6 +19,17 @@ import {
   DialogTitle,
 } from '../ui/dialog'
 import { FormField, FormProvider } from '../ui/form'
+
+type QuickAddStoneFormData = {
+  name: string
+  retail_price?: number
+  length?: number
+  width?: number
+  type: (typeof STONE_TYPES)[number]
+  leftover: boolean
+  bundle: string
+  company_id: number
+}
 
 interface AddStoneQuickDialogProps {
   show: boolean
@@ -45,13 +56,14 @@ export function AddStoneQuickDialog({
       length: undefined as number | undefined,
       width: undefined as number | undefined,
       type: 'granite' as const,
-      leftover: true, // Default to true - quick add is typically for leftover stones
+      leftover: true,
+      bundle: '',
       company_id: companyId,
     }),
     [companyId],
   )
 
-  const form = useForm<TQuickAddStoneSchema>({
+  const form = useForm<QuickAddStoneFormData>({
     resolver: zodResolver(quickAddStoneSchema),
     defaultValues,
   })
@@ -64,15 +76,28 @@ export function AddStoneQuickDialog({
     setError(null)
   }, [reset, defaultValues])
 
-  const handleSubmit = useCallback(async (data: TQuickAddStoneSchema) => {
+  const handleSubmit = useCallback(async (data: QuickAddStoneFormData) => {
     setIsSubmitting(true)
     setError(null)
 
     try {
+      const basePayload = {
+        name: data.name,
+        retail_price: data.retail_price,
+        length: data.length,
+        width: data.width,
+        type: data.type,
+        company_id: companyId,
+      }
+
+      const payload = data.leftover
+        ? { ...basePayload, leftover: true as const }
+        : { ...basePayload, leftover: false as const, bundle: (data as { bundle: string }).bundle }
+
       const response = await fetch('/api/stones/quick-add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, company_id: companyId }),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
@@ -211,6 +236,20 @@ export function AddStoneQuickDialog({
                 <SwitchItem field={field} name='Leftover' />
               )}
             />
+
+            {!leftoverValue && (
+              <FormField
+                control={control}
+                name='bundle'
+                render={({ field }) => (
+                  <InputItem
+                    name='Bundle Number*'
+                    placeholder='Enter bundle number...'
+                    field={field}
+                  />
+                )}
+              />
+            )}
 
             {leftoverValue && (
               <div className='flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-blue-800'>

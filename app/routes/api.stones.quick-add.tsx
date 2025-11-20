@@ -51,21 +51,18 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const stoneId = stoneResult.insertId
 
-    let slabId: number | undefined
+    const bundle = validatedData.leftover
+      ? generateLeftoverBundle()
+      : validatedData.bundle.trim()
 
-    if (validatedData.leftover) {
-      const bundle = generateLeftoverBundle()
+    const [slabResult] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO slab_inventory
+       (bundle, stone_id, width, length, is_leftover, url)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [bundle, stoneId, validatedData.width, validatedData.length, validatedData.leftover, null],
+    )
 
-      // Create slab within the same transaction
-      const [slabResult] = await connection.execute<ResultSetHeader>(
-        `INSERT INTO slab_inventory
-         (bundle, stone_id, width, length, is_leftover, url)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [bundle, stoneId, validatedData.width, validatedData.length, true, null],
-      )
-
-      slabId = slabResult.insertId
-    }
+    const slabId = slabResult.insertId
 
     // Commit transaction - both stone and slab created successfully
     await connection.commit()
@@ -78,11 +75,7 @@ export async function action({ request }: ActionFunctionArgs) {
         type: validatedData.type || 'granite',
         retail_price: validatedData.retail_price,
       },
-      slab: slabId
-        ? {
-            id: slabId,
-          }
-        : undefined,
+      slab: { id: slabId },
     })
   } catch (error) {
     // Rollback transaction on any error
