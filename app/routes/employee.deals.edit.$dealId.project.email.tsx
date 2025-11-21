@@ -4,22 +4,19 @@
 
 // External Dependencies
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation } from '@tanstack/react-query'
 import type { RowDataPacket } from 'mysql2'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
-  type ActionFunctionArgs,
   type LoaderFunctionArgs,
   redirect,
-  useActionData,
   useLoaderData,
   useLocation,
   useNavigate,
 } from 'react-router'
-import { getValidatedFormData } from 'remix-hook-form'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
-
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
@@ -45,15 +42,10 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { Textarea } from '~/components/ui/textarea'
-
 // Server Utilities
 import { db } from '~/db.server'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { sendEmail } from '~/lib/email.server'
-import { commitSession, getSession } from '~/sessions.server'
-import { csrf } from '~/utils/csrf.server'
+import { useToast } from '~/hooks/use-toast'
 import { getEmployeeUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers.server'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -170,62 +162,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     dealId,
   }
 }
-
-// ============================================================================
-// SERVER-SIDE ACTION HANDLER
-// ============================================================================
-
-export async function action({ request, params }: ActionFunctionArgs) {
-  const session = await getSession(request.headers.get('Cookie'))
-
-  let user: EmployeeUser
-  try {
-    user = await getEmployeeUser(request)
-  } catch (error) {
-    return redirect(`/login?error=${error}`)
-  }
-
-  try {
-    await csrf.validate(request)
-  } catch {
-    session.flash('message', toastData('Error', 'Invalid CSRF token'))
-    return redirect('.', { headers: { 'Set-Cookie': await commitSession(session) } })
-  }
-
-  if (!params.dealId) {
-    throw new Error('Deal ID is missing')
-  }
-  const dealId = parseInt(params.dealId, 10)
-
-  const { errors, data, receivedValues } = await getValidatedFormData<EmailFormData>(
-    request,
-    emailResolver,
-  )
-  if (errors) {
-    return { errors, receivedValues }
-  }
-
-  try {
-    await sendEmail(data)
-    await db.execute(
-      `INSERT INTO emails (user_id, subject, body, message_id) VALUES (?, ?, ?, ?)`,
-      [user.id, data.subject, data.text, dealId],
-    )
-  } catch (error) {
-    console.error('Email send error:', error)
-    session.flash('message', toastData('Error', 'Failed to send email'))
-    return redirect('.', { headers: { 'Set-Cookie': await commitSession(session) } })
-  }
-
-  session.flash('message', toastData('Success', 'Email sent'))
-  return redirect('../history', {
-    headers: { 'Set-Cookie': await commitSession(session) },
-  })
-}
-
-// ============================================================================
-// DATABASE UTILITY FUNCTIONS
-// ============================================================================
 
 async function fetchSenderInfo(user: EmployeeUser): Promise<SenderInfo> {
   const senderInfo: SenderInfo = {}
@@ -554,22 +490,50 @@ function AIAssistantMenu({
 
 // ============================================================================
 // MAIN COMPONENT
-// ============================================================================
+// ====
+function sendEmail(to: string, subject: string, body: string) {
+  fetch('/api/employee/sendEmail', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to, subject, body }),
+  })
+}
 
 export default function DealEmailDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { email, customerName, senderInfo, dealId } = useLoaderData<typeof loader>()
-  const actionData = useActionData<typeof action>()
+  const { email, dealId } = useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const { toast } = useToast()
 
   const form = useForm<EmailFormData>({
     resolver: emailResolver,
     defaultValues: {
       to: email,
-      subject: actionData?.receivedValues?.subject || '',
-      text: actionData?.receivedValues?.text || '',
+      subject: '',
+      text: '',
+    },
+  })
+
+  const { mutate } = useMutation({
+    mutationFn: async (values: EmailFormData) => {
+      sendEmail(values.to, values.subject, values.text)
+    },
+    onSuccess: () => {
+      navigate(`../${location.search}`)
+      toast({
+        title: 'Success',
+        description: 'Email sent',
+        variant: 'success',
+      })
+    },
+    onError: () => {
+      toast({
+        title: 'Failure',
+        description: 'Email could not be sent',
+        variant: 'destructive',
+      })
     },
   })
 
@@ -585,7 +549,9 @@ export default function DealEmailDialog() {
     },
   })
 
-  const fullSubmit = useFullSubmit(form)
+  const fullSubmit = (values: EmailFormData) => {
+    mutate(values)
+  }
 
   const handleDialogClose = (open: boolean) => {
     if (!open) navigate(`../${location.search}`)
@@ -625,7 +591,10 @@ export default function DealEmailDialog() {
           <DialogTitle>Send Email</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <form onSubmit={fullSubmit} className='flex-1 flex flex-col'>
+          <form
+            onSubmit={form.handleSubmit(fullSubmit)}
+            className='flex-1 flex flex-col'
+          >
             <AuthenticityTokenInput />
             <EmailFormFields form={form} />
             <div className='mt-4 flex justify-between gap-2 w-full'>
