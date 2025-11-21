@@ -20,7 +20,7 @@ const client = new OpenAI({
 // ============================================================================
 
 /** Basic lead details used within prompt construction */
-export interface LeadInfo {
+interface LeadInfo {
   leadMessage?: string
   remodelType?: string
   referralSource?: string
@@ -29,13 +29,13 @@ export interface LeadInfo {
 }
 
 /** Lightweight user info parsed from full User object */
-export interface UserInfo {
+interface UserInfo {
   name: string
   company?: string
 }
 
 /** Extract only the fields you want to expose to the prompt builder */
-export async function getUserInfo(user: {
+async function getUserInfo(user: {
   name: string
   company_id?: number
 }): Promise<UserInfo> {
@@ -65,7 +65,7 @@ export async function getUserInfo(user: {
 // VALIDATION SCHEMA
 // ============================================================================
 
-export const generateSchema = z.object({
+const generateSchema = z.object({
   emailCategory: z.enum([
     'first-contact',
     'follow-up',
@@ -83,7 +83,7 @@ export const generateSchema = z.object({
   desiredContent: z.string().optional(),
 })
 
-export type EmailGenerationParams = z.infer<typeof generateSchema>
+type EmailGenerationParams = z.infer<typeof generateSchema>
 
 // ============================================================================
 // SYSTEM PROMPT
@@ -183,7 +183,7 @@ function formatSenderInfo(info: UserInfo): string {
 /**
  * Retrieves lead fields needed for content generation.
  */
-export async function getLeadInfoByDeal(dealId: number): Promise<LeadInfo> {
+async function getLeadInfoByDeal(dealId: number): Promise<LeadInfo> {
   const [rows] = await db.execute<RowDataPacket[]>(
     `
        SELECT
@@ -219,7 +219,7 @@ export async function getLeadInfoByDeal(dealId: number): Promise<LeadInfo> {
 /**
  * Builds the final text message sent to the model.
  */
-export function buildUserPrompt(
+function buildUserPrompt(
   params: EmailGenerationParams,
   lead: LeadInfo,
   userInfo: UserInfo,
