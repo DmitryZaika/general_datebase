@@ -3,6 +3,7 @@ import { type ActionFunctionArgs, data } from 'react-router'
 import { z } from 'zod'
 import { db } from '~/db.server'
 import { sendEmail } from '~/lib/email.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export const customerSchema = z.object({
@@ -32,6 +33,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (message.includes('Email address is not verified.')) {
       return data({ error: 'Invalid email address' }, { status: 400 })
     }
+    posthogClient.captureException(error, user.id.toString())
     return data({ error: 'Email failed to send' }, { status: 400 })
   }
 
