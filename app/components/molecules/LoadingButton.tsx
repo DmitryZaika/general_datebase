@@ -6,9 +6,9 @@ interface LoadingButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading: boolean
 }
 
-export function LoadingButton({ loading, children, ...props }: LoadingButtonProps) {
+export function LoadingButton({ loading, type = 'submit', children, ...props }: LoadingButtonProps) {
   return (
-    <Button {...props} type='submit'>
+    <Button {...props} type={type}>
       {loading ? <Spinner size={20} /> : children}
     </Button>
   )

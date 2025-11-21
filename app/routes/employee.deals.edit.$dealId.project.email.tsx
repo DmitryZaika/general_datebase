@@ -315,7 +315,7 @@ function EmailFormFields({
             name='To'
             field={field}
             placeholder='recipient@example.com'
-            disabled={false}
+            disabled={true}
           />
         )}
       />
@@ -580,6 +580,9 @@ export default function DealEmailDialog() {
       setIsGenerating(false)
     }
   }
+
+
+  
 
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
