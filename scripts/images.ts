@@ -102,7 +102,7 @@ export async function processAndUploadImage(
       Key: srcKey,
     }),
   )
-  const buffer = await bodyToBuffer(got.Body)
+  const buffer = await bodyToBuffer((got as any).Body)
 
   // 2) сделать уменьшенную копию
   const iconBuffer = await compressImage(buffer)
@@ -114,7 +114,7 @@ export async function processAndUploadImage(
       Key: destKey,
       Body: iconBuffer,
       // Сохраняем Content-Type, если знаем, иначе JPEG по умолчанию
-      ContentType: got.ContentType ?? 'image/jpeg',
+      ContentType: (got as any).ContentType ?? 'image/jpeg',
       CacheControl: 'public, max-age=31536000, immutable',
     }),
   )
