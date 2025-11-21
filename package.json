@@ -13,6 +13,7 @@
     "hash-password": "node scripts/hash-password.js",
     "prod-deploy": "react-router build && export $(grep -v '^#' .env | xargs -0) && nohup react-router-serve ./build/server/index.js > build.log 2>&1 &",
     "prod-kill": "kill -9 $(lsof -t -i:3000)",
+    "prod-restart": "npm run prod-kill && npm run prod-deploy",
     "load-data": "node scripts/load-stones-csv.js",
     "test": "vitest",
     "shrink-images": "tsx scripts/images.ts",

@@ -30,17 +30,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!params.dealId) {
     throw new Error('Deal ID is missing')
   }
-
-  const dealId = parseInt(params.dealId, 10)
-
-  const [customerRows] = await db.execute<RowDataPacket[]>(
-    `SELECT c.name, c.email
-       FROM deals d
-       JOIN customers c ON d.customer_id = c.id
-      WHERE d.id = ?`,
-    [dealId],
-  )
-
+  
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT e.id, e.subject, e.body, e.sent_at
        FROM emails e
