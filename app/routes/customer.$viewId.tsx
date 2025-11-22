@@ -59,7 +59,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         CASE
           WHEN s.cancelled_date IS NOT NULL THEN 'Cancelled'
           WHEN s.installed_date IS NOT NULL THEN 'Installed'
-          ELSE 'In Progress'
+          WHEN s.sale_date IS NOT NULL AND s.cancelled_date IS NULL AND s.installed_date IS NULL THEN 'Sold'
         END AS status
       FROM sales s
       JOIN customers c ON s.customer_id = c.id
@@ -151,21 +151,21 @@ const columns: ColumnDef<Sale>[] = [
     header: ({ column }) => <SortableHeader column={column} title='Sink' />,
     cell: ({ row }) => row.original.sink || '—',
   },
-  {
-    accessorKey: 'sink_pictures',
-    header: ({ column }) => <SortableHeader column={column} title='Sink Pictures' />,
-    cell: ({ row }) => {
-      return (
-        <ImageGalleryCell
-          images={row.original.sink_pictures}
-          title={row.original.sink || 'Sink'}
-        />
-      )
-    },
-  },
+  // {
+  //   accessorKey: 'sink_pictures',
+  //   header: ({ column }) => <SortableHeader column={column} title='Sink Pictures' />,
+  //   cell: ({ row }) => {
+  //     return (
+  //       <ImageGalleryCell
+  //         images={row.original.sink_pictures}
+  //         title={row.original.sink || 'Sink'}
+  //       />
+  //     )
+  //   },
+  // },
   {
     accessorKey: 'seller_name',
-    header: ({ column }) => <SortableHeader column={column} title='Sold By' />,
+    header: ({ column }) => <SortableHeader column={column} title='Sales Rep' />,
   },
   {
     accessorKey: 'status',
