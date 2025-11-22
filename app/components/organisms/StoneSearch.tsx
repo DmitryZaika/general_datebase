@@ -37,7 +37,7 @@ export const StoneSearch = ({
   onRetailPriceChange?: (price: number) => void
   companyId: number
   allowQuickAdd?: boolean
-  onStoneCreated?: (stone: StoneSlim, slabId?: number) => void
+  onStoneCreated?: (stone: StoneSlim, slabIds?: number[]) => void
 }) => {
   const [inputValue, setInputValue] = useState(stone?.name || '')
   const [show, setShow] = useState(!stone?.name)
@@ -79,9 +79,9 @@ export const StoneSearch = ({
   }
 
   const handleNewStoneCreated = useCallback(
-    (newStone: StoneSlim, slabId?: number) => {
+    (newStone: StoneSlim, slabIds?: number[]) => {
       if (onStoneCreated) {
-        onStoneCreated(newStone, slabId)
+        onStoneCreated(newStone, slabIds)
       }
 
       setStone(newStone)

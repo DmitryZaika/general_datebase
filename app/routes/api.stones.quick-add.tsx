@@ -28,7 +28,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const validatedData = validation.data
 
-  // Use transaction to ensure atomicity (stone + slab created together or not at all)
   const connection = await db.getConnection()
 
   try {
@@ -51,20 +50,29 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const stoneId = stoneResult.insertId
 
-    const bundle = validatedData.leftover
-      ? generateLeftoverBundle()
-      : validatedData.bundle.trim()
+    const slabs: { id: number }[] = []
 
-    const [slabResult] = await connection.execute<ResultSetHeader>(
-      `INSERT INTO slab_inventory
-       (bundle, stone_id, width, length, is_leftover, url)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [bundle, stoneId, validatedData.width, validatedData.length, validatedData.leftover, null],
-    )
+    if (validatedData.leftover) {
+      const bundle = generateLeftoverBundle()
+      const [slabResult] = await connection.execute<ResultSetHeader>(
+        `INSERT INTO slab_inventory
+         (bundle, stone_id, width, length, is_leftover, url)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [bundle, stoneId, validatedData.width, validatedData.length, true, null],
+      )
+      slabs.push({ id: slabResult.insertId })
+    } else {
+      for (const bundle of validatedData.bundles) {
+        const [slabResult] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO slab_inventory
+           (bundle, stone_id, width, length, is_leftover, url)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [bundle.trim(), stoneId, validatedData.width, validatedData.length, false, null],
+        )
+        slabs.push({ id: slabResult.insertId })
+      }
+    }
 
-    const slabId = slabResult.insertId
-
-    // Commit transaction - both stone and slab created successfully
     await connection.commit()
 
     return data({
@@ -75,7 +83,7 @@ export async function action({ request }: ActionFunctionArgs) {
         type: validatedData.type || 'granite',
         retail_price: validatedData.retail_price,
       },
-      slab: { id: slabId },
+      slabs,
     })
   } catch (error) {
     // Rollback transaction on any error

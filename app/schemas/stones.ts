@@ -27,6 +27,38 @@ const quickAddStoneBaseSchema = {
   company_id: z.number(),
 }
 
+export const quickAddStoneFormSchema = z
+  .object({
+    ...quickAddStoneBaseSchema,
+    leftover: z.boolean(),
+    bundles: z.array(z.object({ value: z.string() })),
+  })
+  .refine(
+    data => {
+      if (!data.leftover) {
+        const nonEmptyBundles = data.bundles.filter(b => b.value.trim().length > 0)
+        return nonEmptyBundles.length > 0
+      }
+      return true
+    },
+    {
+      message: 'At least one bundle number is required',
+      path: ['bundles'],
+    },
+  )
+  .refine(
+    data => {
+      if (!data.leftover) {
+        return data.bundles.every(b => b.value.trim().length > 0)
+      }
+      return true
+    },
+    {
+      message: 'All bundle numbers must be filled',
+      path: ['bundles'],
+    },
+  )
+
 export const quickAddStoneSchema = z.discriminatedUnion('leftover', [
   z.object({
     ...quickAddStoneBaseSchema,
@@ -35,11 +67,12 @@ export const quickAddStoneSchema = z.discriminatedUnion('leftover', [
   z.object({
     ...quickAddStoneBaseSchema,
     leftover: z.literal(false),
-    bundle: z.string().min(1, 'Bundle number is required'),
+    bundles: z.array(z.string().min(1, 'Bundle number is required')).min(1, 'At least one bundle is required'),
   }),
 ])
 
 export type TQuickAddStoneSchema = z.infer<typeof quickAddStoneSchema>
+export type TQuickAddStoneFormSchema = z.infer<typeof quickAddStoneFormSchema>
 
 export type TLeftoverStone = Extract<TQuickAddStoneSchema, { leftover: true }>
 export type TRegularStone = Extract<TQuickAddStoneSchema, { leftover: false }>
