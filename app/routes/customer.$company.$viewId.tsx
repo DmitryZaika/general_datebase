@@ -43,6 +43,8 @@ interface Sale {
   sink_pictures: string | null
   status: string
   company_id: number
+  all_cut?: number | null
+  any_cut?: number | null
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -63,9 +65,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         GROUP_CONCAT(DISTINCT st.url ORDER BY si.id SEPARATOR ',') AS stone_pictures,
         MAX(sty.name) AS sink,
         GROUP_CONCAT(DISTINCT isk.url ORDER BY isk.id SEPARATOR ',') AS sink_pictures,
+        MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) AS all_cut,
+        MAX(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) AS any_cut,
         CASE
           WHEN s.cancelled_date IS NOT NULL THEN 'Cancelled'
           WHEN s.installed_date IS NOT NULL THEN 'Installed'
+          WHEN s.paid_date IS NOT NULL THEN 'Paid'
           WHEN s.sale_date IS NOT NULL AND s.cancelled_date IS NULL AND s.installed_date IS NULL THEN 'Sold'
         END AS status
       FROM sales s
@@ -81,6 +86,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       ORDER BY s.sale_date DESC`,
     [viewId],
   )
+
+  const enrichedSales = sales.map(sale => {
+    let currentStatus = sale.status
+    if (currentStatus === 'Sold' || currentStatus === 'Paid') {
+      if (sale.all_cut === 1) {
+        currentStatus = 'Cut'
+      } else if (sale.any_cut === 1) {
+        currentStatus = 'Partially Cut'
+      }
+    }
+    return {
+      ...sale,
+      status: currentStatus,
+    }
+  })
 
   const customerRows = await selectMany<{ name: string }>(
     db,
@@ -119,7 +139,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const customer = customerName ? { name: customerName } : null
 
-  return { customer, sales, viewId }
+  return { customer, sales: enrichedSales, viewId }
 }
 
 const columns: ColumnDef<Sale>[] = [
