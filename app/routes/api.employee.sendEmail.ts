@@ -31,6 +31,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   } catch (error) {
     const message = (error as { message?: string }).message || 'Unknown error'
     if (message.includes('Email address is not verified.')) {
+      posthogClient.captureException(error, user.email)
       return data({ error: 'Invalid email address' }, { status: 400 })
     }
     posthogClient.captureException(error, user.email)
