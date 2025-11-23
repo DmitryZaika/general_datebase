@@ -1,17 +1,17 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
   Link,
-  type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
   useLocation,
   useNavigate,
   useSearchParams,
+  type LoaderFunctionArgs,
 } from 'react-router'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
@@ -40,7 +40,7 @@ interface Customer {
   created_date: string
   className?: string
   company_id: number
-  source: (typeof sourceEnum)[number]
+  source: (typeof sourceEnum)[number] | 'user-input'
   invalid_lead: string | null
 }
 
@@ -160,6 +160,68 @@ function SalesRepCell({ customer }: { customer: Customer }) {
   )
 }
 
+interface CopyableValueProps {
+  value?: string
+  display?: string
+  title?: string
+}
+
+function CopyableValue({ value, display, title }: CopyableValueProps) {
+  const [copied, setCopied] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const resetRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (resetRef.current) clearTimeout(resetRef.current)
+    }
+  }, [])
+
+  if (!value) return <span />
+
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      void navigator.clipboard.writeText(value)
+    }
+    setCopied(true)
+    if (resetRef.current) clearTimeout(resetRef.current)
+    resetRef.current = setTimeout(() => {
+      setCopied(false)
+      resetRef.current = null
+    }, 1500)
+  }
+
+  const showLabel = hovered || copied
+  const labelText = copied ? 'Copied' : 'Copy'
+
+  return (
+    <button
+      type='button'
+      title={title ?? value}
+      className='group relative inline-flex items-center bg-transparent p-0 text-left text-current border-0 focus-visible:outline-none'
+      onClick={handleClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <span className='relative inline-flex items-center justify-center'>
+        <span
+          className={`transition-opacity duration-200 ${showLabel ? 'opacity-10' : 'opacity-100'}`}
+        >
+          {display ?? value}
+        </span>
+        <span
+          className={`pointer-events-none absolute inset-0 flex items-center justify-center text-md transition-opacity duration-200 ${
+            showLabel ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {labelText}
+        </span>
+      </span>
+    </button>
+  )
+}
+
 const customerColumns: ColumnDef<Customer>[] = [
   {
     accessorKey: 'name',
@@ -167,16 +229,22 @@ const customerColumns: ColumnDef<Customer>[] = [
     cell: ({ row }: { row: Row<Customer> }) => {
       const name = row.original.name || ''
       const short = name.length > 20 ? `${name.slice(0, 20)}...` : name
-      return <span title={name}>{short}</span>
+      return <CopyableValue value={name} display={short} title={name} />
     },
   },
   {
     accessorKey: 'phone',
     header: 'Phone Number',
+    cell: ({ row }: { row: Row<Customer> }) => (
+      <CopyableValue value={row.original.phone} title={row.original.phone} />
+    ),
   },
   {
     accessorKey: 'email',
     header: 'Email',
+    cell: ({ row }: { row: Row<Customer> }) => (
+      <CopyableValue value={row.original.email} title={row.original.email} />
+    ),
   },
   // {
   //   accessorKey: 'address',
@@ -276,11 +344,17 @@ export default function AdminCustomers() {
     if (tabParam === 'leads') return c.source === 'leads'
     if (tabParam === 'walkin') return c.source === 'check-in'
     if (tabParam === 'call-in') return c.source === 'call-in'
+    if (tabParam === 'other') return c.source === 'other' || c.source === 'user-input'
     if (tabParam === 'all') return true
   })
 
   let fullDisplayed = filtered
-  if (tabParam === 'leads' || tabParam === 'walkin' || tabParam === 'call-in') {
+  if (
+    tabParam === 'leads' ||
+    tabParam === 'walkin' ||
+    tabParam === 'call-in' ||
+    tabParam === 'other'
+  ) {
     fullDisplayed = [...filtered].sort(
       (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
     )
@@ -294,14 +368,12 @@ export default function AdminCustomers() {
   const currentPage = Math.min(page, totalPages)
   const startIndex = (currentPage - 1) * pageSize
   const endIndex = startIndex + pageSize
-  let displayed = fullDisplayed.slice(startIndex, endIndex)
-
-  displayed = displayed.map((c: Customer) => ({
+  const displayed = fullDisplayed.slice(startIndex, endIndex)
+  const rows = displayed.map((c: Customer) => ({
     ...c,
     className: `${c.className ?? ''} customer-row-${c.id} cursor-pointer ${
       highlightCustomerId === c.id ? 'ring-2 ring-blue-400 bg-blue-50' : ''
     }`.trim(),
-    onClick: () => navigate(`info/${c.id}${location.search}`),
   }))
 
   useEffect(() => {
@@ -310,7 +382,7 @@ export default function AdminCustomers() {
     if (!id) return
     // Delay to next paint to ensure rows are rendered
     setTimeout(() => {
-      const el = document.querySelector(`.customer-row-${id}`) as HTMLElement | null
+      const el = document.querySelector<HTMLElement>(`.customer-row-${id}`)
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' })
         setHighlightCustomerId(id)
@@ -330,6 +402,12 @@ export default function AdminCustomers() {
     }, 50)
   }, [searchParams, navigate, location.pathname])
 
+  const handleRowClick = (customer: Customer) => {
+    navigate(`info/${customer.id}${location.search}`)
+  }
+
+  const getRowClassName = (customer: Customer) => customer.className ?? ''
+
   return (
     <PageLayout title='Customers List'>
       <div className='flex flex-col md:flex-row items-center justify-between'>
@@ -340,6 +418,7 @@ export default function AdminCustomers() {
               <TabsTrigger value='walkin'>Walk-in</TabsTrigger>
               <TabsTrigger value='leads'>Leads</TabsTrigger>
               <TabsTrigger value='call-in'>Call-In</TabsTrigger>
+              <TabsTrigger value='other'>Other</TabsTrigger>
             </TabsList>
           </Tabs>
           {tabParam === 'leads' && (
@@ -390,7 +469,9 @@ export default function AdminCustomers() {
       <DataTable
         key={`${tabParam}-${currentPage}`}
         columns={customerColumns}
-        data={displayed}
+        data={rows}
+        rowClassName={getRowClassName}
+        onRowClick={handleRowClick}
       />
       <Outlet />
       <div className='mt-3 flex items-center justify-center gap-2'>
