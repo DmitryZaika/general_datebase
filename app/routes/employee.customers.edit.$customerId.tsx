@@ -14,13 +14,15 @@ import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 const getCustomerInfo = async (customerId: number): Promise<CustomerDialogSchema> => {
   const response = await fetch(`/api/customers/${customerId}`)
   const data = await response.json()
+  const rawSource = data.customer.source 
+  const mappedSource = rawSource === 'user-input' ? 'other' : rawSource
   return {
     name: data.customer.name,
     email: data.customer.email ?? '',
     phone: data.customer.phone,
     address: data.customer.address ?? '',
     company_name: data.customer.company_name,
-    source: data.customer.source,
+    source: mappedSource,
     your_message: data.customer.your_message ?? '',
     builder: !!data.customer.company_name,
   }

@@ -100,6 +100,32 @@ const CustomerManager = ({
   function handleSpecial() {
     setIsOpen(true)
   }
+  type ExtraCustomerFields = {
+    [key: string]: unknown
+  }
+  const extra: ExtraCustomerFields = currentCustomer ? currentCustomer : {}
+  const rawCompany =
+    typeof extra.company_name === 'string' ? extra.company_name : null
+  const rawMessage =
+    typeof extra.your_message === 'string' ? extra.your_message : ''
+  const builder =
+    typeof rawCompany === 'string' && rawCompany.trim().length > 0
+  const rawSource = typeof extra.source === 'string' ? extra.source : source
+  const mappedSource = rawSource === 'user-input' ? 'other' : rawSource
+  const oldData =
+    selectedCustomer && currentCustomer
+      ? {
+          name: currentCustomer.name,
+          email: currentCustomer.email ?? '',
+          phone: currentCustomer.phone ?? '',
+          address: currentCustomer.address ?? '',
+          your_message: rawMessage,
+          builder,
+          company_name: rawCompany,
+          source: mappedSource,
+        }
+      : undefined
+  const canShowForm = isOpen && (!selectedCustomer || !!currentCustomer)
   return (
     <>
       <Button
@@ -128,7 +154,7 @@ const CustomerManager = ({
             </TooltipProvider>
           )}
       </Button>
-      {isOpen && (
+      {canShowForm && (
         <CustomerForm
           handleChange={setIsOpen}
           onSuccess={handleSuccess}
@@ -136,6 +162,7 @@ const CustomerManager = ({
           customerId={selectedCustomer || undefined}
           source={source}
           initialName={currentText ?? undefined}
+          oldData={oldData}
         />
       )}
     </>

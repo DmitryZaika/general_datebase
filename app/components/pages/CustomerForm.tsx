@@ -48,7 +48,7 @@ function getSourceOptions(
   current: (typeof sourceEnum)[number] | undefined,
 ): SourceOptions[] {
   const baseOptions: SourceOptions[] = sourceEnum
-    .filter(s => s !== 'user-input' && s !== 'check-list')
+    .filter(s => s !== 'check-list')
     .map(s => ({
       key: s,
       value: s.charAt(0).toUpperCase() + s.slice(1),
