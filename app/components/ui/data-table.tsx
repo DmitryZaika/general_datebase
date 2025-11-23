@@ -25,11 +25,21 @@ interface DataTableProps<TData, TValue> {
   rowClassName?: string | ((row: TData) => string)
 }
 
-function getRowClassName<TData>(row: TData, rowClassName?: string | ((row: TData) => string)): string {
+function getRowClassName<TData>(
+  row: TData,
+  rowClassName?: string | ((row: TData) => string),
+): string {
   if (typeof rowClassName === 'function') {
     return rowClassName(row)
   }
-  return rowClassName ?? ''
+  if (typeof rowClassName === 'string' && rowClassName.length > 0) {
+    return rowClassName
+  }
+  const anyRow: any = row
+  if (anyRow && typeof anyRow.className === 'string') {
+    return anyRow.className
+  }
+  return ''
 }
 
 export function DataTable<TData, TValue>({

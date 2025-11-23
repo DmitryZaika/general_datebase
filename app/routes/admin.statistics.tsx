@@ -191,7 +191,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       `SELECT u.name AS rep_name,
               SUM(CASE WHEN c.source = 'check-in' THEN 1 ELSE 0 END) AS walkin,
               SUM(CASE WHEN c.source = 'leads' THEN 1 ELSE 0 END) AS leads,
-              SUM(CASE WHEN c.source = 'user-input' THEN 1 ELSE 0 END) AS manual,
+              SUM(CASE WHEN c.source IN ('other','user-input') THEN 1 ELSE 0 END) AS manual,
               COUNT(c.id) AS total
        FROM customers c
        LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
@@ -331,7 +331,8 @@ export default function AdminStatistics() {
     if (!s) return '-'
     if (s === 'check-in') return 'Walk-in'
     if (s === 'leads') return 'Leads'
-    if (s === 'user-input') return 'Manual added'
+    if (s === 'user-input') return 'Other'
+    if (s === 'other') return 'Other'
     return s
   }
 

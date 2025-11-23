@@ -79,11 +79,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
       if (words.length > 1) {
         const parts = words.map(() => 'c.name LIKE ?').join(' AND ')
         nameCondition = `(c.name LIKE ? OR (${parts}))`
+        const phrase = `%${words.join(' ')}%`
         const wordParams = words.map(w => {
           const base = w.length >= 3 ? w.slice(0, 3) : w
           return `%${base}%`
         })
-        nameParams.push(`%${words[0].length >= 3 ? words[0].slice(0, 3) : words[0]}%`, ...wordParams)
+        nameParams.push(phrase, ...wordParams)
       } else {
         const base = term.trim()
         const short = base.length >= 3 ? base.slice(0, 3) : base
