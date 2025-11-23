@@ -1,4 +1,4 @@
-import { ColumnDef, Row } from '@tanstack/react-table'
+import type { ColumnDef, Row } from '@tanstack/react-table'
 import type { RowDataPacket } from 'mysql2'
 import {
   type LoaderFunctionArgs,
@@ -6,7 +6,7 @@ import {
   redirect,
   useLoaderData,
   useLocation,
-  useNavigate
+  useNavigate,
 } from 'react-router'
 import { Badge } from '~/components/ui/badge'
 import { DataTable } from '~/components/ui/data-table'
@@ -30,7 +30,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!params.dealId) {
     throw new Error('Deal ID is missing')
   }
-  
+
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT e.id, e.subject, e.body, e.sent_at
        FROM emails e
@@ -41,7 +41,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const [readCounts] = await db.execute<RowDataPacket[]>(
     `SELECT e.id, COUNT(*) AS count
        FROM emails e
-       JOIN email_reads er ON e.tracking_id = er.tracking_id
+       JOIN email_reads er ON e.message_id = er.message_id
       WHERE e.deleted_at IS NULL
       GROUP BY e.id`,
   )
@@ -61,9 +61,17 @@ const DateCell = ({ row }: { row: Row<EmailHistory> }) => {
   const date = new Date(row.original.sent_at)
   const cleanDate = date.toLocaleDateString('en-US', {
     month: 'short',
-      day: 'numeric',
-    })
-  return <div><Badge variant='primary'>{readCounts?.find((count: RowDataPacket) => count.id === row.original.id)?.count ?? 0}</Badge><span className='text-xs ml-2'>{cleanDate}</span></div>
+    day: 'numeric',
+  })
+  return (
+    <div>
+      <Badge variant='primary'>
+        {readCounts?.find((count: RowDataPacket) => count.id === row.original.id)
+          ?.count ?? 0}
+      </Badge>
+      <span className='text-xs ml-2'>{cleanDate}</span>
+    </div>
+  )
 }
 
 const customerColumns: ColumnDef<EmailHistory>[] = [
@@ -75,7 +83,6 @@ const customerColumns: ColumnDef<EmailHistory>[] = [
       return row.original.subject
     },
   },
-
 ]
 
 export default function DealEmailHistory() {
@@ -88,9 +95,13 @@ export default function DealEmailHistory() {
 
   return (
     <>
-          <DataTable columns={customerColumns} data={emails} onRowClick={(email: EmailHistory) => handleRowClick(email.id)} rowClassName={(email: EmailHistory) => 'cursor-pointer'} />
+      <DataTable
+        columns={customerColumns}
+        data={emails}
+        onRowClick={(email: EmailHistory) => handleRowClick(email.id)}
+        rowClassName={(email: EmailHistory) => 'cursor-pointer'}
+      />
       <Outlet />
     </>
   )
 }
-
