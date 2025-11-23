@@ -40,7 +40,7 @@ interface Customer {
   created_date: string
   className?: string
   company_id: number
-  source: (typeof sourceEnum)[number]
+  source: (typeof sourceEnum)[number] | 'user-input'
   invalid_lead: string | null
 }
 
@@ -344,11 +344,17 @@ export default function AdminCustomers() {
     if (tabParam === 'leads') return c.source === 'leads'
     if (tabParam === 'walkin') return c.source === 'check-in'
     if (tabParam === 'call-in') return c.source === 'call-in'
+    if (tabParam === 'other') return c.source === 'other' || c.source === 'user-input'
     if (tabParam === 'all') return true
   })
 
   let fullDisplayed = filtered
-  if (tabParam === 'leads' || tabParam === 'walkin' || tabParam === 'call-in') {
+  if (
+    tabParam === 'leads' ||
+    tabParam === 'walkin' ||
+    tabParam === 'call-in' ||
+    tabParam === 'other'
+  ) {
     fullDisplayed = [...filtered].sort(
       (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
     )
@@ -412,6 +418,7 @@ export default function AdminCustomers() {
               <TabsTrigger value='walkin'>Walk-in</TabsTrigger>
               <TabsTrigger value='leads'>Leads</TabsTrigger>
               <TabsTrigger value='call-in'>Call-In</TabsTrigger>
+              <TabsTrigger value='other'>Other</TabsTrigger>
             </TabsList>
           </Tabs>
           {tabParam === 'leads' && (

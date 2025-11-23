@@ -88,6 +88,9 @@ export interface Customer {
   address?: string | null
   phone?: string | null
   email?: string | null
+  postal_code?: string | null
+  company_name?: string | null
+  city?: string | null
 }
 
 export interface StoneSearchResult {

@@ -5,10 +5,10 @@ type ToastFunction = (props: ToastProps & { description: string }) => void
 
 export const sourceEnum = [
   'check-in',
-  'user-input',
   'check-list',
   'leads',
   'call-in',
+  'other',
 ] as const
 
 export const customerSignupSchema = z.object({
