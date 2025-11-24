@@ -291,14 +291,14 @@ export default function App() {
               <AuthenticityTokenProvider token={token}>
                 {isExternalMarketing || isCheckIn || isInstallerRoute ? (
                   <MarketingHeader />
-                ) : !isLogin ? (
+                ) :  (
                   <Header
                     isEmployee={user?.is_employee ?? false}
                     user={user}
                     isAdmin={user?.is_admin ?? false}
                     isSuperUser={user?.is_superuser ?? false}
                   />
-                ) : null}
+                )}
                 <div className='relative'>
                   {!isCustomerViewPage && !isLogin && (
                     <SidebarToggle
