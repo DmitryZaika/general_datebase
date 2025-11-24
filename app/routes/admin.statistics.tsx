@@ -1,6 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table'
 import { format } from 'date-fns'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LoaderFunctionArgs,
   redirect,
@@ -9,8 +9,10 @@ import {
   useNavigate,
 } from 'react-router'
 import { DateRangeControls } from '~/components/molecules/DateRangeControls'
+import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
 import { PageLayout } from '~/components/PageLayout'
+import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -50,6 +52,36 @@ type CustomersByRep = {
   leads: number
   manual: number
   total: number
+}
+
+type CustomersTableCustomer = {
+  id: number
+  name: string
+  created_date: string
+  source: string | null
+  referral_source: string | null
+  invalid_lead: string | null
+}
+
+type CustomersTableDeal = {
+  id: number
+  customer_id: number
+  amount: number | null
+  status: string | null
+  lost_reason: string | null
+}
+
+type CustomersTableRow = {
+  id: number
+  created_date: string
+  source: string
+  referral_source: string
+  name: string
+  status: string
+  lost_reason: string
+  amount: string
+  className?: string
+  createdSortValue?: number
 }
 
 type DealsList = { id: number; name: string; position: number }
@@ -201,6 +233,56 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       customersByRepParams,
     )
 
+    const customersTableWhere: string[] = ['c.company_id = ?', 'c.deleted_at IS NULL']
+    const customersTableParams: (string | number)[] = [user.company_id]
+    if (fromDate) {
+      customersTableWhere.push('DATE(c.created_date) >= ?')
+      customersTableParams.push(fromDate)
+    }
+    if (toDate) {
+      customersTableWhere.push('DATE(c.created_date) <= ?')
+      customersTableParams.push(toDate)
+    }
+
+    const customersTable = await selectMany<CustomersTableCustomer>(
+      db,
+      `SELECT c.id,
+              c.name,
+              c.created_date,
+              c.source,
+              c.referral_source,
+              c.invalid_lead
+       FROM customers c
+       WHERE ${customersTableWhere.join(' AND ')}
+       ORDER BY c.created_date DESC`,
+      customersTableParams,
+    )
+
+    const customersDealsWhere: string[] = ['c.company_id = ?', 'd.deleted_at IS NULL']
+    const customersDealsParams: (string | number)[] = [user.company_id]
+    if (fromDate) {
+      customersDealsWhere.push('DATE(d.created_at) >= ?')
+      customersDealsParams.push(fromDate)
+    }
+    if (toDate) {
+      customersDealsWhere.push('DATE(d.created_at) <= ?')
+      customersDealsParams.push(toDate)
+    }
+
+    const customersDeals = await selectMany<CustomersTableDeal>(
+      db,
+      `SELECT d.id,
+              d.customer_id,
+              d.amount,
+              d.status,
+              d.lost_reason
+       FROM deals d
+       JOIN customers c ON d.customer_id = c.id
+       WHERE ${customersDealsWhere.join(' AND ')}
+       ORDER BY d.created_at DESC`,
+      customersDealsParams,
+    )
+
     const lists = await selectMany<DealsList>(
       db,
       `SELECT id, name, position FROM deals_list WHERE deleted_at IS NULL ORDER BY position`,
@@ -221,6 +303,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       customersByRep,
       fromDate,
       toDate,
+      customersTable,
+      customersDeals,
     }
   } catch (error) {
     return redirect(`/login?error=${error}`)
@@ -237,6 +321,8 @@ export default function AdminStatistics() {
     customersByRep,
     fromDate,
     toDate,
+    customersTable,
+    customersDeals,
   } = useLoaderData<typeof loader>()
 
   const navigate = useNavigate()
@@ -245,6 +331,16 @@ export default function AdminStatistics() {
     fromDate ? new Date(fromDate) : undefined,
   )
   const [to, setTo] = useState<Date | undefined>(toDate ? new Date(toDate) : undefined)
+  const [customersPage, setCustomersPage] = useState(1)
+  const customersPageSize = 50
+  const [highlightCustomerId, setHighlightCustomerId] = useState<number | null>(null)
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
+    }
+  }, [])
 
   const currency = useMemo(
     () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }),
@@ -357,6 +453,16 @@ export default function AdminStatistics() {
     { accessorKey: 'total', header: 'Total' },
   ]
 
+  const customersColumns: ColumnDef<CustomersTableRow>[] = [
+    { header: 'Date', accessorKey: 'created_date' },
+    { header: 'Source', accessorKey: 'source' },
+    { header: 'Reference', accessorKey: 'referral_source' },
+    { header: 'Name', accessorKey: 'name' },
+    { header: 'Status', accessorKey: 'status' },
+    { header: 'Lost reason', accessorKey: 'lost_reason' },
+    { header: 'Amount', accessorKey: 'amount' },
+  ]
+
   const handleFiltersSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const params = new URLSearchParams(location.search)
@@ -374,6 +480,65 @@ export default function AdminStatistics() {
     params.delete('salesRep')
     navigate({ pathname: '/admin/statistics', search: params.toString() })
   }
+
+  const customerRows = useMemo(() => {
+    const dealByCustomer = new Map<number, CustomersTableDeal>()
+    customersDeals.forEach(deal => {
+      if (!dealByCustomer.has(deal.customer_id)) {
+        dealByCustomer.set(deal.customer_id, deal)
+      }
+    })
+    return customersTable
+      .map<CustomersTableRow>(customer => {
+        const createdDate = new Date(customer.created_date)
+        const deal = dealByCustomer.get(customer.id)
+        const isInvalid = customer.invalid_lead && customer.invalid_lead !== ''
+        const status = isInvalid ? 'Invalid' : deal?.status || ''
+        const lostReason = isInvalid ? customer.invalid_lead || '' : deal?.lost_reason || ''
+        const amount =
+          deal?.amount && Number(deal.amount) > 0 ? currency.format(Number(deal.amount)) : ''
+        const sourceValue =
+          customer.source === 'check-in'
+            ? 'Walk-In'
+            : customer.source === 'leads'
+              ? 'Leads'
+              : customer.source || ''
+        const referral =
+          customer.referral_source === 'facebook-form'
+            ? 'Facebook'
+            : customer.referral_source === 'wordpress-form'
+              ? 'Website'
+              : customer.referral_source || ''
+        return {
+          id: customer.id,
+          created_date: createdDate.toLocaleDateString(),
+          createdSortValue: createdDate.getTime(),
+          source: sourceValue,
+          referral_source: referral,
+          name: customer.name || '',
+          status,
+          lost_reason: lostReason,
+          amount,
+        }
+      })
+      .sort((a, b) => (b.createdSortValue || 0) - (a.createdSortValue || 0))
+  }, [customersTable, customersDeals, currency])
+
+  const customersTotalPages = Math.max(
+    1,
+    Math.ceil(customerRows.length / customersPageSize),
+  )
+  const customersCurrentPage = Math.min(customersPage, customersTotalPages)
+  const customersStartIndex = (customersCurrentPage - 1) * customersPageSize
+  const customersEndIndex = customersStartIndex + customersPageSize
+  const displayedCustomers = customerRows
+    .slice(customersStartIndex, customersEndIndex)
+    .map(row => ({
+      ...row,
+      className: `stats-customer-row-${row.id} ${
+        highlightCustomerId === row.id ? 'ring-2 ring-blue-400 bg-blue-50' : ''
+      }`.trim(),
+    }))
 
   return (
     <PageLayout title='Statistics'>
@@ -434,6 +599,56 @@ export default function AdminStatistics() {
         <div className='border rounded p-4'>
           <div className='text-sm text-slate-500'>New (Last 30 Days)</div>
           <div className='text-2xl font-semibold'>{customersTotals.last_30}</div>
+        </div>
+      </div>
+
+      <div className='mt-8'>
+        <div className='flex flex-col md:flex-row items-center justify-between mb-2'>
+          <h2 className='text-xl font-semibold'>Customers</h2>
+          <FindCustomer
+            showActions={false}
+            onSelect={customerId => {
+              const index = customerRows.findIndex(row => row.id === customerId)
+              const targetPage =
+                index >= 0 ? Math.floor(index / customersPageSize) + 1 : 1
+              setCustomersPage(targetPage)
+              setTimeout(() => {
+                const element = document.querySelector<HTMLElement>(
+                  `.stats-customer-row-${customerId}`,
+                )
+                if (element) {
+                  element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  setHighlightCustomerId(customerId)
+                  if (highlightTimeoutRef.current) {
+                    clearTimeout(highlightTimeoutRef.current)
+                  }
+                  highlightTimeoutRef.current = setTimeout(() => {
+                    setHighlightCustomerId(null)
+                  }, 2000)
+                }
+              }, 50)
+            }}
+          />
+        </div>
+        <DataTable columns={customersColumns} data={displayedCustomers} />
+        <div className='mt-3 flex items-center justify-center gap-2'>
+          <Button
+            className='px-3 py-1 border rounded disabled:opacity-50'
+            disabled={customersCurrentPage <= 1}
+            onClick={() => setCustomersPage(customersCurrentPage - 1)}
+          >
+            Prev
+          </Button>
+          <span className='text-sm'>
+            Page {customersCurrentPage} / {customersTotalPages}
+          </span>
+          <Button
+            className='px-3 py-1 border rounded disabled:opacity-50'
+            disabled={customersCurrentPage >= customersTotalPages}
+            onClick={() => setCustomersPage(customersCurrentPage + 1)}
+          >
+            Next
+          </Button>
         </div>
       </div>
     </PageLayout>
