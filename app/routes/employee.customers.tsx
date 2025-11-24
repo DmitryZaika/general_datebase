@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
   Link,
@@ -13,6 +13,7 @@ import {
   useSearchParams,
   type LoaderFunctionArgs,
 } from 'react-router'
+import { CopyText } from '~/components/atoms/CopyText'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -160,68 +161,6 @@ function SalesRepCell({ customer }: { customer: Customer }) {
   )
 }
 
-interface CopyableValueProps {
-  value?: string
-  display?: string
-  title?: string
-}
-
-function CopyableValue({ value, display, title }: CopyableValueProps) {
-  const [copied, setCopied] = useState(false)
-  const [hovered, setHovered] = useState(false)
-  const resetRef = useRef<NodeJS.Timeout | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (resetRef.current) clearTimeout(resetRef.current)
-    }
-  }, [])
-
-  if (!value) return <span />
-
-  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation()
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      void navigator.clipboard.writeText(value)
-    }
-    setCopied(true)
-    if (resetRef.current) clearTimeout(resetRef.current)
-    resetRef.current = setTimeout(() => {
-      setCopied(false)
-      resetRef.current = null
-    }, 1500)
-  }
-
-  const showLabel = hovered || copied
-  const labelText = copied ? 'Copied' : 'Copy'
-
-  return (
-    <button
-      type='button'
-      title={title ?? value}
-      className='group relative inline-flex items-center bg-transparent p-0 text-left text-current border-0 focus-visible:outline-none'
-      onClick={handleClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <span className='relative inline-flex items-center justify-center'>
-        <span
-          className={`transition-opacity duration-200 ${showLabel ? 'opacity-10' : 'opacity-100'}`}
-        >
-          {display ?? value}
-        </span>
-        <span
-          className={`pointer-events-none absolute inset-0 flex items-center justify-center text-md transition-opacity duration-200 ${
-            showLabel ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          {labelText}
-        </span>
-      </span>
-    </button>
-  )
-}
-
 const customerColumns: ColumnDef<Customer>[] = [
   {
     accessorKey: 'name',
@@ -229,21 +168,21 @@ const customerColumns: ColumnDef<Customer>[] = [
     cell: ({ row }: { row: Row<Customer> }) => {
       const name = row.original.name || ''
       const short = name.length > 20 ? `${name.slice(0, 20)}...` : name
-      return <CopyableValue value={name} display={short} title={name} />
+      return <CopyText value={name} display={short} title={name} />
     },
   },
   {
     accessorKey: 'phone',
     header: 'Phone Number',
     cell: ({ row }: { row: Row<Customer> }) => (
-      <CopyableValue value={row.original.phone} title={row.original.phone} />
+      <CopyText value={row.original.phone} title={row.original.phone} />
     ),
   },
   {
     accessorKey: 'email',
     header: 'Email',
     cell: ({ row }: { row: Row<Customer> }) => (
-      <CopyableValue value={row.original.email} title={row.original.email} />
+      <CopyText value={row.original.email} title={row.original.email} />
     ),
   },
   // {

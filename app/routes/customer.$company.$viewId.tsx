@@ -70,7 +70,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         CASE
           WHEN s.cancelled_date IS NOT NULL THEN 'Cancelled'
           WHEN s.installed_date IS NOT NULL THEN 'Installed'
-          WHEN s.paid_date IS NOT NULL THEN 'Paid'
           WHEN s.sale_date IS NOT NULL AND s.cancelled_date IS NULL AND s.installed_date IS NULL THEN 'Sold'
         END AS status
       FROM sales s
