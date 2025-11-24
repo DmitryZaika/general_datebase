@@ -28,6 +28,7 @@ export function FindCustomer({
   onSelect,
   resolveId,
   noActionsLabel = 'No Items',
+  showActions = true,
 }: {
   className?: string
   disableRowClick?: boolean
@@ -41,6 +42,7 @@ export function FindCustomer({
   onSelect?: (customerId: number) => void
   resolveId?: (customerId: number) => number | undefined
   noActionsLabel?: string
+  showActions?: boolean
 }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [visibleCount, setVisibleCount] = useState(5)
@@ -134,69 +136,71 @@ export function FindCustomer({
                   <p>{customer.phone || ''}</p>
                 </div>
               </div>
-              <div className='flex items-center space-x-2'>
-                {resolveId && resolveId(customer.id) === undefined ? (
-                  <span className='text-xs text-gray-500'>{noActionsLabel}</span>
-                ) : (
-                  <>
-                    <Button
-                      variant='ghost'
-                      size='icon'
-                      onClick={e => {
-                        e.stopPropagation()
-                        if (onEdit) {
-                          onEdit(customer.id)
-                          return
-                        }
-                        const link = buildEditLink
-                          ? buildEditLink(customer.id, location.search)
-                          : `${editBasePath}/edit/${customer.id}${location.search}`
-                        navigate(link)
-                      }}
-                      className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
-                    >
-                      <FaEdit style={{ minWidth: '20px', minHeight: '20px' }} />
-                    </Button>
-                    <Button
-                      variant='ghost'
-                      size='icon'
-                      onClick={e => {
-                        e.stopPropagation()
-                        if (onDelete) {
-                          onDelete(customer.id)
-                          return
-                        }
-                        ;(async () => {
-                          const res = await fetch(
-                            `/api/deals/count-by-customer/${customer.id}`,
-                          )
-                          if (res.ok) {
-                            const json = await res.json()
-                            if ((json.count ?? 0) > 0) {
-                              toast({
-                                title: 'Action required',
-                                description:
-                                  'Delete all related deals with this customer.',
-                                duration: 7000,
-                                variant: 'destructive',
-                              })
-                              return
-                            }
+              {showActions && (
+                <div className='flex items-center space-x-2'>
+                  {resolveId && resolveId(customer.id) === undefined ? (
+                    <span className='text-xs text-gray-500'>{noActionsLabel}</span>
+                  ) : (
+                    <>
+                      <Button
+                        variant='ghost'
+                        size='icon'
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (onEdit) {
+                            onEdit(customer.id)
+                            return
                           }
-
-                          const link = buildDeleteLink
-                            ? buildDeleteLink(customer.id, location.search)
-                            : `${deleteBasePath}/delete/${customer.id}${location.search}`
+                          const link = buildEditLink
+                            ? buildEditLink(customer.id, location.search)
+                            : `${editBasePath}/edit/${customer.id}${location.search}`
                           navigate(link)
-                        })()
-                      }}
-                      className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
-                    >
-                      <FaTrash style={{ minWidth: '16px', minHeight: '16px' }} />
-                    </Button>
-                  </>
-                )}
-              </div>
+                        }}
+                        className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                      >
+                        <FaEdit style={{ minWidth: '20px', minHeight: '20px' }} />
+                      </Button>
+                      <Button
+                        variant='ghost'
+                        size='icon'
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (onDelete) {
+                            onDelete(customer.id)
+                            return
+                          }
+                          ;(async () => {
+                            const res = await fetch(
+                              `/api/deals/count-by-customer/${customer.id}`,
+                            )
+                            if (res.ok) {
+                              const json = await res.json()
+                              if ((json.count ?? 0) > 0) {
+                                toast({
+                                  title: 'Action required',
+                                  description:
+                                    'Delete all related deals with this customer.',
+                                  duration: 7000,
+                                  variant: 'destructive',
+                                })
+                                return
+                              }
+                            }
+
+                            const link = buildDeleteLink
+                              ? buildDeleteLink(customer.id, location.search)
+                              : `${deleteBasePath}/delete/${customer.id}${location.search}`
+                            navigate(link)
+                          })()
+                        }}
+                        className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                      >
+                        <FaTrash style={{ minWidth: '16px', minHeight: '16px' }} />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           ))}
           {customers.length > visibleCount && (

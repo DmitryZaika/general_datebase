@@ -89,7 +89,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
          WHERE ${whereSource} AND c.deleted_at IS NULL
            ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
            ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
-           AND c.company_id = ?${referralFilter}`,
+           AND c.company_id = ?${referralFilter}
+         ORDER BY c.created_date DESC`,
     [
       ...([fromDate].filter(Boolean) as string[]),
       ...([toDate].filter(Boolean) as string[]),
