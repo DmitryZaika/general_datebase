@@ -29,6 +29,7 @@ type DealRow = {
   id: number
   amount: number | null
   description: string | null
+  lost_reason: string | null
   list_name: string
 }
 
@@ -91,7 +92,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const deals = await selectMany<DealRow>(
     db,
-    `SELECT d.id, d.amount, d.description, l.name AS list_name
+    `SELECT d.id, d.amount, d.description, d.lost_reason, l.name AS list_name
      FROM deals d
      JOIN deals_list l ON l.id = d.list_id
      WHERE d.customer_id = ? AND d.deleted_at IS NULL AND l.deleted_at IS NULL
@@ -184,14 +185,28 @@ export default function CustomerInfoDialog() {
               ) : (
                 <ul className='space-y-2'>
                   {deals.map(d => (
-                    <li key={d.id} className='border rounded p-2'>
-                      <div className='text-sm font-medium'>
-                        Amount: $ {Number(d.amount || 0)}
+                    <li key={d.id} className='border rounded p-3 bg-white'>
+                      <div className='space-y-1 text-sm text-slate-700'>
+                        <div className='flex items-baseline justify-between gap-4'>
+                          <span className='font-semibold text-slate-800'>Amount</span>
+                          <span className='font-semibold'>
+                            $ {Number(d.amount || 0)}
+                          </span>
+                        </div>
+                        <div className='text-xs text-slate-500'>
+                          <span className='font-semibold'>Stage:</span> {d.list_name}
+                        </div>
                       </div>
-                      <div className='text-xs text-slate-500'>Stage: {d.list_name}</div>
                       {d.description && (
                         <div className='text-sm text-slate-600 mt-1 whitespace-pre-wrap'>
+                          <span className='font-semibold'>Description:</span>{' '}
                           {d.description}
+                        </div>
+                      )}
+                      {d.lost_reason && (
+                        <div className='text-sm text-slate-600 mt-1 whitespace-pre-wrap'>
+                          <span className='font-semibold text-red-600'>Lost reason:</span>{' '}
+                          {d.lost_reason}
                         </div>
                       )}
                     </li>
