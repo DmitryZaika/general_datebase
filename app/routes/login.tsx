@@ -119,7 +119,7 @@ export default function Login() {
   const isSubmitting = navigation.state !== 'idle'
 
   return (
-    <div className='flex flex-col items-center justify-center p-20'>
+    <div className='flex flex-col items-center justify-center p-5'>
       <Link
         to='/customer/1/stones'
         className='pb-4 text-blue-500 underline cursor-pointer'

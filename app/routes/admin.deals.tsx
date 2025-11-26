@@ -19,6 +19,7 @@ type AdminDeal = {
   amount: number | null
   description: string | null
   status: string | null
+  lost_reason: string | null
   list_id: number
   position: number | null
   due_date: string | null
@@ -46,7 +47,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Deals filtered by company (via customers.company_id) and optionally by sales rep
     const dealParams: (string | number)[] = [companyId]
     let dealSql = `
-      SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.list_id, d.position, d.due_date, u.name AS sales_rep
+      SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason, d.list_id, d.position, d.due_date, u.name AS sales_rep
       FROM deals d
       JOIN customers c ON d.customer_id = c.id
       JOIN users u ON d.user_id = u.id
@@ -85,6 +86,7 @@ export default function AdminDeals() {
     amount?: number | null
     description?: string | null
     status?: string | null
+    lost_reason?: string | null
     position?: number
     list_id: number
     due_date?: string | null
@@ -101,6 +103,7 @@ export default function AdminDeals() {
       amount: d.amount,
       description: d.description,
       status: d.status ?? undefined,
+      lost_reason: d.lost_reason ?? undefined,
       position: d.position ?? undefined,
       list_id: d.list_id,
       due_date: d.due_date

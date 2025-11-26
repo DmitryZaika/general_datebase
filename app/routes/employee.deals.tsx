@@ -36,6 +36,7 @@ type FullDeal = DealsDialogSchema & {
   user_id: number
   due_date: string | null
   customer_id: number
+  lost_reason: string | null
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -73,7 +74,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     )
     const deals = await selectMany<FullDeal>(
       db,
-      `SELECT id, customer_id, amount, description, status, list_id, position, due_date, deleted_at
+      `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position, due_date, deleted_at
        FROM deals
        WHERE deleted_at IS NULL AND user_id = ?`,
       [user.id],
@@ -107,6 +108,7 @@ export default function EmployeeDeals() {
     amount?: number | null
     description?: string | null
     status?: string | null
+    lost_reason?: string | null
     position?: number
     list_id: number
     due_date?: string | null
@@ -122,6 +124,7 @@ export default function EmployeeDeals() {
       amount: d.amount,
       description: d.description,
       status: d.status ?? undefined,
+      lost_reason: d.lost_reason ?? undefined,
       position: d.position ?? undefined,
       list_id: d.list_id,
       due_date: d.due_date

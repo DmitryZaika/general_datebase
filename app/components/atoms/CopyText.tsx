@@ -1,3 +1,4 @@
+import { CheckIcon } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 
 interface CopyTextProps {
@@ -34,7 +35,7 @@ export function CopyText({ value, display, title, className }: CopyTextProps) {
   }
 
   const showLabel = hovered || copied
-  const labelText = copied ? 'Copied' : 'Copy'
+  const labelText = copied ? <CheckIcon className='text-green-500' /> : "Copy"
 
   return (
     <button

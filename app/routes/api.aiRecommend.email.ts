@@ -266,7 +266,6 @@ function buildUserPrompt(
 
   prompt += `First provide ONLY the subject line. Then newline: ---BODY---. Then write the body. Do NOT include any signature, sender name, sender title, sender company, or closing phrase such as “Best,” “Thanks,” “Regards,” or similar. The system will insert the signature manually.`
 
-  console.log(prompt)
   return prompt
 }
 
