@@ -12,6 +12,8 @@ interface DealItemProps {
     name: string
     amount?: number | null
     description?: string | null
+    status?: string | null
+    lost_reason?: string | null
     list_id: number
     position?: number | null
     due_date?: string | null
@@ -293,6 +295,12 @@ export default function DealItem({
         )
       )}
 
+      {deal.status === 'Closed Lost' && deal.lost_reason && (
+        <p className='text-xs text-slate-500 mt-1 break-words whitespace-pre-wrap'>
+          {deal.lost_reason}
+        </p>
+      )}
+
       {pickerCoords && (
         <input
           type='date'
@@ -315,30 +323,34 @@ export default function DealItem({
         />
       )}
       <div className='flex items-center justify-between gap-2 w-full'>
-        {localDate ? (
-          <p
-            className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
-            onClick={e => !readonly && openPicker(e.currentTarget)}
-            onPointerDown={e => e.stopPropagation()}
-            style={{ position: 'relative', zIndex: 20 }}
-          >
-            {formatDisplay(localDate)}
-          </p>
-        ) : (
-          !readonly && (
-            <Button
-              variant='ghost'
-              size='icon'
-              className='h-3 w-3 p-2'
-              onClick={e => openPicker(e.currentTarget)}
-              onPointerDown={e => e.stopPropagation()}
-              style={{ position: 'relative', zIndex: 20 }}
-            >
-              <Calendar
-                className={`w-5 h-5 ${getDateColor(localDate, deal.list_id)}`}
-              />
-            </Button>
-          )
+        {deal.list_id !== 5 && deal.list_id !== 4 && (
+          <>
+            {localDate ? (
+              <p
+                className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
+                onClick={e => !readonly && openPicker(e.currentTarget)}
+                onPointerDown={e => e.stopPropagation()}
+                style={{ position: 'relative', zIndex: 20 }}
+              >
+                {formatDisplay(localDate)}
+              </p>
+            ) : (
+              !readonly && (
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='h-3 w-3 p-2'
+                  onClick={e => openPicker(e.currentTarget)}
+                  onPointerDown={e => e.stopPropagation()}
+                  style={{ position: 'relative', zIndex: 20 }}
+                >
+                  <Calendar
+                    className={`w-5 h-5 ${getDateColor(localDate, deal.list_id)}`}
+                  />
+                </Button>
+              )
+            )}
+          </>
         )}
         {hasImages && (
           <Link

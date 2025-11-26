@@ -25,6 +25,12 @@ const paramsSchema = z.object({
   viewId: z.string().uuid('View ID must be a valid UUID'),
 })
 
+function writeStorageIfBlank(key: 'customerViewId', value: string) {
+  if (!localStorage.getItem(key)) {
+    localStorage.setItem(key, value)
+  }
+}
+
 interface Sale {
   id: number
   sale_date: string
@@ -36,6 +42,9 @@ interface Sale {
   sink: string | null
   sink_pictures: string | null
   status: string
+  company_id: number
+  all_cut?: number | null
+  any_cut?: number | null
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -56,6 +65,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         GROUP_CONCAT(DISTINCT st.url ORDER BY si.id SEPARATOR ',') AS stone_pictures,
         MAX(sty.name) AS sink,
         GROUP_CONCAT(DISTINCT isk.url ORDER BY isk.id SEPARATOR ',') AS sink_pictures,
+        MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) AS all_cut,
+        MAX(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) AS any_cut,
         CASE
           WHEN s.cancelled_date IS NOT NULL THEN 'Cancelled'
           WHEN s.installed_date IS NOT NULL THEN 'Installed'
@@ -70,10 +81,25 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       LEFT JOIN sink_type sty ON sty.id = sk.sink_type_id
       LEFT JOIN installed_sinks isk ON isk.sink_id = sk.id
       WHERE c.view_id = UUID_TO_BIN(?)
-      GROUP BY s.id, s.sale_date, s.price, u.name, c.name
+      GROUP BY s.id, s.sale_date, s.price, u.name, c.name, c.company_id
       ORDER BY s.sale_date DESC`,
     [viewId],
   )
+
+  const enrichedSales = sales.map(sale => {
+    let currentStatus = sale.status
+    if (currentStatus === 'Sold' || currentStatus === 'Paid') {
+      if (sale.all_cut === 1) {
+        currentStatus = 'Cut'
+      } else if (sale.any_cut === 1) {
+        currentStatus = 'Partially Cut'
+      }
+    }
+    return {
+      ...sale,
+      status: currentStatus,
+    }
+  })
 
   const customerRows = await selectMany<{ name: string }>(
     db,
@@ -112,7 +138,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const customer = customerName ? { name: customerName } : null
 
-  return { customer, sales }
+  return { customer, sales: enrichedSales, viewId }
 }
 
 const columns: ColumnDef<Sale>[] = [
@@ -201,7 +227,7 @@ function ImageGalleryCell({ images, title }: { images: string | null; title: str
             className='h-12 w-16 overflow-hidden rounded border'
             onClick={() => handleOpen(index)}
           >
-            <img src={url} alt={title} className='h-full w-full object-cover' loading='lazy' />
+            <img src={url} alt={title} className='h-full w-full object-cover cursor-pointer' loading='lazy' />
           </button>
         ))}
         {list.length > 3 && <span className='text-xs text-slate-500'>+{list.length - 3}</span>}
@@ -248,9 +274,13 @@ function ImageGalleryCell({ images, title }: { images: string | null; title: str
 }
 
 export default function CustomersView() {
-  const { customer, sales } = useLoaderData<typeof loader>()
+  const { customer, sales, viewId } = useLoaderData<typeof loader>()
   const [searchParams] = useSearchParams()
   const paymentStatus = searchParams.get('payment_status')
+
+  useEffect(() => {
+    writeStorageIfBlank('customerViewId', viewId)
+  }, [viewId])
 
   useEffect(() => {
     // Clear the URL parameters after processing
@@ -264,7 +294,7 @@ export default function CustomersView() {
 
   return (
     <div className='space-y-4'>
-      <h1 className='text-2xl font-bold'>{customer?.name}</h1>
+      <h1 className='text-2xl font-bold pl-2'>{customer?.name}</h1>
       
       <DataTable columns={columns} data={sales} />
     </div>

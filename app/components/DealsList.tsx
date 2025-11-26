@@ -13,10 +13,13 @@ interface DealsListProps {
     name: string
     amount?: number | null
     description?: string | null
+    status?: string | null
+    lost_reason?: string | null
     list_id: number
     position?: number
     due_date?: string | null
     sales_rep?: string | null
+    has_images?: boolean
   }[]
   id: number
   readonly?: boolean

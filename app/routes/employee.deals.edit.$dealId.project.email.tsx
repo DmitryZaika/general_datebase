@@ -274,7 +274,6 @@ async function generateAIEmail(
 ): Promise<AIEmailResponse> {
   const requestPayload = buildAIRequestPayload(formData, dealId)
 
-  console.log(requestPayload)
 
   const response = await fetch('/api/aiRecommend/email', {
     method: 'POST',
