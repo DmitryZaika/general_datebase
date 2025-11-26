@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { db } from '~/db.server'
 import { sendEmail } from '~/lib/email.server'
 import { posthogClient } from '~/utils/posthog.server'
+import { selectId } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export const customerSchema = z.object({
@@ -16,6 +17,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const user = await getEmployeeUser(request).catch(() => null)
   if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
 
+  const userCompany = await selectId<{ domain: string }>(
+    db,
+    'SELECT domain from company where id = ?',
+    user.company_id,
+  )
+
+  const from = userCompany?.domain ? user.email : 'no-reply@granite-manager.com'
+  const replyTo = userCompany?.domain ? undefined : [user.email]
+
   const raw = await request.json()
   const cleaned = customerSchema.parse(raw)
 
@@ -23,10 +33,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     info = await sendEmail({
       to: cleaned.to,
-      from: user.email,
+      from,
       subject: cleaned.subject,
       html: cleaned.body,
       configurationSet: 'email-tracking-set',
+      replyTo,
     })
   } catch (error) {
     const message = (error as { message?: string }).message || 'Unknown error'
