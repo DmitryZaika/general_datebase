@@ -16,6 +16,7 @@ interface SendEmail {
   subject: string
   html?: string
   text?: string
+  replyTo?: string[]
   configurationSet?: string
 }
 
@@ -30,6 +31,7 @@ export async function sendEmail({
   subject,
   html,
   text,
+  replyTo,
   configurationSet,
 }: SendEmail) {
   const body: Body = {}
@@ -39,6 +41,7 @@ export async function sendEmail({
   return await ses.send(
     new SendEmailCommand({
       Destination: { ToAddresses: [to] },
+      ReplyToAddresses: replyTo,
       Source: from || 'noreply@granite-manager.com',
       Message: {
         Subject: { Data: subject, Charset: 'UTF-8' },
