@@ -29,13 +29,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const raw = await request.json()
   const cleaned = customerSchema.parse(raw)
 
+  const HTMLBody = `<div style="white-space: pre-wrap;">${cleaned.body}</div>`
+
   let info: SendEmailCommandOutput
   try {
     info = await sendEmail({
       to: cleaned.to,
       from,
       subject: cleaned.subject,
-      html: cleaned.body,
+      html: HTMLBody,
       configurationSet: 'email-tracking-set',
       replyTo,
     })
