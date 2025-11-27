@@ -93,8 +93,10 @@ export default function DealEmailHistory() {
   const { emails } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
-  const handleRowClick = (emailId: number) => {
-    navigate(`chat/${location.search}`)
+  const handleRowClick = (email: EmailHistory) => {
+    const searchParams = new URLSearchParams(location.search || '')
+    searchParams.set('subject', email.subject)
+    navigate(`chat?${searchParams.toString()}`)
   }
 
   return (
@@ -102,7 +104,7 @@ export default function DealEmailHistory() {
       <DataTable
         columns={customerColumns}
         data={emails}
-        onRowClick={(email: EmailHistory) => handleRowClick(email.id)}
+        onRowClick={(email: EmailHistory) => handleRowClick(email)}
         rowClassName={(email: EmailHistory) => 'cursor-pointer'}
       />
       <Outlet />

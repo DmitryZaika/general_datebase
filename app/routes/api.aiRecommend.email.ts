@@ -86,6 +86,7 @@ const generateSchema = z.object({
   verboseness: z.enum(['concise', 'detailed']).optional(),
   urgencyLevel: z.enum(['low', 'medium', 'high']).optional(),
   desiredContent: z.string().optional(),
+  subject: z.string().optional(),
   variationToken: z.string().optional(),
 })
 
@@ -220,18 +221,26 @@ async function getLeadInfoByDeal(dealId: number): Promise<LeadInfo> {
   }
 }
 
-async function getEmailHistoryByDeal(dealId: number): Promise<EmailHistoryItem[]> {
-  const [rows] = await db.execute<RowDataPacket[]>(
-    `
+async function getEmailHistoryByDeal(
+  dealId: number,
+  subject?: string,
+): Promise<EmailHistoryItem[]> {
+  let query = `
        SELECT
          e.body,
          e.sent_at
        FROM emails e
-       WHERE e.deal_id = ? AND e.deleted_at IS NULL
-       ORDER BY e.sent_at ASC
-     `,
-    [dealId],
-  )
+       WHERE e.deal_id = ? AND e.deleted_at IS NULL`
+  const params: (number | string)[] = [dealId]
+
+  if (subject) {
+    query += ' AND e.subject = ?'
+    params.push(subject)
+  }
+
+  query += ' ORDER BY e.sent_at ASC'
+
+  const [rows] = await db.execute<RowDataPacket[]>(query, params)
 
   if (!rows?.length) return []
 
@@ -322,7 +331,7 @@ async function createStreamingResponse(
   userInfo: UserInfo,
 ): Promise<ReadableStream> {
   const lead = await getLeadInfoByDeal(params.dealId)
-  const emailHistory = await getEmailHistoryByDeal(params.dealId)
+  const emailHistory = await getEmailHistoryByDeal(params.dealId, params.subject)
   const userPrompt = buildUserPrompt(params, lead, userInfo, emailHistory)
 
   return new ReadableStream({
