@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { Link, useLoaderData, useLocation } from 'react-router'
 import { Button } from '~/components/ui/button'
+import { useCompanyLogo } from '~/hooks/logo-url'
 import type { HeaderProps } from '~/types'
 import { getCustomerUrl, getMirroredUrl } from '~/utils/headerNav'
 import { LinkButton } from '../molecules/LinkButton'
@@ -23,6 +24,7 @@ export function HeaderDesktop({
   const companyId = isCustomerPage
     ? location.pathname.split('/').filter(Boolean)[1]
     : data?.user?.company_id
+  const { url: companyLogo } = useCompanyLogo(Number(companyId))
 
   const customerSwitchUrl =
     companyId === undefined
@@ -35,11 +37,7 @@ export function HeaderDesktop({
       <div className='logo'>
         <a className='flex justify-center' href='/'>
           <img
-            src={
-              Number(companyId) === 4
-                ? 'https://gmqtops.com/wp-content/uploads/2023/01/logo-b.png'
-                : 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp'
-            }
+            src={companyLogo ?? ""}
             alt='Logo'
             className={ Number(companyId) === 4 ? 'h-12 md:h-16 object-contain mr-4' : 'h-12 md:h-16 object-contain' }
           />

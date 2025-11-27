@@ -94,6 +94,8 @@ const SYSTEM_PROMPT = `
 
   Use all provided sender and recipient information. If any sender details are missing, simply omit them. Never invent names, companies, phone numbers, or facts.
 
+  Use the proper spacing and formatting for the text.
+
   EMAIL CATEGORY DEFINITIONS
 
   FIRST-CONTACT
@@ -175,7 +177,7 @@ function formatSenderInfo(info: UserInfo): string {
 
   return parts.length
     ? `Introduce my self as ${parts.join(
-        ' at ',
+        ' with ',
       )} use only the first name of the customer. Dont use signature.`
     : ''
 }
