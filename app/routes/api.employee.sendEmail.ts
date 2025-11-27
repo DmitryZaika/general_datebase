@@ -12,26 +12,13 @@ export const customerSchema = z.object({
   to: z.string().email(),
   subject: z.string().min(1).max(100),
   body: z.string().min(1).max(10000),
-  dealId: z.number(),
+  dealId: z.coerce.number().min(1).int().optional(),
+  threadId: z.string().uuid().optional(),
 })
-
-export function addUuidToEmail(email: string, uuid: string): string {
-  const atIndex = email.indexOf('@')
-  if (atIndex === -1) {
-    throw new Error("Incorrect email — no '@'.")
-  }
-
-  const local = email.slice(0, atIndex)
-  const domain = email.slice(atIndex + 1)
-
-  return `${local}+${uuid}@${domain}`
-}
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const user = await getEmployeeUser(request).catch(() => null)
   if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
-
-  const threadId = uuidv4()
 
   const userCompany = await selectId<{ domain: string | null }>(
     db,
@@ -43,8 +30,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const cleaned = customerSchema.parse(raw)
   const dealId = cleaned.dealId
   const rawFrom = userCompany?.domain ? user.email : 'sales@granite-manager.com'
-  const from = addUuidToEmail(rawFrom, threadId)
+  const from = userCompany?.domain ? user.email : 'sales@granite-manager.com'
   const to = cleaned.to
+  const threadId = cleaned.threadId || uuidv4()
 
   const HTMLBody = `<div style="white-space: pre-wrap;">${cleaned.body}</div>`
 
