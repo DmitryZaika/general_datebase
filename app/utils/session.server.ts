@@ -16,6 +16,7 @@ export interface User {
   id: number
   email: string
   name: string
+  phone_number: string
   is_employee: boolean
   is_admin: boolean
   is_superuser: boolean
@@ -26,6 +27,7 @@ export interface SessionUser {
   id: number
   email: string
   name: string
+  phone_number: string
   is_employee: boolean
   is_admin: boolean
   is_superuser: boolean
@@ -84,7 +86,7 @@ export async function login(
 
 async function getUser(sessionId: string): Promise<SessionUser | undefined> {
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
-    `SELECT users.id, users.email, users.name, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
+    `SELECT users.id, users.email, users.name, users.phone_number, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
      JOIN sessions ON sessions.user_id = users.id
      WHERE sessions.id = ?
        AND sessions.expiration_date > CURRENT_TIMESTAMP
@@ -105,7 +107,7 @@ async function getUserByPositions(
   positions: number[],
 ): Promise<SessionUserNew | undefined> {
   const [rows] = await db.query<SessionUserNew[] & RowDataPacket[]>(
-    `SELECT users.id, users.email, users.name, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
+    `SELECT users.id, users.email, users.name, users.phone_number, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
      JOIN users_positions ON users_positions.user_id = users.id
      JOIN sessions ON sessions.user_id = users.id
      WHERE sessions.id = ?
