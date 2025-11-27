@@ -42,6 +42,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const dealId = parseInt(params.dealId, 10)
+  const url = new URL(request.url)
+  const subjectFilter = url.searchParams.get('subject') || undefined
 
   const [customerRows] = await db.execute<RowDataPacket[]>(
     `SELECT c.name, c.email
@@ -51,13 +53,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [dealId],
   )
 
-  const [emailRows] = await db.execute<RowDataPacket[]>(
-    `SELECT e.id, e.subject, e.body, e.sent_at
+  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at
        FROM emails e
-      WHERE e.deal_id = ? AND e.deleted_at IS NULL
-      ORDER BY e.sent_at ASC`,
-    [dealId],
-  )
+      WHERE e.deal_id = ? AND e.deleted_at IS NULL`
+  const emailParams: (number | string)[] = [dealId]
+
+  if (subjectFilter) {
+    emailQuery += ' AND e.subject = ?'
+    emailParams.push(subjectFilter)
+  }
+
+  emailQuery += ' ORDER BY e.sent_at ASC'
+
+  const [emailRows] = await db.execute<RowDataPacket[]>(emailQuery, emailParams)
 
   const messages: Message[] = (emailRows || []).map(row => ({
     id: row.id,
@@ -71,6 +79,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     customerEmail: customerRows?.[0]?.email || '',
     messages,
     dealId,
+    subject: subjectFilter || null,
   }
 }
 
@@ -127,6 +136,7 @@ async function processStreamingResponse(
 async function generateAIEmailForChat(
   emailCategory: string,
   dealId: number,
+  subject: string | null,
   onStreamBody?: (text: string) => void,
 ): Promise<AIEmailResponse> {
   const variationToken = Math.random().toString(36).slice(2)
@@ -134,6 +144,7 @@ async function generateAIEmailForChat(
     emailCategory,
     dealId,
     variationToken,
+    subject: subject || undefined,
   }
 
   const response = await fetch('/api/aiRecommend/email', {
@@ -159,7 +170,8 @@ export default function EmailChatDialog() {
   const location = useLocation()
   const [showSelect, setShowSelect] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
-  const { customerName, customerEmail, messages, dealId } = useLoaderData<typeof loader>()
+  const { customerName, customerEmail, messages, dealId, subject } =
+    useLoaderData<typeof loader>()
   const [messageText, setMessageText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -187,7 +199,7 @@ export default function EmailChatDialog() {
     setIsGenerating(true)
     setMessageText('')
     try {
-      await generateAIEmailForChat(selectedTemplate, dealId, body => {
+      await generateAIEmailForChat(selectedTemplate, dealId, subject, body => {
         setMessageText(body)
         setTimeout(() => {
           if (textareaRef.current) {
