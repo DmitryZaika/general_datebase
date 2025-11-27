@@ -12,6 +12,7 @@ export const customerSchema = z.object({
   to: z.string().email(),
   subject: z.string().min(1).max(100),
   body: z.string().min(1).max(10000),
+  dealId: z.number(),
 })
 
 export function addUuidToEmail(email: string, uuid: string): string {
@@ -40,6 +41,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const raw = await request.json()
   const cleaned = customerSchema.parse(raw)
+  const dealId = cleaned.dealId
   const rawFrom = userCompany?.domain ? user.email : 'sales@granite-manager.com'
   const from = addUuidToEmail(rawFrom, threadId)
   const to = cleaned.to
@@ -68,9 +70,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const messageId = info.MessageId
 
   await db.execute(
-    `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [user.id, cleaned.subject, cleaned.body, messageId, from, to, threadId],
+    `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id, deal_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [user.id, cleaned.subject, cleaned.body, messageId, from, to, threadId, dealId],
   )
 
   return data({ ok: true })

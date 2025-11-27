@@ -88,6 +88,7 @@ interface AIEmailRequest {
   senderPosition?: string
   senderPhoneNumber?: string
   senderEmail?: string
+  variationToken?: string
 }
 
 interface AIEmailResponse {
@@ -205,9 +206,11 @@ function buildAIRequestPayload(
   formData: AIEmailFormData,
   dealId: number,
 ): Partial<AIEmailRequest> {
+  const variationToken = Math.random().toString(36).slice(2)
   const payload: Partial<AIEmailRequest> = {
     emailCategory: formData.emailCategory,
     dealId: dealId,
+    variationToken,
   }
 
   if (formData.formality) payload.formality = formData.formality
@@ -490,11 +493,11 @@ function AIAssistantMenu({
 // ============================================================================
 // MAIN COMPONENT
 // ====
-function sendEmail(to: string, subject: string, body: string) {
+function sendEmail(to: string, subject: string, body: string, dealId: number) {
   fetch('/api/employee/sendEmail', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to, subject, body }),
+    body: JSON.stringify({ to, subject, body, dealId }),
   })
 }
 
@@ -517,7 +520,7 @@ export default function DealEmailDialog() {
 
   const { mutate } = useMutation({
     mutationFn: async (values: EmailFormData) => {
-      sendEmail(values.to, values.subject, values.text)
+      sendEmail(values.to, values.subject, values.text, dealId)
     },
     onSuccess: () => {
       navigate(`../${location.search}`)

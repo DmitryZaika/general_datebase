@@ -34,6 +34,11 @@ interface UserInfo {
   company?: string
 }
 
+interface EmailHistoryItem {
+  body: string
+  sentAt: string
+}
+
 /** Extract only the fields you want to expose to the prompt builder */
 async function getUserInfo(user: {
   name: string
@@ -81,6 +86,7 @@ const generateSchema = z.object({
   verboseness: z.enum(['concise', 'detailed']).optional(),
   urgencyLevel: z.enum(['low', 'medium', 'high']).optional(),
   desiredContent: z.string().optional(),
+  variationToken: z.string().optional(),
 })
 
 type EmailGenerationParams = z.infer<typeof generateSchema>
@@ -214,6 +220,27 @@ async function getLeadInfoByDeal(dealId: number): Promise<LeadInfo> {
   }
 }
 
+async function getEmailHistoryByDeal(dealId: number): Promise<EmailHistoryItem[]> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `
+       SELECT
+         e.body,
+         e.sent_at
+       FROM emails e
+       WHERE e.deal_id = ? AND e.deleted_at IS NULL
+       ORDER BY e.sent_at ASC
+     `,
+    [dealId],
+  )
+
+  if (!rows?.length) return []
+
+  return rows.map(row => ({
+    body: row.body,
+    sentAt: row.sent_at,
+  }))
+}
+
 // ============================================================================
 // PROMPT CONSTRUCTION
 // ============================================================================
@@ -225,6 +252,7 @@ function buildUserPrompt(
   params: EmailGenerationParams,
   lead: LeadInfo,
   userInfo: UserInfo,
+  emailHistory?: EmailHistoryItem[],
 ): string {
   const {
     emailCategory,
@@ -235,8 +263,8 @@ function buildUserPrompt(
     desiredContent,
   } = params
 
-  const { customerName, leadMessage, remodelType, referralSource, customerCompany } =
-    lead
+  const { customerName, leadMessage, remodelType, referralSource, customerCompany } = lead
+  const { variationToken } = params
 
   let prompt = `Write a ${formality}, ${tone} sales email. `
   prompt += `Email type: ${emailCategory}. `
@@ -264,6 +292,20 @@ function buildUserPrompt(
     prompt += `Include this content: ${desiredContent}. `
   }
 
+  if (emailHistory && emailHistory.length) {
+    const historyText = emailHistory
+      .map(
+        (item, index) =>
+          `Message ${index + 1} on ${item.sentAt}:\n${item.body}`,
+      )
+      .join('\n\n')
+    prompt += `Here is the previous email conversation with this customer. Use it as context and write a natural next email in the same thread without repeating their exact wording:\n${historyText}\n`
+  }
+
+  if (variationToken) {
+    prompt += `Use a slightly different style than any previous email by following this variation hint: ${variationToken}. `
+  }
+
   prompt += formatSenderInfo(userInfo)
 
   prompt += `First provide ONLY the subject line. Then newline: ---BODY---. Then write the body. Do NOT include any signature, sender name, sender title, sender company, or closing phrase such as “Best,” “Thanks,” “Regards,” or similar. The system will insert the signature manually.`
@@ -280,7 +322,8 @@ async function createStreamingResponse(
   userInfo: UserInfo,
 ): Promise<ReadableStream> {
   const lead = await getLeadInfoByDeal(params.dealId)
-  const userPrompt = buildUserPrompt(params, lead, userInfo)
+  const emailHistory = await getEmailHistoryByDeal(params.dealId)
+  const userPrompt = buildUserPrompt(params, lead, userInfo, emailHistory)
 
   return new ReadableStream({
     async start(controller) {
