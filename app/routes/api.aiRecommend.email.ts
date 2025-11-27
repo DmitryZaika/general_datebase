@@ -32,19 +32,27 @@ interface LeadInfo {
 interface UserInfo {
   name: string
   company?: string
+  phone?: string
+  email?: string
+  position?: string
 }
 
 interface EmailHistoryItem {
   body: string
   sentAt: string
+  isFromCustomer?: boolean
 }
 
 /** Extract only the fields you want to expose to the prompt builder */
 async function getUserInfo(user: {
   name: string
   company_id?: number
+  phone_number?: string
+  email?: string
+  position_id?: number
 }): Promise<UserInfo> {
   let companyName: string | undefined
+  let positionName: string | undefined
 
   if (user.company_id) {
     try {
@@ -60,9 +68,26 @@ async function getUserInfo(user: {
     }
   }
 
+  if (user.position_id) {
+    try {
+      const [rows] = await db.execute<RowDataPacket[]>(
+        `SELECT name FROM positions WHERE id = ? LIMIT 1`,
+        [user.position_id],
+      )
+      if (rows?.length) {
+        positionName = rows[0].name
+      }
+    } catch (err) {
+      console.error('Failed to load position info:', err)
+    }
+  }
+
   return {
     name: user.name,
     company: companyName,
+    phone: user.phone_number,
+    email: user.email,
+    position: positionName,
   }
 }
 
@@ -179,14 +204,18 @@ function getLengthInstructions(level: 'concise' | 'detailed'): string {
  */
 function formatSenderInfo(info: UserInfo): string {
   const parts = []
-  if (info.name) parts.push(info.name)
-  if (info.company) parts.push(info.company)
+  if (info.name) parts.push(`Name: ${info.name}`)
+  if (info.company) parts.push(`Company: ${info.company}`)
+  if (info.position) parts.push(`Position: ${info.position}`)
+  if (info.phone) parts.push(`Phone: ${info.phone}`)
+  if (info.email) parts.push(`Email: ${info.email}`)
 
-  return parts.length
-    ? `Introduce my self as ${parts.join(
-        ' with ',
-      )} use only the first name of the customer. Dont use signature.`
-    : ''
+  if (!parts.length) return ''
+
+  let result = `Here is my (the sales rep) contact information: ${parts.join(', ')}. `
+  result += `Use this information when the customer asks for contact details, phone number, or how to reach me. `
+  result += `Introduce myself using only my first name and company. Use only the first name of the customer. Don't use signature.`
+  return result
 }
 
 /**
@@ -228,7 +257,8 @@ async function getEmailHistoryByDeal(
   let query = `
        SELECT
          e.body,
-         e.sent_at
+         e.sent_at,
+         e.sender_user_id
        FROM emails e
        WHERE e.deal_id = ? AND e.deleted_at IS NULL`
   const params: (number | string)[] = [dealId]
@@ -247,6 +277,7 @@ async function getEmailHistoryByDeal(
   return rows.map(row => ({
     body: row.body,
     sentAt: row.sent_at,
+    isFromCustomer: row.sender_user_id === null,
   }))
 }
 
@@ -303,10 +334,10 @@ function buildUserPrompt(
 
   if (emailHistory && emailHistory.length) {
     const historyText = emailHistory
-      .map(
-        (item, index) =>
-          `Message ${index + 1} on ${item.sentAt}:\n${item.body}`,
-      )
+      .map((item, index) => {
+        const sender = item.isFromCustomer ? 'Customer' : 'You (sales rep)'
+        return `Message ${index + 1} from ${sender} on ${item.sentAt}:\n${item.body}`
+      })
       .join('\n\n')
     prompt += `Here is the previous email conversation with this customer. Use it as context and write a natural next email in the same thread without repeating their exact wording:\n${historyText}\n`
   }

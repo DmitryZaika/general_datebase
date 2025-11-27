@@ -50,12 +50,20 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [dealId],
   )
 
-  const emails: EmailHistory[] = (rows || []).map(row => ({
-    id: row.id,
-    subject: row.subject,
-    body: row.body,
-    sent_at: row.sent_at,
-  }))
+  const seenSubjects = new Set<string>()
+  const emails: EmailHistory[] = []
+  for (const row of rows || []) {
+    if (seenSubjects.has(row.subject)) {
+      continue
+    }
+    seenSubjects.add(row.subject)
+    emails.push({
+      id: row.id,
+      subject: row.subject,
+      body: row.body,
+      sent_at: row.sent_at,
+    })
+  }
 
   return { emails, readCounts }
 }

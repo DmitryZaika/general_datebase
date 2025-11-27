@@ -24,6 +24,8 @@ interface Message {
   subject: string
   body: string
   sent_at: string
+  isFromCustomer: boolean
+  read_at?: string
 }
 
 interface AIEmailResponse {
@@ -53,11 +55,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [dealId],
   )
 
-  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at
+  const customerEmail = customerRows?.[0]?.email || ''
+
+  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, er.read_at
        FROM emails e
+       LEFT JOIN email_reads er ON e.message_id = er.message_id
       WHERE e.deal_id = ? AND e.deleted_at IS NULL`
   const emailParams: (number | string)[] = [dealId]
-
   if (subjectFilter) {
     emailQuery += ' AND e.subject = ?'
     emailParams.push(subjectFilter)
@@ -67,16 +71,22 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const [emailRows] = await db.execute<RowDataPacket[]>(emailQuery, emailParams)
 
-  const messages: Message[] = (emailRows || []).map(row => ({
-    id: row.id,
-    subject: row.subject,
-    body: row.body,
-    sent_at: row.sent_at,
-  }))
+  const messages: Message[] = (emailRows || []).map(row => {
+    const isFromCustomer = row.sender_email === customerEmail
+    return {
+      id: row.id,
+      subject: row.subject,
+      body: row.body,
+      sent_at: row.sent_at,
+      isFromCustomer,
+      read_at: row.read_at,
+    }
+  })
+  console.log(messages)
 
   return {
     customerName: customerRows?.[0]?.name || 'Customer',
-    customerEmail: customerRows?.[0]?.email || '',
+    customerEmail,
     messages,
     dealId,
     subject: subjectFilter || null,
@@ -165,10 +175,17 @@ async function generateAIEmailForChat(
   return processStreamingResponse(response.body.getReader(), onStreamBody)
 }
 
+function MessageDate({message}: {message: Message}) {
+  const date = new Date(message.sent_at)
+  const time = date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit' })
+  return <p className='text-xs text-gray-500 text-left'>{time}</p>
+}
+
 export default function EmailChatDialog() {
   const navigate = useNavigate()
   const location = useLocation()
   const [showSelect, setShowSelect] = useState(false)
+  const [selectActive, setSelectActive] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const { customerName, customerEmail, messages, dealId, subject } =
     useLoaderData<typeof loader>()
@@ -190,16 +207,19 @@ export default function EmailChatDialog() {
 
   const handleTemplateSelect = (value: string) => {
     setSelectedTemplate(value)
+    setSelectActive(false)
+    handleGenerate(value)
   }
 
-  const handleGenerate = async () => {
-    if (!selectedTemplate) {
+  const handleGenerate = async (templateOverride?: string) => {
+    const template = templateOverride || selectedTemplate
+    if (!template) {
       return
     }
     setIsGenerating(true)
     setMessageText('')
     try {
-      await generateAIEmailForChat(selectedTemplate, dealId, subject, body => {
+      await generateAIEmailForChat(template, dealId, subject, body => {
         setMessageText(body)
         setTimeout(() => {
           if (textareaRef.current) {
@@ -219,6 +239,12 @@ export default function EmailChatDialog() {
     }
   }
 
+  function showDate(message: Message, index: number) {
+    return index === 0 || 
+      new Date(messages[index - 1].sent_at).toDateString() !== 
+      new Date(message.sent_at).toDateString()
+  }
+
   return (
     <Dialog open={true} onOpenChange={handleClose}>
       <DialogContent className='sm:max-w-[60%] h-[90%] p-0 flex flex-col'>
@@ -235,34 +261,52 @@ export default function EmailChatDialog() {
         </DialogHeader>
 
         <div className='flex-1 overflow-y-auto p-4 space-y-4'>
-          {messages.map((message, index) => {
-            const showDate = index === 0 || 
-              new Date(messages[index - 1].sent_at).toDateString() !== 
-              new Date(message.sent_at).toDateString()
-
-            return (
+          {messages.map((message, index) => (
               <div key={message.id}>
-                {showDate && (
+                {showDate(message, index) && (
                   <div className='text-center text-xs text-gray-500 my-4'>
                     Today
                   </div>
                 )}
-                <div className='flex justify-end'>
-                  <div className='bg-blue-500 text-white rounded-2xl px-4 py-3 max-w-[75%]'>
-                    <p className='whitespace-pre-wrap'>{message.body}</p>
+                <div
+                  className={
+                    message.isFromCustomer
+                      ? 'flex justify-start'
+                      : 'flex justify-end w-full'
+                  }
+                >
+                  <div className={`flex items-center gap-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}>
+                      {!message.isFromCustomer && <MessageDate message={message} />}
+                    <div
+                      className={
+                        message.isFromCustomer
+                          ? 'bg-gray-200 text-black rounded-2xl px-4 py-3 max-w-[75%]'
+                          : 'bg-blue-500 text-white rounded-2xl px-4 py-3 max-w-[75%]'
+                      }
+                    >
+                      <p className='whitespace-pre-wrap'>{message.body}</p>
+                    </div>
+                  
+                   {message.isFromCustomer && <MessageDate message={message} />}
                   </div>
+                
                 </div>
+                {message.read_at ? "read" : null}
               </div>
-            )
-          })}
+            ))}
         </div>
 
-        <div className='p-10 border-t'>
+        <div className='p-4 border-t'>
           <div className='flex items-center gap-2 h-full'>
           {
                 showSelect ? (
                   <div className="flex gap-2 ">
-                        <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+                        <Select
+                          open={selectActive}
+                          onOpenChange={setSelectActive}
+                          value={selectedTemplate}
+                          onValueChange={value => handleTemplateSelect(value)}
+                        >
                     <SelectTrigger className='w-[150px]'>
                       <SelectValue placeholder='Select template' />
                     </SelectTrigger>
@@ -274,12 +318,20 @@ export default function EmailChatDialog() {
                       <SelectItem value='referral'>Referral</SelectItem>
                     </SelectContent>
                   </Select>
-                  <LoadingButton type='button' loading={isGenerating} onClick={handleGenerate}>
+                  <LoadingButton type='button' loading={isGenerating} onClick={() => handleGenerate()}>
                     Generate
                   </LoadingButton>
                   </div>
                 ) : (
-                  <Button type='button' onClick={() => setShowSelect(true)}>Generate with AI</Button>
+                  <Button
+                    type='button'
+                    onClick={() => {
+                      setShowSelect(true);
+                      setSelectActive(true);
+                    }}
+                  >
+                    Generate with AI
+                  </Button>
                 )
               }
             <textarea
