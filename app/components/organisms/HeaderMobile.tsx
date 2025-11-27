@@ -18,6 +18,7 @@ import { Menu, X } from 'lucide-react'
 import type React from 'react'
 import { useEffect, useState } from 'react'
 import { Button } from '~/components/ui/button'
+import { useCompanyLogo } from '~/hooks/logo-url'
 import { LinkButton } from '../molecules/LinkButton'
 
 function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkProps) {
@@ -224,12 +225,20 @@ export function HeaderMobile({
   isSuperUser,
   className,
 }: HeaderMobileProps) {
+  const location = useLocation()
+  const isAdminPage = location.pathname.startsWith('/admin')
+  const isCustomerPage = location.pathname.startsWith('/customer')
+  const data = useLoaderData<{ user: { company_id: number } | null }>()
+  const companyId = isCustomerPage
+    ? location.pathname.split('/').filter(Boolean)[1]
+    : data?.user?.company_id
+  const { url: companyLogo } = useCompanyLogo(Number(companyId))
   return (
     <header className={clsx('flex justify-between', className)}>
       <div className='logo'>
         <a className='flex justify-center' href='/'>
           <img
-            src='https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp'
+            src={companyLogo ?? ""}
             alt='Logo'
             className='h-12 md:h-16 object-contain'
           />
