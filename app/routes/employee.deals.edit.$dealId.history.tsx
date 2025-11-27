@@ -36,7 +36,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT e.id, e.subject, e.body, e.sent_at
        FROM emails e
-      WHERE e.deleted_at IS NULL AND e.message_id = ?
+      WHERE e.deleted_at IS NULL AND e.deal_id = ?
       ORDER BY e.sent_at DESC`,
     [dealId],
   )
@@ -45,7 +45,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     `SELECT e.id, COUNT(*) AS count
        FROM emails e
        JOIN email_reads er ON e.message_id = er.message_id
-      WHERE e.deleted_at IS NULL AND e.message_id = ?
+      WHERE e.deleted_at IS NULL AND e.deal_id = ?
       GROUP BY e.id`,
     [dealId],
   )

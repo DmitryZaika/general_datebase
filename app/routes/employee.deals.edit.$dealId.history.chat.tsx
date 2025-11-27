@@ -26,6 +26,11 @@ interface Message {
   sent_at: string
 }
 
+interface AIEmailResponse {
+  subject?: string
+  bodyText?: string
+}
+
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
     await getEmployeeUser(request)
@@ -39,7 +44,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const dealId = parseInt(params.dealId, 10)
 
   const [customerRows] = await db.execute<RowDataPacket[]>(
-    `SELECT c.name, c.phone
+    `SELECT c.name, c.email
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
       WHERE d.id = ?`,
@@ -49,7 +54,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const [emailRows] = await db.execute<RowDataPacket[]>(
     `SELECT e.id, e.subject, e.body, e.sent_at
        FROM emails e
-      WHERE e.message_id = ? AND e.deleted_at IS NULL
+      WHERE e.deal_id = ? AND e.deleted_at IS NULL
       ORDER BY e.sent_at ASC`,
     [dealId],
   )
@@ -63,9 +68,90 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   return {
     customerName: customerRows?.[0]?.name || 'Customer',
-    customerPhone: customerRows?.[0]?.phone || '',
+    customerEmail: customerRows?.[0]?.email || '',
     messages,
+    dealId,
   }
+}
+
+async function processStreamingResponse(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onStreamBody?: (text: string) => void,
+): Promise<AIEmailResponse> {
+  const decoder = new TextDecoder()
+  let fullText = ''
+  let isInBody = false
+
+  while (true) {
+    const result = await reader.read()
+    if (result.done) {
+      break
+    }
+    const chunk = decoder.decode(result.value, { stream: true })
+    const lines = chunk.split('\n')
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(line.slice(6))
+          if (data.error) {
+            throw new Error(data.error)
+          }
+          if (data.content) {
+            fullText += data.content
+
+            if (fullText.includes('---BODY---')) {
+              isInBody = true
+              const parts = fullText.split('---BODY---')
+              if (onStreamBody) {
+                onStreamBody((parts[1] || '').trim())
+              }
+            } else if (isInBody) {
+              const parts = fullText.split('---BODY---')
+              if (onStreamBody) {
+                onStreamBody((parts[1] || '').trim())
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Parse error:', error)
+        }
+      }
+    }
+  }
+
+  const parts = fullText.split('---BODY---')
+  return { subject: parts[0]?.trim() || '', bodyText: parts[1]?.trim() || '' }
+}
+
+async function generateAIEmailForChat(
+  emailCategory: string,
+  dealId: number,
+  onStreamBody?: (text: string) => void,
+): Promise<AIEmailResponse> {
+  const variationToken = Math.random().toString(36).slice(2)
+  const requestPayload = {
+    emailCategory,
+    dealId,
+    variationToken,
+  }
+
+  const response = await fetch('/api/aiRecommend/email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestPayload),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Failed to generate AI email: ${response.status} ${errorText}`)
+  }
+
+  if (!response.body) {
+    throw new Error('No response body')
+  }
+
+  return processStreamingResponse(response.body.getReader(), onStreamBody)
 }
 
 export default function EmailChatDialog() {
@@ -73,8 +159,9 @@ export default function EmailChatDialog() {
   const location = useLocation()
   const [showSelect, setShowSelect] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
-  const { customerName, customerPhone, messages } = useLoaderData<typeof loader>()
+  const { customerName, customerEmail, messages, dealId } = useLoaderData<typeof loader>()
   const [messageText, setMessageText] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const handleClose = () => {
@@ -93,11 +180,36 @@ export default function EmailChatDialog() {
     setSelectedTemplate(value)
   }
 
- 
+  const handleGenerate = async () => {
+    if (!selectedTemplate) {
+      return
+    }
+    setIsGenerating(true)
+    setMessageText('')
+    try {
+      await generateAIEmailForChat(selectedTemplate, dealId, body => {
+        setMessageText(body)
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+          }
+        }, 0)
+      })
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(`Failed to generate AI email: ${error.message}`)
+      } else {
+        alert('Failed to generate AI email')
+      }
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   return (
     <Dialog open={true} onOpenChange={handleClose}>
-      <DialogContent className='sm:max-w-[700px] h-[550px] p-0 flex flex-col'>
+      <DialogContent className='sm:max-w-[60%] h-[90%] p-0 flex flex-col'>
         <DialogHeader className='p-4 border-b'>
           <div className='flex items-center gap-3'>
             <div className='w-12 h-12 rounded-full bg-pink-500 flex items-center justify-center text-white font-bold'>
@@ -105,7 +217,7 @@ export default function EmailChatDialog() {
             </div>
             <div>
               <DialogTitle className='text-lg font-semibold'>{customerName}</DialogTitle>
-              <p className='text-sm text-gray-500'>{customerPhone}</p>
+              <p className='text-sm text-gray-500'>{customerEmail}</p>
             </div>
           </div>
         </DialogHeader>
@@ -133,8 +245,8 @@ export default function EmailChatDialog() {
           })}
         </div>
 
-        <div className='p-4 border-t'>
-          <div className='flex items-center gap-2 '>
+        <div className='p-10 border-t'>
+          <div className='flex items-center gap-2 h-full'>
           {
                 showSelect ? (
                   <div className="flex gap-2 ">
@@ -145,9 +257,14 @@ export default function EmailChatDialog() {
                     <SelectContent>
                       <SelectItem value='follow-up'>Follow-up</SelectItem>
                       <SelectItem value='reply'>Reply</SelectItem>
+                      <SelectItem value='thank-you'>Thank You</SelectItem>
+                      <SelectItem value='feedback-request'>Feedback Request</SelectItem>
+                      <SelectItem value='referral'>Referral</SelectItem>
                     </SelectContent>
                   </Select>
-                  <LoadingButton type='button' loading={false}>Generate</LoadingButton>
+                  <LoadingButton type='button' loading={isGenerating} onClick={handleGenerate}>
+                    Generate
+                  </LoadingButton>
                   </div>
                 ) : (
                   <Button type='button' onClick={() => setShowSelect(true)}>Generate with AI</Button>
