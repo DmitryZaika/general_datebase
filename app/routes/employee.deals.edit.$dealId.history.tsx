@@ -31,19 +31,23 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw new Error('Deal ID is missing')
   }
 
+  const dealId = parseInt(params.dealId, 10)
+
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT e.id, e.subject, e.body, e.sent_at
        FROM emails e
-      WHERE e.deleted_at IS NULL
+      WHERE e.deleted_at IS NULL AND e.message_id = ?
       ORDER BY e.sent_at DESC`,
+    [dealId],
   )
 
   const [readCounts] = await db.execute<RowDataPacket[]>(
     `SELECT e.id, COUNT(*) AS count
        FROM emails e
        JOIN email_reads er ON e.message_id = er.message_id
-      WHERE e.deleted_at IS NULL
+      WHERE e.deleted_at IS NULL AND e.message_id = ?
       GROUP BY e.id`,
+    [dealId],
   )
 
   const emails: EmailHistory[] = (rows || []).map(row => ({
