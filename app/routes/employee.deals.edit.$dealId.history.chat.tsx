@@ -93,9 +93,7 @@ export default function EmailChatDialog() {
     setSelectedTemplate(value)
   }
 
-  const generateWithAI = () => {
-    console.log('generateWithAI')
-  }
+ 
 
   return (
     <Dialog open={true} onOpenChange={handleClose}>
@@ -149,7 +147,7 @@ export default function EmailChatDialog() {
                       <SelectItem value='reply'>Reply</SelectItem>
                     </SelectContent>
                   </Select>
-                  <LoadingButton type='button' loading={false} onClick={() => generateWithAI()}>Generate</LoadingButton>
+                  <LoadingButton type='button' loading={false}>Generate</LoadingButton>
                   </div>
                 ) : (
                   <Button type='button' onClick={() => setShowSelect(true)}>Generate with AI</Button>
