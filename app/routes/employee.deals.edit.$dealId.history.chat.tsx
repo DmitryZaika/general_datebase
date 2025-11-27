@@ -7,7 +7,6 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -205,6 +204,9 @@ export default function EmailChatDialog() {
     return name.slice(0, 2).toUpperCase()
   }
 
+  const lastMessageFromMe = [...messages].reverse().find(m => !m.isFromCustomer)
+  const lastReadMessageId = lastMessageFromMe?.read_at ? lastMessageFromMe.id : null
+
   const handleTemplateSelect = (value: string) => {
     setSelectedTemplate(value)
     setSelectActive(false)
@@ -286,12 +288,16 @@ export default function EmailChatDialog() {
                     >
                       <p className='whitespace-pre-wrap'>{message.body}</p>
                     </div>
-                  
+                  <div className="flex items-center gap-2">
                    {message.isFromCustomer && <MessageDate message={message} />}
+                   {!message.isFromCustomer && message.id === lastReadMessageId && (
+                     <p className='text-xs text-gray-500'>Read</p>
+                   )}
+                   </div>
                   </div>
-                
-                </div>
-                {message.read_at ? "read" : null}
+               
+                </div  >
+               
               </div>
             ))}
         </div>
@@ -318,9 +324,6 @@ export default function EmailChatDialog() {
                       <SelectItem value='referral'>Referral</SelectItem>
                     </SelectContent>
                   </Select>
-                  <LoadingButton type='button' loading={isGenerating} onClick={() => handleGenerate()}>
-                    Generate
-                  </LoadingButton>
                   </div>
                 ) : (
                   <Button
