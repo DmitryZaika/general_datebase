@@ -268,16 +268,18 @@ export default function DealsView({ deals, customers, lists, imagesMap }: DealsV
         />
       </div>
 
-      <div className='flex gap-4'>
-        {lists.map(list => (
-          <DealsList
-            key={list.id}
-            title={list.name}
-            customers={board[list.id] ?? []}
-            id={list.id}
-            highlightedDealId={highlightDealId ?? undefined}
-          />
-        ))}
+      <div className='flex-1 overflow-auto'>
+        <div className='flex gap-4 h-full'>
+          {lists.map(list => (
+            <DealsList
+              key={list.id}
+              title={list.name}
+              customers={board[list.id] ?? []}
+              id={list.id}
+              highlightedDealId={highlightDealId ?? undefined}
+            />
+          ))}
+        </div>
       </div>
 
       <DragOverlay>
