@@ -176,7 +176,7 @@ const SYSTEM_PROMPT = `
   GENERAL RULES
   • Match the requested tone, formality, and verboseness.
   • Never include a signature or contact block.
-  • NEVER include phone numbers or email addresses in the email body unless the customer explicitly asks for them (e.g., "give me your email", "what's your number", "how can I contact you").
+  • Include phone number or email ONLY when the customer requests contact (e.g., "can you call?", "give me your number", "what's your email?", "call me", "contact me", "how can I reach you?"). Otherwise, do NOT include them.
   • Do not invent details.
   • Avoid placeholders or brackets in your output. Write full, natural sentences.
   • Follow the output structure exactly:
@@ -214,8 +214,8 @@ function formatSenderInfo(info: UserInfo): string {
   if (!parts.length) return ''
 
   let result = `Here is my (the sales rep) contact information: ${parts.join(', ')}. `
-  result += `CRITICAL: DO NOT include email address or phone number in the email body UNLESS the customer explicitly asks for contact details (e.g., "give me your email", "what's your phone number", "how can I reach you"). `
-  result += `By default, never write phone numbers or email addresses in the email. `
+  result += `Include phone number or email ONLY when the customer asks for it. Examples when to include: "can you call?", "give me your number", "what's your email?", "how can I reach you?", "call me", "contact me". `
+  result += `For first-contact emails without prior conversation, do NOT include phone or email. `
   result += `Introduce myself using only my first name and company. Use only the first name of the customer. Don't use signature.`
   return result
 }

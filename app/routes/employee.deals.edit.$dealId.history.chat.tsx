@@ -304,10 +304,10 @@ export default function EmailChatDialog() {
         </div>
 
         <div className='p-4 border-t'>
-          <div className='flex items-center gap-2 h-full'>
+          <div className='flex items-end gap-2'>
           {
                 showSelect ? (
-                  <div className="flex gap-2 ">
+                  <div className="flex gap-2 items-end">
                         <Select
                           open={selectActive}
                           onOpenChange={setSelectActive}
@@ -351,9 +351,9 @@ export default function EmailChatDialog() {
               }}
               placeholder='Send a message'
               rows={1}
-              className='flex-1 max-h-40 rounded-sm border border-zinc-300 bg-transparent px-4 py-2 text-sm outline-none resize-none'
+              className='flex-1 min-h-[38px] max-h-40 rounded-sm border border-zinc-300 bg-transparent px-4 py-2 text-sm outline-none resize-none overflow-y-auto'
             />
-            <Button variant='ghost' size='icon' className='text-zinc-500'>
+            <Button variant='ghost' size='icon' className='text-zinc-500 mb-1'>
               <span className='text-xl'>➤</span>
             </Button>
           </div>
