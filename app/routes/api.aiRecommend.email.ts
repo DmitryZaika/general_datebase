@@ -113,6 +113,7 @@ const generateSchema = z.object({
   desiredContent: z.string().optional(),
   subject: z.string().optional(),
   variationToken: z.string().optional(),
+  skipHistory: z.boolean().optional(),
 })
 
 type EmailGenerationParams = z.infer<typeof generateSchema>
@@ -360,7 +361,7 @@ async function createStreamingResponse(
   userInfo: UserInfo,
 ): Promise<ReadableStream> {
   const lead = await getLeadInfoByDeal(params.dealId)
-  const emailHistory = await getEmailHistoryByDeal(params.dealId, params.subject)
+  const emailHistory = params.skipHistory ? [] : await getEmailHistoryByDeal(params.dealId, params.subject)
   const userPrompt = buildUserPrompt(params, lead, userInfo, emailHistory)
 
   return new ReadableStream({
