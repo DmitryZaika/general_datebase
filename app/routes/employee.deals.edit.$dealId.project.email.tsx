@@ -89,6 +89,7 @@ interface AIEmailRequest {
   senderPhoneNumber?: string
   senderEmail?: string
   variationToken?: string
+  skipHistory?: boolean
 }
 
 interface AIEmailResponse {
@@ -211,6 +212,7 @@ function buildAIRequestPayload(
     emailCategory: formData.emailCategory,
     dealId: dealId,
     variationToken,
+    skipHistory: true,
   }
 
   if (formData.formality) payload.formality = formData.formality

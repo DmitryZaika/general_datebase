@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { Button } from '~/components/ui/button'
+import { defaultLogo } from '~/constants/logos'
 
 interface MarketingHeaderProps {
   companyName?: string
@@ -11,7 +12,7 @@ export function MarketingHeader({ companyName }: MarketingHeaderProps) {
       <div className='logo'>
         <a className='flex justify-center' href='/'>
           <img
-            src='https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp'
+            src={defaultLogo}
             alt='Logo'
             className='h-12 md:h-16 object-contain'
           />

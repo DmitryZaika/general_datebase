@@ -9,6 +9,7 @@ import { AddressInput } from '~/components/organisms/AddressInput'
 import { Checkbox } from '~/components/ui/checkbox'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
+import { gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
 import { useToast } from '~/hooks/use-toast'
 import { type ChecklistFormData, checklistResolver } from '~/schemas/checklist'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -129,15 +130,7 @@ export default function AdminChecklists() {
     <div className='flex justify-center py-10'>
       <div className='w-full max-w-xl border rounded-md bg-white p-8 shadow-sm'>
         <img
-          src={
-            companyId === 1
-              ? 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo.png.png'
-              : companyId === 3
-                ? 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/photo_2025-11-03_17-53-06.jpg'
-                : companyId === 4
-                  ? 'https://gmqtops.com/wp-content/uploads/2023/01/logo-b.png'
-                  : ''
-          }
+          src={companyId === 1 ? gbColumbus : companyId === 3 ? gbIndianapolis : companyId === 4 ? gmqTops : ''}
           alt='Logo'
           className='mx-auto mb-4 h-46 object-contain'
         />

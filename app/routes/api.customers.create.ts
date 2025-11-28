@@ -1,4 +1,4 @@
-import type { ResultSetHeader } from 'mysql2'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
@@ -17,7 +17,17 @@ export async function action({ request }: ActionFunctionArgs) {
   const userData = await request.json()
   const validatedData = customerSignupSchema.parse(userData)
 
-  const salesRep = validatedData.source === 'check-in' ? null : user.id
+  let salesRep: number | null = null
+  if (validatedData.source !== 'check-in') {
+    const [positionRows] = await db.execute<RowDataPacket[]>(
+      `SELECT 1 FROM users_positions up
+       JOIN positions p ON up.position_id = p.id
+       WHERE up.user_id = ? AND p.name = 'sales_rep'
+       LIMIT 1`,
+      [user.id],
+    )
+    salesRep = positionRows.length > 0 ? user.id : null
+  }
 
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO customers (name, phone, email, address, your_message, referral_source, source, company_id, company_name, sales_rep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

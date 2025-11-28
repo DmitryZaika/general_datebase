@@ -1,5 +1,6 @@
 import { PDFDocument, type PDFFont, rgb, StandardFonts } from 'pdf-lib'
 import type { LoaderFunctionArgs } from 'react-router'
+import { gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
 import { db } from '~/db.server'
 import { selectId } from '~/utils/queryHelpers'
 
@@ -55,31 +56,25 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
   let cursorY = height - 60
-  // Draw logo if exists
-  // asdas
-  let logoBytes: Uint8Array | undefined
-  try {
-    const logoUrl =
-      data.company_id === 1
-        ? 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo.png.png'
-        : data.company_id === 3 ? 'https://granite-database.s3.us-east-2.amazonaws.com/static-images/photo_2025-11-03_17-53-06.png' : data.company_id === 4 ? 'https://gmqtops.com/wp-content/uploads/2023/01/logo-b.png' : ''
-
-       
-    const response = await fetch(logoUrl)
-    if (!response.ok) throw new Error('logo fetch failed')
-    const arrBuf = await response.arrayBuffer()
-    logoBytes = new Uint8Array(arrBuf)
-    const logoImage = await pdfDoc.embedPng(logoBytes)
-    const logoDims = logoImage.scale(data.company_id === 1 ? 0.075 : data.company_id === 3 ? 0.125 : data.company_id === 4 ? 1.5 : 0.125)
-    page.drawImage(logoImage, {
-      x: (width - logoDims.width) / 2,
-      y: height - logoDims.height - 20,
-      width: logoDims.width,
-      height: logoDims.height,
-    })
-    cursorY -= logoDims.height + 20
-  } catch {
-    // If remote logo fails, skip drawing any logo.
+  const logoScales: Record<number, number> = { 1: 0.075, 3: 0.125, 4: 1.5 }
+  const logoUrl = data.company_id === 1 ? gbColumbus : data.company_id === 3 ? gbIndianapolis : data.company_id === 4 ? gmqTops : null
+  if (logoUrl) {
+    try {
+      const response = await fetch(logoUrl)
+      if (!response.ok) throw new Error('logo fetch failed')
+      const arrBuf = await response.arrayBuffer()
+      const logoBytes = new Uint8Array(arrBuf)
+      const logoImage = await pdfDoc.embedPng(logoBytes)
+      const logoDims = logoImage.scale(logoScales[data.company_id] || 0.125)
+      page.drawImage(logoImage, {
+        x: (width - logoDims.width) / 2,
+        y: height - logoDims.height - 20,
+        width: logoDims.width,
+        height: logoDims.height,
+      })
+      cursorY -= logoDims.height + 20
+    } catch {
+    }
   }
 
   const drawText = (
