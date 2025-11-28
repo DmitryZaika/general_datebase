@@ -7,6 +7,7 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -324,6 +325,7 @@ export default function EmailChatDialog() {
                       <SelectItem value='referral'>Referral</SelectItem>
                     </SelectContent>
                   </Select>
+                  <LoadingButton loading={isGenerating} type='button'  onClick={() => handleGenerate()}>Generate</LoadingButton>
                   </div>
                 ) : (
                   <Button
