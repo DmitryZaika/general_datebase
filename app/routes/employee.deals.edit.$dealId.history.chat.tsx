@@ -1,5 +1,5 @@
 import type { RowDataPacket } from 'mysql2'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   type LoaderFunctionArgs,
   redirect,
@@ -193,6 +193,13 @@ export default function EmailChatDialog() {
   const [isGenerating, setIsGenerating] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    }
+  }, [messageText])
+
   const handleClose = () => {
     navigate(`..${location.search}`)
   }
@@ -224,12 +231,6 @@ export default function EmailChatDialog() {
     try {
       await generateAIEmailForChat(template, dealId, subject, body => {
         setMessageText(body)
-        setTimeout(() => {
-          if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto'
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-          }
-        }, 0)
       })
     } catch (error) {
       if (error instanceof Error) {
