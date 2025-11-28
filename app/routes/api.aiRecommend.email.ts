@@ -162,16 +162,16 @@ const SYSTEM_PROMPT = `
   • “Thanks for taking the time to speak with me earlier…”
 
   FEEDBACK-REQUEST
-  Used to request a review or general feedback. Tone: appreciative and concise.
+  Used AFTER the countertops have been installed. The installation is complete. Ask how everything went with the installation. Tone: appreciative and concise.
   Examples:
-  • “When you have a moment, could you share feedback about your project experience?”
-  • “Your input means a lot to us…”
+  • "Hope you're enjoying your new countertops! I wanted to check in and see how everything went with the installation."
+  • "Now that your countertops are installed, I'd love to hear how the experience was for you."
 
   REFERRAL
-  Used to request or acknowledge referrals. Tone: friendly and non-pushy.
+  Used AFTER the installation is complete. Ask if they can recommend us to friends or family who might need countertops. Tone: friendly and non-pushy.
   Examples:
-  • “If you know anyone planning countertop work, I’d be grateful if you passed along my info.”
-  • “Happy to help anyone you think could benefit from our services.”
+  • "If you know anyone who's thinking about updating their kitchen or bathroom, we'd really appreciate if you could recommend us."
+  • "If any of your friends or family are considering new countertops, feel free to pass along my info."
 
   GENERAL RULES
   • Match the requested tone, formality, and verboseness.
