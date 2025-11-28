@@ -46,9 +46,10 @@ interface DealsViewProps {
   customers: Customer[]
   lists: List[]
   imagesMap: Record<number, boolean>
+  viewSelect?: React.ReactNode
 }
 
-export default function DealsView({ deals, customers, lists, imagesMap }: DealsViewProps) {
+export default function DealsView({ deals, customers, lists, imagesMap, viewSelect }: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -224,7 +225,8 @@ export default function DealsView({ deals, customers, lists, imagesMap }: DealsV
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full flex justify-end items-center mb-4'>
+      <div className='w-full flex justify-between items-center mb-4'>
+        {viewSelect}
         <FindCustomer
           disableRowClick
           onEdit={customerId => {
@@ -268,7 +270,7 @@ export default function DealsView({ deals, customers, lists, imagesMap }: DealsV
         />
       </div>
 
-      <div className='flex gap-4'>
+      <div className='flex gap-4 pb-2'>
         {lists.map(list => (
           <DealsList
             key={list.id}

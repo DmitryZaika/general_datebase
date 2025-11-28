@@ -116,28 +116,34 @@ export default function EmployeeDeals() {
     navigate({ pathname: location.pathname, search: params.toString() })
   }
 
+  const viewSelect = (
+    <Select value={view} onValueChange={handleViewChange}>
+      <SelectTrigger className='w-[200px]'>
+        <SelectValue placeholder='Select view' />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ViewType.DEALS}>Deals</SelectItem>
+        <SelectItem value={ViewType.PARTNERS}>Partners</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+
   return (
     <>
-      <div className='w-full flex justify-between items-center mb-4'>
-        <Select value={view} onValueChange={handleViewChange}>
-          <SelectTrigger className='w-[200px]'>
-            <SelectValue placeholder='Select view' />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ViewType.DEALS}>Deals</SelectItem>
-            <SelectItem value={ViewType.PARTNERS}>Partners</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {view === ViewType.PARTNERS ? (
-        <PartnersTable partners={partners} />
+        <>
+          <div className='w-full flex justify-between items-center mb-4'>
+            {viewSelect}
+          </div>
+          <PartnersTable partners={partners} />
+        </>
       ) : (
         <DealsView
           deals={deals}
           customers={customers}
           lists={lists}
           imagesMap={imagesMap}
+          viewSelect={viewSelect}
         />
       )}
 
