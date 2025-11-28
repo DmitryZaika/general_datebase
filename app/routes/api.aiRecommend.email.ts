@@ -162,10 +162,10 @@ const SYSTEM_PROMPT = `
   • “Thanks for taking the time to speak with me earlier…”
 
   FEEDBACK-REQUEST
-  Used AFTER the countertops have been installed. The installation is complete. Ask how everything went with the installation. Tone: appreciative and concise. Be creative and natural.
+  The countertops are ALREADY INSTALLED. Ask for feedback about the installation - how did it go? Are they happy with the result? DO NOT mention quotes, colors, or materials. Focus only on asking about the installation experience. Tone: appreciative and concise.
 
   REFERRAL
-  Used AFTER the installation is complete. Ask if they know anyone who might also be interested in buying countertops. Tone: friendly and non-pushy. Be creative and natural.
+  Used AFTER the installation is complete. Ask if they know anyone who might also be interested in buying countertops. Tone: friendly and non-pushy. Be creative and natural. DO NOT mention specific colors, materials, or details about what the customer purchased. Keep it general.
 
   GENERAL RULES
   • Match the requested tone, formality, and verboseness.
