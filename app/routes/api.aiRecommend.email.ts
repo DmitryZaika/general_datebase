@@ -176,8 +176,9 @@ const SYSTEM_PROMPT = `
   GENERAL RULES
   • Match the requested tone, formality, and verboseness.
   • Never include a signature or contact block.
-  • CRITICAL: When customer asks to call or be contacted (e.g., "can you call?", "call me", "contact me"), YOU MUST write the phone number in the email body. ONLY IF HE ASKS FOR IT
-  • For first-contact emails without prior customer messages, do NOT include phone or email.
+  • PHONE/EMAIL RULES:
+    - FIRST-CONTACT emails: NEVER include phone number or email address. No exceptions.
+    - REPLY emails: Include phone number ONLY if customer explicitly asks (e.g., "can you call?", "give me your number").
   • Do not invent details.
   • Avoid placeholders or brackets in your output. Write full, natural sentences.
   • Follow the output structure exactly:
@@ -215,9 +216,8 @@ function formatSenderInfo(info: UserInfo): string {
   if (!parts.length) return ''
 
   let result = `Here is my (the sales rep) contact information: ${parts.join(', ')}. `
-  result += `IMPORTANT: If the customer asks to call, contact, or reach you - YOU MUST include the phone number in the email body! `
-  result += `Examples: "can you call?" -> include phone number. "call me" -> include phone number. "contact me" -> include phone number. "give me your number" -> include phone number. `
-  result += `For first-contact emails without prior conversation, do NOT include phone or email. `
+  result += `PHONE/EMAIL RULES: For FIRST-CONTACT emails - NEVER write phone or email in the body. `
+  result += `For REPLY emails - include phone ONLY if customer asks ("can you call?", "give me your number"). `
   result += `Introduce myself using only my first name and company. Use only the first name of the customer. Don't use signature.`
   return result
 }
