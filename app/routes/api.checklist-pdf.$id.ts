@@ -57,7 +57,7 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
 
   let cursorY = height - 60
   const logoScales: Record<number, number> = { 1: 0.075, 3: 0.125, 4: 1.5 }
-  const logoUrl = data.company_id === 1 ? gbColumbus : data.company_id === 3 ? gbIndianapolis : data.company_id === 4 ? gmqTops : null
+  const logoUrl = data.company_id === 1 ? gbIndianapolis : data.company_id === 3 ? gbColumbus : data.company_id === 4 ? gmqTops : null
   if (logoUrl) {
     try {
       const response = await fetch(logoUrl)

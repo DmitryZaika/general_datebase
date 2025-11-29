@@ -25,7 +25,7 @@ export function HeaderDesktop({
     ? location.pathname.split('/').filter(Boolean)[1]
     : data?.user?.company_id
   const id = Number(companyId)
-  const companyLogo = id === 1 ? gbColumbus : id === 3 ? gbIndianapolis : id === 4 ? gmqTops : defaultLogo
+  const companyLogo = id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
 
   const customerSwitchUrl =
     companyId === undefined

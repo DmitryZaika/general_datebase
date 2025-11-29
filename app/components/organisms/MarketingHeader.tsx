@@ -1,6 +1,5 @@
 import { Link } from 'react-router'
 import { Button } from '~/components/ui/button'
-import { defaultLogo } from '~/constants/logos'
 
 interface MarketingHeaderProps {
   companyName?: string
@@ -10,13 +9,6 @@ export function MarketingHeader({ companyName }: MarketingHeaderProps) {
   return (
     <header className='bg-white flex items-center justify-between p-3'>
       <div className='logo'>
-        <a className='flex justify-center' href='/'>
-          <img
-            src={defaultLogo}
-            alt='Logo'
-            className='h-12 md:h-16 object-contain'
-          />
-        </a>
       </div>
       {companyName && (
         <div className='text-center flex-1'>
