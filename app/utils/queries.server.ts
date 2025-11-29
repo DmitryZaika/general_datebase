@@ -23,6 +23,7 @@ export interface Stone {
   finishing: string | null
   samples_amount: number
   samples_importance: number | null
+  deleted_at: string | null
 }
 
 export const stoneQueryBuilder = async (
@@ -51,11 +52,13 @@ export const stoneQueryBuilder = async (
     COUNT(DISTINCT CASE
       WHEN slab_inventory.id IS NOT NULL
         AND slab_inventory.cut_date IS NULL
+        AND slab_inventory.deleted_at IS NULL
       THEN slab_inventory.id ELSE NULL END) AS amount,
     CAST(SUM(CASE
       WHEN slab_inventory.id IS NOT NULL
         AND slab_inventory.sale_id IS NULL
         AND slab_inventory.cut_date IS NULL
+        AND slab_inventory.deleted_at IS NULL
       THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM stones
   LEFT JOIN slab_inventory ON (
@@ -63,10 +66,10 @@ export const stoneQueryBuilder = async (
     OR slab_inventory.stone_id IN (
       SELECT source_stone_id FROM stone_slab_links WHERE stone_id = stones.id
     )
-  ) AND slab_inventory.cut_date IS NULL
+  ) AND slab_inventory.cut_date IS NULL AND slab_inventory.deleted_at IS NULL
   `
 
-  query += `WHERE stones.company_id = ?`
+  query += `WHERE stones.company_id = ? AND stones.deleted_at IS NULL`
 
   if (!show_hidden) {
     query += ' AND stones.is_display = 1'
