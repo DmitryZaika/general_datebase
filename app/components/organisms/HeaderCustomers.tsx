@@ -22,7 +22,7 @@ export default function HeaderCustomers() {
   const id = Number(companyId)
   const logoUrl = isLogin
     ? loginLogo
-    : id === 1 ? gbColumbus : id === 3 ? gbIndianapolis : id === 4 ? gmqTops : defaultLogo
+    : id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
   const viewId = segments[0] === 'customer' && segments.length >= 3 ? segments[2] : ''
   const isStonesView = viewId === 'stones'
   const buttonLink = getButtonLink({ location, companyId })

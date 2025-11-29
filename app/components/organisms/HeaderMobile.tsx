@@ -233,7 +233,7 @@ export function HeaderMobile({
     ? location.pathname.split('/').filter(Boolean)[1]
     : data?.user?.company_id
   const id = Number(companyId)
-  const companyLogo = id === 1 ? gbColumbus : id === 3 ? gbIndianapolis : id === 4 ? gmqTops : defaultLogo
+  const companyLogo = id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
   return (
     <header className={clsx('flex justify-between', className)}>
       <div className='logo'>
@@ -241,7 +241,7 @@ export function HeaderMobile({
           <img
             src={companyLogo}
             alt='Logo'
-            className='h-12 md:h-16 object-contain'
+            className='h-18 md:h-16 object-contain'
           />
         </a>
       </div>
