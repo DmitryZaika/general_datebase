@@ -31,8 +31,7 @@ import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
-import { selectId, selectMany } from '~/utils/queryHelpers'
-import { deleteFile } from '~/utils/s3.server'
+import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 import { printAllSlabsQRCodes, type SlabData } from '~/utils/slabQRCode'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
@@ -646,17 +645,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
         )
       } else if (id) {
         const slabId = parseInt(id.toString(), 10)
-        const record = await selectId<{ url: string | null }>(
-          db,
-          'SELECT url FROM slab_inventory WHERE id = ?',
-          slabId,
-        )
-        await db.execute('DELETE FROM slab_inventory WHERE id = ?', [slabId])
+        await db.execute('UPDATE slab_inventory SET deleted_at = NOW() WHERE id = ?', [slabId])
         const session = await getSession(request.headers.get('Cookie'))
-        if (record?.url) {
-          deleteFile(record.url)
-        }
-        session.flash('message', toastData('Success', 'Image Deleted'))
+        session.flash('message', toastData('Success', 'Slab Deleted'))
         return data(
           { success: true },
           {
@@ -781,7 +772,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     length: number
   }>(
     db,
-    'SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL',
+    'SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL AND deleted_at IS NULL',
     [stoneId],
   )
 
@@ -815,9 +806,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     db,
     `SELECT DISTINCT s.id, s.name
      FROM stones s
-     WHERE s.id != ?
+     WHERE s.id != ? AND s.deleted_at IS NULL
      AND EXISTS (
-       SELECT 1 FROM slab_inventory si WHERE si.stone_id = s.id AND si.cut_date IS NULL
+       SELECT 1 FROM slab_inventory si WHERE si.stone_id = s.id AND si.cut_date IS NULL AND si.deleted_at IS NULL
      )
      ORDER BY s.name ASC`,
     [stoneId],
@@ -866,7 +857,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       `SELECT
            id, bundle, url, width, length
          FROM slab_inventory
-         WHERE stone_id = ? AND cut_date IS NULL`,
+         WHERE stone_id = ? AND cut_date IS NULL AND deleted_at IS NULL`,
       [link.source_stone_id],
     )
 
