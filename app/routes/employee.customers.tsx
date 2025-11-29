@@ -357,7 +357,6 @@ export default function AdminCustomers() {
               <TabsTrigger value='walkin'>Walk-in</TabsTrigger>
               <TabsTrigger value='leads'>Leads</TabsTrigger>
               <TabsTrigger value='call-in'>Call-In</TabsTrigger>
-              <TabsTrigger value='other'>Other</TabsTrigger>
             </TabsList>
           </Tabs>
           {tabParam === 'leads' && (

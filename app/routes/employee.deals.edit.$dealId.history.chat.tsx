@@ -57,7 +57,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const customerEmail = customerRows?.[0]?.email || ''
 
-  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, er.read_at
+  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
       WHERE e.deal_id = ? AND e.deleted_at IS NULL`
@@ -67,7 +67,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     emailParams.push(subjectFilter)
   }
 
-  emailQuery += ' ORDER BY e.sent_at ASC'
+  emailQuery += ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email ORDER BY e.sent_at ASC'
 
   const [emailRows] = await db.execute<RowDataPacket[]>(emailQuery, emailParams)
 
