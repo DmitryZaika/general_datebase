@@ -56,7 +56,12 @@ async function newContext(
     history: [
       {
         role: 'system',
-        content: `Here is your context: ${JSON.stringify(instructions)}`,
+        content: `Here is your context: ${JSON.stringify(instructions)}. 
+        Follow ALL instructions strictly without exceptions. 
+        Your task is to provide the MOST complete and accurate answer to the user's request based ONLY on this context. 
+        Do NOT add unnecessary information, assumptions, or commentary. 
+        Return only what is explicitly required by the request and the given instructions.`,
+        
       },
       {
         role: 'user',
