@@ -7,6 +7,7 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router'
+import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
 import {
@@ -340,6 +341,12 @@ export default function EmailChatDialog() {
                   </Button>
                 )
               }
+                <AiImproveButton
+                getText={() => messageText}
+                setText={value => setMessageText(value)}
+                buttonSize='icon'
+                iconClassName='text-lg'
+              />
             <textarea
               ref={textareaRef}
               value={messageText}
@@ -354,9 +361,12 @@ export default function EmailChatDialog() {
               rows={1}
               className='flex-1 min-h-[38px] max-h-40 rounded-sm border border-zinc-300 bg-transparent px-4 py-2 text-sm outline-none resize-none overflow-y-auto'
             />
-            <Button variant='ghost' size='icon' className='text-zinc-500 mb-1'>
-              <span className='text-xl'>➤</span>
-            </Button>
+            <div className='flex items-center gap-1 mb-1'>
+            
+              <Button variant='ghost' size='icon' className='text-zinc-500'>
+                <span className='text-xl'>➤</span>
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
