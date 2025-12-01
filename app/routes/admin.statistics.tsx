@@ -30,12 +30,12 @@ type DealsByRep = {
   rep_id: number
   rep_name: string
   deals_count: number
-  total_amount: number
   avg_amount: number
   avg_amount_won: number
   won_count: number
   lost_count: number
   won_lost_ratio: number
+  pipeline_amount: number
   won_count_walkin: number
   lost_count_walkin: number
   won_lost_ratio_walkin: number
@@ -154,14 +154,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       db,
       `SELECT u.id AS rep_id, u.name AS rep_name,
               COUNT(d.id) AS deals_count,
-              COALESCE(SUM(d.amount), 0) AS total_amount,
-              COALESCE(AVG(d.amount), 0) AS avg_amount,
+              COALESCE(AVG(NULLIF(d.amount, 0)), 0) AS avg_amount,
               COALESCE(
-                SUM(CASE WHEN l.name = 'Closed Won' THEN COALESCE(d.amount, 0) ELSE 0 END) /
-                NULLIF(SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END), 0),
+                SUM(
+                  CASE
+                    WHEN l.name = 'Closed Won' AND d.amount <> 0 THEN d.amount
+                    ELSE 0
+                  END
+                ) /
+                NULLIF(
+                  SUM(
+                    CASE
+                      WHEN l.name = 'Closed Won' AND d.amount <> 0 THEN 1
+                      ELSE 0
+                    END
+                  ),
+                  0
+                ),
               0) AS avg_amount_won,
               SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) AS won_count,
               SUM(CASE WHEN l.name = 'Closed Lost' THEN 1 ELSE 0 END) AS lost_count,
+              COALESCE(
+                SUM(
+                  CASE
+                    WHEN l.name NOT IN ('Closed Won', 'Closed Lost') AND d.amount <> 0
+                      THEN d.amount
+                    ELSE 0
+                  END
+                ),
+              0) AS pipeline_amount,
               CASE
                 WHEN SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) +
                      SUM(CASE WHEN l.name = 'Closed Lost' THEN 1 ELSE 0 END) = 0
@@ -439,17 +460,12 @@ export default function AdminStatistics() {
 
   const dealsRepColumns: ColumnDef<DealsByRep>[] = [
     { accessorKey: 'rep_name', header: 'Sales Rep' },
-    { accessorKey: 'deals_count', header: 'Deals' },
-    {
-      accessorKey: 'total_amount',
-      header: 'Total Amount',
-      cell: ({ row }) => currency.format(row.original.total_amount || 0),
-    },
     {
       accessorKey: 'avg_amount',
       header: 'Average Amount',
       cell: ({ row }) => currency.format(row.original.avg_amount || 0),
     },
+    { accessorKey: 'won_count', header: 'Sales' },
     {
       accessorKey: 'avg_amount_won',
       header: 'Average Amount Won',
