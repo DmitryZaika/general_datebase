@@ -36,6 +36,7 @@ interface OutlineItemProps {
   level: number
   onSelect: (id: number) => void
   selectedId: number | null
+  expandedIds: number[]
 }
 
 const OutlineItem: React.FC<OutlineItemProps> = ({
@@ -43,10 +44,13 @@ const OutlineItem: React.FC<OutlineItemProps> = ({
   level = 0,
   onSelect,
   selectedId,
+  expandedIds,
 }) => {
   const hasChildren = section.children.length > 0
   const indent = level * 12 // Отступ для уровней вложенности
   const isSelected = selectedId === section.id
+  // Проверяем, является ли этот элемент одним из открытых аккордеонов
+  const isExpanded = expandedIds.includes(section.id)
 
   // Стили в зависимости от уровня вложенности
   let levelStyles = ''
@@ -61,10 +65,13 @@ const OutlineItem: React.FC<OutlineItemProps> = ({
     levelStyles = 'text-gray-600 text-sm'
   }
 
+  // Подсвечиваем, если элемент выбран ИЛИ если он раскрыт (expanded)
+  const highlightClass = isSelected || isExpanded ? 'bg-blue-100 font-medium' : ''
+
   return (
     <div className='gdoc-outline-item'>
       <div
-        className={`py-1 cursor-pointer hover:bg-gray-100 rounded ${levelStyles} ${isSelected ? 'bg-blue-100 font-medium' : ''}`}
+        className={`py-1 cursor-pointer hover:bg-gray-100 rounded ${levelStyles} ${highlightClass}`}
         style={{ paddingLeft: `${indent + 8}px`, userSelect: 'none' }}
         onClick={() => onSelect(section.id)}
       >
@@ -79,6 +86,7 @@ const OutlineItem: React.FC<OutlineItemProps> = ({
             level={level + 1}
             onSelect={onSelect}
             selectedId={selectedId}
+            expandedIds={expandedIds}
           />
         ))}
     </div>
@@ -230,6 +238,7 @@ export default function Instructions() {
   const { instructions } = useLoaderData<typeof loader>()
   const finalInstructions = cleanData(instructions)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [expandedIds, setExpandedIds] = useState<number[]>([])
 
   const nodeMap = new Map<number, InstructionNode>()
   const populateNodeMap = (nodes: InstructionNode[]) => {
@@ -242,77 +251,112 @@ export default function Instructions() {
   }
   populateNodeMap(finalInstructions)
 
+  const findPathToNode = (
+    nodes: InstructionNode[],
+    targetId: number,
+    currentPath: number[] = [],
+  ): number[] | null => {
+    for (const node of nodes) {
+      if (node.id === targetId) {
+        return [...currentPath, node.id]
+      }
+      if (node.children.length > 0) {
+        const path = findPathToNode(node.children, targetId, [...currentPath, node.id])
+        if (path) return path
+      }
+    }
+    return null
+  }
+
+  const getAllDescendantIds = (nodeId: number): number[] => {
+    const node = nodeMap.get(nodeId)
+    if (!node) return []
+    let ids: number[] = []
+    for (const child of node.children) {
+      ids.push(child.id)
+      ids = [...ids, ...getAllDescendantIds(child.id)]
+    }
+    return ids
+  }
+
   const navigateToInstruction = useCallback(
-    (id: number) => {
-      const isRepeatedClick = selectedId === id
-
-      if (isRepeatedClick) {
+    async (id: number) => {
+      // Если клик по уже выбранному или раскрытому элементу -> сворачиваем
+      if (selectedId === id || expandedIds.includes(id)) {
         setSelectedId(null)
-      } else {
-        setSelectedId(id)
-
-        setTimeout(() => {
-          setSelectedId(prev => (prev === id ? null : prev))
-        }, 2000)
+        const triggerBtn = document.querySelector(
+          `#instruction-${id} button[data-state="open"]`,
+        ) as HTMLElement | null
+        if (triggerBtn) {
+          triggerBtn.click()
+        }
+        
+        // Удаляем текущий ID и всех его потомков из expandedIds
+        const descendants = getAllDescendantIds(id)
+        const idsToRemove = new Set([id, ...descendants])
+        setExpandedIds(prev => prev.filter(expId => !idsToRemove.has(expId)))
+        
+        return
       }
 
+      setSelectedId(id)
+      // Временно сбрасываем через 2 сек (как было), или оставляем перманентно?
+      // В оригинале было setTimeout(() => setSelectedId(null), 2000)
+      // Если нужно "подсвечивать синим все открытые вкладки", то, вероятно,
+      // логика сброса через 2с конфликтует с постоянной подсветкой.
+      // Оставим подсветку "текущего выбранного" (selectedId) постоянной,
+      // пока пользователь не кликнет снова или не выберет другой.
+      // setTimeout убрал, чтобы выделение сохранялось.
+
+      const path = findPathToNode(finalInstructions, id)
+      if (!path) return
+
+      // Обновляем expandedIds: добавляем весь путь к уже существующим
+      setExpandedIds(prev => {
+        const next = new Set(prev)
+        path.forEach(pId => next.add(pId))
+        return Array.from(next)
+      })
+
+      // Sequentially open accordions from top to bottom
+      for (let i = 0; i < path.length; i++) {
+        const nodeId = path[i]
+        
+        // Wait a bit for potential previous expansion animations
+        if (i > 0) await new Promise(resolve => setTimeout(resolve, 100))
+
+        const itemElement = document.getElementById(`instruction-${nodeId}`)
+        
+        if (itemElement) {
+           const trigger = itemElement.querySelector('button[data-state]') as HTMLElement | null
+           
+           if (trigger) {
+             const state = trigger.getAttribute('data-state')
+             if (state === 'closed') {
+               trigger.click()
+             }
+           }
+        } else {
+           await new Promise(resolve => setTimeout(resolve, 100))
+           const retryElement = document.getElementById(`instruction-${nodeId}`)
+           if (retryElement) {
+             const trigger = retryElement.querySelector('button[data-state]') as HTMLElement | null
+             if (trigger && trigger.getAttribute('data-state') === 'closed') {
+               trigger.click()
+             }
+           }
+        }
+      }
+
+      // Finally scroll to the target
       setTimeout(() => {
         const targetElement = document.getElementById(`instruction-${id}`)
-        if (!targetElement) {
-          return
-        }
-
-        const accordionItem = targetElement.closest('[data-state]')
-        if (!accordionItem || !(accordionItem instanceof HTMLElement)) {
-          return
-        }
-
-        const button = accordionItem.querySelector('button[data-state]')
-        if (!button || !(button instanceof HTMLElement)) {
-          return
-        }
-
-        if (isRepeatedClick) {
-          button.click()
-          return
-        }
-
-        const ancestorAccordions: HTMLElement[] = []
-        let parent = accordionItem.parentElement
-
-        while (parent) {
-          const parentAccordion = parent.closest('[data-state]')
-          if (
-            parentAccordion &&
-            parentAccordion instanceof HTMLElement &&
-            parentAccordion !== accordionItem
-          ) {
-            ancestorAccordions.unshift(parentAccordion)
-            parent = parentAccordion.parentElement
-          } else {
-            break
-          }
-        }
-
-        for (const accordion of ancestorAccordions) {
-          if (accordion.getAttribute('data-state') === 'closed') {
-            const accordionButton = accordion.querySelector('button[data-state]')
-            if (accordionButton && accordionButton instanceof HTMLElement) {
-              accordionButton.click()
-            }
-          }
-        }
-
-        if (accordionItem.getAttribute('data-state') === 'closed') {
-          button.click()
-        }
-
-        setTimeout(() => {
+        if (targetElement) {
           targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }, 100)
-      }, 100)
+        }
+      }, 200)
     },
-    [selectedId],
+    [selectedId, finalInstructions],
   )
 
   return (
@@ -348,6 +392,7 @@ export default function Instructions() {
                 level={0}
                 onSelect={navigateToInstruction}
                 selectedId={selectedId}
+                expandedIds={expandedIds}
               />
             ))}
           </div>
