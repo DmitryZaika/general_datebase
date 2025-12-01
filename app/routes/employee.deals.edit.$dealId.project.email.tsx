@@ -17,6 +17,7 @@ import {
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
+import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
@@ -585,9 +586,6 @@ export default function DealEmailDialog() {
     }
   }
 
-
-  
-
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
       <DialogContent className='sm:max-w-[600px] overflow-auto flex flex-col min-h-[400px] max-h-[95vh] p-5'>
@@ -616,9 +614,15 @@ export default function DealEmailDialog() {
               >
                 Generate
               </LoadingButton>
-              <Button type='submit' className='ml-auto'>
-                Send Email
-              </Button>
+              <div className='ml-auto flex items-center gap-2'>
+                <AiImproveButton
+                  getText={() => form.getValues('text')}
+                  setText={value => form.setValue('text', value)}
+                />
+                <Button type='submit'>
+                  Send Email
+                </Button>
+              </div>
             </div>
           </form>
         </FormProvider>

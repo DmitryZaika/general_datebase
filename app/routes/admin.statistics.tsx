@@ -33,6 +33,15 @@ type DealsByRep = {
   total_amount: number
   avg_amount: number
   avg_amount_won: number
+  won_count: number
+  lost_count: number
+  won_lost_ratio: number
+  won_count_walkin: number
+  lost_count_walkin: number
+  won_lost_ratio_walkin: number
+  won_count_leads: number
+  lost_count_leads: number
+  won_lost_ratio_leads: number
 }
 
 type DealsByStage = {
@@ -108,6 +117,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       dateParams.push(toDate)
     }
 
+    const dealsDateFilters: string[] = []
+    const dealsDateParams: (string | number)[] = []
+    if (fromDate) {
+      dealsDateFilters.push('DATE(d.updated_at) >= ?')
+      dealsDateParams.push(fromDate)
+    }
+    if (toDate) {
+      dealsDateFilters.push('DATE(d.updated_at) <= ?')
+      dealsDateParams.push(toDate)
+    }
+
     const salesWhere = [
       's.company_id = ?',
       's.cancelled_date IS NULL',
@@ -139,15 +159,64 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               COALESCE(
                 SUM(CASE WHEN l.name = 'Closed Won' THEN COALESCE(d.amount, 0) ELSE 0 END) /
                 NULLIF(SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END), 0),
-              0) AS avg_amount_won
+              0) AS avg_amount_won,
+              SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) AS won_count,
+              SUM(CASE WHEN l.name = 'Closed Lost' THEN 1 ELSE 0 END) AS lost_count,
+              CASE
+                WHEN SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) +
+                     SUM(CASE WHEN l.name = 'Closed Lost' THEN 1 ELSE 0 END) = 0
+                  THEN 0
+                ELSE ROUND(
+                  100 * SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) /
+                  (
+                    SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN l.name = 'Closed Lost' THEN 1 ELSE 0 END)
+                  ),
+                  0
+                )
+              END AS won_lost_ratio,
+              SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) AS won_count_walkin,
+              SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'check-in' THEN 1 ELSE 0 END) AS lost_count_walkin,
+              CASE
+                WHEN SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) +
+                     SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'check-in' THEN 1 ELSE 0 END) = 0
+                  THEN 0
+                ELSE ROUND(
+                  100 * SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) /
+                  (
+                    SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'check-in' THEN 1 ELSE 0 END)
+                  ),
+                  0
+                )
+              END AS won_lost_ratio_walkin,
+              SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) AS won_count_leads,
+              SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'leads' THEN 1 ELSE 0 END) AS lost_count_leads,
+              CASE
+                WHEN SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) +
+                     SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'leads' THEN 1 ELSE 0 END) = 0
+                  THEN 0
+                ELSE ROUND(
+                  100 * SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) /
+                  (
+                    SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'leads' THEN 1 ELSE 0 END)
+                  ),
+                  0
+                )
+              END AS won_lost_ratio_leads
        FROM deals d
-       JOIN users u ON d.user_id = u.id AND u.is_deleted = 0
+       JOIN users u ON d.user_id = u.id AND u.is_deleted = 0 AND u.company_id = ?
        JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
-       WHERE c.company_id = ? AND d.deleted_at IS NULL${hasRepFilter ? ' AND u.name = ?' : ''}
+       WHERE c.company_id = ? AND d.deleted_at IS NULL${
+         dealsDateFilters.length ? ` AND ${dealsDateFilters.join(' AND ')}` : ''
+       }${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY u.id, u.name
        ORDER BY deals_count DESC`,
-      hasRepFilter ? [user.company_id, salesRepParam] : [user.company_id],
+      hasRepFilter
+        ? [user.company_id, user.company_id, ...dealsDateParams, salesRepParam]
+        : [user.company_id, user.company_id, ...dealsDateParams],
     )
 
     const dealsByStage = await selectMany<DealsByStage>(
@@ -158,11 +227,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        FROM deals d
        JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
-       JOIN users u ON d.user_id = u.id AND u.is_deleted = 0
-       WHERE c.company_id = ? AND d.deleted_at IS NULL${hasRepFilter ? ' AND u.name = ?' : ''}
+       JOIN users u ON d.user_id = u.id AND u.is_deleted = 0 AND u.company_id = ?
+       WHERE c.company_id = ? AND d.deleted_at IS NULL${
+         dealsDateFilters.length ? ` AND ${dealsDateFilters.join(' AND ')}` : ''
+       }${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY l.id, l.name
        ORDER BY l.position ASC`,
-      hasRepFilter ? [user.company_id, salesRepParam] : [user.company_id],
+      hasRepFilter
+        ? [user.company_id, user.company_id, ...dealsDateParams, salesRepParam]
+        : [user.company_id, user.company_id, ...dealsDateParams],
     )
 
     const customersTotals = await selectMany<{
@@ -226,10 +299,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               SUM(CASE WHEN c.source IN ('other','user-input') THEN 1 ELSE 0 END) AS manual,
               COUNT(c.id) AS total
        FROM customers c
-       LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
+       JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0 AND u.company_id = c.company_id
+       JOIN users_positions up ON up.user_id = u.id
+       JOIN positions p ON p.id = up.position_id AND LOWER(p.name) = 'sales_rep'
        WHERE ${customersByRepWhere.join(' AND ')} AND (c.invalid_lead IS NULL OR c.invalid_lead = '')
        GROUP BY u.name
-       ORDER BY (u.name IS NULL) ASC, total DESC`,
+       ORDER BY total DESC`,
       customersByRepParams,
     )
 
@@ -384,6 +459,33 @@ export default function AdminStatistics() {
         </span>
       ),
     },
+    {
+      accessorKey: 'won_lost_ratio',
+      header: 'Won %',
+      cell: ({ row }) => (
+        <span className='inline-block rounded px-2 py-1.5 -mt-2 -mb-2 bg-blue-100 text-blue-800'>
+          {`${row.original.won_lost_ratio}%`}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'won_lost_ratio_walkin',
+      header: 'Walk-in Won %',
+      cell: ({ row }) => (
+        <span className='inline-block rounded px-2 py-1.5 -mt-2 -mb-2 bg-orange-100 text-orange-800'>
+          {`${row.original.won_lost_ratio_walkin}%`}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'won_lost_ratio_leads',
+      header: 'Leads Won %',
+      cell: ({ row }) => (
+        <span className='inline-block rounded px-2 py-1.5 -mt-2 -mb-2 bg-purple-100 text-purple-800'>
+          {`${row.original.won_lost_ratio_leads}%`}
+        </span>
+      ),
+    },
   ]
 
   const stageRows = useMemo(() => {
@@ -471,6 +573,17 @@ export default function AdminStatistics() {
     navigate({ pathname: '/admin/statistics', search: params.toString() })
   }
 
+  const handleCurrentMonth = () => {
+    const now = new Date()
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+    setFrom(firstDay)
+    setTo(now)
+    const params = new URLSearchParams(location.search)
+    params.set('fromDate', format(firstDay, 'yyyy-MM-dd'))
+    params.set('toDate', format(now, 'yyyy-MM-dd'))
+    navigate({ pathname: '/admin/statistics', search: params.toString() })
+  }
+
   const handleClear = () => {
     setFrom(undefined)
     setTo(undefined)
@@ -551,13 +664,23 @@ export default function AdminStatistics() {
             <div className='flex items-center gap-2'>
               <SalesRepsFilter className='-mt-5' />
             </div>
-            <DateRangeControls
-              from={from}
-              to={to}
-              setFrom={setFrom}
-              setTo={setTo}
-              onClear={handleClear}
-            />
+            <div className='flex items-center gap-2'>
+              <Button
+                type='button'
+                variant='outline'
+                className='h-9'
+                onClick={handleCurrentMonth}
+              >
+                Current month
+              </Button>
+              <DateRangeControls
+                from={from}
+                to={to}
+                setFrom={setFrom}
+                setTo={setTo}
+                onClear={handleClear}
+              />
+            </div>
           </form>
         </div>
       </div>
