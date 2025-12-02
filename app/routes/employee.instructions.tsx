@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
 import {
@@ -7,6 +7,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '~/components/ui/accordion'
+import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
 import '~/styles/instructions.css'
 import type { Instruction } from '~/types'
@@ -28,6 +29,7 @@ interface InstructionItemProps {
   id?: string
   isSelected?: boolean
   selectedId?: number | null
+  onToggle: (openIds: string[], allSiblingIds: number[]) => void
 }
 
 // Компонент элемента навигации для боковой панели
@@ -107,6 +109,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({
   id,
   isSelected,
   selectedId,
+  onToggle,
 }) => {
   const hasTitle = Boolean(instruction.title)
   const isEmptyText = isHtmlEmpty(instruction.text)
@@ -129,7 +132,16 @@ const InstructionItem: React.FC<InstructionItemProps> = ({
             />
           )}
           {instruction.children.length > 0 && (
-            <Accordion type='multiple' className='ml-5'>
+            <Accordion
+              type='multiple'
+              className='ml-5'
+              onValueChange={values =>
+                onToggle(
+                  values,
+                  instruction.children.map(c => c.id),
+                )
+              }
+            >
               {instruction.children.map(childInstruction => (
                 <InstructionItem
                   key={childInstruction.id}
@@ -137,6 +149,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({
                   id={`instruction-${childInstruction.id}`}
                   isSelected={selectedId === childInstruction.id}
                   selectedId={selectedId}
+                  onToggle={onToggle}
                 />
               ))}
             </Accordion>
@@ -163,6 +176,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({
                 id={`instruction-${childInstruction.id}`}
                 isSelected={selectedId === childInstruction.id}
                 selectedId={selectedId}
+                onToggle={onToggle}
               />
             ))}
           </div>
@@ -268,16 +282,75 @@ export default function Instructions() {
     return null
   }
 
-  const getAllDescendantIds = (nodeId: number): number[] => {
-    const node = nodeMap.get(nodeId)
-    if (!node) return []
-    let ids: number[] = []
-    for (const child of node.children) {
-      ids.push(child.id)
-      ids = [...ids, ...getAllDescendantIds(child.id)]
-    }
-    return ids
-  }
+  const getDescendants = useCallback(
+    (nodes: InstructionNode[], targetId: number): number[] => {
+      const descendants: number[] = []
+
+      const traverse = (list: InstructionNode[]): boolean => {
+        for (const node of list) {
+          if (node.id === targetId) {
+            const collect = (n: InstructionNode) => {
+              n.children.forEach(c => {
+                descendants.push(c.id)
+                collect(c)
+              })
+            }
+            collect(node)
+            return true // found
+          }
+          if (node.children.length > 0) {
+            if (traverse(node.children)) return true
+          }
+        }
+        return false
+      }
+      traverse(nodes)
+      return descendants
+    },
+    [],
+  )
+
+  const handleExpansionChange = useCallback(
+    (currentOpenValues: string[], allSiblingIds: number[]) => {
+      const currentOpenIds = currentOpenValues.map(Number)
+      const siblingsSet = new Set(allSiblingIds)
+
+      // Сбрасываем selectedId, если закрывается выбранный элемент или его родитель
+      const closedIdsForSelect = allSiblingIds.filter(
+        id => expandedIds.includes(id) && !currentOpenIds.includes(id),
+      )
+      if (closedIdsForSelect.length > 0) {
+        const idsToRemove = new Set<number>(closedIdsForSelect)
+        closedIdsForSelect.forEach(id =>
+          getDescendants(finalInstructions, id).forEach(d => idsToRemove.add(d)),
+        )
+        if (selectedId && idsToRemove.has(selectedId)) {
+          setSelectedId(null)
+        }
+      }
+
+      setExpandedIds(prev => {
+        // Identify which IDs were closed
+        const closedIds = allSiblingIds.filter(
+          id => prev.includes(id) && !currentOpenIds.includes(id),
+        )
+
+        // Remove closed IDs AND their descendants
+        const idsToRemove = new Set<number>()
+        closedIds.forEach(id => {
+          idsToRemove.add(id)
+          const descendants = getDescendants(finalInstructions, id)
+          descendants.forEach(d => idsToRemove.add(d))
+        })
+
+        const prevFiltered = prev.filter(
+          id => !idsToRemove.has(id) && !siblingsSet.has(id),
+        )
+        return [...prevFiltered, ...currentOpenIds]
+      })
+    },
+    [finalInstructions, getDescendants, expandedIds, selectedId],
+  )
 
   const navigateToInstruction = useCallback(
     async (id: number) => {
@@ -290,12 +363,12 @@ export default function Instructions() {
         if (triggerBtn) {
           triggerBtn.click()
         }
-        
+
         // Удаляем текущий ID и всех его потомков из expandedIds
-        const descendants = getAllDescendantIds(id)
+        const descendants = getDescendants(finalInstructions, id)
         const idsToRemove = new Set([id, ...descendants])
         setExpandedIds(prev => prev.filter(expId => !idsToRemove.has(expId)))
-        
+
         return
       }
 
@@ -359,11 +432,67 @@ export default function Instructions() {
     [selectedId, finalInstructions],
   )
 
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const searchResults = useMemo(() => {
+    if (!searchTerm.trim()) return []
+    const term = searchTerm.toLowerCase()
+    const results: { id: number; title: string; matchType: 'Title' | 'Content' }[] =
+      []
+
+    const traverse = (nodes: InstructionNode[]) => {
+      for (const node of nodes) {
+        const title = node.title || ''
+        const text = node.text.replace(/<[^>]*>/g, '') // strip HTML
+
+        const titleMatch = title.toLowerCase().includes(term)
+        const textMatch = text.toLowerCase().includes(term)
+
+        if (titleMatch || textMatch) {
+          results.push({
+            id: node.id,
+            title: title || 'Untitled',
+            matchType: titleMatch ? 'Title' : 'Content',
+          })
+        }
+
+        if (node.children.length > 0) {
+          traverse(node.children)
+        }
+      }
+    }
+
+    traverse(finalInstructions)
+    return results
+  }, [searchTerm, finalInstructions])
+
+  const visibleExpandedIds = useMemo(() => {
+    const expandedSet = new Set(expandedIds)
+    return expandedIds.filter(id => {
+      let current = nodeMap.get(id)
+      while (current && current.parent_id) {
+        if (!expandedSet.has(current.parent_id)) {
+          return false
+        }
+        current = nodeMap.get(current.parent_id)
+      }
+      return true
+    })
+  }, [expandedIds, nodeMap])
+
   return (
     <PageLayout title='Instructions'>
       <div className='flex w-full mt-0'>
         <div className='flex-grow'>
-          <Accordion type='multiple'>
+          <Accordion
+            type='multiple'
+            onValueChange={values =>
+              handleExpansionChange(
+                values,
+                finalInstructions.map(i => i.id),
+              )
+            }
+          >
             {finalInstructions.map(instruction => (
               <InstructionItem
                 key={instruction.id}
@@ -371,6 +500,7 @@ export default function Instructions() {
                 id={`instruction-${instruction.id}`}
                 isSelected={selectedId === instruction.id}
                 selectedId={selectedId}
+                onToggle={handleExpansionChange}
               />
             ))}
           </Accordion>
@@ -381,20 +511,47 @@ export default function Instructions() {
           style={{ userSelect: 'none', marginTop: '0' }}
         >
           <div className='p-3 border-b bg-gray-50 sticky top-0 z-10'>
-            <h3 className='text-lg font-medium'>Outline</h3>
+            <h3 className='text-lg font-medium mb-2'>Outline</h3>
+            <Input
+              placeholder='Search...'
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className='bg-white h-8'
+            />
           </div>
 
           <div className='p-2'>
-            {finalInstructions.map(section => (
-              <OutlineItem
-                key={section.id}
-                section={section}
-                level={0}
-                onSelect={navigateToInstruction}
-                selectedId={selectedId}
-                expandedIds={expandedIds}
-              />
-            ))}
+            {searchTerm ? (
+              searchResults.length > 0 ? (
+                <div className='flex flex-col gap-1'>
+                  {searchResults.map(res => (
+                    <div
+                      key={res.id}
+                      onClick={() => navigateToInstruction(res.id)}
+                      className='text-sm p-2 hover:bg-gray-100 rounded cursor-pointer'
+                    >
+                      <div className='font-medium'>{res.title}</div>
+                      <div className='text-xs text-gray-500'>
+                        Found in {res.matchType}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className='text-sm text-gray-500 p-2'>No results found</div>
+              )
+            ) : (
+              finalInstructions.map(section => (
+                <OutlineItem
+                  key={section.id}
+                  section={section}
+                  level={0}
+                  onSelect={navigateToInstruction}
+                  selectedId={selectedId}
+                  expandedIds={visibleExpandedIds}
+                />
+              ))
+            )}
           </div>
         </div>
       </div>
