@@ -1,10 +1,12 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Calendar, GripVertical, PaperclipIcon, Pencil } from 'lucide-react'
+import { Calendar as CalendarIcon, GripVertical, PaperclipIcon, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher } from 'react-router'
 import { formatMoney, updateNumber } from './functions'
 import { Button } from './ui/button'
+import { Calendar } from './ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 interface DealItemProps {
   deal: {
@@ -52,16 +54,12 @@ export default function DealItem({
   const [editAmount, setEditAmount] = useState(false)
   const [editDesc, setEditDesc] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const dateInputRef = useRef<HTMLInputElement | null>(null)
+  const [calendarOpen, setCalendarOpen] = useState(false)
   const descTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const descDisplayRef = useRef<HTMLParagraphElement | null>(null)
   const [descExpanded, setDescExpanded] = useState(false)
   const [descOverflow, setDescOverflow] = useState(false)
   const [lineHeightPx, setLineHeightPx] = useState<number>(20)
-  const [pickerCoords, setPickerCoords] = useState<{
-    top: number
-    left: number
-  } | null>(null)
   const fetcher = useFetcher()
 
   const hasImages =
@@ -90,26 +88,11 @@ export default function DealItem({
     setLocalDate(dateStr)
   }
 
-  function openPicker(el: HTMLElement) {
-    const rect = el.getBoundingClientRect()
-    setPickerCoords({
-      top: rect.bottom + window.scrollY + 4,
-      left: rect.left + window.scrollX,
-    })
-  }
-
   function resizeTextarea(el: HTMLTextAreaElement | null) {
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }
-
-  useEffect(() => {
-    if (pickerCoords && dateInputRef.current) {
-      const el = dateInputRef.current
-      el.showPicker ? el.showPicker() : el.focus()
-    }
-  }, [pickerCoords])
 
   useEffect(() => {
     if (editDesc) {
@@ -301,56 +284,45 @@ export default function DealItem({
         </p>
       )}
 
-      {pickerCoords && (
-        <input
-          type='date'
-          ref={dateInputRef}
-          style={{
-            position: 'fixed',
-            top: `calc(${pickerCoords.top}px - 30px)`,
-            left: `calc(${pickerCoords.left}px - 20px)`,
-            zIndex: 1000,
-            opacity: 0,
-          }}
-          defaultValue={localDate ?? ''}
-          onChange={e => {
-            const selected = e.currentTarget.value
-            setPickerCoords(null)
-            if (selected) submitDate(selected)
-          }}
-          onBlur={() => setPickerCoords(null)}
-          autoFocus
-        />
-      )}
       <div className='flex items-center justify-between gap-2 w-full'>
-        {deal.list_id !== 5 && deal.list_id !== 4 && (
-          <>
-            {localDate ? (
-              <p
+        {deal.list_id !== 5 && deal.list_id !== 4 && !readonly && (
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <button
                 className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
-                onClick={e => !readonly && openPicker(e.currentTarget)}
+                onClick={e => e.stopPropagation()}
                 onPointerDown={e => e.stopPropagation()}
-                style={{ position: 'relative', zIndex: 20 }}
               >
-                {formatDisplay(localDate)}
-              </p>
-            ) : (
-              !readonly && (
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  className='h-3 w-3 p-2'
-                  onClick={e => openPicker(e.currentTarget)}
-                  onPointerDown={e => e.stopPropagation()}
-                  style={{ position: 'relative', zIndex: 20 }}
-                >
-                  <Calendar
-                    className={`w-5 h-5 ${getDateColor(localDate, deal.list_id)}`}
-                  />
-                </Button>
-              )
-            )}
-          </>
+                {localDate ? (
+                  formatDisplay(localDate)
+                ) : (
+                  <CalendarIcon className='w-5 h-5' />
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className='w-auto p-0' align='start' side='bottom'>
+              <Calendar
+                mode='single'
+                selected={localDate ? new Date(localDate + 'T00:00:00') : undefined}
+                defaultMonth={localDate ? new Date(localDate + 'T00:00:00') : undefined}
+                onSelect={date => {
+                  if (date) {
+                    const year = date.getFullYear()
+                    const month = String(date.getMonth() + 1).padStart(2, '0')
+                    const day = String(date.getDate()).padStart(2, '0')
+                    const dateStr = `${year}-${month}-${day}`
+                    submitDate(dateStr)
+                    setCalendarOpen(false)
+                  }
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+        )}
+        {deal.list_id !== 5 && deal.list_id !== 4 && readonly && localDate && (
+          <p className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}>
+            {formatDisplay(localDate)}
+          </p>
         )}
         {hasImages && (
           <Link
