@@ -296,12 +296,13 @@ export default function DealItem({
                 {localDate ? (
                   formatDisplay(localDate)
                 ) : (
-                  <CalendarIcon className='w-5 h-5' />
+                  <CalendarIcon className='w-4 h-4' />
                 )}
               </button>
             </PopoverTrigger>
             <PopoverContent className='w-auto p-0' align='start' side='bottom'>
               <Calendar
+                fixedWeeks
                 mode='single'
                 selected={localDate ? new Date(localDate + 'T00:00:00') : undefined}
                 defaultMonth={localDate ? new Date(localDate + 'T00:00:00') : undefined}
