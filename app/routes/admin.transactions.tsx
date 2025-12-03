@@ -94,9 +94,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         GROUP_CONCAT(DISTINCT si.bundle) as bundle,
         s.cancelled_date,
         s.installed_date,
-        GROUP_CONCAT(DISTINCT st.name) as stone_name,
+        GROUP_CONCAT(DISTINCT CONCAT(st.name, ':', IF(si.deleted_at IS NOT NULL, 'DELETED', 'ACTIVE'))) as stone_name,
         s.square_feet as sf,
-        GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'))) as bundle_with_cut,
+        GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'), ':', IF(si.deleted_at IS NOT NULL, 'DELETED', 'ACTIVE'))) as bundle_with_cut,
         MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) as all_cut,
         MAX(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as any_cut,
         COUNT(si.id) as total_slabs,
@@ -179,23 +179,20 @@ const transactionColumns: ColumnDef<Transaction>[] = [
     accessorKey: 'stone_name',
     header: ({ column }) => <SortableHeader column={column} title='Stone' />,
     cell: ({ row }) => {
-      const stones = (row.original.stone_name || '').split(', ').filter(Boolean)
-      if (!stones.length) return <span>N/A</span>
-
-      const stoneCounts: { [key: string]: number } = {}
-      stones.forEach(stone => {
-        stoneCounts[stone] = (stoneCounts[stone] || 0) + 1
-      })
-
-      const formattedStones = Object.entries(stoneCounts).map(([stone, count]) =>
-        count > 1 ? `${stone} x ${count}` : stone,
-      )
+      const stonesArr = (row.original.stone_name || '').split(',').filter(Boolean)
+      if (!stonesArr.length) return <span>N/A</span>
 
       return (
         <div className='flex flex-col'>
-          {formattedStones.map((stone, index) => (
-            <span key={index}>{stone}</span>
-          ))}
+          {stonesArr.map((item, index) => {
+            const [stone, status] = item.split(':')
+            const isDeleted = status === 'DELETED'
+            return (
+              <span key={index} className={isDeleted ? 'text-red-500 line-through' : ''}>
+                {stone}
+              </span>
+            )
+          })}
         </div>
       )
     },
@@ -236,23 +233,25 @@ const transactionColumns: ColumnDef<Transaction>[] = [
     accessorKey: 'bundle',
     header: ({ column }) => <SortableHeader column={column} title='Bundle' />,
     cell: ({ row }) => {
-      const bundleInfo = (row.original.bundle_with_cut || '').split(',').filter(Boolean)
+      const bundleInfo = (row.original.bundle_with_cut || '')
+        .split(',')
+        .filter(Boolean)
       if (!bundleInfo.length) return <span>N/A</span>
-
-      const bundleStatusMap: { [key: string]: boolean } = {}
-      bundleInfo.forEach(item => {
-        const [bundle, status] = item.split(':')
-        bundleStatusMap[bundle] = status === 'CUT'
-      })
-
-      const bundles = (row.original.bundle || '').split(',').filter(Boolean)
 
       return (
         <div className='flex flex-col'>
-          {bundles.map((bundle, index) => {
-            const isCut = bundleStatusMap[bundle] === true
+          {bundleInfo.map((item, index) => {
+            const [bundle, cutStatus, deletedStatus] = item.split(':')
+            const isCut = cutStatus === 'CUT'
+            const isDeleted = deletedStatus === 'DELETED'
+            
             return (
-              <span key={index} className={isCut ? 'text-blue-500' : 'text-green-500'}>
+              <span
+                key={index}
+                className={`
+                  ${isDeleted ? 'text-red-500 line-through' : isCut ? 'text-blue-500' : 'text-green-500'}
+                `}
+              >
                 {bundle}
               </span>
             )

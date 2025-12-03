@@ -141,6 +141,7 @@ export interface Sink {
   supplier_id: number | null
   retail_price: number | null
   cost: number | null
+  regular_stock?: boolean | number
 }
 
 export async function sinkQueryBuilder(
@@ -175,7 +176,8 @@ export async function sinkQueryBuilder(
       COUNT(sinks.id) AS amount, 
       sink_type.supplier_id, 
       sink_type.retail_price, 
-      sink_type.cost
+      sink_type.cost,
+      sink_type.regular_stock
     FROM sink_type
     LEFT JOIN sinks ON sinks.sink_type_id = sink_type.id AND sinks.is_deleted = 0
     ${whereClause}
@@ -189,13 +191,14 @@ export async function sinkQueryBuilder(
       sink_type.width,
       sink_type.supplier_id,
       sink_type.retail_price,
-      sink_type.cost
+      sink_type.cost,
+      sink_type.regular_stock
     ORDER BY sink_type.name ASC
   `
 
   const sinks = await selectMany<Sink>(db, query, params)
 
-  return show_sold_out ? sinks : sinks.filter(sink => (sink.amount || 0) > 0)
+  return show_sold_out ? sinks : sinks.filter(sink => (sink.amount || 0) > 0 || sink.regular_stock)
 }
 
 export interface Faucet {
@@ -208,6 +211,7 @@ export interface Faucet {
   supplier_id: number | null
   retail_price: number | null
   cost: number | null
+  regular_stock?: boolean | number
 }
 
 export async function faucetQueryBuilder(
@@ -240,7 +244,8 @@ export async function faucetQueryBuilder(
       COUNT(faucets.id) AS amount, 
       faucet_type.supplier_id, 
       faucet_type.retail_price, 
-      faucet_type.cost
+      faucet_type.cost,
+      faucet_type.regular_stock
     FROM faucet_type
     LEFT JOIN faucets ON faucets.faucet_type_id = faucet_type.id AND faucets.is_deleted = 0
     ${whereClause}
@@ -252,11 +257,12 @@ export async function faucetQueryBuilder(
       faucet_type.is_display,
       faucet_type.supplier_id,
       faucet_type.retail_price,
-      faucet_type.cost
+      faucet_type.cost,
+      faucet_type.regular_stock
     ORDER BY faucet_type.name ASC
   `
 
   const faucets = await selectMany<Faucet>(db, query, params)
 
-  return show_sold_out ? faucets : faucets.filter(faucet => (faucet.amount || 0) > 0)
+  return show_sold_out ? faucets : faucets.filter(faucet => (faucet.amount || 0) > 0 || faucet.regular_stock)
 }

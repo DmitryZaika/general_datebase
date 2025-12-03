@@ -63,11 +63,15 @@ export default function AdminSinks() {
   useEffect(() => {
     // Make sure sinks with 0 or null amount still appear
     const inStock = sinks.filter(
-      sink => Number(sink.available) > 0 && Boolean(sink.is_display),
+      sink =>
+        (Number(sink.available) > 0 || !!sink.regular_stock) &&
+        Boolean(sink.is_display),
     )
     const outOfStock = sinks.filter(
       sink =>
-        (!sink.available || Number(sink.available) <= 0) && Boolean(sink.is_display),
+        (!sink.available || Number(sink.available) <= 0) &&
+        !sink.regular_stock &&
+        Boolean(sink.is_display),
     )
     const notDisplayed = sinks.filter(sink => !sink.is_display)
 
@@ -125,8 +129,13 @@ export default function AdminSinks() {
             />
           </div>
           {sortedSinks.map(sink => {
+            const isRegularStock = !!sink.regular_stock
             const displayedAmount =
-              sink.available && sink.available > 0 ? sink.available : '—'
+              sink.available === 0 && isRegularStock
+                ? 'On-Demand'
+                : sink.available && sink.available > 0
+                  ? sink.available
+                  : '—'
             const displayedWidth = sink.width && sink.width > 0 ? sink.width : '—'
             const displayedLength = sink.length && sink.length > 0 ? sink.length : '—'
             const retailPrice = formatPrice(sink.retail_price)
@@ -147,7 +156,7 @@ export default function AdminSinks() {
                       loading='lazy'
                       onClick={() => handleSetCurrentId(sink.id)}
                     />
-                    {displayedAmount === '—' && (
+                    {displayedAmount === '—' && !isRegularStock && (
                       <div className='absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
                         <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
                           Out of Stock

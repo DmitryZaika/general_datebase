@@ -1,3 +1,4 @@
+import { Calendar, User, UserCircle } from 'lucide-react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -6,14 +7,26 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useNavigation,
 } from 'react-router'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '~/components/ui/table'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -105,7 +118,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   )
 
   const sale = sales[0]
-
   if (!sale) {
     return forceRedirectError(
       request.headers,
@@ -157,30 +169,52 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const formData = await request.formData()
   const intent = formData.get('intent')
-  if (intent !== 'cut-slab') {
+  if (intent === 'cut-slab') {
+    const slabIdValue = formData.get('slabId')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
+    }
+
+    const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
+      db,
+      `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      [slabId, saleId],
+    )
+
+    if (slabs.length === 0) {
+      return null
+    }
+
+    if (slabs[0].cut_date === null) {
+      await db.execute(`UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`, [
+        slabId,
+      ])
+    }
+  } else if (intent === 'uncut-slab') {
+    const slabIdValue = formData.get('slabId')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
+    }
+
+    const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
+      db,
+      `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      [slabId, saleId],
+    )
+
+    if (slabs.length === 0) {
+      return null
+    }
+
+    if (slabs[0].cut_date !== null) {
+      await db.execute(`UPDATE slab_inventory SET cut_date = NULL WHERE id = ?`, [
+        slabId,
+      ])
+    }
+  } else {
     return null
-  }
-
-  const slabIdValue = formData.get('slabId')
-  const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
-  if (!slabId || !Number.isFinite(slabId)) {
-    return null
-  }
-
-  const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
-    db,
-    `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
-    [slabId, saleId],
-  )
-
-  if (slabs.length === 0) {
-    return null
-  }
-
-  if (slabs[0].cut_date === null) {
-    await db.execute(`UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`, [
-      slabId,
-    ])
   }
 
   const remaining = await selectMany<{ count: number }>(
@@ -200,6 +234,7 @@ export default function ViewTransaction() {
   const { sale, slabs, sinks } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
+  const navigation = useNavigation()
 
   const handleDialogClose = (open: boolean) => {
     if (!open) {
@@ -225,154 +260,178 @@ export default function ViewTransaction() {
 
         <div className='flex flex-col gap-6 py-4'>
           <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-            <div className='border rounded-md p-4'>
-              <h3 className='text-lg font-semibold mb-2'>Sale Information</h3>
-              <div className='grid grid-cols-2 gap-y-2 text-sm'>
-                <div className='font-medium'>Customer:</div>
-                <div>{sale.customer_name}</div>
-
-                <div className='font-medium'>Sale Date:</div>
-                <div>{formatDate(sale.sale_date)}</div>
-
-                <div className='font-medium'>Sold By:</div>
-                <div>{sale.seller_name}</div>
-              </div>
-            </div>
-
-            <div className='border rounded-md p-4'>
-              <h3 className='text-lg font-semibold mb-2'>Sinks</h3>
-              {sinks.length === 0 ? (
-                <p className='text-sm text-gray-500'>No sinks in this transaction</p>
-              ) : (
-                <div className='border rounded-md'>
-                  <table className='min-w-full divide-y divide-gray-200'>
-                    <thead className='bg-gray-50'>
-                      <tr>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Type
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Price
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className='bg-white divide-y divide-gray-200'>
-                      {sinks.map(sink => (
-                        <tr key={sink.id}>
-                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
-                            {sink.name}
-                          </td>
-                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
-                            {formatCurrency(sink.price)}
-                          </td>
-                        </tr>
-                      ))}
-                      {sinks.length > 0 && (
-                        <tr className='bg-gray-50'>
-                          <td className='px-4 py-2 text-sm font-medium'>Total:</td>
-                          <td className='px-4 py-2 text-sm font-medium'>
-                            {formatCurrency(totalSinkPrice)}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+            <Card>
+              <CardHeader className='pb-2'>
+                <CardTitle className='text-lg font-semibold flex items-center gap-2'>
+                  Sale Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className='grid gap-4 text-sm'>
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <User className='h-4 w-4' />
+                      <span>Customer</span>
+                    </div>
+                    <span className='font-medium'>{sale.customer_name}</span>
+                  </div>
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <Calendar className='h-4 w-4' />
+                      <span>Sale Date</span>
+                    </div>
+                    <span className='font-medium'>{formatDate(sale.sale_date)}</span>
+                  </div>
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <UserCircle className='h-4 w-4' />
+                      <span>Sold By</span>
+                    </div>
+                    <span className='font-medium'>{sale.seller_name}</span>
+                  </div>
                 </div>
-              )}
-            </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className='pb-2'>
+                <CardTitle className='text-lg font-semibold'>Sinks</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {sinks.length === 0 ? (
+                  <p className='text-sm text-muted-foreground py-4 text-center italic'>
+                    No sinks in this transaction
+                  </p>
+                ) : (
+                  <div className='rounded-md border'>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Price</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sinks.map(sink => (
+                          <TableRow key={sink.id}>
+                            <TableCell>{sink.name}</TableCell>
+                            <TableCell>{formatCurrency(sink.price)}</TableCell>
+                          </TableRow>
+                        ))}
+                        {sinks.length > 0 && (
+                          <TableRow className='bg-muted/50 font-medium'>
+                            <TableCell>Total:</TableCell>
+                            <TableCell>{formatCurrency(totalSinkPrice)}</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
-          <div className='flex justify-center'>
-            <div className='w-full'>
-              <h3 className='text-lg font-semibold mb-2'>Slabs</h3>
+          <Card>
+            <CardHeader className='pb-2'>
+              <CardTitle className='text-lg font-semibold'>Slabs</CardTitle>
+            </CardHeader>
+            <CardContent>
               {slabs.length === 0 ? (
-                <p className='text-gray-500'>No slabs in this transaction</p>
+                <p className='text-muted-foreground text-center py-8'>
+                  No slabs in this transaction
+                </p>
               ) : (
-                <div className='border h-full rounded-md shadow-sm w-full overflow-hidden'>
-                  <table className='min-w-full h-full divide-y divide-gray-200'>
-                    <thead className='bg-gray-50'>
-                      <tr>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Bundle
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Stone
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          SF
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Status
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Notes
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Cut Date
-                        </th>
-                        <th className='px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className='bg-white divide-y divide-gray-200'>
+                <div className='rounded-md border'>
+                  <Table className='p-2'>
+                    <TableHeader >
+                      <TableRow>
+                        <TableHead className='px-2'>Bundle</TableHead>
+                        <TableHead>Stone</TableHead>
+                        <TableHead>SF</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Notes</TableHead>
+                        <TableHead>Cut Date</TableHead>
+                        <TableHead className='text-right'>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {slabs.map(slab => (
-                        <tr key={slab.id}>
-                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
-                            {slab.bundle}
-                          </td>
-                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
-                            {slab.stone_name}
-                          </td>
-                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
-                            {slab.square_feet || 'N/A'}
-                          </td>
-                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        <TableRow key={slab.id}>
+                          <TableCell className='font-medium px-2'>{slab.bundle}</TableCell>
+                          <TableCell>{slab.stone_name}</TableCell>
+                          <TableCell>{slab.square_feet || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={slab.cut_date ? 'secondary' : 'outline'}
+                              className={
                                 slab.cut_date
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-green-100 text-green-800'
-                              }`}
+                                  ? 'bg-blue-100 text-blue-800 hover:bg-blue-100'
+                                  : 'bg-green-100 text-green-800 hover:bg-green-100 border-transparent'
+                              }
                             >
                               {slab.cut_date ? 'Cut' : 'Uncut'}
-                            </span>
-                          </td>
-                          <td className='px-4 py-2 text-sm max-w-[150px] break-words'>
+                            </Badge>
+                          </TableCell>
+                          <TableCell className='max-w-[200px] truncate' title={slab.notes || ''}>
                             {slab.notes || '-'}
-                          </td>
-                          <td className='px-4 py-2 whitespace-nowrap text-sm'>
+                          </TableCell>
+                          <TableCell>
                             {slab.cut_date ? formatDate(slab.cut_date) : '-'}
-                          </td>
-                          <td className='px-4 py-2 whitespace-nowrap text-right text-sm'>
-                            {!slab.cut_date && (
+                          </TableCell>
+                          <TableCell className='text-right'>
+                            {!slab.cut_date ? (
                               <Form method='post'>
                                 <input type='hidden' name='intent' value='cut-slab' />
                                 <input type='hidden' name='slabId' value={String(slab.id)} />
-                                <Button type='submit' size='sm' variant='outline'>
+                                <LoadingButton
+                                  type='submit'
+                                  size='sm'
+                                  variant='outline'
+                                  className='h-7'
+                                  loading={
+                                    navigation.formData?.get('intent') === 'cut-slab' &&
+                                    navigation.formData?.get('slabId') === String(slab.id)
+                                  }
+                                >
                                   Cut
-                                </Button>
+                                </LoadingButton>
+                              </Form>
+                            ) : (
+                              <Form method='post'>
+                                <input type='hidden' name='intent' value='uncut-slab' />
+                                <input type='hidden' name='slabId' value={String(slab.id)} />
+                                <LoadingButton
+                                  type='submit'
+                                  size='sm'
+                                  variant='outline'
+                                  className='h-7 text-red-600 hover:text-red-700 hover:bg-red-50'
+                                  loading={
+                                    navigation.formData?.get('intent') === 'uncut-slab' &&
+                                    navigation.formData?.get('slabId') === String(slab.id)
+                                  }
+                                >
+                                  Uncut
+                                </LoadingButton>
                               </Form>
                             )}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))}
                       {totalSquareFeet > 0 && (
-                        <tr className='bg-gray-50'>
-                          <td colSpan={2} className='px-4 py-2 text-sm font-medium'>
-                            Total Square Feet:
-                          </td>
-                          <td colSpan={5} className='px-4 py-2 text-sm font-medium'>
+                        <TableRow className='bg-muted/50 font-medium'>
+                          <TableCell colSpan={2} className='px-2'>Total Square Feet:</TableCell>
+                          <TableCell colSpan={5}>
                             {Number(totalSquareFeet).toFixed(2)}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className='flex justify-end mt-4'>

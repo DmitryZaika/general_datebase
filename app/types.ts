@@ -19,6 +19,7 @@ export interface Sink {
   retail_price: number
   sink_count: number
   available: number
+  regular_stock?: boolean | number
 }
 
 export interface Stone {
@@ -54,6 +55,7 @@ export interface Faucet {
   retail_price: number
   faucet_count: number
   available: number
+  regular_stock?: boolean | number
 }
 
 export interface InstructionSlim {
