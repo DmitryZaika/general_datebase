@@ -71,6 +71,7 @@ function StoneTable({ stones }: { stones: Stone[] }) {
       cell: ({ row }) => {
         const stone = row.original
         const isOutOfStock = stone.available === 0
+        const isRegularStock = !!stone.regular_stock
 
         return (
           <div className='w-12 h-12 overflow-hidden relative cursor-pointer'>
@@ -79,7 +80,7 @@ function StoneTable({ stones }: { stones: Stone[] }) {
               alt={stone.name}
               className='object-cover w-full h-full'
             />
-            {isOutOfStock && (
+            {isOutOfStock && !isRegularStock && (
               <div className='absolute inset-0 flex items-center justify-center bg-red-500/70'>
                 <span className='text-white text-[8px] font-bold rotate-0 text-center leading-tight px-0.5'>
                   Out of Stock
@@ -118,7 +119,14 @@ function StoneTable({ stones }: { stones: Stone[] }) {
     {
       accessorKey: 'available',
       header: ({ column }) => <SortableHeader column={column} title='Available' />,
-      cell: ({ row }) => <div>{row.original.available}</div>,
+      cell: ({ row }) => {
+        const stone = row.original
+        const isRegularStock = !!stone.regular_stock
+        if (stone.available === 0 && isRegularStock) {
+          return <div>Regular Stock</div>
+        }
+        return <div>{stone.available}</div>
+      },
     },
     {
       accessorKey: 'amount',
@@ -275,6 +283,11 @@ export default function AdminStones() {
                 navigate(`${stone.id}${location.search}`)
               }
 
+              const isRegularStock = !!stone.regular_stock
+              const availableText = stone.available === 0 && isRegularStock 
+                ? 'Regular Stock' 
+                : `${displayedAvailable} / ${displayedAmount}`
+
               return (
                 <div
                   id={`stone-${stone.id}`}
@@ -294,7 +307,7 @@ export default function AdminStones() {
                         className='object-cover w-full h-40 rounded select-none'
                         loading='lazy'
                       />
-                      {displayedAmount === '—' && (
+                      {displayedAmount === '—' && !isRegularStock && (
                         <div className='absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
                           <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
                             Out of Stock
@@ -304,7 +317,7 @@ export default function AdminStones() {
                     </div>
                     <p className='text-center font-bold mt-2'>{stone.name}</p>
                     <p className='text-center text-sm'>
-                      Available: {displayedAvailable} / {displayedAmount}
+                      Available: {availableText}
                     </p>
                     <p className='text-center text-sm'>
                       Size: {displayedLength} x {displayedWidth}
