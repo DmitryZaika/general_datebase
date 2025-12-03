@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, Info } from 'lucide-react'
+import { AlertCircle, Info, Plus, X } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { quickAddStoneSchema } from '~/schemas/stones'
+import { useFieldArray, useForm } from 'react-hook-form'
+import { quickAddStoneFormSchema } from '~/schemas/stones'
 import type { StoneSlim } from '~/types'
 import { STONE_TYPES } from '~/utils/constants'
 import { InputItem } from '../molecules/InputItem'
@@ -19,6 +19,8 @@ import {
   DialogTitle,
 } from '../ui/dialog'
 import { FormField, FormProvider } from '../ui/form'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
 
 type QuickAddStoneFormData = {
   name: string
@@ -27,7 +29,7 @@ type QuickAddStoneFormData = {
   width?: number
   type: (typeof STONE_TYPES)[number]
   leftover: boolean
-  bundle: string
+  bundles: { value: string }[]
   company_id: number
 }
 
@@ -35,7 +37,7 @@ interface AddStoneQuickDialogProps {
   show: boolean
   setShow: (show: boolean) => void
   companyId: number
-  onStoneCreated: (stone: StoneSlim, slabId?: number) => void
+  onStoneCreated: (stone: StoneSlim, slabIds?: number[]) => void
 }
 
 export function AddStoneQuickDialog({
@@ -48,7 +50,6 @@ export function AddStoneQuickDialog({
   const [error, setError] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
-  // Memoize default values to prevent unnecessary re-renders
   const defaultValues = useMemo(
     () => ({
       name: '',
@@ -57,19 +58,45 @@ export function AddStoneQuickDialog({
       width: undefined as number | undefined,
       type: 'granite' as const,
       leftover: true,
-      bundle: '',
+      bundles: [{ value: '' }],
       company_id: companyId,
     }),
     [companyId],
   )
 
   const form = useForm<QuickAddStoneFormData>({
-    resolver: zodResolver(quickAddStoneSchema),
+    resolver: zodResolver(quickAddStoneFormSchema),
     defaultValues,
+    mode: 'onChange',
   })
 
-  const { control, watch, reset, handleSubmit: formHandleSubmit } = form
+  const {
+    control,
+    watch,
+    reset,
+    handleSubmit: formHandleSubmit,
+    formState: { errors },
+    trigger,
+  } = form
   const leftoverValue = watch('leftover')
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'bundles',
+  })
+
+  const handleAddBundle = useCallback(() => {
+    append({ value: '' })
+  }, [append])
+
+  const handleRemoveBundle = useCallback(
+    (index: number) => {
+      if (fields.length > 1) {
+        remove(index)
+      }
+    },
+    [fields.length, remove],
+  )
 
   const resetForm = useCallback(() => {
     reset(defaultValues)
@@ -92,7 +119,7 @@ export function AddStoneQuickDialog({
 
       const payload = data.leftover
         ? { ...basePayload, leftover: true as const }
-        : { ...basePayload, leftover: false as const, bundle: (data as { bundle: string }).bundle }
+        : { ...basePayload, leftover: false as const, bundles: data.bundles.map(b => b.value) }
 
       const response = await fetch('/api/stones/quick-add', {
         method: 'POST',
@@ -105,15 +132,14 @@ export function AddStoneQuickDialog({
         throw new Error(errorMessage || 'Failed to create stone')
       }
 
-      const { stone, slab } = await response.json()
+      const { stone, slabs } = await response.json()
       const { id, name, type, retail_price } = stone
 
-      // Invalidate all stone-related queries to refresh the search dropdown
       await queryClient.invalidateQueries({ queryKey: ['availableStones'] })
 
-      onStoneCreated({ id, name, type, retail_price }, slab?.id)
+      const slabIds = slabs?.map((s: { id: number }) => s.id)
+      onStoneCreated({ id, name, type, retail_price }, slabIds)
 
-      // Close dialog (handleOpenChange will reset form automatically)
       setShow(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create stone')
@@ -233,22 +259,68 @@ export function AddStoneQuickDialog({
               control={control}
               name='leftover'
               render={({ field }) => (
-                <SwitchItem field={field} name='Leftover' />
+                <SwitchItem
+                  field={{
+                    ...field,
+                    onChange: (checked: boolean) => {
+                      field.onChange(checked)
+                      if (checked) {
+                        form.setValue('bundles', [{ value: '' }])
+                      }
+                    },
+                  }}
+                  name='Leftover'
+                />
               )}
             />
 
             {!leftoverValue && (
-              <FormField
-                control={control}
-                name='bundle'
-                render={({ field }) => (
-                  <InputItem
-                    name='Bundle Number*'
-                    placeholder='Enter bundle number...'
-                    field={field}
-                  />
+              <div className='space-y-3'>
+                <Label>Bundle Numbers*</Label>
+                {fields.map((field, index) => (
+                  <div key={field.id} className='flex gap-2'>
+                    <FormField
+                      control={control}
+                      name={`bundles.${index}.value`}
+                      render={({ field }) => (
+                        <Input
+                          {...field}
+                          placeholder={`Bundle ${index + 1}`}
+                          className='flex-1'
+                          onChange={e => {
+                            field.onChange(e)
+                            trigger('bundles')
+                          }}
+                        />
+                      )}
+                    />
+                    {fields.length > 1 && (
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='icon'
+                        onClick={() => handleRemoveBundle(index)}
+                      >
+                        <X className='h-4 w-4' />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                {errors.bundles && (
+                  <p className='text-sm text-red-500'>
+                    {errors.bundles.message || errors.bundles.root?.message}
+                  </p>
                 )}
-              />
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  onClick={handleAddBundle}
+                >
+                  <Plus className='h-4 w-4 mr-2' />
+                  Add Bundle
+                </Button>
+              </div>
             )}
 
             {leftoverValue && (
