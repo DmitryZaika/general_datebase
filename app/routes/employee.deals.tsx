@@ -72,7 +72,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     )
     const deals = await selectMany<FullDeal>(
       db,
-      `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position, due_date, deleted_at
+      `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position,
+       DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at
        FROM deals
        WHERE deleted_at IS NULL AND user_id = ?`,
       [user.id],
