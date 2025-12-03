@@ -185,7 +185,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const remaining = await selectMany<{ count: number }>(
     db,
-    `SELECT COUNT(*) as count FROM slab_inventory WHERE sale_id = ? AND cut_date IS NULL`,
+    `SELECT COUNT(*) as count FROM slab_inventory WHERE sale_id = ? AND cut_date IS NULL AND deleted_at IS NULL`,
     [saleId],
   )
 

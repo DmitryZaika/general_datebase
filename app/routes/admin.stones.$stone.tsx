@@ -120,7 +120,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const slabs = await selectMany<Slab>(
     db,
-    'SELECT id, bundle, url, sale_id, width, length, cut_date, parent_id FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL',
+    'SELECT id, bundle, url, sale_id, width, length, cut_date, parent_id FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL AND deleted_at IS NULL',
     [stoneId],
   )
 

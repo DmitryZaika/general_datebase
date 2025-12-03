@@ -16,6 +16,7 @@ export interface Stone {
   available: number
   created_date: string
   on_sale: boolean
+  regular_stock: boolean
   amount: number
   retail_price: number
   cost_per_sqft: number
@@ -43,6 +44,7 @@ export const stoneQueryBuilder = async (
     stones.width,
     stones.created_date,
     stones.on_sale,
+    stones.regular_stock,
     stones.retail_price,
     stones.cost_per_sqft,
     stones.level,
@@ -115,13 +117,14 @@ export const stoneQueryBuilder = async (
       stones.width,
       stones.created_date,
       stones.on_sale,
+      stones.regular_stock,
       stones.level,
       stones.finishing,
       stones.samples_amount,
       stones.samples_importance
     `
   if (!filters.show_sold_out) {
-    query += `\nHAVING available > 0`
+    query += `\nHAVING available > 0 OR stones.regular_stock = 1`
   }
   query += `\nORDER BY stones.name ASC`
   return await selectMany<Stone>(db, query, params)

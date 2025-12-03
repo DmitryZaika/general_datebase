@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FaCheck, FaLink, FaPencilAlt, FaQrcode, FaTimes } from 'react-icons/fa'
+import { FaCheck, FaLink, FaPencilAlt, FaTimes } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   data,
@@ -985,14 +985,14 @@ export default function EditStoneSlabs() {
 
       {/* List of slabs */}
       <div className='flex flex-col gap-2'>
-        <Button
+        {/* <Button
           onClick={handlePrintAllQRCodes}
           variant='default'
           className='flex items-center gap-2'
         >
           <FaQrcode size={14} />
           ALL QR codes
-        </Button>
+        </Button> */}
 
         {slabs.map(slab => (
           <SlabItem
