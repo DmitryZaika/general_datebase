@@ -37,6 +37,7 @@ export interface StoneImage {
   cost_per_sqft: number
   available: number
   samples_amount: number
+  regular_stock?: boolean | number
 }
 
 export interface StoneSlim {
@@ -105,6 +106,7 @@ export interface StoneSearchResult {
   available: number
   amount: number
   is_display: boolean
+  regular_stock?: boolean | number
 }
 export type Action =
   | { type: 'ADD_EVENT'; payload: Event }

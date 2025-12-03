@@ -19,7 +19,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return Response.json({ stones: [] })
   }
 
-  let query = `SELECT s.id, s.type, s.width, s.length, s.name, s.url, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount,
+  let query = `SELECT s.id, s.type, s.width, s.length, s.name, s.url, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount, s.regular_stock,
             CAST(SUM(CASE WHEN si.id IS NOT NULL AND si.sale_id IS NULL AND si.cut_date IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available,
             CAST(COUNT(si.id) AS UNSIGNED) AS amount
     FROM stones s
@@ -34,12 +34,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     WHERE UPPER(s.name) LIKE UPPER(?)
     AND s.company_id = ?
     AND s.is_display = 1
-    GROUP BY s.id, s.type, s.name, s.url, s.width, s.length, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount`
+    GROUP BY s.id, s.type, s.name, s.url, s.width, s.length, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount, s.regular_stock`
 
   // Only filter by availability if explicitly requested (showSoldOut=false)
   // When unsold_only=true (from StoneSearch), show all stones including those without slabs
   if (!showSoldOut && !cleanParams.get('unsold_only')) {
-    query += `\nHAVING available > 0`
+    query += `\nHAVING (available > 0 OR regular_stock = 1)`
   }
 
   query += `\nORDER BY 
