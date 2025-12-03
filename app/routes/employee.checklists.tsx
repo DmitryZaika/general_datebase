@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { cn } from '~/lib/utils'
+import { getPending, type PendingChecklistSubmission } from '~/utils/offlineChecklistQueue'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 
@@ -59,9 +61,43 @@ export default function EmployeeChecklists() {
   const { items } = useLoaderData<typeof loader>()
   const isMobile = useIsMobile()
 
+  const [pendingSubmission, setPendingSubmission] =
+    useState<PendingChecklistSubmission | null>(null)
+
+  useEffect(() => {
+    setPendingSubmission(getPending())
+  }, [])
+
   return (
     <div className='p-4 mx-auto max-w-4xl'>
       <h1 className='text-2xl font-semibold mb-4'>Post-installation Checklists</h1>
+
+      {pendingSubmission && (
+        <Card className='mb-4 border-orange-400 bg-orange-50'>
+          <CardHeader>
+            <CardTitle className='text-sm flex items-center gap-2'>
+              <span>⏳</span>
+              <span>{pendingSubmission.data.customer_name}</span>
+              <span className='text-xs font-normal text-orange-600'>(Pending)</span>
+            </CardTitle>
+            <p className='text-xs text-gray-600'>
+              {new Date(pendingSubmission.timestamp).toLocaleDateString()}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <p className='text-sm'>
+              <strong>Address:</strong> {pendingSubmission.data.installation_address}
+            </p>
+            <p className='text-xs text-orange-700 mt-2'>
+              This checklist is waiting to be sent when connection is restored.
+            </p>
+            <p className='text-xs text-gray-600 mt-1'>
+              Attempts: {pendingSubmission.attempts}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {items.length === 0 ? (
         <p>No checklists found.</p>
       ) : (
