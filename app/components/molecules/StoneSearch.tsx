@@ -147,7 +147,7 @@ export function StoneSearch({
                   {stone.name}
                   {(mode === 'samples'
                     ? Number(stone.samples_amount ?? 0) <= 0
-                    : stone.available === 0) && (
+                    : stone.available === 0 && !stone.regular_stock) && (
                     <span className='ml-2 text-xs font-bold text-red-500'>
                       Out of Stock
                     </span>
