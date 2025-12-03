@@ -60,11 +60,14 @@ export default function AdminFaucets() {
 
   useEffect(() => {
     const inStock = faucets.filter(
-      faucet => Number(faucet.available) > 0 && Boolean(faucet.is_display),
+      faucet =>
+        (Number(faucet.available) > 0 || !!faucet.regular_stock) &&
+        Boolean(faucet.is_display),
     )
     const outOfStock = faucets.filter(
       faucet =>
         (!faucet.available || Number(faucet.available) <= 0) &&
+        !faucet.regular_stock &&
         Boolean(faucet.is_display),
     )
     const notDisplayed = faucets.filter(faucet => !faucet.is_display)
@@ -123,8 +126,13 @@ export default function AdminFaucets() {
             />
           </div>
           {sortedFaucets.map(faucet => {
+            const isRegularStock = !!faucet.regular_stock
             const displayedAmount =
-              faucet.available && faucet.available > 0 ? faucet.available : '—'
+              faucet.available === 0 && isRegularStock
+                ? 'On-Demand'
+                : faucet.available && faucet.available > 0
+                  ? faucet.available
+                  : '—'
             const retailPrice = formatPrice(faucet.retail_price)
             const cost = formatPrice(faucet.cost)
 
@@ -143,7 +151,7 @@ export default function AdminFaucets() {
                       loading='lazy'
                       onClick={() => handleSetCurrentId(faucet.id)}
                     />
-                    {displayedAmount === '—' && (
+                    {displayedAmount === '—' && !isRegularStock && (
                       <div className='absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
                         <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
                           Out of Stock
