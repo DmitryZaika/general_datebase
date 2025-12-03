@@ -39,7 +39,7 @@ function Calendar({
         ),
         day: cn(
           buttonVariants({ variant: 'ghost' }),
-          'size-8 p-0 font-normal aria-selected:opacity-100',
+          'size-8 p-0 font-normal aria-selected:opacity-100 aria-selected:hover:bg-zinc-900 aria-selected:hover:text-zinc-300 dark:aria-selected:hover:bg-zinc-50 dark:aria-selected:hover:text-zinc-900',
         ),
         day_range_start:
           'day-range-start aria-selected:bg-zinc-900 aria-selected:text-zinc-50 dark:aria-selected:bg-zinc-50 dark:aria-selected:text-zinc-900',
