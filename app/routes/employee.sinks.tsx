@@ -63,7 +63,7 @@ function InteractiveCard({
           Available:
             (sink.available === 0 || !sink.available) && isRegularStock
               ? 'On-Demand'
-              : `${displayedAmount}`,
+              : `${displayedAmount}${displayedAmount !== '—' && isRegularStock ? ' (Regular stock)' : ''}`,
           Size: `${displayedLength} x ${displayedWidth}  `,
           Price:
             sink.retail_price === 0 ? `Contact for price` : `$${sink.retail_price}`,

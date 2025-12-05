@@ -131,7 +131,7 @@ export default function AdminFaucets() {
               faucet.available === 0 && isRegularStock
                 ? 'On-Demand'
                 : faucet.available && faucet.available > 0
-                  ? faucet.available
+                  ? `${faucet.available}${isRegularStock ? ' (Regular stock)' : ''}`
                   : '—'
             const retailPrice = formatPrice(faucet.retail_price)
             const cost = formatPrice(faucet.cost)

@@ -134,7 +134,7 @@ export default function AdminSinks() {
               sink.available === 0 && isRegularStock
                 ? 'On-Demand'
                 : sink.available && sink.available > 0
-                  ? sink.available
+                  ? `${sink.available}${isRegularStock ? ' (Regular stock)' : ''}`
                   : '—'
             const displayedWidth = sink.width && sink.width > 0 ? sink.width : '—'
             const displayedLength = sink.length && sink.length > 0 ? sink.length : '—'

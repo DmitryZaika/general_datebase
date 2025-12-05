@@ -98,7 +98,7 @@ function InteractiveCard({
         fieldList={{
           Available: stone.available === 0 && isRegularStock 
             ? 'Regular Stock' 
-            : `${stone.available} / ${displayedAmount}`,
+            : `${stone.available} / ${displayedAmount}${isRegularStock ? ' (Regular stock)' : ''}`,
           Type: capitalizeFirstLetter(stone.type),
           Price:
             stone.retail_price === 0
