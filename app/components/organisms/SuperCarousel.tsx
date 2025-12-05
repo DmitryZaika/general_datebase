@@ -85,7 +85,7 @@ function ChildrenImagesDialog({
     image?.available === 0 && isRegularStock 
       ? 'Regular Stock' 
       : image?.available !== undefined 
-        ? image.available 
+        ? `${image.available}${isRegularStock ? ' (Regular stock)' : ''}` 
         : '—'
   const displayedType = image?.type ? capitalizeFirstLetter(image.type) : '—'
   const displayedWidth = image?.width && image?.width > 0 ? image.width : '—'

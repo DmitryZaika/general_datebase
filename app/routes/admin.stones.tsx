@@ -286,7 +286,7 @@ export default function AdminStones() {
               const isRegularStock = !!stone.regular_stock
               const availableText = stone.available === 0 && isRegularStock 
                 ? 'Regular Stock' 
-                : `${displayedAvailable} / ${displayedAmount}`
+                : `${displayedAvailable} / ${displayedAmount}${isRegularStock ? ' (Regular stock)' : ''}`
 
               return (
                 <div

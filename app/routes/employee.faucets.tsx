@@ -63,7 +63,7 @@ function InteractiveCard({
           Available:
             (faucet.available === 0 || !faucet.available) && isRegularStock
               ? 'On-Demand'
-              : `${displayedAmount}`,
+              : `${displayedAmount}${displayedAmount !== '—' && isRegularStock ? ' (Regular stock)' : ''}`,
           Price:
             faucet.retail_price === 0 ? `Contact for price` : `$${faucet.retail_price}`,
         }}
