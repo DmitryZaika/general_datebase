@@ -16,6 +16,8 @@ export interface SaleSlab {
   cut_date: string | null
   notes: string | null
   square_feet: number | null
+  length?: number | null
+  width?: number | null
   price?: number | null
   room: string | null
   parent_id: number | null
