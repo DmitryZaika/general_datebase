@@ -76,6 +76,11 @@ const getItems = (
         url: '/shop/samples',
         icon: Package,
       },
+      {
+        title: 'Statistics',
+        url: '/shop/statistics',
+        icon: Calculator,
+      },
     ]
   }
   const isCustomerRoute = base === 'customer'
