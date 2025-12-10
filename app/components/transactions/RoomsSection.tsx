@@ -5,12 +5,12 @@ import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from '~/components/ui/table'
 import type { SaleSlab } from '~/types/sales'
 
@@ -20,7 +20,6 @@ interface RoomsSectionProps {
   roomEntries: RoomEntry[]
   slabsCount: number
   localRoomsCount: number
-  allRooms: string[]
   onRenameRoom: (id: string, name: string) => void
   onRemoveLocalRoom: (id: string) => void
   onAddRoom: (name: string) => void
@@ -44,7 +43,6 @@ export function RoomsSection({
   roomEntries,
   slabsCount,
   localRoomsCount,
-  allRooms,
   onRenameRoom,
   onRemoveLocalRoom,
   onAddRoom,

@@ -10,7 +10,7 @@ import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from 'react-router'
-import { AddSlabDialog } from '~/components/transactions/AddSlabDialogTransactions'
+import { AddSlabDialog, type RoomOption } from '~/components/transactions/AddSlabDialogTransactions'
 import { ReplaceDialog } from '~/components/transactions/ReplaceDialog'
 import { RoomsSection } from '~/components/transactions/RoomsSection'
 import { Button } from '~/components/ui/button'
@@ -34,6 +34,12 @@ function formatDate(dateString: string) {
     day: '2-digit',
   }).format(date)
 }
+
+const normalizeRoomName = (value: string | null | undefined) => value?.trim() || 'Room'
+const roomKeyFromSlab = (slab: Pick<SaleSlab, 'room' | 'room_uuid'>) =>
+  slab.room_uuid ?? `name:${normalizeRoomName(slab.room).toLowerCase()}`
+const roomKeyFromSink = (sink: Pick<SaleSink, 'room' | 'room_uuid'>) =>
+  sink.room_uuid ?? `name:${normalizeRoomName(sink.room).toLowerCase()}`
 
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -96,6 +102,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       slab_inventory.square_feet,
       slab_inventory.length,
       slab_inventory.width,
+      HEX(slab_inventory.room_uuid) as room_uuid,
       slab_inventory.room,
       slab_inventory.parent_id,
       (SELECT COUNT(*) FROM slab_inventory c WHERE c.parent_id = slab_inventory.id AND c.deleted_at IS NULL) as child_count
@@ -115,7 +122,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       sinks.price,
       sinks.is_deleted,
       sinks.slab_id,
-      slab_inventory.room
+      slab_inventory.room,
+      HEX(slab_inventory.room_uuid) as room_uuid
      FROM sinks
      JOIN sink_type ON sinks.sink_type_id = sink_type.id
      JOIN slab_inventory ON sinks.slab_id = slab_inventory.id
@@ -418,20 +426,44 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } else if (intent === 'add-slab') {
     const slabId = Number(formData.get('slabId'))
     const room = (formData.get('room') as string) || null
+    const roomUuidRaw = formData.get('roomUuid')
+    const roomUuid =
+      typeof roomUuidRaw === 'string' && roomUuidRaw.trim() !== '' ? roomUuidRaw.trim() : null
     if (!slabId || !room) return null
 
-    const [templateRows] = await db.execute(
-      `SELECT room_uuid, seam, room, backsplash, tear_out, square_feet, stove, ten_year_sealer, waterfall, corbels, price, extras, edge
-         FROM slab_inventory
-        WHERE sale_id = ? AND (room = ? OR ? IS NULL)
-        ORDER BY id
-        LIMIT 1`,
-      [saleId, room, room],
-    )
-    const template =
-      Array.isArray(templateRows) && templateRows.length > 0
-        ? (templateRows as any[])[0]
-        : null
+    const templateQuery = roomUuid
+      ? `SELECT room_uuid, seam, room, backsplash, tear_out, square_feet, stove, ten_year_sealer, waterfall, corbels, price, extras, edge
+           FROM slab_inventory
+          WHERE sale_id = ? AND HEX(room_uuid) = ?
+          ORDER BY id
+          LIMIT 1`
+      : `SELECT room_uuid, seam, room, backsplash, tear_out, square_feet, stove, ten_year_sealer, waterfall, corbels, price, extras, edge
+           FROM slab_inventory
+          WHERE sale_id = ? AND (room = ? OR ? IS NULL)
+          ORDER BY id
+          LIMIT 1`
+
+    const templateParams = roomUuid ? [saleId, roomUuid] : [saleId, room, room]
+
+    type TemplateRow = {
+      room_uuid: Buffer | null
+      seam: string | null
+      room: string | null
+      backsplash: string | null
+      tear_out: string | null
+      square_feet: number | null
+      stove: string | null
+      ten_year_sealer: string | null
+      waterfall: string | null
+      corbels: string | null
+      price: number | null
+      extras: string | null
+      edge: string | null
+    }
+    const templateRows = await selectMany<TemplateRow>(db, templateQuery, templateParams)
+    const template = templateRows[0] ?? null
+    const roomUuidValue =
+      template?.room_uuid ?? (roomUuid ? Buffer.from(roomUuid, 'hex') : null)
 
     await db.execute(
       `UPDATE slab_inventory
@@ -455,7 +487,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       [
         saleId,
         room,
-        template?.room_uuid ?? null,
+        roomUuidValue,
         template?.seam ?? null,
         template?.backsplash ?? null,
         template?.tear_out ?? null,
@@ -513,13 +545,14 @@ export default function ViewTransaction() {
   >([])
   const [addLoading, setAddLoading] = useState(false)
   const [addSlabsLoading, setAddSlabsLoading] = useState(false)
-  const [addRoom, setAddRoom] = useState<string | null>(null)
+  const [addRoom, setAddRoom] = useState<RoomOption | null>(null)
   const [newRoomName, setNewRoomName] = useState('')
   const openAddDialog = () => {
     const defaultStone = slabs[0]?.stone_name || ''
     setAddSearch(defaultStone)
     setAddStoneId(null)
     setAddSlabs([])
+    setAddRoom(null)
     setAddDialogOpen(true)
   }
   const currentSlabIds = slabs.map(s => s.id)
@@ -532,22 +565,28 @@ export default function ViewTransaction() {
 
   const slabsByRoom = useMemo(
     () =>
-      slabs.reduce<Record<string, SaleSlab[]>>((acc, slab) => {
-        const key = slab.room || 'Room'
-        acc[key] = acc[key] || []
-        acc[key].push(slab)
+      slabs.reduce<
+        Record<string, { name: string; slabs: SaleSlab[]; roomUuid: string | null }>
+      >((acc, slab) => {
+        const roomName = normalizeRoomName(slab.room)
+        const key = roomKeyFromSlab(slab)
+        if (!acc[key]) acc[key] = { name: roomName, slabs: [], roomUuid: slab.room_uuid ?? null }
+        acc[key].slabs.push(slab)
         return acc
       }, {}),
     [slabs],
   )
   const sinksByRoom = useMemo(
     () =>
-      sinks.reduce<Record<string, { name: string; count: number }[]>>((acc, sink) => {
-        const room = sink.room || 'Room'
-        acc[room] = acc[room] || []
-        const existing = acc[room].find(item => item.name === sink.name)
+      sinks.reduce<
+        Record<string, { name: string; items: { name: string; count: number }[] }>
+      >((acc, sink) => {
+        const roomName = normalizeRoomName(sink.room)
+        const key = roomKeyFromSink(sink)
+        if (!acc[key]) acc[key] = { name: roomName, items: [] }
+        const existing = acc[key].items.find(item => item.name === sink.name)
         if (existing) existing.count += 1
-        else acc[room].push({ name: sink.name, count: 1 })
+        else acc[key].items.push({ name: sink.name, count: 1 })
         return acc
       }, {}),
     [sinks],
@@ -601,46 +640,60 @@ export default function ViewTransaction() {
   const [partialSubmitting, setPartialSubmitting] = useState(false)
 
   useEffect(() => {
-    const slabRooms = slabs.map(s => s.room || 'Room')
-    const localNames = localRooms.map(r => r.name)
+    const slabRoomKeys = slabs.map(roomKeyFromSlab)
+    const localIds = localRooms.map(r => r.id)
     setRoomOrder(prev => {
-      const active = new Set([...slabRooms, ...localNames])
+      const active = new Set([...slabRoomKeys, ...localIds])
       const next: string[] = []
-      prev.forEach(name => {
-        if (active.has(name) && !next.includes(name)) next.push(name)
+      prev.forEach(key => {
+        if (active.has(key) && !next.includes(key)) next.push(key)
       })
-      slabRooms.forEach(name => {
-        if (!next.includes(name)) next.push(name)
+      slabRoomKeys.forEach(key => {
+        if (!next.includes(key)) next.push(key)
       })
-      localNames.forEach(name => {
-        if (!next.includes(name)) next.push(name)
+      localIds.forEach(key => {
+        if (!next.includes(key)) next.push(key)
       })
       return next
     })
   }, [slabs, localRooms])
 
   const roomEntries = useMemo(() => {
-    const items: { id: string; name: string; slabs: SaleSlab[]; isLocal: boolean }[] = []
-    const localMap = new Map(localRooms.map(r => [r.name, r]))
-    const addRoomEntry = (name: string) => {
-      if (items.some(r => r.name === name)) return
-      const slabList = slabsByRoom[name]
-      if (slabList) {
-        items.push({ id: name, name, slabs: slabList, isLocal: false })
+    const items: {
+      id: string
+      name: string
+      slabs: SaleSlab[]
+      isLocal: boolean
+      roomUuid: string | null
+    }[] = []
+    const addRoomEntry = (key: string) => {
+      if (items.some(r => r.id === key)) return
+      const slabRoom = slabsByRoom[key]
+      if (slabRoom) {
+        items.push({
+          id: key,
+          name: slabRoom.name,
+          slabs: slabRoom.slabs,
+          isLocal: false,
+          roomUuid: slabRoom.roomUuid,
+        })
         return
       }
-      const local = localMap.get(name)
+      const local = localRooms.find(r => r.id === key)
       if (local) {
-        items.push({ id: local.id, name: local.name, slabs: [], isLocal: true })
+        items.push({ id: local.id, name: local.name, slabs: [], isLocal: true, roomUuid: null })
       }
     }
     roomOrder.forEach(addRoomEntry)
     Object.keys(slabsByRoom).forEach(addRoomEntry)
-    localRooms.forEach(r => addRoomEntry(r.name))
+    localRooms.forEach(r => addRoomEntry(r.id))
     return items
   }, [roomOrder, slabsByRoom, localRooms])
 
-  const allRooms = useMemo(() => roomEntries.map(r => r.name), [roomEntries])
+  const allRooms = useMemo<RoomOption[]>(
+    () => roomEntries.map(r => ({ id: r.id, name: r.name, roomUuid: r.roomUuid })),
+    [roomEntries],
+  )
 
   const handleRemove = (slab: SaleSlab) => {
     if (slabs.length <= 1) {
@@ -797,24 +850,14 @@ export default function ViewTransaction() {
     await submitAction({
       intent: 'add-slab',
       slabId,
-      room: addRoom,
+      room: addRoom.name,
+      roomUuid: addRoom.roomUuid ?? null,
     })
-    setLocalRooms(prev => prev.filter(r => r.name !== addRoom))
+    setLocalRooms(prev => prev.filter(r => r.id !== addRoom.id))
     resetAddDialog()
   }
 
-  const isRoomNameTaken = (name: string, excludeId?: string) => {
-    const normalized = name.trim().toLowerCase()
-    if (!normalized) return false
-    const realTaken = Object.keys(slabsByRoom).some(r => r.toLowerCase() === normalized)
-    const localTaken = localRooms.some(
-      r => r.id !== excludeId && r.name.trim().toLowerCase() === normalized,
-    )
-    return realTaken || localTaken
-  }
-
   const handleRenameRoom = (id: string, name: string) => {
-    if (isRoomNameTaken(name, id)) return
     setLocalRooms(prev => prev.map(r => (r.id === id ? { ...r, name } : r)))
   }
 
@@ -825,23 +868,15 @@ export default function ViewTransaction() {
   const handleAddRoom = (name: string) => {
     const trimmed = name.trim()
     if (!trimmed) return
-    if (isRoomNameTaken(trimmed)) {
-      toast({ title: 'Room name already exists', variant: 'destructive' })
-      return
-    }
     const id = `${Date.now()}-${Math.random()}`
     setLocalRooms(prev => [...prev, { id, name: trimmed }])
-    setRoomOrder(prev => (prev.includes(trimmed) ? prev : [...prev, trimmed]))
+    setRoomOrder(prev => (prev.includes(id) ? prev : [...prev, id]))
     setNewRoomName('')
   }
 
   const handleSubmitNewRoom = () => {
     const name = newRoomName.trim()
     if (!name) return
-    if (isRoomNameTaken(name)) {
-      toast({ title: 'Room name already exists', variant: 'destructive' })
-      return
-    }
     handleAddRoom(name)
   }
 
@@ -918,13 +953,13 @@ export default function ViewTransaction() {
                   <p className='text-sm text-muted-foreground py-2'>No sinks</p>
                 ) : (
                   <div className='space-y-2'>
-                    {Object.entries(sinksByRoom).map(([room, list]) => (
-                      <div key={room} className='flex justify-between items-center'>
+                    {Object.entries(sinksByRoom).map(([roomId, room]) => (
+                      <div key={roomId} className='flex justify-between items-center'>
                         <span className='font-semibold'>
-                          {room.charAt(0).toUpperCase() + room.slice(1)}
+                          {room.name.charAt(0).toUpperCase() + room.name.slice(1)}
                         </span>
                         <div className='flex flex-wrap gap-2 text-sm text-muted-foreground justify-end'>
-                          {list.map(item => (
+                          {room.items.map(item => (
                             <span key={item.name} className='px-2 py-1 rounded bg-muted'>
                               {item.name}
                               {item.count > 1 ? ` x${item.count}` : ''}
@@ -949,7 +984,6 @@ export default function ViewTransaction() {
                 roomEntries={roomEntries}
                 slabsCount={slabs.length}
                 localRoomsCount={localRooms.length}
-                allRooms={allRooms}
                 onRenameRoom={handleRenameRoom}
                 onRemoveLocalRoom={handleRemoveLocalRoom}
                 onAddRoom={handleAddRoom}

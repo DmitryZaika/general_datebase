@@ -7,6 +7,12 @@ import {
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 
+export interface RoomOption {
+  id: string
+  name: string
+  roomUuid: string | null
+}
+
 interface StoneOption {
   id: number
   name: string
@@ -24,8 +30,8 @@ interface SlabOption {
 interface AddSlabDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  addRoom: string | null
-  allRooms: string[]
+  addRoom: RoomOption | null
+  allRooms: RoomOption[]
   addSearch: string
   setAddSearch: (value: string) => void
   addLoading: boolean
@@ -35,7 +41,7 @@ interface AddSlabDialogProps {
   addSlabs: SlabOption[]
   addSlabsLoading: boolean
   onSelectSlab: (id: number) => void
-  onSelectRoom: (room: string) => void
+  onSelectRoom: (room: RoomOption) => void
 }
 
 export function AddSlabDialog({
@@ -67,12 +73,12 @@ export function AddSlabDialog({
               <div className='grid grid-cols-1 md:grid-cols-2 gap-2'>
                 {allRooms.map(room => (
                   <Button
-                    key={room}
+                    key={room.id}
                     variant='outline'
                     className='justify-start'
                     onClick={() => onSelectRoom(room)}
                   >
-                    {room.charAt(0).toUpperCase() + room.slice(1)}
+                    {room.name.charAt(0).toUpperCase() + room.name.slice(1)}
                   </Button>
                 ))}
               </div>
@@ -80,7 +86,7 @@ export function AddSlabDialog({
           ) : (
             <>
               <div className='text-sm text-muted-foreground'>
-                Room: {addRoom.charAt(0).toUpperCase() + addRoom.slice(1)}
+                Room: {addRoom.name.charAt(0).toUpperCase() + addRoom.name.slice(1)}
               </div>
               <Input value={addSearch} onChange={e => setAddSearch(e.target.value)} placeholder='Search stones' />
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
