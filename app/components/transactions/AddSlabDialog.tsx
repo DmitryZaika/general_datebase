@@ -1,9 +1,9 @@
 import { Button } from '~/components/ui/button'
 import {
-    Dialog as UiDialog,
-    DialogContent as UiDialogContent,
-    DialogHeader as UiDialogHeader,
-    DialogTitle as UiDialogTitle,
+  Dialog as UiDialog,
+  DialogContent as UiDialogContent,
+  DialogHeader as UiDialogHeader,
+  DialogTitle as UiDialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 
@@ -17,6 +17,8 @@ interface SlabOption {
   id: number
   bundle: string
   is_leftover: boolean
+  parent_id?: number | null
+  child_count?: number
 }
 
 interface AddSlabDialogProps {
@@ -113,8 +115,21 @@ export function AddSlabDialog({
                         className='p-2 border-b last:border-b-0 cursor-pointer hover:bg-blue-50'
                         onClick={() => onSelectSlab(slab.id)}
                       >
-                        <div className='font-medium'>Bundle {slab.bundle}</div>
-                        <div className='text-xs text-muted-foreground'>{slab.is_leftover ? 'Leftover' : 'Full'}</div>
+                        <div className='font-medium'>
+                          Bundle {slab.bundle}
+                          {slab.parent_id ? ' (Partial)' : ''}
+                        </div>
+                        <div className='text-xs text-muted-foreground'>
+                          {(() => {
+                            const isPartial =
+                              slab.parent_id !== null && slab.parent_id !== undefined
+                                ? true
+                                : (slab.child_count ?? 0) > 0
+                            const statuses = [isPartial ? 'Partial' : 'Full']
+                            if (slab.is_leftover) statuses.push('Leftover')
+                            return statuses.join(' • ')
+                          })()}
+                        </div>
                       </div>
                     ))
                   )}

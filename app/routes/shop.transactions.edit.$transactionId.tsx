@@ -1,14 +1,14 @@
 import { Calendar, MapPin, User, UserCircle } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import {
-    data,
-    Outlet,
-    useFetcher,
-    useLoaderData,
-    useLocation,
-    useNavigate,
-    type ActionFunctionArgs,
-    type LoaderFunctionArgs,
+  data,
+  Outlet,
+  useFetcher,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
 } from 'react-router'
 import { AddSlabDialog } from '~/components/transactions/AddSlabDialogTransactions'
 import { ReplaceDialog } from '~/components/transactions/ReplaceDialog'
@@ -16,6 +16,7 @@ import { RoomsSection } from '~/components/transactions/RoomsSection'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
+import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
 import { commitSession, getSession } from '~/sessions.server'
@@ -93,6 +94,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       slab_inventory.cut_date,
       slab_inventory.notes,
       slab_inventory.square_feet,
+      slab_inventory.length,
+      slab_inventory.width,
       slab_inventory.room,
       slab_inventory.parent_id,
       (SELECT COUNT(*) FROM slab_inventory c WHERE c.parent_id = slab_inventory.id AND c.deleted_at IS NULL) as child_count
@@ -343,6 +346,75 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return data({ success: true }, {
       headers: { 'Set-Cookie': await commitSession(session) },
     })
+  } else if (intent === 'partial-cut') {
+    const slabIdValue = formData.get('slabId')
+    const lengthRaw = formData.get('length')
+    const widthRaw = formData.get('width')
+    const addAnotherRaw = formData.get('addAnother')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    const length =
+      typeof lengthRaw === 'string' && lengthRaw.trim() !== ''
+        ? Number.parseFloat(lengthRaw)
+        : null
+    const width =
+      typeof widthRaw === 'string' && widthRaw.trim() !== '' ? Number.parseFloat(widthRaw) : null
+    const addAnother = typeof addAnotherRaw === 'string' ? Number(addAnotherRaw) === 1 : false
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
+    }
+    if (
+      length === null ||
+      width === null ||
+      !Number.isFinite(length) ||
+      !Number.isFinite(width) ||
+      length <= 0 ||
+      width <= 0
+    ) {
+      return null
+    }
+    const parent = await selectMany<{ stone_id: number; bundle: string; url: string | null }>(
+      db,
+      `SELECT stone_id, bundle, url FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      [slabId, saleId],
+    )
+    if (parent.length === 0) return null
+    await db.execute(
+      `INSERT INTO slab_inventory (stone_id, bundle, parent_id, sale_id, length, width, url)
+       VALUES (?, ?, ?, NULL, ?, ?, ?)`,
+      [parent[0].stone_id, parent[0].bundle, slabId, length, width, parent[0].url],
+    )
+    if (!addAnother) {
+      await db.execute(
+        `UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ? AND sale_id = ?`,
+        [slabId, saleId],
+      )
+      const remaining = await selectMany<{ count: number }>(
+        db,
+        `SELECT COUNT(*) as count FROM slab_inventory WHERE sale_id = ? AND cut_date IS NULL AND deleted_at IS NULL`,
+        [saleId],
+      )
+      const remainingCount = remaining[0]?.count ?? 0
+      const status = remainingCount > 0 ? 'partially cut' : 'cut'
+      await db.execute(`UPDATE sales SET status = ? WHERE id = ?`, [status, saleId])
+    }
+  } else if (intent === 'update-room-square-feet') {
+    const slabIdValue = formData.get('slabId')
+    const squareFeetRaw = formData.get('squareFeet')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    const squareFeet =
+      typeof squareFeetRaw === 'string' && squareFeetRaw.trim() !== ''
+        ? Number.parseFloat(squareFeetRaw)
+        : null
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
+    }
+    if (squareFeet !== null && !Number.isFinite(squareFeet)) {
+      return null
+    }
+    await db.execute(
+      `UPDATE slab_inventory SET square_feet = ? WHERE id = ? AND sale_id = ?`,
+      [squareFeet, slabId, saleId],
+    )
   } else if (intent === 'add-slab') {
     const slabId = Number(formData.get('slabId'))
     const room = (formData.get('room') as string) || null
@@ -427,7 +499,7 @@ export default function ViewTransaction() {
   const [replaceDialogOpen, setReplaceDialogOpen] = useState(false)
   const [replaceTarget, setReplaceTarget] = useState<SaleSlab | null>(null)
   const [replaceOptions, setReplaceOptions] = useState<
-    { id: number; bundle: string; is_leftover: boolean }[]
+    { id: number; bundle: string; is_leftover: boolean; parent_id: number | null; child_count: number }[]
   >([])
   const [replaceLoading, setReplaceLoading] = useState(false)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
@@ -437,7 +509,7 @@ export default function ViewTransaction() {
   >([])
   const [addStoneId, setAddStoneId] = useState<number | null>(null)
   const [addSlabs, setAddSlabs] = useState<
-    { id: number; bundle: string; is_leftover: boolean }[]
+    { id: number; bundle: string; is_leftover: boolean; parent_id?: number | null; child_count?: number }[]
   >([])
   const [addLoading, setAddLoading] = useState(false)
   const [addSlabsLoading, setAddSlabsLoading] = useState(false)
@@ -490,7 +562,10 @@ export default function ViewTransaction() {
     [sinks],
   )
 
-  const submitAction = async (payload: Record<string, string | number | null>) => {
+  const submitAction = async (
+    payload: Record<string, string | number | null>,
+    options?: { skipNavigate?: boolean },
+  ) => {
     const formData = new FormData()
     Object.entries(payload).forEach(([key, value]) => {
       if (value !== null && value !== undefined) formData.append(key, String(value))
@@ -499,7 +574,9 @@ export default function ViewTransaction() {
       method: 'POST',
       body: formData,
     })
-    navigate(location.pathname + location.search, { replace: true })
+    if (!options?.skipNavigate) {
+      navigate(location.pathname + location.search, { replace: true })
+    }
   }
 
   const handleCut = (slab: SaleSlab) => {
@@ -516,6 +593,12 @@ export default function ViewTransaction() {
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<SaleSlab | null>(null)
   const removeFetcher = useFetcher<typeof action>()
+  const [savingRoomId, setSavingRoomId] = useState<string | null>(null)
+  const [partialDialogOpen, setPartialDialogOpen] = useState(false)
+  const [partialTarget, setPartialTarget] = useState<SaleSlab | null>(null)
+  const [partialLength, setPartialLength] = useState('')
+  const [partialWidth, setPartialWidth] = useState('')
+  const [partialSubmitting, setPartialSubmitting] = useState(false)
 
   useEffect(() => {
     const slabRooms = slabs.map(s => s.room || 'Room')
@@ -566,6 +649,69 @@ export default function ViewTransaction() {
     }
     setRemoveTarget(slab)
     setRemoveDialogOpen(true)
+  }
+
+  const handlePartialOpen = (slab: SaleSlab) => {
+    setPartialTarget(slab)
+    setPartialLength('')
+    setPartialWidth('')
+    setPartialDialogOpen(true)
+  }
+
+  const handlePartialSubmit = async (addAnother: boolean) => {
+    if (!partialTarget) return
+    const lengthValue = partialLength.trim()
+    const widthValue = partialWidth.trim()
+    const lengthParsed = lengthValue === '' ? null : Number.parseFloat(lengthValue)
+    const widthParsed = widthValue === '' ? null : Number.parseFloat(widthValue)
+    if (
+      lengthParsed === null ||
+      widthParsed === null ||
+      Number.isNaN(lengthParsed) ||
+      Number.isNaN(widthParsed) ||
+      lengthParsed <= 0 ||
+      widthParsed <= 0
+    )
+      return
+    setPartialSubmitting(true)
+    try {
+      await submitAction(
+        {
+          intent: 'partial-cut',
+          slabId: partialTarget.id,
+          length: lengthParsed,
+          width: widthParsed,
+          addAnother: addAnother ? 1 : 0,
+        },
+        { skipNavigate: addAnother },
+      )
+      if (addAnother) {
+        setPartialLength('')
+        setPartialWidth('')
+      } else {
+        setPartialDialogOpen(false)
+        setPartialTarget(null)
+      }
+    } finally {
+      setPartialSubmitting(false)
+    }
+  }
+
+  const handleUpdateRoomSquareFeet = async (
+    roomId: string,
+    slabId: number,
+    squareFeet: number | null,
+  ) => {
+    setSavingRoomId(roomId)
+    try {
+      await submitAction({
+        intent: 'update-room-square-feet',
+        slabId,
+        squareFeet: squareFeet === null ? '' : squareFeet,
+      })
+    } finally {
+      setSavingRoomId(null)
+    }
   }
 
   useEffect(() => {
@@ -819,6 +965,9 @@ export default function ViewTransaction() {
                     variant: 'destructive',
                   })
                 }
+                onUpdateRoomSquareFeet={handleUpdateRoomSquareFeet}
+                savingRoomId={savingRoomId}
+                openPartial={handlePartialOpen}
               />
             </CardContent>
           </Card>
@@ -844,6 +993,67 @@ export default function ViewTransaction() {
         loading={replaceLoading}
         onChoose={handleReplaceChoose}
       />
+      {partialDialogOpen && partialTarget && (
+        <Dialog
+          open={partialDialogOpen}
+          onOpenChange={open => {
+            setPartialDialogOpen(open)
+            if (!open) {
+              setPartialTarget(null)
+              setPartialLength('')
+              setPartialWidth('')
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Mark as partially cut</DialogTitle>
+              <p className='text-sm text-muted-foreground'>
+                What are the leftover dimensions for slab {partialTarget.bundle}?
+              </p>
+            </DialogHeader>
+            <div className='space-y-3'>
+              <div className='grid grid-cols-2 gap-2'>
+                <Input
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  value={partialLength}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPartialLength(e.target.value)}
+                  disabled={partialSubmitting}
+                  placeholder='Length'
+                />
+                <Input
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  value={partialWidth}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPartialWidth(e.target.value)}
+                  disabled={partialSubmitting}
+                  placeholder='Width'
+                />
+              </div>
+              <div className='flex justify-end gap-2'>
+                <Button
+                  type='button'
+                  variant='outline'
+                  disabled={partialSubmitting}
+                  onClick={() => handlePartialSubmit(true)}
+                >
+                  More left overs
+                </Button>
+                <Button
+                  type='button'
+                  disabled={partialSubmitting}
+                  onClick={() => handlePartialSubmit(false)}
+                >
+                  Done
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
       <AddSlabDialog
         open={addDialogOpen}
         onOpenChange={open => (open ? setAddDialogOpen(true) : resetAddDialog())}

@@ -1,14 +1,16 @@
+import { Loader2, Pencil } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '~/components/ui/table'
 import type { SaleSlab } from '~/types/sales'
 
@@ -29,6 +31,13 @@ interface RoomsSectionProps {
   handleRemove: (slab: SaleSlab) => void
   formatDate: (value: string) => string
   onReplaceBlocked: () => void
+  onUpdateRoomSquareFeet: (
+    roomId: string,
+    slabId: number,
+    squareFeet: number | null,
+  ) => void
+  savingRoomId: string | null
+  openPartial: (slab: SaleSlab) => void
 }
 
 export function RoomsSection({
@@ -46,8 +55,21 @@ export function RoomsSection({
   handleRemove,
   formatDate,
   onReplaceBlocked,
+  onUpdateRoomSquareFeet,
+  savingRoomId,
+  openPartial,
 }: RoomsSectionProps) {
   const isEmpty = slabsCount === 0 && localRoomsCount === 0
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
+  const [editingValue, setEditingValue] = useState('')
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (editingRoomId) inputRef.current?.select()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [editingRoomId])
 
   return (
     <>
@@ -59,6 +81,9 @@ export function RoomsSection({
             const roomName = roomEntry.name
             const roomSlabs = roomEntry.slabs
             const isLocalOnly = roomEntry.isLocal && roomSlabs.length === 0
+            const roomSquareFeet = roomSlabs[0]?.square_feet ?? null
+            const isEditing = editingRoomId === roomEntry.id
+            const isSaving = savingRoomId === roomEntry.id
             return (
               <div key={roomEntry.id} className={idx > 0 ? 'mt-6' : ''}>
                 <div className='rounded-md border overflow-hidden'>
@@ -86,6 +111,82 @@ export function RoomsSection({
                       >
                         ×
                       </Button>
+                    )}
+                  </div>
+                  <div className='px-4 py-2 text-sm text-muted-foreground flex items-center gap-2'>
+                    <span>Total sqft per room:</span>
+                    {roomSlabs.length === 0 ? (
+                      <span>-</span>
+                    ) : isEditing ? (
+                      <div className='flex items-center gap-2'>
+                        <Input
+                          ref={inputRef}
+                          value={editingValue}
+                          onChange={e => setEditingValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              const value = editingValue.trim()
+                              const parsed = value === '' ? null : Number.parseFloat(value)
+                              if (parsed !== null && Number.isNaN(parsed)) return
+                              onUpdateRoomSquareFeet(roomEntry.id, roomSlabs[0].id, parsed)
+                              setEditingRoomId(null)
+                            }
+                          }}
+                          className='h-8 w-13 p-1'
+                          autoFocus
+                          disabled={isSaving}
+                        />
+                        <Button
+                          type='button'
+                          size='sm'
+                          onClick={() => {
+                            const value = editingValue.trim()
+                            const parsed = value === '' ? null : Number.parseFloat(value)
+                            if (parsed !== null && Number.isNaN(parsed)) return
+                            onUpdateRoomSquareFeet(roomEntry.id, roomSlabs[0].id, parsed)
+                            setEditingRoomId(null)
+                          }}
+                          disabled={isSaving}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          type='button'
+                          size='icon'
+                          variant='ghost'
+                          className='h-8 w-8'
+                          onClick={() => {
+                            setEditingRoomId(null)
+                            setEditingValue('')
+                          }}
+                          disabled={isSaving}
+                        >
+                          ×
+                        </Button>
+                        {isSaving && <Loader2 className='h-4 w-4 animate-spin text-foreground' />}
+                      </div>
+                    ) : (
+                      <div className='flex items-center gap-2'>
+                        <span className='font-medium text-foreground'>
+                          {roomSquareFeet ?? '-'}
+                        </span>
+                        <Button
+                          type='button'
+                          size='icon'
+                          variant='ghost'
+                          className='h-8 w-8'
+                          onClick={() => {
+                            setEditingRoomId(roomEntry.id)
+                            setEditingValue(
+                              roomSquareFeet === null ? '' : String(roomSquareFeet),
+                            )
+                          }}
+                          disabled={isSaving}
+                        >
+                          <Pencil className='h-4 w-4' />
+                        </Button>
+                        {isSaving && <Loader2 className='h-4 w-4 animate-spin text-foreground' />}
+                      </div>
                     )}
                   </div>
                   <Table>
@@ -140,11 +241,12 @@ export function RoomsSection({
                           <TableCell>{slab.cut_date ? formatDate(slab.cut_date) : '-'}</TableCell>
                           <TableCell className='text-right'>
                             <ActionDropdown
-                              actions={{
-                                [slab.cut_date ? 'uncut' : 'cut']: '#',
-                                replace: '#',
-                                remove: '#',
-                              }}
+                            actions={{
+                              [slab.cut_date ? 'uncut' : 'cut']: '#',
+                              ...(slab.cut_date ? {} : { partial: '#' }),
+                              replace: '#',
+                              remove: '#',
+                            }}
                               onItemClick={(action, _link, e) => {
                                 e.preventDefault()
                                 if (action === 'cut' || action === 'uncut') handleCut(slab)
@@ -155,6 +257,7 @@ export function RoomsSection({
                                   }
                                   openReplace(slab)
                                 }
+                          if (action === 'partial') openPartial(slab)
                                 if (action === 'remove') handleRemove(slab)
                                 return false
                               }}

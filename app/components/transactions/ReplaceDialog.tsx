@@ -10,6 +10,8 @@ interface ReplaceOption {
   id: number
   bundle: string
   is_leftover: boolean
+  parent_id: number | null
+  child_count: number
 }
 
 interface ReplaceDialogProps {
@@ -37,6 +39,12 @@ export function ReplaceDialog({ open, onOpenChange, target, options, loading, on
               <div className='p-4 text-sm'>No available slabs</div>
             ) : (
               options.map(opt => (
+                (() => {
+                  const statuses: string[] = []
+                  const isPartial = opt.parent_id !== null || opt.child_count > 0
+                  statuses.push(isPartial ? 'Partial' : 'Full')
+                  if (opt.is_leftover) statuses.push('Leftover')
+                  return (
                 <div
                   key={opt.id}
                   className={`p-3 border-b last:border-b-0 cursor-pointer ${
@@ -45,8 +53,10 @@ export function ReplaceDialog({ open, onOpenChange, target, options, loading, on
                   onClick={() => onChoose(opt.id)}
                 >
                   <div className='font-medium'>Bundle {opt.bundle}</div>
-                  <div className='text-xs text-muted-foreground'>{opt.is_leftover ? 'Leftover' : 'Full'}</div>
+                  <div className='text-xs text-muted-foreground'>{statuses.join(' • ')}</div>
                 </div>
+                  )
+                })()
               ))
             )}
           </div>
