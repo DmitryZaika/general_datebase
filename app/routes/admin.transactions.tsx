@@ -326,7 +326,7 @@ export default function AdminTransactions() {
             />
           </div>
         </div>
-        <DataTable columns={transactionColumns} data={filteredTransactions} />
+        <DataTable columns={transactionColumns} data={filteredTransactions} paginate pageSize={50} />
       </PageLayout>
       <Outlet />
     </>

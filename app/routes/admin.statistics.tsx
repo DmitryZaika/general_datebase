@@ -258,7 +258,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        JOIN users u ON d.user_id = u.id AND u.is_deleted = 0 AND u.company_id = ?
        JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
-       WHERE c.company_id = ? AND d.deleted_at IS NULL${
+       WHERE c.company_id = ? AND c.deleted_at IS NULL AND d.deleted_at IS NULL AND l.deleted_at IS NULL${
          dealsDateFilters.length ? ` AND ${dealsDateFilters.join(' AND ')}` : ''
        }${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY u.id, u.name
@@ -277,7 +277,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
        JOIN users u ON d.user_id = u.id AND u.is_deleted = 0 AND u.company_id = ?
-       WHERE c.company_id = ? AND d.deleted_at IS NULL${
+       WHERE c.company_id = ? AND c.deleted_at IS NULL AND d.deleted_at IS NULL AND l.deleted_at IS NULL${
          dealsDateFilters.length ? ` AND ${dealsDateFilters.join(' AND ')}` : ''
        }${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY l.id, l.name
@@ -300,11 +300,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          SUM(CASE WHEN invalid_lead IS NOT NULL AND invalid_lead <> '' THEN 1 ELSE 0 END) AS invalid,
          SUM(CASE WHEN created_date >= (CURRENT_DATE - INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS last_30
        FROM customers
-       WHERE company_id = ?`,
+       WHERE company_id = ? AND deleted_at IS NULL`,
       [user.company_id],
     )
 
-    const customersBySourceWhere: string[] = ['c.company_id = ?']
+    const customersBySourceWhere: string[] = [
+      'c.company_id = ?',
+      'c.deleted_at IS NULL',
+    ]
     const customersBySourceParams: (string | number)[] = [user.company_id]
     if (fromDate) {
       customersBySourceWhere.push('DATE(c.created_date) >= ?')
@@ -330,7 +333,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       customersBySourceParams,
     )
 
-    const customersByRepWhere: string[] = ['c.company_id = ?']
+    const customersByRepWhere: string[] = ['c.company_id = ?', 'c.deleted_at IS NULL']
     const customersByRepParams: (string | number)[] = [user.company_id]
     if (fromDate) {
       customersByRepWhere.push('DATE(c.created_date) >= ?')
@@ -387,7 +390,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       customersTableParams,
     )
 
-    const customersDealsWhere: string[] = ['c.company_id = ?', 'd.deleted_at IS NULL']
+    const customersDealsWhere: string[] = [
+      'c.company_id = ?',
+      'c.deleted_at IS NULL',
+      'd.deleted_at IS NULL',
+    ]
     const customersDealsParams: (string | number)[] = [user.company_id]
     if (fromDate) {
       customersDealsWhere.push('DATE(d.created_at) >= ?')
@@ -414,7 +421,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const conversionMetricsWhere: string[] = [
       'c.company_id = ?',
+      'c.deleted_at IS NULL',
       'd.deleted_at IS NULL',
+      'dl.deleted_at IS NULL',
     ]
     const conversionMetricsParams: (string | number)[] = [user.company_id]
     if (fromDate) {
@@ -485,7 +494,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
        WHERE c.company_id = ?
+         AND c.deleted_at IS NULL
          AND d.deleted_at IS NULL
+         AND l.deleted_at IS NULL
          AND l.name = 'Closed Lost'
          AND d.lost_reason IS NOT NULL
          AND d.lost_reason <> ''${

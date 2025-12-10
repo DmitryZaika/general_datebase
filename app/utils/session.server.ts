@@ -5,6 +5,7 @@ import type { RowDataPacket } from 'mysql2'
 import { v4 as uuidv4 } from 'uuid'
 import { db } from '~/db.server'
 import { getSession } from '~/sessions.server'
+import { Positions } from '~/types'
 
 interface LoginUser {
   id: number
@@ -180,6 +181,27 @@ export async function getMarketingUser(
   companyId: number,
 ): Promise<SessionUserNew> {
   return await handlePermissionsNew(request, companyId, [7])
+}
+
+export async function getShopWorkerUser(request: Request): Promise<SessionUser> {
+  const cookie = request.headers.get('Cookie')
+  const session = await getSession(cookie)
+  const sessionId = session.get('sessionId')
+  if (sessionId === undefined) {
+    throw new TypeError('Session ID cannot be undefined')
+  }
+  const user = await getUser(sessionId)
+  if (user === undefined) {
+    throw new TypeError('Could not find session')
+  }
+  const [rows] = await db.query<RowDataPacket[]>(
+    `SELECT position_id FROM users_positions WHERE user_id = ? AND position_id = ? AND company_id = ?`,
+    [user.id, Positions.ShopWorker, user.company_id],
+  )
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new TypeError('Invalid user permissions')
+  }
+  return user
 }
 
 export async function getSuperUser(request: Request): Promise<SessionUser> {

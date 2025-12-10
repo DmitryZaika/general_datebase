@@ -1,0 +1,902 @@
+import { Calendar, MapPin, User, UserCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+    data,
+    Outlet,
+    useFetcher,
+    useLoaderData,
+    useLocation,
+    useNavigate,
+    type ActionFunctionArgs,
+    type LoaderFunctionArgs,
+} from 'react-router'
+import { AddSlabDialog } from '~/components/transactions/AddSlabDialogTransactions'
+import { ReplaceDialog } from '~/components/transactions/ReplaceDialog'
+import { RoomsSection } from '~/components/transactions/RoomsSection'
+import { Button } from '~/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
+import { db } from '~/db.server'
+import { useToast } from '~/hooks/use-toast'
+import { commitSession, getSession } from '~/sessions.server'
+import type { SaleDetails, SaleSink, SaleSlab } from '~/types/sales'
+import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
+
+function formatDate(dateString: string) {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const user = await getEmployeeUser(request)
+  if (!params.transactionId) {
+    return forceRedirectError(request.headers, 'No transaction ID provided')
+  }
+
+  const saleId = parseInt(params.transactionId, 10)
+  if (Number.isNaN(saleId)) {
+    return forceRedirectError(request.headers, 'Invalid transaction ID format')
+  }
+
+  const checkSales = await selectMany<{ id: number; company_id: number }>(
+    db,
+    `SELECT id, company_id FROM sales WHERE id = ?`,
+    [saleId],
+  )
+
+  if (checkSales.length === 0) {
+    return forceRedirectError(request.headers, 'Transaction does not exist in database')
+  }
+
+  if (checkSales[0].company_id !== user.company_id) {
+    return forceRedirectError(
+      request.headers,
+      'Transaction belongs to different company',
+    )
+  }
+
+  const sales = await selectMany<SaleDetails>(
+    db,
+    `SELECT
+      s.id, s.customer_id, c.name as customer_name,
+      s.sale_date, s.seller_id, u.name as seller_name, s.project_address
+     FROM sales s
+     JOIN customers c ON s.customer_id = c.id
+     JOIN users u ON s.seller_id = u.id
+     WHERE s.id = ? AND s.company_id = ?`,
+    [saleId, user.company_id],
+  )
+
+  const sale = sales[0]
+  if (!sale) {
+    return forceRedirectError(
+      request.headers,
+      'Transaction details could not be retrieved',
+    )
+  }
+
+  const slabs = await selectMany<SaleSlab>(
+    db,
+    `SELECT
+      slab_inventory.id,
+      slab_inventory.stone_id,
+      slab_inventory.bundle,
+      stones.name as stone_name,
+      slab_inventory.cut_date,
+      slab_inventory.notes,
+      slab_inventory.square_feet,
+      slab_inventory.room,
+      slab_inventory.parent_id,
+      (SELECT COUNT(*) FROM slab_inventory c WHERE c.parent_id = slab_inventory.id AND c.deleted_at IS NULL) as child_count
+     FROM slab_inventory
+     JOIN stones ON slab_inventory.stone_id = stones.id
+     WHERE slab_inventory.sale_id = ?
+     ORDER BY slab_inventory.id`,
+    [saleId],
+  )
+
+  const sinks = await selectMany<SaleSink>(
+    db,
+    `SELECT
+      sinks.id,
+      sinks.sink_type_id,
+      sink_type.name,
+      sinks.price,
+      sinks.is_deleted,
+      sinks.slab_id,
+      slab_inventory.room
+     FROM sinks
+     JOIN sink_type ON sinks.sink_type_id = sink_type.id
+     JOIN slab_inventory ON sinks.slab_id = slab_inventory.id
+     WHERE slab_inventory.sale_id = ? AND sinks.is_deleted = 0
+     ORDER BY sinks.id`,
+    [saleId],
+  )
+
+  return {
+    sale,
+    slabs,
+    sinks,
+    companyId: user.company_id,
+  }
+}
+
+export async function action({ request, params }: ActionFunctionArgs) {
+  const user = await getEmployeeUser(request)
+  if (!params.transactionId) {
+    return forceRedirectError(request.headers, 'No transaction ID provided')
+  }
+
+  const saleId = parseInt(params.transactionId, 10)
+  if (Number.isNaN(saleId)) {
+    return forceRedirectError(request.headers, 'Invalid transaction ID format')
+  }
+
+  const formData = await request.formData()
+  const intent = formData.get('intent')
+  if (intent === 'cut-slab') {
+    const slabIdValue = formData.get('slabId')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
+    }
+
+    const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
+      db,
+      `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      [slabId, saleId],
+    )
+
+    if (slabs.length === 0) {
+      return null
+    }
+
+    if (slabs[0].cut_date === null) {
+      await db.execute(`UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`, [
+        slabId,
+      ])
+      const session = await getSession(request.headers.get('Cookie'))
+      session.flash('message', toastData('Success', 'Slab marked as cut'))
+      return data({ success: true }, {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      })
+    }
+  } else if (intent === 'uncut-slab') {
+    const slabIdValue = formData.get('slabId')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
+    }
+
+    const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
+      db,
+      `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      [slabId, saleId],
+    )
+
+    if (slabs.length === 0) {
+      return null
+    }
+
+    if (slabs[0].cut_date !== null) {
+      await db.execute(`UPDATE slab_inventory SET cut_date = NULL WHERE id = ?`, [
+        slabId,
+      ])
+      const session = await getSession(request.headers.get('Cookie'))
+      session.flash('message', toastData('Success', 'Slab marked as uncut'))
+      return data({ success: true }, {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      })
+    }
+  } else if (intent === 'remove-slab') {
+    const slabIdValue = formData.get('slabId') ?? formData.get('id')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
+    }
+    await db.execute(`DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`, [slabId])
+    await db.execute(
+      `UPDATE slab_inventory
+         SET sale_id = NULL,
+             notes = NULL,
+             price = NULL,
+             square_feet = NULL,
+             cut_date = NULL,
+             room = NULL,
+             waterfall = NULL,
+             corbels = NULL,
+             seam = NULL,
+             stove = NULL,
+             extras = NULL,
+             room_uuid = NULL,
+             edge = NULL,
+             backsplash = NULL,
+             tear_out = NULL,
+             ten_year_sealer = NULL
+       WHERE id = ? AND sale_id = ?`,
+      [slabId, saleId],
+    )
+    const session = await getSession(request.headers.get('Cookie'))
+    session.flash('message', toastData('Success', 'Slab removed from sale'))
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
+  } else if (intent === 'remove-room') {
+    const room = formData.get('room') as string
+    if (!room) return null
+    const session = await getSession(request.headers.get('Cookie'))
+    await db.execute(
+      `UPDATE slab_inventory
+         SET room = NULL
+       WHERE sale_id = ? AND room = ?`,
+      [saleId, room],
+    )
+    session.flash('message', toastData('Success', `Room "${room}" removed`))
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
+  } else if (intent === 'replace-slab') {
+    const oldSlabId = Number(formData.get('oldSlabId'))
+    const newSlabId = Number(formData.get('newSlabId'))
+    if (!oldSlabId || !newSlabId) return null
+
+    const oldSlab = await selectMany<{
+      notes: string | null
+      price: number | null
+      square_feet: number | null
+      cut_date: string | null
+      room: string | null
+      room_uuid: string | null
+      seam: string | null
+      backsplash: string | null
+      tear_out: string | null
+      stove: string | null
+      ten_year_sealer: string | null
+      waterfall: string | null
+      corbels: string | null
+      extras: string | null
+      edge: string | null
+    }>(
+      db,
+      `SELECT notes, price, square_feet, cut_date, room, room_uuid, seam, backsplash, tear_out, stove, ten_year_sealer, waterfall, corbels, extras, edge
+         FROM slab_inventory
+        WHERE id = ? AND sale_id = ?`,
+      [oldSlabId, saleId],
+    )
+
+    const template = oldSlab[0] ?? {}
+
+    await db.execute(
+      `UPDATE slab_inventory
+         SET sale_id = ?,
+             room = ?,
+             room_uuid = ?,
+             seam = ?,
+             backsplash = ?,
+             tear_out = ?,
+             square_feet = ?,
+             stove = ?,
+             ten_year_sealer = ?,
+             waterfall = ?,
+             corbels = ?,
+             price = ?,
+             extras = ?,
+             edge = ?,
+             notes = ?,
+             cut_date = ?
+       WHERE id = ? AND sale_id IS NULL`,
+      [
+        saleId,
+        template.room ?? null,
+        template.room_uuid ?? null,
+        template.seam ?? null,
+        template.backsplash ?? null,
+        template.tear_out ?? null,
+        template.square_feet ?? null,
+        template.stove ?? null,
+        template.ten_year_sealer ?? null,
+        template.waterfall ?? null,
+        template.corbels ?? null,
+        template.price ?? null,
+        template.extras ?? null,
+        template.edge ?? null,
+        template.notes ?? null,
+        template.cut_date ?? null,
+        newSlabId,
+      ],
+    )
+
+    await db.execute(`DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`, [oldSlabId])
+
+    await db.execute(
+      `UPDATE slab_inventory
+         SET sale_id = NULL,
+             notes = NULL,
+             price = NULL,
+             square_feet = NULL,
+             cut_date = NULL,
+             room = NULL,
+             room_uuid = NULL,
+             seam = NULL,
+             backsplash = NULL,
+             tear_out = NULL,
+             stove = NULL,
+             ten_year_sealer = NULL,
+             waterfall = NULL,
+             corbels = NULL,
+             extras = NULL,
+             edge = NULL
+       WHERE id = ? AND sale_id = ?`,
+      [oldSlabId, saleId],
+    )
+
+    const session = await getSession(request.headers.get('Cookie'))
+    session.flash('message', toastData('Success', 'Slab replaced'))
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
+  } else if (intent === 'add-slab') {
+    const slabId = Number(formData.get('slabId'))
+    const room = (formData.get('room') as string) || null
+    if (!slabId || !room) return null
+
+    const [templateRows] = await db.execute(
+      `SELECT room_uuid, seam, room, backsplash, tear_out, square_feet, stove, ten_year_sealer, waterfall, corbels, price, extras, edge
+         FROM slab_inventory
+        WHERE sale_id = ? AND (room = ? OR ? IS NULL)
+        ORDER BY id
+        LIMIT 1`,
+      [saleId, room, room],
+    )
+    const template =
+      Array.isArray(templateRows) && templateRows.length > 0
+        ? (templateRows as any[])[0]
+        : null
+
+    await db.execute(
+      `UPDATE slab_inventory
+         SET sale_id = ?,
+             room = ?,
+             room_uuid = ?,
+             seam = ?,
+             backsplash = ?,
+             tear_out = ?,
+             square_feet = ?,
+             stove = ?,
+             ten_year_sealer = ?,
+             waterfall = ?,
+             corbels = ?,
+             price = ?,
+             extras = ?,
+             edge = ?,
+             notes = NULL,
+             cut_date = NULL
+       WHERE id = ? AND sale_id IS NULL`,
+      [
+        saleId,
+        room,
+        template?.room_uuid ?? null,
+        template?.seam ?? null,
+        template?.backsplash ?? null,
+        template?.tear_out ?? null,
+        template?.square_feet ?? null,
+        template?.stove ?? null,
+        template?.ten_year_sealer ?? null,
+        template?.waterfall ?? null,
+        template?.corbels ?? null,
+        template?.price ?? null,
+        template?.extras ?? null,
+        template?.edge ?? null,
+        slabId,
+      ],
+    )
+    const session = await getSession(request.headers.get('Cookie'))
+    session.flash('message', toastData('Success', 'Slab added to sale'))
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
+  } else {
+    return null
+  }
+
+  const remaining = await selectMany<{ count: number }>(
+    db,
+    `SELECT COUNT(*) as count FROM slab_inventory WHERE sale_id = ? AND cut_date IS NULL AND deleted_at IS NULL`,
+    [saleId],
+  )
+
+  const remainingCount = remaining[0]?.count ?? 0
+  const status = remainingCount > 0 ? 'partially cut' : 'cut'
+  await db.execute(`UPDATE sales SET status = ? WHERE id = ?`, [status, saleId])
+
+  return null
+}
+
+export default function ViewTransaction() {
+  const { sale, slabs, sinks, companyId } = useLoaderData<typeof loader>()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [replaceDialogOpen, setReplaceDialogOpen] = useState(false)
+  const [replaceTarget, setReplaceTarget] = useState<SaleSlab | null>(null)
+  const [replaceOptions, setReplaceOptions] = useState<
+    { id: number; bundle: string; is_leftover: boolean }[]
+  >([])
+  const [replaceLoading, setReplaceLoading] = useState(false)
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [addSearch, setAddSearch] = useState('')
+  const [addStones, setAddStones] = useState<
+    { id: number; name: string; url: string | null }[]
+  >([])
+  const [addStoneId, setAddStoneId] = useState<number | null>(null)
+  const [addSlabs, setAddSlabs] = useState<
+    { id: number; bundle: string; is_leftover: boolean }[]
+  >([])
+  const [addLoading, setAddLoading] = useState(false)
+  const [addSlabsLoading, setAddSlabsLoading] = useState(false)
+  const [addRoom, setAddRoom] = useState<string | null>(null)
+  const [newRoomName, setNewRoomName] = useState('')
+  const openAddDialog = () => {
+    const defaultStone = slabs[0]?.stone_name || ''
+    setAddSearch(defaultStone)
+    setAddStoneId(null)
+    setAddSlabs([])
+    setAddDialogOpen(true)
+  }
+  const currentSlabIds = slabs.map(s => s.id)
+
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      navigate(`/employee/transactions${location.search}`)
+    }
+  }
+
+  const slabsByRoom = useMemo(
+    () =>
+      slabs.reduce<Record<string, SaleSlab[]>>((acc, slab) => {
+        const key = slab.room || 'Room'
+        acc[key] = acc[key] || []
+        acc[key].push(slab)
+        return acc
+      }, {}),
+    [slabs],
+  )
+  const sinksByRoom = useMemo(
+    () =>
+      sinks.reduce<Record<string, { name: string; count: number }[]>>((acc, sink) => {
+        const room = sink.room || 'Room'
+        acc[room] = acc[room] || []
+        const existing = acc[room].find(item => item.name === sink.name)
+        if (existing) existing.count += 1
+        else acc[room].push({ name: sink.name, count: 1 })
+        return acc
+      }, {}),
+    [sinks],
+  )
+  const sinksBySlab = useMemo(
+    () =>
+      sinks.reduce<Record<number, SaleSink[]>>((acc, sink) => {
+        acc[sink.slab_id] = acc[sink.slab_id] || []
+        acc[sink.slab_id].push(sink)
+        return acc
+      }, {}),
+    [sinks],
+  )
+
+  const submitAction = async (payload: Record<string, string | number | null>) => {
+    const formData = new FormData()
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) formData.append(key, String(value))
+    })
+    await fetch(location.pathname + location.search, {
+      method: 'POST',
+      body: formData,
+    })
+    navigate(location.pathname + location.search, { replace: true })
+  }
+
+  const handleCut = (slab: SaleSlab) => {
+    submitAction({
+      intent: slab.cut_date ? 'uncut-slab' : 'cut-slab',
+      slabId: slab.id,
+    })
+  }
+
+  const { toast } = useToast()
+  type LocalRoom = { id: string; name: string }
+  const [localRooms, setLocalRooms] = useState<LocalRoom[]>([])
+  const [roomOrder, setRoomOrder] = useState<string[]>([])
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<SaleSlab | null>(null)
+  const removeFetcher = useFetcher<typeof action>()
+
+  useEffect(() => {
+    const slabRooms = slabs.map(s => s.room || 'Room')
+    const localNames = localRooms.map(r => r.name)
+    setRoomOrder(prev => {
+      const active = new Set([...slabRooms, ...localNames])
+      const next: string[] = []
+      prev.forEach(name => {
+        if (active.has(name) && !next.includes(name)) next.push(name)
+      })
+      slabRooms.forEach(name => {
+        if (!next.includes(name)) next.push(name)
+      })
+      localNames.forEach(name => {
+        if (!next.includes(name)) next.push(name)
+      })
+      return next
+    })
+  }, [slabs, localRooms])
+
+  const roomEntries = useMemo(() => {
+    const items: { id: string; name: string; slabs: SaleSlab[]; isLocal: boolean }[] = []
+    const localMap = new Map(localRooms.map(r => [r.name, r]))
+    const addRoomEntry = (name: string) => {
+      if (items.some(r => r.name === name)) return
+      const slabList = slabsByRoom[name]
+      if (slabList) {
+        items.push({ id: name, name, slabs: slabList, isLocal: false })
+        return
+      }
+      const local = localMap.get(name)
+      if (local) {
+        items.push({ id: local.id, name: local.name, slabs: [], isLocal: true })
+      }
+    }
+    roomOrder.forEach(addRoomEntry)
+    Object.keys(slabsByRoom).forEach(addRoomEntry)
+    localRooms.forEach(r => addRoomEntry(r.name))
+    return items
+  }, [roomOrder, slabsByRoom, localRooms])
+
+  const allRooms = useMemo(() => roomEntries.map(r => r.name), [roomEntries])
+
+  const handleRemove = (slab: SaleSlab) => {
+    if (slabs.length <= 1) {
+      toast({ title: 'Cannot remove last slab', variant: 'destructive' })
+      return
+    }
+    setRemoveTarget(slab)
+    setRemoveDialogOpen(true)
+  }
+
+  useEffect(() => {
+    if (removeFetcher.state === 'idle' && removeFetcher.data?.success) {
+      setRemoveDialogOpen(false)
+      setRemoveTarget(null)
+    }
+  }, [removeFetcher.state, removeFetcher.data])
+
+  const openReplace = async (slab: SaleSlab) => {
+    setReplaceTarget(slab)
+    setReplaceOptions([])
+    setReplaceDialogOpen(true)
+    setReplaceLoading(true)
+    try {
+      const res = await fetch(
+        `/api/stones/${slab.stone_id}/slabs?exclude=${encodeURIComponent(
+          JSON.stringify(currentSlabIds),
+        )}`,
+      )
+      const json = await res.json()
+      setReplaceOptions(json.slabs || [])
+    } finally {
+      setReplaceLoading(false)
+    }
+  }
+
+  const handleReplaceChoose = async (newSlabId: number) => {
+    if (!replaceTarget) return
+    setReplaceDialogOpen(false)
+    setReplaceTarget(null)
+    await submitAction({
+      intent: 'replace-slab',
+      oldSlabId: replaceTarget.id,
+      newSlabId,
+    })
+  }
+
+  const searchAddStones = async (term: string) => {
+    setAddLoading(true)
+    try {
+      const res = await fetch(
+        `/api/stones/search/${companyId}?name=${encodeURIComponent(term)}&show_sold_out=true`,
+      )
+      const json = await res.json()
+      setAddStones(json.stones || [])
+    } finally {
+      setAddLoading(false)
+    }
+  }
+
+  const loadAddSlabs = async (stoneId: number) => {
+    setAddSlabsLoading(true)
+    try {
+      const res = await fetch(
+        `/api/stones/${stoneId}/slabs?exclude=${encodeURIComponent(
+          JSON.stringify(currentSlabIds),
+        )}`,
+      )
+      const json = await res.json()
+      setAddSlabs(json.slabs || [])
+    } finally {
+      setAddSlabsLoading(false)
+    }
+  }
+
+  const handleAddStoneSelect = (stoneId: number) => {
+    setAddStoneId(stoneId)
+    setAddSlabs([])
+    loadAddSlabs(stoneId)
+  }
+
+  const resetAddDialog = () => {
+    setAddDialogOpen(false)
+    setAddStoneId(null)
+    setAddSlabs([])
+    setAddSearch('')
+    setAddRoom(null)
+  }
+
+  const handleAddSlab = async (slabId: number) => {
+    if (!addRoom) return
+    await submitAction({
+      intent: 'add-slab',
+      slabId,
+      room: addRoom,
+    })
+    setLocalRooms(prev => prev.filter(r => r.name !== addRoom))
+    resetAddDialog()
+  }
+
+  const isRoomNameTaken = (name: string, excludeId?: string) => {
+    const normalized = name.trim().toLowerCase()
+    if (!normalized) return false
+    const realTaken = Object.keys(slabsByRoom).some(r => r.toLowerCase() === normalized)
+    const localTaken = localRooms.some(
+      r => r.id !== excludeId && r.name.trim().toLowerCase() === normalized,
+    )
+    return realTaken || localTaken
+  }
+
+  const handleRenameRoom = (id: string, name: string) => {
+    if (isRoomNameTaken(name, id)) return
+    setLocalRooms(prev => prev.map(r => (r.id === id ? { ...r, name } : r)))
+  }
+
+  const handleRemoveLocalRoom = (id: string) => {
+    setLocalRooms(prev => prev.filter(r => r.id !== id))
+  }
+
+  const handleAddRoom = (name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    if (isRoomNameTaken(trimmed)) {
+      toast({ title: 'Room name already exists', variant: 'destructive' })
+      return
+    }
+    const id = `${Date.now()}-${Math.random()}`
+    setLocalRooms(prev => [...prev, { id, name: trimmed }])
+    setRoomOrder(prev => (prev.includes(trimmed) ? prev : [...prev, trimmed]))
+    setNewRoomName('')
+  }
+
+  const handleSubmitNewRoom = () => {
+    const name = newRoomName.trim()
+    if (!name) return
+    if (isRoomNameTaken(name)) {
+      toast({ title: 'Room name already exists', variant: 'destructive' })
+      return
+    }
+    handleAddRoom(name)
+  }
+
+  useEffect(() => {
+    if (!addDialogOpen || !addRoom) return
+    const term = addSearch.trim()
+    if (!term) {
+      setAddStones([])
+      return
+    }
+    const timer = setTimeout(() => {
+      searchAddStones(term)
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [addSearch, addDialogOpen, addRoom])
+
+  return (
+    <Dialog open={true} onOpenChange={handleDialogClose}>
+      <DialogContent className='min-w-[500px] max-w-6xl max-h-[90vh] overflow-y-auto'>
+        <DialogHeader>
+          <DialogTitle>Transaction Details</DialogTitle>
+        </DialogHeader>
+
+        <div className='flex flex-col gap-6 py-4'>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-6 items-start'>
+            <Card>
+              <CardHeader className='pb-2'>
+                <CardTitle className='text-lg font-semibold flex items-center gap-2'>
+                  Sale Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className='grid gap-4 text-sm'>
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <User className='h-4 w-4' />
+                      <span>Customer</span>
+                    </div>
+                    <span className='font-medium'>{sale.customer_name}</span>
+                  </div>
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <Calendar className='h-4 w-4' />
+                      <span>Sale Date</span>
+                    </div>
+                    <span className='font-medium'>{formatDate(sale.sale_date)}</span>
+                  </div>
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <UserCircle className='h-4 w-4' />
+                      <span>Sold By</span>
+                    </div>
+                    <span className='font-medium'>{sale.seller_name}</span>
+                  </div>
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <MapPin className='h-4 w-4' />
+                      <span>Project Address</span>
+                    </div>
+                    <span className='font-medium text-right'>
+                      {sale.project_address || 'No address'}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className='pb-2'>
+                <CardTitle className='text-lg font-semibold'>Room Sinks</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {Object.keys(sinksByRoom).length === 0 ? (
+                  <p className='text-sm text-muted-foreground py-2'>No sinks</p>
+                ) : (
+                  <div className='space-y-2'>
+                    {Object.entries(sinksByRoom).map(([room, list]) => (
+                      <div key={room} className='flex justify-between items-center'>
+                        <span className='font-semibold'>
+                          {room.charAt(0).toUpperCase() + room.slice(1)}
+                        </span>
+                        <div className='flex flex-wrap gap-2 text-sm text-muted-foreground justify-end'>
+                          {list.map(item => (
+                            <span key={item.name} className='px-2 py-1 rounded bg-muted'>
+                              {item.name}
+                              {item.count > 1 ? ` x${item.count}` : ''}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+          </div>
+
+          <Card>
+            <CardHeader className='pb-2'>
+              <CardTitle className='text-lg font-semibold'>Rooms</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RoomsSection
+                roomEntries={roomEntries}
+                slabsCount={slabs.length}
+                localRoomsCount={localRooms.length}
+                allRooms={allRooms}
+                onRenameRoom={handleRenameRoom}
+                onRemoveLocalRoom={handleRemoveLocalRoom}
+                onAddRoom={handleAddRoom}
+                newRoomName={newRoomName}
+                onNewRoomNameChange={setNewRoomName}
+                handleCut={handleCut}
+                openReplace={openReplace}
+                handleRemove={handleRemove}
+                formatDate={formatDate}
+                onReplaceBlocked={() =>
+                  toast({
+                    title: 'Uncut slab before replace',
+                    variant: 'destructive',
+                  })
+                }
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className='flex justify-end mt-4 gap-2'>
+          <Button onClick={openAddDialog}>
+            Add Slab
+          </Button>
+          <Button
+            variant='outline'
+            onClick={() => navigate(`/employee/transactions${location.search}`)}
+          >
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+      <ReplaceDialog
+        open={replaceDialogOpen}
+        onOpenChange={setReplaceDialogOpen}
+        target={replaceTarget}
+        options={replaceOptions}
+        loading={replaceLoading}
+        onChoose={handleReplaceChoose}
+      />
+      <AddSlabDialog
+        open={addDialogOpen}
+        onOpenChange={open => (open ? setAddDialogOpen(true) : resetAddDialog())}
+        addRoom={addRoom}
+        allRooms={allRooms}
+        addSearch={addSearch}
+        setAddSearch={setAddSearch}
+        addLoading={addLoading}
+        addStones={addStones}
+        addStoneId={addStoneId}
+        onSelectStone={handleAddStoneSelect}
+        addSlabs={addSlabs}
+        addSlabsLoading={addSlabsLoading}
+        onSelectSlab={handleAddSlab}
+        onSelectRoom={setAddRoom}
+      />
+      {removeDialogOpen && removeTarget && (
+        <Dialog
+          open={removeDialogOpen}
+          onOpenChange={open => {
+            setRemoveDialogOpen(open)
+            if (!open) setRemoveTarget(null)
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Remove Slab</DialogTitle>
+              <p className='text-sm text-muted-foreground'>
+                Are you sure you want to remove slab {removeTarget.bundle} from this sale?
+              </p>
+            </DialogHeader>
+            <div className='flex justify-end gap-2'>
+              <Button
+                variant='outline'
+                onClick={() => {
+                  setRemoveDialogOpen(false)
+                  setRemoveTarget(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <removeFetcher.Form method='post'>
+                <input type='hidden' name='intent' value='remove-slab' />
+                <input type='hidden' name='slabId' value={removeTarget.id} />
+                <Button type='submit' variant='destructive' autoFocus>
+                  Delete
+                </Button>
+              </removeFetcher.Form>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+      <Outlet />
+    </Dialog>
+  )
+}
