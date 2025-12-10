@@ -47,13 +47,18 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const customerId = result.insertId
 
-  // const [[row]] = await db.query(
-  //   'SELECT COALESCE(MAX(position),0)+1 AS next FROM deals WHERE list_id = 1 AND deleted_at IS NULL',
-  // )
-  // await db.execute(
-  //   'INSERT INTO deals (customer_id,status,list_id,position) VALUES (?,?,1,?)',
-  //   [customerId, 'new', row.next],
-  // )
+  if (salesRep) {
+    const listId = 1
+    const [posRows] = await db.query<RowDataPacket[]>(
+      'SELECT COALESCE(MAX(position),0)+1 AS next FROM deals WHERE list_id = ? AND deleted_at IS NULL',
+      [listId],
+    )
+    const nextPos = posRows[0]?.next ?? 1
+    await db.execute(
+      'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
+      [customerId, 'New Customer', listId, nextPos, salesRep],
+    )
+  }
 
   return data({
     success: true,

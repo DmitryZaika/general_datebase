@@ -1,4 +1,4 @@
-import { Calendar, User, UserCircle } from 'lucide-react'
+import { Calendar, MapPin, User, UserCircle } from 'lucide-react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -39,6 +39,7 @@ interface SaleDetails {
   sale_date: string
   seller_id: number
   seller_name: string
+  project_address: string | null
 }
 
 interface SaleSlab {
@@ -109,7 +110,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     db,
     `SELECT
       s.id, s.customer_id, c.name as customer_name,
-      s.sale_date, s.seller_id, u.name as seller_name
+      s.sale_date, s.seller_id, u.name as seller_name, s.project_address
      FROM sales s
      JOIN customers c ON s.customer_id = c.id
      JOIN users u ON s.seller_id = u.id
@@ -288,6 +289,15 @@ export default function ViewTransaction() {
                       <span>Sold By</span>
                     </div>
                     <span className='font-medium'>{sale.seller_name}</span>
+                  </div>
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <MapPin className='h-4 w-4' />
+                      <span>Project Address</span>
+                    </div>
+                    <span className='font-medium text-right'>
+                      {sale.project_address || 'No address'}
+                    </span>
                   </div>
                 </div>
               </CardContent>

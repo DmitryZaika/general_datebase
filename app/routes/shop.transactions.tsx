@@ -1,49 +1,32 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { Calendar, MoreHorizontal, Search } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Search } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  type ActionFunctionArgs,
-  Form,
-  Link,
-  type LoaderFunctionArgs,
-  Outlet,
-  redirect,
-  useLoaderData,
-  useLocation,
-  useNavigate,
-  useSearchParams,
+    type ActionFunctionArgs,
+    Link,
+    type LoaderFunctionArgs,
+    Outlet,
+    redirect,
+    useLoaderData,
+    useLocation,
+    useNavigate,
+    useSearchParams
 } from 'react-router'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { PageLayout } from '~/components/PageLayout'
-import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu'
 import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from '~/components/ui/select'
-import { Switch } from '~/components/ui/switch'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getShopWorkerUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
 interface Transaction {
@@ -54,6 +37,7 @@ interface Transaction {
   bundle: string
   bundle_with_cut: string
   stone_name: string
+  project_address?: string | null
   sf?: number
   all_cut?: number
   any_cut?: number
@@ -82,7 +66,7 @@ function formatDate(dateString: string) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getEmployeeUser(request)
+    const user = await getShopWorkerUser(request)
     if (!user || !user.company_id) {
       return redirect('/login')
     }
@@ -90,7 +74,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const companyId = user.company_id
     const url = new URL(request.url)
 
-    const searchTerm = url.searchParams.get('search') || ''
     const salesRep = url.searchParams.get('salesRep') || 'All'
     const status = url.searchParams.get('status') || 'in_progress'
 
@@ -105,6 +88,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         s.installed_date,
         GROUP_CONCAT(DISTINCT CONCAT(st.name, ':', IF(si.deleted_at IS NOT NULL, 'DELETED', 'ACTIVE'))) as stone_name,
         s.square_feet as sf,
+        s.project_address,
         GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'), ':', IF(si.deleted_at IS NOT NULL, 'DELETED', 'ACTIVE'))) as bundle_with_cut,
         MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) as all_cut,
         MAX(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as any_cut,
@@ -135,17 +119,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       query += ' AND s.installed_date IS NULL AND s.cancelled_date IS NULL'
     } else if (status === 'finished') {
       query += ' AND (s.installed_date IS NOT NULL OR s.cancelled_date IS NOT NULL)'
-    }
-
-    if (searchTerm) {
-      query += ` AND (
-        c.name LIKE ? OR
-        u.name LIKE ? OR
-        si.bundle LIKE ? OR
-        st.name LIKE ?
-      )`
-      const searchPattern = `%${searchTerm}%`
-      queryParams.push(searchPattern, searchPattern, searchPattern, searchPattern)
     }
 
     query += `
@@ -220,7 +193,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       transactions: updatedTransactions,
       salesReps,
       filters: {
-        search: searchTerm,
         salesRep,
         status,
       },
@@ -231,7 +203,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await getEmployeeUser(request)
+  const user = await getShopWorkerUser(request)
   if (!user || !user.company_id) {
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Error', 'Unauthorized', 'destructive'))
@@ -366,11 +338,11 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function EmployeeTransactions() {
   const { transactions, salesReps, filters } = useLoaderData<typeof loader>()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [searchValue, setSearchValue] = useState(filters.search)
-  const [customers, setCustomers] = useState<{ id: number; name: string }[]>([])
-  const [showCustomers, setShowCustomers] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const searchRef = useRef<HTMLDivElement>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isInputFocused, setIsInputFocused] = useState(false)
   const [installDialogOpen, setInstallDialogOpen] = useState(false)
   const [selectedTransactionId, setSelectedTransactionId] = useState<number | null>(
     null,
@@ -380,80 +352,37 @@ export default function EmployeeTransactions() {
   )
   const [isPaid, setIsPaid] = useState(true)
 
-  // Fetch customers when search value changes
-  useEffect(() => {
-    // Only search when there's at least 2 characters to avoid excessive API calls
-    if (searchValue.length >= 2) {
-      const fetchCustomers = async () => {
-        try {
-          const response = await fetch(
-            `/api/customers/search?term=${encodeURIComponent(searchValue)}`,
-          )
-          if (response.ok) {
-            const data = await response.json()
-            setCustomers(data.customers || [])
-            setShowCustomers(data.customers && data.customers.length > 0)
-          } else {
-            setCustomers([])
-            setShowCustomers(false)
-          }
-        } catch {
-          setCustomers([])
-          setShowCustomers(false)
-        }
-      }
-
-      fetchCustomers()
-    } else {
-      setCustomers([])
-      setShowCustomers(false)
-    }
-  }, [searchValue])
-
   const handleSalesRepChange = (value: string) => {
-    searchParams.set('salesRep', value)
-    setSearchParams(searchParams)
+    const next = new URLSearchParams(searchParams)
+    next.set('salesRep', value)
+    setSearchParams(next)
   }
 
   const handleStatusChange = (value: string) => {
-    searchParams.set('status', value)
-    setSearchParams(searchParams)
+    const next = new URLSearchParams(searchParams)
+    next.set('status', value)
+    setSearchParams(next)
   }
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    searchParams.set('search', searchValue)
-    setSearchParams(searchParams)
-    setShowCustomers(false)
-  }
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsInputFocused(false)
+      }
+    }
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchValue(e.target.value)
-  }
-
-  const handleSelectCustomer = (customer: { id: number; name: string }) => {
-    setSearchValue(customer.name)
-    searchParams.set('search', customer.name)
-    setSearchParams(searchParams)
-    setShowCustomers(false)
-  }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   const handleRowClick = (id: number) => {
     navigate(`edit/${id}${location.search}`)
   }
 
-  const openInstallDialog = (id: number) => {
-    setSelectedTransactionId(id)
-    setInstallDate(new Date().toISOString().slice(0, 10)) // Reset to today
-    setIsPaid(true) // Reset paid to default true
-    setInstallDialogOpen(true)
-  }
-
-  const handleFormSubmit = () => {
-    // Закрываем диалог перед отправкой формы
-    setInstallDialogOpen(false)
-    // Не прерываем стандартную отправку формы
-  }
+  
+ 
 
   const transactionColumns: ColumnDef<Transaction>[] = [
     {
@@ -490,7 +419,6 @@ export default function EmployeeTransactions() {
         if (!stonesArr.length) return <span>N/A</span>
 
         const stoneCounts: { [key: string]: number } = {}
-        const stoneStatus: { [key: string]: boolean } = {}
 
         stonesArr.forEach(item => {
           const [stone, status] = item.split(':')
@@ -602,50 +530,9 @@ export default function EmployeeTransactions() {
         return <span className={colorClass}>{row.original.status}</span>
       },
     },
-    {
-      id: 'actions',
-      cell: ({ row }) => {
-        const isInstalled = row.original.installed_date !== null
-        const isCancelled = row.original.cancelled_date !== null
-        const allCut = row.original.all_cut === 1
-
-        const canInstall = allCut && !isInstalled && !isCancelled
-
-        return (
-          <div
-            className='flex items-center justify-center'
-            onClick={e => e.stopPropagation()}
-          >
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant='ghost' className='h-8 w-8 p-0'>
-                  <span className='sr-only'>Open menu</span>
-                  <MoreHorizontal className='h-4 w-4' />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align='end'>
-                <DropdownMenuItem
-                  onClick={e => {
-                    e.stopPropagation()
-                    openInstallDialog(row.original.id)
-                  }}
-                  disabled={!canInstall}
-                  className={!canInstall ? 'opacity-50 cursor-not-allowed' : ''}
-                >
-                  Mark as Installed
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href={`/api/pdf/${row.original.id}`}>Contract</a>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )
-      },
-    },
+   
   ]
 
-  const formAction = `/employee/transactions${location.search}`
 
   return (
     <>
@@ -668,7 +555,6 @@ export default function EmployeeTransactions() {
                   </SelectContent>
                 </Select>
               </div>
-
               <div className='w-1/8 min-w-[120px]'>
                 <div className='mb-1 text-sm font-medium'>Status</div>
                 <Select value={filters.status} onValueChange={handleStatusChange}>
@@ -684,36 +570,55 @@ export default function EmployeeTransactions() {
               </div>
             </div>
           </div>
-          <div className='relative'>
-            <form onSubmit={handleSearchSubmit} className='flex items-center gap-2'>
-              <div className='relative'>
-                <Search className='absolute left-2 top-2.5 h-4 w-4 text-gray-500' />
-                <Input
-                  placeholder='Search transactions...'
-                  value={searchValue}
-                  onChange={handleSearchChange}
-                  className='pl-8 w-64'
-                />
-                {showCustomers && customers.length > 0 && (
-                  <div className='absolute z-10 w-full mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg'>
-                    <ul className='py-1 divide-y divide-gray-200'>
-                      {customers.map(customer => (
-                        <li
-                          key={customer.id}
-                          className='px-4 py-2 hover:bg-gray-50 cursor-pointer'
-                          onClick={() => handleSelectCustomer(customer)}
-                        >
-                          {customer.name}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+          <div ref={searchRef} className='relative w-80'>
+            <div className='relative'>
+              <Input
+                type='text'
+                placeholder='Search transactions...'
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                onFocus={() => setIsInputFocused(true)}
+                className='pr-10 py-2 rounded-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition'
+              />
+              <div className='absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-500'>
+                <Search />
               </div>
-              <Button type='submit' variant='outline' size='sm'>
-                Search
-              </Button>
-            </form>
+            </div>
+            {isInputFocused && searchTerm && (
+              <div className='absolute z-50 w-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'>
+                {transactions
+                  .filter(tx => {
+                    const term = searchTerm.toLowerCase()
+                    return (
+                      tx.customer_name.toLowerCase().includes(term) ||
+                      tx.seller_name.toLowerCase().includes(term) ||
+                      (tx.bundle || '').toLowerCase().includes(term) ||
+                      (tx.stone_name || '').toLowerCase().includes(term)
+                    )
+                  })
+                  .slice(0, 20)
+                  .map(tx => (
+                    <div
+                      key={tx.id}
+                      onClick={() => {
+                        navigate(`edit/${tx.id}${location.search}`)
+                        setIsInputFocused(false)
+                        setSearchTerm('')
+                      }}
+                      className='p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none'
+                    >
+                      <div className='font-medium text-gray-800'>{tx.customer_name}</div>
+                      <div className='text-xs text-gray-500 flex justify-between'>
+                        <span>{formatDate(tx.sale_date)}</span>
+                        <span>{tx.seller_name}</span>
+                      </div>
+                      <div className='text-xs text-gray-500 truncate'>
+                        {tx.project_address || 'No address'}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         </div>
         <DataTable
@@ -727,75 +632,6 @@ export default function EmployeeTransactions() {
           pageSize={50}
         />
       </PageLayout>
-
-      <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mark Transaction as Installed</DialogTitle>
-          </DialogHeader>
-
-          <Form method='post' action={formAction} onSubmit={handleFormSubmit}>
-            <input type='hidden' name='intent' value='mark-installed' />
-            <input
-              type='hidden'
-              name='transactionId'
-              value={selectedTransactionId?.toString() || ''}
-            />
-
-            <div className='py-4 space-y-4'>
-              <div className='flex items-center gap-4'>
-                <Label htmlFor='installation-date' className='text-right w-[140px]'>
-                  Installation Date
-                </Label>
-                <div className='relative '>
-                  <Calendar className='absolute left-3 top-2.5 h-4 w-4 text-gray-500' />
-                  <Input
-                    id='installation-date'
-                    name='installedDate'
-                    type='date'
-                    value={installDate}
-                    onChange={e => setInstallDate(e.target.value)}
-                    className='pl-10'
-                  />
-                </div>
-              </div>
-
-              <div className='flex items-center gap-4'>
-                <Label htmlFor='paid-switch' className='text-right w-[140px]'>
-                  Paid
-                </Label>
-                <div className='flex items-center gap-2'>
-                  <input
-                    type='hidden'
-                    name='isPaid'
-                    value={isPaid ? 'true' : 'false'}
-                  />
-                  <Switch
-                    id='paid-switch'
-                    checked={isPaid}
-                    onCheckedChange={setIsPaid}
-                  />
-                  <span className='text-sm text-gray-500'>
-                    {isPaid ? 'Mark as paid on same date' : 'Do not mark as paid'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type='button'
-                variant='outline'
-                onClick={() => setInstallDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type='submit'>Confirm</Button>
-            </DialogFooter>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
       <Outlet />
     </>
   )

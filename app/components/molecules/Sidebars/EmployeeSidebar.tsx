@@ -64,6 +64,20 @@ const getItems = (
   faucetSuppliers?: ISupplier[] | undefined,
   companyId?: number | string,
 ) => {
+  if (base === 'shop') {
+    return [
+      {
+        title: 'Transactions',
+        url: '/shop/transactions',
+        icon: DollarSign,
+      },
+      {
+        title: 'Samples',
+        url: '/shop/samples',
+        icon: Package,
+      },
+    ]
+  }
   const isCustomerRoute = base === 'customer'
   const finalList: ISidebarItem[] = [
     {
