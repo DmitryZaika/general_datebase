@@ -86,7 +86,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         s.cancelled_date,
         s.installed_date,
         GROUP_CONCAT(DISTINCT CONCAT(st.name, ':', IF(si.deleted_at IS NOT NULL, 'DELETED', 'ACTIVE'))) as stone_name,
-        s.square_feet as sf,
+        (
+          SELECT SUM(room_sqft)
+          FROM (
+            SELECT
+              MAX(si2.square_feet) as room_sqft
+            FROM slab_inventory si2
+            WHERE si2.sale_id = s.id
+            GROUP BY
+              CASE
+                WHEN si2.room_uuid IS NOT NULL THEN CONCAT('uuid:', HEX(si2.room_uuid))
+                WHEN COALESCE(NULLIF(TRIM(si2.room), ''), '') <> '' THEN CONCAT(
+                  'room:',
+                  LOWER(TRIM(si2.room)),
+                  ':bundle:',
+                  COALESCE(si2.bundle, ''),
+                  ':slab:',
+                  si2.id
+                )
+                ELSE CONCAT('bundle:', COALESCE(si2.bundle, ''), ':slab:', si2.id)
+              END
+          ) room_totals
+        ) as sf,
         s.project_address,
         GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'), ':', IF(si.deleted_at IS NOT NULL, 'DELETED', 'ACTIVE'))) as bundle_with_cut,
         MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) as all_cut,

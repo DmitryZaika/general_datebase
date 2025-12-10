@@ -20,6 +20,7 @@ export interface SaleSlab {
   width?: number | null
   price?: number | null
   room: string | null
+  room_uuid?: string | null
   parent_id: number | null
   child_count: number
 }
@@ -32,5 +33,6 @@ export interface SaleSink {
   is_deleted: number
   slab_id: number
   room: string | null
+  room_uuid?: string | null
 }
 
