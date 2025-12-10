@@ -139,7 +139,8 @@ const CustomerManager = ({
         {selectedCustomer &&
           currentCustomer &&
           ((currentCustomer.email ?? '') === '' ||
-            (currentCustomer.address ?? '') === '') && (
+            (currentCustomer.address ?? '') === '' ||
+            (currentCustomer.phone ?? '') === '') && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
