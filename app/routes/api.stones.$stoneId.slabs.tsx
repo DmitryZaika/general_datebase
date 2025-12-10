@@ -41,6 +41,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       )
       AND sale_id IS NULL
       AND cut_date IS NULL
+      AND deleted_at IS NULL
     `
 
     const queryParams = [stoneId, stoneId]
