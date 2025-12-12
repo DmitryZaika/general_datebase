@@ -10,16 +10,9 @@ import { Checkbox } from '~/components/ui/checkbox'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
 import { gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
-import { useOfflineChecklistSync } from '~/hooks/useOfflineChecklistSync'
 import { useToast } from '~/hooks/use-toast'
+import { useChecklistQueue } from '~/hooks/useChecklistQueue'
 import { type ChecklistFormData, checklistResolver } from '~/schemas/checklist'
-import {
-  clearPending,
-  getPending,
-  NetworkError,
-  OfflineError,
-  savePending,
-} from '~/utils/offlineChecklistQueue'
 import { getEmployeeUser } from '~/utils/session.server'
 
 // Static checklist labels mapped to form keys (defined after FormData type)
@@ -49,25 +42,24 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 }
 
+class NetworkError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'NetworkError'
+  }
+}
+
+class OfflineError extends Error {
+  constructor() {
+    super('Device is offline')
+    this.name = 'OfflineError'
+  }
+}
+
 const submitChecklist = async (formData: ChecklistFormData, companyId: number) => {
   if (!navigator.onLine) {
-    savePending({
-      data: formData,
-      companyId,
-      timestamp: Date.now(),
-      attempts: 0,
-      lastAttempt: null,
-    })
     throw new OfflineError()
   }
-
-  savePending({
-    data: formData,
-    companyId,
-    timestamp: Date.now(),
-    attempts: 0,
-    lastAttempt: null,
-  })
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 15000)
@@ -88,7 +80,6 @@ const submitChecklist = async (formData: ChecklistFormData, companyId: number) =
       }
       if (response.status >= 400 && response.status < 500) {
         const errorData = await response.json().catch(() => ({}))
-        clearPending()
 
         if ('errors' in errorData) {
           throw new Error(JSON.stringify(errorData.errors))
@@ -100,11 +91,9 @@ const submitChecklist = async (formData: ChecklistFormData, companyId: number) =
 
     const data = await response.json()
     if ('errors' in data) {
-      clearPending()
       throw new Error(JSON.stringify(data.errors))
     }
 
-    clearPending()
     return data
   } catch (error) {
     clearTimeout(timeoutId)
@@ -123,7 +112,6 @@ const submitChecklist = async (formData: ChecklistFormData, companyId: number) =
       throw error
     }
 
-    clearPending()
     throw error
   }
 }
@@ -153,29 +141,46 @@ export default function AdminChecklists() {
   const localStorageLockedRef = useRef<boolean>(false)
   const { toast } = useToast()
 
-  const { isOnline, hasPendingSubmission, retryPending, isRetrying } =
-    useOfflineChecklistSync({
-      companyId,
-      onSuccess: () => {
-        localStorageLockedRef.current = true
-        localStorage.setItem('checklistData', JSON.stringify(defaultValues))
-        form.reset(defaultValues)
-        sigRef.current?.clear()
-
-        toast({
-          title: 'Success',
-          description: 'Pending checklist has been sent successfully!',
-          variant: 'success',
-        })
-      },
-      onError: error => {
-        console.error('Retry failed:', error)
-      },
-    })
+  const {
+    isOnline,
+    pendingCount,
+    isProcessing,
+    hasPendingSubmissions,
+    pendingSubmissions,
+    addSubmissionToQueue,
+    processQueue,
+    deleteSubmission,
+    clearFailedSubmissions,
+  } = useChecklistQueue({
+    companyId,
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Pending checklist has been sent successfully!',
+        variant: 'success',
+      })
+    },
+    onError: error => {
+      console.error('Queue processing error:', error)
+    },
+  })
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (data: ChecklistFormData) => {
-      await submitChecklist(data, companyId)
+      if (!navigator.onLine) {
+        await addSubmissionToQueue(data)
+        throw new OfflineError()
+      }
+
+      try {
+        const result = await submitChecklist(data, companyId)
+        return result
+      } catch (error) {
+        if (error instanceof NetworkError) {
+          await addSubmissionToQueue(data)
+        }
+        throw error
+      }
     },
     onSuccess: () => {
       localStorageLockedRef.current = true
@@ -190,6 +195,10 @@ export default function AdminChecklists() {
     },
     onError: (error: Error) => {
       if (error instanceof OfflineError || error instanceof NetworkError) {
+        localStorageLockedRef.current = true
+        localStorage.setItem('checklistData', JSON.stringify(defaultValues))
+        form.reset(defaultValues)
+        sigRef.current?.clear()
         toast({
           title: 'Offline Mode',
           description: 'No internet. Form saved and will be sent automatically when online.',
@@ -245,7 +254,7 @@ export default function AdminChecklists() {
         {!isOnline && (
           <div className='mb-4 p-3 bg-orange-100 border border-orange-400 rounded-md'>
             <p className='text-sm font-medium text-orange-800'>
-              ⚠️ No internet connection
+              No internet connection
             </p>
             <p className='text-xs text-orange-700 mt-1'>
               Form will be saved and sent automatically when connection is restored.
@@ -253,85 +262,87 @@ export default function AdminChecklists() {
           </div>
         )}
 
-        {hasPendingSubmission && (() => {
-          const pending = getPending()
-          const maxAttempts = 20
-          const isMaxAttemptsReached = pending && pending.attempts >= maxAttempts
+        {isProcessing && (
+          <div className='mb-4 p-3 bg-blue-100 border border-blue-400 rounded-md'>
+            <div className='flex items-center gap-3'>
+              <div className='text-blue-600 animate-pulse'>🔄</div>
+              <div className='flex-1'>
+                <p className='text-sm font-medium text-blue-800'>
+                  Sending pending checklists...
+                </p>
+                <p className='text-xs text-blue-700 mt-1'>
+                  Processing {pendingCount} pending submission{pendingCount !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
-          if (isMaxAttemptsReached) {
-            return (
-              <div className='mb-4 p-3 bg-red-100 border border-red-400 rounded-md'>
-                <div className='flex flex-col gap-2'>
-                  <p className='text-sm font-medium text-red-800'>
-                    ⚠️ Failed to send checklist after {maxAttempts} attempts
-                  </p>
-                  <p className='text-xs text-red-700'>
-                    There may be a problem with the server or your connection. You can try again or delete this pending form to submit a new one.
-                  </p>
-                  <div className='flex gap-2 mt-2'>
-                    {isOnline && !isRetrying && (
-                      <button
-                        type='button'
-                        onClick={retryPending}
-                        className='text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 transition-colors'
-                      >
-                        Try Again
-                      </button>
-                    )}
+        {hasPendingSubmissions && !isProcessing && (
+          <div className='mb-4 p-3 bg-blue-100 border border-blue-400 rounded-md'>
+            <div className='flex justify-between items-start gap-3'>
+              <div className='flex-1'>
+                <p className='text-sm font-medium text-blue-800'>
+                  {pendingCount} pending checklist{pendingCount !== 1 ? 's' : ''} waiting to be sent
+                </p>
+                <p className='text-xs text-blue-700 mt-1'>
+                  {isOnline
+                    ? 'Will be sent automatically'
+                    : 'Will be sent when connection is restored'}
+                </p>
+                {pendingSubmissions.some(s => s.status === 'failed') && (
+                  <div className='mt-2 space-y-1'>
+                    {pendingSubmissions
+                      .filter(s => s.status === 'failed')
+                      .map(submission => (
+                        <div key={submission.id} className='flex items-center justify-between bg-red-50 p-2 rounded'>
+                          <div className='flex-1'>
+                            <p className='text-xs font-medium text-red-800'>
+                              Failed after {submission.attempts} attempts
+                            </p>
+                            <p className='text-xs text-red-700'>
+                              {new Date(submission.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          <button
+                            type='button'
+                            onClick={() => {
+                              if (confirm('Delete this failed submission?')) {
+                                deleteSubmission(submission.id!)
+                              }
+                            }}
+                            className='text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 transition-colors'
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ))}
                     <button
                       type='button'
                       onClick={() => {
-                        if (confirm('Are you sure you want to delete the pending form? This cannot be undone.')) {
-                          clearPending()
-                          window.location.reload()
+                        if (confirm('Clear all failed submissions?')) {
+                          clearFailedSubmissions()
                         }
                       }}
-                      className='text-xs bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700 transition-colors'
+                      className='text-xs bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700 transition-colors mt-2'
                     >
-                      Delete Pending Form
+                      Clear All Failed
                     </button>
                   </div>
-                </div>
-              </div>
-            )
-          }
-
-          return (
-            <div className='mb-4 p-3 bg-blue-100 border border-blue-400 rounded-md'>
-              <div className='flex justify-between items-start gap-3'>
-                <div className='flex-1'>
-                  <p className='text-sm font-medium text-blue-800'>
-                    {isRetrying ? '🔄 Sending checklist...' : '📤 Previous checklist is waiting to be sent'}
-                  </p>
-                  <p className='text-xs text-blue-700 mt-1'>
-                    {isRetrying
-                      ? 'Please wait, sending in progress...'
-                      : 'It will be sent automatically when connection is available.'}
-                  </p>
-                  {pending && pending.attempts > 0 && (
-                    <p className='text-xs text-blue-600 mt-1'>
-                      Attempts: {pending.attempts}/{maxAttempts}
-                    </p>
-                  )}
-                </div>
-                {isOnline && !isRetrying && (
-                  <button
-                    type='button'
-                    onClick={retryPending}
-                    className='text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 transition-colors whitespace-nowrap'
-                  >
-                    Try Now
-                  </button>
-                )}
-                {isRetrying && (
-                  <div className='text-xs text-blue-600 animate-pulse'>
-                    Sending...
-                  </div>
                 )}
               </div>
+              {isOnline && !isProcessing && (
+                <button
+                  type='button'
+                  onClick={processQueue}
+                  className='text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 transition-colors whitespace-nowrap'
+                >
+                  Send Now
+                </button>
+              )}
             </div>
-          )
-        })()}
+          </div>
+        )}
 
         <FormProvider {...form}>
           <form
@@ -405,16 +416,14 @@ export default function AdminChecklists() {
 
             <div className='mt-6 flex justify-center'>
               <LoadingButton
-                loading={isPending || isRetrying}
-                disabled={isPending || isRetrying}
+                loading={isPending || isProcessing}
+                disabled={isPending || isProcessing}
               >
-                {isRetrying
-                  ? 'Sending pending form...'
-                  : hasPendingSubmission && !isPending
-                    ? 'Submit (will replace pending)'
-                    : isPending
-                      ? 'Submitting...'
-                      : 'Submit'}
+                {isProcessing
+                  ? 'Sending pending forms...'
+                  : isPending
+                    ? 'Submitting...'
+                    : 'Submit'}
               </LoadingButton>
             </div>
           </form>
