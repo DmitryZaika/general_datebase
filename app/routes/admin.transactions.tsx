@@ -8,6 +8,7 @@ import {
   redirect,
   useLoaderData,
   useLocation,
+  useNavigate,
 } from 'react-router'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
@@ -300,6 +301,8 @@ const transactionColumns: ColumnDef<Transaction>[] = [
 export default function AdminTransactions() {
   const { transactions } = useLoaderData<typeof loader>()
   const [searchTerm, setSearchTerm] = useState('')
+  const navigate = useNavigate()
+  const location = useLocation()
 
   const filteredTransactions = transactions.filter(transaction =>
     transaction.customer_name.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -326,7 +329,14 @@ export default function AdminTransactions() {
             />
           </div>
         </div>
-        <DataTable columns={transactionColumns} data={filteredTransactions} paginate pageSize={50} />
+        <DataTable
+          columns={transactionColumns}
+          data={filteredTransactions}
+          paginate
+          pageSize={50}
+          onRowClick={row => navigate(`edit/${row.id}${location.search}`)}
+          rowClassName='cursor-pointer'
+        />
       </PageLayout>
       <Outlet />
     </>
