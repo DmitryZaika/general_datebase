@@ -45,8 +45,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const dealId = parseInt(params.dealId, 10)
-  const url = new URL(request.url)
-  const subjectFilter = url.searchParams.get('subject') || undefined
+  const threadId = params.threadId
+  if (!threadId) {
+    throw new Error('Thread ID is missing')
+  }
 
   const [customerRows] = await db.execute<RowDataPacket[]>(
     `SELECT c.name, c.email
@@ -61,12 +63,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
-      WHERE e.deal_id = ? AND e.deleted_at IS NULL`
-  const emailParams: (number | string)[] = [dealId]
-  if (subjectFilter) {
-    emailQuery += ' AND e.subject = ?'
-    emailParams.push(subjectFilter)
-  }
+      WHERE e.deleted_at IS NULL AND e.deal_id = ? AND e.thread_id = ?`
+  const emailParams: (number | string)[] = [dealId, threadId]
+  
 
   emailQuery += ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email ORDER BY e.sent_at ASC'
 
@@ -83,14 +82,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       read_at: row.read_at,
     }
   })
-  console.log(messages)
 
   return {
     customerName: customerRows?.[0]?.name || 'Customer',
     customerEmail,
     messages,
     dealId,
-    subject: subjectFilter || null,
+    subject: emailRows?.[0]?.subject || null,
+    threadId,
   }
 }
 
@@ -188,10 +187,11 @@ export default function EmailChatDialog() {
   const [showSelect, setShowSelect] = useState(false)
   const [selectActive, setSelectActive] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
-  const { customerName, customerEmail, messages, dealId, subject } =
+  const { customerName, customerEmail, messages, dealId, subject, threadId } =
     useLoaderData<typeof loader>()
   const [messageText, setMessageText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isSending, setIsSending] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
@@ -202,7 +202,7 @@ export default function EmailChatDialog() {
   }, [messageText])
 
   const handleClose = () => {
-    navigate(`..${location.search}`)
+    navigate(`/employee/deals/edit/${dealId}/history`)
   }
 
   const getInitials = (name: string) => {
@@ -241,6 +241,58 @@ export default function EmailChatDialog() {
       }
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const handleSend = async () => {
+    const body = messageText.trim()
+    if (!body) return
+    if (!customerEmail) {
+      alert('Customer email is missing')
+      return
+    }
+    const emailSubject = subject && subject.trim() ? subject : 'Follow up'
+
+    setIsSending(true)
+    try {
+      const response = await fetch('/api/employee/sendEmail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: customerEmail,
+          subject: emailSubject,
+          body,
+          dealId,
+          threadId,
+        }),
+      })
+
+      if (!response.ok) {
+        let errorText = ''
+        try {
+          const payload: unknown = await response.json()
+          if (payload && typeof payload === 'object' && 'error' in payload) {
+            const value = payload.error
+            if (typeof value === 'string') {
+              errorText = value
+            }
+          }
+        } catch {
+          errorText = await response.text().catch(() => '')
+        }
+        throw new Error(errorText || 'Email failed to send')
+      }
+
+      setMessageText('')
+      window.location.reload()
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message)
+      } else {
+        alert('Email failed to send')
+      }
+    } finally {
+      setIsSending(false)
     }
   }
 
@@ -363,9 +415,17 @@ export default function EmailChatDialog() {
             />
             <div className='flex items-center gap-1 mb-1'>
             
-              <Button variant='ghost' size='icon' className='text-zinc-500'>
+              <LoadingButton
+                loading={isSending}
+                type='button'
+                variant='ghost'
+                size='icon'
+                className='text-zinc-500'
+                disabled={isSending || messageText.trim() === ''}
+                onClick={handleSend}
+              >
                 <span className='text-xl'>➤</span>
-              </Button>
+              </LoadingButton>
             </div>
           </div>
         </div>
