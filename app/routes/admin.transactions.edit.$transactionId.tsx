@@ -1,113 +1,54 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import type { RowDataPacket } from 'mysql2'
-import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Calendar, MapPin, User, UserCircle } from 'lucide-react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import {
-  type ActionFunctionArgs,
   data,
-  Form,
-  type LoaderFunctionArgs,
   Outlet,
-  redirect,
   useFetcher,
   useLoaderData,
+  useLocation,
   useNavigate,
-  useNavigation,
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
 } from 'react-router'
-import { AuthenticityTokenInput, useAuthenticityToken } from 'remix-utils/csrf/react'
-import { z } from 'zod'
-import { InputItem } from '~/components/molecules/InputItem'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { DeleteRow } from '~/components/pages/DeleteRow'
+import { AddSlabDialog, type RoomOption } from '~/components/transactions/AddSlabDialogTransactions'
+import { ReplaceDialog } from '~/components/transactions/ReplaceDialog'
+import { RoomsSection } from '~/components/transactions/RoomsSection'
 import { Button } from '~/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
-import { FormField, FormProvider } from '~/components/ui/form'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
+import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
+import { useToast } from '~/hooks/use-toast'
 import { commitSession, getSession } from '~/sessions.server'
-import { csrf } from '~/utils/csrf.server'
+import type { SaleDetails, SaleSink, SaleSlab } from '~/types/sales'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getEmployeeUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
-interface SaleDetails {
-  id: number
-  customer_id: number
-  customer_name: string
-  sale_date: string
-  seller_id: number
-  seller_name: string
+function formatDate(dateString: string) {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
 }
 
-interface SaleSlab {
-  id: number
-  stone_id: number
-  bundle: string
-  stone_name: string
-  cut_date: string | null
-  notes: string | null
-  square_feet: number | null
-}
+const normalizeRoomName = (value: string | null | undefined) => value?.trim() || 'Room'
+const roomKeyFromSlab = (slab: Pick<SaleSlab, 'room' | 'room_uuid'>) =>
+  slab.room_uuid ?? `name:${normalizeRoomName(slab.room).toLowerCase()}`
+const roomKeyFromSink = (sink: Pick<SaleSink, 'room' | 'room_uuid'>) =>
+  sink.room_uuid ?? `name:${normalizeRoomName(sink.room).toLowerCase()}`
 
-interface SaleSink {
-  id: number
-  sink_type_id: number
-  name: string
-  price: number
-  is_deleted: number
-}
-
-interface Sink {
-  id: number
-  name: string
-  type: string
-  retail_price: number
-}
-
-const slabSchema = z.object({
-  notes: z.string().optional(),
-  square_feet: z.coerce.number().optional(),
-})
-
-type SlabFormData = z.infer<typeof slabSchema>
-const slabsResolver = zodResolver(slabSchema)
-
-const sinkSchema = z.object({
-  sink_type_id: z.coerce.number(),
-  price: z.coerce.number(),
-})
-
-type SinkFormData = z.infer<typeof sinkSchema>
-const sinksResolver = zodResolver(sinkSchema)
-
-const sinkAddSchema = z.object({
-  sink_type_id: z.string().min(1, 'Please select a sink'),
-  price: z.coerce.number().optional(),
-})
-
-type SinkAddFormData = z.infer<typeof sinkAddSchema>
-const sinkAddResolver = zodResolver(sinkAddSchema)
-
-const customerSchema = z.object({
-  customer_name: z.string().min(1, 'Customer name is required'),
-})
-
-type CustomerFormData = z.infer<typeof customerSchema>
-const customerResolver = zodResolver(customerSchema)
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const user = await getAdminUser(request)
+  const user = await getEmployeeUser(request)
   if (!params.transactionId) {
     return forceRedirectError(request.headers, 'No transaction ID provided')
   }
-  const saleId = parseInt(params.transactionId, 10)
 
+  const saleId = parseInt(params.transactionId, 10)
   if (Number.isNaN(saleId)) {
     return forceRedirectError(request.headers, 'Invalid transaction ID format')
   }
@@ -132,17 +73,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const sales = await selectMany<SaleDetails>(
     db,
     `SELECT
-        s.id, s.customer_id, c.name as customer_name,
-        s.sale_date, s.seller_id, u.name as seller_name
-       FROM sales s
-       JOIN customers c ON s.customer_id = c.id
-       JOIN users u ON s.seller_id = u.id
-       WHERE s.id = ? AND s.company_id = ?`,
+      s.id, s.customer_id, c.name as customer_name,
+      s.sale_date, s.seller_id, u.name as seller_name, s.project_address
+     FROM sales s
+     JOIN customers c ON s.customer_id = c.id
+     JOIN users u ON s.seller_id = u.id
+     WHERE s.id = ? AND s.company_id = ?`,
     [saleId, user.company_id],
   )
 
   const sale = sales[0]
-
   if (!sale) {
     return forceRedirectError(
       request.headers,
@@ -153,68 +93,55 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const slabs = await selectMany<SaleSlab>(
     db,
     `SELECT
-        slab_inventory.id, slab_inventory.stone_id, slab_inventory.bundle, stones.name as stone_name,
-        slab_inventory.cut_date, slab_inventory.notes, slab_inventory.square_feet
-       FROM slab_inventory
-       JOIN stones ON slab_inventory.stone_id = stones.id
-       WHERE slab_inventory.sale_id = ?
-       ORDER BY slab_inventory.id`,
+      slab_inventory.id,
+      slab_inventory.stone_id,
+      slab_inventory.bundle,
+      stones.name as stone_name,
+      slab_inventory.cut_date,
+      slab_inventory.notes,
+      slab_inventory.square_feet,
+      slab_inventory.length,
+      slab_inventory.width,
+      HEX(slab_inventory.room_uuid) as room_uuid,
+      slab_inventory.room,
+      slab_inventory.parent_id,
+      (SELECT COUNT(*) FROM slab_inventory c WHERE c.parent_id = slab_inventory.id AND c.deleted_at IS NULL) as child_count
+     FROM slab_inventory
+     JOIN stones ON slab_inventory.stone_id = stones.id
+     WHERE slab_inventory.sale_id = ?
+     ORDER BY slab_inventory.id`,
     [saleId],
   )
 
   const sinks = await selectMany<SaleSink>(
     db,
     `SELECT
-        sinks.id, sinks.sink_type_id, sink_type.name, sinks.price, sinks.is_deleted
-       FROM sinks
-       JOIN sink_type ON sinks.sink_type_id = sink_type.id
-       JOIN slab_inventory ON sinks.slab_id = slab_inventory.id
-       WHERE slab_inventory.sale_id = ?
-       ORDER BY sinks.id`,
+      sinks.id,
+      sinks.sink_type_id,
+      sink_type.name,
+      sinks.price,
+      sinks.is_deleted,
+      sinks.slab_id,
+      slab_inventory.room,
+      HEX(slab_inventory.room_uuid) as room_uuid
+     FROM sinks
+     JOIN sink_type ON sinks.sink_type_id = sink_type.id
+     JOIN slab_inventory ON sinks.slab_id = slab_inventory.id
+     WHERE slab_inventory.sale_id = ? AND sinks.is_deleted = 0
+     ORDER BY sinks.id`,
     [saleId],
-  )
-
-  const availableSinks = await selectMany<Sink>(
-    db,
-    `SELECT id, name, type, retail_price
-       FROM sink_type
-       WHERE company_id = ? AND EXISTS (
-           SELECT 1
-           FROM sinks
-           WHERE sinks.sink_type_id = sink_type.id
-           AND sinks.is_deleted = 0
-       )
-       ORDER BY name ASC`,
-    [user.company_id],
-  )
-
-  const sellers = await selectMany<{
-    id: number
-    name: string
-    position_id: number
-  }>(
-    db,
-    `SELECT DISTINCT u.id, u.name, up.position_id
-     FROM users u
-     JOIN users_positions up ON u.id = up.user_id
-     WHERE u.is_deleted = 0
-     WHERE u.company_id = ? AND up.position_id IN (1, 2, 5)
-     ORDER BY u.name ASC`,
-    [user.company_id],
   )
 
   return {
     sale,
     slabs,
     sinks,
-    availableSinks,
-    sellers,
+    companyId: user.company_id,
   }
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const user = await getAdminUser(request)
-
+  const user = await getEmployeeUser(request)
   if (!params.transactionId) {
     return forceRedirectError(request.headers, 'No transaction ID provided')
   }
@@ -224,809 +151,991 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return forceRedirectError(request.headers, 'Invalid transaction ID format')
   }
 
-  try {
-    await csrf.validate(request)
-  } catch {
-    return { error: 'Invalid CSRF token' }
-  }
   const formData = await request.formData()
-  const intent = formData.get('intent') as string
+  const intent = formData.get('intent')
+  if (intent === 'cut-slab') {
+    const slabIdValue = formData.get('slabId')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
+    }
 
-  try {
-    if (intent === 'sale-unsell') {
-      // Find all slabs in this sale to process parent-child relationships
-      const [slabsToUnsell] = await db.execute<RowDataPacket[]>(
-        'SELECT id FROM slab_inventory WHERE sale_id = ?',
-        [saleId],
-      )
+    const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
+      db,
+      `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      [slabId, saleId],
+    )
 
-      // Process all slabs that are being unsold
-      if (slabsToUnsell && slabsToUnsell.length > 0) {
-        for (const slabRow of slabsToUnsell) {
-          const parentId = slabRow.id
+    if (slabs.length === 0) {
+      return null
+    }
 
-          // Check if this slab has any sold child slabs
-          const [soldChildSlabs] = await db.execute<RowDataPacket[]>(
-            'SELECT id FROM slab_inventory WHERE parent_id = ? AND sale_id IS NOT NULL',
-            [parentId],
-          )
-
-          if (soldChildSlabs && soldChildSlabs.length > 0) {
-            // If parent and child are both sold, remove parent_id from children and delete parent
-            await db.execute(
-              'UPDATE slab_inventory SET parent_id = NULL WHERE parent_id = ?',
-              [parentId],
-            )
-
-            // Delete the parent slab
-            await db.execute('DELETE FROM slab_inventory WHERE id = ?', [parentId])
-          } else {
-            // Check for unsold child slabs
-            const [unsoldChildSlabs] = await db.execute<RowDataPacket[]>(
-              "SELECT id FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '')",
-              [parentId],
-            )
-
-            if (unsoldChildSlabs && unsoldChildSlabs.length > 0) {
-              // Delete all unsold child slabs of this parent
-              await db.execute(
-                "DELETE FROM slab_inventory WHERE parent_id = ? AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '')",
-                [parentId],
-              )
-            }
-          }
-        }
-      }
-
-      // Delete all unsold slabs with the same bundle
-      const [bundleInfo] = await db.execute<RowDataPacket[]>(
-        'SELECT DISTINCT bundle, stone_id FROM slab_inventory WHERE sale_id = ?',
-        [saleId],
-      )
-
-      if (bundleInfo && bundleInfo.length > 0) {
-        for (const info of bundleInfo) {
-          const bundle = info.bundle
-          const stoneId = info.stone_id
-
-          // Delete all unsold slabs with the same bundle in the same stone
-          await db.execute(
-            `DELETE FROM slab_inventory
-               WHERE bundle = ?
-               AND (sale_id IS NULL OR sale_id = 0 OR sale_id = '')
-               AND stone_id = ?`,
-            [bundle, stoneId],
-          )
-        }
-      }
-
-      // Unsell remaining slabs
-      await db.execute(
-        `UPDATE slab_inventory
-           SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL
-           WHERE sale_id = ?`,
-        [saleId],
-      )
-
-      // Unsell sinks and faucets from slabs in this sale
-      const [slabIdsForSinks] = await db.execute<RowDataPacket[]>(
-        'SELECT id FROM slab_inventory WHERE sale_id = ?',
-        [saleId],
-      )
-
-      if (slabIdsForSinks && slabIdsForSinks.length > 0) {
-        const slabIdList = slabIdsForSinks.map(row => row.id)
-        for (const slabId of slabIdList) {
-          await db.execute(
-            `UPDATE sinks
-             SET slab_id = NULL, price = NULL, is_deleted = 0
-             WHERE slab_id = ?`,
-            [slabId],
-          )
-          await db.execute(
-            `UPDATE faucets
-             SET slab_id = NULL, price = NULL, is_deleted = 0
-             WHERE slab_id = ?`,
-            [slabId],
-          )
-        }
-      }
-
-      await db.execute(`UPDATE sales SET status = 'cancelled' WHERE id = ?`, [saleId])
-
-      const session = await getSession(request.headers.get('Cookie'))
-      session.flash('message', toastData('Success', 'All items processed successfully'))
-
-      return redirect(`/admin/transactions`, {
-        headers: { 'Set-Cookie': await commitSession(session) },
-      })
-    } else if (intent === 'sale-info-update') {
-      const customer_name = formData.get('customer_name') as string
-      const seller_id = parseInt(formData.get('seller_id') as string)
-
-      if (!customer_name || Number.isNaN(seller_id)) {
-        throw new Error('Invalid sale info update data')
-      }
-
-      try {
-        await db.execute(
-          `UPDATE customers SET name = ? WHERE id = (
-              SELECT customer_id FROM sales WHERE id = ?
-            )`,
-          [customer_name, saleId],
-        )
-
-        await db.execute(`UPDATE sales SET seller_id = ? WHERE id = ?`, [
-          seller_id,
-          saleId,
-        ])
-
-        const session = await getSession(request.headers.get('Cookie'))
-        session.flash(
-          'message',
-          toastData('Success', 'Transaction information updated successfully'),
-        )
-
-        return data(
-          { success: true },
-          {
-            headers: { 'Set-Cookie': await commitSession(session) },
-          },
-        )
-      } catch {
-        throw new Error('Failed to update transaction information')
-      }
-    } else if (intent === 'create-customer') {
-      const customer_name = formData.get('customer_name') as string
-
-      if (!customer_name) {
-        throw new Error('Customer name is required')
-      }
-
-      const [customerResult] = await db.execute<RowDataPacket[]>(
-        `INSERT INTO customers (name, company_id) VALUES (?, ?)`,
-        [customer_name, user.company_id],
-      )
-
-      const customerId = customerResult[0].insertId
-
-      if (!customerId) {
-        throw new Error('Failed to create customer')
-      }
-
-      await db.execute(`UPDATE sales SET customer_id = ? WHERE id = ?`, [
-        customerId,
-        saleId,
+    if (slabs[0].cut_date === null) {
+      await db.execute(`UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`, [
+        slabId,
       ])
-
       const session = await getSession(request.headers.get('Cookie'))
-      session.flash(
-        'message',
-        toastData('Success', 'Customer created and assigned to transaction'),
-      )
-
-      return data(
-        { success: true, customer_id: customerId, customer_name },
-        {
-          headers: { 'Set-Cookie': await commitSession(session) },
-        },
-      )
-    } else if (intent === 'slab-delete') {
-      const slabId = formData.get('id') as string
-      await db.execute(
-        `UPDATE slab_inventory SET sale_id = NULL, notes = NULL, price = NULL, square_feet = NULL WHERE id = ?`,
-        [slabId],
-      )
-    } else if (intent === 'slab-update') {
-      const slabId = formData.get('id') as string
-      const notes = formData.get('notes') as string
-      const squareFeet = parseFloat(formData.get('square_feet') as string) || null
-      await db.execute(
-        `UPDATE slab_inventory
-           SET notes = ?, square_feet = ?
-           WHERE id = ?`,
-        [notes, squareFeet, slabId],
-      )
-    } else if (intent === 'sink-delete') {
-      const sinkId = formData.get('id') as string
-      await db.execute(
-        `UPDATE sinks SET slab_id = NULL, price = NULL, is_deleted = 0 WHERE id = ?`,
-        [sinkId],
-      )
-    } else if (intent === 'sink-update') {
-      const sinkId = formData.get('id') as string
-      const price = parseFloat(formData.get('price') as string) || null
-      await db.execute(`UPDATE sinks SET price = ? WHERE id = ?`, [price, sinkId])
-    } else if (intent === 'sink-add') {
-      const sinkTypeId = formData.get('newSinkTypeId') as string
-      let price = parseFloat(formData.get('newSinkPrice') as string) || null
-      if (price === null || price === 0 || price === undefined) {
-        const sinkTypeDetails = await selectMany<{ retail_price: number }>(
-          db,
-          `SELECT retail_price FROM sink_type WHERE id = ?`,
-          [parseInt(sinkTypeId)],
-        )
-
-        if (sinkTypeDetails.length > 0) {
-          price = sinkTypeDetails[0].retail_price
-        }
-      }
-
-      const availableSinks = await selectMany<{ id: number }>(
-        db,
-        `SELECT id FROM sinks WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
-        [parseInt(sinkTypeId)],
-      )
-
-      if (availableSinks.length === 0) {
-        throw new Error('No available sinks of this type')
-      }
-
-      const sinkId = availableSinks[0].id
-
-      // Find the first slab in this sale to attach the sink to
-      const [firstSlab] = await db.execute<RowDataPacket[]>(
-        `SELECT id FROM slab_inventory WHERE sale_id = ? LIMIT 1`,
-        [saleId],
-      )
-
-      if (firstSlab.length === 0) {
-        throw new Error('No slabs found in this sale')
-      }
-
-      const slabId = firstSlab[0].id
-
-      await db.execute(
-        `UPDATE sinks SET slab_id = ?, price = ?, is_deleted = 1 WHERE id = ?`,
-        [slabId, price, sinkId],
-      )
-    }
-    const session = await getSession(request.headers.get('Cookie'))
-
-    if (intent === 'slab-delete' || intent === 'sink-delete') {
-      session.flash('message', toastData('Success', 'Item removed from transaction'))
-      return redirect(`/admin/transactions/edit/${params.transactionId}`, {
+      session.flash('message', toastData('Success', 'Slab marked as cut'))
+      return data({ success: true }, {
         headers: { 'Set-Cookie': await commitSession(session) },
       })
     }
+  } else if (intent === 'uncut-slab') {
+    const slabIdValue = formData.get('slabId')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
+    }
 
-    session.flash('message', toastData('Success', 'Transaction updated successfully'))
-
-    return data(
-      { success: true },
-      {
-        headers: { 'Set-Cookie': await commitSession(session) },
-      },
+    const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
+      db,
+      `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      [slabId, saleId],
     )
-  } catch {
+
+    if (slabs.length === 0) {
+      return null
+    }
+
+    if (slabs[0].cut_date !== null) {
+      await db.execute(`UPDATE slab_inventory SET cut_date = NULL WHERE id = ?`, [
+        slabId,
+      ])
+      const session = await getSession(request.headers.get('Cookie'))
+      session.flash('message', toastData('Success', 'Slab marked as uncut'))
+      return data({ success: true }, {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      })
+    }
+  } else if (intent === 'remove-slab') {
+    const slabIdValue = formData.get('slabId') ?? formData.get('id')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
+    }
+    await db.execute(`DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`, [slabId])
+    await db.execute(
+      `UPDATE slab_inventory
+         SET sale_id = NULL,
+             notes = NULL,
+             price = NULL,
+             square_feet = NULL,
+             cut_date = NULL,
+             room = NULL,
+             waterfall = NULL,
+             corbels = NULL,
+             seam = NULL,
+             stove = NULL,
+             extras = NULL,
+             room_uuid = NULL,
+             edge = NULL,
+             backsplash = NULL,
+             tear_out = NULL,
+             ten_year_sealer = NULL
+       WHERE id = ? AND sale_id = ?`,
+      [slabId, saleId],
+    )
     const session = await getSession(request.headers.get('Cookie'))
-    session.flash(
-      'message',
-      toastData('Error', 'Failed to update transaction', 'destructive'),
+    session.flash('message', toastData('Success', 'Slab removed from sale'))
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
+  } else if (intent === 'remove-room') {
+    const room = formData.get('room') as string
+    if (!room) return null
+    const session = await getSession(request.headers.get('Cookie'))
+    await db.execute(
+      `UPDATE slab_inventory
+         SET room = NULL
+       WHERE sale_id = ? AND room = ?`,
+      [saleId, room],
+    )
+    session.flash('message', toastData('Success', `Room "${room}" removed`))
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
+  } else if (intent === 'replace-slab') {
+    const oldSlabId = Number(formData.get('oldSlabId'))
+    const newSlabId = Number(formData.get('newSlabId'))
+    if (!oldSlabId || !newSlabId) return null
+
+    const oldSlab = await selectMany<{
+      notes: string | null
+      price: number | null
+      square_feet: number | null
+      cut_date: string | null
+      room: string | null
+      room_uuid: string | null
+      seam: string | null
+      backsplash: string | null
+      tear_out: string | null
+      stove: string | null
+      ten_year_sealer: string | null
+      waterfall: string | null
+      corbels: string | null
+      extras: string | null
+      edge: string | null
+    }>(
+      db,
+      `SELECT notes, price, square_feet, cut_date, room, room_uuid, seam, backsplash, tear_out, stove, ten_year_sealer, waterfall, corbels, extras, edge
+         FROM slab_inventory
+        WHERE id = ? AND sale_id = ?`,
+      [oldSlabId, saleId],
     )
 
-    return data(
-      { success: false },
-      {
-        headers: { 'Set-Cookie': await commitSession(session) },
-      },
+    const template = oldSlab[0] ?? {}
+
+    await db.execute(
+      `UPDATE slab_inventory
+         SET sale_id = ?,
+             room = ?,
+             room_uuid = ?,
+             seam = ?,
+             backsplash = ?,
+             tear_out = ?,
+             square_feet = ?,
+             stove = ?,
+             ten_year_sealer = ?,
+             waterfall = ?,
+             corbels = ?,
+             price = ?,
+             extras = ?,
+             edge = ?,
+             notes = ?,
+             cut_date = ?
+       WHERE id = ? AND sale_id IS NULL`,
+      [
+        saleId,
+        template.room ?? null,
+        template.room_uuid ?? null,
+        template.seam ?? null,
+        template.backsplash ?? null,
+        template.tear_out ?? null,
+        template.square_feet ?? null,
+        template.stove ?? null,
+        template.ten_year_sealer ?? null,
+        template.waterfall ?? null,
+        template.corbels ?? null,
+        template.price ?? null,
+        template.extras ?? null,
+        template.edge ?? null,
+        template.notes ?? null,
+        template.cut_date ?? null,
+        newSlabId,
+      ],
     )
-  }
-}
 
-function SlabEdit({ slab }: { slab: SaleSlab }) {
-  const form = useForm<SlabFormData>({
-    resolver: slabsResolver,
-    defaultValues: {
-      notes: slab.notes || '',
-      square_feet: slab.square_feet || 0,
-    },
-  })
-  return (
-    <FormProvider {...form}>
-      <Form id='customerForm' method='post' className='flex items-center gap-2'>
-        <AuthenticityTokenInput />
-        <input type='hidden' name='id' value={slab.id} />
-        <input type='hidden' name='intent' value='slab-update' />
-        <FormField
-          control={form.control}
-          name='notes'
-          render={({ field }) => <InputItem name='Notes' field={field} />}
-        />
-        <FormField
-          control={form.control}
-          name='square_feet'
-          render={({ field }) => <InputItem name='Square Feet' field={field} />}
-        />
-        <LoadingButton type='submit' loading={form.formState.isSubmitting}>
-          Save
-        </LoadingButton>
-      </Form>
-    </FormProvider>
-  )
-}
+    await db.execute(`DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`, [oldSlabId])
 
-function SinkEdit({ sink }: { sink: SaleSink }) {
-  const form = useForm<SinkFormData>({
-    resolver: sinksResolver,
-    defaultValues: {
-      sink_type_id: sink.sink_type_id,
-      price: sink.price,
-    },
-  })
-  return (
-    <FormProvider {...form}>
-      <Form method='post' className='flex items-center gap-2 -mb-6'>
-        <AuthenticityTokenInput />
-        <input type='hidden' name='id' value={sink.id} />
-        <input type='hidden' name='intent' value='sink-update' />
-        <FormField
-          control={form.control}
-          name='price'
-          render={({ field }) => (
-            <InputItem name='Price' className='w-full' field={field} />
-          )}
-        />
-        <LoadingButton
-          type='submit'
-          className='ml-auto'
-          loading={form.formState.isSubmitting}
-        >
-          Save
-        </LoadingButton>
-      </Form>
-    </FormProvider>
-  )
-}
+    await db.execute(
+      `UPDATE slab_inventory
+         SET sale_id = NULL,
+             notes = NULL,
+             price = NULL,
+             square_feet = NULL,
+             cut_date = NULL,
+             room = NULL,
+             room_uuid = NULL,
+             seam = NULL,
+             backsplash = NULL,
+             tear_out = NULL,
+             stove = NULL,
+             ten_year_sealer = NULL,
+             waterfall = NULL,
+             corbels = NULL,
+             extras = NULL,
+             edge = NULL
+       WHERE id = ? AND sale_id = ?`,
+      [oldSlabId, saleId],
+    )
 
-function SinkAdd({ availableSinks }: { availableSinks: Sink[] }) {
-  const form = useForm<SinkAddFormData>({
-    resolver: sinkAddResolver,
-    defaultValues: {
-      sink_type_id: '',
-      price: undefined,
-    },
-  })
-
-  return (
-    <FormProvider {...form}>
-      <Form method='post'>
-        <AuthenticityTokenInput />
-        <input type='hidden' name='intent' value='sink-add' />
-        <div className='grid grid-cols-6 gap-2'>
-          <div className='col-span-3'>
-            <FormField
-              control={form.control}
-              name='sink_type_id'
-              render={({ field }) => (
-                <div>
-                  <label className='block text-xs font-medium text-gray-500 mb-1'>
-                    Sink
-                  </label>
-                  <select
-                    {...field}
-                    name='newSinkTypeId'
-                    className='w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                  >
-                    <option value=''>Select a sink</option>
-                    {availableSinks.map(sink => (
-                      <option
-                        key={sink.id}
-                        value={sink.id}
-                        data-price={sink.retail_price}
-                      >
-                        {sink.name} - ${sink.retail_price}
-                      </option>
-                    ))}
-                  </select>
-                  {form.formState.errors.sink_type_id && (
-                    <p className='text-xs text-red-500 mt-1'>
-                      {form.formState.errors.sink_type_id.message}
-                    </p>
-                  )}
-                </div>
-              )}
-            />
-          </div>
-
-          <div className='col-span-2'>
-            <FormField
-              control={form.control}
-              name='price'
-              render={({ field }) => (
-                <div>
-                  <label className='block text-xs font-medium text-gray-500 mb-1'>
-                    Price
-                  </label>
-                  <input
-                    {...field}
-                    type='number'
-                    name='newSinkPrice'
-                    placeholder='Auto'
-                    step='1'
-                    min='0'
-                    className='w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                  />
-                </div>
-              )}
-            />
-          </div>
-          <div className='mt-5'>
-            <LoadingButton type='submit' loading={form.formState.isSubmitting}>
-              Add Sink
-            </LoadingButton>
-          </div>
-        </div>
-      </Form>
-    </FormProvider>
-  )
-}
-
-function SaleInfoEdit({
-  sale,
-  sellers,
-}: {
-  sale: SaleDetails
-  sellers: { id: number; name: string }[]
-}) {
-  const [showUnsellConfirm, setShowUnsellConfirm] = useState(false)
-  const [showCreateCustomer, setShowCreateCustomer] = useState(false)
-  const [customerName, setCustomerName] = useState(sale.customer_name)
-  const fetcher = useFetcher()
-  const csrfToken = useAuthenticityToken()
-  const customerForm = useForm<CustomerFormData>({
-    resolver: customerResolver,
-    defaultValues: {
-      customer_name: '',
-    },
-  })
-
-  const onSubmitCustomer = (data: CustomerFormData) => {
-    const formData = new FormData()
-    formData.append('intent', 'create-customer')
-    formData.append('customer_name', data.customer_name)
-    formData.append('csrf', csrfToken)
-    fetcher.submit(formData, { method: 'post' })
-    setShowCreateCustomer(false)
-    customerForm.reset()
-  }
-
-  useEffect(() => {
-    if (fetcher.data?.success && fetcher.data?.customer_name) {
-      setCustomerName(fetcher.data.customer_name)
+    const session = await getSession(request.headers.get('Cookie'))
+    session.flash('message', toastData('Success', 'Slab replaced'))
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
+  } else if (intent === 'partial-cut') {
+    const slabIdValue = formData.get('slabId')
+    const lengthRaw = formData.get('length')
+    const widthRaw = formData.get('width')
+    const addAnotherRaw = formData.get('addAnother')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    const length =
+      typeof lengthRaw === 'string' && lengthRaw.trim() !== ''
+        ? Number.parseFloat(lengthRaw)
+        : null
+    const width =
+      typeof widthRaw === 'string' && widthRaw.trim() !== '' ? Number.parseFloat(widthRaw) : null
+    const addAnother = typeof addAnotherRaw === 'string' ? Number(addAnotherRaw) === 1 : false
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
     }
-  }, [fetcher.data])
+    if (
+      length === null ||
+      width === null ||
+      !Number.isFinite(length) ||
+      !Number.isFinite(width) ||
+      length <= 0 ||
+      width <= 0
+    ) {
+      return null
+    }
+    const parent = await selectMany<{ stone_id: number; bundle: string; url: string | null }>(
+      db,
+      `SELECT stone_id, bundle, url FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      [slabId, saleId],
+    )
+    if (parent.length === 0) return null
+    await db.execute(
+      `INSERT INTO slab_inventory (stone_id, bundle, parent_id, sale_id, length, width, url)
+       VALUES (?, ?, ?, NULL, ?, ?, ?)`,
+      [parent[0].stone_id, parent[0].bundle, slabId, length, width, parent[0].url],
+    )
+    if (!addAnother) {
+      await db.execute(
+        `UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ? AND sale_id = ?`,
+        [slabId, saleId],
+      )
+      const remaining = await selectMany<{ count: number }>(
+        db,
+        `SELECT COUNT(*) as count FROM slab_inventory WHERE sale_id = ? AND cut_date IS NULL AND deleted_at IS NULL`,
+        [saleId],
+      )
+      const remainingCount = remaining[0]?.count ?? 0
+      const status = remainingCount > 0 ? 'partially cut' : 'cut'
+      await db.execute(`UPDATE sales SET status = ? WHERE id = ?`, [status, saleId])
+    }
+  } else if (intent === 'update-room-square-feet') {
+    const slabIdValue = formData.get('slabId')
+    const squareFeetRaw = formData.get('squareFeet')
+    const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
+    const squareFeet =
+      typeof squareFeetRaw === 'string' && squareFeetRaw.trim() !== ''
+        ? Number.parseFloat(squareFeetRaw)
+        : null
+    if (!slabId || !Number.isFinite(slabId)) {
+      return null
+    }
+    if (squareFeet !== null && !Number.isFinite(squareFeet)) {
+      return null
+    }
+    await db.execute(
+      `UPDATE slab_inventory SET square_feet = ? WHERE id = ? AND sale_id = ?`,
+      [squareFeet, slabId, saleId],
+    )
+  } else if (intent === 'add-slab') {
+    const slabId = Number(formData.get('slabId'))
+    const room = (formData.get('room') as string) || null
+    const roomUuidRaw = formData.get('roomUuid')
+    const roomUuid =
+      typeof roomUuidRaw === 'string' && roomUuidRaw.trim() !== '' ? roomUuidRaw.trim() : null
+    if (!slabId || !room) return null
 
-  return (
-    <div className='mb-6'>
-      <Form method='post'>
-        <AuthenticityTokenInput />
-        <input type='hidden' name='intent' value='sale-info-update' />
+    const templateQuery = roomUuid
+      ? `SELECT room_uuid, seam, room, backsplash, tear_out, square_feet, stove, ten_year_sealer, waterfall, corbels, price, extras, edge
+           FROM slab_inventory
+          WHERE sale_id = ? AND HEX(room_uuid) = ?
+          ORDER BY id
+          LIMIT 1`
+      : `SELECT room_uuid, seam, room, backsplash, tear_out, square_feet, stove, ten_year_sealer, waterfall, corbels, price, extras, edge
+           FROM slab_inventory
+          WHERE sale_id = ? AND (room = ? OR ? IS NULL)
+          ORDER BY id
+          LIMIT 1`
 
-        <div className='grid grid-cols-2 gap-3'>
-          <div className='col-span-2 sm:col-span-1'>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>
-              Customer
-            </label>
-            <div className='flex items-center'>
-              <div className='relative flex-grow'>
-                <input
-                  type='text'
-                  name='customer_name'
-                  value={customerName}
-                  onChange={e => setCustomerName(e.target.value)}
-                  className='w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                />
-              </div>
-              <Button
-                type='button'
-                variant='outline'
-                className='ml-2 px-2 py-2 h-[38px] border border-gray-300'
-                onClick={() => setShowCreateCustomer(true)}
-              >
-                <span className='text-lg'>+</span>
-              </Button>
-            </div>
-          </div>
+    const templateParams = roomUuid ? [saleId, roomUuid] : [saleId, room, room]
 
-          <div className='col-span-2 sm:col-span-1'>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>
-              Sale Date
-            </label>
-            <div className='w-full text-sm border border-gray-300 rounded-md px-3 py-2 bg-gray-50 shadow-inner'>
-              {new Date(sale.sale_date).toLocaleDateString()}
-            </div>
-          </div>
+    type TemplateRow = {
+      room_uuid: Buffer | null
+      seam: string | null
+      room: string | null
+      backsplash: string | null
+      tear_out: string | null
+      square_feet: number | null
+      stove: string | null
+      ten_year_sealer: string | null
+      waterfall: string | null
+      corbels: string | null
+      price: number | null
+      extras: string | null
+      edge: string | null
+    }
+    const templateRows = await selectMany<TemplateRow>(db, templateQuery, templateParams)
+    const template = templateRows[0] ?? null
+    const roomUuidValue =
+      template?.room_uuid ?? (roomUuid ? Buffer.from(roomUuid, 'hex') : null)
 
-          <div className='col-span-2 sm:col-span-1'>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>
-              Seller
-            </label>
-            <select
-              name='seller_id'
-              defaultValue={sale.seller_id.toString()}
-              className='w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500'
-            >
-              {sellers.map(seller => (
-                <option key={seller.id} value={seller.id}>
-                  {seller.name}
-                </option>
-              ))}
-            </select>
-          </div>
+    await db.execute(
+      `UPDATE slab_inventory
+         SET sale_id = ?,
+             room = ?,
+             room_uuid = ?,
+             seam = ?,
+             backsplash = ?,
+             tear_out = ?,
+             square_feet = ?,
+             stove = ?,
+             ten_year_sealer = ?,
+             waterfall = ?,
+             corbels = ?,
+             price = ?,
+             extras = ?,
+             edge = ?,
+             notes = NULL,
+             cut_date = NULL
+       WHERE id = ? AND sale_id IS NULL`,
+      [
+        saleId,
+        room,
+        roomUuidValue,
+        template?.seam ?? null,
+        template?.backsplash ?? null,
+        template?.tear_out ?? null,
+        template?.square_feet ?? null,
+        template?.stove ?? null,
+        template?.ten_year_sealer ?? null,
+        template?.waterfall ?? null,
+        template?.corbels ?? null,
+        template?.price ?? null,
+        template?.extras ?? null,
+        template?.edge ?? null,
+        slabId,
+      ],
+    )
+    const session = await getSession(request.headers.get('Cookie'))
+    session.flash('message', toastData('Success', 'Slab added to sale'))
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
+  } else {
+    return null
+  }
 
-          <div className='col-span-2 sm:col-span-1 flex items-end gap-2'>
-            <LoadingButton
-              type='submit'
-              className='py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md shadow-sm transition-colors flex-1'
-              loading={false}
-            >
-              Save Changes
-            </LoadingButton>
-
-            <Button
-              type='button'
-              variant='destructive'
-              className='py-2 px-4'
-              onClick={() => setShowUnsellConfirm(true)}
-            >
-              Unsell
-            </Button>
-          </div>
-        </div>
-      </Form>
-
-      {/* Confirm Unsell Dialog */}
-      <Dialog open={showUnsellConfirm} onOpenChange={setShowUnsellConfirm}>
-        <DialogContent className='bg-white rounded-lg p-6 shadow-lg'>
-          <DialogHeader>
-            <DialogTitle className='text-lg font-semibold text-gray-900'>
-              Confirm Return to Stock
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className='my-4'>
-            <p className='text-sm text-gray-600'>
-              Are you sure you want to return all items from this transaction back to
-              stock? This will reset all slabs and sinks that were part of this
-              transaction.
-            </p>
-          </div>
-
-          <DialogFooter className='flex justify-end gap-2 mt-4'>
-            <Button variant='outline' onClick={() => setShowUnsellConfirm(false)}>
-              Cancel
-            </Button>
-
-            <Form method='post'>
-              <AuthenticityTokenInput />
-              <input type='hidden' name='intent' value='sale-unsell' />
-              <Button type='submit' variant='destructive'>
-                Confirm Unsell
-              </Button>
-            </Form>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Customer Dialog */}
-      <Dialog open={showCreateCustomer} onOpenChange={setShowCreateCustomer}>
-        <DialogContent className='bg-white rounded-lg p-6 shadow-lg'>
-          <DialogHeader>
-            <DialogTitle className='text-lg font-semibold text-gray-900'>
-              Create New Customer
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className='my-4'>
-            <FormProvider {...customerForm}>
-              <form onSubmit={customerForm.handleSubmit(onSubmitCustomer)}>
-                <FormField
-                  control={customerForm.control}
-                  name='customer_name'
-                  render={({ field }) => (
-                    <div>
-                      <label className='block text-sm font-medium text-gray-700 mb-1'>
-                        Customer Name
-                      </label>
-                      <input
-                        {...field}
-                        type='text'
-                        className='w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                      />
-                      {customerForm.formState.errors.customer_name && (
-                        <p className='text-xs text-red-500 mt-1'>
-                          {customerForm.formState.errors.customer_name.message}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                />
-
-                <div className='flex justify-end gap-2 mt-4'>
-                  <Button
-                    variant='outline'
-                    type='button'
-                    onClick={() => setShowCreateCustomer(false)}
-                  >
-                    Cancel
-                  </Button>
-
-                  <LoadingButton
-                    type='submit'
-                    loading={
-                      customerForm.formState.isSubmitting || fetcher.state !== 'idle'
-                    }
-                  >
-                    Create Customer
-                  </LoadingButton>
-                </div>
-              </form>
-            </FormProvider>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+  const remaining = await selectMany<{ count: number }>(
+    db,
+    `SELECT COUNT(*) as count FROM slab_inventory WHERE sale_id = ? AND cut_date IS NULL AND deleted_at IS NULL`,
+    [saleId],
   )
+
+  const remainingCount = remaining[0]?.count ?? 0
+  const status = remainingCount > 0 ? 'partially cut' : 'cut'
+  await db.execute(`UPDATE sales SET status = ? WHERE id = ?`, [status, saleId])
+
+  return null
 }
 
-export default function EditTransaction() {
-  const { sale, slabs, sinks, availableSinks, sellers } = useLoaderData<typeof loader>()
-  const [deleteSlabId, setDeleteSlabId] = useState<number | null>(null)
-  const [deleteSinkId, setDeleteSinkId] = useState<number | null>(null)
+export default function ViewTransaction() {
+  const { sale, slabs, sinks, companyId } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
-
-  const navigation = useNavigation()
-
-  useEffect(() => {
-    if (navigation.state === 'loading' || navigation.state === 'idle') {
-      setDeleteSlabId(null)
-      setDeleteSinkId(null)
-    }
-  }, [navigation.state])
+  const location = useLocation()
+  const [replaceDialogOpen, setReplaceDialogOpen] = useState(false)
+  const [replaceTarget, setReplaceTarget] = useState<SaleSlab | null>(null)
+  const [replaceOptions, setReplaceOptions] = useState<
+    { id: number; bundle: string; is_leftover: boolean; parent_id: number | null; child_count: number }[]
+  >([])
+  const [replaceLoading, setReplaceLoading] = useState(false)
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [addSearch, setAddSearch] = useState('')
+  const [addStones, setAddStones] = useState<
+    { id: number; name: string; url: string | null }[]
+  >([])
+  const [addStoneId, setAddStoneId] = useState<number | null>(null)
+  const [addSlabs, setAddSlabs] = useState<
+    { id: number; bundle: string; is_leftover: boolean; parent_id?: number | null; child_count?: number }[]
+  >([])
+  const [addLoading, setAddLoading] = useState(false)
+  const [addSlabsLoading, setAddSlabsLoading] = useState(false)
+  const [addRoom, setAddRoom] = useState<RoomOption | null>(null)
+  const [newRoomName, setNewRoomName] = useState('')
+  const openAddDialog = () => {
+    const defaultStone = slabs[0]?.stone_name || ''
+    setAddSearch(defaultStone)
+    setAddStoneId(null)
+    setAddSlabs([])
+    setAddRoom(null)
+    setAddDialogOpen(true)
+  }
+  const currentSlabIds = slabs.map(s => s.id)
 
   const handleDialogClose = (open: boolean) => {
     if (!open) {
-      setDeleteSlabId(null)
-      setDeleteSinkId(null)
+      navigate(`/admin/transactions${location.search}`)
     }
   }
 
-  const handleDialogChange = (open: boolean) => {
-    if (open === false) {
-      navigate(`/admin/transactions`)
+  const slabsByRoom = useMemo(
+    () =>
+      slabs.reduce<
+        Record<string, { name: string; slabs: SaleSlab[]; roomUuid: string | null }>
+      >((acc, slab) => {
+        const roomName = normalizeRoomName(slab.room)
+        const key = roomKeyFromSlab(slab)
+        if (!acc[key]) acc[key] = { name: roomName, slabs: [], roomUuid: slab.room_uuid ?? null }
+        acc[key].slabs.push(slab)
+        return acc
+      }, {}),
+    [slabs],
+  )
+  const sinksByRoom = useMemo(
+    () =>
+      sinks.reduce<
+        Record<string, { name: string; items: { name: string; count: number }[] }>
+      >((acc, sink) => {
+        const roomName = normalizeRoomName(sink.room)
+        const key = roomKeyFromSink(sink)
+        if (!acc[key]) acc[key] = { name: roomName, items: [] }
+        const existing = acc[key].items.find(item => item.name === sink.name)
+        if (existing) existing.count += 1
+        else acc[key].items.push({ name: sink.name, count: 1 })
+        return acc
+      }, {}),
+    [sinks],
+  )
+  const sinksBySlab = useMemo(
+    () =>
+      sinks.reduce<Record<number, SaleSink[]>>((acc, sink) => {
+        acc[sink.slab_id] = acc[sink.slab_id] || []
+        acc[sink.slab_id].push(sink)
+        return acc
+      }, {}),
+    [sinks],
+  )
+
+  const submitAction = async (
+    payload: Record<string, string | number | null>,
+    options?: { skipNavigate?: boolean },
+  ) => {
+    const formData = new FormData()
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) formData.append(key, String(value))
+    })
+    await fetch(location.pathname + location.search, {
+      method: 'POST',
+      body: formData,
+    })
+    if (!options?.skipNavigate) {
+      navigate(location.pathname + location.search, { replace: true })
     }
   }
 
-  const hasSingleSlab = slabs.length === 1
+  const handleCut = (slab: SaleSlab) => {
+    submitAction({
+      intent: slab.cut_date ? 'uncut-slab' : 'cut-slab',
+      slabId: slab.id,
+    })
+  }
+
+  const { toast } = useToast()
+  type LocalRoom = { id: string; name: string }
+  const [localRooms, setLocalRooms] = useState<LocalRoom[]>([])
+  const [roomOrder, setRoomOrder] = useState<string[]>([])
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<SaleSlab | null>(null)
+  const removeFetcher = useFetcher<typeof action>()
+  const [savingRoomId, setSavingRoomId] = useState<string | null>(null)
+  const [partialDialogOpen, setPartialDialogOpen] = useState(false)
+  const [partialTarget, setPartialTarget] = useState<SaleSlab | null>(null)
+  const [partialLength, setPartialLength] = useState('')
+  const [partialWidth, setPartialWidth] = useState('')
+  const [partialSubmitting, setPartialSubmitting] = useState(false)
+
+  useEffect(() => {
+    const slabRoomKeys = slabs.map(roomKeyFromSlab)
+    const localIds = localRooms.map(r => r.id)
+    setRoomOrder(prev => {
+      const active = new Set([...slabRoomKeys, ...localIds])
+      const next: string[] = []
+      prev.forEach(key => {
+        if (active.has(key) && !next.includes(key)) next.push(key)
+      })
+      slabRoomKeys.forEach(key => {
+        if (!next.includes(key)) next.push(key)
+      })
+      localIds.forEach(key => {
+        if (!next.includes(key)) next.push(key)
+      })
+      return next
+    })
+  }, [slabs, localRooms])
+
+  const roomEntries = useMemo(() => {
+    const items: {
+      id: string
+      name: string
+      slabs: SaleSlab[]
+      isLocal: boolean
+      roomUuid: string | null
+    }[] = []
+    const addRoomEntry = (key: string) => {
+      if (items.some(r => r.id === key)) return
+      const slabRoom = slabsByRoom[key]
+      if (slabRoom) {
+        items.push({
+          id: key,
+          name: slabRoom.name,
+          slabs: slabRoom.slabs,
+          isLocal: false,
+          roomUuid: slabRoom.roomUuid,
+        })
+        return
+      }
+      const local = localRooms.find(r => r.id === key)
+      if (local) {
+        items.push({ id: local.id, name: local.name, slabs: [], isLocal: true, roomUuid: null })
+      }
+    }
+    roomOrder.forEach(addRoomEntry)
+    Object.keys(slabsByRoom).forEach(addRoomEntry)
+    localRooms.forEach(r => addRoomEntry(r.id))
+    return items
+  }, [roomOrder, slabsByRoom, localRooms])
+
+  const allRooms = useMemo<RoomOption[]>(
+    () => roomEntries.map(r => ({ id: r.id, name: r.name, roomUuid: r.roomUuid })),
+    [roomEntries],
+  )
+
+  const handleRemove = (slab: SaleSlab) => {
+    if (slabs.length <= 1) {
+      toast({ title: 'Cannot remove last slab', variant: 'destructive' })
+      return
+    }
+    setRemoveTarget(slab)
+    setRemoveDialogOpen(true)
+  }
+
+  const handlePartialOpen = (slab: SaleSlab) => {
+    setPartialTarget(slab)
+    setPartialLength('')
+    setPartialWidth('')
+    setPartialDialogOpen(true)
+  }
+
+  const handlePartialSubmit = async (addAnother: boolean) => {
+    if (!partialTarget) return
+    const lengthValue = partialLength.trim()
+    const widthValue = partialWidth.trim()
+    const lengthParsed = lengthValue === '' ? null : Number.parseFloat(lengthValue)
+    const widthParsed = widthValue === '' ? null : Number.parseFloat(widthValue)
+    if (
+      lengthParsed === null ||
+      widthParsed === null ||
+      Number.isNaN(lengthParsed) ||
+      Number.isNaN(widthParsed) ||
+      lengthParsed <= 0 ||
+      widthParsed <= 0
+    )
+      return
+    setPartialSubmitting(true)
+    try {
+      await submitAction(
+        {
+          intent: 'partial-cut',
+          slabId: partialTarget.id,
+          length: lengthParsed,
+          width: widthParsed,
+          addAnother: addAnother ? 1 : 0,
+        },
+        { skipNavigate: addAnother },
+      )
+      if (addAnother) {
+        setPartialLength('')
+        setPartialWidth('')
+      } else {
+        setPartialDialogOpen(false)
+        setPartialTarget(null)
+      }
+    } finally {
+      setPartialSubmitting(false)
+    }
+  }
+
+  const handleUpdateRoomSquareFeet = async (
+    roomId: string,
+    slabId: number,
+    squareFeet: number | null,
+  ) => {
+    setSavingRoomId(roomId)
+    try {
+      await submitAction({
+        intent: 'update-room-square-feet',
+        slabId,
+        squareFeet: squareFeet === null ? '' : squareFeet,
+      })
+    } finally {
+      setSavingRoomId(null)
+    }
+  }
+
+  useEffect(() => {
+    if (removeFetcher.state === 'idle' && removeFetcher.data?.success) {
+      setRemoveDialogOpen(false)
+      setRemoveTarget(null)
+    }
+  }, [removeFetcher.state, removeFetcher.data])
+
+  const openReplace = async (slab: SaleSlab) => {
+    setReplaceTarget(slab)
+    setReplaceOptions([])
+    setReplaceDialogOpen(true)
+    setReplaceLoading(true)
+    try {
+      const res = await fetch(
+        `/api/stones/${slab.stone_id}/slabs?exclude=${encodeURIComponent(
+          JSON.stringify(currentSlabIds),
+        )}`,
+      )
+      const json = await res.json()
+      setReplaceOptions(json.slabs || [])
+    } finally {
+      setReplaceLoading(false)
+    }
+  }
+
+  const handleReplaceChoose = async (newSlabId: number) => {
+    if (!replaceTarget) return
+    setReplaceDialogOpen(false)
+    setReplaceTarget(null)
+    await submitAction({
+      intent: 'replace-slab',
+      oldSlabId: replaceTarget.id,
+      newSlabId,
+    })
+  }
+
+  const searchAddStones = async (term: string) => {
+    setAddLoading(true)
+    try {
+      const res = await fetch(
+        `/api/stones/search/${companyId}?name=${encodeURIComponent(term)}&show_sold_out=true`,
+      )
+      const json = await res.json()
+      setAddStones(json.stones || [])
+    } finally {
+      setAddLoading(false)
+    }
+  }
+
+  const loadAddSlabs = async (stoneId: number) => {
+    setAddSlabsLoading(true)
+    try {
+      const res = await fetch(
+        `/api/stones/${stoneId}/slabs?exclude=${encodeURIComponent(
+          JSON.stringify(currentSlabIds),
+        )}`,
+      )
+      const json = await res.json()
+      setAddSlabs(json.slabs || [])
+    } finally {
+      setAddSlabsLoading(false)
+    }
+  }
+
+  const handleAddStoneSelect = (stoneId: number) => {
+    setAddStoneId(stoneId)
+    setAddSlabs([])
+    loadAddSlabs(stoneId)
+  }
+
+  const resetAddDialog = () => {
+    setAddDialogOpen(false)
+    setAddStoneId(null)
+    setAddSlabs([])
+    setAddSearch('')
+    setAddRoom(null)
+  }
+
+  const handleAddSlab = async (slabId: number) => {
+    if (!addRoom) return
+    await submitAction({
+      intent: 'add-slab',
+      slabId,
+      room: addRoom.name,
+      roomUuid: addRoom.roomUuid ?? null,
+    })
+    setLocalRooms(prev => prev.filter(r => r.id !== addRoom.id))
+    resetAddDialog()
+  }
+
+  const handleRenameRoom = (id: string, name: string) => {
+    setLocalRooms(prev => prev.map(r => (r.id === id ? { ...r, name } : r)))
+  }
+
+  const handleRemoveLocalRoom = (id: string) => {
+    setLocalRooms(prev => prev.filter(r => r.id !== id))
+  }
+
+  const handleAddRoom = (name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    const id = `${Date.now()}-${Math.random()}`
+    setLocalRooms(prev => [...prev, { id, name: trimmed }])
+    setRoomOrder(prev => (prev.includes(id) ? prev : [...prev, id]))
+    setNewRoomName('')
+  }
+
+
+  useEffect(() => {
+    if (!addDialogOpen || !addRoom) return
+    const term = addSearch.trim()
+    if (!term) {
+      setAddStones([])
+      return
+    }
+    const timer = setTimeout(() => {
+      searchAddStones(term)
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [addSearch, addDialogOpen, addRoom])
 
   return (
-    <Dialog open={true} onOpenChange={handleDialogChange}>
-      <DialogContent className='bg-white rounded-lg pt-4 px-4 shadow-lg text-gray-800 overflow-y-auto max-h-[85vh] max-w-2xl'>
-        <DialogHeader className='mb-3 pb-2 border-b border-gray-200'>
-          <DialogTitle className='text-xl font-semibold text-gray-900'>
-            Edit Sale #{sale.id}
-          </DialogTitle>
+    <Dialog open={true} onOpenChange={handleDialogClose}>
+      <DialogContent className='min-w-[500px] max-w-6xl max-h-[90vh] overflow-y-auto'>
+        <DialogHeader>
+          <DialogTitle>Transaction Details</DialogTitle>
         </DialogHeader>
 
-        <SaleInfoEdit sale={sale} sellers={sellers} />
-
-        <Tabs defaultValue='slabs' className='w-full'>
-          <TabsList className='w-full grid grid-cols-2 mb-3'>
-            <TabsTrigger value='slabs' className='data-[state=active]:bg-blue-100'>
-              Slabs ({slabs.length})
-            </TabsTrigger>
-            <TabsTrigger value='sinks' className='data-[state=active]:bg-blue-100'>
-              Sinks ({sinks.length})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent
-            value='slabs'
-            className='max-h-[40vh] overflow-y-auto rounded-md bg-gray-50 p-3 shadow-inner'
-          >
-            {slabs.length === 0 ? (
-              <p className='text-center text-gray-500 py-4'>
-                No slabs in this transaction
-              </p>
-            ) : (
-              <div className='space-y-3'>
-                {slabs.map(slab => (
-                  <div
-                    key={slab.id}
-                    className={`p-3 rounded-md border shadow-sm ${
-                      slab.cut_date
-                        ? 'bg-gray-100 border-gray-300'
-                        : 'bg-white border-gray-200'
-                    }`}
-                  >
-                    <input type='hidden' name='slabId' value={slab.id} />
-
-                    <div className='flex justify-between'>
-                      <span className='font-medium text-sm text-gray-800'>
-                        {slab.stone_name} - {slab.bundle}
-                      </span>
-
-                      <Button
-                        variant='destructive'
-                        disabled={hasSingleSlab}
-                        onClick={() => setDeleteSlabId(slab.id)}
-                      >
-                        Delete
-                      </Button>
-                      {deleteSlabId === slab.id && (
-                        <DeleteRow
-                          handleChange={handleDialogClose}
-                          title='Delete slab'
-                          description={`Are you sure you want to delete ${slab.stone_name} - ${slab.bundle}?`}
-                          intent='slab-delete'
-                          id={slab.id}
-                        />
-                      )}
+        <div className='flex flex-col gap-6 py-4'>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-6 items-start'>
+            <Card>
+              <CardHeader className='pb-2'>
+                <CardTitle className='text-lg font-semibold flex items-center gap-2'>
+                  Sale Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className='grid gap-4 text-sm'>
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <User className='h-4 w-4' />
+                      <span>Customer</span>
                     </div>
-
-                    <SlabEdit slab={slab} />
+                    <span className='font-medium'>{sale.customer_name}</span>
                   </div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value='sinks' className='bg-gray-50 rounded-md p-3 shadow-inner'>
-            <div className='max-h-[25vh] overflow-y-auto mb-4'>
-              <div className='space-y-3'>
-                {sinks.map(sink => (
-                  <div
-                    key={sink.id}
-                    className={`p-3 rounded-md border shadow-sm ${
-                      sink.is_deleted === 1
-                        ? 'bg-gray-100 border-gray-300'
-                        : 'bg-white border-gray-200'
-                    }`}
-                  >
-                    <input type='hidden' name='sinkId' value={sink.id} />
-                    <input type='hidden' name='sinkTypeId' value={sink.sink_type_id} />
-
-                    <div className='flex justify-between items-center mb-2'>
-                      <span className='font-medium text-sm text-gray-800'>
-                        {sink.name}
-                      </span>
-                      <Button
-                        variant='destructive'
-                        onClick={() => setDeleteSinkId(sink.id)}
-                      >
-                        Delete
-                      </Button>
-                      {deleteSinkId === sink.id && (
-                        <DeleteRow
-                          handleChange={handleDialogClose}
-                          title='Delete sink'
-                          description={`Are you sure you want to delete ${sink.name}?`}
-                          intent='sink-delete'
-                          id={sink.id}
-                        />
-                      )}
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <Calendar className='h-4 w-4' />
+                      <span>Sale Date</span>
                     </div>
+                    <span className='font-medium'>{formatDate(sale.sale_date)}</span>
+                  </div>
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <UserCircle className='h-4 w-4' />
+                      <span>Sold By</span>
+                    </div>
+                    <span className='font-medium'>{sale.seller_name}</span>
+                  </div>
+                  <div className='flex items-center justify-between border-b pb-2 last:border-0 last:pb-0'>
+                    <div className='flex items-center gap-2 text-muted-foreground'>
+                      <MapPin className='h-4 w-4' />
+                      <span>Project Address</span>
+                    </div>
+                    <span className='font-medium text-right'>
+                      {sale.project_address || 'No address'}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                    <div className='grid grid-cols-1 gap-2'>
-                      <div className='col-span-1'>
-                        <SinkEdit sink={sink} />
+            <Card>
+              <CardHeader className='pb-2'>
+                <CardTitle className='text-lg font-semibold'>Room Sinks</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {Object.keys(sinksByRoom).length === 0 ? (
+                  <p className='text-sm text-muted-foreground py-2'>No sinks</p>
+                ) : (
+                  <div className='space-y-2'>
+                    {Object.entries(sinksByRoom).map(([roomId, room]) => (
+                      <div key={roomId} className='flex justify-between items-center'>
+                        <span className='font-semibold'>
+                          {room.name.charAt(0).toUpperCase() + room.name.slice(1)}
+                        </span>
+                        <div className='flex flex-wrap gap-2 text-sm text-muted-foreground justify-end'>
+                          {room.items.map(item => (
+                            <span key={item.name} className='px-2 py-1 rounded bg-muted'>
+                              {item.name}
+                              {item.count > 1 ? ` x${item.count}` : ''}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                )}
+              </CardContent>
+            </Card>
+
+          </div>
+
+          <Card>
+            <CardHeader className='pb-2'>
+              <CardTitle className='text-lg font-semibold'>Rooms</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RoomsSection
+                roomEntries={roomEntries}
+                slabsCount={slabs.length}
+                localRoomsCount={localRooms.length}
+                onRenameRoom={handleRenameRoom}
+                onRemoveLocalRoom={handleRemoveLocalRoom}
+                onAddRoom={handleAddRoom}
+                newRoomName={newRoomName}
+                onNewRoomNameChange={setNewRoomName}
+                handleCut={handleCut}
+                openReplace={openReplace}
+                handleRemove={handleRemove}
+                formatDate={formatDate}
+                onReplaceBlocked={() =>
+                  toast({
+                    title: 'Uncut slab before replace',
+                    variant: 'destructive',
+                  })
+                }
+                onUpdateRoomSquareFeet={handleUpdateRoomSquareFeet}
+                savingRoomId={savingRoomId}
+                openPartial={handlePartialOpen}
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className='flex justify-end mt-4 gap-2'>
+          <Button onClick={openAddDialog}>
+            Add Slab
+          </Button>
+          <Button
+            variant='outline'
+            onClick={() => navigate(`/employee/transactions${location.search}`)}
+          >
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+      <ReplaceDialog
+        open={replaceDialogOpen}
+        onOpenChange={setReplaceDialogOpen}
+        target={replaceTarget}
+        options={replaceOptions}
+        loading={replaceLoading}
+        onChoose={handleReplaceChoose}
+      />
+      {partialDialogOpen && partialTarget && (
+        <Dialog
+          open={partialDialogOpen}
+          onOpenChange={open => {
+            setPartialDialogOpen(open)
+            if (!open) {
+              setPartialTarget(null)
+              setPartialLength('')
+              setPartialWidth('')
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Mark as partially cut</DialogTitle>
+              <p className='text-sm text-muted-foreground'>
+                What are the leftover dimensions for slab {partialTarget.bundle}?
+              </p>
+            </DialogHeader>
+            <div className='space-y-3'>
+              <div className='grid grid-cols-2 gap-2'>
+                <Input
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  value={partialLength}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPartialLength(e.target.value)}
+                  disabled={partialSubmitting}
+                  placeholder='Length'
+                />
+                <Input
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  value={partialWidth}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPartialWidth(e.target.value)}
+                  disabled={partialSubmitting}
+                  placeholder='Width'
+                />
+              </div>
+              <div className='flex justify-end gap-2'>
+                <Button
+                  type='button'
+                  variant='outline'
+                  disabled={partialSubmitting}
+                  onClick={() => handlePartialSubmit(true)}
+                >
+                  More left overs
+                </Button>
+                <Button
+                  type='button'
+                  disabled={partialSubmitting}
+                  onClick={() => handlePartialSubmit(false)}
+                >
+                  Done
+                </Button>
               </div>
             </div>
-
-            <div className='mt-4 p-3 border border-blue-100 rounded-md bg-blue-50 shadow-sm'>
-              <h4 className='text-sm font-medium mb-2 text-blue-800'>Add New Sink</h4>
-
-              <SinkAdd availableSinks={availableSinks} />
+          </DialogContent>
+        </Dialog>
+      )}
+      <AddSlabDialog
+        open={addDialogOpen}
+        onOpenChange={open => (open ? setAddDialogOpen(true) : resetAddDialog())}
+        addRoom={addRoom}
+        allRooms={allRooms}
+        addSearch={addSearch}
+        setAddSearch={setAddSearch}
+        addLoading={addLoading}
+        addStones={addStones}
+        addStoneId={addStoneId}
+        onSelectStone={handleAddStoneSelect}
+        addSlabs={addSlabs}
+        addSlabsLoading={addSlabsLoading}
+        onSelectSlab={handleAddSlab}
+        onSelectRoom={setAddRoom}
+      />
+      {removeDialogOpen && removeTarget && (
+        <Dialog
+          open={removeDialogOpen}
+          onOpenChange={open => {
+            setRemoveDialogOpen(open)
+            if (!open) setRemoveTarget(null)
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Remove Slab</DialogTitle>
+              <p className='text-sm text-muted-foreground'>
+                Are you sure you want to remove slab {removeTarget.bundle} from this sale?
+              </p>
+            </DialogHeader>
+            <div className='flex justify-end gap-2'>
+              <Button
+                variant='outline'
+                onClick={() => {
+                  setRemoveDialogOpen(false)
+                  setRemoveTarget(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <removeFetcher.Form method='post'>
+                <input type='hidden' name='intent' value='remove-slab' />
+                <input type='hidden' name='slabId' value={removeTarget.id} />
+                <Button type='submit' variant='destructive' autoFocus>
+                  Delete
+                </Button>
+              </removeFetcher.Form>
             </div>
-          </TabsContent>
-        </Tabs>
-        <Outlet />
-      </DialogContent>
+          </DialogContent>
+        </Dialog>
+      )}
+      <Outlet />
     </Dialog>
   )
 }

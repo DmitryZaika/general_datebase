@@ -4,14 +4,13 @@ import { useEffect, useState } from 'react'
 import {
   type ActionFunctionArgs,
   Form,
-  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
   useLocation,
   useNavigate,
-  useSearchParams,
+  useSearchParams
 } from 'react-router'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { PageLayout } from '~/components/PageLayout'
@@ -465,16 +464,7 @@ export default function EmployeeTransactions() {
     {
       accessorKey: 'customer_name',
       header: ({ column }) => <SortableHeader column={column} title='Customer' />,
-      cell: ({ row }) => {
-        return (
-          <Link
-            to={`edit/${row.original.id}${location.search}`}
-            className='text-blue-600 hover:underline'
-          >
-            {row.original.customer_name}
-          </Link>
-        )
-      },
+      cell: ({ row }) => <span className='text-blue-600'>{row.original.customer_name}</span>,
     },
     {
       accessorKey: 'seller_name',
@@ -721,8 +711,8 @@ export default function EmployeeTransactions() {
           data={transactions.map(transaction => ({
             ...transaction,
             className: 'hover:bg-gray-50 cursor-pointer',
-            onClick: () => handleRowClick(transaction.id),
           }))}
+          onRowClick={row => handleRowClick(row.id)}
           paginate
           pageSize={50}
         />
