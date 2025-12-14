@@ -62,5 +62,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     })
     .filter((n): n is NotificationItem => n !== null)
 
-  return data({ notifications })
+  return data(
+    { notifications },
+    { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } },
+  )
 }

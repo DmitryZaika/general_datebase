@@ -195,7 +195,6 @@ export function HeaderMobile({
   className,
 }: HeaderMobileProps) {
   const location = useLocation()
-  const isAdminPage = location.pathname.startsWith('/admin')
   const isCustomerPage = location.pathname.startsWith('/customer')
   const data = useLoaderData<{ user: { company_id: number } | null }>()
   const companyId = isCustomerPage
