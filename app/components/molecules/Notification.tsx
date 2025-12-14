@@ -27,7 +27,7 @@ export function Notification({ className }: NotificationProps) {
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ['notifications'],
     queryFn: getNotifications,
-    refetchInterval: 10000,
+    refetchInterval: 30000,
     refetchIntervalInBackground: true,
   })
 

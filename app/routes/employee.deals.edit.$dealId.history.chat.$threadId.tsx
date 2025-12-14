@@ -18,6 +18,7 @@ import {
 } from '~/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { db } from '~/db.server'
+import { useToast } from '~/hooks/use-toast'
 import { getEmployeeUser } from '~/utils/session.server'
 
 interface Message {
@@ -213,12 +214,24 @@ export default function EmailChatDialog() {
   const [showSelect, setShowSelect] = useState(false)
   const [selectActive, setSelectActive] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
+  const { toast } = useToast()
   const { customerName, customerEmail, messages, dealId, subject, threadId } =
     useLoaderData<typeof loader>()
+  const [chatMessages, setChatMessages] = useState<Message[]>(messages)
   const [messageText, setMessageText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const bottomRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    setChatMessages(messages)
+    
+  }, [messages])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [chatMessages.length])
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -239,7 +252,7 @@ export default function EmailChatDialog() {
     return name.slice(0, 2).toUpperCase()
   }
 
-  const lastMessageFromMe = [...messages].reverse().find(m => !m.isFromCustomer)
+  const lastMessageFromMe = [...chatMessages].reverse().find(m => !m.isFromCustomer)
   const lastReadMessageId = lastMessageFromMe?.read_at ? lastMessageFromMe.id : null
 
   const handleTemplateSelect = (value: string) => {
@@ -309,8 +322,18 @@ export default function EmailChatDialog() {
         throw new Error(errorText || 'Email failed to send')
       }
 
+      setChatMessages(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          subject: emailSubject,
+          body,
+          sent_at: new Date().toISOString(),
+          isFromCustomer: false,
+        },
+      ])
       setMessageText('')
-      window.location.reload()
+      toast({ title: 'Success', description: 'Email sent!', variant: 'success' })
     } catch (error) {
       if (error instanceof Error) {
         alert(error.message)
@@ -324,7 +347,7 @@ export default function EmailChatDialog() {
 
   function showDate(message: Message, index: number) {
     return index === 0 || 
-      new Date(messages[index - 1].sent_at).toDateString() !== 
+      new Date(chatMessages[index - 1].sent_at).toDateString() !== 
       new Date(message.sent_at).toDateString()
   }
 
@@ -345,7 +368,7 @@ export default function EmailChatDialog() {
         </DialogHeader>
 
         <div className='flex-1 overflow-y-auto p-4 space-y-4'>
-          {messages.map((message, index) => (
+          {chatMessages.map((message, index) => (
               <div key={message.id}>
                 {showDate(message, index) && (
                   <div className='text-center text-xs text-gray-500 my-4'>
@@ -382,6 +405,7 @@ export default function EmailChatDialog() {
                
               </div>
             ))}
+          <div ref={bottomRef} />
         </div>
 
         <div className='p-4 border-t'>
