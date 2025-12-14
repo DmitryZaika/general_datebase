@@ -312,7 +312,8 @@ export default function EmailChatDialog() {
             </div>
             <div>
               <DialogTitle className='text-lg font-semibold'>{customerName}</DialogTitle>
-              <p className='text-sm text-gray-500'>{customerEmail}</p>
+              <p className='text-sm text-gray-500'>Email: {customerEmail}</p>
+              <p className='text-sm text-gray-500'>Subject: {subject}</p>
             </div>
           </div>
         </DialogHeader>
