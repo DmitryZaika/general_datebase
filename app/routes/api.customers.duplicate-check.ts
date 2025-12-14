@@ -38,7 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     params.push(parsed.email)
   }
 
-  const where = `WHERE c.company_id = ? AND (${contactConds.join(' OR ')})`
+  const where = `WHERE c.company_id = ? AND (${contactConds.join(' OR ')}) AND c.deleted_at IS NULL`
 
   const rows = await selectMany<{
     id: number

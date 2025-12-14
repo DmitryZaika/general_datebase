@@ -25,9 +25,9 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { getAdminUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 const payrollRuleSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -68,7 +68,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const { amount } = result.data
 
     await db.execute(
-      `INSERT INTO payroll (name, amount, type, company_id) 
+      `INSERT INTO payroll (name, amount, type, company_id)
        VALUES (?, ?, ?, ?)`,
       [name, amount, type, user.company_id],
     )

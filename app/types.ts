@@ -19,6 +19,7 @@ export interface Sink {
   retail_price: number
   sink_count: number
   available: number
+  regular_stock?: boolean | number
 }
 
 export interface Stone {
@@ -37,9 +38,15 @@ export interface StoneImage {
   cost_per_sqft: number
   available: number
   samples_amount: number
+  regular_stock?: boolean | number
 }
 
-export type StoneSlim = Omit<Stone, 'retail_price'>
+export interface StoneSlim {
+  id: number
+  type: string
+  name: string
+  retail_price?: number
+}
 
 export interface Faucet {
   id: number
@@ -48,6 +55,7 @@ export interface Faucet {
   retail_price: number
   faucet_count: number
   available: number
+  regular_stock?: boolean | number
 }
 
 export interface InstructionSlim {
@@ -83,6 +91,9 @@ export interface Customer {
   address?: string | null
   phone?: string | null
   email?: string | null
+  postal_code?: string | null
+  company_name?: string | null
+  city?: string | null
 }
 
 export interface StoneSearchResult {
@@ -97,6 +108,7 @@ export interface StoneSearchResult {
   available: number
   amount: number
   is_display: boolean
+  regular_stock?: boolean | number
 }
 export type Action =
   | { type: 'ADD_EVENT'; payload: Event }

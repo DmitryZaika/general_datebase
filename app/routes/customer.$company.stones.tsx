@@ -7,6 +7,7 @@ import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { db } from '~/db.server'
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
+import { withIconSuffix } from '~/utils/files'
 import { stoneQueryBuilder } from '~/utils/queries.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { capitalizeFirstLetter } from '~/utils/words'
@@ -22,7 +23,12 @@ interface Stone {
   width: number | null
   amount: number | null
   on_sale: boolean | number
+  regular_stock: boolean | number
   created_date: string
+}
+
+function getStoneUrl(original: string | null) {
+  return original ? withIconSuffix(original) : '/placeholder.png'
 }
 
 function sortStones(a: Stone, b: Stone) {
@@ -46,7 +52,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     hex_code: string
   }>(db, 'SELECT id, name, hex_code FROM colors ORDER BY name ASC')
 
-  return { stones, colors }
+  return { stones, colors, companyId: Number(params.company) }
 }
 
 interface InteractiveCardProps {
@@ -59,6 +65,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
   const displayedWidth = stone.width && stone.width > 0 ? stone.width : '—'
   const displayedLength = stone.length && stone.length > 0 ? stone.length : '—'
   const isOnSale = !!stone.on_sale
+  const isRegularStock = !!stone.regular_stock
   const createdDate = new Date(stone.created_date)
   const threeWeeksAgo = new Date()
   threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 30)
@@ -84,6 +91,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
           </div>
         </div>
       )}
+      {/* TODO: Add slabs link */}
       <ImageCard
         type='slabs'
         itemId={stone.id}
@@ -95,31 +103,31 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
         title={stone.name}
       >
         <img
-          src={stone.url || '/placeholder.png'}
+          src={getStoneUrl(stone.url)}
           alt={stone.name || 'Stone Image'}
           className='object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
           loading='lazy'
           onClick={() => setCurrentId(stone.id, stoneType)}
         />
       </ImageCard>
-      {stone.available === 0 && (
+      {stone.available === 0 && !isRegularStock && (
         <div className='absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
           <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
             Out of Stock
           </div>
         </div>
       )}
-      {isNew && (
+      {/* {isNew && (
         <div className='absolute top-0 right-0 bg-green-500 text-white px-2 py-1 rounded-bl text-sm font-bold'>
           New Color
         </div>
-      )}
+      )} */}
     </div>
   )
 }
 
 export default function Stones() {
-  const { stones } = useLoaderData<typeof loader>()
+  const { stones, companyId } = useLoaderData<typeof loader>()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const [_, setActiveType] = useState<string | undefined>(undefined)
 
@@ -144,7 +152,7 @@ export default function Stones() {
   return (
     <>
       <div className='flex justify-center sm:justify-end'>
-        <StoneSearch userRole='customer' />
+        <StoneSearch userRole='customer' companyId={companyId} />
       </div>
 
       <ModuleList>

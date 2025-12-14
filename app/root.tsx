@@ -16,27 +16,24 @@ import {
 } from 'react-router'
 import { AuthenticityTokenProvider } from 'remix-utils/csrf/react'
 import { EmployeeSidebar } from '~/components/molecules/Sidebars/EmployeeSidebar'
-import {
-  OriginalSidebarTrigger,
-  SidebarProvider,
-  SidebarTrigger,
-} from '~/components/ui/sidebar'
+import { SidebarProvider } from '~/components/ui/sidebar'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
+import { useToast } from '~/hooks/use-toast'
 import type { ISupplier } from '~/schemas/suppliers'
+import { queryClient } from '~/utils/api'
 import { csrf } from '~/utils/csrf.server'
+import { selectId, selectMany } from '~/utils/queryHelpers'
+import { getUserBySessionId } from '~/utils/session.server'
+import type { ToastMessage } from '~/utils/toastHelpers.server'
 import { getBase } from '~/utils/urlHelpers'
 import { Header } from './components/Header'
 import { Chat } from './components/organisms/Chat'
 import { MarketingHeader } from './components/organisms/MarketingHeader'
+import { SidebarToggle } from './components/SidebarToggle'
 import { Toaster } from './components/ui/toaster'
-import { useToast } from './hooks/use-toast'
-import { commitSession, getSession } from './sessions'
+import { commitSession, getSession } from './sessions.server'
 import './tailwind.css'
-import { queryClient } from './utils/api'
-import { selectId, selectMany } from './utils/queryHelpers'
-import { getUserBySessionId } from './utils/session.server'
-import type { ToastMessage } from './utils/toastHelpers'
 
 export const links: LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -146,19 +143,33 @@ export async function loader({ request }: LoaderFunctionArgs) {
        FROM users u
        LEFT JOIN users_positions up ON up.user_id = u.id
        LEFT JOIN positions p ON p.id = up.position_id
-       WHERE u.id = ? AND p.name IN ('external_marketing','check-in') AND u.is_deleted = 0`,
+       WHERE u.id = ? AND p.name IN ('external_marketing','check-in','installer','shop_worker') AND u.is_deleted = 0`,
       [user.id],
     )
     const hasCheckIn = Array.isArray(rows) && rows.some(r => r.position === 'check-in')
     const hasExternalMarketing =
       Array.isArray(rows) && rows.some(r => r.position === 'external_marketing')
+    const hasInstaller =
+      Array.isArray(rows) && rows.some(r => r.position === 'installer')
+    const hasShopWorker =
+      Array.isArray(rows) && rows.some(r => r.position === 'shop_worker')
     position = hasCheckIn
       ? 'check-in'
       : hasExternalMarketing
         ? 'external_marketing'
-        : null
+        : hasShopWorker
+          ? 'shop_worker'
+          : null
 
     const url = new URL(request.url)
+    // Installer users: always redirect to their checklist
+    if (hasInstaller) {
+      const installerTarget = `/installers/${user.company_id}/checklist`
+      if (!url.pathname.startsWith('/installers/')) {
+        return redirect(installerTarget)
+      }
+    }
+
     if (hasCheckIn) {
       const target = `/customer/${user.company_id}/check-in`
       if (!url.pathname.startsWith(target)) {
@@ -172,6 +183,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       if (!url.pathname.startsWith('/external/marketing/')) {
         return redirect(marketingTarget)
       }
+    }
+    if (hasShopWorker && !url.pathname.startsWith('/shop')) {
+      return redirect('/shop/transactions')
     }
   }
 
@@ -206,6 +220,7 @@ export default function App() {
     sinkSuppliers,
     faucetSuppliers,
     colors,
+    position,
   } = useLoaderData<typeof loader>()
   const { pathname } = useLocation()
   const { toast } = useToast()
@@ -215,7 +230,12 @@ export default function App() {
   const isCheckIn = pathname.includes('/check-in')
   const isExternalMarketing = pathname.includes(`/external/marketing/`)
   const isInstallerRoute = pathname.startsWith('/installers')
+  const isShopRoute = pathname.startsWith('/shop')
+  const isShopWorker = position === 'shop_worker'
+  const segments = pathname.split('/').filter(Boolean)
+  const isCustomerViewPage = segments[0] === 'customer' && segments[2] !== 'stones'
   const mainRef = useRef<HTMLElement | null>(null)
+  const isLoginPage = pathname === '/login'
   const [isAtBottom, setIsAtBottom] = useState(false)
   useEffect(() => {
     const el = mainRef.current
@@ -252,7 +272,9 @@ export default function App() {
     !isInstallerRoute &&
     !isCheckIn &&
     !isExternalMarketing &&
-    !isDraw
+    !(isShopRoute && !isShopWorker) &&
+    !isDraw &&
+    !isCustomerViewPage
 
   return (
     <html lang='en'>
@@ -278,9 +300,9 @@ export default function App() {
             )}
             <main ref={mainRef} className='h-screen overflow-y-auto bg-gray-100 w-full'>
               <AuthenticityTokenProvider token={token}>
-                {isExternalMarketing || isCheckIn || isInstallerRoute ? (
+                {isExternalMarketing || isCheckIn || isInstallerRoute || (isShopRoute && isShopWorker) ? (
                   <MarketingHeader />
-                ) : (
+                ) :  (
                   <Header
                     isEmployee={user?.is_employee ?? false}
                     user={user}
@@ -289,16 +311,14 @@ export default function App() {
                   />
                 )}
                 <div className='relative'>
-                  {!!user?.id &&
-                    isMobile &&
-                    !isCheckIn &&
-                    !isExternalMarketing &&
-                    !isInstallerRoute && <SidebarTrigger />}
-                  {!!user?.id &&
-                    !isMobile &&
-                    !isCheckIn &&
-                    !isExternalMarketing &&
-                    !isInstallerRoute && <OriginalSidebarTrigger />}
+                  {!isCustomerViewPage && !isLogin && (
+                    <SidebarToggle
+                      isMobile={isMobile}
+                      isCheckIn={isCheckIn}
+                      isExternalMarketing={isExternalMarketing}
+                      isInstallerRoute={isInstallerRoute}
+                    />
+                  )}
                   <Outlet />
                 </div>
               </AuthenticityTokenProvider>

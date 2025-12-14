@@ -1,5 +1,5 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {
   Link,
@@ -7,12 +7,14 @@ import {
   Outlet,
   redirect,
   useLoaderData,
+  useNavigate,
   useNavigation,
 } from 'react-router'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { PageLayout } from '~/components/PageLayout'
 import { DataTable } from '~/components/ui/data-table'
+import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
@@ -71,7 +73,9 @@ const instructionsColumn: ColumnDef<Instructions>[] = [
 export default function AdminInstructions() {
   const { instructions } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
+  const navigate = useNavigate()
   const [isAddingInstruction, setIsAddingInstruction] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     if (navigation.state === 'idle') {
@@ -83,15 +87,37 @@ export default function AdminInstructions() {
     setIsAddingInstruction(true)
   }
 
+  const filteredInstructions = instructions.filter(item =>
+    item.title.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
   return (
     <PageLayout title='Instructions'>
-      <Link to={`add`} relative='path' onClick={handleAddInstructionClick}>
-        <LoadingButton loading={isAddingInstruction}>
-          <Plus className='w-4 h-4 mr-1' />
-          Add Instruction
-        </LoadingButton>
-      </Link>
-      <DataTable columns={instructionsColumn} data={instructions} />
+      <div className='flex gap-4 justify-between mb-4'>
+        <Link to={`add`} relative='path' onClick={handleAddInstructionClick}>
+          <LoadingButton loading={isAddingInstruction}>
+            <Plus className='w-4 h-4 mr-1' />
+            Add Instruction
+          </LoadingButton>
+        </Link>
+        <div className='relative flex-1 max-w-sm '>
+          <Search className='absolute left-2 top-2.5 h-4 w-4 text-muted-foreground' />
+          <Input
+            placeholder='Search instructions...'
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className='pl-8'
+          />
+        </div>
+      </div>
+      <DataTable
+        columns={instructionsColumn}
+        data={filteredInstructions}
+        onRowClick={(row: Instructions) => {
+          navigate(`edit/${row.id}`)
+        }}
+        rowClassName='cursor-pointer'
+      />
       <Outlet />
     </PageLayout>
   )

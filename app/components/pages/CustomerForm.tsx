@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -25,6 +25,7 @@ import { PhoneInput } from '../molecules/PhoneInput'
 import { SelectInput } from '../molecules/SelectItem'
 import { AddressInput } from '../organisms/AddressInput'
 import { Switch } from '../ui/switch'
+import { Textarea } from '../ui/textarea'
 
 const resolver = zodResolver(customerDialogSchema)
 
@@ -35,19 +36,32 @@ interface CustomerFormProps {
   customerId?: number
   source?: (typeof sourceEnum)[number]
   initialName?: string
+  oldData?: CustomerDialogSchema
 }
 
-const getCustomerInfo = async (customerId: number) => {
-  const response = await fetch(`/api/customers/${customerId}`)
-  const data = await response.json()
-  return {
-    name: data.customer.name,
-    email: data.customer.email ?? '',
-    phone: data.customer.phone,
-    address: data.customer.address ?? '',
-    company_name: data.customer.company_name,
-    source: data.customer.source,
-  }
+type SourceOptions = {
+  key: (typeof sourceEnum)[number]
+  value: string
+}
+
+function getSourceOptions(
+  current: (typeof sourceEnum)[number] | undefined,
+): SourceOptions[] {
+  const baseOptions: SourceOptions[] = sourceEnum
+    .filter(s => s !== 'check-list')
+    .map(s => ({
+      key: s,
+      value: s.charAt(0).toUpperCase() + s.slice(1),
+    }))
+  if (!current) return baseOptions
+  const hasCurrent = baseOptions.some(o => o.key === current)
+  if (!hasCurrent) return baseOptions
+  if (baseOptions.filter(o => o.key === current).length !== 0) return baseOptions
+  baseOptions.push({
+    key: current,
+    value: current.charAt(0).toUpperCase() + current.slice(1),
+  })
+  return baseOptions
 }
 
 export function CustomerForm({
@@ -57,6 +71,7 @@ export function CustomerForm({
   customerId,
   source,
   initialName,
+  oldData,
 }: CustomerFormProps) {
   const { toast: toastFn } = useToast()
   const successToast = (message: string) =>
@@ -73,19 +88,15 @@ export function CustomerForm({
     ? updateCustomerMutation(toastFn, handleSuccess)
     : createCustomerMutation(toastFn, handleSuccess)
   const { mutate, isPending } = useMutation(mutateObject)
-  const { data, isLoading } = useQuery({
-    queryKey: ['customer', customerId],
-    queryFn: () => getCustomerInfo(customerId || 0),
-    enabled: !!customerId,
-  })
 
   const form = useForm<CustomerDialogSchema>({
     resolver,
-    defaultValues: {
+    defaultValues: oldData ?? {
       name: initialName || '',
       email: '',
       address: '',
       source,
+      your_message: '',
     },
   })
 
@@ -103,15 +114,6 @@ export function CustomerForm({
     if (emailValue && emailValue.trim() !== '') params.set('email', emailValue.trim())
     return params.toString()
   }, [phoneValue, emailValue])
-  useEffect(() => {
-    if (data) {
-      form.reset({
-        ...data,
-        builder: Boolean(data.company_name && data.company_name.trim() !== ''),
-        source: data.source ?? source,
-      })
-    }
-  }, [data])
 
   const onSubmit = async (data: CustomerDialogSchema) => {
     if (!customerId && queryString) {
@@ -128,11 +130,14 @@ export function CustomerForm({
     mutate({ ...data, company_id: companyId, id: customerId || 0 })
   }
 
+  const dialogTitle = customerId ? 'Edit Customer' : 'Add Customer'
+  const sourceOptions = getSourceOptions(form.watch('source'))
+
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isLoading ? 'Loading...' : 'Add Customer'}</DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
         <Dialog open={dupOpen} onOpenChange={setDupOpen}>
           <DialogContent>
@@ -146,100 +151,88 @@ export function CustomerForm({
             </DialogHeader>
           </DialogContent>
         </Dialog>
-        {isLoading ? (
-          <div>Loading...</div>
-        ) : (
-          <FormProvider {...form}>
-            <form
-              id='customerForm'
-              onSubmit={e => {
-                e.preventDefault()
-                e.stopPropagation()
-                form.handleSubmit(onSubmit)()
-              }}
-            >
+        <FormProvider {...form}>
+          <form
+            id='customerForm'
+            onSubmit={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              form.handleSubmit(onSubmit)()
+            }}
+          >
+            <FormField
+              control={form.control}
+              name='name'
+              render={({ field }) => (
+                <InputItem
+                  name={'Name*'}
+                  placeholder={'Name of the customer'}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='email'
+              render={({ field }) => <EmailInput field={field} />}
+            />
+            <FormField
+              control={form.control}
+              name='phone'
+              render={({ field }) => <PhoneInput field={field} />}
+            />
+
+            <AddressInput form={form} field='address' type='billing' />
+            <FormField
+              control={form.control}
+              name='source'
+              render={({ field }) => (
+                <SelectInput field={field} options={sourceOptions} name='Source' />
+              )}
+            />
+            <div className='flex items-center space-x-2 my-2'>
               <FormField
                 control={form.control}
-                name='name'
+                name='builder'
                 render={({ field }) => (
-                  <InputItem
-                    name={'Name*'}
-                    placeholder={'Name of the customer'}
-                    field={field}
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={value => {
+                      field.onChange(value)
+                      if (!value) {
+                        form.setValue('company_name', '')
+                      }
+                    }}
+                    id='builder_switch'
+                    label='Partner'
+                    className=''
                   />
                 )}
               />
-              <FormField
-                control={form.control}
-                name='email'
-                render={({ field }) => <EmailInput field={field} />}
+            </div>
+            {form.watch('builder') && (
+              <InputItem
+                name='Company Name'
+                placeholder='Company Name'
+                field={form.register('company_name')}
               />
-              <FormField
-                control={form.control}
-                name='phone'
-                render={({ field }) => <PhoneInput field={field} />}
-              />
-
-              <AddressInput form={form} field='address' type='billing' />
-              <FormField
-                control={form.control}
-                name='source'
-                render={({ field }) => {
-                  const baseOptions = sourceEnum
-                    .filter(s => s !== 'user-input' && s !== 'check-list')
-                    .map(s => ({
-                      key: s,
-                      value: s.charAt(0).toUpperCase() + s.slice(1),
-                    }))
-                  const current = form.getValues('source')
-                  const hasCurrent = baseOptions.some(o => o.key === current)
-                  const options = hasCurrent
-                    ? baseOptions
-                    : current
-                      ? [
-                          {
-                            key: current,
-                            value: current.charAt(0).toUpperCase() + current.slice(1),
-                          },
-                          ...baseOptions,
-                        ]
-                      : baseOptions
-                  return <SelectInput field={field} options={options} name='Source' />
-                }}
-              />
-              <div className='flex items-center space-x-2 my-2'>
-                <FormField
-                  control={form.control}
-                  name='builder'
-                  render={({ field }) => (
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={value => {
-                        field.onChange(value)
-                        if (!value) {
-                          form.setValue('company_name', '')
-                        }
-                      }}
-                      id='builder_switch'
-                      label='Builder'
-                      className=''
-                    />
-                  )}
-                />
-              </div>
-              {form.watch('builder') && (
-                <InputItem
-                  name='Company Name'
-                  placeholder='Company Name'
-                  field={form.register('company_name')}
+            )}
+            <FormField
+              control={form.control}
+              name='your_message'
+              render={({ field }) => (
+                <Textarea
+                  {...field}
+                  value={(field.value as string) ?? ''}
+                  name='Notes'
                 />
               )}
-              <DialogFooter>
-                <LoadingButton loading={isPending}>Submit</LoadingButton>
-              </DialogFooter>
-            </form>
-          </FormProvider>
-        )}
+            />
+            <DialogFooter>
+              <LoadingButton loading={isPending}>Submit</LoadingButton>
+            </DialogFooter>
+          </form>
+        </FormProvider>
       </DialogContent>
     </Dialog>
   )

@@ -12,9 +12,12 @@ import { SendEmailCommand } from '@aws-sdk/client-ses'
 
 interface SendEmail {
   to: string
+  from?: string
   subject: string
   html?: string
   text?: string
+  replyTo?: string[]
+  configurationSet?: string
 }
 
 interface Body {
@@ -22,19 +25,29 @@ interface Body {
   Text?: { Data: string; Charset: string }
 }
 
-export async function sendEmail({ to, subject, html, text }: SendEmail) {
+export async function sendEmail({
+  to,
+  from,
+  subject,
+  html,
+  text,
+  replyTo,
+  configurationSet,
+}: SendEmail) {
   const body: Body = {}
   if (html) body.Html = { Data: html, Charset: 'UTF-8' }
   if (text) body.Text = { Data: text, Charset: 'UTF-8' }
 
-  await ses.send(
+  return await ses.send(
     new SendEmailCommand({
       Destination: { ToAddresses: [to] },
-      Source: 'noreply@granite-manager.com',
+      ReplyToAddresses: replyTo,
+      Source: from || 'noreply@granite-manager.com',
       Message: {
         Subject: { Data: subject, Charset: 'UTF-8' },
         Body: body,
       },
+      ConfigurationSetName: configurationSet,
     }),
   )
 }

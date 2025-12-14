@@ -19,7 +19,7 @@ import { DialogFooter } from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { Positions } from '~/types'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -29,7 +29,7 @@ import {
   login,
   type SessionUser,
 } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 const userSchema = z.object({
   email: z.string().email(),
@@ -58,6 +58,7 @@ async function getRedirectPath(user: SessionUser): Promise<string> {
   )
   if (positions.length === 0) return '..'
   if (positions.length > 1) return '..'
+  if (positions[0].position_id === Positions.ShopWorker) return '/shop/transactions'
   if (positions[0].position_id === Positions.Installer)
     return `/installers/${user.company_id}/checklist`
   if (positions[0].position_id === Positions.ExternalMarketing)
@@ -119,7 +120,7 @@ export default function Login() {
   const isSubmitting = navigation.state !== 'idle'
 
   return (
-    <div className='flex flex-col items-center justify-center p-20'>
+    <div className='flex flex-col items-center justify-center p-5'>
       <Link
         to='/customer/1/stones'
         className='pb-4 text-blue-500 underline cursor-pointer'

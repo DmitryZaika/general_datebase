@@ -5,7 +5,7 @@ import type { ActionFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { todoListSchema } from '~/schemas/general'
 import { getEmployeeUser } from '~/utils/session.server'
-import { forceRedirectError } from '~/utils/toastHelpers'
+import { forceRedirectError } from '~/utils/toastHelpers.server'
 
 const editAction = async (
   rich_text: string,
@@ -13,8 +13,8 @@ const editAction = async (
   userId: number,
 ): Promise<void> => {
   await db.execute(
-    `UPDATE todolist 
-     SET rich_text = ?  
+    `UPDATE todolist
+     SET rich_text = ?
      WHERE id = ?
      AND user_id = ?;`,
     [rich_text, todoId, userId],
@@ -56,7 +56,7 @@ const updateDoneAction = async (
 
 const deleteAction = async (todoId: number, userId: number): Promise<void> => {
   await db.execute(
-    `DELETE FROM todolist 
+    `DELETE FROM todolist
      WHERE id = ?
      AND user_id = ?;`,
     [todoId, userId],

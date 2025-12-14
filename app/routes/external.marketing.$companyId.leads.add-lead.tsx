@@ -26,10 +26,10 @@ import { Textarea } from '~/components/ui/textarea'
 import { cn } from '~/lib/utils'
 import { sourceEnum } from '~/schemas/customers'
 import { NullableString } from '~/schemas/general'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { getMarketingUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 import { useCustomOptionalForm } from '~/utils/useCustomForm'
 
 const LAMBDA_URL = process.env.LAMBDA_URL || ''
@@ -53,7 +53,7 @@ const leadSchema = z.object({
   your_message: NullableString,
   address: NullableString,
   source: z.enum(sourceEnum),
-  referral_source: z.enum(referralSourceEnum).optional(),
+  referral_source: z.enum(referralSourceEnum),
 })
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -95,12 +95,18 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     file: data.file || '',
   }
 
+  const cleaned = Object.fromEntries(
+    Object.entries(body).map(([key, value]) => [
+      key,
+      value === 'undefined' ? null : value,
+    ]),
+  )
   const response = await fetch(
     `${`${LAMBDA_URL}v1/webhooks/new-lead-form/${paramCompanyId}`}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(cleaned),
     },
   )
 

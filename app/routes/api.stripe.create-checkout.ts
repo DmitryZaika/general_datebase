@@ -1,9 +1,9 @@
 import { type ActionFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { getStripe } from '~/utils/getStripe'
 import { selectMany } from '~/utils/queryHelpers'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData()
@@ -31,7 +31,7 @@ export async function action({ request }: ActionFunctionArgs) {
       customer_email: string
     }>(
       db,
-      `SELECT 
+      `SELECT
                 s.id,
                 s.price,
                 c.name as customer_name,

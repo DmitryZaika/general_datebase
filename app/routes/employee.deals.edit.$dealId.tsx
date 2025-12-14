@@ -6,7 +6,7 @@ import {
   Outlet,
   redirect,
   useLocation,
-  useNavigate,
+  useNavigate
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import {
@@ -18,11 +18,11 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 
 import { csrf } from '~/utils/csrf.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
@@ -116,18 +116,19 @@ export default function DealsEdit() {
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className='sm:max-w-[500px] overflow-auto flex flex-col justify-baseline min-h-[390px] max-h-[95vh] p-5'>
-        <DialogHeader>
-          <DialogTitle>Edit Deal</DialogTitle>
+        <DialogHeader> 
+          <DialogTitle>Edit Deal</DialogTitle>  
         </DialogHeader>
         <Tabs
           value={location.pathname.split('/').pop()}
-          onValueChange={value => navigate(value)}
+          onValueChange={value => navigate(`${value}${location.search}`)}
         >
-          <TabsList className='mb-5 grid grid-cols-4'>
-            <TabsTrigger value={`project${location.search}`}>Project</TabsTrigger>
-            <TabsTrigger value={`information${location.search}`}>General</TabsTrigger>
-            <TabsTrigger value={`images${location.search}`}>Images</TabsTrigger>
-            <TabsTrigger value={`documents${location.search}`}>Documents</TabsTrigger>
+          <TabsList className='mb-5 grid grid-cols-5'>
+            <TabsTrigger value='project'>Project</TabsTrigger>
+            <TabsTrigger value='information'>General</TabsTrigger>
+            <TabsTrigger value='images'>Images</TabsTrigger>
+            <TabsTrigger value='documents'>Documents</TabsTrigger>
+            <TabsTrigger value='history'>Email</TabsTrigger>
           </TabsList>
           <Outlet />
         </Tabs>

@@ -25,6 +25,9 @@ async function getSlabs(
   {
     id: number
     bundle: string
+    is_leftover: boolean
+    parent_id: number | null
+    child_count: number
   }[]
 > {
   const cleanParam = encodeURIComponent(JSON.stringify(slabIds))
@@ -51,15 +54,19 @@ export const AddSlabDialog = ({
   stoneId: number
   roomIndex: number
 }) => {
-  type SlabState = { id: number; bundle: string } | undefined
+  type SlabState =
+    | { id: number; bundle: string; is_leftover: boolean; parent_id: number | null; child_count: number }
+    | undefined
   const [selectedSlab, setSelectedSlab] = useState<SlabState>()
 
-  const allRooms = form.watch('rooms')
-  const addedSlabIds = allRooms.flatMap(room => room.slabs.map(slab => slab.id))
+  // Only exclude slabs that are already in the CURRENT room
+  // Allow the same slab to be selected for different rooms
+  const currentRoomSlabs = form.watch(`rooms.${roomIndex}.slabs`)
+  const currentRoomSlabIds = currentRoomSlabs.map(slab => slab.id)
 
   const { data = [] } = useQuery({
-    queryKey: ['slabs', stoneId, addedSlabIds],
-    queryFn: () => getSlabs(stoneId, addedSlabIds),
+    queryKey: ['slabs', stoneId, JSON.stringify(currentRoomSlabIds)],
+    queryFn: () => getSlabs(stoneId, currentRoomSlabIds),
     enabled: !!stoneId && show,
   })
 
@@ -74,6 +81,7 @@ export const AddSlabDialog = ({
         is_full: false,
       },
     ])
+    setSelectedSlab(undefined)
     setShow(false)
   }
 
@@ -99,11 +107,26 @@ export const AddSlabDialog = ({
                 <SelectValue placeholder='Select a slab' />
               </SelectTrigger>
               <SelectContent>
-                {data.map(slab => (
-                  <SelectItem key={slab.id} value={slab.bundle}>
-                    {slab.bundle}
-                  </SelectItem>
-                ))}
+                {data.map(slab => {
+                  const isPartial = slab.parent_id !== null || slab.child_count > 0
+                  return (
+                    <SelectItem key={slab.id} value={slab.bundle}>
+                      <div className='flex items-center gap-2'>
+                        <span>{slab.bundle}</span>
+                        {isPartial && (
+                          <span className='px-1.5 py-0.5 rounded text-xs bg-yellow-100 text-yellow-800 font-medium'>
+                            Partial
+                          </span>
+                        )}
+                        {slab.is_leftover && (
+                          <span className='px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-800 font-medium'>
+                            Leftover
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           )}

@@ -4,14 +4,13 @@ import { useEffect, useState } from 'react'
 import {
   type ActionFunctionArgs,
   Form,
-  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
   useLocation,
   useNavigate,
-  useSearchParams,
+  useSearchParams
 } from 'react-router'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { PageLayout } from '~/components/PageLayout'
@@ -41,10 +40,10 @@ import {
 } from '~/components/ui/select'
 import { Switch } from '~/components/ui/switch'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 interface Transaction {
   id: number
@@ -91,11 +90,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url)
 
     const searchTerm = url.searchParams.get('search') || ''
-    const salesRep = url.searchParams.get('salesRep') || user.name
+    const salesRep = url.searchParams.get('salesRep') || 'All'
     const status = url.searchParams.get('status') || 'in_progress'
 
     let query = `
-      SELECT 
+      SELECT
         s.id,
         s.sale_date,
         c.name as customer_name,
@@ -103,18 +102,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         GROUP_CONCAT(DISTINCT si.bundle) as bundle,
         s.cancelled_date,
         s.installed_date,
-        GROUP_CONCAT(DISTINCT st.name) as stone_name,
+        GROUP_CONCAT(DISTINCT CONCAT(st.name, ':', IF(si.deleted_at IS NOT NULL, 'DELETED', 'ACTIVE'))) as stone_name,
         s.square_feet as sf,
-        GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'))) as bundle_with_cut,
+        GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'), ':', IF(si.deleted_at IS NOT NULL, 'DELETED', 'ACTIVE'))) as bundle_with_cut,
         MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) as all_cut,
         MAX(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as any_cut,
         COUNT(si.id) as total_slabs,
         SUM(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as cut_slabs
-      FROM 
+      FROM
         sales s
-      JOIN 
+      JOIN
         customers c ON s.customer_id = c.id
-      JOIN 
+      JOIN
         users u ON s.seller_id = u.id
       LEFT JOIN
         slab_inventory si ON s.id = si.sale_id
@@ -151,7 +150,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     query += `
       GROUP BY
         s.id, s.sale_date, c.name, u.name
-      ORDER BY 
+      ORDER BY
         s.sale_date DESC
     `
 
@@ -164,31 +163,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const sinkDetails = await selectMany<SinkInfo>(
       db,
-      `SELECT 
-         sales.id as sale_id, 
+      `SELECT
+         sales.id as sale_id,
          GROUP_CONCAT(st.name SEPARATOR ', ') as sink_types
-       FROM 
-         sales 
-       JOIN 
+       FROM
+         sales
+       JOIN
          slab_inventory si ON sales.id = si.sale_id
-       JOIN 
+       JOIN
          sinks sk ON si.id = sk.slab_id
-       JOIN 
+       JOIN
          sink_type st ON sk.sink_type_id = st.id
        WHERE
          sales.company_id = ?
-       GROUP BY 
+       GROUP BY
          sales.id
-       ORDER BY 
+       ORDER BY
          sales.id`,
       [companyId],
     )
 
     const allSalesReps = await selectMany<{ name: string }>(
       db,
-      `SELECT DISTINCT users.name 
-       FROM users 
-       JOIN sales ON users.id = sales.seller_id 
+      `SELECT DISTINCT users.name
+       FROM users
+       JOIN sales ON users.id = sales.seller_id
        WHERE sales.company_id = ?`,
       [companyId],
     )
@@ -465,16 +464,7 @@ export default function EmployeeTransactions() {
     {
       accessorKey: 'customer_name',
       header: ({ column }) => <SortableHeader column={column} title='Customer' />,
-      cell: ({ row }) => {
-        return (
-          <Link
-            to={`edit/${row.original.id}${location.search}`}
-            className='text-blue-600 hover:underline'
-          >
-            {row.original.customer_name}
-          </Link>
-        )
-      },
+      cell: ({ row }) => <span className='text-blue-600'>{row.original.customer_name}</span>,
     },
     {
       accessorKey: 'seller_name',
@@ -484,14 +474,39 @@ export default function EmployeeTransactions() {
       accessorKey: 'stone_name',
       header: ({ column }) => <SortableHeader column={column} title='Stone' />,
       cell: ({ row }) => {
-        const stonesArr = (row.original.stone_name || '').split(/,\s*/).filter(Boolean)
+        const stonesArr = (row.original.stone_name || '')
+          .split(',')
+          .filter(Boolean)
         if (!stonesArr.length) return <span>N/A</span>
 
+        const stoneCounts: { [key: string]: number } = {}
+        const stoneStatus: { [key: string]: boolean } = {}
+
+        stonesArr.forEach(item => {
+          const [stone, status] = item.split(':')
+          stoneCounts[stone] = (stoneCounts[stone] || 0) + 1
+          // If any occurrence is active, consider active (or handle mixed status differently if needed)
+          // Here we assume if ALL occurrences of a stone name are deleted, it's deleted. 
+          // But the query uses DISTINCT CONCAT(name, status). 
+          // So if we have "StoneA:ACTIVE" and "StoneA:DELETED", they are distinct items.
+          
+          // Let's just map the full items.
+        })
+
+        // Since we get "StoneA:ACTIVE" and "StoneA:DELETED" as distinct items
+        // We should probably just display them.
+        
         return (
           <div className='flex flex-col'>
-            {stonesArr.map((s, idx) => (
-              <span key={idx}>{s}</span>
-            ))}
+            {stonesArr.map((item, idx) => {
+              const [stone, status] = item.split(':')
+              const isDeleted = status === 'DELETED'
+              return (
+                <span key={idx} className={isDeleted ? 'text-red-500 line-through' : ''}>
+                  {stone}
+                </span>
+              )
+            })}
           </div>
         )
       },
@@ -537,22 +552,19 @@ export default function EmployeeTransactions() {
           .filter(Boolean)
         if (!bundleInfo.length) return <span>N/A</span>
 
-        const bundleStatusMap: { [key: string]: boolean } = {}
-        bundleInfo.forEach(item => {
-          const [bundle, status] = item.split(':')
-          bundleStatusMap[bundle] = status === 'CUT'
-        })
-
-        const bundles = (row.original.bundle || '').split(',').filter(Boolean)
-
         return (
           <div className='flex flex-col'>
-            {bundles.map((bundle, index) => {
-              const isCut = bundleStatusMap[bundle] === true
+            {bundleInfo.map((item, index) => {
+              const [bundle, cutStatus, deletedStatus] = item.split(':')
+              const isCut = cutStatus === 'CUT'
+              const isDeleted = deletedStatus === 'DELETED'
+
               return (
                 <span
                   key={index}
-                  className={isCut ? 'text-blue-500' : 'text-green-500'}
+                  className={`
+                    ${isDeleted ? 'text-red-500 line-through' : isCut ? 'text-blue-500' : 'text-green-500'}
+                  `}
                 >
                   {bundle}
                 </span>
@@ -699,8 +711,10 @@ export default function EmployeeTransactions() {
           data={transactions.map(transaction => ({
             ...transaction,
             className: 'hover:bg-gray-50 cursor-pointer',
-            onClick: () => handleRowClick(transaction.id),
           }))}
+          onRowClick={row => handleRowClick(row.id)}
+          paginate
+          pageSize={50}
         />
       </PageLayout>
 

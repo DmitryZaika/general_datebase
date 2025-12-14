@@ -5,10 +5,10 @@ type ToastFunction = (props: ToastProps & { description: string }) => void
 
 export const sourceEnum = [
   'check-in',
-  'user-input',
   'check-list',
   'leads',
   'call-in',
+  'other',
 ] as const
 
 export const customerSignupSchema = z.object({
@@ -17,6 +17,7 @@ export const customerSignupSchema = z.object({
   phone: z.string().optional(),
   email: z.string().optional(),
   address: z.string().optional(),
+  your_message: z.string().optional(),
   company_name: z.string().nullish(),
   referral_source: z
     .enum([
@@ -64,9 +65,10 @@ export const updateCustomer = async (id: number, data: CustomerSignupSchema) => 
 
 export const customerDialogSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  email: z.union([z.string().email(), z.literal('')]),
-  phone: z.union([z.coerce.string().min(10), z.literal('')]),
+  email: z.string().optional(),
+  phone: z.string().optional(),
   address: z.string().optional(),
+  your_message: z.string().optional(),
   builder: z.boolean().default(false),
   company_name: z.string().nullish(),
   source: z.enum(sourceEnum),

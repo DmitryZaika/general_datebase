@@ -12,10 +12,13 @@ interface ExtendedCustomer {
   name: string
   amount?: number | null
   description?: string | null
+  status?: string | null
+  lost_reason?: string | null
   list_id: number
   position?: number
   due_date?: string | null
   has_images?: boolean
+  sales_rep?: string | null
 }
 
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'

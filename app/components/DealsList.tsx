@@ -13,10 +13,13 @@ interface DealsListProps {
     name: string
     amount?: number | null
     description?: string | null
+    status?: string | null
+    lost_reason?: string | null
     list_id: number
     position?: number
     due_date?: string | null
     sales_rep?: string | null
+    has_images?: boolean
   }[]
   id: number
   readonly?: boolean
@@ -40,7 +43,7 @@ export default function DealsList({
   return (
     <Card
       ref={setNodeRef}
-      className={`min-w-[18rem] w-72 max-h-[calc(100vh-12rem)] flex flex-col h-full shadow-sm ${id === 4 ? 'bg-green-100' : id === 5 ? 'bg-red-100' : ''}`}
+      className={`min-w-[18rem] w-72 max-h-[calc(100vh-13rem)] flex flex-col h-full shadow-sm ${id === 4 ? 'bg-green-100' : id === 5 ? 'bg-red-100' : ''}`}
     >
       <CardHeader className='bg-black rounded-t-xl py-2 px-3'>
         <div className='flex justify-between items-center'>

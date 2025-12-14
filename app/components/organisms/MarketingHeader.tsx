@@ -9,13 +9,6 @@ export function MarketingHeader({ companyName }: MarketingHeaderProps) {
   return (
     <header className='bg-white flex items-center justify-between p-3'>
       <div className='logo'>
-        <a className='flex justify-center' href='/'>
-          <img
-            src='https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp'
-            alt='Logo'
-            className='h-12 md:h-16 object-contain'
-          />
-        </a>
       </div>
       {companyName && (
         <div className='text-center flex-1'>

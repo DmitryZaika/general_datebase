@@ -24,13 +24,13 @@ import {
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { stoneSchema } from '~/schemas/stones'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 import { useCustomForm } from '~/utils/useCustomForm'
 import { FormField } from '../components/ui/form'
 
@@ -54,8 +54,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const user = await getAdminUser(request)
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO stones
-     (name, type, finishing, url, company_id, is_display, on_sale, supplier_id, width, length, cost_per_sqft, retail_price, level)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+     (name, type, finishing, url, company_id, is_display, on_sale, regular_stock, supplier_id, width, length, cost_per_sqft, retail_price, level)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
     [
       data.name,
       data.type,
@@ -64,6 +64,7 @@ export async function action({ request }: ActionFunctionArgs) {
       user.company_id,
       data.is_display,
       data.on_sale,
+      data.regular_stock,
       data.supplier_id,
       data.width || 0,
       data.length || 0,
@@ -216,6 +217,12 @@ export default function StonesAdd() {
                 control={form.control}
                 name='on_sale'
                 render={({ field }) => <SwitchItem field={field} name='On Sale' />}
+              />
+              <FormField
+                defaultValue={false}
+                control={form.control}
+                name='regular_stock'
+                render={({ field }) => <SwitchItem field={field} name='Regular Stock' />}
               />
             </div>
 

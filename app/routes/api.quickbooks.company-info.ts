@@ -1,5 +1,5 @@
 import { data, type LoaderFunctionArgs, redirect } from 'react-router'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import {
   clearQboSession,
   getQboCompanyInformation,

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FaCheck, FaLink, FaPencilAlt, FaQrcode, FaTimes } from 'react-icons/fa'
+import { FaCheck, FaLink, FaPencilAlt, FaTimes } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   data,
@@ -28,14 +28,13 @@ import {
 import { FormField } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
-import { selectId, selectMany } from '~/utils/queryHelpers'
-import { deleteFile } from '~/utils/s3.server'
+import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 import { printAllSlabsQRCodes, type SlabData } from '~/utils/slabQRCode'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 import { useCustomOptionalForm } from '~/utils/useCustomForm'
 
 // Form schema
@@ -70,6 +69,9 @@ interface LinkedSlabsGroupProps {
 
 interface LinkSlabsDialogProps {
   allStones: Array<{ id: number; name: string }>
+  currentStoneId: number
+  linkedStoneIds: number[]
+  reverseLinkedStoneIds: number[]
   isOpen: boolean
   onClose: () => void
 }
@@ -215,7 +217,14 @@ function LinkedSlabsGroup({ slabs, onBundleUpdate }: LinkedSlabsGroupProps) {
   )
 }
 
-function LinkSlabsDialog({ allStones, isOpen, onClose }: LinkSlabsDialogProps) {
+function LinkSlabsDialog({
+  allStones,
+  currentStoneId,
+  linkedStoneIds,
+  reverseLinkedStoneIds,
+  isOpen,
+  onClose,
+}: LinkSlabsDialogProps) {
   const [selectedStoneId, setSelectedStoneId] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const navigation = useNavigation()
@@ -230,14 +239,30 @@ function LinkSlabsDialog({ allStones, isOpen, onClose }: LinkSlabsDialogProps) {
   }, [isOpen])
 
   useEffect(() => {
-    if (actionData?.success && navigation.state === 'idle') {
+    if (
+      actionData?.success &&
+      actionData?.action === 'link_slabs' &&
+      navigation.state === 'idle'
+    ) {
       onClose()
     }
   }, [actionData, navigation.state, onClose])
 
-  const filteredStones = allStones.filter(stone =>
-    stone.name.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const filteredStones = allStones.filter(stone => {
+    // Filter by search term
+    const matchesSearch = stone.name.toLowerCase().includes(searchTerm.toLowerCase())
+
+    // Exclude current stone
+    if (stone.id === currentStoneId) return false
+
+    // Exclude already linked stones
+    if (linkedStoneIds.includes(stone.id)) return false
+
+    // Exclude stones with reverse link
+    if (reverseLinkedStoneIds.includes(stone.id)) return false
+
+    return matchesSearch
+  })
 
   return (
     <Dialog
@@ -605,7 +630,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       if (unlinkSourceId) {
         await db.execute(
-          `DELETE FROM stone_slab_links 
+          `DELETE FROM stone_slab_links
            WHERE stone_id = ? AND source_stone_id = ?`,
           [stoneId, unlinkSourceId],
         )
@@ -620,17 +645,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
         )
       } else if (id) {
         const slabId = parseInt(id.toString(), 10)
-        const record = await selectId<{ url: string | null }>(
-          db,
-          'SELECT url FROM slab_inventory WHERE id = ?',
-          slabId,
-        )
-        await db.execute('DELETE FROM slab_inventory WHERE id = ?', [slabId])
+        await db.execute('UPDATE slab_inventory SET deleted_at = NOW() WHERE id = ?', [slabId])
         const session = await getSession(request.headers.get('Cookie'))
-        if (record?.url) {
-          deleteFile(record.url)
-        }
-        session.flash('message', toastData('Success', 'Image Deleted'))
+        session.flash('message', toastData('Success', 'Slab Deleted'))
         return data(
           { success: true },
           {
@@ -662,7 +679,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           }
 
           await db.execute(
-            `INSERT INTO stone_slab_links (stone_id, source_stone_id) 
+            `INSERT INTO stone_slab_links (stone_id, source_stone_id)
              VALUES (?, ?)`,
             [stoneId, fromStoneId],
           )
@@ -670,7 +687,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           const session = await getSession(request.headers.get('Cookie'))
           session.flash('message', toastData('Success', 'Slabs linked successfully'))
           return data(
-            { success: true },
+            { success: true, action: 'link_slabs' },
             {
               headers: { 'Set-Cookie': await commitSession(session) },
             },
@@ -755,7 +772,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     length: number
   }>(
     db,
-    'SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL',
+    'SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL AND deleted_at IS NULL',
     [stoneId],
   )
 
@@ -770,14 +787,28 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     stoneId,
   ])
 
+  // Get linked stone IDs (stones that current stone links TO)
+  const linkedStoneIds = await selectMany<{ source_stone_id: number }>(
+    db,
+    `SELECT source_stone_id FROM stone_slab_links WHERE stone_id = ?`,
+    [stoneId],
+  )
+
+  // Get reverse linked stone IDs (stones that link TO current stone)
+  const reverseLinkedStoneIds = await selectMany<{ stone_id: number }>(
+    db,
+    `SELECT stone_id FROM stone_slab_links WHERE source_stone_id = ?`,
+    [stoneId],
+  )
+
   // Load all stones for linking
   const allStones = await selectMany<{ id: number; name: string }>(
     db,
-    `SELECT DISTINCT s.id, s.name 
+    `SELECT DISTINCT s.id, s.name
      FROM stones s
-     WHERE s.id != ? 
+     WHERE s.id != ? AND s.deleted_at IS NULL
      AND EXISTS (
-       SELECT 1 FROM slab_inventory si WHERE si.stone_id = s.id AND si.cut_date IS NULL
+       SELECT 1 FROM slab_inventory si WHERE si.stone_id = s.id AND si.cut_date IS NULL AND si.deleted_at IS NULL
      )
      ORDER BY s.name ASC`,
     [stoneId],
@@ -802,8 +833,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     source_stone_name: string
   }>(
     db,
-    `SELECT 
-         stone_slab_links.source_stone_id, 
+    `SELECT
+         stone_slab_links.source_stone_id,
          s.name as source_stone_name
        FROM stone_slab_links
        JOIN stones s ON stone_slab_links.source_stone_id = s.id
@@ -823,10 +854,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       length: number
     }>(
       db,
-      `SELECT 
+      `SELECT
            id, bundle, url, width, length
-         FROM slab_inventory 
-         WHERE stone_id = ? AND cut_date IS NULL`,
+         FROM slab_inventory
+         WHERE stone_id = ? AND cut_date IS NULL AND deleted_at IS NULL`,
       [link.source_stone_id],
     )
 
@@ -842,12 +873,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     stone,
     allStones,
     linkedSlabs,
+    linkedStoneIds: linkedStoneIds.map(link => link.source_stone_id),
+    reverseLinkedStoneIds: reverseLinkedStoneIds.map(link => link.stone_id),
   }
 }
 
 // Main component
 export default function EditStoneSlabs() {
-  const { slabs, stone, allStones, linkedSlabs } = useLoaderData<typeof loader>()
+  const {
+    slabs,
+    stone,
+    allStones,
+    linkedSlabs,
+    linkedStoneIds,
+    reverseLinkedStoneIds,
+  } = useLoaderData<typeof loader>()
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
@@ -945,14 +985,14 @@ export default function EditStoneSlabs() {
 
       {/* List of slabs */}
       <div className='flex flex-col gap-2'>
-        <Button
+        {/* <Button
           onClick={handlePrintAllQRCodes}
           variant='default'
           className='flex items-center gap-2'
         >
           <FaQrcode size={14} />
           ALL QR codes
-        </Button>
+        </Button> */}
 
         {slabs.map(slab => (
           <SlabItem
@@ -1014,6 +1054,9 @@ export default function EditStoneSlabs() {
 
       <LinkSlabsDialog
         allStones={allStones}
+        currentStoneId={stone.id}
+        linkedStoneIds={linkedStoneIds}
+        reverseLinkedStoneIds={reverseLinkedStoneIds}
         isOpen={showLinkDialog}
         onClose={() => setShowLinkDialog(false)}
       />

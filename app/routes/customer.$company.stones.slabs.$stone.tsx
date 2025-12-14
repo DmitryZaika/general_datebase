@@ -7,9 +7,9 @@ import {
 } from 'react-router'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '~/components/ui/dialog'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 interface Slab {
   id: number
@@ -33,10 +33,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!stone) {
     return forceRedirectError(request.headers, 'No stone found for given ID')
   }
+  // Get slabs that belong to this stone OR are linked from other stones
   const slabs = await selectMany<Slab>(
     db,
-    'SELECT id, bundle, url, width, length FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL AND sale_id IS NULL',
-    [stoneId],
+    `SELECT id, bundle, url, width, length
+     FROM slab_inventory
+     WHERE (
+       stone_id = ?
+       OR stone_id IN (
+         SELECT source_stone_id FROM stone_slab_links WHERE stone_id = ?
+       )
+     )
+     AND cut_date IS NULL
+     AND sale_id IS NULL
+     AND deleted_at IS NULL`,
+    [stoneId, stoneId],
   )
   return { slabs, stone }
 }

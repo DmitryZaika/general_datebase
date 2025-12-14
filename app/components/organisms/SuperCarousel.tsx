@@ -22,6 +22,7 @@ interface ImageInput {
   name: string
   type: string
   available: number | null
+  regular_stock?: boolean | number
   width?: number | null
   length?: number | null
   retail_price?: number | null
@@ -79,7 +80,13 @@ function ChildrenImagesDialog({
     setSelectedImage(src)
   }
 
-  const displayedAvailable = image?.available !== undefined ? image.available : '—'
+  const isRegularStock = !!(image?.regular_stock)
+  const displayedAvailable = 
+    image?.available === 0 && isRegularStock 
+      ? 'Regular Stock' 
+      : image?.available !== undefined 
+        ? `${image.available}${isRegularStock ? ' (Regular stock)' : ''}` 
+        : '—'
   const displayedType = image?.type ? capitalizeFirstLetter(image.type) : '—'
   const displayedWidth = image?.width && image?.width > 0 ? image.width : '—'
   const displayedLength = image?.length && image?.length > 0 ? image.length : '—'
