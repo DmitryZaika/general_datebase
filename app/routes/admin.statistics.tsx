@@ -608,13 +608,7 @@ export default function AdminStatistics() {
     }))
   }, [conversionMetricsByRep])
 
-  const conversionChartData = [
-    {
-      metric: '% Sold / Created (Total)',
-      percentage: 0,
-      fill: 'hsl(var(--chart-1))',
-    },
-  ]
+
 
   // const salesColumns: ColumnDef<SalesBySeller>[] = [
   //   { accessorKey: 'seller_name', header: 'Seller' },
@@ -962,12 +956,7 @@ export default function AdminStatistics() {
         </div>
       </div>
 
-      {/* <div className='mb-8'>
-        <h2 className='text-xl font-semibold mb-4'>Leads and Walk-ins Daily Chart</h2>
-        <div className='bg-white rounded-lg border p-6'>
-          <LeadsWalkInsChartContainer fromDate={fromDate} toDate={toDate} />
-        </div>
-      </div> */}
+   
 
       <div className='mb-8'>
      
