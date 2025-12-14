@@ -41,7 +41,7 @@ export const getMirroredUrl = (isAdminPage: boolean, location: Location) => {
 export const getCustomerUrl = (
   isCustomerPage: boolean,
   location: Location,
-  companyId: number | string = 1,
+  companyId: number | string,
 ) => {
   if (location.pathname.includes('/transactions')) {
     return isCustomerPage ? `/employee/stones` : `/customer/${companyId}/stones`

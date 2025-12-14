@@ -1,5 +1,3 @@
-import type { IncomingMessage } from 'node:http'
-import { PassThrough, Readable } from 'node:stream'
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -12,13 +10,31 @@ import { Upload } from '@aws-sdk/lib-storage'
 import type { FileUpload } from '@mjackson/form-data-parser'
 import { writeAsyncIterableToWritable } from '@react-router/node'
 import mime from 'mime-types'
+import type { IncomingMessage } from 'node:http'
+import { PassThrough, Readable } from 'node:stream'
 import { v4 as uuidv4 } from 'uuid'
+import {
+  ALLOWED_IMAGE_MIME,
+
+  detectMime,
+  normalizeMime,
+  withIconSuffix,
+} from '~/utils/files'
+import { compressImage } from './files.server'
 
 const { STORAGE_ACCESS_KEY, STORAGE_SECRET, STORAGE_REGION, STORAGE_BUCKET } =
   process.env
 
 if (!(STORAGE_ACCESS_KEY && STORAGE_SECRET && STORAGE_REGION && STORAGE_BUCKET)) {
   throw new Error(`Storage is missing required configuration.`)
+}
+
+function bufferToAsyncIterable(buffer: Buffer) {
+  return {
+    async *[Symbol.asyncIterator]() {
+      yield buffer
+    },
+  }
 }
 
 const getClient = () => {
@@ -87,26 +103,6 @@ const uploadStream = ({
   }
 }
 
-function readableStreamToAsyncIterable(stream: ReadableStream<Uint8Array>) {
-  const reader = stream.getReader()
-
-  return {
-    async *[Symbol.asyncIterator]() {
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) {
-            break
-          }
-          yield value
-        }
-      } finally {
-        reader.releaseLock()
-      }
-    },
-  }
-}
-
 export async function uploadStreamToS3(
   data: AsyncIterable<Uint8Array>,
   filename: string,
@@ -124,16 +120,51 @@ export async function uploadStreamToS3(
 export const s3UploadHandler = async (
   fileUpload: FileUpload,
   folder: string,
-): Promise<File | string | null | undefined> => {
-  if (fileUpload.fieldName === 'file') {
-    const extensionRegex = /(?:\.([^.]+))?$/
-    const extension = extensionRegex.exec(fileUpload.name)
-    const finalname = `${folder}/${uuidv4()}.${extension?.[1]}`
+): Promise<string | null | undefined> => {
+  if (fileUpload.fieldName !== 'file') return null
 
-    const asyncIterable = readableStreamToAsyncIterable(fileUpload.stream())
+  // читаем все байты один раз
+  const bytes = await fileUpload.arrayBuffer()
+  const buffer = Buffer.from(bytes)
 
-    const uploadedFileLocation = await uploadStreamToS3(asyncIterable, finalname)
-    return uploadedFileLocation
+  // исходное имя клиента
+  const originalClientName = fileUpload.name || 'upload.bin'
+
+  // делаем детекцию MIME
+  const headerMime = fileUpload.type ?? null // если парсер даёт тип, иначе null
+  const detectedMime = await detectMime(buffer, headerMime, originalClientName)
+
+  // определяем расширение для записи в S3
+  // (если расширения нет — возьмём по mime, иначе — оставим клиентское)
+  const extFromName = (originalClientName.match(/\.[^.]+$/)?.[0] ?? '').toLowerCase()
+  const extFromMime = detectedMime
+    ? `.${mime.extension(detectedMime) || 'bin'}`
+    : extFromName || '.bin'
+  const ext = extFromName || extFromMime
+
+  const base = uuidv4()
+  const finalname = `${folder}/${base}${ext}`
+  const iconName = withIconSuffix(finalname)
+
+  const originalUrl = await uploadStreamToS3(bufferToAsyncIterable(buffer), finalname)
+
+  // Решаем, делать ли иконку
+  const normalized = normalizeMime(detectedMime)
+  const isAllowed = normalized ? ALLOWED_IMAGE_MIME.has(normalized) : false
+
+  if (!isAllowed) {
+    return originalUrl
+  }
+
+  // Пытаемся сделать иконку через sharp; если не получится — не падаем, просто вернём оригинал
+  try {
+    const iconBuffer = await compressImage(buffer)
+
+    await uploadStreamToS3(bufferToAsyncIterable(iconBuffer), iconName)
+    return originalUrl
+  } catch {
+    // console.warn(`Icon generation failed for ${normalized}: ${(err as Error).message}`)
+    return originalUrl
   }
 }
 

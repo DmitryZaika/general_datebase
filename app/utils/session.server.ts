@@ -4,7 +4,8 @@ import bcrypt from 'bcryptjs'
 import type { RowDataPacket } from 'mysql2'
 import { v4 as uuidv4 } from 'uuid'
 import { db } from '~/db.server'
-import { getSession } from '~/sessions'
+import { getSession } from '~/sessions.server'
+import { Positions } from '~/types'
 
 interface LoginUser {
   id: number
@@ -16,6 +17,7 @@ export interface User {
   id: number
   email: string
   name: string
+  phone_number: string
   is_employee: boolean
   is_admin: boolean
   is_superuser: boolean
@@ -26,6 +28,7 @@ export interface SessionUser {
   id: number
   email: string
   name: string
+  phone_number: string
   is_employee: boolean
   is_admin: boolean
   is_superuser: boolean
@@ -84,7 +87,7 @@ export async function login(
 
 async function getUser(sessionId: string): Promise<SessionUser | undefined> {
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
-    `SELECT users.id, users.email, users.name, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
+    `SELECT users.id, users.email, users.name, users.phone_number, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
      JOIN sessions ON sessions.user_id = users.id
      WHERE sessions.id = ?
        AND sessions.expiration_date > CURRENT_TIMESTAMP
@@ -105,7 +108,7 @@ async function getUserByPositions(
   positions: number[],
 ): Promise<SessionUserNew | undefined> {
   const [rows] = await db.query<SessionUserNew[] & RowDataPacket[]>(
-    `SELECT users.id, users.email, users.name, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
+    `SELECT users.id, users.email, users.name, users.phone_number, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
      JOIN users_positions ON users_positions.user_id = users.id
      JOIN sessions ON sessions.user_id = users.id
      WHERE sessions.id = ?
@@ -178,6 +181,27 @@ export async function getMarketingUser(
   companyId: number,
 ): Promise<SessionUserNew> {
   return await handlePermissionsNew(request, companyId, [7])
+}
+
+export async function getShopWorkerUser(request: Request): Promise<SessionUser> {
+  const cookie = request.headers.get('Cookie')
+  const session = await getSession(cookie)
+  const sessionId = session.get('sessionId')
+  if (sessionId === undefined) {
+    throw new TypeError('Session ID cannot be undefined')
+  }
+  const user = await getUser(sessionId)
+  if (user === undefined) {
+    throw new TypeError('Could not find session')
+  }
+  const [rows] = await db.query<RowDataPacket[]>(
+    `SELECT position_id FROM users_positions WHERE user_id = ? AND position_id = ? AND company_id = ?`,
+    [user.id, Positions.ShopWorker, user.company_id],
+  )
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new TypeError('Invalid user permissions')
+  }
+  return user
 }
 
 export async function getSuperUser(request: Request): Promise<SessionUser> {

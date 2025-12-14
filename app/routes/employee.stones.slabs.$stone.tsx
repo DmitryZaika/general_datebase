@@ -24,10 +24,10 @@ import {
   TooltipTrigger,
 } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 interface Slab {
   id: number
@@ -38,6 +38,7 @@ interface Slab {
   length: number
   cut_date: string | null
   parent_id: number | null
+  is_leftover: boolean
   source_stone_id?: number
   source_stone_name?: string
   transaction?: {
@@ -125,11 +126,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return forceRedirectError(request.headers, 'No stone found for given ID')
   }
 
-  const slabs = await selectMany<Slab>(
+  const slabsRaw = await selectMany<Omit<Slab, 'is_leftover'> & { is_leftover: number }>(
     db,
-    'SELECT id, bundle, url, sale_id, width, length, cut_date, parent_id FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL',
+    'SELECT id, bundle, url, sale_id, width, length, cut_date, parent_id, is_leftover FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL AND deleted_at IS NULL',
     [stoneId],
   )
+
+  const slabs: Slab[] = slabsRaw.map(slab => ({
+    ...slab,
+    is_leftover: Boolean(slab.is_leftover),
+  }))
 
   let linkedSlabs: Slab[] = []
 
@@ -138,8 +144,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     source_stone_name: string
   }>(
     db,
-    `SELECT 
-         stone_slab_links.source_stone_id, 
+    `SELECT
+         stone_slab_links.source_stone_id,
          s.name as source_stone_name
        FROM stone_slab_links
        JOIN stones s ON stone_slab_links.source_stone_id = s.id
@@ -150,14 +156,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   )
 
   for (const link of stoneLinks) {
-    const linkedStoneSlabs = await selectMany<Slab>(
+    const linkedStoneSlabsRaw = await selectMany<Omit<Slab, 'is_leftover'> & { is_leftover: number }>(
       db,
-      `SELECT 
-           id, bundle, url, sale_id, width, length, cut_date, parent_id
-         FROM slab_inventory 
-         WHERE stone_id = ? AND cut_date IS NULL`,
+      `SELECT
+           id, bundle, url, sale_id, width, length, cut_date, parent_id, is_leftover
+         FROM slab_inventory
+         WHERE stone_id = ? AND cut_date IS NULL AND deleted_at IS NULL`,
       [link.source_stone_id],
     )
+
+    const linkedStoneSlabs: Slab[] = linkedStoneSlabsRaw.map(slab => ({
+      ...slab,
+      is_leftover: Boolean(slab.is_leftover),
+    }))
 
     linkedStoneSlabs.forEach(slab => {
       slab.source_stone_id = link.source_stone_id
@@ -174,7 +185,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const placeholders = soldSlabIds.map(() => '?').join(',')
 
     const sqlQuery = `
-      SELECT 
+      SELECT
         slab_inventory.id as slab_id,
         sales.id as sale_id,
         sales.sale_date,
@@ -190,15 +201,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           JOIN slab_inventory si ON sinks.slab_id = si.id
           WHERE si.sale_id = sales.id
         ) as sink_names
-      FROM 
+      FROM
         sales
-      LEFT JOIN 
+      LEFT JOIN
         customers ON sales.customer_id = customers.id
-      LEFT JOIN 
+      LEFT JOIN
         users ON sales.seller_id = users.id
-      JOIN 
+      JOIN
         slab_inventory ON sales.id = slab_inventory.sale_id
-      WHERE 
+      WHERE
         slab_inventory.id IN (${placeholders})
       ORDER BY
         slab_inventory.id DESC
@@ -259,19 +270,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const parentPlaceholders = slabsWithParent.map(() => '?').join(',')
 
     const parentSqlQuery = `
-      SELECT 
+      SELECT
         slab_inventory.id as slab_id,
         COALESCE(customers.name, 'Unknown Customer') as customer_name,
         COALESCE(users.name, 'Unknown Seller') as seller_name
-      FROM 
+      FROM
         sales
-      LEFT JOIN 
+      LEFT JOIN
         customers ON sales.customer_id = customers.id
-      LEFT JOIN 
+      LEFT JOIN
         users ON sales.seller_id = users.id
-      JOIN 
+      JOIN
         slab_inventory ON sales.id = slab_inventory.sale_id
-      WHERE 
+      WHERE
         slab_inventory.id IN (${parentPlaceholders})
     `
 
@@ -368,7 +379,7 @@ export default function SlabsModal() {
 
   useEffect(() => {
     if (saleId && saleId !== 'null' && saleId !== '') {
-      window.open(`/api/pdf/${saleId}`, '_blank')
+      // window.open(`/api/pdf/${saleId}`, '_blank')   // TODO: uncomment this when the PDF is ready
       const searchParams = new URLSearchParams(location.search)
       searchParams.delete('saleId')
       const newSearch = searchParams.toString()
@@ -449,17 +460,24 @@ export default function SlabsModal() {
                 }}
               />
 
-              <span
-                className={`font-semibold whitespace-nowrap ${
-                  slab.sale_id
-                    ? 'text-red-900'
-                    : hasParent
-                      ? 'text-yellow-800'
-                      : 'text-gray-800'
-                }`}
-              >
-                {slab.bundle}
-              </span>
+              <div className='flex items-center gap-2'>
+                <span
+                  className={`font-semibold whitespace-nowrap ${
+                    slab.sale_id
+                      ? 'text-red-900'
+                      : hasParent
+                        ? 'text-yellow-800'
+                        : 'text-gray-800'
+                  }`}
+                >
+                  {slab.bundle}
+                </span>
+                {slab.is_leftover && (
+                  <span className='px-2 py-0.5 rounded-md text-xs bg-purple-100 text-purple-800 font-medium'>
+                    Leftover
+                  </span>
+                )}
+              </div>
 
               <div className='flex items-center gap-2 w-full'>
                 {isEditing ? (

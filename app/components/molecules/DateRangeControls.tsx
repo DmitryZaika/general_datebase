@@ -21,7 +21,7 @@ export function DateRangeControls({
   applyButtonType?: 'button' | 'submit'
 }) {
   return (
-    <div className='flex items-center gap-2'>
+    <div className='flex-col flex-wrap items-center gap-2 max-w-[400px]'>
       <Popover>
         <PopoverTrigger asChild>
           <Button
@@ -55,15 +55,15 @@ export function DateRangeControls({
             {to ? format(to, 'PPP') : <span>Select end date</span>}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className='w-auto p-0' align='start'>
+        <PopoverContent className='w-auto p-0 '  align='start'>
           <Calendar mode='single' selected={to} onSelect={setTo} initialFocus />
         </PopoverContent>
       </Popover>
 
-      <Button type='button' variant='outline' onClick={onClear}>
+      <Button type='button' variant='outline' className='w-[50%]' onClick={onClear}>
         Clear
       </Button>
-      <Button type={applyButtonType}>Apply</Button>
+      <Button className='w-[50%]' type={applyButtonType}>Apply</Button>
     </div>
   )
 }

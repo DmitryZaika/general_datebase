@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
-import { getSession } from '~/sessions'
+import { getSession } from '~/sessions.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getUserBySessionId } from '~/utils/session.server'
 

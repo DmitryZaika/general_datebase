@@ -32,7 +32,7 @@ export class Contract {
   protected async createSale(user: User) {
     const totalSquareFeet = await this.calculateTotalSquareFeet()
     const [salesResult] = await db.execute<ResultSetHeader>(
-      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price, project_address, extras) 
+      `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price, project_address, extras)
                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL, ?, ?, ?)`,
 
       [
@@ -48,7 +48,7 @@ export class Contract {
     )
 
     await db.execute(
-      `UPDATE customers 
+      `UPDATE customers
          SET sales_rep = COALESCE(sales_rep, ?)
        WHERE id = ? AND company_id = ?`,
       [user.id, this.data.customer_id, user.company_id],
@@ -92,7 +92,7 @@ export class Contract {
     }
     const totalSquareFeet = await this.calculateTotalSquareFeet()
     await db.execute(
-      `UPDATE sales 
+      `UPDATE sales
          SET customer_id = ?,
              seller_id = COALESCE(?, seller_id),
              notes = ?,
@@ -168,6 +168,18 @@ export class Contract {
   }
 
   protected async sellSink(slabId: number, sinkTypeId: number, price: number) {
+    // Check if there's an available sink of this type
+    const [available] = await db.execute<RowDataPacket[]>(
+      `SELECT id FROM sinks WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+      [sinkTypeId],
+    )
+
+    if (!available || available.length === 0) {
+      throw new Error(
+        `No available sinks of type ${sinkTypeId}. Cannot complete the sale.`,
+      )
+    }
+
     await db.execute(
       `UPDATE sinks SET slab_id = ? , price = ? WHERE sink_type_id = ? AND slab_id IS NULL AND is_deleted = 0 ORDER BY id LIMIT 1`,
       [slabId, price, sinkTypeId],
@@ -181,6 +193,18 @@ export class Contract {
   }
 
   protected async sellFaucet(slabId: number, faucetTypeId: number, price: number) {
+    // Check if there's an available faucet of this type
+    const [available] = await db.execute<RowDataPacket[]>(
+      `SELECT id FROM faucets WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 LIMIT 1`,
+      [faucetTypeId],
+    )
+
+    if (!available || available.length === 0) {
+      throw new Error(
+        `No available faucets of type ${faucetTypeId}. Cannot complete the sale.`,
+      )
+    }
+
     await db.execute(
       `UPDATE faucets SET slab_id = ? , price = ? WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0 ORDER BY id LIMIT 1`,
       [slabId, price, faucetTypeId],
@@ -194,21 +218,22 @@ export class Contract {
     )
   }
 
-  protected async duplicateSlab(slabId: number) {
+  /**
+   * Creates a child slab (copy) of the parent slab and returns the new ID
+   * Used when a slab needs to be split (partial sales or multi-room usage)
+   */
+  protected async createChildSlab(parentSlabId: number): Promise<number> {
     const [slab] = await db.execute<RowDataPacket[]>(
       `SELECT length, width, stone_id, bundle, url FROM slab_inventory WHERE id = ?`,
-      [slabId],
+      [parentSlabId],
     )
-    if (slab.length > 1) {
-      return
-    }
-    if (!slab || slab.length === 0) {
-      return
+    if (slab.length === 0) {
+      throw new Error(`Slab with id ${parentSlabId} not found`)
     }
     const slabItem = slab[0]
-    await db.execute<ResultSetHeader>(
-      `INSERT INTO slab_inventory 
-                (stone_id, bundle, length, width, url, parent_id) 
+    const [result] = await db.execute<ResultSetHeader>(
+      `INSERT INTO slab_inventory
+                (stone_id, bundle, length, width, url, parent_id)
                 VALUES (?, ?, ?, ?, ?, ?)`,
       [
         slabItem.stone_id,
@@ -216,9 +241,25 @@ export class Contract {
         slabItem.length,
         slabItem.width,
         slabItem.url,
-        slabId,
+        parentSlabId,
       ],
     )
+    return result.insertId
+  }
+
+  /**
+   * Legacy method: creates a child slab for partial sales (is_full = false)
+   * Calls createChildSlab but ignores the returned ID
+   */
+  protected async duplicateSlab(slabId: number) {
+    const [slab] = await db.execute<RowDataPacket[]>(
+      `SELECT id FROM slab_inventory WHERE id = ?`,
+      [slabId],
+    )
+    if (slab.length > 1 || slab.length === 0) {
+      return
+    }
+    await this.createChildSlab(slabId)
   }
 
   protected async deleteDuplicateSlab(slabId: number) {
@@ -227,20 +268,80 @@ export class Contract {
 
   async sell(user: User) {
     this.saleId = await this.createSale(user)
-    for (const room of this.data.rooms) {
-      const firstSlab = room.slabs[0]
-      for (const slab of room.slabs) {
-        await this.sellSlab(slab.id, room)
 
-        if (!slab.is_full) {
-          await this.duplicateSlab(slab.id)
+    // Handle duplicate slabs: if a slab is used in multiple rooms, create child slabs
+    const slabUsageMap = new Map<number, number>() // slabId -> usage count
+    const slabReplacementMap = new Map<string, number>() // roomIndex-slabIndex -> new slabId
+
+    // Count slab usage across all rooms
+    this.data.rooms.forEach(room => {
+      room.slabs.forEach(slab => {
+        const count = slabUsageMap.get(slab.id) || 0
+        slabUsageMap.set(slab.id, count + 1)
+      })
+    })
+
+    // Create child slabs for duplicates
+    for (let roomIndex = 0; roomIndex < this.data.rooms.length; roomIndex++) {
+      const room = this.data.rooms[roomIndex]
+      for (let slabIndex = 0; slabIndex < room.slabs.length; slabIndex++) {
+        const slab = room.slabs[slabIndex]
+        const usageCount = slabUsageMap.get(slab.id) || 0
+
+        // If this slab is used more than once, we need child slabs
+        if (usageCount > 1) {
+          // Get current usage index for this slab
+          const previousUsages = []
+          for (let r = 0; r < roomIndex; r++) {
+            previousUsages.push(
+              ...this.data.rooms[r].slabs.filter(s => s.id === slab.id),
+            )
+          }
+          for (let s = 0; s < slabIndex; s++) {
+            if (room.slabs[s].id === slab.id) {
+              previousUsages.push(room.slabs[s])
+            }
+          }
+
+          // If this is not the first usage, create a child slab
+          if (previousUsages.length > 0) {
+            const childSlabId = await this.createChildSlab(slab.id)
+            slabReplacementMap.set(`${roomIndex}-${slabIndex}`, childSlabId)
+          }
         }
       }
+    }
+
+    // Now sell slabs with replacements applied
+    for (let roomIndex = 0; roomIndex < this.data.rooms.length; roomIndex++) {
+      const room = this.data.rooms[roomIndex]
+
+      if (room.slabs.length === 0) {
+        throw new Error(
+          `Room ${roomIndex + 1} has no slabs. At least one slab is required per room.`,
+        )
+      }
+
+      const firstSlab = room.slabs[0]
+      const firstSlabId = slabReplacementMap.get(`${roomIndex}-0`) || firstSlab.id
+
+      for (let slabIndex = 0; slabIndex < room.slabs.length; slabIndex++) {
+        const slab = room.slabs[slabIndex]
+        const actualSlabId =
+          slabReplacementMap.get(`${roomIndex}-${slabIndex}`) || slab.id
+
+        await this.sellSlab(actualSlabId, room)
+
+        if (!slab.is_full) {
+          await this.duplicateSlab(actualSlabId)
+        }
+      }
+
       for (const sinkType of room.sink_type) {
-        await this.sellSink(firstSlab.id, sinkType.type_id, sinkType.price)
+        await this.sellSink(firstSlabId, sinkType.type_id, sinkType.price)
       }
       for (const faucetType of room.faucet_type) {
-        await this.sellFaucet(firstSlab.id, faucetType.type_id, faucetType.price)
+        await this.sellFaucet(firstSlabId, faucetType.type_id, faucetType.price)
       }
     }
     return this.saleId
@@ -251,11 +352,20 @@ export class Contract {
       throw new Error('Sale not found')
     }
     await this.deleteSale()
+
+    // First, unsell all slabs and their associated sinks/faucets
     for (const room of this.data.rooms) {
       for (const slab of room.slabs) {
         await this.unsellSlab(slab.id)
         await this.unsellSink(slab.id)
         await this.unsellFaucet(slab.id)
+      }
+    }
+
+    // Then, delete child slabs (partial slabs)
+    // We need to delete children after unselling to avoid deleting slabs before processing them
+    for (const room of this.data.rooms) {
+      for (const slab of room.slabs) {
         if (!slab.is_full) {
           await this.deleteDuplicateSlab(slab.id)
         }
@@ -271,37 +381,94 @@ export class Contract {
     await this.updateSale(user)
     await this.unsellSlabs(this.saleId)
 
-    for (const room of this.data.rooms) {
+    // Handle duplicate slabs: if a slab is used in multiple rooms, create child slabs
+    const slabUsageMap = new Map<number, number>() // slabId -> usage count
+    const slabReplacementMap = new Map<string, number>() // roomIndex-slabIndex -> new slabId
+
+    // Count slab usage across all rooms
+    this.data.rooms.forEach(room => {
+      room.slabs.forEach(slab => {
+        const count = slabUsageMap.get(slab.id) || 0
+        slabUsageMap.set(slab.id, count + 1)
+      })
+    })
+
+    // Create child slabs for duplicates
+    for (let roomIndex = 0; roomIndex < this.data.rooms.length; roomIndex++) {
+      const room = this.data.rooms[roomIndex]
+      for (let slabIndex = 0; slabIndex < room.slabs.length; slabIndex++) {
+        const slab = room.slabs[slabIndex]
+        const usageCount = slabUsageMap.get(slab.id) || 0
+
+        // If this slab is used more than once, we need child slabs
+        if (usageCount > 1) {
+          // Get current usage index for this slab
+          const previousUsages = []
+          for (let r = 0; r < roomIndex; r++) {
+            previousUsages.push(
+              ...this.data.rooms[r].slabs.filter(s => s.id === slab.id),
+            )
+          }
+          for (let s = 0; s < slabIndex; s++) {
+            if (room.slabs[s].id === slab.id) {
+              previousUsages.push(room.slabs[s])
+            }
+          }
+
+          // If this is not the first usage, create a child slab
+          if (previousUsages.length > 0) {
+            const childSlabId = await this.createChildSlab(slab.id)
+            slabReplacementMap.set(`${roomIndex}-${slabIndex}`, childSlabId)
+          }
+        }
+      }
+    }
+
+    // Now update slabs with replacements applied
+    for (let roomIndex = 0; roomIndex < this.data.rooms.length; roomIndex++) {
+      const room = this.data.rooms[roomIndex]
+
+      if (room.slabs.length === 0) {
+        throw new Error(
+          `Room ${roomIndex + 1} has no slabs. At least one slab is required per room.`,
+        )
+      }
+
       const firstSlab = room.slabs[0]
+      const firstSlabId = slabReplacementMap.get(`${roomIndex}-0`) || firstSlab.id
 
-      for (const slab of room.slabs) {
-        await this.unsellSink(slab.id)
-        await this.unsellFaucet(slab.id)
+      for (let slabIndex = 0; slabIndex < room.slabs.length; slabIndex++) {
+        const slab = room.slabs[slabIndex]
+        const actualSlabId =
+          slabReplacementMap.get(`${roomIndex}-${slabIndex}`) || slab.id
 
-        await this.updateSlab(slab.id, room)
+        await this.unsellSink(actualSlabId)
+        await this.unsellFaucet(actualSlabId)
+
+        await this.updateSlab(actualSlabId, room)
 
         const [hasChildren] = await db.execute<RowDataPacket[]>(
           `SELECT id FROM slab_inventory WHERE parent_id = ?`,
-          [slab.id],
+          [actualSlabId],
         )
 
         if (!slab.is_full) {
           if (hasChildren.length === 0) {
-            await this.duplicateSlab(slab.id)
+            await this.duplicateSlab(actualSlabId)
           }
         } else {
           if (hasChildren.length > 0) {
-            await this.deleteDuplicateSlab(slab.id)
+            await this.deleteDuplicateSlab(actualSlabId)
           }
         }
       }
 
       // Sell sinks and faucets **once per room**, associated with the first slab
       for (const sinkType of room.sink_type) {
-        await this.sellSink(firstSlab.id, sinkType.type_id, sinkType.price)
+        await this.sellSink(firstSlabId, sinkType.type_id, sinkType.price)
       }
       for (const faucetType of room.faucet_type) {
-        await this.sellFaucet(firstSlab.id, faucetType.type_id, faucetType.price)
+        await this.sellFaucet(firstSlabId, faucetType.type_id, faucetType.price)
       }
     }
   }

@@ -19,6 +19,7 @@ import { Menu, X } from 'lucide-react'
 import type React from 'react'
 import { useEffect, useState } from 'react'
 import { Button } from '~/components/ui/button'
+import { defaultLogo, gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
 import { LinkButton } from '../molecules/LinkButton'
 
 function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkProps) {
@@ -52,7 +53,9 @@ export function BurgerMenu({
   const [isRoleSwitching, setIsRoleSwitching] = useState(false)
   const [isCustomerSwitching, setIsCustomerSwitching] = useState(false)
   const data = useLoaderData<{ user: { company_id: number } | null }>()
-  const companyId = data?.user?.company_id || 1
+  const companyId = isCustomerPage
+    ? location.pathname.split('/').filter(Boolean)[1]
+    : data?.user?.company_id
 
   useEffect(() => {
     if (navigation.state === 'idle') {
@@ -63,7 +66,7 @@ export function BurgerMenu({
 
   const targetPath = getMirroredUrl(isAdminPage, location)
 
-  const getCustomerUrl = () => {
+  const buildCustomerUrl = () => {
     // Если переходим из admin/stones в customer/:company/stones, сохраняем фильтры
     if (!isCustomerPage && location.pathname.startsWith('/admin/stones')) {
       return `/customer/${companyId}/stones${location.search}`
@@ -155,7 +158,7 @@ export function BurgerMenu({
                 )
               ) : null}
               <BurgerLink
-                to={getCustomerUrl()}
+                to={buildCustomerUrl()}
                 setOpen={setOpen}
                 onClick={handleCustomerSwitchClick}
               >
@@ -190,14 +193,23 @@ export function HeaderMobile({
   isSuperUser,
   className,
 }: HeaderMobileProps) {
+  const location = useLocation()
+  const isAdminPage = location.pathname.startsWith('/admin')
+  const isCustomerPage = location.pathname.startsWith('/customer')
+  const data = useLoaderData<{ user: { company_id: number } | null }>()
+  const companyId = isCustomerPage
+    ? location.pathname.split('/').filter(Boolean)[1]
+    : data?.user?.company_id
+  const id = Number(companyId)
+  const companyLogo = id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
   return (
     <header className={clsx('flex justify-between', className)}>
       <div className='logo'>
         <a className='flex justify-center' href='/'>
           <img
-            src='https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo_gd_main.webp'
+            src={companyLogo}
             alt='Logo'
-            className='h-12 md:h-16 object-contain'
+            className='h-18 md:h-16 object-contain'
           />
         </a>
       </div>

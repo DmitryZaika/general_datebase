@@ -24,14 +24,14 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { faucetSchema } from '~/schemas/faucets'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { FAUCET_TYPES } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 import { useCustomOptionalForm } from '~/utils/useCustomForm'
 import { FormField } from '../components/ui/form'
 
@@ -44,6 +44,7 @@ type FaucetData = {
   cost: number | null
   retail_price: number | null
   amount: number
+  regular_stock: boolean
 }
 
 type SupplierData = {
@@ -87,13 +88,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (newFile) {
     await db.execute(
       `UPDATE faucet_type
-            SET name = ?, type = ?, url = ?, is_display = ?, supplier_id = ?, cost = ?, retail_price = ?
+            SET name = ?, type = ?, url = ?, is_display = ?, regular_stock = ?, supplier_id = ?, cost = ?, retail_price = ?
            WHERE id = ?`,
       [
         data.name,
         data.type,
         data.file,
         data.is_display,
+        data.regular_stock,
         !data.supplier_id || data.supplier_id === 0 ? null : data.supplier_id,
         data.cost,
         data.retail_price,
@@ -103,12 +105,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } else {
     await db.execute(
       `UPDATE faucet_type
-           SET name = ?, type = ?, is_display = ?, supplier_id = ?, cost = ?, retail_price = ?
+           SET name = ?, type = ?, is_display = ?, regular_stock = ?, supplier_id = ?, cost = ?, retail_price = ?
            WHERE id = ?`,
       [
         data.name,
         data.type,
         data.is_display,
+        data.regular_stock,
         !data.supplier_id || data.supplier_id === 0 ? null : data.supplier_id,
         data.cost,
         data.retail_price,
@@ -136,7 +139,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const toDelete = currentAmount - newAmount
 
     const [allUnusedRows] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT id FROM faucets 
+      `SELECT id FROM faucets
            WHERE faucet_type_id = ? AND slab_id IS NULL AND is_deleted = 0`,
       [faucetId],
     )
@@ -178,12 +181,13 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     type: string
     url: string
     is_display: boolean
+    regular_stock: boolean
     supplier_id: string
     cost: number | null
     retail_price: number | null
   }>(
     db,
-    'SELECT name, type, url, is_display, supplier_id, cost, retail_price FROM faucet_type WHERE id = ?',
+    'SELECT name, type, url, is_display, regular_stock, supplier_id, cost, retail_price FROM faucet_type WHERE id = ?',
     faucetId,
   )
 
@@ -222,13 +226,23 @@ function FaucetInformation({
 }) {
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
-  const { name, type, url, is_display, supplier_id, amount, cost, retail_price } =
-    faucetData
+  const {
+    name,
+    type,
+    url,
+    is_display,
+    regular_stock,
+    supplier_id,
+    amount,
+    cost,
+    retail_price,
+  } = faucetData
   const defaultValues = {
     name,
     type,
     url: '',
     is_display,
+    regular_stock,
     supplier_id,
     amount,
     cost,
@@ -279,6 +293,11 @@ function FaucetInformation({
           control={form.control}
           name='is_display'
           render={({ field }) => <SwitchItem field={field} name='Display' />}
+        />
+        <FormField
+          control={form.control}
+          name='regular_stock'
+          render={({ field }) => <SwitchItem field={field} name='Regular Stock' />}
         />
         <FormField
           control={form.control}

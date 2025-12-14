@@ -27,7 +27,7 @@ function MainComponent({
           form.setValue('customer_id', value ?? (undefined as unknown as number))
         }
         companyId={companyId}
-        source={'user-input'}
+        source={'other'}
         selectedCustomer={form.watch('customer_id') ?? undefined}
         error={form.formState.errors.customer_id?.message}
         setError={error =>

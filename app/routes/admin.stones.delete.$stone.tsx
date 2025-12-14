@@ -8,12 +8,12 @@ import {
 } from 'react-router'
 import { DeleteRow } from '~/components/pages/DeleteRow'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { selectId } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 export async function action({ params, request }: ActionFunctionArgs) {
   try {
@@ -30,16 +30,29 @@ export async function action({ params, request }: ActionFunctionArgs) {
     return forceRedirectError(request.headers, 'No document id provided')
   }
   const stoneId = parseInt(params.stone)
-  const stone = await selectId<{ url: string }>(
-    db,
-    'select url from stones WHERE id = ?',
-    stoneId,
+ 
+ 
+  // Get all slab images that need to be deleted from S3
+  const slabsResult = await db.execute(
+    `SELECT url FROM slab_inventory WHERE stone_id = ? AND url IS NOT NULL`,
+    [stoneId],
   )
-  if (stone?.url) {
-    deleteFile(stone.url)
+
+  // Delete slab images from S3
+  const slabs = slabsResult[0] as Array<{ url: string }>
+  if (slabs && slabs.length > 0) {
+    for (const slab of slabs) {
+      if (slab.url) {
+        deleteFile(slab.url)
+      }
+    }
   }
 
-  await db.execute(`DELETE FROM stones WHERE id = ?`, [stoneId])
+  // Soft delete all slabs belonging to this stone
+  await db.execute(`UPDATE slab_inventory SET deleted_at = CURRENT_TIMESTAMP WHERE stone_id = ?`, [stoneId])
+
+  // Soft delete the stone itself
+  await db.execute(`UPDATE stones SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`, [stoneId])
 
   const url = new URL(request.url)
   const searchParams = url.searchParams.toString()

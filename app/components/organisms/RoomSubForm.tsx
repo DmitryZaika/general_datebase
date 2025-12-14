@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import {
   DynamicAddition,
@@ -47,15 +47,20 @@ const cleanValue = (key: string) => {
   return text.replace('_', ' ')
 }
 
-async function getSlabMap(slabIds: number[]): Promise<Record<number, string>> {
+async function getSlabMap(
+  slabIds: number[],
+): Promise<Record<number, { bundle: string; is_leftover: boolean }>> {
   const response = await fetch(`/api/slabNames?ids=${slabIds.join(',')}`)
   if (!response.ok) {
     throw new Error('Failed to fetch slabs')
   }
   const data = await response.json()
   return data.slabNames.reduce(
-    (acc: Record<number, string>, slab: { id: number; bundle: string }) => {
-      acc[slab.id] = slab.bundle
+    (
+      acc: Record<number, { bundle: string; is_leftover: boolean }>,
+      slab: { id: number; bundle: string; is_leftover: boolean },
+    ) => {
+      acc[slab.id] = { bundle: slab.bundle, is_leftover: slab.is_leftover }
       return acc
     },
     {},
@@ -80,12 +85,14 @@ export const RoomSubForm = ({
   sink_type,
   faucet_type,
   isEdit,
+  companyId,
 }: {
   form: UseFormReturn<TCustomerSchema>
   index: number
   sink_type: Sink[]
   faucet_type: Faucet[]
   isEdit?: boolean
+  companyId: number
 }) => {
   const roomValues = form.watch(`rooms.${index}`)
 
@@ -106,10 +113,28 @@ export const RoomSubForm = ({
   const [stone, setStone] = useState<StoneSlim | undefined>()
 
   useEffect(() => {
+    let isMounted = true
+
     if (slabIds.length > 0) {
-      getStone(slabIds[0]).then(setStone)
+      getStone(slabIds[0]).then((stone) => {
+        if (isMounted) setStone(stone)
+      })
+    } else {
+      // If current room has no slabs, try to get stone from first room
+      const allRooms = form.getValues('rooms')
+      const firstRoomWithSlabs = allRooms.find(room => room.slabs.length > 0)
+      if (firstRoomWithSlabs && firstRoomWithSlabs.slabs.length > 0) {
+        getStone(firstRoomWithSlabs.slabs[0].id).then((stone) => {
+          if (isMounted) setStone(stone)
+        })
+      }
     }
-  }, [JSON.stringify(slabIds)])
+
+    return () => {
+      isMounted = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slabIds.length, slabIds[0]])
 
   const { data: slabMap } = useQuery({
     queryKey: ['slabMap', slabIds],
@@ -214,11 +239,36 @@ export const RoomSubForm = ({
     form.setValue(`rooms.${index}.total_price`, roundedPrice)
   }
 
-  const handleRetailPriceChange = (price: number) => {
-    const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
-    const totalPrice = squareFeet * price
-    updateTotalPrice(totalPrice)
-  }
+  const handleStoneChange = useCallback(
+    (val: StoneSlim | undefined) => {
+      if (!val) {
+        form.setValue(`rooms.${index}.slabs`, [])
+      }
+      setStone(val)
+    },
+    [form, index],
+  )
+
+  const handleRetailPriceChange = useCallback(
+    (price: number) => {
+      form.setValue(`rooms.${index}.retail_price`, price)
+      const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
+      updateTotalPrice(squareFeet * price)
+    },
+    [form, index, updateTotalPrice],
+  )
+
+  const handleStoneCreated = useCallback(
+    (_stone: StoneSlim, slabIds?: number[]) => {
+      if (slabIds && slabIds.length > 0) {
+        form.setValue(
+          `rooms.${index}.slabs`,
+          slabIds.map(id => ({ id, is_full: false })),
+        )
+      }
+    },
+    [form, index],
+  )
 
   const handleSquareFeetChange = (squareFeet: number) => {
     const tearOutValue = form.getValues(`rooms.${index}.tear_out`)
@@ -266,17 +316,12 @@ export const RoomSubForm = ({
         />
 
         <StoneSearch
+          companyId={companyId}
           stone={stone}
-          setStone={val => {
-            form.setValue(`rooms.${index}.slabs`, [])
-            setStone(val)
-          }}
-          onRetailPriceChange={price => {
-            form.setValue(`rooms.${index}.retail_price`, price)
-            const squareFeet = form.getValues(`rooms.${index}.square_feet`) || 0
-            const totalPrice = squareFeet * price
-            updateTotalPrice(totalPrice)
-          }}
+          setStone={handleStoneChange}
+          onRetailPriceChange={handleRetailPriceChange}
+          allowQuickAdd
+          onStoneCreated={handleStoneCreated}
         />
 
         <FormField
@@ -568,16 +613,22 @@ export const RoomSubForm = ({
                   />
                 </div>
                 <div className='flex items-center space-x-2'>
-                  <div
-                    className={`px-2 py-1 rounded-md text-sm ${
-                      slab.is_full
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}
-                  >
-                    Bundle {slabMap?.[slab.id]}
-                    {slab.is_full ? '(Full)' : '(Partial)'}
-                  </div>
+                  {slabMap?.[slab.id]?.is_leftover ? (
+                    <div className='px-2 py-1 rounded-md text-sm bg-purple-100 text-purple-800'>
+                      Bundle {slabMap[slab.id].bundle} (Leftover)
+                    </div>
+                  ) : (
+                    <div
+                      className={`px-2 py-1 rounded-md text-sm ${
+                        slab.is_full
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}
+                    >
+                      Bundle {slabMap?.[slab.id]?.bundle}
+                      {slab.is_full ? ' (Full)' : ' (Partial)'}
+                    </div>
+                  )}
                   {form.watch(`rooms.${index}.slabs`).length > 1 && (
                     <Button
                       type='button'

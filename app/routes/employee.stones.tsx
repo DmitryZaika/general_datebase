@@ -2,6 +2,7 @@ import { GridIcon, TableIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useEffect, useState } from 'react'
 import {
+  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
@@ -19,6 +20,7 @@ import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
+import { withIconSuffix } from '~/utils/files'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
 import { getEmployeeUser } from '~/utils/session.server'
 import { capitalizeFirstLetter } from '~/utils/words'
@@ -36,7 +38,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const queryParams = new URLSearchParams(searchParams)
   const filters = stoneFilterSchema.parse(cleanParams(queryParams))
   const stones = await stoneQueryBuilder(filters, user.company_id)
-  return { stones }
+  return { stones, companyId: user.company_id }
+}
+
+function getStoneUrl(original: string | null) {
+  return original ? withIconSuffix(original) : '/placeholder.png'
 }
 
 function InteractiveCard({
@@ -48,11 +54,10 @@ function InteractiveCard({
   stoneType: string
 }) {
   const displayedAmount = stone.amount > 0 ? stone.amount : '—'
-  const createdDate = new Date(stone.created_date)
   const threeWeeksAgo = new Date()
   threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 30)
-  const isNew = createdDate > threeWeeksAgo
   const isOnSale = !!stone.on_sale
+  const isRegularStock = !!stone.regular_stock
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -91,10 +96,10 @@ function InteractiveCard({
         type='slabs'
         itemId={stone.id}
         fieldList={{
-          Available: `${stone.available} / ${displayedAmount}`,
-
+          Available: stone.available === 0 && isRegularStock 
+            ? 'Regular Stock' 
+            : `${stone.available} / ${displayedAmount}${isRegularStock ? ' (Regular stock)' : ''}`,
           Type: capitalizeFirstLetter(stone.type),
-
           Price:
             stone.retail_price === 0
               ? ` By slab $${stone.cost_per_sqft} sqft`
@@ -104,7 +109,7 @@ function InteractiveCard({
       >
         <div onClick={e => e.stopPropagation()}>
           <img
-            src={stone.url || '/placeholder.png'}
+            src={getStoneUrl(stone.url)}
             alt={stone.name || 'Stone Image'}
             className='object-cover w-full h-40 border-2 border-gray-300 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
             loading='lazy'
@@ -112,24 +117,24 @@ function InteractiveCard({
           />
         </div>
       </ImageCard>
-      {stone.available === 0 && (
+      {stone.available === 0 && !isRegularStock && (
         <div className='absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
           <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
             Out of Stock
           </div>
         </div>
       )}
-      {isNew && (
+      {/* {isNew && (
         <div className='absolute top-0 right-0 bg-green-500 text-white px-2 py-1 rounded-bl text-sm font-bold'>
           New Color
         </div>
-      )}
+      )} */}
     </div>
   )
 }
 
 export default function Stones() {
-  const { stones } = useLoaderData<typeof loader>()
+  const { stones, companyId } = useLoaderData<typeof loader>()
   const [searchParams, setSearchParams] = useSearchParams()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones)
@@ -142,10 +147,10 @@ export default function Stones() {
 
   useEffect(() => {
     const inStock = stones.filter(
-      stone => Number(stone.available) > 0 && Boolean(stone.is_display),
+      stone => (Number(stone.available) > 0 || stone.regular_stock) && Boolean(stone.is_display),
     )
     const outOfStock = stones.filter(
-      stone => Number(stone.available) <= 0 && Boolean(stone.is_display),
+      stone => Number(stone.available) <= 0 && !stone.regular_stock && Boolean(stone.is_display),
     )
     const notDisplayed = stones.filter(stone => !stone.is_display)
 
@@ -179,6 +184,7 @@ export default function Stones() {
       cell: ({ row }) => {
         const stone = row.original
         const isOutOfStock = stone.available === 0
+        const isRegularStock = !!stone.regular_stock
 
         return (
           <div
@@ -189,11 +195,11 @@ export default function Stones() {
             }}
           >
             <img
-              src={stone.url || '/placeholder.png'}
+              src={getStoneUrl(stone.url)}
               alt={stone.name}
               className='object-cover w-full h-full'
             />
-            {isOutOfStock && (
+            {isOutOfStock && !isRegularStock && (
               <div className='absolute inset-0 flex items-center justify-center bg-red-500/70'>
                 <span className='text-white text-[8px] font-bold rotate-0 text-center leading-tight px-0.5'>
                   Out of Stock
@@ -241,6 +247,14 @@ export default function Stones() {
     {
       accessorKey: 'available',
       header: ({ column }) => <SortableHeader column={column} title='Available' />,
+      cell: ({ row }) => {
+        const stone = row.original
+        const isRegularStock = !!stone.regular_stock
+        if (stone.available === 0 && isRegularStock) {
+          return 'Regular Stock'
+        }
+        return stone.available
+      },
     },
     {
       accessorKey: 'amount',
@@ -280,9 +294,13 @@ export default function Stones() {
             )}
             {viewMode === 'grid' ? 'Table View' : 'Grid View'}
           </Button>
+
+          <Link to={`sell-slab${location.search}`}>
+            <Button variant='default'>Sell Slab</Button>
+          </Link>
         </div>
         <div className='flex-1 flex justify-center md:justify-end md:ml-auto'>
-          <StoneSearch userRole='employee' />
+          <StoneSearch userRole='employee' companyId={companyId} />
         </div>
       </div>
 

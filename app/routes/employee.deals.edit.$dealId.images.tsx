@@ -1,19 +1,20 @@
-import { Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { FaPlus, FaTimes } from 'react-icons/fa'
+import { FaTimes } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   data,
-  Form,
   type LoaderFunctionArgs,
-  Form as RemixForm,
   redirect,
+  Form as RemixForm,
   useLoaderData,
   useNavigation,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 
+import { FileInput } from '~/components/molecules/FileInput'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { MultiPartForm } from '~/components/molecules/MultiPartForm'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import {
@@ -24,19 +25,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import { FormField } from '~/components/ui/form'
 
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getEmployeeUser } from '~/utils/session.server'
-import { forceRedirectError, toastData } from '~/utils/toastHelpers'
+import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
+import { useCustomForm } from '~/utils/useCustomForm'
 
-const DealImagesSchema = z.object({
-  // parseMutliForm автоматически добавит поле file
-})
+export const DealImagesSchema = z.object({})
+type TDealImagesSchema = z.infer<typeof DealImagesSchema>
 
 interface DealImage {
   id: number
@@ -158,41 +160,39 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 function AddImageForm() {
   const navigation = useNavigation()
+  const form = useCustomForm<TDealImagesSchema>(DealImagesSchema)
+    const isSubmitting = useNavigation().state !== 'idle'
   const [inputKey, setInputKey] = useState(0)
-  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     if (navigation.state === 'idle') {
+      form.reset()
       setInputKey(k => k + 1)
-      setUploading(false)
     }
-  }, [navigation.state])
+  }, [navigation.state, form])
 
   return (
-    <div className='relative'>
-      <input
-        key={inputKey}
-        type='file'
-        name='file'
-        accept='image/png, image/jpeg, image/jpg, image/gif, image/webp, image/svg+xml, image/tiff, image/bmp, image/x-icon, image/heif, image/x-canon-cr2, image/x-nikon-nef'
-        className='absolute inset-0 w-full h-32 opacity-0 cursor-pointer z-10'
-        onChange={e => {
-          const input = e.currentTarget as HTMLInputElement
-          const file = input.files?.[0]
-          if (file) {
-            setUploading(true)
-            input.form?.requestSubmit()
-          }
-        }}
-      />
-      <div className='w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors border-2 border-dashed border-gray-300 hover:border-blue-500'>
-        {uploading ? (
-          <Loader2 className='w-8 h-8 text-gray-400 animate-spin' />
-        ) : (
-          <FaPlus className='text-gray-400 text-3xl' />
-        )}
+
+    <MultiPartForm form={form}>
+      <div className='flex items-center space-x-4'>
+        <FormField
+          control={form.control}
+          name='file'
+          render={({ field }) => (
+            <FileInput
+              key={inputKey}
+              inputName='deals'
+              id='deal-image'
+              type='image'
+              onChange={field.onChange}
+            />
+          )}
+        />
+        <LoadingButton type='submit' className='mt-2' loading={isSubmitting}>
+          Add image
+        </LoadingButton>
       </div>
-    </div>
+    </MultiPartForm>
   )
 }
 
@@ -229,15 +229,8 @@ export default function DealEditImages() {
   return (
     <>
       <div className='space-y-4'>
-        <h2 className='text-xl font-bold'>Deal Images</h2>
-
-        <Form
-          method='post'
-          encType='multipart/form-data'
-          className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'
-        >
-          <AuthenticityTokenInput />
-          <AddImageForm />
+        <AddImageForm />
+        <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
           {images.map(image => (
             <div key={image.id} className='relative group cursor-pointer'>
               <img
@@ -258,7 +251,7 @@ export default function DealEditImages() {
               </div>
             </div>
           ))}
-        </Form>
+        </div>
       </div>
 
       {/* Confirmation Dialog for Delete */}

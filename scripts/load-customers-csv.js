@@ -3,7 +3,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import dotenv from 'dotenv'
 import mysql from 'mysql2/promise'
+
+dotenv.config()
 
 const access = {
   user: process.env.DB_USER,
@@ -30,6 +33,13 @@ function normalizePhone(val) {
     return `${d.slice(1, 4)}-${d.slice(4, 7)}-${d.slice(7)}`
   if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`
   return null
+}
+
+function normalizeEmail(v) {
+  if (v == null) return null
+  const s = String(v).trim()
+  if (!s) return null
+  return s.toLowerCase()
 }
 
 // "dd.mm.yyyy[ HH:MM[:SS]]" | "yyyy-mm-dd[ HH:MM[:SS]]" -> "YYYY-MM-DD HH:MM:SS"
@@ -126,11 +136,72 @@ function convertData(data) {
     created_date: normalizeDateKeepTime(item.created_date),
     name: item.name ?? null,
     phone: normalizePhone(item.phone ?? null),
-    email: item.email ?? null,
+    email: normalizeEmail(item.email ?? null),
     address: item.address ?? null,
     sales_rep: toInt(item.sales_rep),
     source: item.source ?? 'leads',
   }))
+}
+
+// ---- загрузка существующих телефонов/email из БД и нормализация ------------------
+async function loadExistingIdentifiers({ companyId = 1 } = {}) {
+  const conn = await db.getConnection()
+  try {
+    // Если нужно ограничивать по компании — оставляем WHERE company_id = ?
+    const [rows] = await conn.query(
+      `SELECT phone, email FROM customers WHERE company_id = ?`,
+      [companyId],
+    )
+
+    const existingPhones = new Set()
+    const existingEmails = new Set()
+
+    for (const r of rows) {
+      // нормализуем то, что лежит в базе (на всякий случай поддержим любые форматы)
+      const p = normalizePhone(r.phone)
+      if (p) existingPhones.add(p)
+      const e = normalizeEmail(r.email)
+      if (e) existingEmails.add(e)
+    }
+
+    return { existingPhones, existingEmails }
+  } finally {
+    conn.release()
+  }
+}
+
+function filterDuplicates(data, existingPhones, existingEmails) {
+  const batchPhones = new Set(existingPhones)
+  const batchEmails = new Set(existingEmails)
+
+  const result = []
+  let skippedNoContact = 0
+  let skippedDuplicates = 0
+
+  for (const r of data) {
+    // пропускаем запись, если нет и телефона, и email
+    if (!r.phone && !r.email) {
+      skippedNoContact++
+      continue
+    }
+
+    // проверяем дубли по телефону/email
+    const phoneDup = r.phone && batchPhones.has(r.phone)
+    const emailDup = r.email && batchEmails.has(r.email)
+
+    if (phoneDup || emailDup) {
+      skippedDuplicates++
+      continue
+    }
+
+    // новая уникальная запись — добавляем и учитываем в сетах,
+    // чтобы внутри текущей загрузки тоже не было дублей
+    if (r.phone) batchPhones.add(r.phone)
+    if (r.email) batchEmails.add(r.email)
+    result.push(r)
+  }
+
+  return { filtered: result, skippedDuplicates, skippedNoContact }
 }
 
 async function saveData(data) {
@@ -139,10 +210,14 @@ async function saveData(data) {
       (created_date, name, phone, email, address, sales_rep, company_id, source)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `
+
   const conn = await db.getConnection()
+
   let _inserted = 0
+
   try {
     await conn.beginTransaction()
+
     for (const r of data) {
       await conn.execute(sql, [
         r.created_date,
@@ -151,22 +226,50 @@ async function saveData(data) {
         r.email,
         r.address,
         r.sales_rep,
-        3,
+        1,
         'leads',
       ])
+
       _inserted++
     }
+
     await conn.commit()
   } catch (e) {
     await conn.rollback()
+
     throw e
   } finally {
     conn.release()
+
     await db.end()
   }
+
+  return _inserted
 }
 
 // --- run --------------------------------------------------------
-const data = getCsvData()
-const cleanData = convertData(data)
-await saveData(cleanData)
+// biome-ignore lint/suspicious/noConsole: for tests
+console.log('customers import started')
+
+const rawData = getCsvData()
+const cleanData = convertData(rawData)
+// biome-ignore lint/suspicious/noConsole: for tests
+console.log('customers cleanData count', cleanData.length)
+
+const { existingPhones, existingEmails } = await loadExistingIdentifiers({
+  companyId: 1,
+})
+const { filtered, skippedDuplicates, skippedNoContact } = filterDuplicates(
+  cleanData,
+  existingPhones,
+  existingEmails,
+)
+
+// biome-ignore lint/suspicious/noConsole: for tests
+console.log(
+  `filtered to insert: ${filtered.length} (skipped duplicates: ${skippedDuplicates}, skipped no phone+email: ${skippedNoContact})`,
+)
+
+const inserted = await saveData(filtered)
+// biome-ignore lint/suspicious/noConsole: for tests
+console.log(`customers import finished, inserted: ${inserted}`)

@@ -13,10 +13,10 @@ import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 interface PayrollItem {
   id: number
@@ -44,8 +44,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const paymentStatus = url.searchParams.get('paymentStatus') || 'all'
 
     let query = `
-      SELECT 
-        sales.id as sale_id, 
+      SELECT
+        sales.id as sale_id,
         users.id as seller_id,
         users.name as seller_name,
         customers.name as customer_name,
@@ -58,11 +58,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         END as sale_status,
         sales.paid_date,
         sales.sales_payroll
-      FROM 
+      FROM
         sales
-      JOIN 
+      JOIN
         customers ON sales.customer_id = customers.id
-      JOIN 
+      JOIN
         users ON sales.seller_id = users.id
       WHERE
         sales.company_id = ? AND
@@ -78,7 +78,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     query += `
-      ORDER BY 
+      ORDER BY
         sales.sale_date DESC
     `
 

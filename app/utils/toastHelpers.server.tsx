@@ -1,6 +1,6 @@
 import { redirect } from 'react-router'
 import { v4 as uuidv4 } from 'uuid'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 
 type Variants = 'default' | 'destructive' | 'success'
 

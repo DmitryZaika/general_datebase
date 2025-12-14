@@ -19,6 +19,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getEmployeeUser(request)
   const [, searchParams] = request.url.split('?')
   const queryParams = new URLSearchParams(searchParams)
+
+  // Always show all faucets (including out of stock) for inventory visibility
+  if (!queryParams.has('show_sold_out')) {
+    queryParams.set('show_sold_out', 'true')
+  }
+
   const filters = faucetFilterSchema.parse(cleanParams(queryParams))
 
   const faucets = await faucetQueryBuilder(filters, user.company_id)
@@ -38,6 +44,7 @@ function InteractiveCard({
 }) {
   const displayedAmount =
     faucet.available && faucet.available > 0 ? faucet.available : '—'
+  const isRegularStock = !!faucet.regular_stock
 
   return (
     <div
@@ -53,7 +60,10 @@ function InteractiveCard({
       <ImageCard
         disabled={true}
         fieldList={{
-          Available: `${displayedAmount}`,
+          Available:
+            (faucet.available === 0 || !faucet.available) && isRegularStock
+              ? 'On-Demand'
+              : `${displayedAmount}${displayedAmount !== '—' && isRegularStock ? ' (Regular stock)' : ''}`,
           Price:
             faucet.retail_price === 0 ? `Contact for price` : `$${faucet.retail_price}`,
         }}
@@ -67,7 +77,7 @@ function InteractiveCard({
           onClick={() => setCurrentId(faucet.id, faucetType)}
         />
       </ImageCard>
-      {displayedAmount === '—' && (
+      {displayedAmount === '—' && !isRegularStock && (
         <div className='absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center cursor-pointer whitespace-nowrap'>
           <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
             Out of Stock
@@ -91,10 +101,15 @@ export default function Faucets() {
 
   useEffect(() => {
     const inStock = faucets.filter(
-      faucet => Number(faucet.available) > 0 && Boolean(faucet.is_display),
+      faucet =>
+        (Number(faucet.available) > 0 || !!faucet.regular_stock) &&
+        Boolean(faucet.is_display),
     )
     const outOfStock = faucets.filter(
-      faucet => Number(faucet.available) <= 0 && Boolean(faucet.is_display),
+      faucet =>
+        Number(faucet.available) <= 0 &&
+        !faucet.regular_stock &&
+        Boolean(faucet.is_display),
     )
     const notDisplayed = faucets.filter(faucet => !faucet.is_display)
 

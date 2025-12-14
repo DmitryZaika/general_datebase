@@ -1,5 +1,5 @@
 import { createCookieSessionStorage, type Session } from 'react-router'
-import type { ToastMessage } from './utils/toastHelpers'
+import type { ToastMessage } from './utils/toastHelpers.server'
 
 type SessionData = {
   sessionId: string

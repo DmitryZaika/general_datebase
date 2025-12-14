@@ -16,21 +16,11 @@ function detectSearchType(term: string): 'name' | 'phone' | 'email' {
   return 'name'
 }
 
-async function getCustomers(name: string): Promise<Customer[]> {
-  if (!name) return []
-  const searchType = detectSearchType(name)
-  const response = await fetch(
-    `/api/customers/search?term=${encodeURIComponent(name)}&searchType=${searchType}`,
-  )
-  if (!response.ok) return []
-  const data = await response.json()
-  return data?.customers || []
-}
-
 export function FindCustomer({
   className,
   editBasePath = '/employee/customers',
   deleteBasePath = '/employee/customers',
+  buildSearchUrl,
   buildEditLink,
   buildDeleteLink,
   onEdit,
@@ -38,11 +28,13 @@ export function FindCustomer({
   onSelect,
   resolveId,
   noActionsLabel = 'No Items',
+  showActions = true,
 }: {
   className?: string
   disableRowClick?: boolean
   editBasePath?: string
   deleteBasePath?: string
+  buildSearchUrl?: (term: string, searchType: 'name' | 'phone' | 'email') => string
   buildEditLink?: (customerId: number, search: string) => string
   buildDeleteLink?: (customerId: number, search: string) => string
   onEdit?: (customerId: number) => void
@@ -50,20 +42,46 @@ export function FindCustomer({
   onSelect?: (customerId: number) => void
   resolveId?: (customerId: number) => number | undefined
   noActionsLabel?: string
+  showActions?: boolean
 }) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [visibleCount, setVisibleCount] = useState(5)
   const [isInputFocused, setIsInputFocused] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
   const { toast } = useToast()
-  const { data: customers = [] } = useQuery({
-    queryKey: ['customers', 'search', searchTerm],
-    queryFn: () => getCustomers(searchTerm),
+  const { data: customers = [] } = useQuery<Customer[]>({
+    queryKey: ['customers', 'search', searchTerm, location.pathname],
+    queryFn: async (): Promise<Customer[]> => {
+      if (!searchTerm) {
+        const empty: Customer[] = []
+        return empty
+      }
+      const searchType = detectSearchType(searchTerm)
+      const url = buildSearchUrl
+        ? buildSearchUrl(searchTerm, searchType)
+        : `/api/customers/search?term=${encodeURIComponent(searchTerm)}&searchType=${searchType}`
+      const response = await fetch(url)
+      if (!response.ok) {
+        const empty: Customer[] = []
+        return empty
+      }
+      const data = await response.json()
+      const list: Customer[] = data?.customers || []
+      return list
+    },
     enabled: !!searchTerm,
   })
 
-  const displayCustomers = useMemo(() => customers, [customers])
+  const displayCustomers = useMemo(
+    () => customers.slice(0, visibleCount),
+    [customers, visibleCount],
+  )
+
+  useEffect(() => {
+    setVisibleCount(5)
+  }, [searchTerm])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -93,7 +111,7 @@ export function FindCustomer({
         </div>
       </div>
 
-      {isInputFocused && displayCustomers.length > 0 && (
+      {isInputFocused && customers.length > 0 && (
         <div className='absolute z-50 w-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'>
           {displayCustomers.map(customer => (
             <div
@@ -118,71 +136,87 @@ export function FindCustomer({
                   <p>{customer.phone || ''}</p>
                 </div>
               </div>
-              <div className='flex items-center space-x-2'>
-                {resolveId && resolveId(customer.id) === undefined ? (
-                  <span className='text-xs text-gray-500'>{noActionsLabel}</span>
-                ) : (
-                  <>
-                    <Button
-                      variant='ghost'
-                      size='icon'
-                      onClick={e => {
-                        e.stopPropagation()
-                        if (onEdit) {
-                          onEdit(customer.id)
-                          return
-                        }
-                        const link = buildEditLink
-                          ? buildEditLink(customer.id, location.search)
-                          : `${editBasePath}/edit/${customer.id}${location.search}`
-                        navigate(link)
-                      }}
-                      className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
-                    >
-                      <FaEdit style={{ minWidth: '20px', minHeight: '20px' }} />
-                    </Button>
-                    <Button
-                      variant='ghost'
-                      size='icon'
-                      onClick={e => {
-                        e.stopPropagation()
-                        if (onDelete) {
-                          onDelete(customer.id)
-                          return
-                        }
-                        ;(async () => {
-                          const res = await fetch(
-                            `/api/deals/count-by-customer/${customer.id}`,
-                          )
-                          if (res.ok) {
-                            const json = await res.json()
-                            if ((json.count ?? 0) > 0) {
-                              toast({
-                                title: 'Action required',
-                                description:
-                                  'Delete all related deals with this customer.',
-                                duration: 7000,
-                                variant: 'destructive',
-                              })
-                              return
-                            }
+              {showActions && (
+                <div className='flex items-center space-x-2'>
+                  {resolveId && resolveId(customer.id) === undefined ? (
+                    <span className='text-xs text-gray-500'>{noActionsLabel}</span>
+                  ) : (
+                    <>
+                      <Button
+                        variant='ghost'
+                        size='icon'
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (onEdit) {
+                            onEdit(customer.id)
+                            return
                           }
-
-                          const link = buildDeleteLink
-                            ? buildDeleteLink(customer.id, location.search)
-                            : `${deleteBasePath}/delete/${customer.id}${location.search}`
+                          const link = buildEditLink
+                            ? buildEditLink(customer.id, location.search)
+                            : `${editBasePath}/edit/${customer.id}${location.search}`
                           navigate(link)
-                        })()
-                      }}
-                      className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
-                    >
-                      <FaTrash style={{ minWidth: '16px', minHeight: '16px' }} />
-                    </Button>
-                  </>
-                )}
-              </div>
+                        }}
+                        className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                      >
+                        <FaEdit style={{ minWidth: '20px', minHeight: '20px' }} />
+                      </Button>
+                      <Button
+                        variant='ghost'
+                        size='icon'
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (onDelete) {
+                            onDelete(customer.id)
+                            return
+                          }
+                          ;(async () => {
+                            const res = await fetch(
+                              `/api/deals/count-by-customer/${customer.id}`,
+                            )
+                            if (res.ok) {
+                              const json = await res.json()
+                              if ((json.count ?? 0) > 0) {
+                                toast({
+                                  title: 'Action required',
+                                  description:
+                                    'Delete all related deals with this customer.',
+                                  duration: 7000,
+                                  variant: 'destructive',
+                                })
+                                return
+                              }
+                            }
+
+                            const link = buildDeleteLink
+                              ? buildDeleteLink(customer.id, location.search)
+                              : `${deleteBasePath}/delete/${customer.id}${location.search}`
+                            navigate(link)
+                          })()
+                        }}
+                        className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                      >
+                        <FaTrash style={{ minWidth: '16px', minHeight: '16px' }} />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           ))}
+          {customers.length > visibleCount && (
+            <div className='p-2 flex justify-center'>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={e => {
+                  e.stopPropagation()
+                  setVisibleCount(prev => prev + 5)
+                }}
+              >
+                Show more
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

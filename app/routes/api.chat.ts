@@ -2,9 +2,9 @@ import OpenAI from 'openai'
 import type { LoaderFunctionArgs } from 'react-router'
 import { eventStream } from 'remix-utils/sse/server'
 import { db } from '~/db.server'
+import { getSession } from '~/sessions.server'
 import type { InstructionSlim } from '~/types'
 import { DONE_KEY } from '~/utils/constants'
-import { getSession } from '../sessions'
 import { selectMany } from '../utils/queryHelpers'
 import { getUserBySessionId } from '../utils/session.server'
 
@@ -23,7 +23,7 @@ async function getContext(
 ): Promise<{ messages: Message[]; id: number }> {
   const history = await selectMany<{ history: Message[]; id: number }>(
     db,
-    'SELECT id, history from chat_history WHERE user_id = ?',
+    'SELECT id, history from chat_history WHERE user_id = ? ORDER BY id DESC LIMIT 1',
     [user_id],
   )
 
@@ -56,7 +56,11 @@ async function newContext(
     history: [
       {
         role: 'system',
-        content: `Here is your context: ${JSON.stringify(instructions)}`,
+        content: `Here is your context: ${JSON.stringify(instructions)}.
+        Follow ALL instructions strictly without exceptions.
+        Your task is to provide the MOST complete and accurate answer to the user's request based ONLY on this context.
+        Do NOT add unnecessary information, assumptions, or commentary.
+        Return only what is explicitly required by the request and the given instructions.`,
       },
       {
         role: 'user',
@@ -121,21 +125,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const response = await openai.chat.completions.create({
     model: 'gpt-4.1-mini-2025-04-14',
     messages: messages,
-    temperature: 1.3,
+
     max_tokens: 1024,
+    temperature: 1.1,
     stream: true,
   })
 
   return eventStream(
     request.signal,
     function setup(send) {
-      // Используем SSE комментарии для заполнения буфера
-      // Комментарии начинаются с ':' и не отображаются клиенту
       for (let i = 0; i < 30; i++) {
         send({ event: 'ping', data: '' })
       }
-
-      // Информационное сообщение отправляем как комментарий (не будет видно пользователю)
       send({ event: 'info', data: 'Connecting to AI...' })
 
       ;(async () => {

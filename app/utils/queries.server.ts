@@ -16,6 +16,7 @@ export interface Stone {
   available: number
   created_date: string
   on_sale: boolean
+  regular_stock: boolean
   amount: number
   retail_price: number
   cost_per_sqft: number
@@ -23,6 +24,7 @@ export interface Stone {
   finishing: string | null
   samples_amount: number
   samples_importance: number | null
+  deleted_at: string | null
 }
 
 export const stoneQueryBuilder = async (
@@ -32,36 +34,44 @@ export const stoneQueryBuilder = async (
 ): Promise<Stone[]> => {
   const params: (string | number)[] = [companyId]
   let query = `
-  SELECT 
-    stones.id, 
-    stones.name, 
-    stones.type, 
-    stones.url, 
-    stones.is_display, 
-    stones.length, 
+  SELECT
+    stones.id,
+    stones.name,
+    stones.type,
+    stones.url,
+    stones.is_display,
+    stones.length,
     stones.width,
-    stones.created_date, 
+    stones.created_date,
     stones.on_sale,
+    stones.regular_stock,
     stones.retail_price,
     stones.cost_per_sqft,
     stones.level,
     stones.finishing,
     stones.samples_amount,
     stones.samples_importance,
-    COUNT(DISTINCT CASE 
-      WHEN slab_inventory.id IS NOT NULL 
-        AND slab_inventory.cut_date IS NULL 
+    COUNT(DISTINCT CASE
+      WHEN slab_inventory.id IS NOT NULL
+        AND slab_inventory.cut_date IS NULL
+        AND slab_inventory.deleted_at IS NULL
       THEN slab_inventory.id ELSE NULL END) AS amount,
-    CAST(SUM(CASE 
-      WHEN slab_inventory.id IS NOT NULL 
-        AND slab_inventory.sale_id IS NULL 
-        AND slab_inventory.cut_date IS NULL 
+    CAST(SUM(CASE
+      WHEN slab_inventory.id IS NOT NULL
+        AND slab_inventory.sale_id IS NULL
+        AND slab_inventory.cut_date IS NULL
+        AND slab_inventory.deleted_at IS NULL
       THEN 1 ELSE 0 END) AS UNSIGNED) AS available
   FROM stones
-  LEFT JOIN slab_inventory ON slab_inventory.stone_id = stones.id AND slab_inventory.cut_date IS NULL
+  LEFT JOIN slab_inventory ON (
+    slab_inventory.stone_id = stones.id
+    OR slab_inventory.stone_id IN (
+      SELECT source_stone_id FROM stone_slab_links WHERE stone_id = stones.id
+    )
+  ) AND slab_inventory.cut_date IS NULL AND slab_inventory.deleted_at IS NULL
   `
 
-  query += `WHERE stones.company_id = ?`
+  query += `WHERE stones.company_id = ? AND stones.deleted_at IS NULL`
 
   if (!show_hidden) {
     query += ' AND stones.is_display = 1'
@@ -107,13 +117,14 @@ export const stoneQueryBuilder = async (
       stones.width,
       stones.created_date,
       stones.on_sale,
+      stones.regular_stock,
       stones.level,
       stones.finishing,
       stones.samples_amount,
       stones.samples_importance
     `
   if (!filters.show_sold_out) {
-    query += `\nHAVING available > 0`
+    query += `\nHAVING available > 0 OR stones.regular_stock = 1`
   }
   query += `\nORDER BY stones.name ASC`
   return await selectMany<Stone>(db, query, params)
@@ -131,6 +142,7 @@ export interface Sink {
   supplier_id: number | null
   retail_price: number | null
   cost: number | null
+  regular_stock?: boolean | number
 }
 
 export async function sinkQueryBuilder(
@@ -154,20 +166,23 @@ export async function sinkQueryBuilder(
   }
 
   const query = `
-    SELECT 
-      sink_type.id, 
-      sink_type.name, 
-      sink_type.type, 
-      sink_type.url, 
-      sink_type.is_display, 
-      sink_type.length, 
-      sink_type.width, 
-      COUNT(sinks.id) AS available, 
-      sink_type.supplier_id, 
-      sink_type.retail_price, 
-      sink_type.cost
+    SELECT
+      sink_type.id,
+      sink_type.name,
+      sink_type.type,
+      sink_type.url,
+      sink_type.is_display,
+      sink_type.length,
+      sink_type.width,
+      COUNT(sinks.id) AS available,
+      sink_type.supplier_id,
+      sink_type.retail_price,
+      sink_type.cost,
+      sink_type.regular_stock
     FROM sink_type
-    LEFT JOIN sinks ON sinks.sink_type_id = sink_type.id AND sinks.is_deleted = 0
+    LEFT JOIN sinks ON sinks.sink_type_id = sink_type.id
+      AND sinks.is_deleted = 0
+      AND sinks.slab_id IS NULL
     ${whereClause}
     GROUP BY
       sink_type.id,
@@ -179,13 +194,14 @@ export async function sinkQueryBuilder(
       sink_type.width,
       sink_type.supplier_id,
       sink_type.retail_price,
-      sink_type.cost
+      sink_type.cost,
+      sink_type.regular_stock
     ORDER BY sink_type.name ASC
   `
 
   const sinks = await selectMany<Sink>(db, query, params)
 
-  return show_sold_out ? sinks : sinks.filter(sink => (sink.available || 0) > 0)
+  return show_sold_out ? sinks : sinks.filter(sink => (sink.available || 0) > 0 || sink.regular_stock)
 }
 
 export interface Faucet {
@@ -198,6 +214,7 @@ export interface Faucet {
   supplier_id: number | null
   retail_price: number | null
   cost: number | null
+  regular_stock?: boolean | number
 }
 
 export async function faucetQueryBuilder(
@@ -221,18 +238,21 @@ export async function faucetQueryBuilder(
   }
 
   const query = `
-    SELECT 
-      faucet_type.id, 
-      faucet_type.name, 
-      faucet_type.type, 
-      faucet_type.url, 
-      faucet_type.is_display, 
-      COUNT(faucets.id) AS available, 
-      faucet_type.supplier_id, 
-      faucet_type.retail_price, 
-      faucet_type.cost
+    SELECT
+      faucet_type.id,
+      faucet_type.name,
+      faucet_type.type,
+      faucet_type.url,
+      faucet_type.is_display,
+      COUNT(faucets.id) AS available,
+      faucet_type.supplier_id,
+      faucet_type.retail_price,
+      faucet_type.cost,
+      faucet_type.regular_stock
     FROM faucet_type
-    LEFT JOIN faucets ON faucets.faucet_type_id = faucet_type.id AND faucets.is_deleted = 0
+    LEFT JOIN faucets ON faucets.faucet_type_id = faucet_type.id
+      AND faucets.is_deleted = 0
+      AND faucets.slab_id IS NULL
     ${whereClause}
     GROUP BY
       faucet_type.id,
@@ -242,11 +262,12 @@ export async function faucetQueryBuilder(
       faucet_type.is_display,
       faucet_type.supplier_id,
       faucet_type.retail_price,
-      faucet_type.cost
+      faucet_type.cost,
+      faucet_type.regular_stock
     ORDER BY faucet_type.name ASC
   `
 
   const faucets = await selectMany<Faucet>(db, query, params)
 
-  return show_sold_out ? faucets : faucets.filter(faucet => (faucet.available || 0) > 0)
+  return show_sold_out ? faucets : faucets.filter(faucet => (faucet.available || 0) > 0 || faucet.regular_stock)
 }

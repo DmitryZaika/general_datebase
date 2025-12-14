@@ -75,7 +75,7 @@ export const customerSchema = z.object({
     })
     .min(1, 'Please add a customer'),
   seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
-  project_address: z.string().optional(),
+  project_address: z.string().optional().nullable(),
   notes_to_sale: StringOrNumber,
   price: z.coerce.number().default(0),
   company_name: z.string().nullable().optional(),

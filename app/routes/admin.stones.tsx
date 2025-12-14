@@ -13,7 +13,6 @@ import {
   useLocation,
   useNavigate,
   useNavigation,
-  useSearchParams,
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
@@ -22,32 +21,42 @@ import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
-import { cleanParams } from '~/hooks/use-safe-search-params'
+import { cleanParams, useSafeSearchParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
+import { withIconSuffix } from '~/utils/files'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
 import { getAdminUser } from '~/utils/session.server'
 import { capitalizeFirstLetter } from '~/utils/words'
 
+function getStoneUrl(original: string | null) {
+  return original ? withIconSuffix(original) : '/placeholder.png'
+}
+
 type ViewMode = 'grid' | 'table'
+
+const VIEW_MODE = {
+  GRID: 'grid',
+  TABLE: 'table',
+} as const
+
+const DEFAULT_VIEW_MODE: ViewMode = VIEW_MODE.GRID
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request)
-  const [, searchParams] = request.url.split('?')
-  const queryParams = new URLSearchParams(searchParams)
-  const filters = stoneFilterSchema.parse(cleanParams(queryParams))
+  const url = new URL(request.url)
+  const cleanedParams = cleanParams(url.searchParams)
+  const filters = stoneFilterSchema.parse(cleanedParams)
   const stones = await stoneQueryBuilder(filters, user.company_id, true)
 
-  return { stones }
+  return { stones, companyId: user.company_id }
 }
 
 function StoneTable({ stones }: { stones: Stone[] }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
 
   const getEditUrl = (stoneId: number) => {
-    const currentParams = new URLSearchParams(searchParams)
-    return `edit/${stoneId}/information?${currentParams.toString()}`
+    return `edit/${stoneId}/information${location.search}`
   }
 
   const handleRowClick = (stoneId: number) => {
@@ -62,15 +71,16 @@ function StoneTable({ stones }: { stones: Stone[] }) {
       cell: ({ row }) => {
         const stone = row.original
         const isOutOfStock = stone.available === 0
+        const isRegularStock = !!stone.regular_stock
 
         return (
           <div className='w-12 h-12 overflow-hidden relative cursor-pointer'>
             <img
-              src={stone.url || '/placeholder.png'}
+              src={getStoneUrl(stone.url)}
               alt={stone.name}
               className='object-cover w-full h-full'
             />
-            {isOutOfStock && (
+            {isOutOfStock && !isRegularStock && (
               <div className='absolute inset-0 flex items-center justify-center bg-red-500/70'>
                 <span className='text-white text-[8px] font-bold rotate-0 text-center leading-tight px-0.5'>
                   Out of Stock
@@ -109,7 +119,14 @@ function StoneTable({ stones }: { stones: Stone[] }) {
     {
       accessorKey: 'available',
       header: ({ column }) => <SortableHeader column={column} title='Available' />,
-      cell: ({ row }) => <div>{row.original.available}</div>,
+      cell: ({ row }) => {
+        const stone = row.original
+        const isRegularStock = !!stone.regular_stock
+        if (stone.available === 0 && isRegularStock) {
+          return <div>Regular Stock</div>
+        }
+        return <div>{stone.available}</div>
+      },
     },
     {
       accessorKey: 'amount',
@@ -153,28 +170,25 @@ function StoneTable({ stones }: { stones: Stone[] }) {
   return (
     <DataTable
       columns={columns}
-      data={stones.map(stone => ({
-        ...stone,
-        className: `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200 
-                   hover:shadow-md ${stone.is_display ? '' : 'opacity-60'}`,
-        onClick: () => handleRowClick(stone.id),
-      }))}
+      onRowClick={(stone: Stone) => handleRowClick(stone.id)}
+      rowClassName={(stone: Stone) => `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200
+                   hover:shadow-md ${stone?.is_display ? '' : 'opacity-60'}`}
+      data={stones}
     />
   )
 }
 
 export default function AdminStones() {
-  const { stones } = useLoaderData<typeof loader>()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const { stones, companyId } = useLoaderData<typeof loader>()
+  const [searchParams, setSearchParams] = useSafeSearchParams(stoneFilterSchema)
   const navigation = useNavigation()
   const navigate = useNavigate()
   const [isAddingStone, setIsAddingStone] = useState(false)
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones)
   const location = useLocation()
 
-  // Получаем viewMode из URL или используем "grid" по умолчанию
-  const initialViewMode = (searchParams.get('viewMode') as ViewMode) || 'grid'
-  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode)
+  // Получаем viewMode из searchParams
+  const viewMode: ViewMode = searchParams.viewMode || DEFAULT_VIEW_MODE
 
   useEffect(() => {
     const inStock = stones.filter(
@@ -207,22 +221,16 @@ export default function AdminStones() {
   }
 
   const getEditUrl = (stoneId: number) => {
-    const currentParams = new URLSearchParams(searchParams)
-    return `edit/${stoneId}/information?${currentParams.toString()}`
+    return `edit/${stoneId}/information${location.search}`
   }
 
-  const toggleViewMode = () => {
-    const newViewMode = viewMode === 'grid' ? 'table' : 'grid'
-
-    // Обновить состояние
-    setViewMode(newViewMode)
+  const toggleViewMode = (): void => {
+    const newViewMode: ViewMode =
+      viewMode === VIEW_MODE.GRID ? VIEW_MODE.TABLE : VIEW_MODE.GRID
 
     // Обновить URL параметры
-    const newParams = new URLSearchParams(searchParams)
-    newParams.set('viewMode', newViewMode)
-    setSearchParams(newParams)
+    setSearchParams({ ...searchParams, viewMode: newViewMode })
   }
-
   return (
     <>
       <div className='flex justify-between flex-wrap items-center items-end mb-2'>
@@ -231,14 +239,18 @@ export default function AdminStones() {
             variant='outline'
             onClick={toggleViewMode}
             className='ml-2'
-            title={viewMode === 'grid' ? 'Switch to Table View' : 'Switch to Grid View'}
+            title={
+              viewMode === VIEW_MODE.GRID
+                ? 'Switch to Table View'
+                : 'Switch to Grid View'
+            }
           >
-            {viewMode === 'grid' ? (
+            {viewMode === VIEW_MODE.GRID ? (
               <TableIcon className='mr-1' />
             ) : (
               <GridIcon className='mr-1' />
             )}
-            {viewMode === 'grid' ? 'Table View' : 'Grid View'}
+            {viewMode === VIEW_MODE.GRID ? 'Table View' : 'Grid View'}
           </Button>
 
           <Link
@@ -253,12 +265,12 @@ export default function AdminStones() {
           </Link>
         </div>
         <div className='flex-1 flex justify-center md:justify-end '>
-          <StoneSearch userRole='admin' />
+          <StoneSearch userRole='admin' companyId={companyId} />
         </div>
       </div>
 
       <div>
-        {viewMode === 'grid' ? (
+        {viewMode === VIEW_MODE.GRID ? (
           <ModuleList>
             {sortedStones.map(stone => {
               const displayedAmount = stone.amount > 0 ? stone.amount : '—'
@@ -270,6 +282,11 @@ export default function AdminStones() {
               const handleGridItemClick = () => {
                 navigate(`${stone.id}${location.search}`)
               }
+
+              const isRegularStock = !!stone.regular_stock
+              const availableText = stone.available === 0 && isRegularStock 
+                ? 'Regular Stock' 
+                : `${displayedAvailable} / ${displayedAmount}${isRegularStock ? ' (Regular stock)' : ''}`
 
               return (
                 <div
@@ -285,12 +302,12 @@ export default function AdminStones() {
                   >
                     <div className='relative'>
                       <img
-                        src={stone.url || '/placeholder.png'}
+                        src={getStoneUrl(stone.url)}
                         alt={stone.name || 'Stone Image'}
                         className='object-cover w-full h-40 rounded select-none'
                         loading='lazy'
                       />
-                      {displayedAmount === '—' && (
+                      {displayedAmount === '—' && !isRegularStock && (
                         <div className='absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
                           <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
                             Out of Stock
@@ -300,7 +317,7 @@ export default function AdminStones() {
                     </div>
                     <p className='text-center font-bold mt-2'>{stone.name}</p>
                     <p className='text-center text-sm'>
-                      Available: {displayedAvailable} / {displayedAmount}
+                      Available: {availableText}
                     </p>
                     <p className='text-center text-sm'>
                       Size: {displayedLength} x {displayedWidth}

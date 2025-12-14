@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import bcrypt from 'bcryptjs'
 import type { RowDataPacket } from 'mysql2'
+import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { FaCopy, FaTelegramPlane } from 'react-icons/fa'
 import {
@@ -19,19 +20,21 @@ import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
 import { FormField, FormProvider } from '~/components/ui/form'
+import { Textarea } from '~/components/ui/textarea'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
-import { commitSession, getSession } from '~/sessions'
+import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { getQboUrl } from '~/utils/quickbooks.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
-import { toastData } from '~/utils/toastHelpers'
+import { toastData } from '~/utils/toastHelpers.server'
 
 const userSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   phone_number: z.union([z.coerce.string().min(10), z.literal('')]).optional(),
   email: z.string().email('Invalid email address'),
   password: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  email_signature: z.string().optional(),
 })
 
 type FormData = z.infer<typeof userSchema>
@@ -41,6 +44,7 @@ interface UserData extends RowDataPacket {
   name: string | null
   email: string | null
   phone_number: string | null
+  email_signature: string | null
   telegram_id: boolean
 }
 
@@ -73,8 +77,8 @@ export async function action({ request }: ActionFunctionArgs) {
       return { errors, receivedValues }
     }
 
-    const updateFields = ['name = ?', 'email = ?', 'phone_number = ?']
-    const params = [data.name, data.email, data.phone_number]
+    const updateFields = ['name = ?', 'email = ?', 'phone_number = ?', 'email_signature = ?']
+    const params = [data.name, data.email, data.phone_number, data.email_signature]
 
     // Only hash and update password if provided
     if (data.password && data.password.trim() !== '') {
@@ -111,7 +115,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = await getEmployeeUser(request)
 
     ;[rows] = await db.query<UserData[]>(
-      `SELECT name, email, phone_number, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ? AND is_deleted = 0`,
+      `SELECT name, email, phone_number, email_signature, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ? AND is_deleted = 0`,
       [user.id],
     )
 
@@ -157,11 +161,13 @@ function TelegramLink({ email }: { email: string }) {
   )
 }
 
+
 export default function UserProfile() {
   const { userData } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
   const token = useAuthenticityToken()
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const form = useForm<FormData>({
     resolver,
@@ -170,21 +176,31 @@ export default function UserProfile() {
       phone_number: userData.phone_number || '',
       email: userData.email || '',
       password: '',
+      email_signature: userData.email_signature || '',
     },
   })
 
   const fullSubmit = useFullSubmit(form)
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    }
+  }, [userData.email_signature])
+
   return (
     <div className='container  py-5'>
       <h1 className='text-2xl  font-bold mb-6 ml-3'>My Account</h1>
+      
 
       <div className='bg-card  rounded-lg shadow p-6 w-full'>
+    
         {!userData.telegram_id && userData.email && (
           <TelegramLink email={userData.email} />
         )}
         <h2 className='text-xl font-semibold mb-4'>Personal Information</h2>
-        {/* 
+        {/*
         {data ? (
           <p>Logged into: {data?.CompanyInfo?.CompanyName}</p>
         ) : (
@@ -242,6 +258,29 @@ export default function UserProfile() {
                   />
                 )}
               />
+              <FormField
+                control={form.control}
+                name='email_signature'
+                render={({ field }) => (
+                  <Textarea
+                    {...field}
+                    value={field.value || ''}
+                    name='Email Signature'
+                    ref={e => {
+                      field.ref(e)
+                      textareaRef.current = e
+                    }}
+                    onChange={e => {
+                      field.onChange(e)
+                      if (textareaRef.current) {
+                        textareaRef.current.style.height = 'auto'
+                        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+                      }
+                    }}
+                    className='min-h-[100px] resize-none overflow-hidden'
+                  />
+                )}
+              />
             </div>
 
             <div className='mt-6'>
@@ -251,7 +290,9 @@ export default function UserProfile() {
             </div>
           </Form>
         </FormProvider>
-      </div>
-    </div>
+        </div>
+    
+        </div>
+   
   )
 }

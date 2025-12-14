@@ -1,6 +1,6 @@
 import OAuthClient from 'intuit-oauth'
 import type { RowDataPacket } from 'mysql2'
-import type { RemixSession } from '~/sessions'
+import type { RemixSession } from '~/sessions.server'
 import type { TokenSet } from '~/types'
 import { decrypt, encrypt } from '~/utils/cryptoHelpers.server'
 import { db } from '../db.server'

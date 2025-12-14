@@ -1,5 +1,6 @@
 import { PDFDocument, type PDFFont, rgb, StandardFonts } from 'pdf-lib'
 import type { LoaderFunctionArgs } from 'react-router'
+import { gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
 import { db } from '~/db.server'
 import { selectId } from '~/utils/queryHelpers'
 
@@ -7,6 +8,7 @@ interface ChecklistData {
   id: number
   customer_name: string
   installation_address: string
+  company_id: number
   material_correct: boolean
   seams_satisfaction: boolean
   appliances_fit: boolean
@@ -54,27 +56,25 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
   let cursorY = height - 60
-
-  // Draw logo if exists
-  let logoBytes: Uint8Array | undefined
-  try {
-    const logoUrl =
-      'https://granite-database.s3.us-east-2.amazonaws.com/static-images/logo.png.png'
-    const response = await fetch(logoUrl)
-    if (!response.ok) throw new Error('logo fetch failed')
-    const arrBuf = await response.arrayBuffer()
-    logoBytes = new Uint8Array(arrBuf)
-    const logoImage = await pdfDoc.embedPng(logoBytes)
-    const logoDims = logoImage.scale(0.075)
-    page.drawImage(logoImage, {
-      x: (width - logoDims.width) / 2,
-      y: height - logoDims.height - 20,
-      width: logoDims.width,
-      height: logoDims.height,
-    })
-    cursorY -= logoDims.height + 20
-  } catch {
-    // If remote logo fails, skip drawing any logo.
+  const logoScales: Record<number, number> = { 1: 0.075, 3: 0.125, 4: 1.5 }
+  const logoUrl = data.company_id === 1 ? gbIndianapolis : data.company_id === 3 ? gbColumbus : data.company_id === 4 ? gmqTops : null
+  if (logoUrl) {
+    try {
+      const response = await fetch(logoUrl)
+      if (!response.ok) throw new Error('logo fetch failed')
+      const arrBuf = await response.arrayBuffer()
+      const logoBytes = new Uint8Array(arrBuf)
+      const logoImage = await pdfDoc.embedPng(logoBytes)
+      const logoDims = logoImage.scale(logoScales[data.company_id] || 0.125)
+      page.drawImage(logoImage, {
+        x: (width - logoDims.width) / 2,
+        y: height - logoDims.height - 20,
+        width: logoDims.width,
+        height: logoDims.height,
+      })
+      cursorY -= logoDims.height + 20
+    } catch {
+    }
   }
 
   const drawText = (
@@ -188,7 +188,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
   // Fetch the checklist data from the database
   const checklist = await selectId<ChecklistData>(
     db,
-    `SELECT id, customer_name, installation_address, material_correct, seams_satisfaction, 
+    `SELECT id, customer_name, installation_address, company_id, material_correct, seams_satisfaction, 
      appliances_fit, backsplashes_correct, edges_correct, holes_drilled, 
      cleanup_completed, comments, signature 
      FROM checklists WHERE id = ?`,
