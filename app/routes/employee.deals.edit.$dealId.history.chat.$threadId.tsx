@@ -147,6 +147,7 @@ async function generateAIEmailForChat(
   emailCategory: string,
   dealId: number,
   subject: string | null,
+  threadId: string,
   onStreamBody?: (text: string) => void,
 ): Promise<AIEmailResponse> {
   const variationToken = Math.random().toString(36).slice(2)
@@ -155,6 +156,7 @@ async function generateAIEmailForChat(
     dealId,
     variationToken,
     subject: subject || undefined,
+    threadId,
   }
 
   const response = await fetch('/api/aiRecommend/email', {
@@ -230,7 +232,7 @@ export default function EmailChatDialog() {
     setIsGenerating(true)
     setMessageText('')
     try {
-      await generateAIEmailForChat(template, dealId, subject, body => {
+      await generateAIEmailForChat(template, dealId, subject, threadId, body => {
         setMessageText(body)
       })
     } catch (error) {
