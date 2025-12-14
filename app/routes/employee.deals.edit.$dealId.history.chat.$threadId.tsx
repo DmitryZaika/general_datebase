@@ -63,8 +63,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
-      WHERE e.deleted_at IS NULL AND e.deal_id = ? AND e.thread_id = ?`
-  const emailParams: (number | string)[] = [dealId, threadId]
+      WHERE e.deleted_at IS NULL AND e.thread_id = ? AND (e.deal_id = ? OR e.deal_id IS NULL)`
+  const emailParams: (number | string)[] = [threadId, dealId]
   
 
   emailQuery += ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email ORDER BY e.sent_at ASC'
