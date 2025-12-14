@@ -17,6 +17,7 @@ import {
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
+import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
@@ -88,6 +89,8 @@ interface AIEmailRequest {
   senderPosition?: string
   senderPhoneNumber?: string
   senderEmail?: string
+  variationToken?: string
+  skipHistory?: boolean
 }
 
 interface AIEmailResponse {
@@ -205,9 +208,12 @@ function buildAIRequestPayload(
   formData: AIEmailFormData,
   dealId: number,
 ): Partial<AIEmailRequest> {
+  const variationToken = Math.random().toString(36).slice(2)
   const payload: Partial<AIEmailRequest> = {
     emailCategory: formData.emailCategory,
     dealId: dealId,
+    variationToken,
+    skipHistory: true,
   }
 
   if (formData.formality) payload.formality = formData.formality
@@ -490,11 +496,11 @@ function AIAssistantMenu({
 // ============================================================================
 // MAIN COMPONENT
 // ====
-function sendEmail(to: string, subject: string, body: string) {
+function sendEmail(to: string, subject: string, body: string, dealId: number) {
   fetch('/api/employee/sendEmail', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to, subject, body }),
+    body: JSON.stringify({ to, subject, body, dealId }),
   })
 }
 
@@ -517,7 +523,7 @@ export default function DealEmailDialog() {
 
   const { mutate } = useMutation({
     mutationFn: async (values: EmailFormData) => {
-      sendEmail(values.to, values.subject, values.text)
+      sendEmail(values.to, values.subject, values.text, dealId)
     },
     onSuccess: () => {
       navigate(`../${location.search}`)
@@ -580,9 +586,6 @@ export default function DealEmailDialog() {
     }
   }
 
-
-  
-
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
       <DialogContent className='sm:max-w-[600px] overflow-auto flex flex-col min-h-[400px] max-h-[95vh] p-5'>
@@ -611,9 +614,15 @@ export default function DealEmailDialog() {
               >
                 Generate
               </LoadingButton>
-              <Button type='submit' className='ml-auto'>
-                Send Email
-              </Button>
+              <div className='ml-auto flex items-center gap-2'>
+                <AiImproveButton
+                  getText={() => form.getValues('text')}
+                  setText={value => form.setValue('text', value)}
+                />
+                <Button type='submit'>
+                  Send Email
+                </Button>
+              </div>
             </div>
           </form>
         </FormProvider>

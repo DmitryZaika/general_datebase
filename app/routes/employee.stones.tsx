@@ -57,6 +57,7 @@ function InteractiveCard({
   const threeWeeksAgo = new Date()
   threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 30)
   const isOnSale = !!stone.on_sale
+  const isRegularStock = !!stone.regular_stock
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -95,7 +96,9 @@ function InteractiveCard({
         type='slabs'
         itemId={stone.id}
         fieldList={{
-          Available: `${stone.available} / ${displayedAmount}`,
+          Available: stone.available === 0 && isRegularStock 
+            ? 'Regular Stock' 
+            : `${stone.available} / ${displayedAmount}${isRegularStock ? ' (Regular stock)' : ''}`,
           Type: capitalizeFirstLetter(stone.type),
           Price:
             stone.retail_price === 0
@@ -114,7 +117,7 @@ function InteractiveCard({
           />
         </div>
       </ImageCard>
-      {stone.available === 0 && (
+      {stone.available === 0 && !isRegularStock && (
         <div className='absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
           <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
             Out of Stock
@@ -144,10 +147,10 @@ export default function Stones() {
 
   useEffect(() => {
     const inStock = stones.filter(
-      stone => Number(stone.available) > 0 && Boolean(stone.is_display),
+      stone => (Number(stone.available) > 0 || stone.regular_stock) && Boolean(stone.is_display),
     )
     const outOfStock = stones.filter(
-      stone => Number(stone.available) <= 0 && Boolean(stone.is_display),
+      stone => Number(stone.available) <= 0 && !stone.regular_stock && Boolean(stone.is_display),
     )
     const notDisplayed = stones.filter(stone => !stone.is_display)
 
@@ -181,6 +184,7 @@ export default function Stones() {
       cell: ({ row }) => {
         const stone = row.original
         const isOutOfStock = stone.available === 0
+        const isRegularStock = !!stone.regular_stock
 
         return (
           <div
@@ -195,7 +199,7 @@ export default function Stones() {
               alt={stone.name}
               className='object-cover w-full h-full'
             />
-            {isOutOfStock && (
+            {isOutOfStock && !isRegularStock && (
               <div className='absolute inset-0 flex items-center justify-center bg-red-500/70'>
                 <span className='text-white text-[8px] font-bold rotate-0 text-center leading-tight px-0.5'>
                   Out of Stock
@@ -243,6 +247,14 @@ export default function Stones() {
     {
       accessorKey: 'available',
       header: ({ column }) => <SortableHeader column={column} title='Available' />,
+      cell: ({ row }) => {
+        const stone = row.original
+        const isRegularStock = !!stone.regular_stock
+        if (stone.available === 0 && isRegularStock) {
+          return 'Regular Stock'
+        }
+        return stone.available
+      },
     },
     {
       accessorKey: 'amount',

@@ -143,7 +143,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
        FROM users u
        LEFT JOIN users_positions up ON up.user_id = u.id
        LEFT JOIN positions p ON p.id = up.position_id
-       WHERE u.id = ? AND p.name IN ('external_marketing','check-in','installer') AND u.is_deleted = 0`,
+       WHERE u.id = ? AND p.name IN ('external_marketing','check-in','installer','shop_worker') AND u.is_deleted = 0`,
       [user.id],
     )
     const hasCheckIn = Array.isArray(rows) && rows.some(r => r.position === 'check-in')
@@ -151,11 +151,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
       Array.isArray(rows) && rows.some(r => r.position === 'external_marketing')
     const hasInstaller =
       Array.isArray(rows) && rows.some(r => r.position === 'installer')
+    const hasShopWorker =
+      Array.isArray(rows) && rows.some(r => r.position === 'shop_worker')
     position = hasCheckIn
       ? 'check-in'
       : hasExternalMarketing
         ? 'external_marketing'
-        : null
+        : hasShopWorker
+          ? 'shop_worker'
+          : null
 
     const url = new URL(request.url)
     // Installer users: always redirect to their checklist
@@ -179,6 +183,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       if (!url.pathname.startsWith('/external/marketing/')) {
         return redirect(marketingTarget)
       }
+    }
+    if (hasShopWorker && !url.pathname.startsWith('/shop')) {
+      return redirect('/shop/transactions')
     }
   }
 
@@ -213,6 +220,7 @@ export default function App() {
     sinkSuppliers,
     faucetSuppliers,
     colors,
+    position,
   } = useLoaderData<typeof loader>()
   const { pathname } = useLocation()
   const { toast } = useToast()
@@ -222,6 +230,8 @@ export default function App() {
   const isCheckIn = pathname.includes('/check-in')
   const isExternalMarketing = pathname.includes(`/external/marketing/`)
   const isInstallerRoute = pathname.startsWith('/installers')
+  const isShopRoute = pathname.startsWith('/shop')
+  const isShopWorker = position === 'shop_worker'
   const segments = pathname.split('/').filter(Boolean)
   const isCustomerViewPage = segments[0] === 'customer' && segments[2] !== 'stones'
   const mainRef = useRef<HTMLElement | null>(null)
@@ -262,6 +272,7 @@ export default function App() {
     !isInstallerRoute &&
     !isCheckIn &&
     !isExternalMarketing &&
+    !(isShopRoute && !isShopWorker) &&
     !isDraw &&
     !isCustomerViewPage
 
@@ -289,7 +300,7 @@ export default function App() {
             )}
             <main ref={mainRef} className='h-screen overflow-y-auto bg-gray-100 w-full'>
               <AuthenticityTokenProvider token={token}>
-                {isExternalMarketing || isCheckIn || isInstallerRoute ? (
+                {isExternalMarketing || isCheckIn || isInstallerRoute || (isShopRoute && isShopWorker) ? (
                   <MarketingHeader />
                 ) :  (
                   <Header

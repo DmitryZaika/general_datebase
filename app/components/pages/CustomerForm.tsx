@@ -204,7 +204,7 @@ export function CustomerForm({
                       }
                     }}
                     id='builder_switch'
-                    label='Builder'
+                    label='Partner'
                     className=''
                   />
                 )}

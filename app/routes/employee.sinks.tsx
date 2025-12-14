@@ -44,6 +44,7 @@ function InteractiveCard({
   const displayedAmount = sink.available && sink.available > 0 ? sink.available : '—'
   const displayedWidth = sink.width && sink.width > 0 ? sink.width : '—'
   const displayedLength = sink.length && sink.length > 0 ? sink.length : '—'
+  const isRegularStock = !!sink.regular_stock
 
   return (
     <div
@@ -59,7 +60,10 @@ function InteractiveCard({
       <ImageCard
         disabled={true}
         fieldList={{
-          Available: `${displayedAmount}`,
+          Available:
+            (sink.available === 0 || !sink.available) && isRegularStock
+              ? 'On-Demand'
+              : `${displayedAmount}${displayedAmount !== '—' && isRegularStock ? ' (Regular stock)' : ''}`,
           Size: `${displayedLength} x ${displayedWidth}  `,
           Price:
             sink.retail_price === 0 ? `Contact for price` : `$${sink.retail_price}`,
@@ -74,7 +78,7 @@ function InteractiveCard({
           onClick={() => setCurrentId(sink.id, sinkType)}
         />
       </ImageCard>
-      {displayedAmount === '—' && (
+      {displayedAmount === '—' && !isRegularStock && (
         <div className='absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center cursor-pointer whitespace-nowrap'>
           <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>
             Out of Stock
@@ -98,10 +102,15 @@ export default function Sinks() {
 
   useEffect(() => {
     const inStock = sinks.filter(
-      sink => Number(sink.available) > 0 && Boolean(sink.is_display),
+      sink =>
+        (Number(sink.available) > 0 || !!sink.regular_stock) &&
+        Boolean(sink.is_display),
     )
     const outOfStock = sinks.filter(
-      sink => Number(sink.available) <= 0 && Boolean(sink.is_display),
+      sink =>
+        Number(sink.available) <= 0 &&
+        !sink.regular_stock &&
+        Boolean(sink.is_display),
     )
     const notDisplayed = sinks.filter(sink => !sink.is_display)
 

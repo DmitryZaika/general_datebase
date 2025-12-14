@@ -53,7 +53,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (newFile) {
       await db.execute(
         `UPDATE stones
-           SET name = ?, type = ?, finishing = ?, url = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
+           SET name = ?, type = ?, finishing = ?, url = ?, is_display = ?, regular_stock = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
            WHERE id = ?`,
         [
           data.name,
@@ -61,6 +61,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.finishing,
           data.file,
           data.is_display,
+          data.regular_stock,
           data.supplier_id,
           data.length,
           data.width,
@@ -74,13 +75,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     } else {
       await db.execute(
         `UPDATE stones
-           SET name = ?, type = ?, finishing = ?, is_display = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
+           SET name = ?, type = ?, finishing = ?, is_display = ?, regular_stock = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
            WHERE id = ?`,
         [
           data.name,
           data.type,
           data.finishing,
           data.is_display,
+          data.regular_stock,
           data.supplier_id,
           data.length,
           data.width,
@@ -152,13 +154,14 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     length: string
     width: string
     on_sale: boolean
+    regular_stock: boolean
     cost_per_sqft: number
     retail_price: number
     level: number | null
     finishing: string | null
   }>(
     db,
-    'SELECT name, type, url, is_display, supplier_id, length, width, on_sale, cost_per_sqft, retail_price, level, finishing FROM stones WHERE id = ?',
+    'SELECT name, type, url, is_display, regular_stock, supplier_id, length, width, on_sale, cost_per_sqft, retail_price, level, finishing FROM stones WHERE id = ?',
     stoneId,
   )
   if (!stone) {
@@ -200,6 +203,7 @@ export default function Information() {
     type,
     url,
     is_display,
+    regular_stock,
     supplier_id,
     length,
     width,
@@ -214,6 +218,7 @@ export default function Information() {
     type,
     url: '',
     is_display,
+    regular_stock,
     supplier_id,
     length,
     width,
@@ -275,6 +280,11 @@ export default function Information() {
             control={form.control}
             name='on_sale'
             render={({ field }) => <SwitchItem field={field} name='On Sale' />}
+          />
+          <FormField
+            control={form.control}
+            name='regular_stock'
+            render={({ field }) => <SwitchItem field={field} name='Regular Stock' />}
           />
         </div>
         <FormField

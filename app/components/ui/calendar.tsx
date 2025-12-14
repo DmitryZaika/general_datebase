@@ -39,7 +39,7 @@ function Calendar({
         ),
         day: cn(
           buttonVariants({ variant: 'ghost' }),
-          'size-8 p-0 font-normal aria-selected:opacity-100',
+          'size-8 p-0 font-normal aria-selected:opacity-100 aria-selected:hover:bg-zinc-900 aria-selected:hover:text-zinc-300 dark:aria-selected:hover:bg-zinc-50 dark:aria-selected:hover:text-zinc-900',
         ),
         day_range_start:
           'day-range-start aria-selected:bg-zinc-900 aria-selected:text-zinc-50 dark:aria-selected:bg-zinc-50 dark:aria-selected:text-zinc-900',
@@ -47,7 +47,8 @@ function Calendar({
           'day-range-end aria-selected:bg-zinc-900 aria-selected:text-zinc-50 dark:aria-selected:bg-zinc-50 dark:aria-selected:text-zinc-900',
         day_selected:
           'bg-zinc-900 text-zinc-50 hover:bg-zinc-900 hover:text-zinc-50 focus:bg-zinc-900 focus:text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 dark:focus:bg-zinc-50 dark:focus:text-zinc-900',
-        day_today: 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50',
+        day_today:
+          'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50 aria-selected:text-zinc-50 dark:aria-selected:text-zinc-900',
         day_outside:
           'day-outside text-zinc-500 aria-selected:text-zinc-500 dark:text-zinc-400 dark:aria-selected:text-zinc-400',
         day_disabled: 'text-zinc-500 opacity-50 dark:text-zinc-400',

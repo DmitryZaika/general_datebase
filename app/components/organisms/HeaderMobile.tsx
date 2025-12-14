@@ -1,5 +1,7 @@
 import { Link, useLoaderData, useLocation, useNavigation } from 'react-router'
 import type { HeaderProps } from '~/types'
+import { getMirroredUrl } from '~/utils/headerNav'
+import { Notification } from '../molecules/Notification'
 import { TodoList } from '../organisms/TodoList'
 
 interface HeaderMobileProps extends HeaderProps {
@@ -18,7 +20,7 @@ import { Menu, X } from 'lucide-react'
 import type React from 'react'
 import { useEffect, useState } from 'react'
 import { Button } from '~/components/ui/button'
-import { useCompanyLogo } from '~/hooks/logo-url'
+import { defaultLogo, gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
 import { LinkButton } from '../molecules/LinkButton'
 
 function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkProps) {
@@ -38,39 +40,6 @@ function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkPro
   )
 }
 
-function getMirroredUrl(path: string, search: string) {
-  const segments = path.split('/').filter(Boolean)
-
-  if (segments.length >= 2 && segments[0] === 'customer' && segments[2] === 'stones') {
-    return `/admin/stones${search}`
-  }
-
-  if (segments.length < 1) return `/employee${search}`
-
-  const currentRole = segments[0]
-  const targetRole = currentRole === 'admin' ? 'employee' : 'admin'
-
-  if (segments.length < 2) return `/${targetRole}${search}`
-
-  const currentSection = segments[1]
-
-  const supportedSections = [
-    'stones',
-    'instructions',
-    'sinks',
-    'faucets',
-    'suppliers',
-    'supports',
-    'documents',
-    'images',
-    'deals',
-  ]
-  if (supportedSections.includes(currentSection)) {
-    return `/${targetRole}/${currentSection}${search}`
-  }
-
-  return `/${targetRole}${search}`
-}
 
 export function BurgerMenu({
   user,
@@ -96,7 +65,7 @@ export function BurgerMenu({
     }
   }, [navigation.state])
 
-  const targetPath = getMirroredUrl(location.pathname, location.search)
+  const targetPath = getMirroredUrl(isAdminPage, location)
 
   const buildCustomerUrl = () => {
     // Если переходим из admin/stones в customer/:company/stones, сохраняем фильтры
@@ -226,26 +195,26 @@ export function HeaderMobile({
   className,
 }: HeaderMobileProps) {
   const location = useLocation()
-  const isAdminPage = location.pathname.startsWith('/admin')
   const isCustomerPage = location.pathname.startsWith('/customer')
   const data = useLoaderData<{ user: { company_id: number } | null }>()
   const companyId = isCustomerPage
     ? location.pathname.split('/').filter(Boolean)[1]
     : data?.user?.company_id
-  const { url: companyLogo } = useCompanyLogo(Number(companyId))
+  const id = Number(companyId)
+  const companyLogo = id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
   return (
     <header className={clsx('flex justify-between', className)}>
       <div className='logo'>
         <a className='flex justify-center' href='/'>
           <img
-            src={companyLogo ?? ""}
+            src={companyLogo}
             alt='Logo'
-            className='h-12 md:h-16 object-contain'
+            className='h-18 md:h-16 object-contain'
           />
         </a>
       </div>
       <div className='flex items-center gap-2'>
-        {/* <Notification /> */}
+        <Notification />
         <TodoList />
       </div>
       <BurgerMenu user={user} isAdmin={isAdmin} isSuperUser={isSuperUser}></BurgerMenu>

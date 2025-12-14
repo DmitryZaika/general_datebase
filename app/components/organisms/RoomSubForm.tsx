@@ -259,9 +259,12 @@ export const RoomSubForm = ({
   )
 
   const handleStoneCreated = useCallback(
-    (_stone: StoneSlim, slabId?: number) => {
-      if (slabId) {
-        form.setValue(`rooms.${index}.slabs`, [{ id: slabId, is_full: false }])
+    (_stone: StoneSlim, slabIds?: number[]) => {
+      if (slabIds && slabIds.length > 0) {
+        form.setValue(
+          `rooms.${index}.slabs`,
+          slabIds.map(id => ({ id, is_full: false })),
+        )
       }
     },
     [form, index],
