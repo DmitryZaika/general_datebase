@@ -62,6 +62,7 @@ export const ActionDropdown = ({
                   if (result === false) {
                     e.preventDefault()
                   }
+                  setOpen(false)
                   e.stopPropagation()
                 }}
               >

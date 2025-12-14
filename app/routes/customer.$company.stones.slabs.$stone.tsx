@@ -45,7 +45,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
        )
      )
      AND cut_date IS NULL
-     AND sale_id IS NULL`,
+     AND sale_id IS NULL
+     AND deleted_at IS NULL`,
     [stoneId, stoneId],
   )
   return { slabs, stone }

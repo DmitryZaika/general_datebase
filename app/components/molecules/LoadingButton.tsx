@@ -1,8 +1,7 @@
-import type { ButtonHTMLAttributes } from 'react'
 import { Spinner } from '../atoms/Spinner'
-import { Button } from '../ui/button'
+import { Button, type ButtonProps } from '../ui/button'
 
-interface LoadingButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface LoadingButtonProps extends ButtonProps {
   loading: boolean
 }
 

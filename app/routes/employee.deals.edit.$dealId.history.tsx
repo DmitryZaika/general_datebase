@@ -5,8 +5,7 @@ import {
   Outlet,
   redirect,
   useLoaderData,
-  useLocation,
-  useNavigate,
+  useNavigate
 } from 'react-router'
 import { Badge } from '~/components/ui/badge'
 import { DataTable } from '~/components/ui/data-table'
@@ -15,7 +14,7 @@ import { getEmployeeUser } from '~/utils/session.server'
 
 interface EmailHistory {
   id: number
-
+  thread_id: string
   subject: string
   body: string
   sent_at: string
@@ -34,9 +33,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const dealId = parseInt(params.dealId, 10)
 
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT e.id, e.subject, e.body, e.sent_at
+    `SELECT e.id, e.thread_id, e.subject, e.body, e.sent_at
        FROM emails e
-      WHERE e.deleted_at IS NULL AND e.message_id = ?
+      WHERE e.deleted_at IS NULL AND e.deal_id = ?
       ORDER BY e.sent_at DESC`,
     [dealId],
   )
@@ -45,17 +44,26 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     `SELECT e.id, COUNT(*) AS count
        FROM emails e
        JOIN email_reads er ON e.message_id = er.message_id
-      WHERE e.deleted_at IS NULL AND e.message_id = ?
+      WHERE e.deleted_at IS NULL AND e.deal_id = ?
       GROUP BY e.id`,
     [dealId],
   )
 
-  const emails: EmailHistory[] = (rows || []).map(row => ({
-    id: row.id,
-    subject: row.subject,
-    body: row.body,
-    sent_at: row.sent_at,
-  }))
+  const seenSubjects = new Set<string>()
+  const emails: EmailHistory[] = []
+  for (const row of rows || []) {
+    if (seenSubjects.has(row.subject)) {
+      continue
+    }
+    seenSubjects.add(row.subject)
+    emails.push({
+      id: row.id,
+      thread_id: row.thread_id,
+      subject: row.subject,
+      body: row.body,
+      sent_at: row.sent_at,
+    })
+  }
 
   return { emails, readCounts }
 }
@@ -92,9 +100,8 @@ const customerColumns: ColumnDef<EmailHistory>[] = [
 export default function DealEmailHistory() {
   const { emails } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
-  const location = useLocation()
-  const handleRowClick = (emailId: number) => {
-    navigate(`chat/${location.search}`)
+  const handleRowClick = (email: EmailHistory) => {
+    navigate(`chat/${email.thread_id}`)
   }
 
   return (
@@ -102,7 +109,7 @@ export default function DealEmailHistory() {
       <DataTable
         columns={customerColumns}
         data={emails}
-        onRowClick={(email: EmailHistory) => handleRowClick(email.id)}
+        onRowClick={(email: EmailHistory) => handleRowClick(email)}
         rowClassName={(email: EmailHistory) => 'cursor-pointer'}
       />
       <Outlet />

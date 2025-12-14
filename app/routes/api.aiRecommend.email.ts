@@ -32,14 +32,27 @@ interface LeadInfo {
 interface UserInfo {
   name: string
   company?: string
+  phone?: string
+  email?: string
+  position?: string
+}
+
+interface EmailHistoryItem {
+  body: string
+  sentAt: string
+  isFromCustomer?: boolean
 }
 
 /** Extract only the fields you want to expose to the prompt builder */
 async function getUserInfo(user: {
   name: string
   company_id?: number
+  phone_number?: string
+  email?: string
+  position_id?: number
 }): Promise<UserInfo> {
   let companyName: string | undefined
+  let positionName: string | undefined
 
   if (user.company_id) {
     try {
@@ -55,9 +68,26 @@ async function getUserInfo(user: {
     }
   }
 
+  if (user.position_id) {
+    try {
+      const [rows] = await db.execute<RowDataPacket[]>(
+        `SELECT name FROM positions WHERE id = ? LIMIT 1`,
+        [user.position_id],
+      )
+      if (rows?.length) {
+        positionName = rows[0].name
+      }
+    } catch (err) {
+      console.error('Failed to load position info:', err)
+    }
+  }
+
   return {
     name: user.name,
     company: companyName,
+    phone: user.phone_number,
+    email: user.email,
+    position: positionName,
   }
 }
 
@@ -76,11 +106,15 @@ const generateSchema = z.object({
     'referral',
   ]),
   dealId: z.number(),
+  threadId: z.string().uuid().optional(),
   formality: z.enum(['formal', 'neutral', 'casual']).optional(),
   tone: z.enum(['friendly', 'persuasive', 'empathetic', 'urgent']).optional(),
   verboseness: z.enum(['concise', 'detailed']).optional(),
   urgencyLevel: z.enum(['low', 'medium', 'high']).optional(),
   desiredContent: z.string().optional(),
+  subject: z.string().optional(),
+  variationToken: z.string().optional(),
+  skipHistory: z.boolean().optional(),
 })
 
 type EmailGenerationParams = z.infer<typeof generateSchema>
@@ -130,24 +164,21 @@ const SYSTEM_PROMPT = `
   • “Thanks for taking the time to speak with me earlier…”
 
   FEEDBACK-REQUEST
-  Used to request a review or general feedback. Tone: appreciative and concise.
-  Examples:
-  • “When you have a moment, could you share feedback about your project experience?”
-  • “Your input means a lot to us…”
+  The countertops are ALREADY INSTALLED. Ask for feedback about the installation - how did it go? Are they happy with the result? DO NOT mention quotes, colors, or materials. Focus only on asking about the installation experience. Tone: appreciative and concise.
 
   REFERRAL
-  Used to request or acknowledge referrals. Tone: friendly and non-pushy.
-  Examples:
-  • “If you know anyone planning countertop work, I’d be grateful if you passed along my info.”
-  • “Happy to help anyone you think could benefit from our services.”
+  Used AFTER the installation is complete. Ask if they know anyone who might also be interested in buying countertops. Tone: friendly and non-pushy. Be creative and natural. DO NOT mention specific colors, materials, or details about what the customer purchased. Keep it general.
 
   GENERAL RULES
   • Match the requested tone, formality, and verboseness.
   • Never include a signature or contact block.
+  • PHONE/EMAIL RULES:
+    - FIRST-CONTACT emails: NEVER include phone number or email address. No exceptions.
+    - REPLY emails: Include phone number ONLY if customer explicitly asks (e.g., "can you call?", "give me your number").
   • Do not invent details.
   • Avoid placeholders or brackets in your output. Write full, natural sentences.
   • Follow the output structure exactly:
-    1. Provide ONLY the subject line (no “Subject:” prefix).
+    1. Provide ONLY the subject line (no "Subject:" prefix).
     2. Next line: ---BODY---
     3. Then the email body (no signature).
 
@@ -172,14 +203,19 @@ function getLengthInstructions(level: 'concise' | 'detailed'): string {
  */
 function formatSenderInfo(info: UserInfo): string {
   const parts = []
-  if (info.name) parts.push(info.name)
-  if (info.company) parts.push(info.company)
+  if (info.name) parts.push(`Name: ${info.name}`)
+  if (info.company) parts.push(`Company: ${info.company}`)
+  if (info.position) parts.push(`Position: ${info.position}`)
+  if (info.phone) parts.push(`Phone: ${info.phone}`)
+  if (info.email) parts.push(`Email: ${info.email}`)
 
-  return parts.length
-    ? `Introduce my self as ${parts.join(
-        ' with ',
-      )} use only the first name of the customer. Dont use signature.`
-    : ''
+  if (!parts.length) return ''
+
+  let result = `Here is my (the sales rep) contact information: ${parts.join(', ')}. `
+  result += `PHONE/EMAIL RULES: For FIRST-CONTACT emails - NEVER write phone or email in the body. `
+  result += `For REPLY emails - include phone ONLY if customer asks ("can you call?", "give me your number"). `
+  result += `Introduce myself using only my first name and company. Use only the first name of the customer. Don't use signature.`
+  return result
 }
 
 /**
@@ -214,6 +250,63 @@ async function getLeadInfoByDeal(dealId: number): Promise<LeadInfo> {
   }
 }
 
+async function getEmailHistoryByDeal(
+  dealId: number,
+  subject?: string,
+): Promise<EmailHistoryItem[]> {
+  let query = `
+       SELECT
+         e.body,
+         e.sent_at,
+         e.sender_user_id
+       FROM emails e
+       WHERE e.deal_id = ? AND e.deleted_at IS NULL`
+  const params: (number | string)[] = [dealId]
+
+  if (subject) {
+    query += ' AND e.subject = ?'
+    params.push(subject)
+  }
+
+  query += ' ORDER BY e.sent_at ASC'
+
+  const [rows] = await db.execute<RowDataPacket[]>(query, params)
+
+  if (!rows?.length) return []
+
+  return rows.map(row => ({
+    body: row.body,
+    sentAt: row.sent_at,
+    isFromCustomer: row.sender_user_id === null,
+  }))
+}
+
+async function getEmailHistoryByThread(
+  dealId: number,
+  threadId: string,
+): Promise<EmailHistoryItem[]> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `
+      SELECT
+        e.body,
+        e.sent_at,
+        e.sender_user_id
+      FROM emails e
+      WHERE e.deleted_at IS NULL AND e.thread_id = ? AND (e.deal_id = ? OR e.deal_id IS NULL)
+      ORDER BY e.sent_at ASC
+    `,
+    [threadId, dealId],
+  )
+
+  if (!rows?.length) return []
+
+  return rows.map(row => ({
+    body: row.body,
+    sentAt: row.sent_at,
+    isFromCustomer: row.sender_user_id === null,
+  }))
+}
+
 // ============================================================================
 // PROMPT CONSTRUCTION
 // ============================================================================
@@ -225,6 +318,7 @@ function buildUserPrompt(
   params: EmailGenerationParams,
   lead: LeadInfo,
   userInfo: UserInfo,
+  emailHistory?: EmailHistoryItem[],
 ): string {
   const {
     emailCategory,
@@ -235,8 +329,8 @@ function buildUserPrompt(
     desiredContent,
   } = params
 
-  const { customerName, leadMessage, remodelType, referralSource, customerCompany } =
-    lead
+  const { customerName, leadMessage, remodelType, referralSource, customerCompany } = lead
+  const { variationToken } = params
 
   let prompt = `Write a ${formality}, ${tone} sales email. `
   prompt += `Email type: ${emailCategory}. `
@@ -264,6 +358,20 @@ function buildUserPrompt(
     prompt += `Include this content: ${desiredContent}. `
   }
 
+  if (emailHistory && emailHistory.length) {
+    const historyText = emailHistory
+      .map((item, index) => {
+        const sender = item.isFromCustomer ? 'Customer' : 'You (sales rep)'
+        return `Message ${index + 1} from ${sender} on ${item.sentAt}:\n${item.body}`
+      })
+      .join('\n\n')
+    prompt += `Here is the previous email conversation with this customer. Use it as context and write a natural next email in the same thread without repeating their exact wording:\n${historyText}\n`
+  }
+
+  if (variationToken) {
+    prompt += `Use a slightly different style than any previous email by following this variation hint: ${variationToken}. `
+  }
+
   prompt += formatSenderInfo(userInfo)
 
   prompt += `First provide ONLY the subject line. Then newline: ---BODY---. Then write the body. Do NOT include any signature, sender name, sender title, sender company, or closing phrase such as “Best,” “Thanks,” “Regards,” or similar. The system will insert the signature manually.`
@@ -280,7 +388,12 @@ async function createStreamingResponse(
   userInfo: UserInfo,
 ): Promise<ReadableStream> {
   const lead = await getLeadInfoByDeal(params.dealId)
-  const userPrompt = buildUserPrompt(params, lead, userInfo)
+  const emailHistory = params.skipHistory
+    ? []
+    : params.threadId
+      ? await getEmailHistoryByThread(params.dealId, params.threadId)
+      : await getEmailHistoryByDeal(params.dealId, params.subject)
+  const userPrompt = buildUserPrompt(params, lead, userInfo, emailHistory)
 
   return new ReadableStream({
     async start(controller) {

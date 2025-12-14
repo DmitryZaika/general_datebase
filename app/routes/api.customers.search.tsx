@@ -66,7 +66,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   try {
     const like = `%${term}%`
     const prefixLike = `${term}%`
-    const wordLike = `% ${term} %`
+    const prefetchedLimit = 100
 
     let customers: Customer[] = []
 
@@ -110,8 +110,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
              ELSE 2
            END,
            c.name ASC
-         LIMIT 15`,
-        [user.id, user.company_id, ...nameParams, user.id, prefixLike, wordLike],
+         LIMIT ${prefetchedLimit}`,
+        [user.id, user.company_id, ...nameParams, user.id, prefixLike, like],
       )
     } else {
       customers = await selectMany<Customer>(
@@ -143,13 +143,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
           searchType,
           prefixLike,
           searchType,
-          wordLike,
+          like,
         ],
       )
     }
 
     if (searchType === 'name') {
-      customers = customers.filter(c => matchesNameFuzzy(c.name, term))
+      customers = customers.filter(c => matchesNameFuzzy(c.name, term)).slice(0, 15)
     }
 
     return data({ customers })

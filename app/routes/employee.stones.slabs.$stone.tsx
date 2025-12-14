@@ -128,7 +128,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const slabsRaw = await selectMany<Omit<Slab, 'is_leftover'> & { is_leftover: number }>(
     db,
-    'SELECT id, bundle, url, sale_id, width, length, cut_date, parent_id, is_leftover FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL',
+    'SELECT id, bundle, url, sale_id, width, length, cut_date, parent_id, is_leftover FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL AND deleted_at IS NULL',
     [stoneId],
   )
 
@@ -161,7 +161,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       `SELECT
            id, bundle, url, sale_id, width, length, cut_date, parent_id, is_leftover
          FROM slab_inventory
-         WHERE stone_id = ? AND cut_date IS NULL`,
+         WHERE stone_id = ? AND cut_date IS NULL AND deleted_at IS NULL`,
       [link.source_stone_id],
     )
 

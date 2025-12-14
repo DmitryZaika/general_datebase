@@ -12,6 +12,7 @@ export const sinkSchema = z.object({
   cost: z.coerce.number().default(0),
   retail_price: z.coerce.number().default(0),
   is_display: StringBoolean,
+  regular_stock: StringBoolean,
 })
 
 export const sinkFilterSchema = z.object({

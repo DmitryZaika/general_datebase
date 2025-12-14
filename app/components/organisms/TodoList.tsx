@@ -23,7 +23,7 @@ import { useEffect, useState } from 'react'
 import { Form, FormProvider, useForm } from 'react-hook-form'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Dialog, DialogContent, DialogTrigger } from '~/components/ui/dialog'
-import { type TTodoListSchema, todoListSchema } from '~/schemas/general'
+import { todoListSchema, type TTodoListSchema } from '~/schemas/general'
 import type { Todo } from '~/types'
 import { queryClient } from '~/utils/api'
 import { DialogFullHeader } from '../molecules/DialogFullHeader'
@@ -322,7 +322,7 @@ export function TodoList() {
   return (
     <Dialog modal={false}>
       <DialogTrigger
-        className='relative top-[10px] right-[10px] md:top-0 md:right-5 lg:top-0 lg:right-15'
+        className='relative top-[10px] right-[10px] md:top-0 md:right-5 lg:top-0 lg:right-4'
         asChild
       >
         <Button>Todo List</Button>

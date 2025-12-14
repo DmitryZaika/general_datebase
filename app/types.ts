@@ -19,6 +19,7 @@ export interface Sink {
   retail_price: number
   sink_count: number
   available: number
+  regular_stock?: boolean | number
 }
 
 export interface Stone {
@@ -37,6 +38,7 @@ export interface StoneImage {
   cost_per_sqft: number
   available: number
   samples_amount: number
+  regular_stock?: boolean | number
 }
 
 export interface StoneSlim {
@@ -53,6 +55,7 @@ export interface Faucet {
   retail_price: number
   faucet_count: number
   available: number
+  regular_stock?: boolean | number
 }
 
 export interface InstructionSlim {
@@ -105,6 +108,7 @@ export interface StoneSearchResult {
   available: number
   amount: number
   is_display: boolean
+  regular_stock?: boolean | number
 }
 export type Action =
   | { type: 'ADD_EVENT'; payload: Event }

@@ -1,10 +1,11 @@
 import clsx from 'clsx'
 import { Link, useLoaderData, useLocation } from 'react-router'
 import { Button } from '~/components/ui/button'
-import { useCompanyLogo } from '~/hooks/logo-url'
+import { defaultLogo, gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
 import type { HeaderProps } from '~/types'
 import { getCustomerUrl, getMirroredUrl } from '~/utils/headerNav'
 import { LinkButton } from '../molecules/LinkButton'
+import { Notification } from '../molecules/Notification'
 import { TodoList } from '../organisms/TodoList'
 
 interface HeaderDesktopProps extends HeaderProps {
@@ -24,7 +25,8 @@ export function HeaderDesktop({
   const companyId = isCustomerPage
     ? location.pathname.split('/').filter(Boolean)[1]
     : data?.user?.company_id
-  const { url: companyLogo } = useCompanyLogo(Number(companyId))
+  const id = Number(companyId)
+  const companyLogo = id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
 
   const customerSwitchUrl =
     companyId === undefined
@@ -32,14 +34,14 @@ export function HeaderDesktop({
       : getCustomerUrl(isCustomerPage, location, companyId)
   return (
     <header
-      className={clsx('flex-row items-center   gap-0 justify-between  p-3 ', className)}
+      className={id === 4 ? clsx('flex-row items-center   gap-0 justify-between  px-3 py-2', className) : clsx('flex-row items-center gap-0 justify-between  px-3', className)}
     >
       <div className='logo'>
         <a className='flex justify-center' href='/'>
           <img
-            src={companyLogo ?? ""}
+            src={companyLogo}
             alt='Logo'
-            className={ Number(companyId) === 4 ? 'h-12 md:h-16 object-contain mr-4' : 'h-12 md:h-16 object-contain' }
+            className={id === 4 ? 'h-12 md:h-16 object-contain mr-4' : 'h-16 md:h-24 object-contain'}
           />
         </a>
       </div>
@@ -69,7 +71,7 @@ export function HeaderDesktop({
       </nav>
 
       <div className='flex items-center gap-2'>
-        {/* <Notification className='relative z-10 mr-20' /> */}
+        <Notification className='relative z-10 mr-3' />
         <TodoList />
       </div>
 

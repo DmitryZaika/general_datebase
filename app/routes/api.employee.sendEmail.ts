@@ -61,7 +61,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const messageId = info.MessageId
 
   await db.execute(
-    `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id)
+    `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id, deal_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       user.id,
@@ -71,6 +71,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       emailInformation.from,
       emailInformation.to,
       threadId,
+      cleaned.dealId,
     ],
   )
 

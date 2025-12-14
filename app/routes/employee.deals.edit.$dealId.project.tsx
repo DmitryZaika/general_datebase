@@ -24,7 +24,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     `SELECT c.name, c.email, c.phone, c.address, c.city, c.state, c.postal_code, c.company_name,
             c.remodal_type, c.project_size, c.contact_time, c.remove_and_dispose, c.improve_offer, c.sink,
             c.when_start, c.details, c.compaign_name, c.adset_name, c.ad_name, c.backsplash, c.kitchen_stove,
-            c.your_message, c.attached_file, c.qbo_id, c.notes, c.source
+            c.your_message, c.attached_file, c.qbo_id, c.notes, c.source,d.created_at as deal_created, c.created_date as customer_created
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
       WHERE d.id = ? AND c.company_id = ?`,
@@ -154,7 +154,7 @@ export default function DealProjectInfo() {
     .filter(([k, v]) => v != null && k !== 'attached_file')
     .map(([k, v]) => ({
       key: k.replace(/_/g, ' ').replace(/\b\w/g, s => s.toUpperCase()),
-      value: String(v),
+      value: k === 'customer_created' ? new Date(String(v)).toLocaleDateString() : k === 'deal_created' ? new Date(String(v)).toLocaleDateString() : String(v),
     }))
 
   return (
