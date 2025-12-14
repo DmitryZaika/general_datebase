@@ -14,12 +14,13 @@ interface NotificationItem {
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await getEmployeeUser(request).catch(() => null)
   if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
+  const userEmail = typeof user.email === 'string' ? user.email : ''
 
   const [rows] = await db.execute<RowDataPacket[]>(
     `
       SELECT
         e.thread_id,
-        e.deal_id,
+        COALESCE(e.deal_id, td.deal_id) AS deal_id,
         e.subject,
         e.sent_at,
         c.name AS customer_name
@@ -27,21 +28,30 @@ export async function loader({ request }: LoaderFunctionArgs) {
       JOIN (
         SELECT thread_id, MAX(sent_at) AS max_sent_at
         FROM emails
-        WHERE deleted_at IS NULL AND thread_id IS NOT NULL
+        WHERE deleted_at IS NULL AND thread_id IS NOT NULL AND sender_user_id IS NULL
         GROUP BY thread_id
       ) last_e ON last_e.thread_id = e.thread_id AND last_e.max_sent_at = e.sent_at
-      JOIN deals d ON d.id = e.deal_id AND d.deleted_at IS NULL
+      JOIN (
+        SELECT thread_id, MAX(deal_id) AS deal_id
+        FROM emails
+        WHERE deleted_at IS NULL AND thread_id IS NOT NULL AND deal_id IS NOT NULL
+        GROUP BY thread_id
+      ) td ON td.thread_id = e.thread_id
+      JOIN deals d ON d.id = COALESCE(e.deal_id, td.deal_id) AND d.deleted_at IS NULL
       JOIN customers c ON c.id = d.customer_id
       WHERE e.deleted_at IS NULL
         AND e.thread_id IS NOT NULL
-        AND e.deal_id IS NOT NULL
         AND e.sender_user_id IS NULL
         AND e.employee_read_at IS NULL
-        AND d.user_id = ?
+        AND (
+          e.receiver_user_id = ?
+          OR d.user_id = ?
+          OR e.receiver_email = ?
+        )
       ORDER BY e.sent_at DESC
       LIMIT 50
     `,
-    [user.id],
+    [user.id, user.id, userEmail],
   )
 
   const notifications: NotificationItem[] = (rows || [])
