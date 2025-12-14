@@ -14,7 +14,7 @@ interface NotificationProps {
   className?: string
 }
 async function getNotifications(): Promise<NotificationItem[]> {
-  const response = await fetch('/api/notifications')
+  const response = await fetch('/api/notifications', { cache: 'no-store' })
   if (!response.ok) {
     throw Error('Bad Request')
   }
@@ -27,7 +27,7 @@ export function Notification({ className }: NotificationProps) {
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ['notifications'],
     queryFn: getNotifications,
-    refetchInterval: 60000,
+    refetchInterval: 10000,
     refetchIntervalInBackground: true,
   })
 
