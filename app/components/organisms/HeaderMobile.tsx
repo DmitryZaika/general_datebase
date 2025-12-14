@@ -1,5 +1,6 @@
 import { Link, useLoaderData, useLocation, useNavigation } from 'react-router'
 import type { HeaderProps } from '~/types'
+import { getMirroredUrl } from '~/utils/headerNav'
 import { TodoList } from '../organisms/TodoList'
 
 interface HeaderMobileProps extends HeaderProps {
@@ -38,39 +39,6 @@ function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkPro
   )
 }
 
-function getMirroredUrl(path: string, search: string) {
-  const segments = path.split('/').filter(Boolean)
-
-  if (segments.length >= 2 && segments[0] === 'customer' && segments[2] === 'stones') {
-    return `/admin/stones${search}`
-  }
-
-  if (segments.length < 1) return `/employee${search}`
-
-  const currentRole = segments[0]
-  const targetRole = currentRole === 'admin' ? 'employee' : 'admin'
-
-  if (segments.length < 2) return `/${targetRole}${search}`
-
-  const currentSection = segments[1]
-
-  const supportedSections = [
-    'stones',
-    'instructions',
-    'sinks',
-    'faucets',
-    'suppliers',
-    'supports',
-    'documents',
-    'images',
-    'deals',
-  ]
-  if (supportedSections.includes(currentSection)) {
-    return `/${targetRole}/${currentSection}${search}`
-  }
-
-  return `/${targetRole}${search}`
-}
 
 export function BurgerMenu({
   user,
@@ -96,7 +64,7 @@ export function BurgerMenu({
     }
   }, [navigation.state])
 
-  const targetPath = getMirroredUrl(location.pathname, location.search)
+  const targetPath = getMirroredUrl(isAdminPage, location)
 
   const buildCustomerUrl = () => {
     // Если переходим из admin/stones в customer/:company/stones, сохраняем фильтры
