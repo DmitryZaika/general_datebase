@@ -148,7 +148,7 @@ const getItems = (
       },
       {
         title: 'Teach Mode',
-        url: `/employee/teach-mode`,
+        url: `/${base}/teach-mode`,
         icon: BookOpen,
       },
     )
@@ -258,7 +258,7 @@ export function EmployeeSidebar({
     'Instructions',
     'Teach Mode',
   ]
-  const operationTitles = ['Checklists', 'Special Order']
+  const operationTitles = ['Suppliers', 'Checklists', 'Special Order']
 
   const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))
   const crmItems = items.filter(item => crmTitles.includes(item.title))
