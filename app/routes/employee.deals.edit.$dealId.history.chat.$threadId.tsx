@@ -27,6 +27,7 @@ interface Message {
   sent_at: string
   isFromCustomer: boolean
   read_at?: string
+  employee_read_at?: string
 }
 
 interface AIEmailResponse {
@@ -60,14 +61,29 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const customerEmail = customerRows?.[0]?.email || ''
 
-  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, MAX(er.read_at) AS read_at
+  if (customerEmail) {
+    await db.execute(
+      `
+        UPDATE emails
+        SET employee_read_at = NOW()
+        WHERE deleted_at IS NULL
+          AND thread_id = ?
+          AND (deal_id = ? OR deal_id IS NULL)
+          AND sender_email = ?
+          AND employee_read_at IS NULL
+      `,
+      [threadId, dealId, customerEmail],
+    )
+  }
+
+  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
       WHERE e.deleted_at IS NULL AND e.thread_id = ? AND (e.deal_id = ? OR e.deal_id IS NULL)`
   const emailParams: (number | string)[] = [threadId, dealId]
   
 
-  emailQuery += ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email ORDER BY e.sent_at ASC'
+  emailQuery += ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at ORDER BY e.sent_at ASC'
 
   const [emailRows] = await db.execute<RowDataPacket[]>(emailQuery, emailParams)
 
@@ -80,6 +96,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       sent_at: row.sent_at,
       isFromCustomer,
       read_at: row.read_at,
+      employee_read_at: row.employee_read_at,
     }
   })
 
@@ -179,6 +196,13 @@ async function generateAIEmailForChat(
 
 function MessageDate({message}: {message: Message}) {
   const date = new Date(message.sent_at)
+  const time = date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit' })
+  return <p className='text-xs text-gray-500 text-left'>{time}</p>
+}
+
+function EmployeeReadDate({message}: {message: Message}) {
+  if (!message.employee_read_at) return null
+  const date = new Date(message.employee_read_at)
   const time = date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit' })
   return <p className='text-xs text-gray-500 text-left'>{time}</p>
 }

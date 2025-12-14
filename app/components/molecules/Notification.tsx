@@ -1,14 +1,13 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { Bell } from 'lucide-react'
-import { Button } from '~/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
-import { queryClient } from '~/utils/api'
 
 interface NotificationItem {
   id: string | number
   title?: string
   message: string
+  href?: string
 }
 
 interface NotificationProps {
@@ -28,19 +27,8 @@ export function Notification({ className }: NotificationProps) {
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ['notifications'],
     queryFn: getNotifications,
-  })
-
-  const mutation = useMutation({
-    mutationFn: async (id: number) => {
-      await fetch('/api/notifications/done', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
-    },
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ['notifications'] })
-    },
+    refetchInterval: 60000,
+    refetchIntervalInBackground: true,
   })
 
   return (
@@ -56,7 +44,7 @@ export function Notification({ className }: NotificationProps) {
         >
           <Bell className='h-6 w-6 text-black' />
           {notifications.length > 0 && (
-            <span className='absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white'>
+            <span className='absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white'>
               !
             </span>
           )}
@@ -80,11 +68,14 @@ export function Notification({ className }: NotificationProps) {
                   {n.title && (
                     <p className='text-sm font-medium text-gray-800'>{n.title}</p>
                   )}
-                  <p className='text-sm text-gray-600'>{n.message}</p>
+                  {n.href ? (
+                    <a className='text-sm text-gray-600 underline' href={n.href}>
+                      {n.message}
+                    </a>
+                  ) : (
+                    <p className='text-sm text-gray-600'>{n.message}</p>
+                  )}
                 </div>
-                <Button size='sm' onClick={() => mutation.mutate(Number(n.id))}>
-                  Done
-                </Button>
               </div>
             ))
           )}

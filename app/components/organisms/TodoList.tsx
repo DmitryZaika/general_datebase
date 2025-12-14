@@ -322,7 +322,7 @@ export function TodoList() {
   return (
     <Dialog modal={false}>
       <DialogTrigger
-        className='relative top-[10px] right-[10px] md:top-0 md:right-5 lg:top-0 lg:right-15'
+        className='relative top-[10px] right-[10px] md:top-0 md:right-5 lg:top-0 lg:right-4'
         asChild
       >
         <Button>Todo List</Button>
