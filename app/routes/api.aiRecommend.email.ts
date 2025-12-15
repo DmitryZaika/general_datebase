@@ -106,6 +106,7 @@ const generateSchema = z.object({
     'referral',
   ]),
   dealId: z.number(),
+  threadId: z.string().uuid().optional(),
   formality: z.enum(['formal', 'neutral', 'casual']).optional(),
   tone: z.enum(['friendly', 'persuasive', 'empathetic', 'urgent']).optional(),
   verboseness: z.enum(['concise', 'detailed']).optional(),
@@ -280,6 +281,32 @@ async function getEmailHistoryByDeal(
   }))
 }
 
+async function getEmailHistoryByThread(
+  dealId: number,
+  threadId: string,
+): Promise<EmailHistoryItem[]> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `
+      SELECT
+        e.body,
+        e.sent_at,
+        e.sender_user_id
+      FROM emails e
+      WHERE e.deleted_at IS NULL AND e.thread_id = ? AND (e.deal_id = ? OR e.deal_id IS NULL)
+      ORDER BY e.sent_at ASC
+    `,
+    [threadId, dealId],
+  )
+
+  if (!rows?.length) return []
+
+  return rows.map(row => ({
+    body: row.body,
+    sentAt: row.sent_at,
+    isFromCustomer: row.sender_user_id === null,
+  }))
+}
+
 // ============================================================================
 // PROMPT CONSTRUCTION
 // ============================================================================
@@ -361,7 +388,11 @@ async function createStreamingResponse(
   userInfo: UserInfo,
 ): Promise<ReadableStream> {
   const lead = await getLeadInfoByDeal(params.dealId)
-  const emailHistory = params.skipHistory ? [] : await getEmailHistoryByDeal(params.dealId, params.subject)
+  const emailHistory = params.skipHistory
+    ? []
+    : params.threadId
+      ? await getEmailHistoryByThread(params.dealId, params.threadId)
+      : await getEmailHistoryByDeal(params.dealId, params.subject)
   const userPrompt = buildUserPrompt(params, lead, userInfo, emailHistory)
 
   return new ReadableStream({

@@ -559,7 +559,7 @@ export default function ViewTransaction() {
 
   const handleDialogClose = (open: boolean) => {
     if (!open) {
-      navigate(`/admin/transactions${location.search}`)
+      navigate(`/employee/transactions${location.search}`)
     }
   }
 
@@ -874,6 +874,11 @@ export default function ViewTransaction() {
     setNewRoomName('')
   }
 
+  const handleSubmitNewRoom = () => {
+    const name = newRoomName.trim()
+    if (!name) return
+    handleAddRoom(name)
+  }
 
   useEffect(() => {
     if (!addDialogOpen || !addRoom) return

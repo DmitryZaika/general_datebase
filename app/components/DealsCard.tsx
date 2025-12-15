@@ -18,6 +18,7 @@ interface ExtendedCustomer {
   position?: number
   due_date?: string | null
   has_images?: boolean
+  has_email?: boolean
   sales_rep?: string | null
 }
 

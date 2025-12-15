@@ -58,6 +58,7 @@ async function getRedirectPath(user: SessionUser): Promise<string> {
   )
   if (positions.length === 0) return '..'
   if (positions.length > 1) return '..'
+  if (positions[0].position_id === Positions.ShopWorker) return '/shop/transactions'
   if (positions[0].position_id === Positions.Installer)
     return `/installers/${user.company_id}/checklist`
   if (positions[0].position_id === Positions.ExternalMarketing)

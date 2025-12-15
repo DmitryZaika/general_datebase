@@ -9,3 +9,4 @@ public/service-worker.js
 build.log
 oAuthClient-log.log
 tsconfig.tsbuildinfo
+.DS_Store

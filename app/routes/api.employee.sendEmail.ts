@@ -6,7 +6,7 @@ import { db } from '~/db.server'
 import { sendEmail } from '~/lib/email.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectId } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 
 export const customerSchema = z.object({
   to: z.string().email(),
@@ -16,35 +16,38 @@ export const customerSchema = z.object({
   threadId: z.string().uuid().optional(),
 })
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const user = await getEmployeeUser(request).catch(() => null)
-  if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
+type Customer = z.infer<typeof customerSchema>
 
+const emailToSend = async (user: SessionUser, cleaned: Customer) => {
   const userCompany = await selectId<{ domain: string | null }>(
     db,
     'SELECT domain from company where id = ?',
     user.company_id,
   )
+  const HTMLBody = `<div style="white-space: pre-wrap;">${cleaned.body}</div>`
+  const from = userCompany?.domain ? user.email : 'sales@granite-manager.com'
+  const to = cleaned.to
+  return {
+    to,
+    from,
+    subject: cleaned.subject,
+    html: HTMLBody,
+    configurationSet: 'email-tracking-set',
+  }
+}
+
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const user = await getEmployeeUser(request).catch(() => null)
+  if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
 
   const raw = await request.json()
   const cleaned = customerSchema.parse(raw)
-  const dealId = cleaned.dealId
-  const rawFrom = userCompany?.domain ? user.email : 'sales@granite-manager.com'
-  const from = userCompany?.domain ? user.email : 'sales@granite-manager.com'
-  const to = cleaned.to
   const threadId = cleaned.threadId || uuidv4()
 
-  const HTMLBody = `<div style="white-space: pre-wrap;">${cleaned.body}</div>`
-
+  const emailInformation = await emailToSend(user, cleaned)
   let info: SendEmailCommandOutput
   try {
-    info = await sendEmail({
-      to,
-      from,
-      subject: cleaned.subject,
-      html: HTMLBody,
-      configurationSet: 'email-tracking-set',
-    })
+    info = await sendEmail(emailInformation)
   } catch (error) {
     const message = (error as { message?: string }).message || 'Unknown error'
     if (message.includes('Email address is not verified.')) {
@@ -59,8 +62,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   await db.execute(
     `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id, deal_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [user.id, cleaned.subject, cleaned.body, messageId, from, to, threadId, dealId],
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      user.id,
+      cleaned.subject,
+      cleaned.body,
+      messageId,
+      emailInformation.from,
+      emailInformation.to,
+      threadId,
+      cleaned.dealId,
+    ],
   )
 
   return data({ ok: true })
