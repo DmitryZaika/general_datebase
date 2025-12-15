@@ -84,6 +84,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     )
     const imagesMap: Record<number, boolean> = {}
     for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
+    const emailCounts = await selectMany<{ deal_id: number; count: number }>(
+      db,
+      'SELECT deal_id, COUNT(*) as count FROM emails WHERE deleted_at IS NULL AND deal_id IS NOT NULL GROUP BY deal_id',
+    )
+    const emailsMap: Record<number, boolean> = {}
+    for (const row of emailCounts) emailsMap[row.deal_id] = Number(row.count) > 0
+
     const customers = await selectMany<{ id: number; name: string }>(
       db,
       'SELECT id, name FROM customers WHERE company_id = ? AND deleted_at IS NULL',
@@ -99,14 +106,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       )
     }
 
-    return { deals, customers, lists, imagesMap, partners, view }
+    return { deals, customers, lists, imagesMap, emailsMap, partners, view }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export default function EmployeeDeals() {
-  const { deals, customers, lists, imagesMap, partners, view } = useLoaderData<typeof loader>()
+  const { deals, customers, lists, imagesMap, emailsMap, partners, view } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
@@ -144,6 +151,7 @@ export default function EmployeeDeals() {
           customers={customers}
           lists={lists}
           imagesMap={imagesMap}
+          emailsMap={emailsMap}
           viewSelect={viewSelect}
         />
       )}

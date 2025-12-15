@@ -20,6 +20,7 @@ interface DealsListProps {
     due_date?: string | null
     sales_rep?: string | null
     has_images?: boolean
+    has_email?: boolean
   }[]
   id: number
   readonly?: boolean
