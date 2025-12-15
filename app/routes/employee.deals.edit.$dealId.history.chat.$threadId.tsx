@@ -18,6 +18,7 @@ import {
 } from '~/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { db } from '~/db.server'
+import { useToast } from '~/hooks/use-toast'
 import { getEmployeeUser } from '~/utils/session.server'
 
 interface Message {
@@ -27,6 +28,7 @@ interface Message {
   sent_at: string
   isFromCustomer: boolean
   read_at?: string
+  employee_read_at?: string
 }
 
 interface AIEmailResponse {
@@ -45,8 +47,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const dealId = parseInt(params.dealId, 10)
-  const url = new URL(request.url)
-  const subjectFilter = url.searchParams.get('subject') || undefined
+  const threadId = params.threadId
+  if (!threadId) {
+    throw new Error('Thread ID is missing')
+  }
 
   const [customerRows] = await db.execute<RowDataPacket[]>(
     `SELECT c.name, c.email
@@ -58,17 +62,29 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const customerEmail = customerRows?.[0]?.email || ''
 
-  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, MAX(er.read_at) AS read_at
-       FROM emails e
-       LEFT JOIN email_reads er ON e.message_id = er.message_id
-      WHERE e.deal_id = ? AND e.deleted_at IS NULL`
-  const emailParams: (number | string)[] = [dealId]
-  if (subjectFilter) {
-    emailQuery += ' AND e.subject = ?'
-    emailParams.push(subjectFilter)
+  if (customerEmail) {
+    await db.execute(
+      `
+        UPDATE emails
+        SET employee_read_at = NOW()
+        WHERE deleted_at IS NULL
+          AND thread_id = ?
+          AND (deal_id = ? OR deal_id IS NULL)
+          AND sender_email = ?
+          AND employee_read_at IS NULL
+      `,
+      [threadId, dealId, customerEmail],
+    )
   }
 
-  emailQuery += ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email ORDER BY e.sent_at ASC'
+  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, MAX(er.read_at) AS read_at
+       FROM emails e
+       LEFT JOIN email_reads er ON e.message_id = er.message_id
+      WHERE e.deleted_at IS NULL AND e.thread_id = ? AND (e.deal_id = ? OR e.deal_id IS NULL)`
+  const emailParams: (number | string)[] = [threadId, dealId]
+  
+
+  emailQuery += ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at ORDER BY e.sent_at ASC'
 
   const [emailRows] = await db.execute<RowDataPacket[]>(emailQuery, emailParams)
 
@@ -81,16 +97,17 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       sent_at: row.sent_at,
       isFromCustomer,
       read_at: row.read_at,
+      employee_read_at: row.employee_read_at,
     }
   })
-  console.log(messages)
 
   return {
     customerName: customerRows?.[0]?.name || 'Customer',
     customerEmail,
     messages,
     dealId,
-    subject: subjectFilter || null,
+    subject: emailRows?.[0]?.subject || null,
+    threadId,
   }
 }
 
@@ -148,6 +165,7 @@ async function generateAIEmailForChat(
   emailCategory: string,
   dealId: number,
   subject: string | null,
+  threadId: string,
   onStreamBody?: (text: string) => void,
 ): Promise<AIEmailResponse> {
   const variationToken = Math.random().toString(36).slice(2)
@@ -156,6 +174,7 @@ async function generateAIEmailForChat(
     dealId,
     variationToken,
     subject: subject || undefined,
+    threadId,
   }
 
   const response = await fetch('/api/aiRecommend/email', {
@@ -182,17 +201,37 @@ function MessageDate({message}: {message: Message}) {
   return <p className='text-xs text-gray-500 text-left'>{time}</p>
 }
 
+function EmployeeReadDate({message}: {message: Message}) {
+  if (!message.employee_read_at) return null
+  const date = new Date(message.employee_read_at)
+  const time = date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit' })
+  return <p className='text-xs text-gray-500 text-left'>{time}</p>
+}
+
 export default function EmailChatDialog() {
   const navigate = useNavigate()
   const location = useLocation()
   const [showSelect, setShowSelect] = useState(false)
   const [selectActive, setSelectActive] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
-  const { customerName, customerEmail, messages, dealId, subject } =
+  const { toast } = useToast()
+  const { customerName, customerEmail, messages, dealId, subject, threadId } =
     useLoaderData<typeof loader>()
+  const [chatMessages, setChatMessages] = useState<Message[]>(messages)
   const [messageText, setMessageText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isSending, setIsSending] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const bottomRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    setChatMessages(messages)
+    
+  }, [messages])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [chatMessages.length])
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -202,7 +241,7 @@ export default function EmailChatDialog() {
   }, [messageText])
 
   const handleClose = () => {
-    navigate(`..${location.search}`)
+    navigate(`/employee/deals/edit/${dealId}/history`)
   }
 
   const getInitials = (name: string) => {
@@ -213,7 +252,7 @@ export default function EmailChatDialog() {
     return name.slice(0, 2).toUpperCase()
   }
 
-  const lastMessageFromMe = [...messages].reverse().find(m => !m.isFromCustomer)
+  const lastMessageFromMe = [...chatMessages].reverse().find(m => !m.isFromCustomer)
   const lastReadMessageId = lastMessageFromMe?.read_at ? lastMessageFromMe.id : null
 
   const handleTemplateSelect = (value: string) => {
@@ -230,7 +269,7 @@ export default function EmailChatDialog() {
     setIsGenerating(true)
     setMessageText('')
     try {
-      await generateAIEmailForChat(template, dealId, subject, body => {
+      await generateAIEmailForChat(template, dealId, subject, threadId, body => {
         setMessageText(body)
       })
     } catch (error) {
@@ -244,9 +283,71 @@ export default function EmailChatDialog() {
     }
   }
 
+  const handleSend = async () => {
+    const body = messageText.trim()
+    if (!body) return
+    if (!customerEmail) {
+      alert('Customer email is missing')
+      return
+    }
+    const emailSubject = subject && subject.trim() ? subject : 'Follow up'
+
+    setIsSending(true)
+    try {
+      const response = await fetch('/api/employee/sendEmail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: customerEmail,
+          subject: emailSubject,
+          body,
+          dealId,
+          threadId,
+        }),
+      })
+
+      if (!response.ok) {
+        let errorText = ''
+        try {
+          const payload: unknown = await response.json()
+          if (payload && typeof payload === 'object' && 'error' in payload) {
+            const value = payload.error
+            if (typeof value === 'string') {
+              errorText = value
+            }
+          }
+        } catch {
+          errorText = await response.text().catch(() => '')
+        }
+        throw new Error(errorText || 'Email failed to send')
+      }
+
+      setChatMessages(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          subject: emailSubject,
+          body,
+          sent_at: new Date().toISOString(),
+          isFromCustomer: false,
+        },
+      ])
+      setMessageText('')
+      toast({ title: 'Success', description: 'Email sent!', variant: 'success' })
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message)
+      } else {
+        alert('Email failed to send')
+      }
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   function showDate(message: Message, index: number) {
     return index === 0 || 
-      new Date(messages[index - 1].sent_at).toDateString() !== 
+      new Date(chatMessages[index - 1].sent_at).toDateString() !== 
       new Date(message.sent_at).toDateString()
   }
 
@@ -260,13 +361,14 @@ export default function EmailChatDialog() {
             </div>
             <div>
               <DialogTitle className='text-lg font-semibold'>{customerName}</DialogTitle>
-              <p className='text-sm text-gray-500'>{customerEmail}</p>
+              <p className='text-sm text-gray-500'>Email: {customerEmail}</p>
+              <p className='text-sm text-gray-500'>Subject: {subject}</p>
             </div>
           </div>
         </DialogHeader>
 
         <div className='flex-1 overflow-y-auto p-4 space-y-4'>
-          {messages.map((message, index) => (
+          {chatMessages.map((message, index) => (
               <div key={message.id}>
                 {showDate(message, index) && (
                   <div className='text-center text-xs text-gray-500 my-4'>
@@ -303,6 +405,7 @@ export default function EmailChatDialog() {
                
               </div>
             ))}
+          <div ref={bottomRef} />
         </div>
 
         <div className='p-4 border-t'>
@@ -363,9 +466,17 @@ export default function EmailChatDialog() {
             />
             <div className='flex items-center gap-1 mb-1'>
             
-              <Button variant='ghost' size='icon' className='text-zinc-500'>
+              <LoadingButton
+                loading={isSending}
+                type='button'
+                variant='ghost'
+                size='icon'
+                className='text-zinc-500'
+                disabled={isSending || messageText.trim() === ''}
+                onClick={handleSend}
+              >
                 <span className='text-xl'>➤</span>
-              </Button>
+              </LoadingButton>
             </div>
           </div>
         </div>

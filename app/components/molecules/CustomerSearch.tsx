@@ -3,8 +3,8 @@ import { AlertCircle, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { CustomerForm } from '~/components/pages/CustomerForm'
 import { cn } from '~/lib/utils'
-import type { sourceEnum } from '~/schemas/customers'
-import type { Customer } from '~/types'
+import type { CustomerDialogSchema, sourceEnum } from '~/schemas/customers'
+import type { Customer, Sources } from '~/types/customer'
 import { Button } from '../ui/button'
 import { Command, CommandGroup, CommandItem } from '../ui/command'
 import { Input } from '../ui/input'
@@ -64,6 +64,35 @@ async function fetchCustomerById(customerId: number): Promise<Customer | null> {
   return json.customer
 }
 
+const getOldData = (
+  currentCustomer: Customer | undefined | null,
+  selectedCustomer: number | undefined,
+  source: (typeof sourceEnum)[number] | 'user-input',
+): CustomerDialogSchema | undefined => {
+  if (!currentCustomer) return undefined
+  if (!selectedCustomer) return undefined
+
+  const rawCompany =
+    typeof currentCustomer.company_name === 'string'
+      ? currentCustomer.company_name
+      : null
+  const rawMessage = currentCustomer.your_message ?? ''
+  const builder = typeof rawCompany === 'string' && rawCompany.trim().length > 0
+  const rawSource: Sources | 'user-input' =
+    typeof currentCustomer.source === 'string' ? currentCustomer.source : source
+  const mappedSource: Sources = rawSource === 'user-input' ? 'other' : rawSource
+  return {
+    name: currentCustomer.name,
+    email: currentCustomer.email ?? '',
+    phone: currentCustomer.phone ?? '',
+    address: currentCustomer.address ?? '',
+    your_message: rawMessage,
+    builder,
+    company_name: rawCompany,
+    source: mappedSource,
+  }
+}
+
 const CustomerManager = ({
   selectedCustomer,
   setSearchTerm,
@@ -100,31 +129,8 @@ const CustomerManager = ({
   function handleSpecial() {
     setIsOpen(true)
   }
-  type ExtraCustomerFields = {
-    [key: string]: unknown
-  }
-  const extra: ExtraCustomerFields = currentCustomer ? currentCustomer : {}
-  const rawCompany =
-    typeof extra.company_name === 'string' ? extra.company_name : null
-  const rawMessage =
-    typeof extra.your_message === 'string' ? extra.your_message : ''
-  const builder =
-    typeof rawCompany === 'string' && rawCompany.trim().length > 0
-  const rawSource = typeof extra.source === 'string' ? extra.source : source
-  const mappedSource = rawSource === 'user-input' ? 'other' : rawSource
-  const oldData =
-    selectedCustomer && currentCustomer
-      ? {
-          name: currentCustomer.name,
-          email: currentCustomer.email ?? '',
-          phone: currentCustomer.phone ?? '',
-          address: currentCustomer.address ?? '',
-          your_message: rawMessage,
-          builder,
-          company_name: rawCompany,
-          source: mappedSource,
-        }
-      : undefined
+
+  const oldData = getOldData(currentCustomer, selectedCustomer, source)
   const canShowForm = isOpen && (!selectedCustomer || !!currentCustomer)
   return (
     <>
@@ -139,7 +145,8 @@ const CustomerManager = ({
         {selectedCustomer &&
           currentCustomer &&
           ((currentCustomer.email ?? '') === '' ||
-            (currentCustomer.address ?? '') === '') && (
+            (currentCustomer.address ?? '') === '' ||
+            (currentCustomer.phone ?? '') === '') && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

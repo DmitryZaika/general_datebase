@@ -26,7 +26,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     // Include both direct slabs and linked slabs from other stones
     let query = `
-      SELECT id, bundle, is_leftover
+      SELECT
+        id,
+        bundle,
+        is_leftover,
+        parent_id,
+        (SELECT COUNT(*) FROM slab_inventory c WHERE c.parent_id = slab_inventory.id AND c.deleted_at IS NULL) as child_count
       FROM slab_inventory
       WHERE (
         stone_id = ?
@@ -36,6 +41,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       )
       AND sale_id IS NULL
       AND cut_date IS NULL
+      AND deleted_at IS NULL
     `
 
     const queryParams = [stoneId, stoneId]
@@ -45,7 +51,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       queryParams.push(excludeSlabIds)
     }
 
-    const slabs = await selectMany<{ id: number; bundle: string; is_leftover: number }>(
+    const slabs = await selectMany<{
+      id: number
+      bundle: string
+      is_leftover: number
+      parent_id: number | null
+      child_count: number
+    }>(
       db,
       query,
       queryParams,

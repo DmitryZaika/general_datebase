@@ -2,16 +2,8 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
+import type { Customer } from '~/types/customer'
 import { getEmployeeUser } from '~/utils/session.server'
-
-interface Customer {
-  id: number
-  name: string
-  address: string | null
-  phone: string | null
-  email: string | null
-  company_name: string | null
-}
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await getEmployeeUser(request)
@@ -24,8 +16,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     // Get customer details
     const [customer] = await db.query<(Customer & RowDataPacket)[]>(
-      `SELECT id, name, address, phone, email, company_name, source, your_message 
-       FROM customers 
+      `SELECT id, name, address, phone, email, company_name, source, your_message
+       FROM customers
        WHERE id = ? AND company_id = ? AND deleted_at IS NULL`,
       [customerId, user.company_id],
     )

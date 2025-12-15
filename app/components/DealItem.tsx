@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Calendar as CalendarIcon, GripVertical, PaperclipIcon, Pencil } from 'lucide-react'
+import { Calendar as CalendarIcon, GripVertical, Mail, PaperclipIcon, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher } from 'react-router'
 import { formatMoney, updateNumber } from './functions'
@@ -21,6 +21,7 @@ interface DealItemProps {
     due_date?: string | null
     images?: string[] | null
     has_images?: boolean
+    has_email?: boolean
     sales_rep?: string | null
   }
   readonly?: boolean
@@ -61,6 +62,8 @@ export default function DealItem({
   const [descOverflow, setDescOverflow] = useState(false)
   const [lineHeightPx, setLineHeightPx] = useState<number>(20)
   const fetcher = useFetcher()
+
+  const hasEmail = Boolean(deal.has_email)
 
   const hasImages =
     (Array.isArray(deal.images) && deal.images.length > 0) || Boolean(deal.has_images)
@@ -325,14 +328,28 @@ export default function DealItem({
             {formatDisplay(localDate)}
           </p>
         )}
-        {hasImages && (
-          <Link
-            to={`edit/${deal.id}/images`}
-            className='text-slate-500 hover:text-black'
-            onPointerDown={e => e.stopPropagation()}
-          >
-            <PaperclipIcon className='w-4 h-4' />
-          </Link>
+        
+        {(hasEmail || hasImages) && (
+          <div className='flex flex-col items-center gap-1'>
+            {hasEmail && (
+              <Link
+                to={`edit/${deal.id}/history`}
+                className='text-slate-500 hover:text-black'
+                onPointerDown={e => e.stopPropagation()}
+              >
+                <Mail className='w-4 h-4' />
+              </Link>
+            )}
+            {hasImages && (
+              <Link
+                to={`edit/${deal.id}/images`}
+                className='text-slate-500 hover:text-black'
+                onPointerDown={e => e.stopPropagation()}
+              >
+                <PaperclipIcon className='w-4 h-4' />
+              </Link>
+            )}
+          </div>
         )}
       </div>
     </div>
