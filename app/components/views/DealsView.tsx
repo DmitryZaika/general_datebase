@@ -39,6 +39,7 @@ type FullDeal = {
 type Deal = FullDeal & {
   name: string
   has_images?: boolean
+  has_email?: boolean
 }
 
 interface DealsViewProps {
@@ -46,10 +47,11 @@ interface DealsViewProps {
   customers: Customer[]
   lists: List[]
   imagesMap: Record<number, boolean>
+  emailsMap: Record<number, boolean>
   viewSelect?: React.ReactNode
 }
 
-export default function DealsView({ deals, customers, lists, imagesMap, viewSelect }: DealsViewProps) {
+export default function DealsView({ deals, customers, lists, imagesMap, emailsMap, viewSelect }: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -71,6 +73,7 @@ export default function DealsView({ deals, customers, lists, imagesMap, viewSele
           : new Date(d.due_date).toISOString().slice(0, 10)
         : null,
       has_images: imagesMap?.[d.id] || false,
+      has_email: emailsMap?.[d.id] || false,
     }
   }
 
