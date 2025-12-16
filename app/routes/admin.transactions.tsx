@@ -1,6 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table'
 import { Search } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
@@ -28,6 +28,7 @@ interface Transaction {
   bundle: string
   bundle_with_cut: string
   stone_name: string
+  project_address?: string | null
   sf?: number
   all_cut?: number
   any_cut?: number
@@ -87,7 +88,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const transactions = await selectMany<Transaction>(
       db,
-      `SELECT 
+      `SELECT
         s.id,
         s.sale_date,
         c.name as customer_name,
@@ -96,17 +97,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         s.cancelled_date,
         s.installed_date,
         GROUP_CONCAT(DISTINCT CONCAT(st.name, ':', IF(si.deleted_at IS NOT NULL, 'DELETED', 'ACTIVE'))) as stone_name,
+        s.project_address,
         s.square_feet as sf,
         GROUP_CONCAT(DISTINCT CONCAT(si.bundle, ':', IF(si.cut_date IS NOT NULL, 'CUT', 'UNCUT'), ':', IF(si.deleted_at IS NOT NULL, 'DELETED', 'ACTIVE'))) as bundle_with_cut,
         MIN(CASE WHEN si.cut_date IS NULL THEN 0 ELSE 1 END) as all_cut,
         MAX(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as any_cut,
         COUNT(si.id) as total_slabs,
         SUM(CASE WHEN si.cut_date IS NOT NULL THEN 1 ELSE 0 END) as cut_slabs
-      FROM 
+      FROM
         sales s
-      JOIN 
+      JOIN
         customers c ON s.customer_id = c.id
-      JOIN 
+      JOIN
         users u ON s.seller_id = u.id AND u.is_deleted = 0
       LEFT JOIN
         slab_inventory si ON s.id = si.sale_id
@@ -116,7 +118,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         s.company_id = ?
       GROUP BY
         s.id, s.sale_date, c.name, u.name
-      ORDER BY 
+      ORDER BY
         s.sale_date DESC`,
       [companyId],
     )
@@ -301,12 +303,27 @@ const transactionColumns: ColumnDef<Transaction>[] = [
 export default function AdminTransactions() {
   const { transactions } = useLoaderData<typeof loader>()
   const [searchTerm, setSearchTerm] = useState('')
+  const [isInputFocused, setIsInputFocused] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
 
-  const filteredTransactions = transactions.filter(transaction =>
-    transaction.customer_name.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsInputFocused(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
+  const handleRowClick = (id: number) => {
+    navigate(`edit/${id}${location.search}`)
+  }
 
   return (
     <>
@@ -319,23 +336,66 @@ export default function AdminTransactions() {
               </Button>
             </Link>
           </div>
-          <div className='relative'>
-            <Search className='absolute left-2 top-2.5 h-4 w-4 text-gray-500' />
-            <Input
-              placeholder='Search by customer'
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className='pl-8 w-64'
-            />
+          <div ref={searchRef} className='relative w-80'>
+            <div className='relative'>
+              <Input
+                type='text'
+                placeholder='Search transactions...'
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                onFocus={() => setIsInputFocused(true)}
+                className='pr-10 py-2 rounded-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition'
+              />
+              <div className='absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-500'>
+                <Search />
+              </div>
+            </div>
+            {isInputFocused && searchTerm && (
+              <div className='absolute z-50 w-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'>
+                {transactions
+                  .filter(tx => {
+                    const term = searchTerm.toLowerCase()
+                    return (
+                      tx.customer_name.toLowerCase().includes(term) ||
+                      tx.seller_name.toLowerCase().includes(term) ||
+                      (tx.bundle || '').toLowerCase().includes(term) ||
+                      (tx.stone_name || '').toLowerCase().includes(term)
+                    )
+                  })
+                  .slice(0, 20)
+                  .map(tx => (
+                    <div
+                      key={tx.id}
+                      onClick={() => {
+                        navigate(`edit/${tx.id}${location.search}`)
+                        setIsInputFocused(false)
+                        setSearchTerm('')
+                      }}
+                      className='p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none'
+                    >
+                      <div className='font-medium text-gray-800'>{tx.customer_name}</div>
+                      <div className='text-xs text-gray-500 flex justify-between'>
+                        <span>{formatDate(tx.sale_date)}</span>
+                        <span>{tx.seller_name}</span>
+                      </div>
+                      <div className='text-xs text-gray-500 truncate'>
+                        {tx.project_address || 'No address'}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         </div>
         <DataTable
           columns={transactionColumns}
-          data={filteredTransactions}
+          data={transactions.map(transaction => ({
+            ...transaction,
+            className: 'hover:bg-gray-50 cursor-pointer',
+          }))}
+          onRowClick={row => handleRowClick(row.id)}
           paginate
           pageSize={50}
-          onRowClick={row => navigate(`edit/${row.id}${location.search}`)}
-          rowClassName='cursor-pointer'
         />
       </PageLayout>
       <Outlet />
