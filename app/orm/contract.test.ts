@@ -43,6 +43,7 @@ describe('Contract Integration Tests', () => {
       id: userId,
       email: 'test@example.com',
       name: 'Test User',
+      phone_number: '+1234567890',
       is_employee: true,
       is_admin: false,
       is_superuser: false,
