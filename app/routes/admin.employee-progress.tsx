@@ -47,7 +47,7 @@ interface LoaderData {
 // ═════════════════════════════════════════════════════════════════════════════
 
 async function fetchUsers(companyId: number): Promise<User[]> {
-  const [usersResult] = await db.execute<User>(
+  const [usersResult] = await db.execute(
     `SELECT id, email, name FROM users WHERE company_id = ? ORDER BY name, email`,
     [companyId],
   )
@@ -55,7 +55,7 @@ async function fetchUsers(companyId: number): Promise<User[]> {
 }
 
 async function fetchAnswerAttempts(companyId: number): Promise<AnswerAttempt[]> {
-  const [attemptsResult] = await db.execute<AnswerAttempt>(
+  const [attemptsResult] = await db.execute(
     `SELECT
        aa.employee_id,
        aa.attempt_number,
