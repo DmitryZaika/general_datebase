@@ -33,14 +33,17 @@ interface UseChecklistQueueReturn {
 }
 
 const MAX_RETRY_ATTEMPTS = 20
-const API_TIMEOUT = 15000
+const API_TIMEOUT = 8000
+const RETRY_DELAY = 3000
 
-const isNetworkError = (error: Error): boolean => {
+export const isNetworkError = (error: Error): boolean => {
   return (
     error.name === 'AbortError' ||
     error.message.includes('fetch') ||
     error.message.includes('network') ||
-    error.message.includes('Failed to fetch')
+    error.message.includes('Failed to fetch') ||
+    error.message.includes('Connection timeout') ||
+    error.message.includes('Server error')
   )
 }
 
@@ -54,7 +57,7 @@ const isValidationError = (message: string): boolean => {
   )
 }
 
-async function submitChecklistAPI(
+export async function submitChecklistAPI(
   formData: ChecklistFormData,
   companyId: number,
 ): Promise<unknown> {
@@ -107,7 +110,9 @@ export function useChecklistQueue({
   onError,
 }: UseChecklistQueueProps): UseChecklistQueueReturn {
   const [isHydrated, setIsHydrated] = useState(false)
-  const [isOnline, setIsOnline] = useState(true)
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  )
   const [pendingCount, setPendingCount] = useState(0)
   const [pendingSubmissions, setPendingSubmissions] = useState<PendingSubmission[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
@@ -164,7 +169,6 @@ export function useChecklistQueue({
         return
       }
 
-      console.log(`[Queue] Processing ${pending.length} pending submissions`)
 
       for (const submission of pending) {
         if (!navigator.onLine) break
@@ -175,6 +179,13 @@ export function useChecklistQueue({
             status: 'failed',
             error: `Max retry attempts (${MAX_RETRY_ATTEMPTS}) reached`,
           })
+          continue
+        }
+
+        const lastAttemptTime = submission.lastAttempt || 0
+        const timeSinceLastAttempt = Date.now() - lastAttemptTime
+
+        if (submission.attempts > 0 && timeSinceLastAttempt < RETRY_DELAY) {
           continue
         }
 
@@ -215,6 +226,7 @@ export function useChecklistQueue({
 
   useEffect(() => {
     if (typeof navigator === 'undefined') return
+    if (isProcessingRef.current) return
 
     if (navigator.onLine && pendingCount > 0) {
       processQueue()
@@ -225,13 +237,11 @@ export function useChecklistQueue({
     if (typeof window === 'undefined') return
 
     const handleOnline = () => {
-      console.log('[Queue] Network online, processing queue')
       setIsOnline(true)
       processQueue()
     }
 
     const handleOffline = () => {
-      console.log('[Queue] Network offline')
       setIsOnline(false)
     }
 
@@ -248,10 +258,9 @@ export function useChecklistQueue({
     if (typeof window === 'undefined') return
 
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('[Queue] Page visible, refreshing queue')
+      if (!document.hidden && !isProcessingRef.current) {
         refreshQueue().then(() => {
-          if (navigator.onLine && pendingCount > 0) {
+          if (navigator.onLine && pendingCount > 0 && !isProcessingRef.current) {
             processQueue()
           }
         })
@@ -274,7 +283,7 @@ export function useChecklistQueue({
     const getInterval = () => (document.hidden ? BACKGROUND_INTERVAL : ACTIVE_INTERVAL)
 
     const checkQueue = () => {
-      if (navigator.onLine && pendingCount > 0) {
+      if (navigator.onLine && pendingCount > 0 && !isProcessingRef.current) {
         processQueue()
       }
     }

@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { InputItem } from '~/components/molecules/InputItem'
@@ -11,7 +11,7 @@ import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
 import { gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
 import { useToast } from '~/hooks/use-toast'
-import { useChecklistQueue } from '~/hooks/useChecklistQueue'
+import { useChecklistQueue, submitChecklistAPI, isNetworkError } from '~/hooks/useChecklistQueue'
 import { type ChecklistFormData, checklistResolver } from '~/schemas/checklist'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -42,80 +42,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 }
 
-class NetworkError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'NetworkError'
-  }
-}
-
-class OfflineError extends Error {
-  constructor() {
-    super('Device is offline')
-    this.name = 'OfflineError'
-  }
-}
-
-const submitChecklist = async (formData: ChecklistFormData, companyId: number) => {
-  if (!navigator.onLine) {
-    throw new OfflineError()
-  }
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 15000)
-
-  try {
-    const response = await fetch(`/api/checklist/${companyId}`, {
-      method: 'POST',
-      body: JSON.stringify(formData),
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json' },
-    })
-
-    clearTimeout(timeoutId)
-
-    if (!response.ok) {
-      if (response.status >= 500) {
-        throw new NetworkError(`Server error: ${response.status}`)
-      }
-      if (response.status >= 400 && response.status < 500) {
-        const errorData = await response.json().catch(() => ({}))
-
-        if ('errors' in errorData) {
-          throw new Error(JSON.stringify(errorData.errors))
-        }
-        throw new Error(`Request failed with status ${response.status}`)
-      }
-      throw new NetworkError(`HTTP error: ${response.status}`)
-    }
-
-    const data = await response.json()
-    if ('errors' in data) {
-      throw new Error(JSON.stringify(data.errors))
-    }
-
-    return data
-  } catch (error) {
-    clearTimeout(timeoutId)
-
-    if (
-      error instanceof Error &&
-      (error.name === 'AbortError' ||
-        error.message.includes('fetch') ||
-        error.message.includes('network') ||
-        error.message.includes('Failed to fetch'))
-    ) {
-      throw new NetworkError('Connection timeout or network error')
-    }
-
-    if (error instanceof NetworkError) {
-      throw error
-    }
-
-    throw error
-  }
-}
-
 const defaultValues: ChecklistFormData = {
   customer_name: '',
   customer_id: null,
@@ -140,6 +66,13 @@ export default function AdminChecklists() {
   })
   const localStorageLockedRef = useRef<boolean>(false)
   const { toast } = useToast()
+
+  const resetForm = useCallback(() => {
+    localStorageLockedRef.current = true
+    localStorage.setItem('checklistData', JSON.stringify(defaultValues))
+    form.reset(defaultValues)
+    sigRef.current?.clear()
+  }, [form])
 
   const {
     isOnline,
@@ -167,44 +100,36 @@ export default function AdminChecklists() {
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (data: ChecklistFormData) => {
-      if (!navigator.onLine) {
-        await addSubmissionToQueue(data)
-        throw new OfflineError()
-      }
-
-      try {
-        const result = await submitChecklist(data, companyId)
-        return result
-      } catch (error) {
-        if (error instanceof NetworkError) {
-          await addSubmissionToQueue(data)
-        }
-        throw error
-      }
+      const result = await submitChecklistAPI(data, companyId)
+      return result
     },
     onSuccess: () => {
-      localStorageLockedRef.current = true
-      localStorage.setItem('checklistData', JSON.stringify(defaultValues))
-      form.reset(defaultValues)
-      sigRef.current?.clear()
+      resetForm()
       toast({
         title: 'Success',
         description: 'Checklist saved to database',
         variant: 'success',
       })
     },
-    onError: (error: Error) => {
-      if (error instanceof OfflineError || error instanceof NetworkError) {
-        localStorageLockedRef.current = true
-        localStorage.setItem('checklistData', JSON.stringify(defaultValues))
-        form.reset(defaultValues)
-        sigRef.current?.clear()
-        toast({
-          title: 'Offline Mode',
-          description: 'No internet. Form saved and will be sent automatically when online.',
-          variant: 'default',
-          duration: 6000,
-        })
+    onError: async (error: Error) => {
+      if (error instanceof Error && isNetworkError(error)) {
+        try {
+          await addSubmissionToQueue(form.getValues())
+          resetForm()
+          toast({
+            title: 'Offline Mode',
+            description: 'No internet. Form saved and will be sent automatically when online.',
+            variant: 'default',
+            duration: 6000,
+          })
+        } catch (queueError) {
+          console.error('[Checklist] Failed to add to queue:', queueError)
+          toast({
+            title: 'Error',
+            description: 'Failed to save. Please try again.',
+            variant: 'destructive',
+          })
+        }
       } else {
         toast({
           title: 'Error',
@@ -235,9 +160,35 @@ export default function AdminChecklists() {
     }
   }, [watchValues])
 
-  const handleSubmit = (data: ChecklistFormData) => {
-    mutate(data)
-  }
+  const handleSubmit = useCallback(
+    async (data: ChecklistFormData) => {
+      const isCurrentlyOffline = !navigator.onLine
+
+      if (isCurrentlyOffline) {
+        try {
+          await addSubmissionToQueue(data)
+          resetForm()
+          toast({
+            title: 'Offline Mode',
+            description: 'No internet. Form saved and will be sent automatically when online.',
+            variant: 'default',
+            duration: 6000,
+          })
+        } catch (error) {
+          console.error('[Checklist] Failed to add to queue:', error)
+          toast({
+            title: 'Error',
+            description: 'Failed to save offline. Please try again.',
+            variant: 'destructive',
+          })
+        }
+        return
+      }
+
+      mutate(data)
+    },
+    [isOnline, addSubmissionToQueue, resetForm, toast, mutate]
+  )
 
   return (
     <div className='flex justify-center py-10'>
