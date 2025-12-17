@@ -133,6 +133,7 @@ export class TestDataFactory {
       email: 'test@example.com',
       name: 'Test User',
       is_employee: true,
+      phone_number: '1234567890', // Provide default value as string
       is_admin: false,
       is_superuser: false,
       company_id: 1,
