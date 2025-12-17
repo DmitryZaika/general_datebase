@@ -146,9 +146,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const response = await openai.chat.completions.create({
     model: 'gpt-5-mini',
     messages: messages,
-
-    max_tokens: 1024,
-    temperature: 1.1,
     max_completion_tokens: 1024,
     stream: true,
   })
