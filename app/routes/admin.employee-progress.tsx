@@ -1,5 +1,6 @@
 // app/routes/admin.employee-progress.tsx
-import * as React from 'react'
+import type { RowDataPacket } from 'mysql2'
+import React from 'react'
 import { Link, type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { db } from '~/db.server'
@@ -17,6 +18,24 @@ interface User {
 }
 
 interface AnswerAttempt {
+  employee_id: number
+  attempt_number: number
+  question_id: number
+  selected_answer_id: number | null
+  is_correct: boolean | number | null
+  question_text: string
+  selected_answer_text: string | null
+  correct_answer_text: string
+}
+
+interface DbUserRow extends RowDataPacket {
+  id: number
+  email: string
+  name: string | null
+  company_id: number
+}
+
+interface DbAnswerAttemptRow extends RowDataPacket {
   employee_id: number
   attempt_number: number
   question_id: number
@@ -47,15 +66,15 @@ interface LoaderData {
 // ═════════════════════════════════════════════════════════════════════════════
 
 async function fetchUsers(companyId: number): Promise<User[]> {
-  const [usersResult] = await db.execute<User>(
-    `SELECT id, email, name FROM users WHERE company_id = ? ORDER BY name, email`,
+  const [rows] = await db.query<DbUserRow[]>(
+    `SELECT id, email, name, company_id FROM users WHERE company_id = ? ORDER BY name, email`,
     [companyId],
   )
-  return usersResult as User[]
+  return rows
 }
 
 async function fetchAnswerAttempts(companyId: number): Promise<AnswerAttempt[]> {
-  const [attemptsResult] = await db.execute<AnswerAttempt>(
+  const [rows] = await db.query<DbAnswerAttemptRow[]>(
     `SELECT
        aa.employee_id,
        aa.attempt_number,
@@ -74,7 +93,7 @@ async function fetchAnswerAttempts(companyId: number): Promise<AnswerAttempt[]> 
      ORDER BY aa.employee_id, aa.attempt_number DESC, aa.created_date`,
     [companyId],
   )
-  return attemptsResult as AnswerAttempt[]
+  return rows
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -102,24 +121,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 function groupAttemptsByNumber(attempts: AnswerAttempt[]) {
-  return attempts.reduce(
-    (acc, attempt) => {
-      const key = attempt.attempt_number
-      if (!acc[key]) {
-        acc[key] = { correct: 0, total: 0, questions: [] }
-      }
-      acc[key].total += 1
-      if (attempt.is_correct === 1 || attempt.is_correct === true) {
-        acc[key].correct += 1
-      }
-      acc[key].questions.push(attempt)
-      return acc
-    },
-    {} as Record<
-      number,
-      { correct: number; total: number; questions: AnswerAttempt[] }
-    >,
-  )
+  const grouped: Record<number, { correct: number; total: number; questions: AnswerAttempt[] }> = {}
+  for (const attempt of attempts) {
+    const key = attempt.attempt_number
+    const existing = grouped[key]
+    const bucket = existing ?? { correct: 0, total: 0, questions: [] }
+    bucket.total += 1
+    if (attempt.is_correct === 1 || attempt.is_correct === true) {
+      bucket.correct += 1
+    }
+    bucket.questions.push(attempt)
+    grouped[key] = bucket
+  }
+  return grouped
 }
 
 function calculateScore(correct: number, total: number) {
