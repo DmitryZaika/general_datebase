@@ -18,6 +18,13 @@ export const customerSchema = z.object({
 
 type Customer = z.infer<typeof customerSchema>
 
+const fromEmail = (companyDomain: string | null, userEmail: string) => {
+  const DEFAULT_EMAIL = 'sales@granite-manager.com'
+  if (!companyDomain) return DEFAULT_EMAIL
+  if (userEmail.includes(companyDomain)) return userEmail
+  return DEFAULT_EMAIL
+}
+
 const emailToSend = async (user: SessionUser, cleaned: Customer) => {
   const userCompany = await selectId<{ domain: string | null }>(
     db,
@@ -25,7 +32,7 @@ const emailToSend = async (user: SessionUser, cleaned: Customer) => {
     user.company_id,
   )
   const HTMLBody = `<div style="white-space: pre-wrap;">${cleaned.body}</div>`
-  const from = userCompany?.domain ? user.email : 'sales@granite-manager.com'
+  const from = fromEmail(userCompany?.domain || null, user.email)
   const to = cleaned.to
   return {
     to,
