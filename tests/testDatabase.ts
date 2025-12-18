@@ -134,7 +134,6 @@ export class TestDataFactory {
       name: 'Test User',
       phone_number: '+1234567890',
       is_employee: true,
-      phone_number: '1234567890', // Provide default value as string
       is_admin: false,
       is_superuser: false,
       company_id: 1,
