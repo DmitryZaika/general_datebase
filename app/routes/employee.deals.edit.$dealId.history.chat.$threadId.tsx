@@ -19,7 +19,19 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
+import { selectMany } from '~/utils/queryHelpers'
+import { presignIfS3Uri } from '~/utils/s3Presign.server'
 import { getEmployeeUser } from '~/utils/session.server'
+
+interface Attachment {
+  id: number
+  email_id: number
+  content_type: string
+  content_subtype: string
+  filename: string
+  url: string
+  signed_url?: string
+}
 
 interface Message {
   id: number
@@ -29,6 +41,7 @@ interface Message {
   isFromCustomer: boolean
   read_at?: string
   employee_read_at?: string
+  attachments?: Attachment[]
 }
 
 interface AIEmailResponse {
@@ -77,12 +90,31 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     )
   }
 
+
   let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
       WHERE e.deleted_at IS NULL AND e.thread_id = ? AND (e.deal_id = ? OR e.deal_id IS NULL)`
   const emailParams: (number | string)[] = [threadId, dealId]
   
+  const attachmentsRaw = await selectMany<Attachment>(
+    db,
+    `SELECT id, email_id, content_type, content_subtype, filename, url
+     FROM email_attachments
+     WHERE email_id IN (
+       SELECT id
+       FROM emails
+       WHERE deleted_at IS NULL AND thread_id = ?
+     )`,
+    [threadId],
+  )
+  const attachments = await Promise.all(
+    attachmentsRaw.map(async attachment => {
+      const signed = await presignIfS3Uri(attachment.url)
+      if (signed === attachment.url) return attachment
+      return { ...attachment, signed_url: signed }
+    }),
+  )
 
   emailQuery += ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at ORDER BY e.sent_at ASC'
 
@@ -98,6 +130,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       isFromCustomer,
       read_at: row.read_at,
       employee_read_at: row.employee_read_at,
+      attachments: attachments.filter(attachment => attachment.email_id === row.id),
     }
   })
 
@@ -201,13 +234,6 @@ function MessageDate({message}: {message: Message}) {
   return <p className='text-xs text-gray-500 text-left'>{time}</p>
 }
 
-function EmployeeReadDate({message}: {message: Message}) {
-  if (!message.employee_read_at) return null
-  const date = new Date(message.employee_read_at)
-  const time = date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit' })
-  return <p className='text-xs text-gray-500 text-left'>{time}</p>
-}
-
 export default function EmailChatDialog() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -215,8 +241,9 @@ export default function EmailChatDialog() {
   const [selectActive, setSelectActive] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const { toast } = useToast()
-  const { customerName, customerEmail, messages, dealId, subject, threadId } =
-    useLoaderData<typeof loader>()
+  const { customerName, customerEmail, messages, dealId, subject, threadId } = useLoaderData<
+    typeof loader
+  >()
   const [chatMessages, setChatMessages] = useState<Message[]>(messages)
   const [messageText, setMessageText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -392,6 +419,44 @@ export default function EmailChatDialog() {
                       }
                     >
                       <p className='whitespace-pre-wrap'>{message.body}</p>
+                      {message.attachments && message.attachments.length > 0 ? (
+                        <div className='mt-3 space-y-2'>
+                          {message.attachments.map(attachment => {
+                            const mime = `${attachment.content_type}/${attachment.content_subtype}`
+                            const label = attachment.filename || mime
+                            const isImage = attachment.content_type.toLowerCase() === 'image'
+                            const href = attachment.signed_url || attachment.url
+                            const linkClass = message.isFromCustomer
+                              ? 'text-blue-700 underline'
+                              : 'text-white underline'
+
+                            return (
+                              <div key={attachment.id} className='space-y-2'>
+                                {href ? (
+                                  <a
+                                    href={href}
+                                    target='_blank'
+                                    rel='noreferrer'
+                                    className={linkClass}
+                                  >
+                                   
+                                  </a>
+                                ) : 
+                                null}
+                                {isImage && href ? (
+                                  <a href={href} target='_blank' rel='noreferrer'>
+                                    <img
+                                      src={href}
+                                      alt={label}
+                                      className='max-h-48 rounded-md border border-black/10'
+                                    />
+                                  </a>
+                                ) : null}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : null}
                     </div>
                   <div className="flex items-center gap-2">
                    {message.isFromCustomer && <MessageDate message={message} />}
