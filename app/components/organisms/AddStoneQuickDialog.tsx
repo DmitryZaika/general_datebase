@@ -64,7 +64,7 @@ export function AddStoneQuickDialog({
     [companyId],
   )
 
-  const form = useForm<QuickAddStoneFormData>({
+  const form = useForm({
     resolver: zodResolver(quickAddStoneFormSchema),
     defaultValues,
     mode: 'onChange',
@@ -103,50 +103,57 @@ export function AddStoneQuickDialog({
     setError(null)
   }, [reset, defaultValues])
 
-  const handleSubmit = useCallback(async (data: QuickAddStoneFormData) => {
-    setIsSubmitting(true)
-    setError(null)
+  const handleSubmit = useCallback(
+    async (data: QuickAddStoneFormData) => {
+      setIsSubmitting(true)
+      setError(null)
 
-    try {
-      const basePayload = {
-        name: data.name,
-        retail_price: data.retail_price,
-        length: data.length,
-        width: data.width,
-        type: data.type,
-        company_id: companyId,
+      try {
+        const basePayload = {
+          name: data.name,
+          retail_price: data.retail_price,
+          length: data.length,
+          width: data.width,
+          type: data.type,
+          company_id: companyId,
+        }
+
+        const payload = data.leftover
+          ? { ...basePayload, leftover: true as const }
+          : {
+              ...basePayload,
+              leftover: false as const,
+              bundles: data.bundles.map(b => b.value),
+            }
+
+        const response = await fetch('/api/stones/quick-add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+
+        if (!response.ok) {
+          const { error: errorMessage } = await response.json()
+          throw new Error(errorMessage || 'Failed to create stone')
+        }
+
+        const { stone, slabs } = await response.json()
+        const { id, name, type, retail_price } = stone
+
+        await queryClient.invalidateQueries({ queryKey: ['availableStones'] })
+
+        const slabIds = slabs?.map((s: { id: number }) => s.id)
+        onStoneCreated({ id, name, type, retail_price }, slabIds)
+
+        setShow(false)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to create stone')
+      } finally {
+        setIsSubmitting(false)
       }
-
-      const payload = data.leftover
-        ? { ...basePayload, leftover: true as const }
-        : { ...basePayload, leftover: false as const, bundles: data.bundles.map(b => b.value) }
-
-      const response = await fetch('/api/stones/quick-add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (!response.ok) {
-        const { error: errorMessage } = await response.json()
-        throw new Error(errorMessage || 'Failed to create stone')
-      }
-
-      const { stone, slabs } = await response.json()
-      const { id, name, type, retail_price } = stone
-
-      await queryClient.invalidateQueries({ queryKey: ['availableStones'] })
-
-      const slabIds = slabs?.map((s: { id: number }) => s.id)
-      onStoneCreated({ id, name, type, retail_price }, slabIds)
-
-      setShow(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create stone')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }, [companyId, queryClient, onStoneCreated, setShow])
+    },
+    [companyId, queryClient, onStoneCreated, setShow],
+  )
 
   const handleCancel = useCallback(() => {
     resetForm()
@@ -329,8 +336,8 @@ export function AddStoneQuickDialog({
                 <div className='text-sm'>
                   <p className='font-medium mb-1'>Leftover Stone</p>
                   <p>
-                    A slab with a unique bundle number (format: LO-YYYYMMDD-XXXX) will be
-                    automatically created using the provided dimensions.
+                    A slab with a unique bundle number (format: LO-YYYYMMDD-XXXX) will
+                    be automatically created using the provided dimensions.
                   </p>
                 </div>
               </div>

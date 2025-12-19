@@ -149,7 +149,7 @@ export default function UsersAdd() {
     value: position.displayName,
     description: position.description,
   }))
-  const form = useForm<FormData>({
+  const form = useForm({
     resolver,
     defaultValues: {
       name: '',

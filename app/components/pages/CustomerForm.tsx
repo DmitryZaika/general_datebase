@@ -89,7 +89,7 @@ export function CustomerForm({
     : createCustomerMutation(toastFn, handleSuccess)
   const { mutate, isPending } = useMutation(mutateObject)
 
-  const form = useForm<CustomerDialogSchema>({
+  const form = useForm({
     resolver,
     defaultValues: oldData ?? {
       name: initialName || '',

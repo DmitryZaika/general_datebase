@@ -93,10 +93,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return forceRedirectError(request.headers, 'No user id provided')
   }
   const userId = parseInt(params.user)
-  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
-    request,
-    resolver,
-  )
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }
@@ -226,7 +223,7 @@ export default function User() {
     }>()
 
   const token = useAuthenticityToken()
-  const form = useForm<FormData>({
+  const form = useForm({
     resolver,
     defaultValues: {
       name: user.name || '',

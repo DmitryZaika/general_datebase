@@ -76,10 +76,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { error: 'Invalid CSRF token' }
   }
 
-  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
-    request,
-    resolver,
-  )
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }
@@ -304,7 +301,7 @@ export default function AddToSale() {
   const params = useParams()
   const location = useLocation()
 
-  const form = useForm<FormData>({
+  const form = useForm({
     resolver,
     defaultValues: {
       notes_to_slab: '',
