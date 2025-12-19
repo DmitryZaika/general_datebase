@@ -10,7 +10,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
-  useSearchParams
+  useSearchParams,
 } from 'react-router'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { PageLayout } from '~/components/PageLayout'
@@ -464,7 +464,9 @@ export default function EmployeeTransactions() {
     {
       accessorKey: 'customer_name',
       header: ({ column }) => <SortableHeader column={column} title='Customer' />,
-      cell: ({ row }) => <span className='text-blue-600'>{row.original.customer_name}</span>,
+      cell: ({ row }) => (
+        <span className='text-blue-600'>{row.original.customer_name}</span>
+      ),
     },
     {
       accessorKey: 'seller_name',
@@ -474,35 +476,35 @@ export default function EmployeeTransactions() {
       accessorKey: 'stone_name',
       header: ({ column }) => <SortableHeader column={column} title='Stone' />,
       cell: ({ row }) => {
-        const stonesArr = (row.original.stone_name || '')
-          .split(',')
-          .filter(Boolean)
+        const stonesArr = (row.original.stone_name || '').split(',').filter(Boolean)
         if (!stonesArr.length) return <span>N/A</span>
 
         const stoneCounts: { [key: string]: number } = {}
-        const stoneStatus: { [key: string]: boolean } = {}
 
         stonesArr.forEach(item => {
-          const [stone, status] = item.split(':')
+          const [stone, _] = item.split(':')
           stoneCounts[stone] = (stoneCounts[stone] || 0) + 1
           // If any occurrence is active, consider active (or handle mixed status differently if needed)
-          // Here we assume if ALL occurrences of a stone name are deleted, it's deleted. 
-          // But the query uses DISTINCT CONCAT(name, status). 
+          // Here we assume if ALL occurrences of a stone name are deleted, it's deleted.
+          // But the query uses DISTINCT CONCAT(name, status).
           // So if we have "StoneA:ACTIVE" and "StoneA:DELETED", they are distinct items.
-          
+
           // Let's just map the full items.
         })
 
         // Since we get "StoneA:ACTIVE" and "StoneA:DELETED" as distinct items
         // We should probably just display them.
-        
+
         return (
           <div className='flex flex-col'>
             {stonesArr.map((item, idx) => {
               const [stone, status] = item.split(':')
               const isDeleted = status === 'DELETED'
               return (
-                <span key={idx} className={isDeleted ? 'text-red-500 line-through' : ''}>
+                <span
+                  key={idx}
+                  className={isDeleted ? 'text-red-500 line-through' : ''}
+                >
                   {stone}
                 </span>
               )
@@ -643,7 +645,7 @@ export default function EmployeeTransactions() {
         <div className='flex justify-between items-center'>
           <div className='flex items-center gap-4'>
             <div className='flex gap-4 items-center'>
-              <div className='w-1/8 min-w-[120px]'>
+              <div className='w-1/8 min-w-30'>
                 <div className='mb-1 text-sm font-medium'>Sales Rep</div>
                 <Select value={filters.salesRep} onValueChange={handleSalesRepChange}>
                   <SelectTrigger>
@@ -659,7 +661,7 @@ export default function EmployeeTransactions() {
                 </Select>
               </div>
 
-              <div className='w-1/8 min-w-[120px]'>
+              <div className='w-1/8 min-w-30'>
                 <div className='mb-1 text-sm font-medium'>Status</div>
                 <Select value={filters.status} onValueChange={handleStatusChange}>
                   <SelectTrigger>
@@ -734,7 +736,7 @@ export default function EmployeeTransactions() {
 
             <div className='py-4 space-y-4'>
               <div className='flex items-center gap-4'>
-                <Label htmlFor='installation-date' className='text-right w-[140px]'>
+                <Label htmlFor='installation-date' className='text-right w-35'>
                   Installation Date
                 </Label>
                 <div className='relative '>
@@ -751,7 +753,7 @@ export default function EmployeeTransactions() {
               </div>
 
               <div className='flex items-center gap-4'>
-                <Label htmlFor='paid-switch' className='text-right w-[140px]'>
+                <Label htmlFor='paid-switch' className='text-right w-35'>
                   Paid
                 </Label>
                 <div className='flex items-center gap-2'>
