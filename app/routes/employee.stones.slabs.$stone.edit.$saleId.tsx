@@ -9,7 +9,7 @@ import {
 import { getValidatedFormData } from 'remix-hook-form'
 import { ContractForm } from '~/components/pages/ContractForm'
 import { Contract } from '~/orm/contract'
-import { customerSchema, type TCustomerSchema } from '~/schemas/sales'
+import { customerSchema } from '~/schemas/sales'
 import { commitSession, getSession } from '~/sessions.server'
 import { getCustomerSchemaFromSaleId } from '~/utils/contractsBackend.server'
 import { csrf } from '~/utils/csrf.server'
@@ -38,10 +38,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   // 2. Parse & validate form data
-  const { errors, data, receivedValues } = await getValidatedFormData<TCustomerSchema>(
-    request,
-    resolver,
-  )
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
 
   if (errors) {
     return { errors, receivedValues }

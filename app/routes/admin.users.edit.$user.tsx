@@ -52,12 +52,13 @@ const userschema = z.object({
       if (!val) return []
       return val
         .split(',')
-        .map(id => parseInt(id.trim()))
+        .map(id => parseInt(id.trim(), 10))
         .filter(id => !Number.isNaN(id))
     }),
     z.array(z.coerce.number()),
     z.coerce.number().transform(val => [val]),
   ]),
+
   marketing_company_ids: z
     .union([
       z.string().transform(val => {
@@ -75,7 +76,6 @@ const userschema = z.object({
   is_admin: z.boolean(),
 })
 
-type FormData = z.infer<typeof userschema>
 const resolver = zodResolver(userschema)
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -214,13 +214,7 @@ export default function User() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, userPositions, companies, positions, marketingCompanyIds } =
-    useLoaderData<{
-      user: User
-      userPositions: number[]
-      companies: Array<{ key: number; value: string }>
-      positions: Array<{ key: number; value: string }>
-      marketingCompanyIds: number[]
-    }>()
+    useLoaderData<typeof loader>()
 
   const token = useAuthenticityToken()
   const form = useForm({
@@ -244,9 +238,11 @@ export default function User() {
     }
   }
 
+  const formPositions = form.watch('positions')
+
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[425px]'>
+      <DialogContent className='sm:max-w-106.25'>
         <DialogHeader>
           <DialogTitle>User</DialogTitle>
         </DialogHeader>
@@ -291,11 +287,14 @@ export default function User() {
                     <div className='flex items-center space-x-2'>
                       <Switch
                         id={`position-${position.key}`}
-                        checked={field.value.includes(position.key)}
+                        checked={
+                          Array.isArray(field.value) &&
+                          field.value.includes(position.key)
+                        }
                         onCheckedChange={checked => {
-                          if (checked) {
+                          if (checked && Array.isArray(field.value)) {
                             field.onChange([...field.value, position.key])
-                          } else {
+                          } else if (Array.isArray(field.value)) {
                             field.onChange(
                               field.value.filter((id: number) => id !== position.key),
                             )
@@ -348,7 +347,7 @@ export default function User() {
                   </div>
                 )}
               />
-              {form.watch('positions').includes(7) && (
+              {Array.isArray(formPositions) && formPositions.includes(7) && (
                 <div className='col-span-2 border-t pt-2 mt-2'>
                   <div className='text-sm font-medium mb-2'>
                     External Marketing Companies
@@ -362,11 +361,14 @@ export default function User() {
                         <div className='flex items-center space-x-2'>
                           <Switch
                             id={`marketing-company-${company.key}`}
-                            checked={field.value.includes(company.key)}
+                            checked={
+                              Array.isArray(field.value) &&
+                              field.value.includes(company.key)
+                            }
                             onCheckedChange={checked => {
-                              if (checked) {
+                              if (checked && Array.isArray(field.value)) {
                                 field.onChange([...field.value, company.key])
-                              } else {
+                              } else if (Array.isArray(field.value)) {
                                 field.onChange(
                                   field.value.filter(
                                     (id: number) => id !== company.key,

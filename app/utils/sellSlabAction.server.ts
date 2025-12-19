@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { redirect, data as routerData } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { Contract } from '~/orm/contract'
-import { customerSchema, type TCustomerSchema } from '~/schemas/sales'
+import { customerSchema } from '~/schemas/sales'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
@@ -24,10 +24,7 @@ export async function handleSellSlabAction(request: Request) {
     return { error: 'Invalid CSRF token' }
   }
 
-  const { errors, data, receivedValues } = await getValidatedFormData<TCustomerSchema>(
-    request,
-    resolver,
-  )
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }
