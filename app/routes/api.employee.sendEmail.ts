@@ -69,7 +69,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   await db.execute(
     `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id, deal_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       user.id,
       cleaned.subject,

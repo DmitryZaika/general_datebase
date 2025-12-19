@@ -22,6 +22,30 @@ const instructionsCache = new Map<
   { data: InstructionSlim[]; updatedAt: number }
 >()
 
+function compactText(input: string, maxLen: number) {
+  const cleaned = input
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (cleaned.length <= maxLen) return cleaned
+  return cleaned.slice(0, maxLen)
+}
+
+function compactMessages(messages: Message[], maxMessages: number) {
+  const systemMessages = messages.filter(m => m.role === 'system')
+  const nonSystem = messages.filter(m => m.role !== 'system')
+  const tail = nonSystem.slice(Math.max(0, nonSystem.length - maxMessages))
+  const clippedTail = tail.map(m => ({
+    role: m.role,
+    content: compactText(m.content, 4000),
+  }))
+  const clippedSystem = systemMessages.slice(0, 1).map(m => ({
+    role: m.role,
+    content: compactText(m.content, 8000),
+  }))
+  return [...clippedSystem, ...clippedTail]
+}
+
 async function getInstructions(company_id: number): Promise<InstructionSlim[]> {
   const cached = instructionsCache.get(company_id)
   const now = Date.now()
@@ -33,8 +57,13 @@ async function getInstructions(company_id: number): Promise<InstructionSlim[]> {
     'SELECT id, title, rich_text from instructions WHERE company_id = ?',
     [company_id],
   )
-  instructionsCache.set(company_id, { data: instructions, updatedAt: now })
-  return instructions
+  const compacted = instructions.map(i => ({
+    id: i.id,
+    title: i.title,
+    rich_text: compactText(i.rich_text || '', 1200),
+  }))
+  instructionsCache.set(company_id, { data: compacted, updatedAt: now })
+  return compacted
 }
 
 async function getContext(
@@ -54,7 +83,8 @@ async function getContext(
 
   const currentConvo = history[0].history
   currentConvo.push({ role: 'user', content: query })
-  return { messages: currentConvo, id: history[0].id }
+  const compacted = compactMessages(currentConvo, 20)
+  return { messages: compacted, id: history[0].id }
 }
 
 async function newContext(
@@ -145,21 +175,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const response = await openai.chat.completions.create({
     model: 'gpt-5-mini',
-    messages: messages,
-
-    max_tokens: 1024,
-    temperature: 1.1,
-    max_completion_tokens: 1024,
+    messages: compactMessages(messages, 20),
     stream: true,
   })
 
   return eventStream(
     request.signal,
     function setup(send) {
-      for (let i = 0; i < 30; i++) {
-        send({ event: 'ping', data: '' })
-      }
       send({ event: 'info', data: 'Connecting to AI...' })
+      const heartbeat = setInterval(() => {
+        send({ event: 'ping', data: '' })
+      }, 15_000)
 
       ;(async () => {
         let answer = ''
@@ -187,11 +213,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
           send({
             data: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
           })
+        } finally {
+          clearInterval(heartbeat)
         }
       })()
 
       return function clear() {
-        // do nothing
+        clearInterval(heartbeat)
       }
     },
     {

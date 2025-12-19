@@ -29,7 +29,7 @@ interface InstructionMedium extends InstructionSlim {
   after_id: number
 }
 
-interface Question {
+export interface Question {
   id: number
   text: string
   instruction_id: number
@@ -446,10 +446,10 @@ function useManualQuestion(
 ) {
   const [editedQuestionText, setEditedQuestionText] = React.useState('')
   const [editedChoices, setEditedChoices] = React.useState<
-    { id: number | null; text: string; is_correct: boolean; is_deleted?: boolean }[]
+    { id: number | null; text: string; is_correct: boolean; is_deleted: boolean }[]
   >([
-    { id: -1, text: '', is_correct: false },
-    { id: -2, text: '', is_correct: false },
+    { id: -1, text: '', is_correct: false, is_deleted: false },
+    { id: -2, text: '', is_correct: false, is_deleted: false },
   ])
   const [correctAnswerId, setCorrectAnswerId] = React.useState<number | null>(null)
 
@@ -467,7 +467,7 @@ function useManualQuestion(
 
   const handleAddChoice = () => {
     const newId = Math.min(...editedChoices.map(c => c.id || 0), 0) - 1
-    setEditedChoices(prev => [...prev, { id: newId, text: '', is_correct: false }])
+    setEditedChoices(prev => [...prev, { id: newId, text: '', is_correct: false, is_deleted: false }])
   }
 
   const handleDeleteChoice = (id: number | null) => {
@@ -531,6 +531,7 @@ function useEditableQuestion(
     choices.map(choice => ({
       id: choice.id,
       text: choice.text,
+      is_deleted: false,
       is_correct: choice.is_correct,
     })),
   )
@@ -545,6 +546,7 @@ function useEditableQuestion(
         choices.map(choice => ({
           id: choice.id,
           text: choice.text,
+          is_deleted: false,
           is_correct: choice.is_correct,
         })),
       )
@@ -576,7 +578,7 @@ function useEditableQuestion(
 
   const handleAddChoice = () => {
     const newId = Math.min(...editedChoices.map(c => c.id || 0), 0) - 1
-    setEditedChoices(prev => [...prev, { id: newId, text: '', is_correct: false }])
+    setEditedChoices(prev => [...prev, { id: newId, text: '', is_deleted: false, is_correct: false }])
   }
 
   const handleDeleteChoice = (id: number | null) => {
@@ -912,7 +914,10 @@ export function useInstructionContent(node: InstructionMedium) {
       .replace(/\s+/g, ' ')
       .trim()
 
-    return { title: node.title, content: cleanText || node.title }
+    return {
+      title: node.title || 'Untitled Instruction',
+      content: cleanText || node.title || 'No content available'
+    }
   }, [node])
 
   return { getInstructionContent }
@@ -1482,7 +1487,7 @@ export default function TeachMode() {
 
       <div style={{ marginTop: 40 }}>
         <h2>All Questions ({questions.length})</h2>
-        {questions.map(question => (
+        {questions.map((question: Question) => (
           <AdminQuestionComponent
             key={question.id}
             question={question}
