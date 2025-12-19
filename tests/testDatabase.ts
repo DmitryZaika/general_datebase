@@ -2,7 +2,6 @@ import dotenv from 'dotenv'
 import mysql from 'mysql2/promise'
 import type { TCustomerSchema, TRoomSchema } from '~/schemas/sales'
 import type { User } from '~/utils/session.server'
-import { testMigrations } from '../scripts/migrate'
 
 dotenv.config()
 
@@ -47,22 +46,13 @@ export class DatabaseTestHelper {
     }
   }
 
-  static async runMigrations(): Promise<void> {
-    await testMigrations(
-      TEST_DB_CONFIG.database,
-      TEST_DB_CONFIG.user,
-      TEST_DB_CONFIG.password,
-      TEST_DB_CONFIG.host,
-    )
-  }
-
   static async clearAllTables(): Promise<void> {
     const connection = await DatabaseTestHelper.connect()
 
     // Get all table names
     const [tables] = await connection.execute(`
-        SELECT table_name 
-        FROM information_schema.tables 
+        SELECT table_name
+        FROM information_schema.tables
         WHERE table_schema = '${TEST_DB_CONFIG.database}'
         AND table_type = 'BASE TABLE'
       `)

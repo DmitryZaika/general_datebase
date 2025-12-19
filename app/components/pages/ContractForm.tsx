@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { type Resolver, type UseFormReturn, useForm } from 'react-hook-form'
 import {
   Form,
   Link,
@@ -39,8 +39,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select'
-
-const resolver = zodResolver(customerSchema)
 
 interface IContractFormProps {
   startings: Partial<TCustomerSchema>
@@ -95,9 +93,11 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
   })
   const [sameAddress, setSameAddress] = useState(true)
 
-  const form = useForm<TCustomerSchema>({
+  const resolver = zodResolver(customerSchema) as Resolver<TCustomerSchema>
+
+  const form: UseFormReturn<TCustomerSchema> = useForm({
     resolver,
-    defaultValues: startings,
+    defaultValues: startings as TCustomerSchema,
   })
 
   const fullSubmit = useFullSubmit(form, undefined, 'POST', value => {
@@ -108,7 +108,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
   })
 
   const handleAddRoom = () => {
-    const currentRooms = form.getValues('rooms')
+    const currentRooms = form.getValues('rooms') || []
     const newRoom = roomSchema.parse({
       tear_out: 'no',
       stove: 'f/s',
@@ -137,7 +137,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
 
   const totalRoomPrice = useMemo(() => {
     let total = 0
-    roomValues.forEach(room => {
+    roomValues?.forEach(room => {
       const price = roomPrice(room, sink_type, faucet_type)
       total += Math.round(price * 100) / 100
     })
@@ -156,7 +156,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[500px] max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='sm:max-w-125 max-h-[90vh] overflow-y-auto'>
         <DialogHeader>
           <DialogTitle>Sell Slab - Add Customer</DialogTitle>
         </DialogHeader>
@@ -217,7 +217,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
                 />
               )}
 
-              {form.watch('rooms').map((room, index) => (
+              {form.watch('rooms')?.map((room, index) => (
                 <RoomSubForm
                   companyId={companyId}
                   key={room.room_id}

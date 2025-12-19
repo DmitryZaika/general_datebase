@@ -1,4 +1,3 @@
-import { ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons'
 import type * as React from 'react'
 import { DayPicker } from 'react-day-picker'
 import { buttonVariants } from '~/components/ui/button'
@@ -56,14 +55,6 @@ function Calendar({
           'aria-selected:bg-zinc-100 aria-selected:text-zinc-900 dark:aria-selected:bg-zinc-800 dark:aria-selected:text-zinc-50',
         day_hidden: 'invisible',
         ...classNames,
-      }}
-      components={{
-        IconLeft: ({ className }) => (
-          <ChevronLeftIcon className={cn('size-4', className)} />
-        ),
-        IconRight: ({ className }) => (
-          <ChevronRightIcon className={cn('size-4', className)} />
-        ),
       }}
       {...props}
     />
