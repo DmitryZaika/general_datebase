@@ -1,7 +1,13 @@
 import { format, parseISO } from 'date-fns'
 import { Calendar as CalendarIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { data, type LoaderFunctionArgs, useLoaderData, useNavigate, useSearchParams } from 'react-router'
+import {
+  data,
+  type LoaderFunctionArgs,
+  useLoaderData,
+  useNavigate,
+  useSearchParams,
+} from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
 import { Badge } from '~/components/ui/badge'
 import { Calendar } from '~/components/ui/calendar'
@@ -35,7 +41,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url)
   const today = new Date()
   const defaultEnd = format(today, 'yyyy-MM-dd')
-  const defaultStart = format(new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
+  const defaultStart = format(
+    new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000),
+    'yyyy-MM-dd',
+  )
   const start = url.searchParams.get('start') || defaultStart
   const end = url.searchParams.get('end') || defaultEnd
 
@@ -77,7 +86,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const dayMap = new Map<string, DayMaterial[]>()
   const materialMap = new Map<string, number>()
   rows.forEach(row => {
-    const dayKey = format(typeof row.day === 'string' ? parseISO(row.day) : row.day, 'yyyy-MM-dd')
+    const dayKey = format(
+      typeof row.day === 'string' ? parseISO(row.day) : row.day,
+      'yyyy-MM-dd',
+    )
     const list = dayMap.get(dayKey) || []
     list.push({ stone_type: row.stone_type, sqft: row.sqft || 0 })
     dayMap.set(dayKey, list)
@@ -110,13 +122,7 @@ export default function ShopStatistic() {
     start: string
     end: string
   }>
-  const {
-    days = [],
-    materials = [],
-    totalSqft = 0,
-    start = '',
-    end = '',
-  } = loaded
+  const { days = [], materials = [], totalSqft = 0, start = '', end = '' } = loaded
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [openStart, setOpenStart] = useState(false)
@@ -166,11 +172,6 @@ export default function ShopStatistic() {
   }
 
   const sortedDays = useMemo(() => days || [], [days])
-  const rangeLabel = useMemo(() => {
-    const startFmt = startValue ? format(parseISO(startValue), 'MMM d, yyyy') : ''
-    const endFmt = endValue ? format(parseISO(endValue), 'MMM d, yyyy') : ''
-    return startFmt && endFmt ? `${startFmt} — ${endFmt}` : ''
-  }, [startValue, endValue])
 
   return (
     <PageLayout title='Shop Statistic'>
@@ -183,27 +184,28 @@ export default function ShopStatistic() {
         <div className='flex flex-col gap-1'>
           <div className='rounded-md border bg-white px-3 py-2 text-2xl font-semibold'>
             <div className='text-sm font-semibold mb-1'>Materials cut (sqft)</div>
-          {materials.length === 0 ? (
-            <div className='text-sm text-muted-foreground'>No data</div>
-          ) : (
-            materials.map((mat: MaterialTotal) => (
-              <div key={mat.stone_type} className='flex items-center justify-between text-sm'>
-                <span className='font-medium'>{mat.stone_type}</span>
-                <span>{Math.round((mat.sqft || 0) * 100) / 100} sqft</span>
+            {materials.length === 0 ? (
+              <div className='text-sm text-muted-foreground'>No data</div>
+            ) : (
+              materials.map((mat: MaterialTotal) => (
+                <div
+                  key={mat.stone_type}
+                  className='flex items-center justify-between text-sm'
+                >
+                  <span className='font-medium'>{mat.stone_type}</span>
+                  <span>{Math.round((mat.sqft || 0) * 100) / 100} sqft</span>
+                </div>
+              ))
+            )}
+            {materials.length > 0 && (
+              <div className='pt-2 border-t text-sm font-semibold flex items-center justify-between'>
+                <span>Total</span>
+                <span>{Math.round(totalSqft * 100) / 100} sqft</span>
               </div>
-            ))
-          )}
-          {materials.length > 0 && (
-            <div className='pt-2 border-t text-sm font-semibold flex items-center justify-between'>
-              <span>Total</span>
-              <span>{Math.round(totalSqft * 100) / 100} sqft</span>
-            </div>
-          )}
-        </div>
+            )}
           </div>
         </div>
-
-    
+      </div>
 
       <div className='space-y-3'>
         <div className='text-sm font-semibold'>Cut days</div>
@@ -216,11 +218,18 @@ export default function ShopStatistic() {
             {sortedDays.map(stat => {
               const dateObj = parseISO(stat.day)
               return (
-                <div key={stat.day} className='rounded-lg border bg-white p-2 shadow-sm space-y-2 text-sm'>
+                <div
+                  key={stat.day}
+                  className='rounded-lg border bg-white p-2 shadow-sm space-y-2 text-sm'
+                >
                   <div className='flex items-start justify-between gap-2'>
                     <div className='space-y-0.5 leading-tight'>
-                      <div className='text-sm font-semibold'>{format(dateObj, 'MMM d, yyyy')}</div>
-                      <div className='text-[11px] text-muted-foreground'>{format(dateObj, 'EEEE')}</div>
+                      <div className='text-sm font-semibold'>
+                        {format(dateObj, 'MMM d, yyyy')}
+                      </div>
+                      <div className='text-[11px] text-muted-foreground'>
+                        {format(dateObj, 'EEEE')}
+                      </div>
                     </div>
                     <div className='text-base font-semibold'>
                       {Math.round((stat.total || 0) * 100) / 100} sqft
@@ -228,8 +237,14 @@ export default function ShopStatistic() {
                   </div>
                   <div className='space-y-1 text-xs'>
                     {stat.materials.map(mat => (
-                      <div key={mat.stone_type} className='flex items-center justify-between gap-1.5'>
-                        <Badge variant='secondary' className='truncate max-w-[70%] text-[11px] h-6 px-2'>
+                      <div
+                        key={mat.stone_type}
+                        className='flex items-center justify-between gap-1.5'
+                      >
+                        <Badge
+                          variant='secondary'
+                          className='truncate max-w-[70%] text-[11px] h-6 px-2'
+                        >
                           {mat.stone_type}
                         </Badge>
                         <span className='whitespace-nowrap text-[11px]'>
@@ -244,8 +259,6 @@ export default function ShopStatistic() {
           </div>
         )}
       </div>
-
     </PageLayout>
   )
 }
-
