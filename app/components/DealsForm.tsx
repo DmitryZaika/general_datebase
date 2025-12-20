@@ -12,6 +12,7 @@ import { DialogFooter } from './ui/dialog'
 import { FormField } from './ui/form'
 
 function MainComponent({
+  setCreatedDealId,
   form,
   companyId,
   dealId,
@@ -19,6 +20,7 @@ function MainComponent({
   form: UseFormReturn<DealsDialogSchema>
   companyId: number
   dealId?: number
+  setCreatedDealId: (id: number) => void
 }) {
   return (
     <>
@@ -33,6 +35,7 @@ function MainComponent({
         setError={error =>
           form.setError('customer_id', { message: error ?? undefined })
         }
+        setCreatedDealId={setCreatedDealId}
       />
       <FormField
         control={form.control}
@@ -80,6 +83,8 @@ export function DealsForm({
   })
   const fullSubmit = useFullSubmit(form)
 
+
+
   return (
     <FormProvider {...form}>
       <Form id='dealForm' method='post' onSubmit={fullSubmit}>
@@ -89,7 +94,7 @@ export function DealsForm({
           <input type='hidden' name={k} value={String(v)} key={k} />
         ))}
 
-        <MainComponent form={form} companyId={companyId} dealId={dealId} />
+        <MainComponent setCreatedDealId={(deal_id: number) => form.setValue('deal_id', deal_id)} form={form} companyId={companyId} dealId={dealId} />
 
         <DialogFooter>
           <div className='flex justify-between gap-2 w-full'>

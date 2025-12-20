@@ -17,74 +17,19 @@ interface Message {
   content: string
 }
 
-const instructionsCache = new Map<
-  number,
-  { data: InstructionSlim[]; updatedAt: number }
->()
-
-function compactText(input: string, maxLen: number) {
-  const cleaned = input
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  if (cleaned.length <= maxLen) return cleaned
-  return cleaned.slice(0, maxLen)
-}
-
-function compactMessages(messages: Message[], maxMessages: number) {
-  const systemMessages = messages.filter(m => m.role === 'system')
-  const nonSystem = messages.filter(m => m.role !== 'system')
-  const tail = nonSystem.slice(Math.max(0, nonSystem.length - maxMessages))
-  const clippedTail = tail.map(m => ({
-    role: m.role,
-    content: compactText(m.content, 4000),
-  }))
-  const clippedSystem = systemMessages.slice(0, 1).map(m => ({
-    role: m.role,
-    content: compactText(m.content, 8000),
-  }))
-  return [...clippedSystem, ...clippedTail]
-}
-
-async function getInstructions(company_id: number): Promise<InstructionSlim[]> {
-  const cached = instructionsCache.get(company_id)
-  const now = Date.now()
-  if (cached && now - cached.updatedAt < 60_000) {
-    return cached.data
-  }
-  const instructions = await selectMany<InstructionSlim>(
-    db,
-    'SELECT id, title, rich_text from instructions WHERE company_id = ?',
-    [company_id],
-  )
-  const compacted = instructions.map(i => ({
-    id: i.id,
-    title: i.title,
-    rich_text: compactText(i.rich_text || '', 1200),
-  }))
-  instructionsCache.set(company_id, { data: compacted, updatedAt: now })
-  return compacted
-}
-
 async function getContext(
   user_id: number,
   query: string,
 ): Promise<{ messages: Message[]; id: number }> {
   const history = await selectMany<{ history: Message[]; id: number }>(
     db,
-    'SELECT id, history from chat_history WHERE user_id = ? ORDER BY id DESC LIMIT 1',
+    'SELECT id, history from chat_history WHERE user_id = ?',
     [user_id],
   )
 
-  if (history.length === 0) {
-    const messages: Message[] = [{ role: 'user', content: query }]
-    return { messages, id: 0 }
-  }
-
   const currentConvo = history[0].history
   currentConvo.push({ role: 'user', content: query })
-  const compacted = compactMessages(currentConvo, 20)
-  return { messages: compacted, id: history[0].id }
+  return { messages: currentConvo, id: history[0].id }
 }
 
 async function newContext(
@@ -92,10 +37,14 @@ async function newContext(
   company_id: number,
   query: string,
 ): Promise<{ history: Message[]; id: number | undefined }> {
-  const instructions = await getInstructions(company_id)
+  const instructions = await selectMany<InstructionSlim>(
+    db,
+    'SELECT id, title, rich_text from instructions WHERE company_id = ?',
+    [company_id],
+  )
   const chatHistory = await selectMany<{ id: number }>(
     db,
-    'SELECT id from chat_history WHERE user_id = ? ORDER BY id DESC LIMIT 1',
+    'SELECT id from chat_history WHERE user_id = ?',
     [user_id],
   )
 
@@ -107,11 +56,7 @@ async function newContext(
     history: [
       {
         role: 'system',
-        content: `Here is your context: ${JSON.stringify(instructions)}.
-        Follow ALL instructions strictly without exceptions.
-        Your task is to provide the MOST complete and accurate answer to the user's request based ONLY on this context.
-        Do NOT add unnecessary information, assumptions, or commentary.
-        Return only what is explicitly required by the request and the given instructions.`,
+        content: `Here is your context: ${JSON.stringify(instructions)}`,
       },
       {
         role: 'user',
@@ -174,32 +119,35 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-5-mini',
-    messages: compactMessages(messages, 20),
+    model: 'gpt-4.1-mini-2025-04-14',
+    messages: messages,
+    temperature: 0,
+    max_tokens: 1024,
     stream: true,
   })
 
   return eventStream(
     request.signal,
     function setup(send) {
-      send({ event: 'info', data: 'Connecting to AI...' })
-      const heartbeat = setInterval(() => {
+      // Используем SSE комментарии для заполнения буфера
+      // Комментарии начинаются с ':' и не отображаются клиенту
+      for (let i = 0; i < 30; i++) {
         send({ event: 'ping', data: '' })
-      }, 15_000)
+      }
+
+      // Информационное сообщение отправляем как комментарий (не будет видно пользователю)
+      send({ event: 'info', data: 'Connecting to AI...' })
 
       ;(async () => {
         let answer = ''
 
         try {
           for await (const chunk of response) {
-            const delta = chunk.choices?.[0]?.delta
-            const message = delta?.content
-
-            if (!delta) continue
-            if (!message) continue
-
-            send({ data: message })
-            answer += message
+            const message = chunk.choices[0].delta.content
+            if (message) {
+              send({ data: message })
+              answer += message
+            }
           }
 
           send({ data: DONE_KEY })
@@ -213,13 +161,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
           send({
             data: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
           })
-        } finally {
-          clearInterval(heartbeat)
         }
       })()
 
       return function clear() {
-        clearInterval(heartbeat)
+        // do nothing
       }
     },
     {

@@ -43,6 +43,7 @@ interface CustomerSearchProps {
   source: (typeof sourceEnum)[number]
   error: string | undefined
   setError: (error: string | null) => void
+  setCreatedDealId?: (id: number) => void
 }
 
 const fetchCustomers = async (customerName: string, searchType: SelectOption) => {
@@ -101,6 +102,7 @@ const CustomerManager = ({
   source,
   currentText,
   onCustomerChange,
+  setCreatedDealId,
 }: {
   selectedCustomer: number | undefined
   setSearchTerm: (term: string | null) => void
@@ -109,6 +111,7 @@ const CustomerManager = ({
   source: (typeof sourceEnum)[number]
   currentText: string | null
   onCustomerChange: (customerId: number) => void
+  setCreatedDealId?: (id: number) => void
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false)
   const queryClient = useQueryClient()
@@ -163,6 +166,7 @@ const CustomerManager = ({
       </Button>
       {canShowForm && (
         <CustomerForm
+          setCreatedDealId={setCreatedDealId}
           handleChange={setIsOpen}
           onSuccess={handleSuccess}
           companyId={companyId}
@@ -183,6 +187,7 @@ export function CustomerSearch({
   source,
   error,
   setError,
+  setCreatedDealId,
 }: CustomerSearchProps) {
   const [searchTerm, setSearchTerm] = useState<string | null>(null)
   const [selectedOption, setSelectedOption] = useState<SelectOption>(selectOptions[0])
@@ -328,6 +333,7 @@ export function CustomerSearch({
           source={source}
           currentText={searchTerm ?? name}
           onCustomerChange={onCustomerChange}
+          setCreatedDealId={setCreatedDealId}
         />
       )}
     </div>
