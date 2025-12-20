@@ -3,8 +3,8 @@ import { X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import {
-  DynamicAddition,
-  DynamicAdditions,
+    DynamicAddition,
+    DynamicAdditions,
 } from '~/components/molecules/DynamicAdditions'
 import { InputItem } from '~/components/molecules/InputItem'
 import { SelectInputOther } from '~/components/molecules/SelectInputOther'
@@ -86,6 +86,7 @@ export const RoomSubForm = ({
   faucet_type,
   isEdit,
   companyId,
+  hideContractFields,
 }: {
   form: UseFormReturn<TCustomerSchema>
   index: number
@@ -93,6 +94,7 @@ export const RoomSubForm = ({
   faucet_type: Faucet[]
   isEdit?: boolean
   companyId: number
+  hideContractFields?: boolean
 }) => {
   const roomValues = form.watch(`rooms.${index}`)
 
@@ -331,14 +333,20 @@ export const RoomSubForm = ({
             <SelectInputOther
               field={field}
               name='Backsplash'
-              className={`mb-0`}
+              className={hideContractFields ? 'hidden' : 'mb-0'}
               options={backsplashOptions}
             />
           )}
         />
       </div>
 
-      <div className='border border-gray-200 rounded-md p-2 flex gap-2 mt-2'>
+      <div
+        className={
+          hideContractFields
+            ? 'border border-gray-200 rounded-md p-2 flex gap-2 mt-2 hidden'
+            : 'border border-gray-200 rounded-md p-2 flex gap-2 mt-2'
+        }
+      >
         <FormField
           control={form.control}
           name={`rooms.${index}.square_feet`}
@@ -392,7 +400,7 @@ export const RoomSubForm = ({
         />
       </div>
 
-      <div className='flex flex-col gap-2 mt-2'>
+      <div className={hideContractFields ? 'hidden' : 'flex flex-col gap-2 mt-2'}>
         <div className='border border-gray-200 rounded-md pt-2 px-2 flex gap-2'>
           <DynamicAddition target='edge_price' form={form} index={index} />
         </div>
@@ -571,13 +579,13 @@ export const RoomSubForm = ({
           />
         </div>
       </div>
-      <div className='flex items-center justify-between space-x-2'>
+      <div className={hideContractFields ? 'hidden' : 'flex items-center justify-between space-x-2'}>
         <div className='flex items-center space-x-2 mt-4'></div>
         <div className='flex items-center space-x-2 mt-4'>
           <AddExtraDialog form={form} index={index} />
         </div>
       </div>
-      <DynamicAdditions form={form} index={index} />
+      {!hideContractFields && <DynamicAdditions form={form} index={index} />}
 
       <Tabs defaultValue='slabs' className='mt-4'>
         <TabsList className='grid w-full grid-cols-3'>
