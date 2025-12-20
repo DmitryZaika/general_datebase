@@ -25,13 +25,34 @@ const fromEmail = (companyDomain: string | null, userEmail: string) => {
   return DEFAULT_EMAIL
 }
 
+const appendEmailSignature = (body: string, signature: string | null | undefined) => {
+  const cleanBody = body.trim()
+  const cleanSignature = (signature || '').trim()
+  if (!cleanSignature) return cleanBody
+  if (cleanBody.includes(cleanSignature)) return cleanBody
+  const sign =
+    cleanSignature.startsWith('--') || cleanSignature.startsWith('—')
+      ? cleanSignature
+      : `—\n${cleanSignature}`
+  return `${cleanBody}\n\n${sign}`
+}
+
 const emailToSend = async (user: SessionUser, cleaned: Customer) => {
   const userCompany = await selectId<{ domain: string | null }>(
     db,
     'SELECT domain from company where id = ?',
     user.company_id,
   )
-  const HTMLBody = `<div style="white-space: pre-wrap;">${cleaned.body}</div>`
+  const userSignature = await selectId<{ email_signature: string | null }>(
+    db,
+    'SELECT email_signature FROM users WHERE id = ? AND is_deleted = 0',
+    user.id,
+  )
+  const bodyWithSignature = appendEmailSignature(
+    cleaned.body,
+    userSignature?.email_signature,
+  )
+  const HTMLBody = `<div style="white-space: pre-wrap;">${bodyWithSignature}</div>`
   const from = fromEmail(userCompany?.domain || null, user.email)
   const to = cleaned.to
   return {
@@ -56,7 +77,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     info = await sendEmail(emailInformation)
   } catch (error) {
-    const message = (error as { message?: string }).message || 'Unknown error'
+    const message = error instanceof Error ? error.message : 'Unknown error'
     if (message.includes('Email address is not verified.')) {
       posthogClient.captureException(error, user.email)
       return data({ error: 'Invalid email address' }, { status: 400 })
