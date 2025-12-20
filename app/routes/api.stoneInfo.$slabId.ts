@@ -19,7 +19,8 @@ export async function loader({ params }: LoaderFunctionArgs) {
     `SELECT stones.id, stones.type, stones.name
      FROM stones 
      JOIN slab_inventory ON slab_inventory.stone_id = stones.id 
-     WHERE slab_inventory.id = ?`,
+     WHERE slab_inventory.id = ?
+       AND stones.deleted_at IS NULL`,
     [result.data.slabId],
   )
 
