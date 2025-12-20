@@ -54,10 +54,17 @@ export async function action({ request }: ActionFunctionArgs) {
       [listId],
     )
     const nextPos = posRows[0]?.next ?? 1
-    await db.execute(
+  const [dealResult] = await db.execute<ResultSetHeader>(
       'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
       [customerId, 'New Customer', listId, nextPos, salesRep],
     )
+    const dealId = dealResult.insertId
+    return data({
+      success: true,
+      message: 'Customer created successfully',
+      customerId,
+      dealId,
+    })
   }
 
   return data({

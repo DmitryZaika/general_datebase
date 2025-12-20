@@ -78,12 +78,12 @@ export type CustomerDialogSchema = z.infer<typeof customerDialogSchema>
 
 export const createCustomerMutation = (
   toast: ToastFunction,
-  onSuccess?: (id: number) => void,
+  onSuccess?: (id: number, dealId?: number) => void,
 ) => {
   return {
     mutationFn: createCustomer,
-    onSuccess: (data: { customerId: number }) => {
-      onSuccess?.(data.customerId)
+    onSuccess: (data: { customerId: number; dealId?: number }) => {
+      onSuccess?.(data.customerId, data.dealId)
     },
     onError: (error: unknown) => {
       toast({
@@ -100,7 +100,7 @@ export const createCustomerMutation = (
 
 export const updateCustomerMutation = (
   toast: ToastFunction,
-  onSuccess?: (id: number) => void,
+  onSuccess?: (id: number, dealId?: number) => void,
 ) => {
   return {
     mutationFn: (data: CustomerSignupSchema & { id: number }) =>
