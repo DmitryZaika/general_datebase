@@ -3,8 +3,8 @@ import { X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import {
-    DynamicAddition,
-    DynamicAdditions,
+  DynamicAddition,
+  DynamicAdditions,
 } from '~/components/molecules/DynamicAdditions'
 import { InputItem } from '~/components/molecules/InputItem'
 import { SelectInputOther } from '~/components/molecules/SelectInputOther'
