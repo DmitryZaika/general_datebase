@@ -262,23 +262,26 @@ export default function UserProfile() {
                 control={form.control}
                 name='email_signature'
                 render={({ field }) => (
-                  <Textarea
-                    {...field}
-                    value={field.value || ''}
-                    name='Email Signature'
-                    ref={e => {
-                      field.ref(e)
-                      textareaRef.current = e
-                    }}
-                    onChange={e => {
-                      field.onChange(e)
-                      if (textareaRef.current) {
-                        textareaRef.current.style.height = 'auto'
-                        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-                      }
-                    }}
-                    className='min-h-[100px] resize-none overflow-hidden'
-                  />
+                  <div className='space-y-2'>
+                    <div className='text-sm font-medium'>Email Signature</div>
+                    <Textarea
+                      {...field}
+                      value={field.value || ''}
+                      placeholder='Your signature'
+                      ref={e => {
+                        field.ref(e)
+                        textareaRef.current = e
+                      }}
+                      onChange={e => {
+                        field.onChange(e)
+                        if (textareaRef.current) {
+                          textareaRef.current.style.height = 'auto'
+                          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+                        }
+                      }}
+                      className='min-h-[100px] resize-none overflow-hidden'
+                    />
+                  </div>
                 )}
               />
             </div>

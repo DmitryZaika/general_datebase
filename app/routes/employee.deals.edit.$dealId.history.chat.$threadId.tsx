@@ -1,3 +1,4 @@
+import { Pencil } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -17,11 +18,12 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 interface Attachment {
   id: number
@@ -37,6 +39,7 @@ interface Message {
   id: number
   subject: string
   body: string
+  signature?: string | null
   sent_at: string
   isFromCustomer: boolean
   read_at?: string
@@ -50,11 +53,18 @@ interface AIEmailResponse {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  let user: User
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
+  
+  const [userSignatureRows] = await db.execute<RowDataPacket[]>(
+    'SELECT email_signature FROM users WHERE id = ?',
+    [user.id]
+  )
+  const currentUserSignature = userSignatureRows?.[0]?.email_signature || null
   if (!params.dealId) {
     throw new Error('Deal ID is missing')
   }
@@ -91,9 +101,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
 
-  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, MAX(er.read_at) AS read_at
+  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, u.email_signature as signature, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
+       LEFT JOIN users u ON u.id = e.sender_user_id
       WHERE e.deleted_at IS NULL AND e.thread_id = ? AND (e.deal_id = ? OR e.deal_id IS NULL)`
   const emailParams: (number | string)[] = [threadId, dealId]
   
@@ -116,7 +127,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }),
   )
 
-  emailQuery += ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at ORDER BY e.sent_at ASC'
+  emailQuery += ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, u.email_signature ORDER BY e.sent_at ASC'
 
   const [emailRows] = await db.execute<RowDataPacket[]>(emailQuery, emailParams)
 
@@ -126,6 +137,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       id: row.id,
       subject: row.subject,
       body: row.body,
+      signature: row.signature,
       sent_at: row.sent_at,
       isFromCustomer,
       read_at: row.read_at,
@@ -141,6 +153,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     dealId,
     subject: emailRows?.[0]?.subject || null,
     threadId,
+    currentUserSignature,
   }
 }
 
@@ -241,7 +254,7 @@ export default function EmailChatDialog() {
   const [selectActive, setSelectActive] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const { toast } = useToast()
-  const { customerName, customerEmail, messages, dealId, subject, threadId } = useLoaderData<
+  const { customerName, customerEmail, messages, dealId, subject, threadId, currentUserSignature } = useLoaderData<
     typeof loader
   >()
   const [chatMessages, setChatMessages] = useState<Message[]>(messages)
@@ -250,6 +263,18 @@ export default function EmailChatDialog() {
   const [isSending, setIsSending] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+
+  const getDisplayBody = (body: string, signature: string | null | undefined) => {
+    const b = (body || '').trimEnd()
+    const s = (signature || '').trim()
+    if (!s) return b
+    const idx = b.lastIndexOf(s)
+    if (idx === -1) return b
+    if (idx < b.length - s.length - 20) return b
+    const without = b.slice(0, idx).trimEnd()
+    const withoutDash = without.endsWith('—') ? without.slice(0, -1).trimEnd() : without
+    return withoutDash.trimEnd()
+  }
 
   useEffect(() => {
     setChatMessages(messages)
@@ -355,6 +380,7 @@ export default function EmailChatDialog() {
           id: Date.now(),
           subject: emailSubject,
           body,
+          signature: currentUserSignature,
           sent_at: new Date().toISOString(),
           isFromCustomer: false,
         },
@@ -414,11 +440,32 @@ export default function EmailChatDialog() {
                     <div
                       className={
                         message.isFromCustomer
-                          ? 'bg-gray-200 text-black rounded-2xl px-4 py-3 max-w-[75%]'
-                          : 'bg-blue-500 text-white rounded-2xl px-4 py-3 max-w-[75%]'
+                          ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%]'
+                          : `bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative ${
+                              message.signature && message.signature.trim() !== '' ? 'pb-6 min-w-[85px]' : ''
+                            }`
                       }
                     >
-                      <p className='whitespace-pre-wrap'>{message.body}</p>
+                      <p className='whitespace-pre-wrap'>
+                        {getDisplayBody(message.body, message.isFromCustomer ? null : message.signature)}
+                      </p>
+                      {!message.isFromCustomer && message.signature && message.signature.trim() !== '' ? (
+                        <div className='absolute bottom-1 right-2'>
+                          <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
+                                <Pencil className='w-2 h-2 opacity-70' />
+                                Signature
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side='top' className='max-w-[360px] whitespace-pre-wrap select-none bg-zinc-900 text-zinc-100 border-zinc-800 shadow-xl'>
+                              {message.signature}
+                            </TooltipContent>
+                          </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      ) : null}
                       {message.attachments && message.attachments.length > 0 ? (
                         <div className='mt-3 space-y-2'>
                           {message.attachments.map(attachment => {
