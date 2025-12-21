@@ -86,6 +86,7 @@ export const RoomSubForm = ({
   faucet_type,
   isEdit,
   companyId,
+  hideContractFields,
 }: {
   form: UseFormReturn<TCustomerSchema>
   index: number
@@ -93,6 +94,7 @@ export const RoomSubForm = ({
   faucet_type: Faucet[]
   isEdit?: boolean
   companyId: number
+  hideContractFields?: boolean
 }) => {
   const roomValues = form.watch(`rooms.${index}`)
 
@@ -301,7 +303,7 @@ export const RoomSubForm = ({
           </Button>
         )}
       </div>
-      <div className='grid grid-cols-2 gap-2 mt-2'>
+      <div className='grid grid-cols-3 gap-2 mt-2'>
         <FormField
           control={form.control}
           name={`rooms.${index}.room`}
@@ -311,6 +313,32 @@ export const RoomSubForm = ({
               name='Room'
               className='mb-0'
               options={roomOptions}
+            />
+          )}
+        />
+            <FormField
+          control={form.control}
+          name={`rooms.${index}.square_feet`}
+          render={({ field }) => (
+            <InputItem
+              name={'Square Feet'}
+              placeholder={'Enter Sqft'}
+              field={{
+                ...field,
+                value: field.value ? String(field.value) : '',
+                onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                  const raw = event.target.value
+                  if (raw === '') {
+                    field.onChange(undefined)
+                    handleSquareFeetChange(0)
+                    return
+                  }
+                  const parsed = Number(raw)
+                  field.onChange(parsed)
+                  handleSquareFeetChange(Number.isFinite(parsed) ? parsed : 0)
+                },
+              }}
+              formClassName={`mb-0 `}
             />
           )}
         />
@@ -331,32 +359,18 @@ export const RoomSubForm = ({
             <SelectInputOther
               field={field}
               name='Backsplash'
-              className={`mb-0`}
+              className={hideContractFields ? 'hidden' : 'mb-0'}
               options={backsplashOptions}
             />
           )}
         />
+        
       </div>
 
-      <div className='border border-gray-200 rounded-md p-2 flex gap-2 mt-2'>
-        <FormField
-          control={form.control}
-          name={`rooms.${index}.square_feet`}
-          render={({ field }) => (
-            <InputItem
-              name={'Square Feet'}
-              placeholder={'Enter Sqft'}
-              field={{
-                ...field,
-                onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-                  field.onChange(event)
-                  handleSquareFeetChange(parseFloat(event.target.value) || 0)
-                },
-              }}
-              formClassName={`mb-0 ${inputWidth}`}
-            />
-          )}
-        />
+      <div
+        className='border border-gray-200 rounded-md p-2 flex gap-2 mt-2 hidden '
+      >
+    
 
         <FormField
           control={form.control}
@@ -392,7 +406,7 @@ export const RoomSubForm = ({
         />
       </div>
 
-      <div className='flex flex-col gap-2 mt-2'>
+      <div className={hideContractFields ? 'hidden' : 'flex flex-col gap-2 mt-2'}>
         <div className='border border-gray-200 rounded-md pt-2 px-2 flex gap-2'>
           <DynamicAddition target='edge_price' form={form} index={index} />
         </div>
@@ -571,13 +585,13 @@ export const RoomSubForm = ({
           />
         </div>
       </div>
-      <div className='flex items-center justify-between space-x-2'>
+      <div className={hideContractFields ? 'hidden' : 'flex items-center justify-between space-x-2'}>
         <div className='flex items-center space-x-2 mt-4'></div>
         <div className='flex items-center space-x-2 mt-4'>
           <AddExtraDialog form={form} index={index} />
         </div>
       </div>
-      <DynamicAdditions form={form} index={index} />
+      {!hideContractFields && <DynamicAdditions form={form} index={index} />}
 
       <Tabs defaultValue='slabs' className='mt-4'>
         <TabsList className='grid w-full grid-cols-3'>
@@ -787,7 +801,7 @@ export const RoomSubForm = ({
         </>
       )}
 
-      <div className='text-right font-semibold text-lg my-4'>
+      <div className='text-right hidden font-semibold text-lg my-4'>
         Total Room Price: ${totalRoomPrice}
       </div>
     </>
