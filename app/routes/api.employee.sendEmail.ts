@@ -52,15 +52,18 @@ const emailToSend = async (user: SessionUser, cleaned: Customer) => {
     cleaned.body,
     userSignature?.email_signature,
   )
-  const HTMLBody = `<div style="white-space: pre-wrap;">${bodyWithSignature}</div>`
+
+  const textBody = bodyWithSignature
+  const HTMLBody = `<html><body><div style="white-space: pre-wrap;">${bodyWithSignature}</div></body></html>`
+
   const from = fromEmail(userCompany?.domain || null, user.email)
-  const to = cleaned.to
+
   return {
-    to,
+    to: cleaned.to,
     from,
     subject: cleaned.subject,
     html: HTMLBody,
-    configurationSet: 'email-tracking-set',
+    text: textBody,
   }
 }
 

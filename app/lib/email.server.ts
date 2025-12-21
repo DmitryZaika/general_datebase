@@ -18,6 +18,7 @@ interface SendEmail {
   text?: string
   replyTo?: string[]
   configurationSet?: string
+  headers?: Record<string, string>
 }
 
 interface Body {

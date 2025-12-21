@@ -133,10 +133,10 @@ const SYSTEM_PROMPT = `
   EMAIL CATEGORY DEFINITIONS
 
   FIRST-CONTACT
-  Used when the recipient already reached out through another channel. Tone: warm and helpful. Purpose: acknowledge their request, introduce yourself, and ask for a convenient time to talk.
+  Used when the recipient already reached out through another channel. Tone: warm and helpful. Purpose: acknowledge their request, introduce yourself, and ALWAYS end with a specific question to encourage a reply (e.g., about their project details or availability). This is crucial for email deliverability.
   Examples:
-  • “Good morning, [Name]! This is [Sender] from [Company]. Thanks for reaching out about new countertops…”
-  • “Hi [Name], I saw your request come in and wanted to introduce myself…”
+  • “Good morning, [Name]! This is [Sender] from [Company]. Thanks for reaching out about new countertops. Could you tell me a bit more about your project timeline?”
+  • “Hi [Name], I saw your request and wanted to introduce myself. When would be a good time to briefly discuss your project details?”
   Hey [Name], this is [Sender], with [Company]. You asked us to call you back. Looks like you responded to our ad on [Social Media] about updating your kitchen. Are you currently available to provide me with more information about your project?
 
   FOLLOW-UP
@@ -214,6 +214,7 @@ function formatSenderInfo(info: UserInfo): string {
 
   let result = `Here is my (the sales rep) contact information: ${parts.join(', ')}. `
   result += `PHONE/EMAIL RULES: For FIRST-CONTACT emails - NEVER write phone or email in the body. `
+  result += `Always end FIRST-CONTACT emails with a direct question (e.g., "Could you tell me more about the project?" or "When is a good time to chat?"). `
   result += `For REPLY emails - include phone ONLY if customer asks ("can you call?", "give me your number"). `
   result += `Introduce myself using only my first name and company. Use only the first name of the customer. Don't use signature.`
   return result
