@@ -15,7 +15,7 @@ describe('Contract Integration Tests', () => {
   beforeAll(async () => {
     // Set up test database
     await DatabaseTestHelper.createTestDatabase()
-    await DatabaseTestHelper.runMigrations()
+    // await DatabaseTestHelper.runMigrations()
   })
 
   afterAll(async () => {

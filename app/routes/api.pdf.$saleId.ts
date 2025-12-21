@@ -458,7 +458,7 @@ export async function loader({ request, params }: ActionFunctionArgs) {
   const safeCustomerName = sanitizeFilename(customerName)
   const filename = `${safeCustomerName}.pdf`
 
-  return new Response(pdfBytes, {
+  return new Response(pdfBytes as BodyInit, {
     headers: {
       'Content-Type': pdfData.contentType || 'application/pdf',
       'Content-Disposition': `inline; filename="${filename}"`,

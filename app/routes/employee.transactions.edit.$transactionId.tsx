@@ -1,9 +1,10 @@
 import { Calendar, MapPin, User, UserCircle } from 'lucide-react'
 import {
   type ActionFunctionArgs,
-  type LoaderFunctionArgs,
   Form,
+  type LoaderFunctionArgs,
   Outlet,
+  redirect,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -158,7 +159,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const user = await getEmployeeUser(request)
+  try {
+    await getEmployeeUser(request)
+  } catch (error) {
+    return redirect(`/login?error=${error}`)
+  }
   if (!params.transactionId) {
     return forceRedirectError(request.headers, 'No transaction ID provided')
   }
@@ -177,7 +182,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return null
     }
 
-    const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
+    const slabs = await selectMany<{
+      id: number
+      sale_id: number
+      cut_date: string | null
+    }>(
       db,
       `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
       [slabId, saleId],
@@ -188,9 +197,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     if (slabs[0].cut_date === null) {
-      await db.execute(`UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`, [
-        slabId,
-      ])
+      await db.execute(
+        `UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`,
+        [slabId],
+      )
     }
   } else if (intent === 'uncut-slab') {
     const slabIdValue = formData.get('slabId')
@@ -199,7 +209,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return null
     }
 
-    const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
+    const slabs = await selectMany<{
+      id: number
+      sale_id: number
+      cut_date: string | null
+    }>(
       db,
       `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
       [slabId, saleId],
@@ -354,7 +368,7 @@ export default function ViewTransaction() {
               ) : (
                 <div className='rounded-md border'>
                   <Table className='p-2'>
-                    <TableHeader >
+                    <TableHeader>
                       <TableRow>
                         <TableHead className='px-2'>Bundle</TableHead>
                         <TableHead>Stone</TableHead>
@@ -368,7 +382,9 @@ export default function ViewTransaction() {
                     <TableBody>
                       {slabs.map(slab => (
                         <TableRow key={slab.id}>
-                          <TableCell className='font-medium px-2'>{slab.bundle}</TableCell>
+                          <TableCell className='font-medium px-2'>
+                            {slab.bundle}
+                          </TableCell>
                           <TableCell>{slab.stone_name}</TableCell>
                           <TableCell>{slab.square_feet || 'N/A'}</TableCell>
                           <TableCell>
@@ -383,7 +399,10 @@ export default function ViewTransaction() {
                               {slab.cut_date ? 'Cut' : 'Uncut'}
                             </Badge>
                           </TableCell>
-                          <TableCell className='max-w-[200px] truncate' title={slab.notes || ''}>
+                          <TableCell
+                            className='max-w-[200px] truncate'
+                            title={slab.notes || ''}
+                          >
                             {slab.notes || '-'}
                           </TableCell>
                           <TableCell>
@@ -393,7 +412,11 @@ export default function ViewTransaction() {
                             {!slab.cut_date ? (
                               <Form method='post'>
                                 <input type='hidden' name='intent' value='cut-slab' />
-                                <input type='hidden' name='slabId' value={String(slab.id)} />
+                                <input
+                                  type='hidden'
+                                  name='slabId'
+                                  value={String(slab.id)}
+                                />
                                 <LoadingButton
                                   type='submit'
                                   size='sm'
@@ -401,7 +424,8 @@ export default function ViewTransaction() {
                                   className='h-7'
                                   loading={
                                     navigation.formData?.get('intent') === 'cut-slab' &&
-                                    navigation.formData?.get('slabId') === String(slab.id)
+                                    navigation.formData?.get('slabId') ===
+                                      String(slab.id)
                                   }
                                 >
                                   Cut
@@ -410,15 +434,21 @@ export default function ViewTransaction() {
                             ) : (
                               <Form method='post'>
                                 <input type='hidden' name='intent' value='uncut-slab' />
-                                <input type='hidden' name='slabId' value={String(slab.id)} />
+                                <input
+                                  type='hidden'
+                                  name='slabId'
+                                  value={String(slab.id)}
+                                />
                                 <LoadingButton
                                   type='submit'
                                   size='sm'
                                   variant='outline'
                                   className='h-7 text-red-600 hover:text-red-700 hover:bg-red-50'
                                   loading={
-                                    navigation.formData?.get('intent') === 'uncut-slab' &&
-                                    navigation.formData?.get('slabId') === String(slab.id)
+                                    navigation.formData?.get('intent') ===
+                                      'uncut-slab' &&
+                                    navigation.formData?.get('slabId') ===
+                                      String(slab.id)
                                   }
                                 >
                                   Uncut
@@ -430,7 +460,9 @@ export default function ViewTransaction() {
                       ))}
                       {totalSquareFeet > 0 && (
                         <TableRow className='bg-muted/50 font-medium'>
-                          <TableCell colSpan={2} className='px-2'>Total Square Feet:</TableCell>
+                          <TableCell colSpan={2} className='px-2'>
+                            Total Square Feet:
+                          </TableCell>
                           <TableCell colSpan={5}>
                             {Number(totalSquareFeet).toFixed(2)}
                           </TableCell>
