@@ -1,9 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Info, Plus, X } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
-import { quickAddStoneFormSchema } from '~/schemas/stones'
+import {
+  quickAddStoneFormSchema,
+  type TQuickAddStoneFormSchema,
+} from '~/schemas/stones'
 import type { StoneSlim } from '~/types'
 import { STONE_TYPES } from '~/utils/constants'
 import { InputItem } from '../molecules/InputItem'
@@ -22,23 +25,23 @@ import { FormField, FormProvider } from '../ui/form'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 
-type QuickAddStoneFormData = {
-  name: string
-  retail_price?: number
-  length?: number
-  width?: number
-  type: (typeof STONE_TYPES)[number]
-  leftover: boolean
-  bundles: { value: string }[]
-  company_id: number
-}
-
 interface AddStoneQuickDialogProps {
   show: boolean
   setShow: (show: boolean) => void
   companyId: number
   onStoneCreated: (stone: StoneSlim, slabIds?: number[]) => void
 }
+
+const defaultValues = (companyId: number) => ({
+  name: '',
+  retail_price: 0,
+  length: 0,
+  width: 0,
+  type: 'granite' as const,
+  leftover: true,
+  bundles: [{ value: '' }],
+  company_id: companyId,
+})
 
 export function AddStoneQuickDialog({
   show,
@@ -50,23 +53,9 @@ export function AddStoneQuickDialog({
   const [error, setError] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
-  const defaultValues = useMemo(
-    () => ({
-      name: '',
-      retail_price: undefined as number | undefined,
-      length: undefined as number | undefined,
-      width: undefined as number | undefined,
-      type: 'granite' as const,
-      leftover: true,
-      bundles: [{ value: '' }],
-      company_id: companyId,
-    }),
-    [companyId],
-  )
-
-  const form = useForm<QuickAddStoneFormData>({
+  const form = useForm({
     resolver: zodResolver(quickAddStoneFormSchema),
-    defaultValues,
+    defaultValues: defaultValues(companyId),
     mode: 'onChange',
   })
 
@@ -99,54 +88,61 @@ export function AddStoneQuickDialog({
   )
 
   const resetForm = useCallback(() => {
-    reset(defaultValues)
+    reset(defaultValues(companyId))
     setError(null)
   }, [reset, defaultValues])
 
-  const handleSubmit = useCallback(async (data: QuickAddStoneFormData) => {
-    setIsSubmitting(true)
-    setError(null)
+  const handleSubmit = useCallback(
+    async (data: TQuickAddStoneFormSchema) => {
+      setIsSubmitting(true)
+      setError(null)
 
-    try {
-      const basePayload = {
-        name: data.name,
-        retail_price: data.retail_price,
-        length: data.length,
-        width: data.width,
-        type: data.type,
-        company_id: companyId,
+      try {
+        const basePayload = {
+          name: data.name,
+          retail_price: data.retail_price,
+          length: data.length,
+          width: data.width,
+          type: data.type,
+          company_id: companyId,
+        }
+
+        const payload = data.leftover
+          ? { ...basePayload, leftover: true as const }
+          : {
+              ...basePayload,
+              leftover: false as const,
+              bundles: data.bundles.map(b => b.value),
+            }
+
+        const response = await fetch('/api/stones/quick-add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+
+        if (!response.ok) {
+          const { error: errorMessage } = await response.json()
+          throw new Error(errorMessage || 'Failed to create stone')
+        }
+
+        const { stone, slabs } = await response.json()
+        const { id, name, type, retail_price } = stone
+
+        await queryClient.invalidateQueries({ queryKey: ['availableStones'] })
+
+        const slabIds = slabs?.map((s: { id: number }) => s.id)
+        onStoneCreated({ id, name, type, retail_price }, slabIds)
+
+        setShow(false)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to create stone')
+      } finally {
+        setIsSubmitting(false)
       }
-
-      const payload = data.leftover
-        ? { ...basePayload, leftover: true as const }
-        : { ...basePayload, leftover: false as const, bundles: data.bundles.map(b => b.value) }
-
-      const response = await fetch('/api/stones/quick-add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (!response.ok) {
-        const { error: errorMessage } = await response.json()
-        throw new Error(errorMessage || 'Failed to create stone')
-      }
-
-      const { stone, slabs } = await response.json()
-      const { id, name, type, retail_price } = stone
-
-      await queryClient.invalidateQueries({ queryKey: ['availableStones'] })
-
-      const slabIds = slabs?.map((s: { id: number }) => s.id)
-      onStoneCreated({ id, name, type, retail_price }, slabIds)
-
-      setShow(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create stone')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }, [companyId, queryClient, onStoneCreated, setShow])
+    },
+    [companyId, queryClient, onStoneCreated, setShow],
+  )
 
   const handleCancel = useCallback(() => {
     resetForm()
@@ -165,7 +161,7 @@ export function AddStoneQuickDialog({
 
   return (
     <Dialog open={show} onOpenChange={handleOpenChange}>
-      <DialogContent className='sm:max-w-[500px] overflow-y-auto max-h-[90vh]'>
+      <DialogContent className='sm:max-w-125 overflow-y-auto max-h-[90vh]'>
         <DialogHeader>
           <DialogTitle>Add New Color</DialogTitle>
         </DialogHeader>
@@ -181,7 +177,7 @@ export function AddStoneQuickDialog({
           >
             {error && (
               <div className='flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md text-red-800'>
-                <AlertCircle className='h-4 w-4 flex-shrink-0' />
+                <AlertCircle className='h-4 w-4 shrink-0' />
                 <p className='text-sm'>{error}</p>
               </div>
             )}
@@ -325,12 +321,12 @@ export function AddStoneQuickDialog({
 
             {leftoverValue && (
               <div className='flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-blue-800'>
-                <Info className='h-4 w-4 flex-shrink-0 mt-0.5' />
+                <Info className='h-4 w-4 shrink-0 mt-0.5' />
                 <div className='text-sm'>
                   <p className='font-medium mb-1'>Leftover Stone</p>
                   <p>
-                    A slab with a unique bundle number (format: LO-YYYYMMDD-XXXX) will be
-                    automatically created using the provided dimensions.
+                    A slab with a unique bundle number (format: LO-YYYYMMDD-XXXX) will
+                    be automatically created using the provided dimensions.
                   </p>
                 </div>
               </div>
