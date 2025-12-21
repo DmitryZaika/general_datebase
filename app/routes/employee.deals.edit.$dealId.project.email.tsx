@@ -280,7 +280,6 @@ async function generateAIEmail(
 ): Promise<AIEmailResponse> {
   const requestPayload = buildAIRequestPayload(formData, dealId)
 
-
   const response = await fetch('/api/aiRecommend/email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -619,9 +618,7 @@ export default function DealEmailDialog() {
                   getText={() => form.getValues('text')}
                   setText={value => form.setValue('text', value)}
                 />
-                <Button type='submit'>
-                  Send Email
-                </Button>
+                <Button type='submit'>Send Email</Button>
               </div>
             </div>
           </form>

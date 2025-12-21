@@ -44,7 +44,7 @@ export const quickAddStoneFormSchema = z
     },
     {
       path: ['bundles'],
-        error: 'At least one bundle number is required'
+      error: 'At least one bundle number is required',
     },
   )
   .refine(
@@ -56,7 +56,7 @@ export const quickAddStoneFormSchema = z
     },
     {
       path: ['bundles'],
-        error: 'All bundle numbers must be filled'
+      error: 'All bundle numbers must be filled',
     },
   )
 

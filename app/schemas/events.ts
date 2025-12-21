@@ -11,7 +11,10 @@ export const eventSchema = z
     start_date: z.date(),
     end_date: z.date(),
     all_day: z.boolean().prefault(false),
-    color: z.string().max(50, 'Color must be 50 characters or less').prefault('primary'),
+    color: z
+      .string()
+      .max(50, 'Color must be 50 characters or less')
+      .prefault('primary'),
     status: z
       .string()
       .max(50, 'Status must be 50 characters or less')
@@ -22,8 +25,8 @@ export const eventSchema = z
   })
   .refine(data => data.end_date >= data.start_date, {
     path: ['end_date'],
-      error: 'End date must be after start date'
-})
+    error: 'End date must be after start date',
+  })
 
 export type EventFormData = z.infer<typeof eventSchema>
 
@@ -38,7 +41,10 @@ export const eventUpdateSchema = z
     start_date: z.date(),
     end_date: z.date(),
     all_day: z.boolean().prefault(false),
-    color: z.string().max(50, 'Color must be 50 characters or less').prefault('primary'),
+    color: z
+      .string()
+      .max(50, 'Color must be 50 characters or less')
+      .prefault('primary'),
     status: z
       .string()
       .max(50, 'Status must be 50 characters or less')
@@ -49,7 +55,7 @@ export const eventUpdateSchema = z
   })
   .refine(data => data.end_date >= data.start_date, {
     path: ['end_date'],
-      error: 'End date must be after start date'
-})
+    error: 'End date must be after start date',
+  })
 
 export type EventUpdateData = z.infer<typeof eventUpdateSchema>

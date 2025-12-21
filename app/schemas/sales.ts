@@ -70,29 +70,32 @@ export const finalExtrasSchema = z.object({
 
 export type TFullExtrasSchema = z.infer<typeof finalExtrasSchema>[]
 
-export const customerSchema = z.object({
-  customer_id: z.coerce
-    .number({
-        error: (issue) => issue.input === undefined ? 'Please add a customer' : 'Please add a customer'
-    })
-    .min(1, 'Please add a customer'),
-  seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
-  project_address: z.string().optional().nullable(),
-  notes_to_sale: StringOrNumber,
-  price: z.coerce.number().prefault(0),
-  company_name: z.string().nullable().optional(),
-  rooms: z.array(roomSchema).prefault([]),
-  extras: z.array(finalExtrasSchema).prefault([]),
-}).superRefine((value, ctx) => {
-  value.rooms.forEach((room, index) => {
-    if (!room.square_feet || room.square_feet <= 0) {
-      ctx.addIssue({
-        code: "custom",
-        message: 'Square feet is required',
-        path: ['rooms', index, 'square_feet'],
+export const customerSchema = z
+  .object({
+    customer_id: z.coerce
+      .number({
+        error: issue =>
+          issue.input === undefined ? 'Please add a customer' : 'Please add a customer',
       })
-    }
+      .min(1, 'Please add a customer'),
+    seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
+    project_address: z.string().optional().nullable(),
+    notes_to_sale: StringOrNumber,
+    price: z.coerce.number().prefault(0),
+    company_name: z.string().nullable().optional(),
+    rooms: z.array(roomSchema).prefault([]),
+    extras: z.array(finalExtrasSchema).prefault([]),
   })
-})
+  .superRefine((value, ctx) => {
+    value.rooms.forEach((room, index) => {
+      if (!room.square_feet || room.square_feet <= 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Square feet is required',
+          path: ['rooms', index, 'square_feet'],
+        })
+      }
+    })
+  })
 
 export type TCustomerSchema = z.infer<typeof customerSchema>

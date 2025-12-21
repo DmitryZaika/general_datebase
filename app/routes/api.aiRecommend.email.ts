@@ -330,7 +330,8 @@ function buildUserPrompt(
     desiredContent,
   } = params
 
-  const { customerName, leadMessage, remodelType, referralSource, customerCompany } = lead
+  const { customerName, leadMessage, remodelType, referralSource, customerCompany } =
+    lead
   const { variationToken } = params
 
   let prompt = `Write a ${formality}, ${tone} sales email. `

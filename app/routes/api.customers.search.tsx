@@ -71,7 +71,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     let customers: Customer[] = []
 
     if (searchType === 'name') {
-      const words = term.trim().split(/\s+/).filter(w => w.length > 0)
+      const words = term
+        .trim()
+        .split(/\s+/)
+        .filter(w => w.length > 0)
 
       let nameCondition = 'c.name LIKE ?'
       const nameParams: string[] = []
