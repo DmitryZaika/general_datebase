@@ -119,7 +119,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const stone = await selectId<{ id: number; name: string; url: string }>(
     db,
-    'SELECT id, name, url FROM stones WHERE id = ?',
+    'SELECT id, name, url FROM stones WHERE id = ? AND deleted_at IS NULL',
     stoneId,
   )
   if (!stone) {

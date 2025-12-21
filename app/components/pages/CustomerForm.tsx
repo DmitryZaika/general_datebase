@@ -30,6 +30,7 @@ import { Textarea } from '../ui/textarea'
 const resolver = zodResolver(customerDialogSchema)
 
 interface CustomerFormProps {
+  setCreatedDealId?: (id: number) => void
   handleChange: (open: boolean) => void
   onSuccess: (value: number, name: string) => void
   companyId: number
@@ -65,6 +66,7 @@ function getSourceOptions(
 }
 
 export function CustomerForm({
+  setCreatedDealId,
   handleChange,
   onSuccess,
   companyId,
@@ -77,11 +79,15 @@ export function CustomerForm({
   const successToast = (message: string) =>
     toastFn({ title: 'Success', description: message, variant: 'success' })
 
-  const handleSuccess = (id: number) => {
+  const handleSuccess = (id: number, dealId?: number) => {
     successToast(
       customerId ? 'Customer updated successfully' : 'Customer added successfully',
     )
     onSuccess(id, form.getValues('name'))
+    
+    if (setCreatedDealId && dealId) {
+      setCreatedDealId(dealId)
+    }
   }
 
   const mutateObject = customerId

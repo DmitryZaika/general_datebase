@@ -38,7 +38,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return { error: 'Invalid CSRF token' }
   }
   const resolver = zodResolver(dealsSchema)
-
+ 
   const { errors, data, receivedValues } =
     await getValidatedFormData<DealsDialogSchema>(request, resolver)
   if (errors) {
@@ -51,7 +51,7 @@ export async function action({ request }: ActionFunctionArgs) {
     [data.list_id],
   )
   const initialStatus = listRows[0]?.name || 'New Customer'
-
+if (!data.deal_id) {
   await db.execute(
     `INSERT INTO deals
      (customer_id, amount, description, status, list_id, position, user_id)
@@ -66,6 +66,13 @@ export async function action({ request }: ActionFunctionArgs) {
       user.id,
     ],
   )
+  } else {
+    await db.execute(`UPDATE deals SET amount = ?, description = ? WHERE id = ?`, [
+      data.amount,
+      data.description,
+      data.deal_id,
+    ])
+  }
 
   await db.execute(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
     user.id,

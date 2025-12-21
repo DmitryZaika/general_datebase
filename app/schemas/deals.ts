@@ -14,6 +14,7 @@ export const dealsSchema = z.object({
   list_id: z.coerce.number(),
   position: z.number(),
   user_id: z.coerce.number(),
+  deal_id: z.coerce.number().optional(),
 })
 
 export type DealsDialogSchema = z.infer<typeof dealsSchema>

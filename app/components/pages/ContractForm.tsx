@@ -226,6 +226,7 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
                   sink_type={sink_type}
                   faucet_type={faucet_type}
                   isEdit={Boolean(saleId)}
+                  hideContractFields={true}
                 />
               ))}
 
@@ -235,7 +236,9 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
                 </Button>
               </div>
 
-              <FullDynamicAdditions form={form} name='extras' />
+              <div className='hidden'>
+                <FullDynamicAdditions form={form} name='extras' />
+              </div>
 
               <div className='flex flex-row gap-2 mt-6'>
                 <FormField
@@ -246,23 +249,25 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
                       name={'Notes'}
                       placeholder={'Notes to Sale'}
                       field={field}
-                      formClassName='mb-0 w-3/4'
+                      formClassName='mb-0 w-full'
                     />
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name='price'
-                  render={({ field }) => (
-                    <InputItem
-                      name='Price'
-                      placeholder='Price'
-                      field={field}
-                      disabled={true} // только чтение, но значение отправится
-                      formClassName='mb-0 w-3/4'
-                    />
-                  )}
-                />
+                <div className='hidden'>
+                  <FormField
+                    control={form.control}
+                    name='price'
+                    render={({ field }) => (
+                      <InputItem
+                        name='Price'
+                        placeholder='Price'
+                        field={field}
+                        disabled={true}
+                        formClassName='mb-0 w-3/4'
+                      />
+                    )}
+                  />
+                </div>
               </div>
             </div>
 

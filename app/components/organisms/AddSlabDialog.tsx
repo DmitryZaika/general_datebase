@@ -98,9 +98,9 @@ export const AddSlabDialog = ({
             </div>
           ) : (
             <Select
-              value={selectedSlab?.bundle || ''}
+              value={selectedSlab ? String(selectedSlab.id) : ''}
               onValueChange={val =>
-                setSelectedSlab(data.find(slab => slab.bundle === val))
+                setSelectedSlab(data.find(slab => String(slab.id) === val))
               }
             >
               <SelectTrigger className='min-w-[150px]'>
@@ -110,7 +110,7 @@ export const AddSlabDialog = ({
                 {data.map(slab => {
                   const isPartial = slab.parent_id !== null || slab.child_count > 0
                   return (
-                    <SelectItem key={slab.id} value={slab.bundle}>
+                    <SelectItem key={slab.id} value={String(slab.id)}>
                       <div className='flex items-center gap-2'>
                         <span>{slab.bundle}</span>
                         {isPartial && (
