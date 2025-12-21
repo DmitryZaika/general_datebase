@@ -303,7 +303,7 @@ export const RoomSubForm = ({
           </Button>
         )}
       </div>
-      <div className='grid grid-cols-2 gap-2 mt-2'>
+      <div className='grid grid-cols-3 gap-2 mt-2'>
         <FormField
           control={form.control}
           name={`rooms.${index}.room`}
@@ -313,6 +313,32 @@ export const RoomSubForm = ({
               name='Room'
               className='mb-0'
               options={roomOptions}
+            />
+          )}
+        />
+            <FormField
+          control={form.control}
+          name={`rooms.${index}.square_feet`}
+          render={({ field }) => (
+            <InputItem
+              name={'Square Feet'}
+              placeholder={'Enter Sqft'}
+              field={{
+                ...field,
+                value: field.value ? String(field.value) : '',
+                onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                  const raw = event.target.value
+                  if (raw === '') {
+                    field.onChange(undefined)
+                    handleSquareFeetChange(0)
+                    return
+                  }
+                  const parsed = Number(raw)
+                  field.onChange(parsed)
+                  handleSquareFeetChange(Number.isFinite(parsed) ? parsed : 0)
+                },
+              }}
+              formClassName={`mb-0 `}
             />
           )}
         />
@@ -338,33 +364,13 @@ export const RoomSubForm = ({
             />
           )}
         />
+        
       </div>
 
       <div
-        className={
-          hideContractFields
-            ? 'border border-gray-200 rounded-md p-2 flex gap-2 mt-2 hidden'
-            : 'border border-gray-200 rounded-md p-2 flex gap-2 mt-2'
-        }
+        className='border border-gray-200 rounded-md p-2 flex gap-2 mt-2 hidden '
       >
-        <FormField
-          control={form.control}
-          name={`rooms.${index}.square_feet`}
-          render={({ field }) => (
-            <InputItem
-              name={'Square Feet'}
-              placeholder={'Enter Sqft'}
-              field={{
-                ...field,
-                onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-                  field.onChange(event)
-                  handleSquareFeetChange(parseFloat(event.target.value) || 0)
-                },
-              }}
-              formClassName={`mb-0 ${inputWidth}`}
-            />
-          )}
-        />
+    
 
         <FormField
           control={form.control}
@@ -795,7 +801,7 @@ export const RoomSubForm = ({
         </>
       )}
 
-      <div className='text-right font-semibold text-lg my-4'>
+      <div className='text-right hidden font-semibold text-lg my-4'>
         Total Room Price: ${totalRoomPrice}
       </div>
     </>
