@@ -10,3 +10,4 @@ build.log
 oAuthClient-log.log
 tsconfig.tsbuildinfo
 .DS_Store
+tsconfig.tsbuildinfo
