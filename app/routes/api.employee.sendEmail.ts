@@ -31,7 +31,7 @@ const appendEmailSignature = (body: string, signature: string | null | undefined
   if (!cleanSignature) return cleanBody
   if (cleanBody.includes(cleanSignature)) return cleanBody
   const sign =
-    cleanSignature.startsWith('--') || cleanSignature.startsWith('—')
+    cleanSignature.startsWith('--')
       ? cleanSignature
       : `—\n${cleanSignature}`
   return `${cleanBody}\n\n${sign}`
@@ -53,8 +53,17 @@ const emailToSend = async (user: SessionUser, cleaned: Customer) => {
     userSignature?.email_signature,
   )
 
-  const textBody = bodyWithSignature
-  const HTMLBody = `<html><body><div style="white-space: pre-wrap;">${bodyWithSignature}</div></body></html>`
+  const softOptOutText = "\n\nIf you'd prefer I stop, just reply and tell me."
+
+  const textBody = bodyWithSignature + softOptOutText
+  const HTMLBody = `<html>
+    <body>
+      <div style="white-space: pre-wrap;">${bodyWithSignature}</div>
+      <div style="margin-top: 24px; font-size: 12px; color: #666666;">
+        If you'd prefer I stop, just reply and tell me.
+      </div>
+    </body>
+  </html>`
 
   const from = fromEmail(userCompany?.domain || null, user.email)
 
