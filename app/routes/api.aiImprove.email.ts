@@ -39,7 +39,7 @@ export async function action({ request }: ActionFunctionArgs) {
         {
           role: 'system',
           content:
-            'You are an expert editor for customer-facing business emails. Improve the provided email body text: fix all grammar, spelling, and style issues, make it sound more professional and clear, keep the same language as the input, preserve the original meaning, and do not add new ideas. Return only the improved email body text without any explanations or labels.',
+            'You are an expert editor for customer-facing business emails. Improve the provided email body text: fix all grammar, spelling, and style issues, make it sound more professional and clear, keep the same language as the input, preserve the original meaning, and do not add new ideas. If you see the term "wordPress" as a source, replace it with "Web-site". Return only the improved email body text without any explanations or labels.',
         },
         { role: 'user', content: parsed.body },
       ],

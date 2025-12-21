@@ -176,6 +176,7 @@ const SYSTEM_PROMPT = `
     - FIRST-CONTACT emails: NEVER include phone number or email address. No exceptions.
     - REPLY emails: Include phone number ONLY if customer explicitly asks (e.g., "can you call?", "give me your number").
   • Do not invent details.
+  • If the referral source is mentioned as "wordPress", always refer to it as "web-site" in the email text.
   • Avoid placeholders or brackets in your output. Write full, natural sentences.
   • Follow the output structure exactly:
     1. Provide ONLY the subject line (no "Subject:" prefix).
