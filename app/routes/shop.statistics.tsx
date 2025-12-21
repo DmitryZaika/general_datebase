@@ -1,6 +1,6 @@
-import { format, parseISO } from 'date-fns'
+import { format, parse, parseISO } from 'date-fns'
 import { Calendar as CalendarIcon } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
   data,
   type LoaderFunctionArgs,
@@ -35,7 +35,7 @@ type MaterialTotal = {
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await getShopWorkerUser(request)
   if (!user || !user.company_id) {
-    return data({ days: [], totalSqft: 0, start: '', end: '' })
+    return data({ days: [], materials: [], totalSqft: 0, start: '', end: '' })
   }
 
   const url = new URL(request.url)
@@ -114,22 +114,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return data({ days, materials, totalSqft, start, end })
 }
 
-export default function ShopStatistic() {
-  const loaded = (useLoaderData<typeof loader>() ?? {}) as Partial<{
-    days: DayStat[]
-    materials: MaterialTotal[]
-    totalSqft: number
-    start: string
-    end: string
-  }>
-  const { days = [], materials = [], totalSqft = 0, start = '', end = '' } = loaded
-  const [searchParams] = useSearchParams()
+const CustomDatePicker = ({
+  label,
+  name,
+  value,
+}: {
+  label: string
+  name: 'start' | 'end'
+  value: string
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
-  const [openStart, setOpenStart] = useState(false)
-  const [openEnd, setOpenEnd] = useState(false)
-
-  const startValue = searchParams.get('start') || start
-  const endValue = searchParams.get('end') || end
+  const [searchParams] = useSearchParams()
 
   const handleDateChange = (key: 'start' | 'end', value: string) => {
     const next = new URLSearchParams(searchParams)
@@ -137,48 +133,48 @@ export default function ShopStatistic() {
     navigate(`/shop/statistics?${next.toString()}`)
   }
 
-  const renderDatePicker = (label: string, value: string, key: 'start' | 'end') => {
-    const parsed = value ? parseISO(value) : undefined
-    const isOpen = key === 'start' ? openStart : openEnd
-    const setIsOpen = key === 'start' ? setOpenStart : setOpenEnd
-    return (
-      <div className='flex flex-col gap-1 max-w-[220px] w-full'>
-        <label className='text-xs text-muted-foreground'>{label}</label>
-        <Popover open={isOpen} onOpenChange={setIsOpen}>
-          <PopoverTrigger asChild>
-            <button className='flex items-center justify-between rounded-md border px-2 py-2 text-xs hover:bg-muted h-9'>
-              <span>{parsed ? format(parsed, 'MMM dd, yyyy') : 'Pick a date'}</span>
-              <CalendarIcon className='w-4 h-4 text-muted-foreground' />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className='w-auto p-0' align='start' side='bottom'>
-            <Calendar
-              fixedWeeks
-              mode='single'
-              selected={parsed}
-              defaultMonth={parsed}
-              onSelect={date => {
-                if (date) {
-                  const dateStr = format(date, 'yyyy-MM-dd')
-                  handleDateChange(key, dateStr)
-                  setIsOpen(false)
-                }
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
-    )
-  }
+  const cleanValue = parse(value, 'yyyy-MM-dd', new Date())
 
-  const sortedDays = useMemo(() => days || [], [days])
+  console.log(cleanValue)
+
+  return (
+    <div className='flex flex-col gap-1 max-w-55 w-full'>
+      <label className='text-xs text-muted-foreground'>{label}</label>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <button className='flex items-center justify-between rounded-md border px-2 py-2 text-xs hover:bg-muted h-9'>
+            <span>{format(value, 'MMM dd, yyyy')}</span>
+            <CalendarIcon className='w-4 h-4 text-muted-foreground' />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className='w-auto p-0' align='start' side='bottom'>
+          <Calendar
+            fixedWeeks
+            mode='single'
+            selected={cleanValue}
+            onSelect={date => {
+              if (date) {
+                const dateStr = format(date, 'yyyy-MM-dd')
+                handleDateChange(name, dateStr)
+                setIsOpen(false)
+              }
+            }}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  )
+}
+
+export default function ShopStatistic() {
+  const { days, materials, totalSqft, start, end } = useLoaderData<typeof loader>()
 
   return (
     <PageLayout title='Shop Statistic'>
       <div className='mb-6 grid grid-cols-1 lg:grid-cols-3 gap-3 items-start'>
         <div className='flex flex-wrap gap-2'>
-          {renderDatePicker('Start date', startValue, 'start')}
-          {renderDatePicker('End date', endValue, 'end')}
+          <CustomDatePicker label='Start date' name='start' value={start} />
+          <CustomDatePicker label='End date' name='end' value={end} />
         </div>
 
         <div className='flex flex-col gap-1'>
@@ -209,13 +205,13 @@ export default function ShopStatistic() {
 
       <div className='space-y-3'>
         <div className='text-sm font-semibold'>Cut days</div>
-        {sortedDays.length === 0 ? (
+        {days.length === 0 ? (
           <div className='rounded-lg border bg-white p-4 text-sm text-muted-foreground shadow-sm'>
             No data for selected dates
           </div>
         ) : (
           <div className='grid gap-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'>
-            {sortedDays.map(stat => {
+            {days.map(stat => {
               const dateObj = parseISO(stat.day)
               return (
                 <div
