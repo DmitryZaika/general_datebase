@@ -135,8 +135,6 @@ const CustomDatePicker = ({
 
   const cleanValue = parse(value, 'yyyy-MM-dd', new Date())
 
-  console.log(cleanValue)
-
   return (
     <div className='flex flex-col gap-1 max-w-55 w-full'>
       <label className='text-xs text-muted-foreground'>{label}</label>
