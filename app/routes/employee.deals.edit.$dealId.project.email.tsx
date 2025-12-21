@@ -103,7 +103,7 @@ interface AIEmailResponse {
 // ============================================================================
 
 const emailSchema = z.object({
-  to: z.string().email('Valid email address is required'),
+  to: z.email('Valid email address is required'),
   subject: z.string().min(1, 'Subject is required'),
   text: z.string().min(1, 'Email body is required'),
 })

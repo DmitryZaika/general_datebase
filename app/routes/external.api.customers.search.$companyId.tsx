@@ -7,7 +7,7 @@ import { getMarketingUser } from '~/utils/session.server'
 
 const customerSchema = z.object({
   term: z.string(),
-  searchType: z.enum(['name', 'phone', 'email']).default('name'),
+  searchType: z.enum(['name', 'phone', 'email']).prefault('name'),
 })
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

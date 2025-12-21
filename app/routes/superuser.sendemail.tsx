@@ -28,7 +28,7 @@ import {
 } from '../components/ui/form'
 
 const emailSchema = z.object({
-  to: z.string().email(),
+  to: z.email(),
   subject: z.string().min(1, 'Subject is required'),
   text: z.string().min(1, 'Email body is required'),
 })

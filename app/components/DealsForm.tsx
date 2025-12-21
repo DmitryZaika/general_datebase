@@ -77,13 +77,11 @@ export function DealsForm({
   dealId?: number
   user_id: number
 }) {
-  const form = useForm<DealsDialogSchema>({
+  const form = useForm({
     resolver: zodResolver(dealsSchema),
     defaultValues: { ...hiddenFields, ...(initial || {}), user_id },
   })
   const fullSubmit = useFullSubmit(form)
-
-
 
   return (
     <FormProvider {...form}>
@@ -94,7 +92,12 @@ export function DealsForm({
           <input type='hidden' name={k} value={String(v)} key={k} />
         ))}
 
-        <MainComponent setCreatedDealId={(deal_id: number) => form.setValue('deal_id', deal_id)} form={form} companyId={companyId} dealId={dealId} />
+        <MainComponent
+          setCreatedDealId={(deal_id: number) => form.setValue('deal_id', deal_id)}
+          form={form}
+          companyId={companyId}
+          dealId={dealId}
+        />
 
         <DialogFooter>
           <div className='flex justify-between gap-2 w-full'>

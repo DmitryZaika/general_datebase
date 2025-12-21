@@ -32,11 +32,11 @@ import {
 import { toastData } from '~/utils/toastHelpers.server'
 
 const userSchema = z.object({
-  email: z.string().email(),
-  password: z.coerce.string().min(4),
+  email: z.email(),
+  password: z.string().min(4),
 })
 
-type FormData = z.infer<typeof userSchema>
+const userResolver = zodResolver(userSchema)
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
@@ -76,7 +76,7 @@ export async function action({ request }: ActionFunctionArgs) {
     errors,
     data,
     receivedValues: defaultValues,
-  } = await getValidatedFormData<FormData>(request, zodResolver(userSchema))
+  } = await getValidatedFormData(request, userResolver)
   if (errors) {
     return { errors, defaultValues }
   }
@@ -112,9 +112,11 @@ export default function Login() {
   const navigation = useNavigation()
   const { error } = useLoaderData<{ error: string | null }>()
   const actionData = useActionData<typeof action>()
-  const form = useForm<FormData>({
-    resolver: zodResolver(userSchema),
-    defaultValues: actionData?.defaultValues || { email: '', password: '' },
+  const { email, password } = actionData?.defaultValues || { email: '', password: '' }
+  const finalEmail: string = email || ''
+  const form = useForm({
+    resolver: userResolver,
+    defaultValues: { email: finalEmail, password: password ?? '' },
   })
   const fullSubmit = useFullSubmit(form, undefined, 'POST', undefined, true)
   const isSubmitting = navigation.state !== 'idle'

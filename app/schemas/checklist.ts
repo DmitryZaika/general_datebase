@@ -13,7 +13,7 @@ export const checklistSchema = z.object({
     cleanup_completed: z.union([z.literal('on'), z.literal('')]).optional(),
     comments: z.string().optional(),
     signature: z.string().min(1, 'Signature is required'),
-    customer_id: z.number().nullable().default(null),
+    customer_id: z.number().nullable().prefault(null),
   })
   
 export type ChecklistFormData = z.infer<typeof checklistSchema>

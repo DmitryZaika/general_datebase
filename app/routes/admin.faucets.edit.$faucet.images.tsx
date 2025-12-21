@@ -107,7 +107,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 function AddImage() {
   const navigation = useNavigation()
-  const form = useCustomForm<TInstalledProjectsSchema>(InstalledProjectsSchema)
+  const form = useCustomForm(InstalledProjectsSchema)
 
   const [inputKey, setInputKey] = useState(0)
 

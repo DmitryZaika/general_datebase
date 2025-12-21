@@ -43,7 +43,7 @@ function LinkedImagesCarousel({ images }: { images: { url: string }[] }) {
     <div className='overflow-x-auto whitespace-nowrap pb-4'>
       <div className='flex gap-4'>
         {images.map((image, index) => (
-          <div key={index} className='w-40 h-32 flex-shrink-0'>
+          <div key={index} className='w-40 h-32 shrink-0'>
             <img
               src={image.url}
               alt=''
@@ -57,8 +57,6 @@ function LinkedImagesCarousel({ images }: { images: { url: string }[] }) {
 }
 
 export const InstalledProjectsSchema = z.object({})
-type TInstalledProjectsSchema = z.infer<typeof InstalledProjectsSchema>
-
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
     await getAdminUser(request)
@@ -236,7 +234,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 function AddImage() {
   const navigation = useNavigation()
   const isSubmitting = useNavigation().state === 'submitting'
-  const form = useCustomForm<TInstalledProjectsSchema>(InstalledProjectsSchema)
+  const form = useCustomForm(InstalledProjectsSchema)
 
   const [inputKey, setInputKey] = useState(0)
 

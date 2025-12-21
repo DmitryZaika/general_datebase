@@ -31,7 +31,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   if (!validation.success) {
     return data(
-      { error: 'Validation failed', details: validation.error.format() },
+      { error: 'Validation failed', details: z.treeifyError(validation.error) },
       { status: 400 },
     )
   }

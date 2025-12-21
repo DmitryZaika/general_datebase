@@ -43,8 +43,8 @@ export const quickAddStoneFormSchema = z
       return true
     },
     {
-      message: 'At least one bundle number is required',
       path: ['bundles'],
+        error: 'At least one bundle number is required'
     },
   )
   .refine(
@@ -55,8 +55,8 @@ export const quickAddStoneFormSchema = z
       return true
     },
     {
-      message: 'All bundle numbers must be filled',
       path: ['bundles'],
+        error: 'All bundle numbers must be filled'
     },
   )
 
@@ -81,17 +81,17 @@ export type TLeftoverStone = Extract<TQuickAddStoneSchema, { leftover: true }>
 export type TRegularStone = Extract<TQuickAddStoneSchema, { leftover: false }>
 
 export const stoneFilterSchema = z.object({
-  type: z.array(z.enum(STONE_TYPES)).default([]),
+  type: z.array(z.enum(STONE_TYPES)).prefault([]),
   show_sold_out: z
     .preprocess(value => {
       if (typeof value === 'boolean') return value
       return value === 'true'
     }, z.boolean())
-    .default(false),
-  supplier: z.number().gte(0).default(0),
+    .prefault(false),
+  supplier: z.number().gte(0).prefault(0),
   colors: z.any().optional(),
-  level: z.array(z.number()).default([]),
-  finishing: z.array(z.enum(STONE_FINISHES)).default([]),
-  viewMode: z.enum(['grid', 'table']).optional().default('grid'),
+  level: z.array(z.number()).prefault([]),
+  finishing: z.array(z.enum(STONE_FINISHES)).prefault([]),
+  viewMode: z.enum(['grid', 'table']).optional().prefault('grid'),
 })
 export type StoneFilter = z.infer<typeof stoneFilterSchema>

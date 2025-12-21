@@ -4,8 +4,8 @@ import {
   type ActionFunctionArgs,
   data,
   type LoaderFunctionArgs,
-  redirect,
   Form as RemixForm,
+  redirect,
   useLoaderData,
   useNavigation,
 } from 'react-router'
@@ -160,8 +160,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 function AddImageForm() {
   const navigation = useNavigation()
-  const form = useCustomForm<TDealImagesSchema>(DealImagesSchema)
-    const isSubmitting = useNavigation().state !== 'idle'
+  const form = useCustomForm(DealImagesSchema)
+  const isSubmitting = useNavigation().state !== 'idle'
   const [inputKey, setInputKey] = useState(0)
 
   useEffect(() => {
@@ -172,7 +172,6 @@ function AddImageForm() {
   }, [navigation.state, form])
 
   return (
-
     <MultiPartForm form={form}>
       <div className='flex items-center space-x-4'>
         <FormField

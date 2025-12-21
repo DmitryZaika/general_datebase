@@ -25,7 +25,6 @@ import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 import { useCustomForm } from '~/utils/useCustomForm'
 
 export const InstalledProjectsSchema = z.object({})
-type TInstalledProjectsSchema = z.infer<typeof InstalledProjectsSchema>
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
@@ -107,7 +106,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 function AddImage() {
   const navigation = useNavigation()
-  const form = useCustomForm<TInstalledProjectsSchema>(InstalledProjectsSchema)
+  const form = useCustomForm(InstalledProjectsSchema)
 
   const [inputKey, setInputKey] = useState(0)
 

@@ -22,7 +22,7 @@ import { selectMany } from '~/utils/queryHelpers'
 import { toastData } from '~/utils/toastHelpers.server'
 
 const paramsSchema = z.object({
-  viewId: z.string().uuid('View ID must be a valid UUID'),
+  viewId: z.uuid('View ID must be a valid UUID'),
 })
 
 function writeStorageIfBlank(key: 'customerViewId', value: string) {

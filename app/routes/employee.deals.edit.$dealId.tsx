@@ -6,7 +6,7 @@ import {
   Outlet,
   redirect,
   useLocation,
-  useNavigate
+  useNavigate,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import {
@@ -37,8 +37,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   const resolver = zodResolver(dealsSchema)
 
-  const { errors, data, receivedValues } =
-    await getValidatedFormData<DealsDialogSchema>(request, resolver)
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }
@@ -115,9 +114,9 @@ export default function DealsEdit() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[500px] overflow-auto flex flex-col justify-baseline min-h-[390px] max-h-[95vh] p-5'>
-        <DialogHeader> 
-          <DialogTitle>Edit Deal</DialogTitle>  
+      <DialogContent className='sm:max-w-125 overflow-auto flex flex-col justify-baseline min-h-[390px] max-h-[95vh] p-5'>
+        <DialogHeader>
+          <DialogTitle>Edit Deal</DialogTitle>
         </DialogHeader>
         <Tabs
           value={location.pathname.split('/').pop()}

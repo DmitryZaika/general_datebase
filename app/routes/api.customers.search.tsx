@@ -45,7 +45,7 @@ function matchesNameFuzzy(name: string, term: string) {
 
 export const customerSchema = z.object({
   term: z.string(),
-  searchType: z.enum(['name', 'phone', 'email']).default('name'),
+  searchType: z.enum(['name', 'phone', 'email']).prefault('name'),
 })
 
 export async function loader({ request }: LoaderFunctionArgs) {

@@ -40,8 +40,8 @@ import { useCustomOptionalForm } from '~/utils/useCustomForm'
 // Form schema
 const slabSchema = z.object({
   bundle: z.string().min(1),
-  length: z.coerce.number().default(0),
-  width: z.coerce.number().default(0),
+  length: z.coerce.number().prefault(0),
+  width: z.coerce.number().prefault(0),
 })
 
 // Schema for updating slab bundle

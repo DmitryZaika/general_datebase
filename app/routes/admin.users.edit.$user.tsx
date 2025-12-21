@@ -45,7 +45,7 @@ import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 const userschema = z.object({
   name: z.string().min(1),
   phone_number: z.union([z.coerce.string().min(10), z.literal('')]).optional(),
-  email: z.union([z.string().email().optional(), z.literal('')]),
+  email: z.union([z.email().optional(), z.literal('')]),
   company_id: z.coerce.number(),
   positions: z.union([
     z.string().transform(val => {
@@ -72,7 +72,7 @@ const userschema = z.object({
       z.coerce.number().transform(val => [val]),
     ])
     .optional()
-    .default([]),
+    .prefault([]),
   is_admin: z.boolean(),
 })
 

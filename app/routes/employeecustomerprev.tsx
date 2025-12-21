@@ -20,7 +20,7 @@ import { Input } from '../components/ui/input'
 
 const customerSchema = z.object({
   name: z.string().min(5),
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   phoneNumber: z.string().min(10).optional(),
   address: z.string().min(10).optional(),
 })

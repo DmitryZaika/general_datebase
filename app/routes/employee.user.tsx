@@ -32,12 +32,11 @@ import { toastData } from '~/utils/toastHelpers.server'
 const userSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   phone_number: z.union([z.coerce.string().min(10), z.literal('')]).optional(),
-  email: z.string().email('Invalid email address'),
+  email: z.email('Invalid email address'),
   password: z.union([z.string(), z.null(), z.undefined()]).optional(),
   email_signature: z.string().optional(),
 })
 
-type FormData = z.infer<typeof userSchema>
 const resolver = zodResolver(userSchema)
 
 interface UserData extends RowDataPacket {
@@ -46,16 +45,6 @@ interface UserData extends RowDataPacket {
   phone_number: string | null
   email_signature: string | null
   telegram_id: boolean
-}
-
-async function _getCompanyInfo(): Promise<{ CompanyInfo: { CompanyName: string } }> {
-  const result = await fetch('/api/quickbooks/company-info')
-  if (!result.ok) {
-    throw new Error(await result.text())
-  }
-  const data = await result.json()
-
-  return data
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -68,7 +57,7 @@ export async function action({ request }: ActionFunctionArgs) {
       return { error: 'Invalid CSRF token' }
     }
 
-    const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
+    const { errors, data, receivedValues } = await getValidatedFormData(
       request,
       resolver,
     )
@@ -77,7 +66,12 @@ export async function action({ request }: ActionFunctionArgs) {
       return { errors, receivedValues }
     }
 
-    const updateFields = ['name = ?', 'email = ?', 'phone_number = ?', 'email_signature = ?']
+    const updateFields = [
+      'name = ?',
+      'email = ?',
+      'phone_number = ?',
+      'email_signature = ?',
+    ]
     const params = [data.name, data.email, data.phone_number, data.email_signature]
 
     // Only hash and update password if provided
@@ -161,7 +155,6 @@ function TelegramLink({ email }: { email: string }) {
   )
 }
 
-
 export default function UserProfile() {
   const { userData } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
@@ -169,7 +162,7 @@ export default function UserProfile() {
   const token = useAuthenticityToken()
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
-  const form = useForm<FormData>({
+  const form = useForm({
     resolver,
     defaultValues: {
       name: userData.name || '',
@@ -192,10 +185,8 @@ export default function UserProfile() {
   return (
     <div className='container  py-5'>
       <h1 className='text-2xl  font-bold mb-6 ml-3'>My Account</h1>
-      
 
       <div className='bg-card  rounded-lg shadow p-6 w-full'>
-    
         {!userData.telegram_id && userData.email && (
           <TelegramLink email={userData.email} />
         )}
@@ -279,7 +270,7 @@ export default function UserProfile() {
                           textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
                         }
                       }}
-                      className='min-h-[100px] resize-none overflow-hidden'
+                      className='min-h-25 resize-none overflow-hidden'
                     />
                   </div>
                 )}
@@ -293,9 +284,7 @@ export default function UserProfile() {
             </div>
           </Form>
         </FormProvider>
-        </div>
-    
-        </div>
-   
+      </div>
+    </div>
   )
 }

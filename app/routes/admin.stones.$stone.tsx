@@ -65,7 +65,7 @@ const TransactionSchema = z.object({
   seller_name: z.string(),
   sale_notes: z.string().nullable().optional(),
   slab_notes: z.string().nullable().optional(),
-  square_feet: z.coerce.number().default(0),
+  square_feet: z.coerce.number().prefault(0),
   sink_names: z.string().nullable().optional(),
 })
 
