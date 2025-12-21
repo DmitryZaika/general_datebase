@@ -23,7 +23,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { Variant } from '@/types'
 import { useFullFetcher } from '~/hooks/useFullFetcher'
-import { type EventFormData, eventSchema } from '~/schemas/events'
+import { eventSchema } from '~/schemas/events'
 
 interface AddEventModalProps {
   open: boolean
@@ -44,7 +44,7 @@ export default function AddEventModal({
   onOpenChange,
   defaultValues,
 }: AddEventModalProps) {
-  const form = useForm<EventFormData>({
+  const form = useForm({
     resolver: zodResolver(eventSchema),
     defaultValues: {
       id: defaultValues?.id || undefined,

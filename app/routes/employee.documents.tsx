@@ -1,23 +1,18 @@
-import { Document, Page, pdfjs } from 'react-pdf'
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css'
-import 'react-pdf/dist/esm/Page/TextLayer.css'
+import { lazy, Suspense } from 'react'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
-import ModuleList from '~/components/ModuleList'
+import { ClientOnly } from 'remix-utils/client-only'
 import { Accordion, AccordionContent, AccordionItem } from '~/components/ui/accordion'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
+
+const DocumentRenderer = lazy(() => import('~/components/DisplayPDF.client'))
 
 interface ItemDocument {
   id: number
   name: string
   url: string | null
 }
-
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
@@ -34,6 +29,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { documents }
 }
 
+function Fallback() {
+  return <div>Loading...</div>
+}
+
 export default function Documents() {
   const { documents } = useLoaderData<typeof loader>()
 
@@ -43,18 +42,13 @@ export default function Documents() {
         <AccordionContent>
           <Accordion type='multiple'>
             <AccordionContent>
-              <ModuleList>
-                {documents
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map(({ url, id, name }) => (
-                    <div key={id} className='w-[118px] h-auto'>
-                      <Document file={url} onClick={() => window.open(url || '')}>
-                        <Page pageNumber={1} scale={0.2} />
-                      </Document>
-                      <p className='text-center font-bold select-none'>{name}</p>
-                    </div>
-                  ))}
-              </ModuleList>
+              <ClientOnly fallback={<Fallback />}>
+                {() => (
+                  <Suspense fallback={<Fallback />}>
+                    <DocumentRenderer documents={documents} />
+                  </Suspense>
+                )}
+              </ClientOnly>
             </AccordionContent>
           </Accordion>
         </AccordionContent>
