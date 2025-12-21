@@ -45,7 +45,10 @@ export const roomSchema = z.object({
   sink_type: z.array(sinkOptionsSchema).default([]),
   faucet_type: z.array(faucetOptionsSchema).default([]),
   backsplash: z.string().default('no'),
-  square_feet: z.coerce.number().default(0),
+  square_feet: z.preprocess(
+    value => (value === '' || value === null ? undefined : value),
+    z.coerce.number().optional(),
+  ),
   retail_price: z.coerce.number().default(0),
   total_price: z.coerce.number().optional(),
   tear_out: z.string().default('no'),
@@ -81,6 +84,16 @@ export const customerSchema = z.object({
   company_name: z.string().nullable().optional(),
   rooms: z.array(roomSchema).default([]),
   extras: z.array(finalExtrasSchema).default([]),
+}).superRefine((value, ctx) => {
+  value.rooms.forEach((room, index) => {
+    if (!room.square_feet || room.square_feet <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Square feet is required',
+        path: ['rooms', index, 'square_feet'],
+      })
+    }
+  })
 })
 
 export type TCustomerSchema = z.infer<typeof customerSchema>
