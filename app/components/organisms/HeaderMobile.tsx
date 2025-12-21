@@ -40,7 +40,6 @@ function BurgerLink({ setOpen, to, children, className, onClick }: BurgerLinkPro
   )
 }
 
-
 export function BurgerMenu({
   user,
   isAdmin,
@@ -201,16 +200,13 @@ export function HeaderMobile({
     ? location.pathname.split('/').filter(Boolean)[1]
     : data?.user?.company_id
   const id = Number(companyId)
-  const companyLogo = id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
+  const companyLogo =
+    id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
   return (
     <header className={clsx('flex justify-between', className)}>
       <div className='logo'>
         <a className='flex justify-center' href='/'>
-          <img
-            src={companyLogo}
-            alt='Logo'
-            className='h-18 md:h-16 object-contain'
-          />
+          <img src={companyLogo} alt='Logo' className='h-18 md:h-16 object-contain' />
         </a>
       </div>
       <div className='flex items-center gap-2'>

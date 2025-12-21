@@ -66,7 +66,6 @@ const userschema = z.object({
   is_admin: z.boolean(),
 })
 
-type FormData = z.infer<typeof userschema>
 const resolver = zodResolver(userschema)
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -81,10 +80,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return { error: 'Invalid CSRF token' }
   }
 
-  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
-    request,
-    resolver,
-  )
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }
@@ -149,7 +145,7 @@ export default function UsersAdd() {
     value: position.displayName,
     description: position.description,
   }))
-  const form = useForm<FormData>({
+  const form = useForm({
     resolver,
     defaultValues: {
       name: '',
@@ -225,11 +221,14 @@ export default function UsersAdd() {
                     <div className='flex items-center space-x-2'>
                       <Switch
                         id={`position-${position.key}`}
-                        checked={field.value.includes(position.key)}
+                        checked={
+                          Array.isArray(field.value) &&
+                          field.value.includes(position.key)
+                        }
                         onCheckedChange={checked => {
-                          if (checked) {
+                          if (checked && Array.isArray(field.value)) {
                             field.onChange([...field.value, position.key])
-                          } else {
+                          } else if (Array.isArray(field.value)) {
                             field.onChange(
                               field.value.filter((id: number) => id !== position.key),
                             )

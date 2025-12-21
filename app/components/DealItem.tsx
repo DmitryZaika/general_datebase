@@ -1,6 +1,12 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Calendar as CalendarIcon, GripVertical, Mail, PaperclipIcon, Pencil } from 'lucide-react'
+import {
+  Calendar as CalendarIcon,
+  GripVertical,
+  Mail,
+  PaperclipIcon,
+  Pencil,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher } from 'react-router'
 import { formatMoney, updateNumber } from './functions'
@@ -44,6 +50,11 @@ function getDateColor(dateStr: string | null | undefined, listId: number): strin
   if (Number.isNaN(selected.getTime())) return 'text-gray-700'
   if (selected.getTime() === today.getTime()) return 'text-yellow-500'
   return selected < today ? 'text-red-500' : 'text-gray-500'
+}
+
+function formatDate(date: string | null): Date | undefined {
+  if (!date) return undefined
+  return new Date(`${date}T00:00:00`)
 }
 
 export default function DealItem({
@@ -305,11 +316,9 @@ export default function DealItem({
             </PopoverTrigger>
             <PopoverContent className='w-auto p-0' align='start' side='bottom'>
               <Calendar
-                fixedWeeks
-                mode='single'
-                selected={localDate ? new Date(localDate + 'T00:00:00') : undefined}
-                defaultMonth={localDate ? new Date(localDate + 'T00:00:00') : undefined}
-                onSelect={date => {
+                selected={formatDate(localDate)}
+                defaultMonth={formatDate(localDate)}
+                onDayClick={(date: Date) => {
                   if (date) {
                     const year = date.getFullYear()
                     const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -328,7 +337,7 @@ export default function DealItem({
             {formatDisplay(localDate)}
           </p>
         )}
-        
+
         {(hasEmail || hasImages) && (
           <div className='flex flex-col items-center gap-1'>
             {hasEmail && (

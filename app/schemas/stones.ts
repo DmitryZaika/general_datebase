@@ -68,7 +68,9 @@ export const quickAddStoneSchema = z.discriminatedUnion('leftover', [
   z.object({
     ...quickAddStoneBaseSchema,
     leftover: z.literal(false),
-    bundles: z.array(z.string().min(1, 'Bundle number is required')).min(1, 'At least one bundle is required'),
+    bundles: z
+      .array(z.string().min(1, 'Bundle number is required'))
+      .min(1, 'At least one bundle is required'),
   }),
 ])
 
