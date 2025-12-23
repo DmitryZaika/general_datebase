@@ -316,9 +316,10 @@ export default function DealItem({
             </PopoverTrigger>
             <PopoverContent className='w-auto p-0' align='start' side='bottom'>
               <Calendar
+                mode='single'
                 selected={formatDate(localDate)}
                 defaultMonth={formatDate(localDate)}
-                onDayClick={(date: Date) => {
+                onSelect={(date: Date | undefined) => {
                   if (date) {
                     const year = date.getFullYear()
                     const month = String(date.getMonth() + 1).padStart(2, '0')
