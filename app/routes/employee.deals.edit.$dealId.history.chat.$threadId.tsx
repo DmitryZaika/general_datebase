@@ -1,3 +1,4 @@
+import { format } from 'date-fns'
 import { Pencil } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
@@ -425,7 +426,7 @@ export default function EmailChatDialog() {
               <div key={message.id}>
                 {showDate(message, index) && (
                   <div className='text-center text-xs text-gray-500 my-4'>
-                    Today
+                    {format(new Date(message.sent_at), 'MMM d, yyyy')}
                   </div>
                 )}
                 <div
