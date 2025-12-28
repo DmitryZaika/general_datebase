@@ -106,7 +106,7 @@ const generateSchema = z.object({
     'referral',
   ]),
   dealId: z.number(),
-  threadId: z.string().uuid().optional(),
+  threadId: z.uuid().optional(),
   formality: z.enum(['formal', 'neutral', 'casual']).optional(),
   tone: z.enum(['friendly', 'persuasive', 'empathetic', 'urgent']).optional(),
   verboseness: z.enum(['concise', 'detailed']).optional(),
@@ -331,7 +331,8 @@ function buildUserPrompt(
     desiredContent,
   } = params
 
-  const { customerName, leadMessage, remodelType, referralSource, customerCompany } = lead
+  const { customerName, leadMessage, remodelType, referralSource, customerCompany } =
+    lead
   const { variationToken } = params
 
   let prompt = `Write a ${formality}, ${tone} sales email. `

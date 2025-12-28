@@ -1,21 +1,29 @@
 import { Calendar, MapPin, User, UserCircle } from 'lucide-react'
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import {
+  type ActionFunctionArgs,
   data,
+  type LoaderFunctionArgs,
   Outlet,
   useFetcher,
   useLoaderData,
   useLocation,
   useNavigate,
-  type ActionFunctionArgs,
-  type LoaderFunctionArgs,
 } from 'react-router'
-import { AddSlabDialog, type RoomOption } from '~/components/transactions/AddSlabDialogTransactions'
+import {
+  AddSlabDialog,
+  type RoomOption,
+} from '~/components/transactions/AddSlabDialogTransactions'
 import { ReplaceDialog } from '~/components/transactions/ReplaceDialog'
 import { RoomsSection } from '~/components/transactions/RoomsSection'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
@@ -40,7 +48,6 @@ const roomKeyFromSlab = (slab: Pick<SaleSlab, 'room' | 'room_uuid'>) =>
   slab.room_uuid ?? `name:${normalizeRoomName(slab.room).toLowerCase()}`
 const roomKeyFromSink = (sink: Pick<SaleSink, 'room' | 'room_uuid'>) =>
   sink.room_uuid ?? `name:${normalizeRoomName(sink.room).toLowerCase()}`
-
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await getEmployeeUser(request)
@@ -160,7 +167,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return null
     }
 
-    const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
+    const slabs = await selectMany<{
+      id: number
+      sale_id: number
+      cut_date: string | null
+    }>(
       db,
       `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
       [slabId, saleId],
@@ -171,14 +182,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     if (slabs[0].cut_date === null) {
-      await db.execute(`UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`, [
-        slabId,
-      ])
+      await db.execute(
+        `UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`,
+        [slabId],
+      )
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Slab marked as cut'))
-      return data({ success: true }, {
-        headers: { 'Set-Cookie': await commitSession(session) },
-      })
+      return data(
+        { success: true },
+        {
+          headers: { 'Set-Cookie': await commitSession(session) },
+        },
+      )
     }
   } else if (intent === 'uncut-slab') {
     const slabIdValue = formData.get('slabId')
@@ -249,7 +264,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (!slabId || !Number.isFinite(slabId)) {
       return null
     }
-    await db.execute(`DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`, [slabId])
+    await db.execute(
+      `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`,
+      [slabId],
+    )
     await db.execute(
       `UPDATE slab_inventory
          SET sale_id = NULL,
@@ -273,9 +291,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
     )
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Success', 'Slab removed from sale'))
-    return data({ success: true }, {
-      headers: { 'Set-Cookie': await commitSession(session) },
-    })
+    return data(
+      { success: true },
+      {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      },
+    )
   } else if (intent === 'remove-room') {
     const room = formData.get('room') as string
     if (!room) return null
@@ -287,9 +308,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
       [saleId, room],
     )
     session.flash('message', toastData('Success', `Room "${room}" removed`))
-    return data({ success: true }, {
-      headers: { 'Set-Cookie': await commitSession(session) },
-    })
+    return data(
+      { success: true },
+      {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      },
+    )
   } else if (intent === 'replace-slab') {
     const oldSlabId = Number(formData.get('oldSlabId'))
     const newSlabId = Number(formData.get('newSlabId'))
@@ -361,7 +385,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
       ],
     )
 
-    await db.execute(`DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`, [oldSlabId])
+    await db.execute(
+      `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`,
+      [oldSlabId],
+    )
 
     await db.execute(
       `UPDATE slab_inventory
@@ -387,9 +414,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Success', 'Slab replaced'))
-    return data({ success: true }, {
-      headers: { 'Set-Cookie': await commitSession(session) },
-    })
+    return data(
+      { success: true },
+      {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      },
+    )
   } else if (intent === 'partial-cut') {
     const slabIdValue = formData.get('slabId')
     const lengthRaw = formData.get('length')
@@ -419,7 +449,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
     ) {
       return null
     }
-    const parent = await selectMany<{ stone_id: number; bundle: string; url: string | null }>(
+    const parent = await selectMany<{
+      stone_id: number
+      bundle: string
+      url: string | null
+    }>(
       db,
       `SELECT stone_id, bundle, url FROM slab_inventory WHERE id = ? AND sale_id = ?`,
       [slabId, saleId],
@@ -487,7 +521,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const room = (formData.get('room') as string) || null
     const roomUuidRaw = formData.get('roomUuid')
     const roomUuid =
-      typeof roomUuidRaw === 'string' && roomUuidRaw.trim() !== '' ? roomUuidRaw.trim() : null
+      typeof roomUuidRaw === 'string' && roomUuidRaw.trim() !== ''
+        ? roomUuidRaw.trim()
+        : null
     if (!slabId || !room) return null
 
     const templateQuery = roomUuid
@@ -519,7 +555,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
       extras: string | null
       edge: string | null
     }
-    const templateRows = await selectMany<TemplateRow>(db, templateQuery, templateParams)
+    const templateRows = await selectMany<TemplateRow>(
+      db,
+      templateQuery,
+      templateParams,
+    )
     const template = templateRows[0] ?? null
     const roomUuidValue =
       template?.room_uuid ?? (roomUuid ? Buffer.from(roomUuid, 'hex') : null)
@@ -563,9 +603,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
     )
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Success', 'Slab added to sale'))
-    return data({ success: true }, {
-      headers: { 'Set-Cookie': await commitSession(session) },
-    })
+    return data(
+      { success: true },
+      {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      },
+    )
   } else {
     return null
   }
@@ -590,7 +633,13 @@ export default function ViewTransaction() {
   const [replaceDialogOpen, setReplaceDialogOpen] = useState(false)
   const [replaceTarget, setReplaceTarget] = useState<SaleSlab | null>(null)
   const [replaceOptions, setReplaceOptions] = useState<
-    { id: number; bundle: string; is_leftover: boolean; parent_id: number | null; child_count: number }[]
+    {
+      id: number
+      bundle: string
+      is_leftover: boolean
+      parent_id: number | null
+      child_count: number
+    }[]
   >([])
   const [replaceLoading, setReplaceLoading] = useState(false)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
@@ -600,7 +649,13 @@ export default function ViewTransaction() {
   >([])
   const [addStoneId, setAddStoneId] = useState<number | null>(null)
   const [addSlabs, setAddSlabs] = useState<
-    { id: number; bundle: string; is_leftover: boolean; parent_id?: number | null; child_count?: number }[]
+    {
+      id: number
+      bundle: string
+      is_leftover: boolean
+      parent_id?: number | null
+      child_count?: number
+    }[]
   >([])
   const [addLoading, setAddLoading] = useState(false)
   const [addSlabsLoading, setAddSlabsLoading] = useState(false)
@@ -629,7 +684,8 @@ export default function ViewTransaction() {
       >((acc, slab) => {
         const roomName = normalizeRoomName(slab.room)
         const key = roomKeyFromSlab(slab)
-        if (!acc[key]) acc[key] = { name: roomName, slabs: [], roomUuid: slab.room_uuid ?? null }
+        if (!acc[key])
+          acc[key] = { name: roomName, slabs: [], roomUuid: slab.room_uuid ?? null }
         acc[key].slabs.push(slab)
         return acc
       }, {}),
@@ -741,7 +797,13 @@ export default function ViewTransaction() {
       }
       const local = localRooms.find(r => r.id === key)
       if (local) {
-        items.push({ id: local.id, name: local.name, slabs: [], isLocal: true, roomUuid: null })
+        items.push({
+          id: local.id,
+          name: local.name,
+          slabs: [],
+          isLocal: true,
+          roomUuid: null,
+        })
       }
     }
     roomOrder.forEach(addRoomEntry)
@@ -937,7 +999,6 @@ export default function ViewTransaction() {
     setNewRoomName('')
   }
 
-
   useEffect(() => {
     if (!addDialogOpen || !addRoom) return
     const term = addSearch.trim()
@@ -1018,7 +1079,10 @@ export default function ViewTransaction() {
                         </span>
                         <div className='flex flex-wrap gap-2 text-sm text-muted-foreground justify-end'>
                           {room.items.map(item => (
-                            <span key={item.name} className='px-2 py-1 rounded bg-muted'>
+                            <span
+                              key={item.name}
+                              className='px-2 py-1 rounded bg-muted'
+                            >
                               {item.name}
                               {item.count > 1 ? ` x${item.count}` : ''}
                             </span>
@@ -1030,7 +1094,6 @@ export default function ViewTransaction() {
                 )}
               </CardContent>
             </Card>
-
           </div>
 
           <Card>
@@ -1066,9 +1129,7 @@ export default function ViewTransaction() {
         </div>
 
         <div className='flex justify-end mt-4 gap-2'>
-          <Button onClick={openAddDialog}>
-            Add Slab
-          </Button>
+          <Button onClick={openAddDialog}>Add Slab</Button>
           <Button
             variant='outline'
             onClick={() => navigate(`/employee/transactions${location.search}`)}
@@ -1111,7 +1172,9 @@ export default function ViewTransaction() {
                   min='0'
                   step='0.01'
                   value={partialLength}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPartialLength(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setPartialLength(e.target.value)
+                  }
                   disabled={partialSubmitting}
                   placeholder='Length'
                 />
@@ -1120,7 +1183,9 @@ export default function ViewTransaction() {
                   min='0'
                   step='0.01'
                   value={partialWidth}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPartialWidth(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setPartialWidth(e.target.value)
+                  }
                   disabled={partialSubmitting}
                   placeholder='Width'
                 />
@@ -1174,7 +1239,8 @@ export default function ViewTransaction() {
             <DialogHeader>
               <DialogTitle>Remove Slab</DialogTitle>
               <p className='text-sm text-muted-foreground'>
-                Are you sure you want to remove slab {removeTarget.bundle} from this sale?
+                Are you sure you want to remove slab {removeTarget.bundle} from this
+                sale?
               </p>
             </DialogHeader>
             <div className='flex justify-end gap-2'>

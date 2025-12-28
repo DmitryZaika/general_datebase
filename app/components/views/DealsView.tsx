@@ -51,7 +51,14 @@ interface DealsViewProps {
   viewSelect?: React.ReactNode
 }
 
-export default function DealsView({ deals, customers, lists, imagesMap, emailsMap, viewSelect }: DealsViewProps) {
+export default function DealsView({
+  deals,
+  customers,
+  lists,
+  imagesMap,
+  emailsMap,
+  viewSelect,
+}: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
 

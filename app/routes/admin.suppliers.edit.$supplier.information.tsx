@@ -23,11 +23,11 @@ import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 import { FormField, FormProvider } from '../components/ui/form'
 
 const supplierschema = z.object({
-  website: z.string().url(),
+  website: z.url(),
   supplier_name: z.string().min(1),
   manager: z.string().optional(),
   phone: z.union([z.coerce.string().min(10), z.literal('')]),
-  email: z.union([z.string().email().optional(), z.literal('')]),
+  email: z.union([z.email().optional(), z.literal('')]),
   notes: z.string().optional(),
 })
 
@@ -51,10 +51,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   const supplierId = parseInt(params.supplier)
 
-  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
-    request,
-    resolver,
-  )
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }
@@ -127,7 +124,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function SuppliersAdd() {
   const { website, supplier_name, manager, email, phone, notes } =
     useLoaderData<typeof loader>()
-  const form = useForm<FormData>({
+  const form = useForm({
     resolver,
     defaultValues: {
       website: website || '',

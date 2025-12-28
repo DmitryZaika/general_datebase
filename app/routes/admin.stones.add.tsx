@@ -222,7 +222,9 @@ export default function StonesAdd() {
                 defaultValue={false}
                 control={form.control}
                 name='regular_stock'
-                render={({ field }) => <SwitchItem field={field} name='Regular Stock' />}
+                render={({ field }) => (
+                  <SwitchItem field={field} name='Regular Stock' />
+                )}
               />
             </div>
 

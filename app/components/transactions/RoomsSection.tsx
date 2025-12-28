@@ -72,7 +72,9 @@ export function RoomsSection({
   return (
     <>
       {isEmpty ? (
-        <p className='text-muted-foreground text-center py-8'>No slabs in this transaction</p>
+        <p className='text-muted-foreground text-center py-8'>
+          No slabs in this transaction
+        </p>
       ) : (
         <>
           {roomEntries.map((roomEntry, idx) => {
@@ -97,7 +99,9 @@ export function RoomsSection({
                         className='bg-transparent outline-none border-b border-transparent focus:border-foreground text-sm font-semibold flex-1'
                       />
                     ) : (
-                      <span>{roomName.charAt(0).toUpperCase() + roomName.slice(1)}</span>
+                      <span>
+                        {roomName.charAt(0).toUpperCase() + roomName.slice(1)}
+                      </span>
                     )}
                     {isLocalOnly && (
                       <Button
@@ -124,9 +128,14 @@ export function RoomsSection({
                           onKeyDown={e => {
                             if (e.key === 'Enter') {
                               const value = editingValue.trim()
-                              const parsed = value === '' ? null : Number.parseFloat(value)
+                              const parsed =
+                                value === '' ? null : Number.parseFloat(value)
                               if (parsed !== null && Number.isNaN(parsed)) return
-                              onUpdateRoomSquareFeet(roomEntry.id, roomSlabs[0].id, parsed)
+                              onUpdateRoomSquareFeet(
+                                roomEntry.id,
+                                roomSlabs[0].id,
+                                parsed,
+                              )
                               setEditingRoomId(null)
                             }
                           }}
@@ -139,9 +148,14 @@ export function RoomsSection({
                           size='sm'
                           onClick={() => {
                             const value = editingValue.trim()
-                            const parsed = value === '' ? null : Number.parseFloat(value)
+                            const parsed =
+                              value === '' ? null : Number.parseFloat(value)
                             if (parsed !== null && Number.isNaN(parsed)) return
-                            onUpdateRoomSquareFeet(roomEntry.id, roomSlabs[0].id, parsed)
+                            onUpdateRoomSquareFeet(
+                              roomEntry.id,
+                              roomSlabs[0].id,
+                              parsed,
+                            )
                             setEditingRoomId(null)
                           }}
                           disabled={isSaving}
@@ -161,7 +175,9 @@ export function RoomsSection({
                         >
                           ×
                         </Button>
-                        {isSaving && <Loader2 className='h-4 w-4 animate-spin text-foreground' />}
+                        {isSaving && (
+                          <Loader2 className='h-4 w-4 animate-spin text-foreground' />
+                        )}
                       </div>
                     ) : (
                       <div className='flex items-center gap-2'>
@@ -183,7 +199,9 @@ export function RoomsSection({
                         >
                           <Pencil className='h-4 w-4' />
                         </Button>
-                        {isSaving && <Loader2 className='h-4 w-4 animate-spin text-foreground' />}
+                        {isSaving && (
+                          <Loader2 className='h-4 w-4 animate-spin text-foreground' />
+                        )}
                       </div>
                     )}
                   </div>
@@ -209,17 +227,23 @@ export function RoomsSection({
                     <TableBody>
                       {roomSlabs.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={6} className='text-center text-sm text-muted-foreground py-4'>
+                          <TableCell
+                            colSpan={6}
+                            className='text-center text-sm text-muted-foreground py-4'
+                          >
                             No slabs in this room
                           </TableCell>
                         </TableRow>
                       )}
                       {roomSlabs.map(slab => (
                         <TableRow key={slab.id}>
-                          <TableCell className='font-medium px-4'>{slab.bundle}</TableCell>
+                          <TableCell className='font-medium px-4'>
+                            {slab.bundle}
+                          </TableCell>
                           <TableCell>
                             {slab.stone_name}
-                            {(slab.parent_id !== null || slab.child_count > 0) && ' (Partial)'}
+                            {(slab.parent_id !== null || slab.child_count > 0) &&
+                              ' (Partial)'}
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -233,21 +257,27 @@ export function RoomsSection({
                               {slab.cut_date ? 'Cut' : 'Uncut'}
                             </Badge>
                           </TableCell>
-                          <TableCell className='max-w-[200px] truncate' title={slab.notes || ''}>
+                          <TableCell
+                            className='max-w-[200px] truncate'
+                            title={slab.notes || ''}
+                          >
                             {slab.notes || '-'}
                           </TableCell>
-                          <TableCell>{slab.cut_date ? formatDate(slab.cut_date) : '-'}</TableCell>
+                          <TableCell>
+                            {slab.cut_date ? formatDate(slab.cut_date) : '-'}
+                          </TableCell>
                           <TableCell className='text-right'>
                             <ActionDropdown
-                            actions={{
-                              [slab.cut_date ? 'uncut' : 'cut']: '#',
-                              ...(slab.cut_date ? {} : { partial: '#' }),
-                              replace: '#',
-                              remove: '#',
-                            }}
+                              actions={{
+                                [slab.cut_date ? 'uncut' : 'cut']: '#',
+                                ...(slab.cut_date ? {} : { partial: '#' }),
+                                replace: '#',
+                                remove: '#',
+                              }}
                               onItemClick={(action, _link, e) => {
                                 e.preventDefault()
-                                if (action === 'cut' || action === 'uncut') handleCut(slab)
+                                if (action === 'cut' || action === 'uncut')
+                                  handleCut(slab)
                                 if (action === 'replace') {
                                   if (slab.cut_date) {
                                     onReplaceBlocked()
@@ -255,7 +285,7 @@ export function RoomsSection({
                                   }
                                   openReplace(slab)
                                 }
-                          if (action === 'partial') openPartial(slab)
+                                if (action === 'partial') openPartial(slab)
                                 if (action === 'remove') handleRemove(slab)
                                 return false
                               }}
@@ -293,4 +323,3 @@ export function RoomsSection({
     </>
   )
 }
-

@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
-import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
+import { dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -38,9 +38,8 @@ export async function action({ request }: ActionFunctionArgs) {
     return { error: 'Invalid CSRF token' }
   }
   const resolver = zodResolver(dealsSchema)
- 
-  const { errors, data, receivedValues } =
-    await getValidatedFormData<DealsDialogSchema>(request, resolver)
+
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }
@@ -51,21 +50,21 @@ export async function action({ request }: ActionFunctionArgs) {
     [data.list_id],
   )
   const initialStatus = listRows[0]?.name || 'New Customer'
-if (!data.deal_id) {
-  await db.execute(
-    `INSERT INTO deals
+  if (!data.deal_id) {
+    await db.execute(
+      `INSERT INTO deals
      (customer_id, amount, description, status, list_id, position, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?);`,
-    [
-      data.customer_id,
-      data.amount,
-      data.description,
-      initialStatus,
-      data.list_id,
-      data.position,
-      user.id,
-    ],
-  )
+      [
+        data.customer_id,
+        data.amount,
+        data.description,
+        initialStatus,
+        data.list_id,
+        data.position,
+        user.id,
+      ],
+    )
   } else {
     await db.execute(`UPDATE deals SET amount = ?, description = ? WHERE id = ?`, [
       data.amount,

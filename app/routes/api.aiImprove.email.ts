@@ -56,5 +56,3 @@ export async function action({ request }: ActionFunctionArgs) {
     return createErrorResponse('Failed to improve email', 500)
   }
 }
-
-

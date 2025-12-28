@@ -6,8 +6,8 @@ import {
 } from 'react-router'
 import { ContractForm } from '~/components/pages/ContractForm'
 import { roomSchema } from '~/schemas/sales'
-import { getEmployeeUser, type User } from '~/utils/session.server'
 import { handleSellSlabAction } from '~/utils/sellSlabAction.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 export async function action({ request }: ActionFunctionArgs) {
   return handleSellSlabAction(request)

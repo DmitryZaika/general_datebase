@@ -26,7 +26,8 @@ export function HeaderDesktop({
     ? location.pathname.split('/').filter(Boolean)[1]
     : data?.user?.company_id
   const id = Number(companyId)
-  const companyLogo = id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
+  const companyLogo =
+    id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
 
   const customerSwitchUrl =
     companyId === undefined
@@ -34,14 +35,22 @@ export function HeaderDesktop({
       : getCustomerUrl(isCustomerPage, location, companyId)
   return (
     <header
-      className={id === 4 ? clsx('flex-row items-center   gap-0 justify-between  px-3 py-2', className) : clsx('flex-row items-center gap-0 justify-between  px-3', className)}
+      className={
+        id === 4
+          ? clsx('flex-row items-center   gap-0 justify-between  px-3 py-2', className)
+          : clsx('flex-row items-center gap-0 justify-between  px-3', className)
+      }
     >
       <div className='logo'>
         <a className='flex justify-center' href='/'>
           <img
             src={companyLogo}
             alt='Logo'
-            className={id === 4 ? 'h-12 md:h-16 object-contain mr-4' : 'h-16 md:h-24 object-contain'}
+            className={
+              id === 4
+                ? 'h-12 md:h-16 object-contain mr-4'
+                : 'h-16 md:h-24 object-contain'
+            }
           />
         </a>
       </div>

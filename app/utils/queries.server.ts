@@ -201,7 +201,9 @@ export async function sinkQueryBuilder(
 
   const sinks = await selectMany<Sink>(db, query, params)
 
-  return show_sold_out ? sinks : sinks.filter(sink => (sink.available || 0) > 0 || sink.regular_stock)
+  return show_sold_out
+    ? sinks
+    : sinks.filter(sink => (sink.available || 0) > 0 || sink.regular_stock)
 }
 
 export interface Faucet {
@@ -269,5 +271,7 @@ export async function faucetQueryBuilder(
 
   const faucets = await selectMany<Faucet>(db, query, params)
 
-  return show_sold_out ? faucets : faucets.filter(faucet => (faucet.available || 0) > 0 || faucet.regular_stock)
+  return show_sold_out
+    ? faucets
+    : faucets.filter(faucet => (faucet.available || 0) > 0 || faucet.regular_stock)
 }

@@ -9,11 +9,11 @@ import { selectId } from '~/utils/queryHelpers'
 import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 
 export const customerSchema = z.object({
-  to: z.string().email(),
+  to: z.email(),
   subject: z.string().min(1).max(100),
   body: z.string().min(1).max(10000),
   dealId: z.coerce.number().min(1).int().optional(),
-  threadId: z.string().uuid().optional(),
+  threadId: z.uuid().optional(),
 })
 
 type Customer = z.infer<typeof customerSchema>
@@ -30,10 +30,7 @@ const appendEmailSignature = (body: string, signature: string | null | undefined
   const cleanSignature = (signature || '').trim()
   if (!cleanSignature) return cleanBody
   if (cleanBody.includes(cleanSignature)) return cleanBody
-  const sign =
-    cleanSignature.startsWith('--')
-      ? cleanSignature
-      : `—\n${cleanSignature}`
+  const sign = cleanSignature.startsWith('--') ? cleanSignature : `—\n${cleanSignature}`
   return `${cleanBody}\n\n${sign}`
 }
 

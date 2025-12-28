@@ -18,8 +18,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '~/components/ui/tooltip'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
 import { selectMany } from '~/utils/queryHelpers'
@@ -60,10 +71,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
-  
+
   const [userSignatureRows] = await db.execute<RowDataPacket[]>(
     'SELECT email_signature FROM users WHERE id = ?',
-    [user.id]
+    [user.id],
   )
   const currentUserSignature = userSignatureRows?.[0]?.email_signature || null
   if (!params.dealId) {
@@ -101,14 +112,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     )
   }
 
-
   let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, u.email_signature as signature, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
        LEFT JOIN users u ON u.id = e.sender_user_id
       WHERE e.deleted_at IS NULL AND e.thread_id = ? AND (e.deal_id = ? OR e.deal_id IS NULL)`
   const emailParams: (number | string)[] = [threadId, dealId]
-  
+
   const attachmentsRaw = await selectMany<Attachment>(
     db,
     `SELECT id, email_id, content_type, content_subtype, filename, url
@@ -128,7 +138,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }),
   )
 
-  emailQuery += ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, u.email_signature ORDER BY e.sent_at ASC'
+  emailQuery +=
+    ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, u.email_signature ORDER BY e.sent_at ASC'
 
   const [emailRows] = await db.execute<RowDataPacket[]>(emailQuery, emailParams)
 
@@ -242,9 +253,9 @@ async function generateAIEmailForChat(
   return processStreamingResponse(response.body.getReader(), onStreamBody)
 }
 
-function MessageDate({message}: {message: Message}) {
+function MessageDate({ message }: { message: Message }) {
   const date = new Date(message.sent_at)
-  const time = date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit' })
+  const time = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   return <p className='text-xs text-gray-500 text-left'>{time}</p>
 }
 
@@ -255,9 +266,15 @@ export default function EmailChatDialog() {
   const [selectActive, setSelectActive] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const { toast } = useToast()
-  const { customerName, customerEmail, messages, dealId, subject, threadId, currentUserSignature } = useLoaderData<
-    typeof loader
-  >()
+  const {
+    customerName,
+    customerEmail,
+    messages,
+    dealId,
+    subject,
+    threadId,
+    currentUserSignature,
+  } = useLoaderData<typeof loader>()
   const [chatMessages, setChatMessages] = useState<Message[]>(messages)
   const [messageText, setMessageText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -279,7 +296,6 @@ export default function EmailChatDialog() {
 
   useEffect(() => {
     setChatMessages(messages)
-    
   }, [messages])
 
   useEffect(() => {
@@ -400,9 +416,11 @@ export default function EmailChatDialog() {
   }
 
   function showDate(message: Message, index: number) {
-    return index === 0 || 
-      new Date(chatMessages[index - 1].sent_at).toDateString() !== 
-      new Date(message.sent_at).toDateString()
+    return (
+      index === 0 ||
+      new Date(chatMessages[index - 1].sent_at).toDateString() !==
+        new Date(message.sent_at).toDateString()
+    )
   }
 
   return (
@@ -414,7 +432,9 @@ export default function EmailChatDialog() {
               {getInitials(customerName)}
             </div>
             <div>
-              <DialogTitle className='text-lg font-semibold'>{customerName}</DialogTitle>
+              <DialogTitle className='text-lg font-semibold'>
+                {customerName}
+              </DialogTitle>
               <p className='text-sm text-gray-500'>Email: {customerEmail}</p>
               <p className='text-sm text-gray-500'>Subject: {subject}</p>
             </div>
@@ -430,29 +450,31 @@ export default function EmailChatDialog() {
                   </div>
                 )}
                 <div
-                  className={
-                    message.isFromCustomer
-                      ? 'flex justify-start'
-                      : 'flex justify-end w-full'
-                  }
+                  className={`flex items-center gap-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
                 >
-                  <div className={`flex items-center gap-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}>
-                      {!message.isFromCustomer && <MessageDate message={message} />}
-                    <div
-                      className={
-                        message.isFromCustomer
-                          ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%]'
-                          : `bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative ${
-                              message.signature && message.signature.trim() !== '' ? 'pb-6 min-w-[85px]' : ''
-                            }`
-                      }
-                    >
-                      <p className='whitespace-pre-wrap'>
-                        {getDisplayBody(message.body, message.isFromCustomer ? null : message.signature)}
-                      </p>
-                      {!message.isFromCustomer && message.signature && message.signature.trim() !== '' ? (
-                        <div className='absolute bottom-1 right-2'>
-                          <TooltipProvider>
+                  {!message.isFromCustomer && <MessageDate message={message} />}
+                  <div
+                    className={
+                      message.isFromCustomer
+                        ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%]'
+                        : `bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative ${
+                            message.signature && message.signature.trim() !== ''
+                              ? 'pb-6 min-w-[85px]'
+                              : ''
+                          }`
+                    }
+                  >
+                    <p className='whitespace-pre-wrap'>
+                      {getDisplayBody(
+                        message.body,
+                        message.isFromCustomer ? null : message.signature,
+                      )}
+                    </p>
+                    {!message.isFromCustomer &&
+                    message.signature &&
+                    message.signature.trim() !== '' ? (
+                      <div className='absolute bottom-1 right-2'>
+                        <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
@@ -460,109 +482,112 @@ export default function EmailChatDialog() {
                                 Signature
                               </span>
                             </TooltipTrigger>
-                            <TooltipContent side='top' className='max-w-[360px] whitespace-pre-wrap select-none bg-zinc-900 text-zinc-100 border-zinc-800 shadow-xl'>
+                            <TooltipContent
+                              side='top'
+                              className='max-w-[360px] whitespace-pre-wrap select-none bg-zinc-900 text-zinc-100 border-zinc-800 shadow-xl'
+                            >
                               {message.signature}
                             </TooltipContent>
                           </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      ) : null}
-                      {message.attachments && message.attachments.length > 0 ? (
-                        <div className='mt-3 space-y-2'>
-                          {message.attachments.map(attachment => {
-                            const mime = `${attachment.content_type}/${attachment.content_subtype}`
-                            const label = attachment.filename || mime
-                            const isImage = attachment.content_type.toLowerCase() === 'image'
-                            const href = attachment.signed_url || attachment.url
-                            const linkClass = message.isFromCustomer
-                              ? 'text-blue-700 underline'
-                              : 'text-white underline'
+                        </TooltipProvider>
+                      </div>
+                    ) : null}
+                    {message.attachments && message.attachments.length > 0 ? (
+                      <div className='mt-3 space-y-2'>
+                        {message.attachments.map(attachment => {
+                          const mime = `${attachment.content_type}/${attachment.content_subtype}`
+                          const label = attachment.filename || mime
+                          const isImage =
+                            attachment.content_type.toLowerCase() === 'image'
+                          const href = attachment.signed_url || attachment.url
+                          const linkClass = message.isFromCustomer
+                            ? 'text-blue-700 underline'
+                            : 'text-white underline'
 
-                            return (
-                              <div key={attachment.id} className='space-y-2'>
-                                {href ? (
-                                  <a
-                                    href={href}
-                                    target='_blank'
-                                    rel='noreferrer'
-                                    className={linkClass}
-                                  >
-                                   
-                                  </a>
-                                ) : 
-                                null}
-                                {isImage && href ? (
-                                  <a href={href} target='_blank' rel='noreferrer'>
-                                    <img
-                                      src={href}
-                                      alt={label}
-                                      className='max-h-48 rounded-md border border-black/10'
-                                    />
-                                  </a>
-                                ) : null}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
-                  <div className="flex items-center gap-2">
-                   {message.isFromCustomer && <MessageDate message={message} />}
-                   {!message.isFromCustomer && message.id === lastReadMessageId && (
-                     <p className='text-xs text-gray-500'>Read</p>
-                   )}
-                   </div>
+                          return (
+                            <div key={attachment.id} className='space-y-2'>
+                              {href ? (
+                                <a
+                                  href={href}
+                                  target='_blank'
+                                  rel='noreferrer'
+                                  className={linkClass}
+                                ></a>
+                              ) : null}
+                              {isImage && href ? (
+                                <a href={href} target='_blank' rel='noreferrer'>
+                                  <img
+                                    src={href}
+                                    alt={label}
+                                    className='max-h-48 rounded-md border border-black/10'
+                                  />
+                                </a>
+                              ) : null}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : null}
                   </div>
-               
-                </div  >
-               
+                  <div className='flex items-center gap-2'>
+                    {message.isFromCustomer && <MessageDate message={message} />}
+                    {!message.isFromCustomer && message.id === lastReadMessageId && (
+                      <p className='text-xs text-gray-500'>Read</p>
+                    )}
+                  </div>
+                </div>
               </div>
-            ))}
+            </div>
+          ))}
           <div ref={bottomRef} />
         </div>
 
         <div className='p-4 border-t'>
           <div className='flex items-end gap-2'>
-          {
-                showSelect ? (
-                  <div className="flex gap-2 items-end">
-                        <Select
-                          open={selectActive}
-                          onOpenChange={setSelectActive}
-                          value={selectedTemplate}
-                          onValueChange={value => handleTemplateSelect(value)}
-                        >
-                    <SelectTrigger className='w-[150px]'>
-                      <SelectValue placeholder='Select template' />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value='follow-up'>Follow-up</SelectItem>
-                      <SelectItem value='reply'>Reply</SelectItem>
-                      <SelectItem value='thank-you'>Thank You</SelectItem>
-                      <SelectItem value='feedback-request'>Feedback Request</SelectItem>
-                      <SelectItem value='referral'>Referral</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <LoadingButton loading={isGenerating} type='button'  onClick={() => handleGenerate()}>Generate</LoadingButton>
-                  </div>
-                ) : (
-                  <Button
-                    type='button'
-                    onClick={() => {
-                      setShowSelect(true);
-                      setSelectActive(true);
-                    }}
-                  >
-                    Generate with AI
-                  </Button>
-                )
-              }
-                <AiImproveButton
-                getText={() => messageText}
-                setText={value => setMessageText(value)}
-                buttonSize='icon'
-                iconClassName='text-lg'
-              />
+            {showSelect ? (
+              <div className='flex gap-2 items-end'>
+                <Select
+                  open={selectActive}
+                  onOpenChange={setSelectActive}
+                  value={selectedTemplate}
+                  onValueChange={value => handleTemplateSelect(value)}
+                >
+                  <SelectTrigger className='w-[150px]'>
+                    <SelectValue placeholder='Select template' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='follow-up'>Follow-up</SelectItem>
+                    <SelectItem value='reply'>Reply</SelectItem>
+                    <SelectItem value='thank-you'>Thank You</SelectItem>
+                    <SelectItem value='feedback-request'>Feedback Request</SelectItem>
+                    <SelectItem value='referral'>Referral</SelectItem>
+                  </SelectContent>
+                </Select>
+                <LoadingButton
+                  loading={isGenerating}
+                  type='button'
+                  onClick={() => handleGenerate()}
+                >
+                  Generate
+                </LoadingButton>
+              </div>
+            ) : (
+              <Button
+                type='button'
+                onClick={() => {
+                  setShowSelect(true)
+                  setSelectActive(true)
+                }}
+              >
+                Generate with AI
+              </Button>
+            )}
+            <AiImproveButton
+              getText={() => messageText}
+              setText={value => setMessageText(value)}
+              buttonSize='icon'
+              iconClassName='text-lg'
+            />
             <textarea
               ref={textareaRef}
               value={messageText}
@@ -578,7 +603,6 @@ export default function EmailChatDialog() {
               className='flex-1 min-h-[38px] max-h-40 rounded-sm border border-zinc-300 bg-transparent px-4 py-2 text-sm outline-none resize-none overflow-y-auto'
             />
             <div className='flex items-center gap-1 mb-1'>
-            
               <LoadingButton
                 loading={isSending}
                 type='button'

@@ -4,7 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { cn } from '~/lib/utils'
-import { getPending, type PendingChecklistSubmission } from '~/utils/offlineChecklistQueue'
+import {
+  getPending,
+  type PendingChecklistSubmission,
+} from '~/utils/offlineChecklistQueue'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 

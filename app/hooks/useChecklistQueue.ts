@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ChecklistFormData } from '~/schemas/checklist'
 import {
   addToQueue,
+  clearFailed,
   getAllPending,
   getPendingCount,
-  updateSubmission,
-  removeFromQueue,
-  clearFailed,
-  migrateFromLocalStorage,
   isIndexedDBAvailable,
+  migrateFromLocalStorage,
   type PendingSubmission,
+  removeFromQueue,
+  updateSubmission,
 } from '~/utils/checklistDB'
-import type { ChecklistFormData } from '~/schemas/checklist'
 
 interface UseChecklistQueueProps {
   companyId: number
@@ -111,7 +111,7 @@ export function useChecklistQueue({
 }: UseChecklistQueueProps): UseChecklistQueueReturn {
   const [isHydrated, setIsHydrated] = useState(false)
   const [isOnline, setIsOnline] = useState(() =>
-    typeof navigator !== 'undefined' ? navigator.onLine : true
+    typeof navigator !== 'undefined' ? navigator.onLine : true,
   )
   const [pendingCount, setPendingCount] = useState(0)
   const [pendingSubmissions, setPendingSubmissions] = useState<PendingSubmission[]>([])
@@ -168,7 +168,6 @@ export function useChecklistQueue({
       if (pending.length === 0) {
         return
       }
-
 
       for (const submission of pending) {
         if (!navigator.onLine) break
@@ -321,7 +320,7 @@ export function useChecklistQueue({
       await refreshQueue()
       return id
     },
-    [companyId, refreshQueue]
+    [companyId, refreshQueue],
   )
 
   const clearFailedSubmissions = useCallback(async (): Promise<number> => {
@@ -349,7 +348,7 @@ export function useChecklistQueue({
       await refreshQueue()
       await processQueue()
     },
-    [refreshQueue, processQueue]
+    [refreshQueue, processQueue],
   )
 
   const deleteSubmission = useCallback(
@@ -361,7 +360,7 @@ export function useChecklistQueue({
       await removeFromQueue(id)
       await refreshQueue()
     },
-    [refreshQueue]
+    [refreshQueue],
   )
 
   return {

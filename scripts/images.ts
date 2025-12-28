@@ -156,37 +156,24 @@ async function main() {
     'SELECT url FROM stones',
   )
   const dbUrls = rows.map(row => row.url)
-  console.log(dbUrls.length)
 
   const files = await listAllStoneImages()
-  console.log(files.length)
 
   const missingFiles = dbUrls.filter(file => !files.includes(withIconSuffix(file)))
-  console.log(missingFiles.length)
   for (const file of missingFiles) {
     const cleanFile = file.replace(
       'https://granite-database.s3.us-east-2.amazonaws.com/',
       '',
     )
-    try {
-      await processAndUploadImage(cleanFile, withIconSuffix(cleanFile))
-      console.log(`Processed ${file} to ${withIconSuffix(file)}`)
-    } catch (error) {
-      console.error(`Error processing ${file}: ${error}`)
-    }
+    await processAndUploadImage(cleanFile, withIconSuffix(cleanFile))
   }
 }
 
 main()
-  .catch(e => {
-    console.error(e)
+  .catch(() => {
     process.exitCode = 1
   })
   .finally(async () => {
-    try {
-      await db.end() // закрыть пул
-    } catch {}
-    try {
-      s3.destroy() // закрыть S3 клиент
-    } catch {}
+    await db.end() // закрыть пул
+    s3.destroy() // закрыть S3 клиент
   })

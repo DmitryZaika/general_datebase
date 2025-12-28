@@ -394,30 +394,34 @@ export default function Instructions() {
       // Sequentially open accordions from top to bottom
       for (let i = 0; i < path.length; i++) {
         const nodeId = path[i]
-        
+
         // Wait a bit for potential previous expansion animations
         if (i > 0) await new Promise(resolve => setTimeout(resolve, 100))
 
         const itemElement = document.getElementById(`instruction-${nodeId}`)
-        
+
         if (itemElement) {
-           const trigger = itemElement.querySelector('button[data-state]') as HTMLElement | null
-           
-           if (trigger) {
-             const state = trigger.getAttribute('data-state')
-             if (state === 'closed') {
-               trigger.click()
-             }
-           }
+          const trigger = itemElement.querySelector(
+            'button[data-state]',
+          ) as HTMLElement | null
+
+          if (trigger) {
+            const state = trigger.getAttribute('data-state')
+            if (state === 'closed') {
+              trigger.click()
+            }
+          }
         } else {
-           await new Promise(resolve => setTimeout(resolve, 100))
-           const retryElement = document.getElementById(`instruction-${nodeId}`)
-           if (retryElement) {
-             const trigger = retryElement.querySelector('button[data-state]') as HTMLElement | null
-             if (trigger && trigger.getAttribute('data-state') === 'closed') {
-               trigger.click()
-             }
-           }
+          await new Promise(resolve => setTimeout(resolve, 100))
+          const retryElement = document.getElementById(`instruction-${nodeId}`)
+          if (retryElement) {
+            const trigger = retryElement.querySelector(
+              'button[data-state]',
+            ) as HTMLElement | null
+            if (trigger && trigger.getAttribute('data-state') === 'closed') {
+              trigger.click()
+            }
+          }
         }
       }
 
@@ -437,8 +441,7 @@ export default function Instructions() {
   const searchResults = useMemo(() => {
     if (!searchTerm.trim()) return []
     const term = searchTerm.toLowerCase()
-    const results: { id: number; title: string; matchType: 'Title' | 'Content' }[] =
-      []
+    const results: { id: number; title: string; matchType: 'Title' | 'Content' }[] = []
 
     const traverse = (nodes: InstructionNode[]) => {
       for (const node of nodes) {

@@ -70,7 +70,7 @@ const TransactionSchema = z.object({
     .transform(val => val ?? 'Unknown Seller'),
   sale_notes: z.string().nullable().optional(),
   slab_notes: z.string().nullable().optional(),
-  square_feet: z.coerce.number().default(0),
+  square_feet: z.coerce.number().prefault(0),
   sink_names: z.string().nullable().optional(),
 })
 
@@ -126,7 +126,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return forceRedirectError(request.headers, 'No stone found for given ID')
   }
 
-  const slabsRaw = await selectMany<Omit<Slab, 'is_leftover'> & { is_leftover: number }>(
+  const slabsRaw = await selectMany<
+    Omit<Slab, 'is_leftover'> & { is_leftover: number }
+  >(
     db,
     'SELECT id, bundle, url, sale_id, width, length, cut_date, parent_id, is_leftover FROM slab_inventory WHERE stone_id = ? AND cut_date IS NULL AND deleted_at IS NULL',
     [stoneId],
@@ -156,7 +158,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   )
 
   for (const link of stoneLinks) {
-    const linkedStoneSlabsRaw = await selectMany<Omit<Slab, 'is_leftover'> & { is_leftover: number }>(
+    const linkedStoneSlabsRaw = await selectMany<
+      Omit<Slab, 'is_leftover'> & { is_leftover: number }
+    >(
       db,
       `SELECT
            id, bundle, url, sale_id, width, length, cut_date, parent_id, is_leftover

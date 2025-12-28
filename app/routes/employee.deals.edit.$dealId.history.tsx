@@ -5,7 +5,7 @@ import {
   Outlet,
   redirect,
   useLoaderData,
-  useNavigate
+  useNavigate,
 } from 'react-router'
 import { Badge } from '~/components/ui/badge'
 import { DataTable } from '~/components/ui/data-table'

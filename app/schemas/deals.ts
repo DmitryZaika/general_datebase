@@ -6,8 +6,8 @@ export const dealsSchema = z.object({
   description: z.string().nullish(),
   customer_id: z.coerce
     .number({
-      required_error: 'Please add a customer',
-      invalid_type_error: 'Please add a customer',
+      error: issue =>
+        issue.input === undefined ? 'Please add a customer' : 'Please add a customer',
     })
     .min(1, 'Please add a customer'),
   status: z.string().nullish(),

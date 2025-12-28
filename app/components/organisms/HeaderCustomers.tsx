@@ -1,9 +1,22 @@
-import { type Location, Link, useLocation, useNavigation } from 'react-router'
-import { defaultLogo, gbColumbus, gbIndianapolis, gmqTops, loginLogo } from '~/constants/logos'
+import { Link, type Location, useLocation, useNavigation } from 'react-router'
+import {
+  defaultLogo,
+  gbColumbus,
+  gbIndianapolis,
+  gmqTops,
+  loginLogo,
+} from '~/constants/logos'
 import { LoadingButton } from '../molecules/LoadingButton'
 
-function getButtonLink({ location, companyId }: { location: Location, companyId: string }) {
-  const viewId = typeof window !== 'undefined' ? window.localStorage.getItem('customerViewId') : null
+function getButtonLink({
+  location,
+  companyId,
+}: {
+  location: Location
+  companyId: string
+}) {
+  const viewId =
+    typeof window !== 'undefined' ? window.localStorage.getItem('customerViewId') : null
   if (viewId && location.pathname.includes('stones')) {
     return `/customer/${companyId}/${viewId}`
   } else if (!viewId && location.pathname.includes('stones')) {
@@ -22,7 +35,13 @@ export default function HeaderCustomers() {
   const id = Number(companyId)
   const logoUrl = isLogin
     ? loginLogo
-    : id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
+    : id === 1
+      ? gbIndianapolis
+      : id === 3
+        ? gbColumbus
+        : id === 4
+          ? gmqTops
+          : defaultLogo
   const viewId = segments[0] === 'customer' && segments.length >= 3 ? segments[2] : ''
   const isStonesView = viewId === 'stones'
   const buttonLink = getButtonLink({ location, companyId })
@@ -41,7 +60,9 @@ export default function HeaderCustomers() {
             <img
               src={logoUrl}
               alt='Logo'
-              className={isLogin ? 'h-36 md:h-36 object-contain' : 'h-12 md:h-16 object-contain'}
+              className={
+                isLogin ? 'h-36 md:h-36 object-contain' : 'h-12 md:h-16 object-contain'
+              }
             />
           </a>
         </div>

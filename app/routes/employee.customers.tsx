@@ -5,13 +5,13 @@ import { useEffect, useRef, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
   Link,
+  type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
   useLocation,
   useNavigate,
   useSearchParams,
-  type LoaderFunctionArgs,
 } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'

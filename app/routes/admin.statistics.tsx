@@ -608,8 +608,6 @@ export default function AdminStatistics() {
     }))
   }, [conversionMetricsByRep])
 
-
-
   // const salesColumns: ColumnDef<SalesBySeller>[] = [
   //   { accessorKey: 'seller_name', header: 'Seller' },
   //   { accessorKey: 'sales_count', header: 'Sales' },
@@ -779,8 +777,7 @@ export default function AdminStatistics() {
         cell: ({ row }) => {
           const totalLost = (row.original as any).total
           const totalDeals = (row.original as any).total_deals
-          const pct =
-            totalDeals > 0 ? Math.round((totalLost / totalDeals) * 100) : 0
+          const pct = totalDeals > 0 ? Math.round((totalLost / totalDeals) * 100) : 0
           return (
             <div className='flex flex-col'>
               <span className='font-bold'>{totalLost}</span>
@@ -876,9 +873,13 @@ export default function AdminStatistics() {
         const deal = dealByCustomer.get(customer.id)
         const isInvalid = customer.invalid_lead && customer.invalid_lead !== ''
         const status = isInvalid ? 'Invalid' : deal?.status || ''
-        const lostReason = isInvalid ? customer.invalid_lead || '' : deal?.lost_reason || ''
+        const lostReason = isInvalid
+          ? customer.invalid_lead || ''
+          : deal?.lost_reason || ''
         const amount =
-          deal?.amount && Number(deal.amount) > 0 ? currency.format(Number(deal.amount)) : ''
+          deal?.amount && Number(deal.amount) > 0
+            ? currency.format(Number(deal.amount))
+            : ''
         const sourceValue =
           customer.source === 'check-in'
             ? 'Walk-In'
@@ -956,12 +957,7 @@ export default function AdminStatistics() {
         </div>
       </div>
 
-   
-
-      <div className='mb-8'>
-     
-      </div>
-      
+      <div className='mb-8'></div>
 
       <div className='grid grid-cols-1 md:grid-cols-2 gap-8 mb-8'>
         <div>
@@ -986,10 +982,11 @@ export default function AdminStatistics() {
       </div>
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mt-8'>
         <div className='border rounded p-4 col-span-2'>
-          <h2 className='text-xl font-semibold mb-2'>Conversion Metrics (by Deal Creation Date)</h2>
+          <h2 className='text-xl font-semibold mb-2'>
+            Conversion Metrics (by Deal Creation Date)
+          </h2>
           <DataTable columns={conversionMetricsColumns} data={conversionMetricsRows} />
         </div>
-      
       </div>
 
       <div className='mt-8'>

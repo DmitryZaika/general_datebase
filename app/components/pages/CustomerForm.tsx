@@ -84,7 +84,7 @@ export function CustomerForm({
       customerId ? 'Customer updated successfully' : 'Customer added successfully',
     )
     onSuccess(id, form.getValues('name'))
-    
+
     if (setCreatedDealId && dealId) {
       setCreatedDealId(dealId)
     }

@@ -13,7 +13,6 @@ import {
   useParams,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
-import { z } from 'zod'
 import { FileInput } from '~/components/molecules/FileInput'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { MultiPartForm } from '~/components/molecules/MultiPartForm'
@@ -36,14 +35,14 @@ import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
-import { useCustomForm } from '~/utils/useCustomForm'
+import { fileSchema, useCustomForm } from '~/utils/useCustomForm'
 
 function LinkedImagesCarousel({ images }: { images: { url: string }[] }) {
   return (
     <div className='overflow-x-auto whitespace-nowrap pb-4'>
       <div className='flex gap-4'>
         {images.map((image, index) => (
-          <div key={index} className='w-40 h-32 flex-shrink-0'>
+          <div key={index} className='w-40 h-32 shrink-0'>
             <img
               src={image.url}
               alt=''
@@ -55,9 +54,6 @@ function LinkedImagesCarousel({ images }: { images: { url: string }[] }) {
     </div>
   )
 }
-
-export const InstalledProjectsSchema = z.object({})
-type TInstalledProjectsSchema = z.infer<typeof InstalledProjectsSchema>
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
@@ -128,7 +124,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (contentType.includes('multipart/form-data')) {
       const { errors, data: parsedData } = await parseMutliForm(
         requestClone,
-        InstalledProjectsSchema,
+        fileSchema,
         'stones',
       )
       if (errors || !parsedData) {
@@ -236,7 +232,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 function AddImage() {
   const navigation = useNavigation()
   const isSubmitting = useNavigation().state === 'submitting'
-  const form = useCustomForm<TInstalledProjectsSchema>(InstalledProjectsSchema)
+  const form = useCustomForm(fileSchema)
 
   const [inputKey, setInputKey] = useState(0)
 

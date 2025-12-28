@@ -38,8 +38,6 @@ const instructionSchema = z.object({
   rich_text: z.string().min(1),
 })
 
-type FormData = z.infer<typeof instructionSchema>
-
 const resolver = zodResolver(instructionSchema)
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -59,10 +57,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   const instructionId = parseInt(params.instruction)
 
-  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
-    request,
-    resolver,
-  )
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }
@@ -138,7 +133,7 @@ export default function InstructionsEdit() {
   const navigate = useNavigate()
   const { title, parent_id, after_id, rich_text } = useLoaderData<typeof loader>()
   const { instructions } = useLoaderData<typeof loader>()
-  const form = useForm<FormData>({
+  const form = useForm({
     resolver,
     defaultValues: {
       title,

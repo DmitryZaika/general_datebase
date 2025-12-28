@@ -1,10 +1,10 @@
-import { ColumnDef } from '@tanstack/react-table'
+import type { ColumnDef } from '@tanstack/react-table'
 import { useEffect, useState } from 'react'
 import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
-  useSearchParams
+  useSearchParams,
 } from 'react-router'
 import { z } from 'zod'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
@@ -22,7 +22,7 @@ import { selectMany } from '~/utils/queryHelpers'
 import { toastData } from '~/utils/toastHelpers.server'
 
 const paramsSchema = z.object({
-  viewId: z.string().uuid('View ID must be a valid UUID'),
+  viewId: z.uuid('View ID must be a valid UUID'),
 })
 
 function writeStorageIfBlank(key: 'customerViewId', value: string) {
@@ -107,7 +107,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     [viewId],
   )
 
-  const customerName = (sales[0] && sales[0].customer_name) || (customerRows[0] && customerRows[0].name) || ''
+  const customerName =
+    (sales[0] && sales[0].customer_name) ||
+    (customerRows[0] && customerRows[0].name) ||
+    ''
 
   // Handle payment status
   if (paymentStatus === 'success' && sessionId) {
@@ -197,8 +200,7 @@ const columns: ColumnDef<Sale>[] = [
     accessorKey: 'status',
     header: ({ column }) => <SortableHeader column={column} title='Status' />,
     cell: ({ row }) => row.original.status || '—',
-  }
- 
+  },
 ]
 
 function ImageGalleryCell({ images, title }: { images: string | null; title: string }) {
@@ -210,7 +212,8 @@ function ImageGalleryCell({ images, title }: { images: string | null; title: str
   const [isOpen, setIsOpen] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
 
-  if (list.length === 0) return <span className='text-xs text-slate-500'>No photos</span>
+  if (list.length === 0)
+    return <span className='text-xs text-slate-500'>No photos</span>
 
   const handleOpen = (index: number) => {
     setCurrentIndex(index)
@@ -227,10 +230,17 @@ function ImageGalleryCell({ images, title }: { images: string | null; title: str
             className='h-12 w-16 overflow-hidden rounded border'
             onClick={() => handleOpen(index)}
           >
-            <img src={url} alt={title} className='h-full w-full object-cover cursor-pointer' loading='lazy' />
+            <img
+              src={url}
+              alt={title}
+              className='h-full w-full object-cover cursor-pointer'
+              loading='lazy'
+            />
           </button>
         ))}
-        {list.length > 3 && <span className='text-xs text-slate-500'>+{list.length - 3}</span>}
+        {list.length > 3 && (
+          <span className='text-xs text-slate-500'>+{list.length - 3}</span>
+        )}
       </div>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -248,7 +258,12 @@ function ImageGalleryCell({ images, title }: { images: string | null; title: str
               <span>
                 {currentIndex + 1}/{list.length}
               </span>
-              <a href={list[currentIndex]} target='_blank' rel='noreferrer' className='underline'>
+              <a
+                href={list[currentIndex]}
+                target='_blank'
+                rel='noreferrer'
+                className='underline'
+              >
                 Open image
               </a>
             </div>
@@ -261,7 +276,11 @@ function ImageGalleryCell({ images, title }: { images: string | null; title: str
                     onClick={() => setCurrentIndex(index)}
                     className={`h-16 w-20 overflow-hidden rounded border ${index === currentIndex ? 'border-white' : 'border-transparent'}`}
                   >
-                    <img src={url} alt={`${title} ${index + 1}`} className='h-full w-full object-cover' />
+                    <img
+                      src={url}
+                      alt={`${title} ${index + 1}`}
+                      className='h-full w-full object-cover'
+                    />
                   </button>
                 ))}
               </div>
@@ -295,7 +314,7 @@ export default function CustomersView() {
   return (
     <div className='space-y-4'>
       <h1 className='text-2xl font-bold pl-2'>{customer?.name}</h1>
-      
+
       <DataTable columns={columns} data={sales} />
     </div>
   )

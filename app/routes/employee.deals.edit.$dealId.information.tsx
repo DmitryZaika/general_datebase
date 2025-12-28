@@ -28,8 +28,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   const resolver = zodResolver(dealsSchema)
 
-  const { errors, data, receivedValues } =
-    await getValidatedFormData<DealsDialogSchema>(request, resolver)
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }

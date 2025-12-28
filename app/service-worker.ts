@@ -1,6 +1,9 @@
 /// <reference lib="webworker" />
 
+import { BackgroundSyncPlugin } from 'workbox-background-sync'
+import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 import { clientsClaim } from 'workbox-core'
+import { ExpirationPlugin } from 'workbox-expiration'
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
 import { registerRoute } from 'workbox-routing'
 import {
@@ -9,9 +12,6 @@ import {
   NetworkOnly,
   StaleWhileRevalidate,
 } from 'workbox-strategies'
-import { CacheableResponsePlugin } from 'workbox-cacheable-response'
-import { ExpirationPlugin } from 'workbox-expiration'
-import { BackgroundSyncPlugin } from 'workbox-background-sync'
 
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>
@@ -49,7 +49,7 @@ registerRoute(
         maxAgeSeconds: 24 * 60 * 60,
       }),
     ],
-  })
+  }),
 )
 registerRoute(
   ({ request }) => {
@@ -70,7 +70,7 @@ registerRoute(
         maxAgeSeconds: 30 * 24 * 60 * 60,
       }),
     ],
-  })
+  }),
 )
 registerRoute(
   ({ request }) => request.destination === 'image',
@@ -85,7 +85,7 @@ registerRoute(
         maxAgeSeconds: 30 * 24 * 60 * 60,
       }),
     ],
-  })
+  }),
 )
 const bgSyncPlugin = new BackgroundSyncPlugin('checklist-queue', {
   maxRetentionTime: 24 * 60,
@@ -111,13 +111,10 @@ registerRoute(
   new NetworkOnly({
     plugins: [bgSyncPlugin],
   }),
-  'POST'
+  'POST',
 )
 
-registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/'),
-  new NetworkOnly()
-)
+registerRoute(({ url }) => url.pathname.startsWith('/api/'), new NetworkOnly())
 registerRoute(
   ({ request }) => request.mode === 'navigate',
   new NetworkFirst({
@@ -127,7 +124,7 @@ registerRoute(
         statuses: [0, 200],
       }),
     ],
-  })
+  }),
 )
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
@@ -137,7 +134,7 @@ self.addEventListener('message', event => {
     event.waitUntil(
       caches.open(CHECKLIST_PAGE_CACHE).then(cache => {
         return cache.addAll(event.data.payload)
-      })
+      }),
     )
   }
 })

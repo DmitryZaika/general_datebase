@@ -69,7 +69,7 @@ export const customerDialogSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   your_message: z.string().optional(),
-  builder: z.boolean().default(false),
+  builder: z.boolean().prefault(false),
   company_name: z.string().nullish(),
   source: z.enum(sourceEnum),
 })

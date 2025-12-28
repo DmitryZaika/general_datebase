@@ -44,7 +44,7 @@ const payrollRuleSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   amount: z.number().positive('Amount must be a positive number'),
   type: z.enum(['percentage', 'fixed'], {
-    errorMap: () => ({ message: 'Type must be either percentage or fixed' }),
+    error: () => 'Type must be either percentage or fixed',
   }),
 })
 
@@ -117,7 +117,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     if (!result.success) {
       // Return validation errors
-      const errors = result.error.flatten().fieldErrors
+      const errors = z.treeifyError(result.error)
       return { errors }
     }
 

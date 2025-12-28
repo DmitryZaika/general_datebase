@@ -39,7 +39,10 @@ export const AddFaucetDialog = ({
   // Count how many of each faucet type are already selected
   const selectedFaucetCounts = new Map<number, number>()
   allSelectedFaucets.forEach(faucet => {
-    selectedFaucetCounts.set(faucet.type_id, (selectedFaucetCounts.get(faucet.type_id) || 0) + 1)
+    selectedFaucetCounts.set(
+      faucet.type_id,
+      (selectedFaucetCounts.get(faucet.type_id) || 0) + 1,
+    )
   })
 
   // Calculate remaining available for each faucet type

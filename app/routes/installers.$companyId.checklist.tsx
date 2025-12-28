@@ -9,7 +9,7 @@ import { AddressInput } from '~/components/organisms/AddressInput'
 import { Checkbox } from '~/components/ui/checkbox'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
-import { gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
+import { companyIdToUrl } from '~/constants/logos'
 import { useToast } from '~/hooks/use-toast'
 import { useOfflineChecklistSync } from '~/hooks/useOfflineChecklistSync'
 import { type ChecklistFormData, checklistResolver } from '~/schemas/checklist'
@@ -22,7 +22,6 @@ import {
 } from '~/utils/offlineChecklistQueue'
 import { getEmployeeUser } from '~/utils/session.server'
 
-// Static checklist labels mapped to form keys (defined after FormData type)
 const checklistItems: Array<[keyof ChecklistFormData, string]> = [
   ['material_correct', 'Material is correct'],
   ['seams_satisfaction', 'Seams meet my satisfaction'],
@@ -43,7 +42,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     if (paramCompanyId !== user.company_id) {
       return redirect(`/installers/${user.company_id}/checklist`)
     }
-    return { user, companyId: user.company_id }
+
+    return { user, companyId: user.company_id as 1 | 3 | 4 }
   } catch (_error) {
     return redirect(`/login?error=${_error}`)
   }
@@ -145,7 +145,7 @@ const defaultValues: ChecklistFormData = {
 
 export default function AdminChecklists() {
   const sigRef = useRef<SigRef>(null)
-  const { companyId } = useLoaderData<{ companyId: number }>()
+  const { companyId } = useLoaderData<typeof loader>()
   const form = useForm({
     resolver: checklistResolver,
     defaultValues,
@@ -236,15 +236,7 @@ export default function AdminChecklists() {
     <div className='flex justify-center py-10'>
       <div className='w-full max-w-xl border rounded-md bg-white p-8 shadow-sm'>
         <img
-          src={
-            companyId === 1
-              ? gbColumbus
-              : companyId === 3
-                ? gbIndianapolis
-                : companyId === 4
-                  ? gmqTops
-                  : ''
-          }
+          src={companyIdToUrl[companyId] ?? ''}
           alt='Logo'
           className='mx-auto mb-4 h-46 object-contain'
         />

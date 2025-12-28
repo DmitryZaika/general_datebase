@@ -11,7 +11,13 @@ import {
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import PartnersTable from '~/components/PartnersTable'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
@@ -45,7 +51,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   const resolver = zodResolver(dealsSchema)
 
-  const { errors } = await getValidatedFormData<DealsDialogSchema>(request, resolver)
+  const { errors } = await getValidatedFormData(request, resolver)
 
   if (errors) {
     return { errors }
@@ -64,7 +70,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const url = new URL(request.url)
     const viewParam = url.searchParams.get('view')
-    const view = (viewParam === ViewType.PARTNERS ? ViewType.PARTNERS : ViewType.DEALS) as ViewType
+    const view = (
+      viewParam === ViewType.PARTNERS ? ViewType.PARTNERS : ViewType.DEALS
+    ) as ViewType
 
     const lists = await selectMany<{ id: number; name: string }>(
       db,
@@ -99,11 +107,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     let partners: Partner[] = []
     if (view === ViewType.PARTNERS) {
-      partners = await selectMany<Partner>(
-        db,
-        getPartnersForUser(user.id),
-        [user.id]
-      )
+      partners = await selectMany<Partner>(db, getPartnersForUser(user.id), [user.id])
     }
 
     return { deals, customers, lists, imagesMap, emailsMap, partners, view }
@@ -113,7 +117,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 }
 
 export default function EmployeeDeals() {
-  const { deals, customers, lists, imagesMap, emailsMap, partners, view } = useLoaderData<typeof loader>()
+  const { deals, customers, lists, imagesMap, emailsMap, partners, view } =
+    useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()

@@ -108,9 +108,7 @@ export default function Sinks() {
     )
     const outOfStock = sinks.filter(
       sink =>
-        Number(sink.available) <= 0 &&
-        !sink.regular_stock &&
-        Boolean(sink.is_display),
+        Number(sink.available) <= 0 && !sink.regular_stock && Boolean(sink.is_display),
     )
     const notDisplayed = sinks.filter(sink => !sink.is_display)
 

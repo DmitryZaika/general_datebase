@@ -80,12 +80,12 @@ function ChildrenImagesDialog({
     setSelectedImage(src)
   }
 
-  const isRegularStock = !!(image?.regular_stock)
-  const displayedAvailable = 
-    image?.available === 0 && isRegularStock 
-      ? 'Regular Stock' 
-      : image?.available !== undefined 
-        ? `${image.available}${isRegularStock ? ' (Regular stock)' : ''}` 
+  const isRegularStock = !!image?.regular_stock
+  const displayedAvailable =
+    image?.available === 0 && isRegularStock
+      ? 'Regular Stock'
+      : image?.available !== undefined
+        ? `${image.available}${isRegularStock ? ' (Regular stock)' : ''}`
         : '—'
   const displayedType = image?.type ? capitalizeFirstLetter(image.type) : '—'
   const displayedWidth = image?.width && image?.width > 0 ? image.width : '—'

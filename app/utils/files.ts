@@ -1,7 +1,6 @@
 import { fileTypeFromBuffer } from 'file-type'
 import mime from 'mime-types'
 
-
 // --- Белый список и утилиты ---
 
 export const ALLOWED_IMAGE_MIME = new Set([

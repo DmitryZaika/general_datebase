@@ -1,4 +1,4 @@
-import { openDB, type IDBPDatabase } from 'idb'
+import { type IDBPDatabase, openDB } from 'idb'
 import type { ChecklistFormData } from '~/schemas/checklist'
 
 const DB_NAME = 'ChecklistDB'
@@ -65,7 +65,7 @@ export async function initDB(): Promise<IDBPDatabase> {
 }
 
 export async function addToQueue(
-  submission: Omit<PendingSubmission, 'id'>
+  submission: Omit<PendingSubmission, 'id'>,
 ): Promise<number> {
   try {
     const db = await initDB()
@@ -74,7 +74,7 @@ export async function addToQueue(
     const currentCount = await db.count(STORE_NAME)
     if (currentCount >= MAX_QUEUE_SIZE) {
       throw new Error(
-        `Queue is full (${MAX_QUEUE_SIZE} submissions). Please try again later.`
+        `Queue is full (${MAX_QUEUE_SIZE} submissions). Please try again later.`,
       )
     }
 
@@ -89,7 +89,7 @@ export async function addToQueue(
     // Handle quota exceeded error
     if (error instanceof Error && error.name === 'QuotaExceededError') {
       throw new Error(
-        'Storage quota exceeded. Please clear old submissions or free up space.'
+        'Storage quota exceeded. Please clear old submissions or free up space.',
       )
     }
 
@@ -126,7 +126,7 @@ export async function getPendingCount(): Promise<number> {
 }
 
 export async function getSubmissionById(
-  id: number
+  id: number,
 ): Promise<PendingSubmission | undefined> {
   try {
     const db = await initDB()
@@ -140,7 +140,7 @@ export async function getSubmissionById(
 
 export async function updateSubmission(
   id: number,
-  updates: Partial<PendingSubmission>
+  updates: Partial<PendingSubmission>,
 ): Promise<void> {
   try {
     const db = await initDB()
@@ -215,7 +215,7 @@ export async function clearAll(): Promise<void> {
 }
 
 export async function getSubmissionsByStatus(
-  status: PendingSubmission['status']
+  status: PendingSubmission['status'],
 ): Promise<PendingSubmission[]> {
   try {
     const db = await initDB()
@@ -227,16 +227,13 @@ export async function getSubmissionsByStatus(
 
     return submissions
   } catch (error) {
-    console.error(
-      `[ChecklistDB] Failed to get submissions by status ${status}:`,
-      error
-    )
+    console.error(`[ChecklistDB] Failed to get submissions by status ${status}:`, error)
     return []
   }
 }
 
 export async function getSubmissionsByCompany(
-  companyId: number
+  companyId: number,
 ): Promise<PendingSubmission[]> {
   try {
     const db = await initDB()
@@ -250,7 +247,7 @@ export async function getSubmissionsByCompany(
   } catch (error) {
     console.error(
       `[ChecklistDB] Failed to get submissions for company ${companyId}:`,
-      error
+      error,
     )
     return []
   }
