@@ -610,16 +610,43 @@ export default function SlabsModal() {
   // For each bundle, add all slabs with that bundle name
   orderedBundles.forEach(bundle => {
     const bundleSlabs = slabsByBundle[bundle]
+    // Sort by ID to ensure consistent order
+    bundleSlabs.sort((a, b) => a.id - b.id)
 
-    // Within a bundle group, place parents first, then children
-    const parents = bundleSlabs.filter(slab => slab.parent_id === null)
-    const children = bundleSlabs.filter(slab => slab.parent_id !== null)
+    const processedIds = new Set<number>()
 
-    // Add parents first
-    sortedSlabs.push(...parents)
+    // 1. Handle explicit roots (parent_id is null)
+    const roots = bundleSlabs.filter(s => s.parent_id === null)
+    roots.forEach(root => {
+      sortedSlabs.push(root)
+      processedIds.add(root.id)
 
-    // Then add children
-    sortedSlabs.push(...children)
+      // Find direct children in this bundle
+      const children = bundleSlabs.filter(s => s.parent_id === root.id)
+      children.forEach(child => {
+        if (!processedIds.has(child.id)) {
+          sortedSlabs.push(child)
+          processedIds.add(child.id)
+        }
+      })
+    })
+
+    // 2. Handle remaining slabs (orphans or missing parents)
+    const remaining = bundleSlabs.filter(s => !processedIds.has(s.id))
+    if (remaining.length > 0) {
+      // Group by parent_id to keep siblings together
+      const byParent = remaining.reduce((acc, slab) => {
+        const key = slab.parent_id ?? 'root'
+        if (!acc[key]) acc[key] = []
+        acc[key].push(slab)
+        return acc
+      }, {} as Record<string | number, Slab[]>)
+
+      Object.values(byParent).forEach(group => {
+        sortedSlabs.push(...group)
+        group.forEach(s => processedIds.add(s.id))
+      })
+    }
   })
 
   const uniqueSlabs = sortedSlabs

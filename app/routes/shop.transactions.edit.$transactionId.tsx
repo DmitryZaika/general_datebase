@@ -229,6 +229,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (slabs[0].parent_id) {
         targetLength = slabs[0].length
         targetWidth = slabs[0].width
+
+        await db.execute(
+          `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
+          [targetLength, targetWidth, slabs[0].parent_id],
+        )
       } else {
         const stoneInfo = await selectMany<{ length: number; width: number }>(
           db,
@@ -244,20 +249,36 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
       }
 
-      const children = await selectMany<{ id: number }>(
+      const children = await selectMany<{ id: number; sale_id: number | null }>(
         db,
-        `SELECT id FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL ORDER BY id ASC`,
+        `SELECT id, sale_id FROM slab_inventory WHERE parent_id = ? ORDER BY id ASC`,
         [slabId],
       )
 
-      if (children.length > 0) {
-        const firstChildId = children[0].id
+      const soldChildren = children.filter(c => c.sale_id !== null)
+      const unsoldChildren = children.filter(c => c.sale_id === null)
+
+      if (soldChildren.length > 0) {
+        for (const child of soldChildren) {
+          await db.execute(
+            `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
+            [targetLength, targetWidth, child.id],
+          )
+        }
+        if (unsoldChildren.length > 0) {
+          await db.execute(
+            `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`,
+            [slabId],
+          )
+        }
+      } else if (unsoldChildren.length > 0) {
+        const firstChildId = unsoldChildren[0].id
         await db.execute(
           `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
           [targetLength, targetWidth, firstChildId],
         )
 
-        if (children.length > 1) {
+        if (unsoldChildren.length > 1) {
           await db.execute(
             `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND id != ?`,
             [slabId, firstChildId],
@@ -473,47 +494,260 @@ export async function action({ request, params }: ActionFunctionArgs) {
       bundle: string
       url: string | null
       parent_id: number | null
+      sale_id: number | null
+      notes: string | null
+      price: number | null
+      square_feet: number | null
+      room: string | null
+      room_uuid: Buffer | null
+      seam: string | null
+      backsplash: string | null
+      tear_out: string | null
+      stove: string | null
+      ten_year_sealer: string | null
+      waterfall: string | null
+      corbels: string | null
+      extras: string | null
+      edge: string | null
     }>(
       db,
-      `SELECT stone_id, bundle, url, parent_id FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      `SELECT stone_id, bundle, url, parent_id, sale_id, notes, price, square_feet, room, room_uuid, seam, backsplash, tear_out, stove, ten_year_sealer, waterfall, corbels, extras, edge
+         FROM slab_inventory
+        WHERE id = ? AND sale_id = ?`,
       [slabId, saleId],
     )
     if (parent.length === 0) return null
 
-    let handled = false
-    if (replaceFirst) {
-      const baseDims = await selectMany<{ length: number; width: number }>(
+    const soldChild = await selectMany<{
+      id: number
+      stone_id: number
+      bundle: string
+      url: string | null
+      parent_id: number | null
+      notes: string | null
+      price: number | null
+      square_feet: number | null
+      room: string | null
+      room_uuid: Buffer | null
+      seam: string | null
+      backsplash: string | null
+      tear_out: string | null
+      stove: string | null
+      ten_year_sealer: string | null
+      waterfall: string | null
+      corbels: string | null
+      extras: string | null
+      edge: string | null
+    }>(
+      db,
+      `SELECT
+          si.id,
+          si.stone_id,
+          si.bundle,
+          si.url,
+          si.parent_id,
+          si.notes,
+          si.price,
+          si.square_feet,
+          si.room,
+          si.room_uuid,
+          si.seam,
+          si.backsplash,
+          si.tear_out,
+          si.stove,
+          si.ten_year_sealer,
+          si.waterfall,
+          si.corbels,
+          si.extras,
+          si.edge
+        FROM slab_inventory si
+       WHERE si.parent_id = ?
+         AND si.sale_id IS NOT NULL
+         AND si.deleted_at IS NULL
+         AND (
+           SELECT COUNT(*)
+             FROM slab_inventory c
+            WHERE c.parent_id = si.id
+              AND c.deleted_at IS NULL
+         ) = 0
+       ORDER BY si.id ASC
+       LIMIT 1`,
+      [slabId],
+    )
+
+    let actualParentInSale = null
+    if (parent[0].parent_id) {
+      const p = await selectMany<{
+        id: number
+        stone_id: number
+        bundle: string
+        url: string | null
+        parent_id: number | null
+        notes: string | null
+        price: number | null
+        square_feet: number | null
+        room: string | null
+        room_uuid: Buffer | null
+        seam: string | null
+        backsplash: string | null
+        tear_out: string | null
+        stove: string | null
+        ten_year_sealer: string | null
+        waterfall: string | null
+        corbels: string | null
+        extras: string | null
+        edge: string | null
+      }>(
         db,
-        `SELECT length, width FROM slab_inventory WHERE id = ?`,
-        [slabId],
+        `SELECT
+            si.id,
+            si.stone_id,
+            si.bundle,
+            si.url,
+            si.parent_id,
+            si.notes,
+            si.price,
+            si.square_feet,
+            si.room,
+            si.room_uuid,
+            si.seam,
+            si.backsplash,
+            si.tear_out,
+            si.stove,
+            si.ten_year_sealer,
+            si.waterfall,
+            si.corbels,
+            si.extras,
+            si.edge
+           FROM slab_inventory si
+          WHERE si.id = ?
+            AND si.sale_id IS NOT NULL
+            AND si.deleted_at IS NULL
+            AND (
+              SELECT COUNT(*)
+              FROM slab_inventory c
+              WHERE c.parent_id = si.id
+                AND c.deleted_at IS NULL
+                AND c.id != ?
+            ) = 0`,
+        [parent[0].parent_id, slabId],
       )
-      if (baseDims.length > 0) {
-        const matchChild = await selectMany<{ id: number }>(
-          db,
-          `SELECT id FROM slab_inventory
-           WHERE parent_id = ?
-           AND sale_id IS NULL
-           AND length = ?
-           AND width = ?
-           ORDER BY id ASC
-           LIMIT 1`,
-          [slabId, baseDims[0].length, baseDims[0].width],
+      if (p.length > 0) {
+        actualParentInSale = p[0]
+      }
+    }
+
+    const soldTarget = soldChild[0] ?? actualParentInSale ?? (parent[0].sale_id ? { ...parent[0], id: slabId, sale_id: saleId } : null)
+    const template = soldTarget ?? parent[0]
+
+    let handled = false
+    if (replaceFirst || soldTarget) {
+      if (soldTarget) {
+        await db.execute(
+          `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
+          [length, width, (soldTarget as { id: number }).id],
         )
-        if (matchChild.length > 0) {
-          await db.execute(
-            `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
-            [length, width, matchChild[0].id],
+        handled = true
+      } else if (replaceFirst) {
+        const baseDims = await selectMany<{ length: number; width: number }>(
+          db,
+          `SELECT length, width FROM slab_inventory WHERE id = ?`,
+          [slabId],
+        )
+        if (baseDims.length > 0) {
+          const matchChild = await selectMany<{ id: number }>(
+            db,
+            `SELECT id FROM slab_inventory
+             WHERE parent_id = ?
+             AND sale_id IS NULL
+             AND length = ?
+             AND width = ?
+             ORDER BY id ASC
+             LIMIT 1`,
+            [slabId, baseDims[0].length, baseDims[0].width],
           )
-          handled = true
+          if (matchChild.length > 0) {
+            await db.execute(
+              `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
+              [length, width, matchChild[0].id],
+            )
+            handled = true
+          }
         }
       }
     }
 
     if (!handled) {
       await db.execute(
-        `INSERT INTO slab_inventory (stone_id, bundle, parent_id, sale_id, length, width, url)
-         VALUES (?, ?, ?, NULL, ?, ?, ?)`,
-        [parent[0].stone_id, parent[0].bundle, slabId, length, width, parent[0].url],
+        `INSERT INTO slab_inventory (
+           stone_id,
+           bundle,
+           parent_id,
+           sale_id,
+           length,
+           width,
+           url,
+           notes,
+           price,
+           square_feet,
+           room,
+           room_uuid,
+           seam,
+           backsplash,
+           tear_out,
+           stove,
+           ten_year_sealer,
+           waterfall,
+           corbels,
+           extras,
+           edge
+         )
+         VALUES (
+           ?,
+           ?,
+           ?,
+          ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?,
+           ?
+         )`,
+        [
+          template.stone_id,
+          template.bundle,
+          slabId,
+          soldTarget ? saleId : null,
+          length,
+          width,
+          template.url ?? null,
+          template.notes ?? null,
+          template.price ?? null,
+          template.square_feet ?? null,
+          template.room ?? null,
+          template.room_uuid ?? null,
+          template.seam ?? null,
+          template.backsplash ?? null,
+          template.tear_out ?? null,
+          template.stove ?? null,
+          template.ten_year_sealer ?? null,
+          template.waterfall ?? null,
+          template.corbels ?? null,
+          template.extras ?? null,
+          template.edge ?? null,
+        ],
       )
     }
 
