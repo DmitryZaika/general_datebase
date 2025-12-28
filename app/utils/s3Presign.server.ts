@@ -37,5 +37,3 @@ export async function presignIfS3Uri(url: string, expiresInSeconds: number = 360
   const command = new GetObjectCommand({ Bucket: parsed.bucket, Key: parsed.key })
   return getSignedUrl(client, command, { expiresIn: expiresInSeconds })
 }
-
-

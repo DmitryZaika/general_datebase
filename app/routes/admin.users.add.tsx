@@ -49,7 +49,7 @@ interface Company {
 const userschema = z.object({
   name: z.string().min(1),
   phone_number: z.union([z.coerce.string().min(10), z.literal('')]).optional(),
-  email: z.union([z.string().email().optional(), z.literal('')]),
+  email: z.union([z.email().optional(), z.literal('')]),
   password: z.coerce.string().min(4),
   company_id: z.coerce.number(),
   positions: z.union([

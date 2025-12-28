@@ -1,5 +1,5 @@
 import type { RowDataPacket } from 'mysql2'
-import { type LoaderFunctionArgs, data } from 'react-router'
+import { data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -58,7 +58,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     .map(row => {
       const threadId = typeof row.thread_id === 'string' ? row.thread_id : ''
       const dealId = typeof row.deal_id === 'number' ? row.deal_id : 0
-      const customerName = typeof row.customer_name === 'string' ? row.customer_name : 'Customer'
+      const customerName =
+        typeof row.customer_name === 'string' ? row.customer_name : 'Customer'
       const subject = typeof row.subject === 'string' ? row.subject : 'New email'
       const sentAt = typeof row.sent_at === 'string' ? row.sent_at : ''
       if (!threadId || !dealId) return null

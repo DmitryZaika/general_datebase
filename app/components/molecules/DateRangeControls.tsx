@@ -55,7 +55,7 @@ export function DateRangeControls({
             {to ? format(to, 'PPP') : <span>Select end date</span>}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className='w-auto p-0 '  align='start'>
+        <PopoverContent className='w-auto p-0 ' align='start'>
           <Calendar mode='single' selected={to} onSelect={setTo} initialFocus />
         </PopoverContent>
       </Popover>
@@ -63,7 +63,9 @@ export function DateRangeControls({
       <Button type='button' variant='outline' className='w-[50%]' onClick={onClear}>
         Clear
       </Button>
-      <Button className='w-[50%]' type={applyButtonType}>Apply</Button>
+      <Button className='w-[50%]' type={applyButtonType}>
+        Apply
+      </Button>
     </div>
   )
 }

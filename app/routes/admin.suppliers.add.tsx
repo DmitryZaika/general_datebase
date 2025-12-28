@@ -29,11 +29,11 @@ import { toastData } from '~/utils/toastHelpers.server'
 import { FormField, FormProvider } from '../components/ui/form'
 
 const supplierschema = z.object({
-  website: z.union([z.string().url().optional(), z.literal('')]).optional(),
+  website: z.union([z.url().optional(), z.literal('')]).optional(),
   supplier_name: z.string().min(1),
   manager: z.string().optional(),
   phone: z.union([z.coerce.string().min(10), z.literal('')]).optional(),
-  email: z.union([z.string().email().optional(), z.literal('')]),
+  email: z.union([z.email().optional(), z.literal('')]),
   notes: z.string().optional(),
 })
 
@@ -53,10 +53,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return { error: 'Invalid CSRF token' }
   }
 
-  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
-    request,
-    resolver,
-  )
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }
@@ -92,7 +89,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function SuppliersAdd() {
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state === 'idle'
-  const form = useForm<FormData>({
+  const form = useForm({
     resolver,
     defaultValues: {
       website: '',

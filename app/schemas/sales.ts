@@ -39,61 +39,63 @@ export const EXTRA_DEFAULTS = {
 }
 
 export const roomSchema = z.object({
-  room: z.string().default('kitchen'),
-  room_id: z.string().default(uuidv7),
+  room: z.string().prefault('kitchen'),
+  room_id: z.string().prefault(uuidv7),
   stone_id: z.coerce.number().optional(),
-  sink_type: z.array(sinkOptionsSchema).default([]),
-  faucet_type: z.array(faucetOptionsSchema).default([]),
-  backsplash: z.string().default('no'),
+  sink_type: z.array(sinkOptionsSchema).prefault([]),
+  faucet_type: z.array(faucetOptionsSchema).prefault([]),
+  backsplash: z.string().prefault('no'),
   square_feet: z.preprocess(
     value => (value === '' || value === null ? undefined : value),
     z.coerce.number().optional(),
   ),
-  retail_price: z.coerce.number().default(0),
+  retail_price: z.coerce.number().prefault(0),
   total_price: z.coerce.number().optional(),
-  tear_out: z.string().default('no'),
-  stove: z.string().default('f/s'),
-  waterfall: z.string().default('no'),
-  corbels: z.coerce.number().default(0),
-  seam: z.string().default('standard'),
-  ten_year_sealer: z.boolean().default(false),
-  slabs: z.array(slabOptionsSchema).default([]),
-  extras: extrasSchema.default(EXTRA_DEFAULTS),
+  tear_out: z.string().prefault('no'),
+  stove: z.string().prefault('f/s'),
+  waterfall: z.string().prefault('no'),
+  corbels: z.coerce.number().prefault(0),
+  seam: z.string().prefault('standard'),
+  ten_year_sealer: z.boolean().prefault(false),
+  slabs: z.array(slabOptionsSchema).prefault([]),
+  extras: extrasSchema.prefault(EXTRA_DEFAULTS),
 })
 
 export type TRoomSchema = z.infer<typeof roomSchema>
 
 export const finalExtrasSchema = z.object({
-  adjustment: z.string().default(''),
-  price: z.coerce.number().default(0),
+  adjustment: z.string().prefault(''),
+  price: z.coerce.number().prefault(0),
 })
 
 export type TFullExtrasSchema = z.infer<typeof finalExtrasSchema>[]
 
-export const customerSchema = z.object({
-  customer_id: z.coerce
-    .number({
-      required_error: 'Please add a customer',
-      invalid_type_error: 'Please add a customer',
-    })
-    .min(1, 'Please add a customer'),
-  seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
-  project_address: z.string().optional().nullable(),
-  notes_to_sale: StringOrNumber,
-  price: z.coerce.number().default(0),
-  company_name: z.string().nullable().optional(),
-  rooms: z.array(roomSchema).default([]),
-  extras: z.array(finalExtrasSchema).default([]),
-}).superRefine((value, ctx) => {
-  value.rooms.forEach((room, index) => {
-    if (!room.square_feet || room.square_feet <= 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Square feet is required',
-        path: ['rooms', index, 'square_feet'],
+export const customerSchema = z
+  .object({
+    customer_id: z.coerce
+      .number({
+        error: issue =>
+          issue.input === undefined ? 'Please add a customer' : 'Please add a customer',
       })
-    }
+      .min(1, 'Please add a customer'),
+    seller_id: z.coerce.number().min(1, 'Sales rep is required').optional(),
+    project_address: z.string().optional().nullable(),
+    notes_to_sale: StringOrNumber,
+    price: z.coerce.number().prefault(0),
+    company_name: z.string().nullable().optional(),
+    rooms: z.array(roomSchema).prefault([]),
+    extras: z.array(finalExtrasSchema).prefault([]),
   })
-})
+  .superRefine((value, ctx) => {
+    value.rooms.forEach((room, index) => {
+      if (!room.square_feet || room.square_feet <= 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Square feet is required',
+          path: ['rooms', index, 'square_feet'],
+        })
+      }
+    })
+  })
 
 export type TCustomerSchema = z.infer<typeof customerSchema>

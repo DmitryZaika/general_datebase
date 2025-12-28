@@ -300,9 +300,12 @@ export default function App() {
             )}
             <main ref={mainRef} className='h-screen overflow-y-auto bg-gray-100 w-full'>
               <AuthenticityTokenProvider token={token}>
-                {isExternalMarketing || isCheckIn || isInstallerRoute || (isShopRoute && isShopWorker) ? (
+                {isExternalMarketing ||
+                isCheckIn ||
+                isInstallerRoute ||
+                (isShopRoute && isShopWorker) ? (
                   <MarketingHeader />
-                ) :  (
+                ) : (
                   <Header
                     isEmployee={user?.is_employee ?? false}
                     user={user}

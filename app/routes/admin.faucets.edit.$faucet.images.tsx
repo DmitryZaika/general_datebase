@@ -9,7 +9,6 @@ import {
   useNavigation,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
-import { z } from 'zod'
 import { FileInput } from '~/components/molecules/FileInput'
 import { MultiPartForm } from '~/components/molecules/MultiPartForm'
 import { Button } from '~/components/ui/button'
@@ -22,10 +21,7 @@ import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
-import { useCustomForm } from '~/utils/useCustomForm'
-
-export const InstalledProjectsSchema = z.object({})
-type TInstalledProjectsSchema = z.infer<typeof InstalledProjectsSchema>
+import { fileSchema, useCustomForm } from '~/utils/useCustomForm'
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
@@ -66,11 +62,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     })
   }
 
-  const { errors, data } = await parseMutliForm(
-    request,
-    InstalledProjectsSchema,
-    'faucets',
-  )
+  const { errors, data } = await parseMutliForm(request, fileSchema, 'faucets')
   if (errors || !data) {
     return { errors }
   }
@@ -107,7 +99,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 function AddImage() {
   const navigation = useNavigation()
-  const form = useCustomForm<TInstalledProjectsSchema>(InstalledProjectsSchema)
+  const form = useCustomForm(fileSchema)
 
   const [inputKey, setInputKey] = useState(0)
 

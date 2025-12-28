@@ -121,7 +121,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 function groupAttemptsByNumber(attempts: AnswerAttempt[]) {
-  const grouped: Record<number, { correct: number; total: number; questions: AnswerAttempt[] }> = {}
+  const grouped: Record<
+    number,
+    { correct: number; total: number; questions: AnswerAttempt[] }
+  > = {}
   for (const attempt of attempts) {
     const key = attempt.attempt_number
     const existing = grouped[key]

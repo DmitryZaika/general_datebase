@@ -34,7 +34,6 @@ const userschema = z.object({
   qboClientSecret: z.string().min(10),
 })
 
-type FormData = z.infer<typeof userschema>
 const resolver = zodResolver(userschema)
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -49,10 +48,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return { error: 'Invalid CSRF token' }
   }
 
-  const { errors, data, receivedValues } = await getValidatedFormData<FormData>(
-    request,
-    resolver,
-  )
+  const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
   }
@@ -76,7 +72,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function UsersAdd() {
   const { companies } = useLoaderData<typeof loader>()
-  const form = useForm<FormData>({
+  const form = useForm({
     resolver,
   })
   const fullSubmit = useFullSubmit(form)

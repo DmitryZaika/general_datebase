@@ -23,21 +23,18 @@ import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { selectMany } from '~/utils/queryHelpers'
 
 const surveySchema = z.object({
-  sales_rep_id: z.coerce.number().min(1),
-  sales_rep_rating: z.coerce.number().min(1).max(5),
+  sales_rep_id: z.number().min(1),
+  sales_rep_rating: z.number().min(1).max(5),
   sales_rep_comments: z.string().optional(),
-  technician_rating: z.coerce.number().min(1).max(5),
+  technician_rating: z.number().min(1).max(5),
   technician_comments: z.string().optional(),
-  installation_rating: z.coerce.number().min(1).max(5),
+  installation_rating: z.number().min(1).max(5),
   installation_comments: z.string().optional(),
 })
 
-type SurveyForm = z.infer<typeof surveySchema>
 const resolver = zodResolver(surveySchema)
 
-
 type SalesRep = { id: number; name: string }
-
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
   const companyId = Number(params.company)
@@ -57,10 +54,7 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const companyId = Number(params.company)
-  const { errors, data} = await getValidatedFormData<SurveyForm>(
-    request,
-    resolver,
-  )
+  const { errors, data } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors }
   }
@@ -89,7 +83,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         data.installation_rating,
         data.installation_comments,
         companyId,
-      ]
+      ],
     )
 
     return redirect(`/customer/${companyId}/survey?submitted=1`)
@@ -181,11 +175,14 @@ export default function Survey() {
   const error = searchParams.get('error') === '1'
   const salesRepSelectRef = useRef<HTMLButtonElement>(null)
   const navigation = useNavigation()
-  const isSubmitting = navigation.state !== 'idle'  
+  const isSubmitting = navigation.state !== 'idle'
 
-  const options = useMemo(() => salesReps.map(r => ({ key: r.id, value: r.name })), [salesReps])
+  const options = useMemo(
+    () => salesReps.map(r => ({ key: r.id, value: r.name })),
+    [salesReps],
+  )
 
-  const form = useForm<SurveyForm>({
+  const form = useForm({
     resolver,
     defaultValues: {
       sales_rep_id: undefined,
@@ -199,12 +196,15 @@ export default function Survey() {
   })
 
   const fullSubmit = useFullSubmit(form, `/customer/${companyId}/survey`, 'POST')
-  const salesRepId = form.watch('sales_rep_id')
   const salesRepRating = form.watch('sales_rep_rating')
   const technicianRating = form.watch('technician_rating')
   const installationRating = form.watch('installation_rating')
   useEffect(() => {
-    if (form.formState.submitCount > 0 && form.formState.errors.sales_rep_id && salesRepSelectRef.current) {
+    if (
+      form.formState.submitCount > 0 &&
+      form.formState.errors.sales_rep_id &&
+      salesRepSelectRef.current
+    ) {
       salesRepSelectRef.current.focus()
     }
   }, [form.formState.submitCount, form.formState.errors.sales_rep_id])
@@ -213,11 +213,10 @@ export default function Survey() {
     <div className='mx-auto flex w-full max-w-2xl flex-col gap-4 p-4'>
       <div>
         <p className='text-center text-xl font-light text-zinc-800 leading-relaxed'>
-          Please fill out the survey to help us improve our service. This survey is <span className='font-normal text-zinc-900'>FULLY ANONYMOUS</span>.
+          Please fill out the survey to help us improve our service. This survey is{' '}
+          <span className='font-normal text-zinc-900'>FULLY ANONYMOUS</span>.
         </p>
       </div>
-
-    
 
       {error ? (
         <div className='rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800'>
@@ -228,18 +227,19 @@ export default function Survey() {
         <Form id='customerForm' method='post' onSubmit={fullSubmit}>
           <div className='space-y-4'>
             <SectionCard title='Pick your sales rep'>
-            <FormField
-          control={form.control}
-          name='sales_rep_id'
-          render={({ field }) => (
-            <SelectInput
-              name='Sales rep'
-              placeholder='Select rep'
-              options={options}
-              field={field}
-              disabled={submitted}
-              />
-            )}></FormField>
+              <FormField
+                control={form.control}
+                name='sales_rep_id'
+                render={({ field }) => (
+                  <SelectInput
+                    name='Sales rep'
+                    placeholder='Select rep'
+                    options={options}
+                    field={field}
+                    disabled={submitted}
+                  />
+                )}
+              ></FormField>
             </SectionCard>
 
             <SectionCard title='How did you like the sales rep?'>
@@ -247,13 +247,22 @@ export default function Survey() {
                 <StarRating
                   name='sales_rep_rating'
                   value={salesRepRating}
-                  onChange={val => form.setValue('sales_rep_rating', val, { shouldValidate: true })}
-                  invalid={form.formState.submitCount > 0 && !!form.formState.errors.sales_rep_rating}
+                  onChange={val =>
+                    form.setValue('sales_rep_rating', val, { shouldValidate: true })
+                  }
+                  invalid={
+                    form.formState.submitCount > 0 &&
+                    !!form.formState.errors.sales_rep_rating
+                  }
                   disabled={submitted}
                 />
               </div>
               <div className='space-y-2'>
-                <Textarea {...form.register('sales_rep_comments')} rows={4} disabled={submitted} />
+                <Textarea
+                  {...form.register('sales_rep_comments')}
+                  rows={4}
+                  disabled={submitted}
+                />
               </div>
             </SectionCard>
 
@@ -262,13 +271,22 @@ export default function Survey() {
                 <StarRating
                   name='technician_rating'
                   value={technicianRating}
-                  onChange={val => form.setValue('technician_rating', val, { shouldValidate: true })}
-                  invalid={form.formState.submitCount > 0 && !!form.formState.errors.technician_rating}
+                  onChange={val =>
+                    form.setValue('technician_rating', val, { shouldValidate: true })
+                  }
+                  invalid={
+                    form.formState.submitCount > 0 &&
+                    !!form.formState.errors.technician_rating
+                  }
                   disabled={submitted}
                 />
               </div>
               <div className='space-y-2'>
-                <Textarea {...form.register('technician_comments')} rows={4} disabled={submitted} />
+                <Textarea
+                  {...form.register('technician_comments')}
+                  rows={4}
+                  disabled={submitted}
+                />
               </div>
             </SectionCard>
 
@@ -277,13 +295,22 @@ export default function Survey() {
                 <StarRating
                   name='installation_rating'
                   value={installationRating}
-                  onChange={val => form.setValue('installation_rating', val, { shouldValidate: true })}
-                  invalid={form.formState.submitCount > 0 && !!form.formState.errors.installation_rating}
+                  onChange={val =>
+                    form.setValue('installation_rating', val, { shouldValidate: true })
+                  }
+                  invalid={
+                    form.formState.submitCount > 0 &&
+                    !!form.formState.errors.installation_rating
+                  }
                   disabled={submitted}
                 />
               </div>
               <div className='space-y-2'>
-                <Textarea {...form.register('installation_comments')} rows={4} disabled={submitted} />
+                <Textarea
+                  {...form.register('installation_comments')}
+                  rows={4}
+                  disabled={submitted}
+                />
               </div>
             </SectionCard>
 

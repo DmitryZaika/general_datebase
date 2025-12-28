@@ -1,5 +1,4 @@
-import { OriginalSidebarTrigger, SidebarTrigger } from "./ui/sidebar"
-
+import { OriginalSidebarTrigger, SidebarTrigger } from './ui/sidebar'
 
 interface SidebarToggleProps {
   isMobile: boolean

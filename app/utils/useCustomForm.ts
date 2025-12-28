@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { type FieldValues, type UseFormReturn, useForm } from 'react-hook-form'
 import { z } from 'zod'
 
-const fileSchema = z.object({
+export const fileSchema = z.object({
   file: z.instanceof(File),
 })
 

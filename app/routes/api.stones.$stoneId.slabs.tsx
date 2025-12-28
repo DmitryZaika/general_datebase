@@ -57,12 +57,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       is_leftover: number
       parent_id: number | null
       child_count: number
-    }>(
-      db,
-      query,
-      queryParams,
-    )
-    
+    }>(db, query, queryParams)
+
     const slabsWithLO = slabs.map(slab => ({
       ...slab,
       is_leftover: Boolean(slab.is_leftover),

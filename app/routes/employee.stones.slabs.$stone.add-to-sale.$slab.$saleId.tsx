@@ -56,7 +56,7 @@ const schema = z.object({
     .optional(),
   sink: z.union([z.string(), z.number()]).optional(),
   square_feet: z.coerce.number().optional(),
-  is_full_slab_sold: z.boolean().default(false),
+  is_full_slab_sold: z.boolean().prefault(false),
 })
 
 type FormData = z.infer<typeof schema>

@@ -29,9 +29,7 @@ if ('serviceWorker' in navigator && typeof window !== 'undefined') {
       console.log('[SW] New Service Worker waiting to activate')
 
       // Show update notification to user
-      const updateConfirm = confirm(
-        'A new version is available. Reload to update?'
-      )
+      const updateConfirm = confirm('A new version is available. Reload to update?')
 
       if (updateConfirm) {
         wb.addEventListener('controlling', () => {
@@ -67,9 +65,12 @@ if ('serviceWorker' in navigator && typeof window !== 'undefined') {
         console.log('[SW] Service Worker registered:', registration)
 
         // Check for updates periodically (every hour)
-        setInterval(() => {
-          registration?.update()
-        }, 60 * 60 * 1000)
+        setInterval(
+          () => {
+            registration?.update()
+          },
+          60 * 60 * 1000,
+        )
       })
       .catch(error => {
         console.error('[SW] Service Worker registration failed:', error)

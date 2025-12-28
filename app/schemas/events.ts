@@ -10,19 +10,22 @@ export const eventSchema = z
     description: z.string().optional(),
     start_date: z.date(),
     end_date: z.date(),
-    all_day: z.boolean().default(false),
-    color: z.string().max(50, 'Color must be 50 characters or less').default('primary'),
+    all_day: z.boolean().prefault(false),
+    color: z
+      .string()
+      .max(50, 'Color must be 50 characters or less')
+      .prefault('primary'),
     status: z
       .string()
       .max(50, 'Status must be 50 characters or less')
-      .default('scheduled'),
+      .prefault('scheduled'),
     notes: z.string().optional(),
     assigned_user_id: z.number().optional(),
     sale_id: z.number().optional(),
   })
   .refine(data => data.end_date >= data.start_date, {
-    message: 'End date must be after start date',
     path: ['end_date'],
+    error: 'End date must be after start date',
   })
 
 export type EventFormData = z.infer<typeof eventSchema>
@@ -37,19 +40,22 @@ export const eventUpdateSchema = z
     description: z.string().optional(),
     start_date: z.date(),
     end_date: z.date(),
-    all_day: z.boolean().default(false),
-    color: z.string().max(50, 'Color must be 50 characters or less').default('primary'),
+    all_day: z.boolean().prefault(false),
+    color: z
+      .string()
+      .max(50, 'Color must be 50 characters or less')
+      .prefault('primary'),
     status: z
       .string()
       .max(50, 'Status must be 50 characters or less')
-      .default('scheduled'),
+      .prefault('scheduled'),
     notes: z.string().optional(),
     assigned_user_id: z.number().optional(),
     sale_id: z.number().optional(),
   })
   .refine(data => data.end_date >= data.start_date, {
-    message: 'End date must be after start date',
     path: ['end_date'],
+    error: 'End date must be after start date',
   })
 
 export type EventUpdateData = z.infer<typeof eventUpdateSchema>

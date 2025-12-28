@@ -40,8 +40,8 @@ import { useCustomOptionalForm } from '~/utils/useCustomForm'
 // Form schema
 const slabSchema = z.object({
   bundle: z.string().min(1),
-  length: z.coerce.number().default(0),
-  width: z.coerce.number().default(0),
+  length: z.coerce.number().prefault(0),
+  width: z.coerce.number().prefault(0),
 })
 
 // Schema for updating slab bundle
@@ -645,7 +645,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
         )
       } else if (id) {
         const slabId = parseInt(id.toString(), 10)
-        await db.execute('UPDATE slab_inventory SET deleted_at = NOW() WHERE id = ?', [slabId])
+        await db.execute('UPDATE slab_inventory SET deleted_at = NOW() WHERE id = ?', [
+          slabId,
+        ])
         const session = await getSession(request.headers.get('Cookie'))
         session.flash('message', toastData('Success', 'Slab Deleted'))
         return data(

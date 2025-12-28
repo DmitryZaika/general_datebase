@@ -43,7 +43,10 @@ export async function action({ request }: ActionFunctionArgs) {
   const customer = customers[0]
 
   if (!customer) {
-    const result: ActionData = { error: 'Customer with this email was not found', email }
+    const result: ActionData = {
+      error: 'Customer with this email was not found',
+      email,
+    }
     return result
   }
 
@@ -94,7 +97,7 @@ export default function CustomerAccount() {
               required
             />
           </div>
-          <LoadingButton loading={isSubmitting} type='submit' >
+          <LoadingButton loading={isSubmitting} type='submit'>
             Submit
           </LoadingButton>
         </Form>

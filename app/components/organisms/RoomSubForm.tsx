@@ -118,7 +118,7 @@ export const RoomSubForm = ({
     let isMounted = true
 
     if (slabIds.length > 0) {
-      getStone(slabIds[0]).then((stone) => {
+      getStone(slabIds[0]).then(stone => {
         if (isMounted) setStone(stone)
       })
     } else {
@@ -126,7 +126,7 @@ export const RoomSubForm = ({
       const allRooms = form.getValues('rooms')
       const firstRoomWithSlabs = allRooms.find(room => room.slabs.length > 0)
       if (firstRoomWithSlabs && firstRoomWithSlabs.slabs.length > 0) {
-        getStone(firstRoomWithSlabs.slabs[0].id).then((stone) => {
+        getStone(firstRoomWithSlabs.slabs[0].id).then(stone => {
           if (isMounted) setStone(stone)
         })
       }
@@ -316,7 +316,7 @@ export const RoomSubForm = ({
             />
           )}
         />
-            <FormField
+        <FormField
           control={form.control}
           name={`rooms.${index}.square_feet`}
           render={({ field }) => (
@@ -364,14 +364,9 @@ export const RoomSubForm = ({
             />
           )}
         />
-        
       </div>
 
-      <div
-        className='border border-gray-200 rounded-md p-2 flex gap-2 mt-2 hidden '
-      >
-    
-
+      <div className='border border-gray-200 rounded-md p-2 flex gap-2 mt-2 hidden '>
         <FormField
           control={form.control}
           name={`rooms.${index}.retail_price`}
@@ -585,7 +580,11 @@ export const RoomSubForm = ({
           />
         </div>
       </div>
-      <div className={hideContractFields ? 'hidden' : 'flex items-center justify-between space-x-2'}>
+      <div
+        className={
+          hideContractFields ? 'hidden' : 'flex items-center justify-between space-x-2'
+        }
+      >
         <div className='flex items-center space-x-2 mt-4'></div>
         <div className='flex items-center space-x-2 mt-4'>
           <AddExtraDialog form={form} index={index} />

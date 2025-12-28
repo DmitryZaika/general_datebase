@@ -13,7 +13,7 @@ import {
 import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser, User } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 
 interface SlabReport {
   id: number

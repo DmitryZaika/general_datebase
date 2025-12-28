@@ -467,7 +467,10 @@ function useManualQuestion(
 
   const handleAddChoice = () => {
     const newId = Math.min(...editedChoices.map(c => c.id || 0), 0) - 1
-    setEditedChoices(prev => [...prev, { id: newId, text: '', is_correct: false, is_deleted: false }])
+    setEditedChoices(prev => [
+      ...prev,
+      { id: newId, text: '', is_correct: false, is_deleted: false },
+    ])
   }
 
   const handleDeleteChoice = (id: number | null) => {
@@ -578,7 +581,10 @@ function useEditableQuestion(
 
   const handleAddChoice = () => {
     const newId = Math.min(...editedChoices.map(c => c.id || 0), 0) - 1
-    setEditedChoices(prev => [...prev, { id: newId, text: '', is_deleted: false, is_correct: false }])
+    setEditedChoices(prev => [
+      ...prev,
+      { id: newId, text: '', is_deleted: false, is_correct: false },
+    ])
   }
 
   const handleDeleteChoice = (id: number | null) => {
@@ -916,7 +922,7 @@ export function useInstructionContent(node: InstructionMedium) {
 
     return {
       title: node.title || 'Untitled Instruction',
-      content: cleanText || node.title || 'No content available'
+      content: cleanText || node.title || 'No content available',
     }
   }, [node])
 

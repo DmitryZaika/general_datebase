@@ -61,7 +61,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return { error: 'Invalid CSRF token' }
   }
 
-  const { errors, data } = await getValidatedFormData<FormData>(request, resolver)
+  const { errors, data } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors }
   }
@@ -133,7 +133,7 @@ export default function InstructionsAdd() {
   const token = useAuthenticityToken()
   const { instructions } = useLoaderData<typeof loader>()
 
-  const form = useForm<FormData>({
+  const form = useForm({
     resolver,
     defaultValues: {
       title: '',

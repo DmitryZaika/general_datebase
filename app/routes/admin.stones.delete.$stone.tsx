@@ -30,8 +30,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
     return forceRedirectError(request.headers, 'No document id provided')
   }
   const stoneId = parseInt(params.stone)
- 
- 
+
   // Get all slab images that need to be deleted from S3
   const slabsResult = await db.execute(
     `SELECT url FROM slab_inventory WHERE stone_id = ? AND url IS NOT NULL`,
@@ -49,10 +48,15 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
 
   // Soft delete all slabs belonging to this stone
-  await db.execute(`UPDATE slab_inventory SET deleted_at = CURRENT_TIMESTAMP WHERE stone_id = ?`, [stoneId])
+  await db.execute(
+    `UPDATE slab_inventory SET deleted_at = CURRENT_TIMESTAMP WHERE stone_id = ?`,
+    [stoneId],
+  )
 
   // Soft delete the stone itself
-  await db.execute(`UPDATE stones SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`, [stoneId])
+  await db.execute(`UPDATE stones SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`, [
+    stoneId,
+  ])
 
   const url = new URL(request.url)
   const searchParams = url.searchParams.toString()

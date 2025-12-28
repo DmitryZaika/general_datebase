@@ -39,7 +39,10 @@ export const AddSinkDialog = ({
   // Count how many of each sink type are already selected
   const selectedSinkCounts = new Map<number, number>()
   allSelectedSinks.forEach(sink => {
-    selectedSinkCounts.set(sink.type_id, (selectedSinkCounts.get(sink.type_id) || 0) + 1)
+    selectedSinkCounts.set(
+      sink.type_id,
+      (selectedSinkCounts.get(sink.type_id) || 0) + 1,
+    )
   })
 
   // Calculate remaining available for each sink type

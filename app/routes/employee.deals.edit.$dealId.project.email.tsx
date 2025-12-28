@@ -103,7 +103,7 @@ interface AIEmailResponse {
 // ============================================================================
 
 const emailSchema = z.object({
-  to: z.string().email('Valid email address is required'),
+  to: z.email('Valid email address is required'),
   subject: z.string().min(1, 'Subject is required'),
   text: z.string().min(1, 'Email body is required'),
 })
@@ -279,7 +279,6 @@ async function generateAIEmail(
   onStreamBody?: (text: string) => void,
 ): Promise<AIEmailResponse> {
   const requestPayload = buildAIRequestPayload(formData, dealId)
-
 
   const response = await fetch('/api/aiRecommend/email', {
     method: 'POST',
@@ -619,9 +618,7 @@ export default function DealEmailDialog() {
                   getText={() => form.getValues('text')}
                   setText={value => form.setValue('text', value)}
                 />
-                <Button type='submit'>
-                  Send Email
-                </Button>
+                <Button type='submit'>Send Email</Button>
               </div>
             </div>
           </form>

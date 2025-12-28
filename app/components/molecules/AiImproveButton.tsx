@@ -67,5 +67,3 @@ export function AiImproveButton({
     </Button>
   )
 }
-
-

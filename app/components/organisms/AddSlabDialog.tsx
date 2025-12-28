@@ -55,7 +55,13 @@ export const AddSlabDialog = ({
   roomIndex: number
 }) => {
   type SlabState =
-    | { id: number; bundle: string; is_leftover: boolean; parent_id: number | null; child_count: number }
+    | {
+        id: number
+        bundle: string
+        is_leftover: boolean
+        parent_id: number | null
+        child_count: number
+      }
     | undefined
   const [selectedSlab, setSelectedSlab] = useState<SlabState>()
 

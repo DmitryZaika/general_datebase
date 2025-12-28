@@ -5,7 +5,12 @@ interface LoadingButtonProps extends ButtonProps {
   loading: boolean
 }
 
-export function LoadingButton({ loading, type = 'submit', children, ...props }: LoadingButtonProps) {
+export function LoadingButton({
+  loading,
+  type = 'submit',
+  children,
+  ...props
+}: LoadingButtonProps) {
   return (
     <Button {...props} type={type}>
       {loading ? <Spinner size={20} /> : children}
