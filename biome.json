@@ -110,5 +110,13 @@
     "clientKind": "git",
     "enabled": true,
     "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!scripts",
+      "!app/components/ui/chart.tsx",
+      "!app/components/ui/data-table.tsx"
+    ]
   }
 }

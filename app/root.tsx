@@ -235,7 +235,6 @@ export default function App() {
   const segments = pathname.split('/').filter(Boolean)
   const isCustomerViewPage = segments[0] === 'customer' && segments[2] !== 'stones'
   const mainRef = useRef<HTMLElement | null>(null)
-  const isLoginPage = pathname === '/login'
   const [isAtBottom, setIsAtBottom] = useState(false)
   useEffect(() => {
     const el = mainRef.current
