@@ -537,7 +537,6 @@ export default function EmailChatDialog() {
                   </div>
                 </div>
               </div>
-            </div>
           ))}
           <div ref={bottomRef} />
         </div>

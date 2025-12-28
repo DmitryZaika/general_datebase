@@ -207,9 +207,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
       sale_id: number
       cut_date: string | null
       stone_id: number
+      parent_id: number | null
+      length: number
+      width: number
     }>(
       db,
-      `SELECT id, sale_id, cut_date, stone_id FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      `SELECT id, sale_id, cut_date, stone_id, parent_id, length, width FROM slab_inventory WHERE id = ? AND sale_id = ?`,
       [slabId, saleId],
     )
 
@@ -219,33 +222,46 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     if (slabs[0].cut_date !== null) {
       await db.execute(`UPDATE slab_inventory SET cut_date = NULL WHERE id = ?`, [slabId])
-      const stoneInfo = await selectMany<{ length: number; width: number }>(
+      
+      let targetLength: number
+      let targetWidth: number
+
+      if (slabs[0].parent_id) {
+        targetLength = slabs[0].length
+        targetWidth = slabs[0].width
+      } else {
+        const stoneInfo = await selectMany<{ length: number; width: number }>(
+          db,
+          `SELECT length, width FROM stones WHERE id = ?`,
+          [slabs[0].stone_id],
+        )
+        if (stoneInfo.length > 0) {
+          targetLength = stoneInfo[0].length
+          targetWidth = stoneInfo[0].width
+        } else {
+          targetLength = slabs[0].length
+          targetWidth = slabs[0].width
+        }
+      }
+
+      const children = await selectMany<{ id: number }>(
         db,
-        `SELECT length, width FROM stones WHERE id = ?`,
-        [slabs[0].stone_id],
+        `SELECT id FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL ORDER BY id ASC`,
+        [slabId],
       )
 
-      if (stoneInfo.length > 0) {
-        const { length: stoneLength, width: stoneWidth } = stoneInfo[0]
-        const children = await selectMany<{ id: number }>(
-          db,
-          `SELECT id FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL ORDER BY id ASC`,
-          [slabId],
+      if (children.length > 0) {
+        const firstChildId = children[0].id
+        await db.execute(
+          `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
+          [targetLength, targetWidth, firstChildId],
         )
 
-        if (children.length > 0) {
-          const firstChildId = children[0].id
+        if (children.length > 1) {
           await db.execute(
-            `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
-            [stoneLength, stoneWidth, firstChildId],
+            `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND id != ?`,
+            [slabId, firstChildId],
           )
-
-          if (children.length > 1) {
-            await db.execute(
-              `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND id != ?`,
-              [slabId, firstChildId],
-            )
-          }
         }
       }
 
@@ -456,26 +472,40 @@ export async function action({ request, params }: ActionFunctionArgs) {
       stone_id: number
       bundle: string
       url: string | null
+      parent_id: number | null
     }>(
       db,
-      `SELECT stone_id, bundle, url FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      `SELECT stone_id, bundle, url, parent_id FROM slab_inventory WHERE id = ? AND sale_id = ?`,
       [slabId, saleId],
     )
     if (parent.length === 0) return null
 
     let handled = false
     if (replaceFirst) {
-      const children = await selectMany<{ id: number }>(
+      const baseDims = await selectMany<{ length: number; width: number }>(
         db,
-        `SELECT id FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL ORDER BY id ASC LIMIT 1`,
+        `SELECT length, width FROM slab_inventory WHERE id = ?`,
         [slabId],
       )
-      if (children.length > 0) {
-        await db.execute(
-          `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
-          [length, width, children[0].id],
+      if (baseDims.length > 0) {
+        const matchChild = await selectMany<{ id: number }>(
+          db,
+          `SELECT id FROM slab_inventory
+           WHERE parent_id = ?
+           AND sale_id IS NULL
+           AND length = ?
+           AND width = ?
+           ORDER BY id ASC
+           LIMIT 1`,
+          [slabId, baseDims[0].length, baseDims[0].width],
         )
-        handled = true
+        if (matchChild.length > 0) {
+          await db.execute(
+            `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
+            [length, width, matchChild[0].id],
+          )
+          handled = true
+        }
       }
     }
 
