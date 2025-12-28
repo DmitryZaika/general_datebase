@@ -35,10 +35,7 @@ import { selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getEmployeeUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
-import { useCustomForm } from '~/utils/useCustomForm'
-
-export const DealImagesSchema = z.object({})
-type TDealImagesSchema = z.infer<typeof DealImagesSchema>
+import { fileSchema, useCustomForm } from '~/utils/useCustomForm'
 
 interface DealImage {
   id: number
@@ -98,7 +95,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (contentType.includes('multipart/form-data')) {
       const { errors, data: parsedData } = await parseMutliForm(
         requestClone,
-        DealImagesSchema,
+        fileSchema,
         'deals',
       )
 
@@ -160,7 +157,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 function AddImageForm() {
   const navigation = useNavigation()
-  const form = useCustomForm(DealImagesSchema)
+  const form = useCustomForm(fileSchema)
   const isSubmitting = useNavigation().state !== 'idle'
   const [inputKey, setInputKey] = useState(0)
 

@@ -35,4 +35,3 @@ export interface SaleSink {
   room: string | null
   room_uuid?: string | null
 }
-

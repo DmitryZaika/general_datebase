@@ -88,7 +88,11 @@ export function AddSlabDialog({
               <div className='text-sm text-muted-foreground'>
                 Room: {addRoom.name.charAt(0).toUpperCase() + addRoom.name.slice(1)}
               </div>
-              <Input value={addSearch} onChange={e => setAddSearch(e.target.value)} placeholder='Search stones' />
+              <Input
+                value={addSearch}
+                onChange={e => setAddSearch(e.target.value)}
+                placeholder='Search stones'
+              />
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                 <div className='border rounded p-2 max-h-80 overflow-y-auto'>
                   {addLoading ? (
@@ -148,4 +152,3 @@ export function AddSlabDialog({
     </UiDialog>
   )
 }
-

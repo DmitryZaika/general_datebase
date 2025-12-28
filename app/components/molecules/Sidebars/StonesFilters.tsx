@@ -177,11 +177,11 @@ function createToggleFilterHandler<T extends object, V extends keyof T>(
       }
 
       if (typeof itemValue === 'number') {
-        // @ts-ignore
+        // @ts-expect-error
         newValues.sort((a, b) => a - b)
       }
 
-      // @ts-ignore
+      // @ts-expect-error
       if (newValues.length === 0 && defaultValue && !Array.isArray(defaultValue)) {
         newValues = defaultValue
       }
@@ -279,7 +279,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
     isSubmitting,
     defaultValue: [],
     filterKey: 'colors',
-    // @ts-ignore
+    // @ts-expect-error
     itemToValue: color => color.id,
   })
 
@@ -289,7 +289,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
     isSubmitting,
     defaultValue: [],
     filterKey: 'level',
-    // @ts-ignore
+    // @ts-expect-error
     itemToValue: (level: number | string) => {
       if (typeof level === 'string') {
         const match = level.match(/\d+/)
@@ -305,7 +305,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
     isSubmitting,
     defaultValue: 0,
     filterKey: 'supplier',
-    // @ts-ignore
+    // @ts-expect-error
     itemToValue: supplier => supplier.id,
   })
 
@@ -393,7 +393,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
             value={item}
             key={item}
             selected={searchParams.type ? searchParams.type.includes(item) : false}
-            // @ts-ignore
+            // @ts-expect-error
             toggleValue={() => toggleStoneType(item)}
             isLoading={isSubmitting}
           />
@@ -415,7 +415,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
             selected={
               searchParams.finishing ? searchParams.finishing.includes(item) : false
             }
-            // @ts-ignore
+            // @ts-expect-error
             toggleValue={() => toggleFinishing(item)}
             isLoading={isSubmitting}
           />
@@ -438,7 +438,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
               selected={
                 searchParams.colors ? searchParams.colors.includes(color.id) : false
               }
-              // @ts-ignore
+              // @ts-expect-error
               toggleValue={() => toggleColor(color)}
               isLoading={isSubmitting}
               icon={
@@ -463,7 +463,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
             value={`Level ${item}`}
             key={item}
             selected={isLevelSelected(item)}
-            // @ts-ignore
+            // @ts-expect-error
             toggleValue={() => toggleLevel(`Level ${item}`)}
             isLoading={isSubmitting}
           />
@@ -492,7 +492,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
           renderItem={supplier => (
             <div
               key={supplier.id}
-              // @ts-ignore
+              // @ts-expect-error
               onClick={() => toggleSupplier(supplier)}
               className={`p-1 cursor-pointer hover:bg-gray-100 transition-colors ${
                 searchParams.supplier === supplier.id ? 'bg-gray-100' : ''

@@ -8,8 +8,7 @@ interface MarketingHeaderProps {
 export function MarketingHeader({ companyName }: MarketingHeaderProps) {
   return (
     <header className='bg-white flex items-center justify-between p-3'>
-      <div className='logo'>
-      </div>
+      <div className='logo'></div>
       {companyName && (
         <div className='text-center flex-1'>
           <span className='text-sm md:text-base font-medium'>{companyName}</span>

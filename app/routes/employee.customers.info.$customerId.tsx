@@ -164,7 +164,6 @@ export default function CustomerInfoDialog() {
                 <div>Address: {customer.address || '-'}</div>
                 <div>Sales Rep: {customer.sales_rep_name || 'Not assigned'}</div>
                 <div>Source: {customer.source || 'Not assigned'}</div>
-             
               </div>
             </div>
 
@@ -208,7 +207,9 @@ export default function CustomerInfoDialog() {
                       )}
                       {d.lost_reason && (
                         <div className='text-sm text-slate-600 mt-1 whitespace-pre-wrap'>
-                          <span className='font-semibold text-red-600'>Lost reason:</span>{' '}
+                          <span className='font-semibold text-red-600'>
+                            Lost reason:
+                          </span>{' '}
                           {d.lost_reason}
                         </div>
                       )}

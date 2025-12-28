@@ -1,5 +1,3 @@
-
-
 import type { LoaderFunctionArgs } from 'react-router'
 
 type VCardFields = {
@@ -10,7 +8,13 @@ type VCardFields = {
   address: string
 }
 
-const fieldKeys: Array<keyof VCardFields> = ['name', 'phone', 'email', 'company', 'address']
+const fieldKeys: Array<keyof VCardFields> = [
+  'name',
+  'phone',
+  'email',
+  'company',
+  'address',
+]
 
 const sanitize = (value: string | null) => {
   const str = (value ?? '').toString().trim()
@@ -71,7 +75,3 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   })
 }
-
-
-
-

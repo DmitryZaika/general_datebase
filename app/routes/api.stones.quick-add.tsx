@@ -67,7 +67,14 @@ export async function action({ request }: ActionFunctionArgs) {
           `INSERT INTO slab_inventory
            (bundle, stone_id, width, length, is_leftover, url)
            VALUES (?, ?, ?, ?, ?, ?)`,
-          [bundle.trim(), stoneId, validatedData.width, validatedData.length, false, null],
+          [
+            bundle.trim(),
+            stoneId,
+            validatedData.width,
+            validatedData.length,
+            false,
+            null,
+          ],
         )
         slabs.push({ id: slabResult.insertId })
       }

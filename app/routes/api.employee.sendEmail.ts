@@ -30,10 +30,7 @@ const appendEmailSignature = (body: string, signature: string | null | undefined
   const cleanSignature = (signature || '').trim()
   if (!cleanSignature) return cleanBody
   if (cleanBody.includes(cleanSignature)) return cleanBody
-  const sign =
-    cleanSignature.startsWith('--')
-      ? cleanSignature
-      : `—\n${cleanSignature}`
+  const sign = cleanSignature.startsWith('--') ? cleanSignature : `—\n${cleanSignature}`
   return `${cleanBody}\n\n${sign}`
 }
 

@@ -115,7 +115,7 @@ export default function FaucetsAdd() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[425px] overflow-y-auto max-h-[95vh]'>
+      <DialogContent className='sm:max-w-106.25 overflow-y-auto max-h-[95vh]'>
         <DialogHeader>
           <DialogTitle>Add Faucet</DialogTitle>
         </DialogHeader>

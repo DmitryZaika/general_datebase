@@ -191,7 +191,10 @@ const transactionColumns: ColumnDef<Transaction>[] = [
             const [stone, status] = item.split(':')
             const isDeleted = status === 'DELETED'
             return (
-              <span key={index} className={isDeleted ? 'text-red-500 line-through' : ''}>
+              <span
+                key={index}
+                className={isDeleted ? 'text-red-500 line-through' : ''}
+              >
                 {stone}
               </span>
             )
@@ -236,9 +239,7 @@ const transactionColumns: ColumnDef<Transaction>[] = [
     accessorKey: 'bundle',
     header: ({ column }) => <SortableHeader column={column} title='Bundle' />,
     cell: ({ row }) => {
-      const bundleInfo = (row.original.bundle_with_cut || '')
-        .split(',')
-        .filter(Boolean)
+      const bundleInfo = (row.original.bundle_with_cut || '').split(',').filter(Boolean)
       if (!bundleInfo.length) return <span>N/A</span>
 
       return (
@@ -247,7 +248,7 @@ const transactionColumns: ColumnDef<Transaction>[] = [
             const [bundle, cutStatus, deletedStatus] = item.split(':')
             const isCut = cutStatus === 'CUT'
             const isDeleted = deletedStatus === 'DELETED'
-            
+
             return (
               <span
                 key={index}
@@ -373,7 +374,9 @@ export default function AdminTransactions() {
                       }}
                       className='p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none'
                     >
-                      <div className='font-medium text-gray-800'>{tx.customer_name}</div>
+                      <div className='font-medium text-gray-800'>
+                        {tx.customer_name}
+                      </div>
                       <div className='text-xs text-gray-500 flex justify-between'>
                         <span>{formatDate(tx.sale_date)}</span>
                         <span>{tx.seller_name}</span>

@@ -8,7 +8,7 @@ const partnerColumns: ColumnDef<Partner>[] = [
     accessorKey: 'company_name',
     header: 'Company Name',
     cell: ({ row }) => (
-      <div className="font-semibold text-lg text-blue-900">
+      <div className='font-semibold text-lg text-blue-900'>
         {row.original.company_name}
       </div>
     ),
@@ -16,9 +16,7 @@ const partnerColumns: ColumnDef<Partner>[] = [
   {
     accessorKey: 'contact_name',
     header: 'Contact Person',
-    cell: ({ row }) => (
-      <CopyText value={row.original.contact_name || 'N/A'} />
-    ),
+    cell: ({ row }) => <CopyText value={row.original.contact_name || 'N/A'} />,
   },
   {
     accessorKey: 'phone',
@@ -42,26 +40,23 @@ interface PartnersTableProps {
 
 export default function PartnersTable({ partners }: PartnersTableProps) {
   return (
-    <div className="w-full bg-white rounded-lg shadow-sm border">
-      <div className="p-6 border-b">
-        <h2 className="text-2xl font-bold text-gray-900">Partners</h2>
+    <div className='w-full bg-white rounded-lg shadow-sm border'>
+      <div className='p-6 border-b'>
+        <h2 className='text-2xl font-bold text-gray-900'>Partners</h2>
       </div>
 
-      <div className="p-6">
+      <div className='p-6'>
         {partners.length > 0 ? (
-          <DataTable
-            columns={partnerColumns}
-            data={partners}
-          />
+          <DataTable columns={partnerColumns} data={partners} />
         ) : (
-          <div className="text-center py-12">
-            <div className="text-gray-400 text-lg">No partners found</div>
+          <div className='text-center py-12'>
+            <div className='text-gray-400 text-lg'>No partners found</div>
           </div>
         )}
       </div>
 
-      <div className="p-4 bg-gray-50 border-t text-sm text-gray-600">
-        Total Partners: <span className="font-semibold">{partners.length}</span>
+      <div className='p-4 bg-gray-50 border-t text-sm text-gray-600'>
+        Total Partners: <span className='font-semibold'>{partners.length}</span>
       </div>
     </div>
   )

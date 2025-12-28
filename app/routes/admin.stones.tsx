@@ -171,7 +171,9 @@ function StoneTable({ stones }: { stones: Stone[] }) {
     <DataTable
       columns={columns}
       onRowClick={(stone: Stone) => handleRowClick(stone.id)}
-      rowClassName={(stone: Stone) => `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200
+      rowClassName={(
+        stone: Stone,
+      ) => `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200
                    hover:shadow-md ${stone?.is_display ? '' : 'opacity-60'}`}
       data={stones}
     />
@@ -284,9 +286,10 @@ export default function AdminStones() {
               }
 
               const isRegularStock = !!stone.regular_stock
-              const availableText = stone.available === 0 && isRegularStock 
-                ? 'Regular Stock' 
-                : `${displayedAvailable} / ${displayedAmount}${isRegularStock ? ' (Regular stock)' : ''}`
+              const availableText =
+                stone.available === 0 && isRegularStock
+                  ? 'Regular Stock'
+                  : `${displayedAvailable} / ${displayedAmount}${isRegularStock ? ' (Regular stock)' : ''}`
 
               return (
                 <div
@@ -316,9 +319,7 @@ export default function AdminStones() {
                       )}
                     </div>
                     <p className='text-center font-bold mt-2'>{stone.name}</p>
-                    <p className='text-center text-sm'>
-                      Available: {availableText}
-                    </p>
+                    <p className='text-center text-sm'>Available: {availableText}</p>
                     <p className='text-center text-sm'>
                       Size: {displayedLength} x {displayedWidth}
                     </p>

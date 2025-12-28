@@ -18,4 +18,3 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function Shop() {
   return <Outlet />
 }
-

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getPending, savePending, clearPending, hasPending } from '~/utils/offlineChecklistQueue'
+import {
+  clearPending,
+  getPending,
+  hasPending,
+  savePending,
+} from '~/utils/offlineChecklistQueue'
 
 interface UseOfflineChecklistSyncProps {
   companyId: number
@@ -249,7 +254,10 @@ export function useOfflineChecklistSync({
 
     return () => {
       clearInterval(intervalId)
-      document.removeEventListener('visibilitychange', handleVisibilityChangeForInterval)
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChangeForInterval,
+      )
     }
   }, [trySubmitPending])
 

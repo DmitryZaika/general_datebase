@@ -94,7 +94,7 @@ export function DealsForm({
 
         <MainComponent
           setCreatedDealId={(deal_id: number) => form.setValue('deal_id', deal_id)}
-          form={form}
+          form={form as UseFormReturn<DealsDialogSchema>}
           companyId={companyId}
           dealId={dealId}
         />
