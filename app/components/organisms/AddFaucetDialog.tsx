@@ -100,7 +100,7 @@ export const AddFaucetDialog = ({
           ) : (
             <Select
               value={selectedFaucet?.toString() || ''}
-              onValueChange={val => setSelectedFaucet(parseInt(val))}
+              onValueChange={val => setSelectedFaucet(parseInt(val, 10))}
             >
               <SelectTrigger className='min-w-[150px]'>
                 <SelectValue placeholder='Select a faucet' />

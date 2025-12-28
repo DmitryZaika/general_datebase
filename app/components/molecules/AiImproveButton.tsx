@@ -40,7 +40,7 @@ export function AiImproveButton({
       }
 
       const json: { body?: string } = await response.json()
-      if (json.body && json.body.trim()) {
+      if (json.body?.trim()) {
         setText(json.body.trim())
       }
     } catch (error) {

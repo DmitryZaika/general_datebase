@@ -522,7 +522,7 @@ export const RoomSubForm = ({
                   onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
                     field.onChange(event)
                     handleExtraChange(
-                      parseInt(event.target.value) || 0,
+                      parseInt(event.target.value, 10) || 0,
                       'corbels_price',
                     )
                   },
