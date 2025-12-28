@@ -338,7 +338,7 @@ export const RoomSubForm = ({
                   handleSquareFeetChange(Number.isFinite(parsed) ? parsed : 0)
                 },
               }}
-              formClassName={`mb-0 `}
+              formClassName={`mb-0`}
             />
           )}
         />

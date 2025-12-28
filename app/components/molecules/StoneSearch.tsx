@@ -42,7 +42,7 @@ const getStones = async (
     `/api/stones/search/${companyId}?name=${encodeURIComponent(name)}&show_sold_out=${showSoldOut}`,
   )
   const data = await response.json()
-  return data?.stones || []
+  return (data?.stones || []).filter((stone: StoneImage) => stone.is_display !== 0)
 }
 
 export function StoneSearch({

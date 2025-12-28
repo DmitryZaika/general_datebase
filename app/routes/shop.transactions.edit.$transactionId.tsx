@@ -1,28 +1,28 @@
 import { Calendar, MapPin, User, UserCircle } from 'lucide-react'
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import {
-  type ActionFunctionArgs,
-  data,
-  type LoaderFunctionArgs,
-  Outlet,
-  useFetcher,
-  useLoaderData,
-  useLocation,
-  useNavigate,
+    type ActionFunctionArgs,
+    data,
+    type LoaderFunctionArgs,
+    Outlet,
+    useFetcher,
+    useLoaderData,
+    useLocation,
+    useNavigate,
 } from 'react-router'
 import {
-  AddSlabDialog,
-  type RoomOption,
+    AddSlabDialog,
+    type RoomOption,
 } from '~/components/transactions/AddSlabDialogTransactions'
 import { ReplaceDialog } from '~/components/transactions/ReplaceDialog'
 import { RoomsSection } from '~/components/transactions/RoomsSection'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
@@ -206,9 +206,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
       id: number
       sale_id: number
       cut_date: string | null
+      stone_id: number
     }>(
       db,
-      `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
+      `SELECT id, sale_id, cut_date, stone_id FROM slab_inventory WHERE id = ? AND sale_id = ?`,
       [slabId, saleId],
     )
 
@@ -217,9 +218,37 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     if (slabs[0].cut_date !== null) {
-      await db.execute(`UPDATE slab_inventory SET cut_date = NULL WHERE id = ?`, [
-        slabId,
-      ])
+      await db.execute(`UPDATE slab_inventory SET cut_date = NULL WHERE id = ?`, [slabId])
+      const stoneInfo = await selectMany<{ length: number; width: number }>(
+        db,
+        `SELECT length, width FROM stones WHERE id = ?`,
+        [slabs[0].stone_id],
+      )
+
+      if (stoneInfo.length > 0) {
+        const { length: stoneLength, width: stoneWidth } = stoneInfo[0]
+        const children = await selectMany<{ id: number }>(
+          db,
+          `SELECT id FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL ORDER BY id ASC`,
+          [slabId],
+        )
+
+        if (children.length > 0) {
+          const firstChildId = children[0].id
+          await db.execute(
+            `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
+            [stoneLength, stoneWidth, firstChildId],
+          )
+
+          if (children.length > 1) {
+            await db.execute(
+              `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND id != ?`,
+              [slabId, firstChildId],
+            )
+          }
+        }
+      }
+
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Slab marked as uncut'))
       return data(
@@ -396,6 +425,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const lengthRaw = formData.get('length')
     const widthRaw = formData.get('width')
     const addAnotherRaw = formData.get('addAnother')
+    const replaceFirstRaw = formData.get('replaceFirst')
     const slabId = typeof slabIdValue === 'string' ? Number(slabIdValue) : 0
     const length =
       typeof lengthRaw === 'string' && lengthRaw.trim() !== ''
@@ -407,6 +437,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         : null
     const addAnother =
       typeof addAnotherRaw === 'string' ? Number(addAnotherRaw) === 1 : false
+    const replaceFirst = typeof replaceFirstRaw === 'string' ? replaceFirstRaw === '1' : false
+
     if (!slabId || !Number.isFinite(slabId)) {
       return null
     }
@@ -430,11 +462,31 @@ export async function action({ request, params }: ActionFunctionArgs) {
       [slabId, saleId],
     )
     if (parent.length === 0) return null
-    await db.execute(
-      `INSERT INTO slab_inventory (stone_id, bundle, parent_id, sale_id, length, width, url)
-       VALUES (?, ?, ?, NULL, ?, ?, ?)`,
-      [parent[0].stone_id, parent[0].bundle, slabId, length, width, parent[0].url],
-    )
+
+    let handled = false
+    if (replaceFirst) {
+      const children = await selectMany<{ id: number }>(
+        db,
+        `SELECT id FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL ORDER BY id ASC LIMIT 1`,
+        [slabId],
+      )
+      if (children.length > 0) {
+        await db.execute(
+          `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
+          [length, width, children[0].id],
+        )
+        handled = true
+      }
+    }
+
+    if (!handled) {
+      await db.execute(
+        `INSERT INTO slab_inventory (stone_id, bundle, parent_id, sale_id, length, width, url)
+         VALUES (?, ?, ?, NULL, ?, ?, ?)`,
+        [parent[0].stone_id, parent[0].bundle, slabId, length, width, parent[0].url],
+      )
+    }
+
     if (!addAnother) {
       await db.execute(
         `UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ? AND sale_id = ?`,
@@ -694,6 +746,7 @@ export default function ViewTransaction() {
   const [partialLength, setPartialLength] = useState('')
   const [partialWidth, setPartialWidth] = useState('')
   const [partialSubmitting, setPartialSubmitting] = useState(false)
+  const [canReplaceFirst, setCanReplaceFirst] = useState(false)
 
   useEffect(() => {
     const slabRoomKeys = slabs.map(roomKeyFromSlab)
@@ -770,6 +823,7 @@ export default function ViewTransaction() {
     setPartialTarget(slab)
     setPartialLength('')
     setPartialWidth('')
+    setCanReplaceFirst((slab.child_count || 0) > 0)
     setPartialDialogOpen(true)
   }
 
@@ -797,12 +851,14 @@ export default function ViewTransaction() {
           length: lengthParsed,
           width: widthParsed,
           addAnother: addAnother ? 1 : 0,
+          replaceFirst: canReplaceFirst ? '1' : '0',
         },
         { skipNavigate: addAnother },
       )
       if (addAnother) {
         setPartialLength('')
         setPartialWidth('')
+        setCanReplaceFirst(false)
       } else {
         setPartialDialogOpen(false)
         setPartialTarget(null)
