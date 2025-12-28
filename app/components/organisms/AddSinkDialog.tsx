@@ -86,7 +86,7 @@ export const AddSinkDialog = ({
 
   return (
     <Dialog open={show} onOpenChange={handleOpenChange}>
-      <DialogContent className='sm:max-w-[425px]'>
+      <DialogContent className='sm:max-w-106.25'>
         <DialogHeader>
           <DialogTitle>Add Sink</DialogTitle>
         </DialogHeader>
@@ -98,7 +98,7 @@ export const AddSinkDialog = ({
           ) : (
             <Select
               value={selectedSink?.toString() || ''}
-              onValueChange={val => setSelectedSink(parseInt(val))}
+              onValueChange={val => setSelectedSink(parseInt(val, 10))}
             >
               <SelectTrigger className='min-w-[150px]'>
                 <SelectValue placeholder='Select a sink' />

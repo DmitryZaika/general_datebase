@@ -6,7 +6,6 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
-  useLocation,
   useNavigate,
 } from 'react-router'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
@@ -261,7 +260,6 @@ function MessageDate({ message }: { message: Message }) {
 
 export default function EmailChatDialog() {
   const navigate = useNavigate()
-  const location = useLocation()
   const [showSelect, setShowSelect] = useState(false)
   const [selectActive, setSelectActive] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
@@ -359,7 +357,7 @@ export default function EmailChatDialog() {
       alert('Customer email is missing')
       return
     }
-    const emailSubject = subject && subject.trim() ? subject : 'Follow up'
+    const emailSubject = subject?.trim() ? subject : 'Follow up'
 
     setIsSending(true)
     try {
@@ -443,98 +441,97 @@ export default function EmailChatDialog() {
 
         <div className='flex-1 overflow-y-auto p-4 space-y-4'>
           {chatMessages.map((message, index) => (
-              <div key={message.id}>
-                {showDate(message, index) && (
-                  <div className='text-center text-xs text-gray-500 my-4'>
-                    {format(new Date(message.sent_at), 'MMM d, yyyy')}
-                  </div>
-                )}
+            <div key={message.id}>
+              {showDate(message, index) && (
+                <div className='text-center text-xs text-gray-500 my-4'>
+                  {format(new Date(message.sent_at), 'MMM d, yyyy')}
+                </div>
+              )}
+              <div
+                className={`flex items-center gap-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
+              >
+                {!message.isFromCustomer && <MessageDate message={message} />}
                 <div
-                  className={`flex items-center gap-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
+                  className={
+                    message.isFromCustomer
+                      ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%]'
+                      : `bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative ${
+                          message.signature && message.signature.trim() !== ''
+                            ? 'pb-6 min-w-21.25'
+                            : ''
+                        }`
+                  }
                 >
-                  {!message.isFromCustomer && <MessageDate message={message} />}
-                  <div
-                    className={
-                      message.isFromCustomer
-                        ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%]'
-                        : `bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative ${
-                            message.signature && message.signature.trim() !== ''
-                              ? 'pb-6 min-w-[85px]'
-                              : ''
-                          }`
-                    }
-                  >
-                    <p className='whitespace-pre-wrap'>
-                      {getDisplayBody(
-                        message.body,
-                        message.isFromCustomer ? null : message.signature,
-                      )}
-                    </p>
-                    {!message.isFromCustomer &&
-                    message.signature &&
-                    message.signature.trim() !== '' ? (
-                      <div className='absolute bottom-1 right-2'>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
-                                <Pencil className='w-2 h-2 opacity-70' />
-                                Signature
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent
-                              side='top'
-                              className='max-w-[360px] whitespace-pre-wrap select-none bg-zinc-900 text-zinc-100 border-zinc-800 shadow-xl'
-                            >
-                              {message.signature}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    ) : null}
-                    {message.attachments && message.attachments.length > 0 ? (
-                      <div className='mt-3 space-y-2'>
-                        {message.attachments.map(attachment => {
-                          const mime = `${attachment.content_type}/${attachment.content_subtype}`
-                          const label = attachment.filename || mime
-                          const isImage =
-                            attachment.content_type.toLowerCase() === 'image'
-                          const href = attachment.signed_url || attachment.url
-                          const linkClass = message.isFromCustomer
-                            ? 'text-blue-700 underline'
-                            : 'text-white underline'
-
-                          return (
-                            <div key={attachment.id} className='space-y-2'>
-                              {href ? (
-                                <a
-                                  href={href}
-                                  target='_blank'
-                                  rel='noreferrer'
-                                  className={linkClass}
-                                ></a>
-                              ) : null}
-                              {isImage && href ? (
-                                <a href={href} target='_blank' rel='noreferrer'>
-                                  <img
-                                    src={href}
-                                    alt={label}
-                                    className='max-h-48 rounded-md border border-black/10'
-                                  />
-                                </a>
-                              ) : null}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className='flex items-center gap-2'>
-                    {message.isFromCustomer && <MessageDate message={message} />}
-                    {!message.isFromCustomer && message.id === lastReadMessageId && (
-                      <p className='text-xs text-gray-500'>Read</p>
+                  <p className='whitespace-pre-wrap'>
+                    {getDisplayBody(
+                      message.body,
+                      message.isFromCustomer ? null : message.signature,
                     )}
-                  </div>
+                  </p>
+                  {!message.isFromCustomer &&
+                  message.signature &&
+                  message.signature.trim() !== '' ? (
+                    <div className='absolute bottom-1 right-2'>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
+                              <Pencil className='w-2 h-2 opacity-70' />
+                              Signature
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side='top'
+                            className='max-w-90 whitespace-pre-wrap select-none bg-zinc-900 text-zinc-100 border-zinc-800 shadow-xl'
+                          >
+                            {message.signature}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  ) : null}
+                  {message.attachments && message.attachments.length > 0 ? (
+                    <div className='mt-3 space-y-2'>
+                      {message.attachments.map(attachment => {
+                        const mime = `${attachment.content_type}/${attachment.content_subtype}`
+                        const label = attachment.filename || mime
+                        const isImage =
+                          attachment.content_type.toLowerCase() === 'image'
+                        const href = attachment.signed_url || attachment.url
+                        const linkClass = message.isFromCustomer
+                          ? 'text-blue-700 underline'
+                          : 'text-white underline'
+
+                        return (
+                          <div key={attachment.id} className='space-y-2'>
+                            {href ? (
+                              <a
+                                href={href}
+                                target='_blank'
+                                rel='noreferrer'
+                                className={linkClass}
+                              ></a>
+                            ) : null}
+                            {isImage && href ? (
+                              <a href={href} target='_blank' rel='noreferrer'>
+                                <img
+                                  src={href}
+                                  alt={label}
+                                  className='max-h-48 rounded-md border border-black/10'
+                                />
+                              </a>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+                <div className='flex items-center gap-2'>
+                  {message.isFromCustomer && <MessageDate message={message} />}
+                  {!message.isFromCustomer && message.id === lastReadMessageId && (
+                    <p className='text-xs text-gray-500'>Read</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -552,7 +549,7 @@ export default function EmailChatDialog() {
                   value={selectedTemplate}
                   onValueChange={value => handleTemplateSelect(value)}
                 >
-                  <SelectTrigger className='w-[150px]'>
+                  <SelectTrigger className='w-37.5'>
                     <SelectValue placeholder='Select template' />
                   </SelectTrigger>
                   <SelectContent>
@@ -600,7 +597,7 @@ export default function EmailChatDialog() {
               }}
               placeholder='Send a message'
               rows={1}
-              className='flex-1 min-h-[38px] max-h-40 rounded-sm border border-zinc-300 bg-transparent px-4 py-2 text-sm outline-none resize-none overflow-y-auto'
+              className='flex-1 min-h-9.5 max-h-40 rounded-sm border border-zinc-300 bg-transparent px-4 py-2 text-sm outline-none resize-none overflow-y-auto'
             />
             <div className='flex items-center gap-1 mb-1'>
               <LoadingButton

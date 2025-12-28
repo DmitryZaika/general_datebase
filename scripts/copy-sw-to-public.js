@@ -22,7 +22,4 @@ const dest = join(rootDir, 'public/service-worker.js')
 
 if (existsSync(source)) {
   copyFileSync(source, dest)
-  console.log('[Copy SW] ✅ Service Worker copied to public/ for dev mode')
-} else {
-  console.log('[Copy SW] ⚠️  Service Worker not found in build/client/')
 }

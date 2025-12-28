@@ -213,8 +213,8 @@ export default function DailyView() {
     // Parse the time from detailedHour (e.g., "2:30 PM")
     const [time, period] = detailedHour.split(' ')
     const [hourStr, minuteStr] = time.split(':')
-    let hour = parseInt(hourStr)
-    const minute = parseInt(minuteStr)
+    let hour = parseInt(hourStr, 10)
+    const minute = parseInt(minuteStr, 10)
 
     // Convert to 24-hour format
     if (period === 'PM' && hour !== 12) {

@@ -96,7 +96,6 @@ export function useOfflineChecklistSync({
 
   const trySubmitPending = useCallback(async () => {
     if (isSubmittingRef.current) {
-      console.log('Already submitting, skipping...')
       return
     }
 
@@ -108,9 +107,6 @@ export function useOfflineChecklistSync({
     }
 
     if (pending.attempts >= MAX_RETRY_ATTEMPTS) {
-      console.error(
-        `Max retry attempts (${MAX_RETRY_ATTEMPTS}) reached for checklist submission`,
-      )
       setHasPendingSubmission(true)
       setIsRetrying(false)
       return
@@ -141,8 +137,6 @@ export function useOfflineChecklistSync({
       isSubmittingRef.current = false
       onSuccess?.()
     } catch (error) {
-      console.error('Failed to submit pending checklist:', error)
-
       const errorMessage = error instanceof Error ? error.message : String(error)
 
       if (
@@ -263,7 +257,6 @@ export function useOfflineChecklistSync({
 
   const retryPending = useCallback(async () => {
     if (!navigator.onLine) {
-      console.warn('Cannot retry while offline')
       return
     }
     await trySubmitPending()

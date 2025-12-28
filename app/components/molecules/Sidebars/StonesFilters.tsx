@@ -293,7 +293,7 @@ export function StonesFilters({ suppliers, colors, base }: IProps) {
     itemToValue: (level: number | string) => {
       if (typeof level === 'string') {
         const match = level.match(/\d+/)
-        return match ? parseInt(match[0]) : 0
+        return match ? parseInt(match[0], 10) : 0
       }
       return level
     },
