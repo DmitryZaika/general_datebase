@@ -39,6 +39,7 @@ export interface StoneImage {
   available: number
   samples_amount: number
   regular_stock?: boolean | number
+  is_display?: boolean | number
 }
 
 export interface StoneSlim {

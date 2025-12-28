@@ -140,8 +140,26 @@ export default function Stones() {
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones)
 
   // Получаем viewMode из URL или используем "grid" по умолчанию
-  const initialViewMode = (searchParams.get('viewMode') as ViewMode) || 'grid'
-  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode)
+  const viewModeParam = searchParams.get('viewMode') as ViewMode | null
+
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (viewModeParam) return viewModeParam
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('stoneViewMode') as ViewMode
+      if (stored === 'grid' || stored === 'table') return stored
+    }
+    return 'grid'
+  })
+
+  useEffect(() => {
+    if (viewModeParam && viewModeParam !== viewMode) {
+      setViewMode(viewModeParam)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('stoneViewMode', viewModeParam)
+      }
+    }
+  }, [viewModeParam, viewMode])
+
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -170,6 +188,10 @@ export default function Stones() {
 
     // Обновить состояние
     setViewMode(newViewMode)
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('stoneViewMode', newViewMode)
+    }
 
     // Обновить URL параметры
     const newParams = new URLSearchParams(searchParams)
