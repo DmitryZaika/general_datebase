@@ -1,8 +1,8 @@
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type * as React from 'react'
 import { DayPicker } from 'react-day-picker'
-import { buttonVariants } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
@@ -15,6 +15,7 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      fixedWeeks
       className={cn('p-3', className)}
       classNames={{
         month: 'space-y-4',
@@ -31,7 +32,7 @@ function Calendar({
           buttonVariants({ variant: 'outline' }),
           'h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 z-10',
         ),
-        weeks: 'w-full border-collapse space-y-',
+        weeks: 'w-full border-collapse space-y-1',
         weekdays: 'flex',
         weekday: 'text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]',
         week: 'flex w-full mt-2',
@@ -39,15 +40,15 @@ function Calendar({
           buttonVariants({ variant: 'ghost' }),
           'h-9 w-9 p-0 font-normal',
           // ВАЖНО: делаем подсветку через aria-selected, без :has()
-          'aria-selected:bg-black aria-selected:text-white',
-          'aria-selected:hover:bg-black aria-selected:hover:text-white',
+          'aria-selected:bg-red-500 aria-selected:text-white aria-selected:opacity-100',
+          'aria-selected:hover:bg-red-500 aria-selected:hover:text-white',
           'focus-visible:ring-1 focus-visible:ring-ring',
         ),
-        day: 'relative p-0',
+        day: 'relative p-0 ',
         range_end: 'day-range-end rounded-l-none',
         range_start: 'day-range-start rounded-r-none',
         selected: 'bg-black text-white rounded',
-        today: 'bg-accent text-accent-foreground',
+        today: 'bg-gray-200 text-black rounded',
         outside:
           'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',
         disabled: 'text-muted-foreground opacity-50',

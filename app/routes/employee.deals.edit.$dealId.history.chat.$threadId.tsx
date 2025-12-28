@@ -1,3 +1,4 @@
+import { format } from 'date-fns'
 import { Pencil } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
@@ -442,17 +443,12 @@ export default function EmailChatDialog() {
 
         <div className='flex-1 overflow-y-auto p-4 space-y-4'>
           {chatMessages.map((message, index) => (
-            <div key={message.id}>
-              {showDate(message, index) && (
-                <div className='text-center text-xs text-gray-500 my-4'>Today</div>
-              )}
-              <div
-                className={
-                  message.isFromCustomer
-                    ? 'flex justify-start'
-                    : 'flex justify-end w-full'
-                }
-              >
+              <div key={message.id}>
+                {showDate(message, index) && (
+                  <div className='text-center text-xs text-gray-500 my-4'>
+                    {format(new Date(message.sent_at), 'MMM d, yyyy')}
+                  </div>
+                )}
                 <div
                   className={`flex items-center gap-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
                 >
