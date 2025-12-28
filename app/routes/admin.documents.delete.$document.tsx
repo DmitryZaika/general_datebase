@@ -42,7 +42,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   if (!params.document) {
     return forceRedirectError(request.headers, 'No document id provided')
   }
-  const documentId = parseInt(params.document)
+  const documentId = parseInt(params.document, 10)
 
   const document = await selectId<{ name: string }>(
     db,

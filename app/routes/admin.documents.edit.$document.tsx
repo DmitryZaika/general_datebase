@@ -47,7 +47,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!params.document) {
     return forceRedirectError(request.headers, 'No document id provided')
   }
-  const documentId = parseInt(params.document)
+  const documentId = parseInt(params.document, 10)
   const { errors, data } = await parseMutliForm(request, documentSchema, 'documents')
 
   if (errors || !data) {
@@ -93,7 +93,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   if (!params.document) {
     return forceRedirectError(request.headers, 'No document id provided')
   }
-  const documentId = parseInt(params.document)
+  const documentId = parseInt(params.document, 10)
 
   const document = await selectId<{ name: string; url: string }>(
     db,
