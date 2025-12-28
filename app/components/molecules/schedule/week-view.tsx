@@ -135,8 +135,8 @@ export default function WeeklyView() {
 
     const [timePart, ampm] = detailedHour.split(' ')
     const [hourStr, minuteStr] = timePart.split(':')
-    let hours = parseInt(hourStr)
-    const minutes = parseInt(minuteStr)
+    let hours = parseInt(hourStr, 10)
+    const minutes = parseInt(minuteStr, 10)
 
     if (ampm === 'PM' && hours < 12) {
       hours += 12

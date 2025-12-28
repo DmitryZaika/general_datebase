@@ -123,15 +123,11 @@ export function useChecklistQueue({
   const refreshQueue = useCallback(async () => {
     if (!isIndexedDBAvailable()) return
 
-    try {
-      const count = await getPendingCount()
-      const submissions = await getAllPending()
+    const count = await getPendingCount()
+    const submissions = await getAllPending()
 
-      setPendingCount(count)
-      setPendingSubmissions(submissions)
-    } catch (error) {
-      console.error('[Queue] Failed to refresh queue:', error)
-    }
+    setPendingCount(count)
+    setPendingSubmissions(submissions)
   }, [])
 
   useEffect(() => {
