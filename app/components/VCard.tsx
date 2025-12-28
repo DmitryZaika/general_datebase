@@ -18,7 +18,13 @@ type VCardFields = {
   address: string
 }
 
-const fieldKeys: Array<keyof VCardFields> = ['name', 'phone', 'email', 'company', 'address']
+const fieldKeys: Array<keyof VCardFields> = [
+  'name',
+  'phone',
+  'email',
+  'company',
+  'address',
+]
 
 export function VCard({ name, phone, email, company, address, className }: VCardProps) {
   const [isDownloading, setIsDownloading] = useState(false)
@@ -138,4 +144,3 @@ export function VCard({ name, phone, email, company, address, className }: VCard
     </Button>
   )
 }
-
