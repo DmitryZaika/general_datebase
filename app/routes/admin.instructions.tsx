@@ -108,7 +108,11 @@ function buildInstructionTree(instructions: Instructions[]): InstructionNode[] {
   return rootNodes
 }
 
-const InstructionItem: FC<InstructionItemProps> = ({ instruction, onEdit, onDelete }) => {
+const InstructionItem: FC<InstructionItemProps> = ({
+  instruction,
+  onEdit,
+  onDelete,
+}) => {
   const hasChildren = instruction.children.length > 0
   const hasTitle = Boolean(instruction.title)
 
@@ -124,7 +128,10 @@ const InstructionItem: FC<InstructionItemProps> = ({ instruction, onEdit, onDele
 
   if (hasTitle) {
     return (
-      <AccordionItem value={instruction.id.toString()} className='border-b border-gray-200 last:border-b-0'>
+      <AccordionItem
+        value={instruction.id.toString()}
+        className='border-b border-gray-200 last:border-b-0'
+      >
         <AccordionTrigger className='py-5 px-6 [&[data-state=open]_h3]:underline [&[data-state=open]_h3]:underline-offset-4'>
           <div className='flex items-center justify-between flex-1 gap-6'>
             <h3 className='font-bold text-2xl text-gray-900 text-left'>
@@ -153,7 +160,12 @@ const InstructionItem: FC<InstructionItemProps> = ({ instruction, onEdit, onDele
           </div>
         </AccordionTrigger>
         <AccordionContent>
-          <div className={cn('ml-6 mb-4 border-l-1 pl-4', {'border-blue-200': hasChildren, '!border-transparent': !hasChildren})}>          
+          <div
+            className={cn('ml-6 mb-4 border-l-1 pl-4', {
+              'border-blue-200': hasChildren,
+              '!border-transparent': !hasChildren,
+            })}
+          >
             <article
               className='prose prose-base max-w-none instructions px-6 py-5 bg-gray-50 rounded-lg shadow-md'
               dangerouslySetInnerHTML={{ __html: instruction.rich_text }}
@@ -189,7 +201,7 @@ const InstructionItem: FC<InstructionItemProps> = ({ instruction, onEdit, onDele
           <div className='flex items-center gap-3 shrink-0'>
             <button
               type='button'
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation()
                 onEdit(instruction.id)
               }}
@@ -201,7 +213,7 @@ const InstructionItem: FC<InstructionItemProps> = ({ instruction, onEdit, onDele
             </button>
             <button
               type='button'
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation()
                 onDelete(instruction.id)
               }}
@@ -233,7 +245,7 @@ const InstructionItem: FC<InstructionItemProps> = ({ instruction, onEdit, onDele
 const findInstructionById = (
   id: number,
   nodes: InstructionNode[],
-  visited = new Set<number>()
+  visited = new Set<number>(),
 ): InstructionNode | null => {
   for (const node of nodes) {
     if (visited.has(node.id)) continue
@@ -254,7 +266,7 @@ const stripHtml = (html: string): string => html.replace(/<[^>]*>/g, '')
 const searchAllInstructions = (
   term: string,
   nodes: InstructionNode[],
-  visited = new Set<number>()
+  visited = new Set<number>(),
 ): SearchResult[] => {
   const results: SearchResult[] = []
   const search = term.toLowerCase()
@@ -287,11 +299,17 @@ export default function AdminInstructions() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [showDropdown, setShowDropdown] = useState(false)
 
-  const instructionTree = useMemo(() => buildInstructionTree(instructions), [instructions])
+  const instructionTree = useMemo(
+    () => buildInstructionTree(instructions),
+    [instructions],
+  )
 
   const searchResults = useMemo(
-    () => (searchTerm.trim() ? searchAllInstructions(searchTerm.trim(), instructionTree) : []),
-    [searchTerm, instructionTree]
+    () =>
+      searchTerm.trim()
+        ? searchAllInstructions(searchTerm.trim(), instructionTree)
+        : [],
+    [searchTerm, instructionTree],
   )
 
   const displayTree = useMemo(() => {
@@ -328,7 +346,10 @@ export default function AdminInstructions() {
     <PageLayout title='Instructions'>
       <header className='flex gap-4 justify-between mb-6'>
         <Link to='add' relative='path'>
-          <Button size='lg' className='gap-2 shadow-sm hover:shadow-md transition-shadow'>
+          <Button
+            size='lg'
+            className='gap-2 shadow-sm hover:shadow-md transition-shadow'
+          >
             <Plus className='w-5 h-5' />
             Add Instruction
           </Button>
@@ -360,9 +381,13 @@ export default function AdminInstructions() {
                     className='w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors'
                   >
                     <div className='flex items-center justify-between gap-2'>
-                      <p className='font-medium text-sm text-gray-900'>{instruction.title}</p>
+                      <p className='font-medium text-sm text-gray-900'>
+                        {instruction.title}
+                      </p>
                       <span className='text-xs text-gray-500 shrink-0'>
-                        {instruction.matchType === 'title' ? 'Found in title' : 'Found in content'}
+                        {instruction.matchType === 'title'
+                          ? 'Found in title'
+                          : 'Found in content'}
                       </span>
                     </div>
                   </button>
@@ -382,7 +407,9 @@ export default function AdminInstructions() {
           <div className='w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4'>
             <Search className='w-8 h-8 text-gray-400' />
           </div>
-          <h2 className='text-lg font-medium text-gray-700 mb-2'>No instructions yet</h2>
+          <h2 className='text-lg font-medium text-gray-700 mb-2'>
+            No instructions yet
+          </h2>
           <p className='text-sm text-gray-500 text-center max-w-md'>
             Get started by creating your first instruction to help guide your team.
           </p>
