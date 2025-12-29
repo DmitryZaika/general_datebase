@@ -194,7 +194,10 @@ export function useChecklistQueue({
           await submitChecklistAPI(submission.data, submission.companyId)
           await removeFromQueue(submission.id!)
 
-          if (typeof window !== 'undefined' && window.location.pathname.includes('/checklist')) {
+          if (
+            typeof window !== 'undefined' &&
+            window.location.pathname.includes('/checklist')
+          ) {
             onSuccess?.()
           }
         } catch (error) {

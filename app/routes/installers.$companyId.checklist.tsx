@@ -11,7 +11,11 @@ import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
 import { companyIdToUrl } from '~/constants/logos'
 import { useToast } from '~/hooks/use-toast'
-import { useChecklistQueue, submitChecklistAPI, isNetworkError } from '~/hooks/useChecklistQueue'
+import {
+  isNetworkError,
+  submitChecklistAPI,
+  useChecklistQueue,
+} from '~/hooks/useChecklistQueue'
 import { type ChecklistFormData, checklistResolver } from '~/schemas/checklist'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -161,7 +165,8 @@ export default function AdminChecklists() {
           resetForm()
           toast({
             title: 'Offline Mode',
-            description: 'No internet. Form saved and will be sent automatically when online.',
+            description:
+              'No internet. Form saved and will be sent automatically when online.',
             variant: 'default',
             duration: 6000,
           })
@@ -178,7 +183,7 @@ export default function AdminChecklists() {
 
       mutate(data)
     },
-    [addSubmissionToQueue, resetForm, toast, mutate]
+    [addSubmissionToQueue, resetForm, toast, mutate],
   )
 
   return (
