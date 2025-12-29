@@ -1,5 +1,5 @@
 import * as AccordionPrimitive from '@radix-ui/react-accordion'
-import { ChevronDownIcon } from '@radix-ui/react-icons'
+import { ChevronDown } from 'lucide-react'
 import * as React from 'react'
 
 import { cn } from '~/lib/utils'
@@ -22,13 +22,13 @@ const AccordionTrigger = React.forwardRef<
     <AccordionPrimitive.Trigger
       ref={ref}
       className={cn(
-        "relative flex flex-1 items-center justify-between py-4 text-xl font-medium transition-all hover:underline underline-offset-4 before:content-[''] before:absolute before:bottom-0 before:left-0 before:h-[2px] before:bg-zinc-900 before:scale-x-0 before:origin-left before:transition-transform before:duration-300 hover:before:scale-x-100 data-[state=open]:before:scale-x-100 dark:before:bg-zinc-50 cursor-pointer",
+        "relative flex flex-1 gap-2 items-center justify-between py-4 text-xl font-medium transition-all hover:underline underline-offset-4 before:content-[''] before:absolute before:bottom-0 before:left-0 before:h-[2px] before:bg-zinc-900 before:scale-x-0 before:origin-left before:transition-transform before:duration-300 hover:before:scale-x-100 data-[state=open]:before:scale-x-100 dark:before:bg-zinc-50 cursor-pointer [&[data-state=open]_.chevron]:rotate-180",
         className,
       )}
       {...props}
     >
-      <span className='relative'>{children}</span>
-      <ChevronDownIcon className='h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-200 dark:text-zinc-400' />
+      {children}
+      <ChevronDown className='w-4 h-4 text-gray-600 transition-transform duration-200 chevron shrink-0' />
     </AccordionPrimitive.Trigger>
   </AccordionPrimitive.Header>
 ))
@@ -48,4 +48,5 @@ const AccordionContent = React.forwardRef<
 ))
 AccordionContent.displayName = AccordionPrimitive.Content.displayName
 
-export { Accordion, AccordionItem, AccordionTrigger, AccordionContent }
+export { Accordion, AccordionContent, AccordionItem, AccordionTrigger }
+
