@@ -193,7 +193,10 @@ export function useChecklistQueue({
 
           await submitChecklistAPI(submission.data, submission.companyId)
           await removeFromQueue(submission.id!)
-          onSuccess?.()
+
+          if (typeof window !== 'undefined' && window.location.pathname.includes('/checklist')) {
+            onSuccess?.()
+          }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error)
           const isValidation = isValidationError(errorMessage)
