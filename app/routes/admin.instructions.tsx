@@ -19,6 +19,7 @@ import {
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
+import { cn } from '~/lib/utils'
 import '~/styles/instructions.css'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
@@ -123,7 +124,7 @@ const InstructionItem: FC<InstructionItemProps> = ({ instruction, onEdit, onDele
 
   if (hasTitle) {
     return (
-      <AccordionItem value={instruction.id.toString()} className='border-b border-gray-200 last:border-b-0'>
+      <AccordionItem value={instruction.id.toString()} className='border-b border-gray-200 last:border-b-0 pb-4'>
         <AccordionTrigger className='py-5 px-6 [&[data-state=open]_h3]:underline [&[data-state=open]_h3]:underline-offset-4'>
           <div className='flex items-center justify-between flex-1 gap-6'>
             <h3 className='font-bold text-2xl text-gray-900 text-left'>
@@ -152,7 +153,7 @@ const InstructionItem: FC<InstructionItemProps> = ({ instruction, onEdit, onDele
           </div>
         </AccordionTrigger>
         <AccordionContent>
-          <div className='ml-6 border-l-1 border-blue-200 pl-4'>
+          <div className={cn('ml-6 border-l-1 pl-4', {'border-blue-200': hasChildren, '!border-transparent': !hasChildren})}>          
             <article
               className='prose prose-base max-w-none instructions px-6 py-5 bg-gray-50 rounded-lg shadow-md'
               dangerouslySetInnerHTML={{ __html: instruction.rich_text }}
