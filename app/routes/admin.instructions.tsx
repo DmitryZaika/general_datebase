@@ -1,6 +1,6 @@
-import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import type { FC } from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
@@ -38,6 +38,10 @@ interface InstructionNode {
   after_id: number | null
   rich_text: string
   children: InstructionNode[]
+}
+
+interface SearchResult extends InstructionNode {
+  matchType: 'title' | 'content'
 }
 
 interface InstructionItemProps {
@@ -225,23 +229,98 @@ const InstructionItem: FC<InstructionItemProps> = ({ instruction, onEdit, onDele
   )
 }
 
+const findInstructionById = (
+  id: number,
+  nodes: InstructionNode[],
+  visited = new Set<number>()
+): InstructionNode | null => {
+  for (const node of nodes) {
+    if (visited.has(node.id)) continue
+    visited.add(node.id)
+
+    if (node.id === id) return node
+
+    if (node.children.length > 0) {
+      const found = findInstructionById(id, node.children, visited)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+const stripHtml = (html: string): string => html.replace(/<[^>]*>/g, '')
+
+const searchAllInstructions = (
+  term: string,
+  nodes: InstructionNode[],
+  visited = new Set<number>()
+): SearchResult[] => {
+  const results: SearchResult[] = []
+  const search = term.toLowerCase()
+
+  for (const node of nodes) {
+    if (visited.has(node.id)) continue
+    visited.add(node.id)
+
+    const titleMatch = node.title.toLowerCase().includes(search)
+    const contentMatch = stripHtml(node.rich_text).toLowerCase().includes(search)
+
+    if (titleMatch) {
+      results.push({ ...node, matchType: 'title' })
+    } else if (contentMatch) {
+      results.push({ ...node, matchType: 'content' })
+    }
+
+    if (node.children.length > 0) {
+      results.push(...searchAllInstructions(term, node.children, visited))
+    }
+  }
+
+  return results
+}
+
 export default function AdminInstructions() {
   const { instructions } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [showDropdown, setShowDropdown] = useState(false)
 
-  const instructionTree = buildInstructionTree(instructions)
+  const instructionTree = useMemo(() => buildInstructionTree(instructions), [instructions])
 
-  const filteredTree = instructionTree.filter(item =>
-    item.title.toLowerCase().includes(searchTerm.toLowerCase()),
+  const searchResults = useMemo(
+    () => (searchTerm.trim() ? searchAllInstructions(searchTerm.trim(), instructionTree) : []),
+    [searchTerm, instructionTree]
   )
 
-  const handleEdit = (id: number) => {
-    navigate(`edit/${id}`)
+  const displayTree = useMemo(() => {
+    if (!selectedId) return instructionTree
+    const selected = findInstructionById(selectedId, instructionTree)
+    return selected ? [selected] : instructionTree
+  }, [selectedId, instructionTree])
+
+  const handleEdit = (id: number) => navigate(`edit/${id}`)
+  const handleDelete = (id: number) => navigate(`delete/${id}`)
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setSearchTerm(value)
+    setShowDropdown(value.trim().length > 0)
+    if (!value.trim()) {
+      setSelectedId(null)
+    }
   }
 
-  const handleDelete = (id: number) => {
-    navigate(`delete/${id}`)
+  const handleSelectInstruction = (instruction: SearchResult) => {
+    setSelectedId(instruction.id)
+    setSearchTerm(instruction.title)
+    setShowDropdown(false)
+  }
+
+  const handleReset = () => {
+    setSearchTerm('')
+    setSelectedId(null)
+    setShowDropdown(false)
   }
 
   return (
@@ -258,38 +337,65 @@ export default function AdminInstructions() {
           <Input
             placeholder='Search instructions...'
             value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className='pl-8'
+            onChange={handleSearchChange}
+            className='pl-8 pr-8'
           />
+          {searchTerm && (
+            <button
+              onClick={handleReset}
+              className='absolute right-2 top-2 p-0.5 hover:bg-gray-100 rounded transition-colors'
+              aria-label='Clear search'
+            >
+              <X className='h-4 w-4 text-muted-foreground' />
+            </button>
+          )}
+          {showDropdown && (
+            <div className='absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-80 overflow-y-auto z-50'>
+              {searchResults.length > 0 ? (
+                searchResults.map(instruction => (
+                  <button
+                    key={instruction.id}
+                    onClick={() => handleSelectInstruction(instruction)}
+                    className='w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors'
+                  >
+                    <div className='flex items-center justify-between gap-2'>
+                      <p className='font-medium text-sm text-gray-900'>{instruction.title}</p>
+                      <span className='text-xs text-gray-500 shrink-0'>
+                        {instruction.matchType === 'title' ? 'Found in title' : 'Found in content'}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className='px-3 py-4 text-sm text-gray-500 text-center'>
+                  No instructions found
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
-      {filteredTree.length === 0 ? (
+      {displayTree.length === 0 ? (
         <section className='flex flex-col items-center justify-center py-16 px-4'>
           <div className='w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4'>
             <Search className='w-8 h-8 text-gray-400' />
           </div>
-          <h2 className='text-lg font-medium text-gray-700 mb-2'>
-            {searchTerm ? 'No instructions found' : 'No instructions yet'}
-          </h2>
+          <h2 className='text-lg font-medium text-gray-700 mb-2'>No instructions yet</h2>
           <p className='text-sm text-gray-500 text-center max-w-md'>
-            {searchTerm
-              ? 'Try adjusting your search terms or clear the search to see all instructions.'
-              : 'Get started by creating your first instruction to help guide your team.'}
+            Get started by creating your first instruction to help guide your team.
           </p>
-          {!searchTerm && (
-            <Link to='add' relative='path' className='mt-6'>
-              <Button size='lg' className='gap-2'>
-                <Plus className='w-5 h-5' />
-                Create First Instruction
-              </Button>
-            </Link>
-          )}
+          <Link to='add' relative='path' className='mt-6'>
+            <Button size='lg' className='gap-2'>
+              <Plus className='w-5 h-5' />
+              Create First Instruction
+            </Button>
+          </Link>
         </section>
       ) : (
         <section>
           <Accordion type='multiple' className='w-full space-y-2'>
-            {filteredTree.map(instruction => (
+            {displayTree.map(instruction => (
               <InstructionItem
                 key={instruction.id}
                 instruction={instruction}
