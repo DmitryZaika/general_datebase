@@ -124,7 +124,7 @@ const InstructionItem: FC<InstructionItemProps> = ({ instruction, onEdit, onDele
 
   if (hasTitle) {
     return (
-      <AccordionItem value={instruction.id.toString()} className='border-b border-gray-200 last:border-b-0 pb-4'>
+      <AccordionItem value={instruction.id.toString()} className='border-b border-gray-200 last:border-b-0'>
         <AccordionTrigger className='py-5 px-6 [&[data-state=open]_h3]:underline [&[data-state=open]_h3]:underline-offset-4'>
           <div className='flex items-center justify-between flex-1 gap-6'>
             <h3 className='font-bold text-2xl text-gray-900 text-left'>
@@ -153,7 +153,7 @@ const InstructionItem: FC<InstructionItemProps> = ({ instruction, onEdit, onDele
           </div>
         </AccordionTrigger>
         <AccordionContent>
-          <div className={cn('ml-6 border-l-1 pl-4', {'border-blue-200': hasChildren, '!border-transparent': !hasChildren})}>          
+          <div className={cn('ml-6 mb-4 border-l-1 pl-4', {'border-blue-200': hasChildren, '!border-transparent': !hasChildren})}>          
             <article
               className='prose prose-base max-w-none instructions px-6 py-5 bg-gray-50 rounded-lg shadow-md'
               dangerouslySetInnerHTML={{ __html: instruction.rich_text }}
@@ -395,7 +395,7 @@ export default function AdminInstructions() {
         </section>
       ) : (
         <section>
-          <Accordion type='multiple' className='w-full space-y-2'>
+          <Accordion type='multiple' className='w-full'>
             {displayTree.map(instruction => (
               <InstructionItem
                 key={instruction.id}
