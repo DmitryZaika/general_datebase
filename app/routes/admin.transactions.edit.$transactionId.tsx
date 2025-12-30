@@ -262,7 +262,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
           [targetLength, targetWidth, firstChildId],
         )
-
+ 
         if (unsoldChildren.length > 1) {
           await db.execute(
             `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND id != ?`,
