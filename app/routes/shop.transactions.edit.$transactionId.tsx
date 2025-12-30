@@ -538,6 +538,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
       corbels: string | null
       extras: string | null
       edge: string | null
+      length: number
+      width: number
+      sale_id: number | null
+      is_leftover: number
     }>(
       db,
       `SELECT
@@ -559,7 +563,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
           si.waterfall,
           si.corbels,
           si.extras,
-          si.edge
+          si.edge,
+          si.length,
+          si.width,
+          si.sale_id,
+          si.is_leftover
         FROM slab_inventory si
        WHERE si.parent_id = ?
          AND si.sale_id IS NOT NULL
@@ -597,6 +605,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
         corbels: string | null
         extras: string | null
         edge: string | null
+        length: number
+        width: number
+        sale_id: number | null
+        is_leftover: number
       }>(
         db,
         `SELECT
@@ -618,10 +630,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
             si.waterfall,
             si.corbels,
             si.extras,
-            si.edge
+            si.edge,
+            si.length,
+            si.width,
+            si.sale_id,
+            si.is_leftover
            FROM slab_inventory si
           WHERE si.id = ?
-            AND si.sale_id IS NOT NULL
             AND si.deleted_at IS NULL
             AND (
               SELECT COUNT(*)
@@ -637,14 +652,46 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
     }
 
-    const soldTarget = soldChild[0] ?? actualParentInSale ?? (parent[0].sale_id ? { ...parent[0], id: slabId, sale_id: saleId } : null)
+    let unsoldRelativesCount = 0
+    if (parent[0].parent_id === null) {
+      const unsoldChildren = await selectMany<{ count: number }>(
+        db,
+        `SELECT COUNT(*) as count FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND deleted_at IS NULL`,
+        [slabId],
+      )
+      unsoldRelativesCount = unsoldChildren[0]?.count ?? 0
+    } else {
+      const unsoldSiblings = await selectMany<{ count: number }>(
+        db,
+        `SELECT COUNT(*) as count FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND id != ? AND deleted_at IS NULL`,
+        [parent[0].parent_id, slabId],
+      )
+      unsoldRelativesCount += unsoldSiblings[0]?.count ?? 0
+
+      const unsoldParent = await selectMany<{ count: number }>(
+        db,
+        `SELECT COUNT(*) as count FROM slab_inventory WHERE id = ? AND sale_id IS NULL AND deleted_at IS NULL`,
+        [parent[0].parent_id],
+      )
+      unsoldRelativesCount += unsoldParent[0]?.count ?? 0
+    }
+
+    const soldTarget = soldChild[0] ?? actualParentInSale ?? (parent[0].sale_id ? { ...parent[0], id: slabId, sale_id: saleId, length: parent[0].length, width: parent[0].width, is_leftover: 0 } : null)
     const template = soldTarget ?? parent[0]
+
+    const canUpdateSold = soldTarget && soldTarget.sale_id !== null && (soldTarget as { is_leftover: number }).is_leftover === 0 && unsoldRelativesCount === 0
 
     let handled = false
     if (replaceFirst || soldTarget) {
-      if (soldTarget) {
+      if (canUpdateSold) {
         await db.execute(
-          `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
+          `UPDATE slab_inventory SET length = ?, width = ?, is_leftover = 1 WHERE id = ?`,
+          [length, width, (soldTarget as { id: number }).id],
+        )
+        handled = true
+      } else if (soldTarget && soldTarget.sale_id === null && !soldTarget.is_leftover) {
+        await db.execute(
+          `UPDATE slab_inventory SET length = ?, width = ?, is_leftover = 1 WHERE id = ?`,
           [length, width, (soldTarget as { id: number }).id],
         )
         handled = true
@@ -678,6 +725,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     if (!handled) {
+      const parentForNew = (soldTarget && soldTarget.sale_id === null) ? (soldTarget.parent_id ?? soldTarget.id) : slabId
       await db.execute(
         `INSERT INTO slab_inventory (
            stone_id,
@@ -700,13 +748,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
            waterfall,
            corbels,
            extras,
-           edge
+           edge,
+           is_leftover
          )
          VALUES (
            ?,
            ?,
            ?,
-          ?,
            ?,
            ?,
            ?,
@@ -723,13 +771,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
            ?,
            ?,
            ?,
-           ?
+           ?,
+           ?,
+           1
          )`,
         [
           template.stone_id,
           template.bundle,
-          slabId,
-          soldTarget ? saleId : null,
+          parentForNew,
+          soldTarget && soldTarget.sale_id !== null ? soldTarget.sale_id : null,
           length,
           width,
           template.url ?? null,

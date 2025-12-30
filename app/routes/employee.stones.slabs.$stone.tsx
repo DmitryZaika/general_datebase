@@ -476,11 +476,6 @@ export default function SlabsModal() {
                 >
                   {slab.bundle}
                 </span>
-                {slab.is_leftover && (
-                  <span className='px-2 py-0.5 rounded-md text-xs bg-purple-100 text-purple-800 font-medium'>
-                    Leftover
-                  </span>
-                )}
               </div>
 
               <div className='flex items-center gap-2 w-full'>
