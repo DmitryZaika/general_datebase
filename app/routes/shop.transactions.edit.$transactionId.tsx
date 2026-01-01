@@ -1,28 +1,28 @@
 import { Calendar, MapPin, User, UserCircle } from 'lucide-react'
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import {
-    type ActionFunctionArgs,
-    data,
-    type LoaderFunctionArgs,
-    Outlet,
-    useFetcher,
-    useLoaderData,
-    useLocation,
-    useNavigate,
+  type ActionFunctionArgs,
+  data,
+  type LoaderFunctionArgs,
+  Outlet,
+  useFetcher,
+  useLoaderData,
+  useLocation,
+  useNavigate,
 } from 'react-router'
 import {
-    AddSlabDialog,
-    type RoomOption,
+  AddSlabDialog,
+  type RoomOption,
 } from '~/components/transactions/AddSlabDialogTransactions'
 import { ReplaceDialog } from '~/components/transactions/ReplaceDialog'
 import { RoomsSection } from '~/components/transactions/RoomsSection'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
@@ -509,9 +509,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
       corbels: string | null
       extras: string | null
       edge: string | null
+      length: number
+      width: number
     }>(
       db,
-      `SELECT stone_id, bundle, url, parent_id, sale_id, notes, price, square_feet, room, room_uuid, seam, backsplash, tear_out, stove, ten_year_sealer, waterfall, corbels, extras, edge
+      `SELECT stone_id, bundle, url, parent_id, sale_id, notes, price, square_feet, room, room_uuid, seam, backsplash, tear_out, stove, ten_year_sealer, waterfall, corbels, extras, edge, length, width
          FROM slab_inventory
         WHERE id = ? AND sale_id = ?`,
       [slabId, saleId],
