@@ -1,6 +1,6 @@
 import { type LoaderFunctionArgs, redirect } from 'react-router'
 import { z } from 'zod'
-import { BASE_URL, getAuthString } from '~/utils/cloudtalk'
+import { BASE_URL, getAuthString } from '~/utils/cloudtalk.server'
 import type { User } from '~/utils/session.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
