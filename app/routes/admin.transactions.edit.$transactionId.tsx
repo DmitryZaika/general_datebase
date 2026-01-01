@@ -510,7 +510,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
       length: number
       width: number
       sale_id: number | null
-      is_leftover: number
     }>(
       db,
       `SELECT
@@ -535,21 +534,74 @@ export async function action({ request, params }: ActionFunctionArgs) {
           si.edge,
           si.length,
           si.width,
-          si.sale_id,
-          si.is_leftover
+          si.sale_id
         FROM slab_inventory si
        WHERE si.parent_id = ?
          AND si.deleted_at IS NULL
-         AND (
-           SELECT COUNT(*)
-             FROM slab_inventory c
-            WHERE c.parent_id = si.id
-              AND c.deleted_at IS NULL
-         ) = 0
-       ORDER BY si.sale_id ASC, si.id ASC
+         AND si.sale_id IS NOT NULL
+       ORDER BY si.id ASC
        LIMIT 1`,
       [slabId],
     )
+
+    const childCandidate =
+      soldChild.length > 0
+        ? soldChild
+        : await selectMany<{
+            id: number
+            stone_id: number
+            bundle: string
+            url: string | null
+            parent_id: number | null
+            notes: string | null
+            price: number | null
+            square_feet: number | null
+            room: string | null
+            room_uuid: Buffer | null
+            seam: string | null
+            backsplash: string | null
+            tear_out: string | null
+            stove: string | null
+            ten_year_sealer: string | null
+            waterfall: string | null
+            corbels: string | null
+            extras: string | null
+            edge: string | null
+            length: number
+            width: number
+            sale_id: number | null
+          }>(
+            db,
+            `SELECT
+                si.id,
+                si.stone_id,
+                si.bundle,
+                si.url,
+                si.parent_id,
+                si.notes,
+                si.price,
+                si.square_feet,
+                si.room,
+                si.room_uuid,
+                si.seam,
+                si.backsplash,
+                si.tear_out,
+                si.stove,
+                si.ten_year_sealer,
+                si.waterfall,
+                si.corbels,
+                si.extras,
+                si.edge,
+                si.length,
+                si.width,
+                si.sale_id
+              FROM slab_inventory si
+             WHERE si.parent_id = ?
+               AND si.deleted_at IS NULL
+             ORDER BY (si.sale_id IS NOT NULL) DESC, si.id ASC
+             LIMIT 1`,
+            [slabId],
+          )
 
     let actualParentInSale = null
     if (parent[0].parent_id) {
@@ -576,7 +628,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         length: number
         width: number
         sale_id: number | null
-        is_leftover: number
       }>(
         db,
         `SELECT
@@ -601,66 +652,42 @@ export async function action({ request, params }: ActionFunctionArgs) {
             si.edge,
             si.length,
             si.width,
-            si.sale_id,
-            si.is_leftover
+            si.sale_id
            FROM slab_inventory si
           WHERE si.id = ?
             AND si.deleted_at IS NULL
-            AND (
-              SELECT COUNT(*)
-              FROM slab_inventory c
-              WHERE c.parent_id = si.id
-                AND c.deleted_at IS NULL
-                AND c.id != ?
-            ) = 0`,
-        [parent[0].parent_id, slabId],
+            AND si.sale_id IS NOT NULL`,
+        [parent[0].parent_id],
       )
       if (p.length > 0) {
         actualParentInSale = p[0]
       }
     }
 
-    let unsoldRelativesCount = 0
-    if (parent[0].parent_id === null) {
-      const unsoldChildren = await selectMany<{ count: number }>(
-        db,
-        `SELECT COUNT(*) as count FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND deleted_at IS NULL`,
-        [slabId],
-      )
-      unsoldRelativesCount = unsoldChildren[0]?.count ?? 0
-    } else {
-      const unsoldSiblings = await selectMany<{ count: number }>(
-        db,
-        `SELECT COUNT(*) as count FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND id != ? AND deleted_at IS NULL`,
-        [parent[0].parent_id, slabId],
-      )
-      unsoldRelativesCount += unsoldSiblings[0]?.count ?? 0
-
-      const unsoldParent = await selectMany<{ count: number }>(
-        db,
-        `SELECT COUNT(*) as count FROM slab_inventory WHERE id = ? AND sale_id IS NULL AND deleted_at IS NULL`,
-        [parent[0].parent_id],
-      )
-      unsoldRelativesCount += unsoldParent[0]?.count ?? 0
-    }
-
-    const soldTarget = soldChild[0] ?? actualParentInSale ?? (parent[0].sale_id ? { ...parent[0], id: slabId, sale_id: saleId, length: parent[0].length, width: parent[0].width, is_leftover: 0 } : null)
+    const soldTarget =
+      soldChild[0] ??
+      childCandidate[0] ??
+      actualParentInSale ??
+      (parent[0].sale_id ? { ...parent[0], id: slabId, sale_id: saleId, length: parent[0].length, width: parent[0].width } : null)
     const template = soldTarget ?? parent[0]
 
-    const canUpdateSold = soldTarget && soldTarget.sale_id !== null && (soldTarget as { is_leftover: number }).is_leftover === 0 && unsoldRelativesCount === 0
+    const canUpdateSold = replaceFirst && soldTarget && soldTarget.sale_id !== null
 
     let handled = false
     if (replaceFirst || soldTarget) {
       if (canUpdateSold) {
+        const targetId = soldTarget ? soldTarget.id : null
+        if (!targetId) return null
         await db.execute(
-          `UPDATE slab_inventory SET length = ?, width = ?, is_leftover = 1 WHERE id = ?`,
-          [length, width, (soldTarget as { id: number }).id],
+          `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
+          [length, width, targetId],
         )
         handled = true
-      } else if (soldTarget && soldTarget.sale_id === null && !soldTarget.is_leftover) {
+      } else if (replaceFirst && soldTarget && soldTarget.sale_id === null) {
+        const targetId = soldTarget.id
         await db.execute(
-          `UPDATE slab_inventory SET length = ?, width = ?, is_leftover = 1 WHERE id = ?`,
-          [length, width, (soldTarget as { id: number }).id],
+          `UPDATE slab_inventory SET length = ?, width = ?  WHERE id = ?`,
+          [length, width, targetId],
         )
         handled = true
       } else if (replaceFirst) {
@@ -716,8 +743,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
            waterfall,
            corbels,
            extras,
-           edge,
-           is_leftover
+           edge
          )
          VALUES (
            ?,
@@ -740,8 +766,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
            ?,
            ?,
            ?,
-           ?,
-           1
+           ?
          )`,
         [
           template.stone_id,
@@ -908,7 +933,7 @@ export default function ViewTransaction() {
   const [replaceDialogOpen, setReplaceDialogOpen] = useState(false)
   const [replaceTarget, setReplaceTarget] = useState<SaleSlab | null>(null)
   const [replaceOptions, setReplaceOptions] = useState<
-    { id: number; bundle: string; is_leftover: boolean; parent_id: number | null; child_count: number }[]
+    { id: number; bundle: string; parent_id: number | null; child_count: number }[]
   >([])
   const [replaceLoading, setReplaceLoading] = useState(false)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
@@ -918,7 +943,7 @@ export default function ViewTransaction() {
   >([])
   const [addStoneId, setAddStoneId] = useState<number | null>(null)
   const [addSlabs, setAddSlabs] = useState<
-    { id: number; bundle: string; is_leftover: boolean; parent_id?: number | null; child_count?: number }[]
+    { id: number; bundle: string; parent_id?: number | null; child_count?: number }[]
   >([])
   const [addLoading, setAddLoading] = useState(false)
   const [addSlabsLoading, setAddSlabsLoading] = useState(false)
@@ -1085,7 +1110,7 @@ export default function ViewTransaction() {
     setPartialTarget(slab)
     setPartialLength('')
     setPartialWidth('')
-    setCanReplaceFirst((slab.child_count || 0) > 0)
+    setCanReplaceFirst(true)
     setPartialDialogOpen(true)
   }
 
@@ -1429,6 +1454,7 @@ export default function ViewTransaction() {
             <div className='space-y-3'>
               <div className='grid grid-cols-2 gap-2'>
                 <Input
+                 autoFocus={true}
                   type='number'
                   min='0'
                   step='0.01'

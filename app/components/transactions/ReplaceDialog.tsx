@@ -9,7 +9,6 @@ import type { SaleSlab } from '~/types/sales'
 interface ReplaceOption {
   id: number
   bundle: string
-  is_leftover: boolean
   parent_id: number | null
   child_count: number
 }
@@ -52,7 +51,6 @@ export function ReplaceDialog({
                   const statuses: string[] = []
                   const isPartial = opt.parent_id !== null || opt.child_count > 0
                   statuses.push(isPartial ? 'Partial' : 'Full')
-                  if (opt.is_leftover) statuses.push('Leftover')
                   return (
                     <div
                       key={opt.id}
