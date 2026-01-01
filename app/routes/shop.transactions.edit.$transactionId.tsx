@@ -1,29 +1,21 @@
 import { Calendar, MapPin, User, UserCircle } from 'lucide-react'
-import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import {
-  type ActionFunctionArgs,
   data,
-  type LoaderFunctionArgs,
   Outlet,
   useFetcher,
   useLoaderData,
   useLocation,
   useNavigate,
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
 } from 'react-router'
-import {
-  AddSlabDialog,
-  type RoomOption,
-} from '~/components/transactions/AddSlabDialogTransactions'
+import { AddSlabDialog, type RoomOption } from '~/components/transactions/AddSlabDialogTransactions'
 import { ReplaceDialog } from '~/components/transactions/ReplaceDialog'
 import { RoomsSection } from '~/components/transactions/RoomsSection'
 import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
@@ -48,6 +40,7 @@ const roomKeyFromSlab = (slab: Pick<SaleSlab, 'room' | 'room_uuid'>) =>
   slab.room_uuid ?? `name:${normalizeRoomName(slab.room).toLowerCase()}`
 const roomKeyFromSink = (sink: Pick<SaleSink, 'room' | 'room_uuid'>) =>
   sink.room_uuid ?? `name:${normalizeRoomName(sink.room).toLowerCase()}`
+
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await getEmployeeUser(request)
@@ -148,7 +141,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  await getEmployeeUser(request)
+  const user = await getEmployeeUser(request)
   if (!params.transactionId) {
     return forceRedirectError(request.headers, 'No transaction ID provided')
   }
@@ -167,11 +160,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return null
     }
 
-    const slabs = await selectMany<{
-      id: number
-      sale_id: number
-      cut_date: string | null
-    }>(
+    const slabs = await selectMany<{ id: number; sale_id: number; cut_date: string | null }>(
       db,
       `SELECT id, sale_id, cut_date FROM slab_inventory WHERE id = ? AND sale_id = ?`,
       [slabId, saleId],
@@ -182,18 +171,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     if (slabs[0].cut_date === null) {
-      await db.execute(
-        `UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`,
-        [slabId],
-      )
+      await db.execute(`UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`, [
+        slabId,
+      ])
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Slab marked as cut'))
-      return data(
-        { success: true },
-        {
-          headers: { 'Set-Cookie': await commitSession(session) },
-        },
-      )
+      return data({ success: true }, {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      })
     }
   } else if (intent === 'uncut-slab') {
     const slabIdValue = formData.get('slabId')
@@ -277,7 +262,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
           [targetLength, targetWidth, firstChildId],
         )
-
+ 
         if (unsoldChildren.length > 1) {
           await db.execute(
             `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND id != ?`,
@@ -301,10 +286,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (!slabId || !Number.isFinite(slabId)) {
       return null
     }
-    await db.execute(
-      `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`,
-      [slabId],
-    )
+    await db.execute(`DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`, [slabId])
     await db.execute(
       `UPDATE slab_inventory
          SET sale_id = NULL,
@@ -328,12 +310,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     )
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Success', 'Slab removed from sale'))
-    return data(
-      { success: true },
-      {
-        headers: { 'Set-Cookie': await commitSession(session) },
-      },
-    )
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
   } else if (intent === 'remove-room') {
     const room = formData.get('room') as string
     if (!room) return null
@@ -345,12 +324,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
       [saleId, room],
     )
     session.flash('message', toastData('Success', `Room "${room}" removed`))
-    return data(
-      { success: true },
-      {
-        headers: { 'Set-Cookie': await commitSession(session) },
-      },
-    )
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
   } else if (intent === 'replace-slab') {
     const oldSlabId = Number(formData.get('oldSlabId'))
     const newSlabId = Number(formData.get('newSlabId'))
@@ -422,10 +398,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       ],
     )
 
-    await db.execute(
-      `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`,
-      [oldSlabId],
-    )
+    await db.execute(`DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`, [oldSlabId])
 
     await db.execute(
       `UPDATE slab_inventory
@@ -451,12 +424,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Success', 'Slab replaced'))
-    return data(
-      { success: true },
-      {
-        headers: { 'Set-Cookie': await commitSession(session) },
-      },
-    )
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
   } else if (intent === 'partial-cut') {
     const slabIdValue = formData.get('slabId')
     const lengthRaw = formData.get('length')
@@ -469,11 +439,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         ? Number.parseFloat(lengthRaw)
         : null
     const width =
-      typeof widthRaw === 'string' && widthRaw.trim() !== ''
-        ? Number.parseFloat(widthRaw)
-        : null
-    const addAnother =
-      typeof addAnotherRaw === 'string' ? Number(addAnotherRaw) === 1 : false
+      typeof widthRaw === 'string' && widthRaw.trim() !== '' ? Number.parseFloat(widthRaw) : null
+    const addAnother = typeof addAnotherRaw === 'string' ? Number(addAnotherRaw) === 1 : false
     const replaceFirst = typeof replaceFirstRaw === 'string' ? replaceFirstRaw === '1' : false
 
     if (!slabId || !Number.isFinite(slabId)) {
@@ -513,7 +480,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       width: number
     }>(
       db,
-      `SELECT stone_id, bundle, url, parent_id, sale_id, notes, price, square_feet, room, room_uuid, seam, backsplash, tear_out, stove, ten_year_sealer, waterfall, corbels, extras, edge, length, width
+      `SELECT length, width, stone_id, bundle, url, parent_id, sale_id, notes, price, square_feet, room, room_uuid, seam, backsplash, tear_out, stove, ten_year_sealer, waterfall, corbels, extras, edge
          FROM slab_inventory
         WHERE id = ? AND sale_id = ?`,
       [slabId, saleId],
@@ -543,7 +510,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
       length: number
       width: number
       sale_id: number | null
-      is_leftover: number
     }>(
       db,
       `SELECT
@@ -568,22 +534,74 @@ export async function action({ request, params }: ActionFunctionArgs) {
           si.edge,
           si.length,
           si.width,
-          si.sale_id,
-          si.is_leftover
+          si.sale_id
         FROM slab_inventory si
        WHERE si.parent_id = ?
-         AND si.sale_id IS NOT NULL
          AND si.deleted_at IS NULL
-         AND (
-           SELECT COUNT(*)
-             FROM slab_inventory c
-            WHERE c.parent_id = si.id
-              AND c.deleted_at IS NULL
-         ) = 0
+         AND si.sale_id IS NOT NULL
        ORDER BY si.id ASC
        LIMIT 1`,
       [slabId],
     )
+
+    const childCandidate =
+      soldChild.length > 0
+        ? soldChild
+        : await selectMany<{
+            id: number
+            stone_id: number
+            bundle: string
+            url: string | null
+            parent_id: number | null
+            notes: string | null
+            price: number | null
+            square_feet: number | null
+            room: string | null
+            room_uuid: Buffer | null
+            seam: string | null
+            backsplash: string | null
+            tear_out: string | null
+            stove: string | null
+            ten_year_sealer: string | null
+            waterfall: string | null
+            corbels: string | null
+            extras: string | null
+            edge: string | null
+            length: number
+            width: number
+            sale_id: number | null
+          }>(
+            db,
+            `SELECT
+                si.id,
+                si.stone_id,
+                si.bundle,
+                si.url,
+                si.parent_id,
+                si.notes,
+                si.price,
+                si.square_feet,
+                si.room,
+                si.room_uuid,
+                si.seam,
+                si.backsplash,
+                si.tear_out,
+                si.stove,
+                si.ten_year_sealer,
+                si.waterfall,
+                si.corbels,
+                si.extras,
+                si.edge,
+                si.length,
+                si.width,
+                si.sale_id
+              FROM slab_inventory si
+             WHERE si.parent_id = ?
+               AND si.deleted_at IS NULL
+             ORDER BY (si.sale_id IS NOT NULL) DESC, si.id ASC
+             LIMIT 1`,
+            [slabId],
+          )
 
     let actualParentInSale = null
     if (parent[0].parent_id) {
@@ -610,7 +628,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         length: number
         width: number
         sale_id: number | null
-        is_leftover: number
       }>(
         db,
         `SELECT
@@ -635,66 +652,42 @@ export async function action({ request, params }: ActionFunctionArgs) {
             si.edge,
             si.length,
             si.width,
-            si.sale_id,
-            si.is_leftover
+            si.sale_id
            FROM slab_inventory si
           WHERE si.id = ?
             AND si.deleted_at IS NULL
-            AND (
-              SELECT COUNT(*)
-              FROM slab_inventory c
-              WHERE c.parent_id = si.id
-                AND c.deleted_at IS NULL
-                AND c.id != ?
-            ) = 0`,
-        [parent[0].parent_id, slabId],
+            AND si.sale_id IS NOT NULL`,
+        [parent[0].parent_id],
       )
       if (p.length > 0) {
         actualParentInSale = p[0]
       }
     }
 
-    let unsoldRelativesCount = 0
-    if (parent[0].parent_id === null) {
-      const unsoldChildren = await selectMany<{ count: number }>(
-        db,
-        `SELECT COUNT(*) as count FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND deleted_at IS NULL`,
-        [slabId],
-      )
-      unsoldRelativesCount = unsoldChildren[0]?.count ?? 0
-    } else {
-      const unsoldSiblings = await selectMany<{ count: number }>(
-        db,
-        `SELECT COUNT(*) as count FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND id != ? AND deleted_at IS NULL`,
-        [parent[0].parent_id, slabId],
-      )
-      unsoldRelativesCount += unsoldSiblings[0]?.count ?? 0
-
-      const unsoldParent = await selectMany<{ count: number }>(
-        db,
-        `SELECT COUNT(*) as count FROM slab_inventory WHERE id = ? AND sale_id IS NULL AND deleted_at IS NULL`,
-        [parent[0].parent_id],
-      )
-      unsoldRelativesCount += unsoldParent[0]?.count ?? 0
-    }
-
-    const soldTarget = soldChild[0] ?? actualParentInSale ?? (parent[0].sale_id ? { ...parent[0], id: slabId, sale_id: saleId, length: parent[0].length, width: parent[0].width, is_leftover: 0 } : null)
+    const soldTarget =
+      soldChild[0] ??
+      childCandidate[0] ??
+      actualParentInSale ??
+      (parent[0].sale_id ? { ...parent[0], id: slabId, sale_id: saleId, length: parent[0].length, width: parent[0].width } : null)
     const template = soldTarget ?? parent[0]
 
-    const canUpdateSold = soldTarget && soldTarget.sale_id !== null && (soldTarget as { is_leftover: number }).is_leftover === 0 && unsoldRelativesCount === 0
+    const canUpdateSold = replaceFirst && soldTarget && soldTarget.sale_id !== null
 
     let handled = false
     if (replaceFirst || soldTarget) {
       if (canUpdateSold) {
+        const targetId = soldTarget ? soldTarget.id : null
+        if (!targetId) return null
         await db.execute(
-          `UPDATE slab_inventory SET length = ?, width = ?, is_leftover = 1 WHERE id = ?`,
-          [length, width, (soldTarget as { id: number }).id],
+          `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
+          [length, width, targetId],
         )
         handled = true
-      } else if (soldTarget && soldTarget.sale_id === null && !soldTarget.is_leftover) {
+      } else if (replaceFirst && soldTarget && soldTarget.sale_id === null) {
+        const targetId = soldTarget.id
         await db.execute(
-          `UPDATE slab_inventory SET length = ?, width = ?, is_leftover = 1 WHERE id = ?`,
-          [length, width, (soldTarget as { id: number }).id],
+          `UPDATE slab_inventory SET length = ?, width = ?  WHERE id = ?`,
+          [length, width, targetId],
         )
         handled = true
       } else if (replaceFirst) {
@@ -750,8 +743,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
            waterfall,
            corbels,
            extras,
-           edge,
-           is_leftover
+           edge
          )
          VALUES (
            ?,
@@ -774,8 +766,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
            ?,
            ?,
            ?,
-           ?,
-           1
+           ?
          )`,
         [
           template.stone_id,
@@ -840,11 +831,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const room = (formData.get('room') as string) || null
     const roomUuidRaw = formData.get('roomUuid')
     const roomUuid =
-      typeof roomUuidRaw === 'string' && roomUuidRaw.trim() !== ''
-        ? roomUuidRaw.trim()
-        : null
+      typeof roomUuidRaw === 'string' && roomUuidRaw.trim() !== '' ? roomUuidRaw.trim() : null
     if (!slabId || !room) return null
-
     const templateQuery = roomUuid
       ? `SELECT room_uuid, seam, room, backsplash, tear_out, square_feet, stove, ten_year_sealer, waterfall, corbels, price, extras, edge
            FROM slab_inventory
@@ -874,11 +862,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       extras: string | null
       edge: string | null
     }
-    const templateRows = await selectMany<TemplateRow>(
-      db,
-      templateQuery,
-      templateParams,
-    )
+    const templateRows = await selectMany<TemplateRow>(db, templateQuery, templateParams)
     const template = templateRows[0] ?? null
     const roomUuidValue =
       template?.room_uuid ?? (roomUuid ? Buffer.from(roomUuid, 'hex') : null)
@@ -922,12 +906,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     )
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Success', 'Slab added to sale'))
-    return data(
-      { success: true },
-      {
-        headers: { 'Set-Cookie': await commitSession(session) },
-      },
-    )
+    return data({ success: true }, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
   } else {
     return null
   }
@@ -952,13 +933,7 @@ export default function ViewTransaction() {
   const [replaceDialogOpen, setReplaceDialogOpen] = useState(false)
   const [replaceTarget, setReplaceTarget] = useState<SaleSlab | null>(null)
   const [replaceOptions, setReplaceOptions] = useState<
-    {
-      id: number
-      bundle: string
-      is_leftover: boolean
-      parent_id: number | null
-      child_count: number
-    }[]
+    { id: number; bundle: string; parent_id: number | null; child_count: number }[]
   >([])
   const [replaceLoading, setReplaceLoading] = useState(false)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
@@ -968,13 +943,7 @@ export default function ViewTransaction() {
   >([])
   const [addStoneId, setAddStoneId] = useState<number | null>(null)
   const [addSlabs, setAddSlabs] = useState<
-    {
-      id: number
-      bundle: string
-      is_leftover: boolean
-      parent_id?: number | null
-      child_count?: number
-    }[]
+    { id: number; bundle: string; parent_id?: number | null; child_count?: number }[]
   >([])
   const [addLoading, setAddLoading] = useState(false)
   const [addSlabsLoading, setAddSlabsLoading] = useState(false)
@@ -989,10 +958,9 @@ export default function ViewTransaction() {
     setAddDialogOpen(true)
   }
   const currentSlabIds = slabs.map(s => s.id)
-
   const handleDialogClose = (open: boolean) => {
     if (!open) {
-      navigate(`/employee/transactions${location.search}`)
+      navigate(`/admin/transactions${location.search}`)
     }
   }
 
@@ -1003,8 +971,7 @@ export default function ViewTransaction() {
       >((acc, slab) => {
         const roomName = normalizeRoomName(slab.room)
         const key = roomKeyFromSlab(slab)
-        if (!acc[key])
-          acc[key] = { name: roomName, slabs: [], roomUuid: slab.room_uuid ?? null }
+        if (!acc[key]) acc[key] = { name: roomName, slabs: [], roomUuid: slab.room_uuid ?? null }
         acc[key].slabs.push(slab)
         return acc
       }, {}),
@@ -1025,6 +992,16 @@ export default function ViewTransaction() {
       }, {}),
     [sinks],
   )
+  const sinksBySlab = useMemo(
+    () =>
+      sinks.reduce<Record<number, SaleSink[]>>((acc, sink) => {
+        acc[sink.slab_id] = acc[sink.slab_id] || []
+        acc[sink.slab_id].push(sink)
+        return acc
+      }, {}),
+    [sinks],
+  )
+
   const submitAction = async (
     payload: Record<string, string | number | null>,
     options?: { skipNavigate?: boolean },
@@ -1106,13 +1083,7 @@ export default function ViewTransaction() {
       }
       const local = localRooms.find(r => r.id === key)
       if (local) {
-        items.push({
-          id: local.id,
-          name: local.name,
-          slabs: [],
-          isLocal: true,
-          roomUuid: null,
-        })
+        items.push({ id: local.id, name: local.name, slabs: [], isLocal: true, roomUuid: null })
       }
     }
     roomOrder.forEach(addRoomEntry)
@@ -1139,7 +1110,7 @@ export default function ViewTransaction() {
     setPartialTarget(slab)
     setPartialLength('')
     setPartialWidth('')
-    setCanReplaceFirst((slab.child_count || 0) > 0)
+    setCanReplaceFirst(true)
     setPartialDialogOpen(true)
   }
 
@@ -1202,7 +1173,12 @@ export default function ViewTransaction() {
   }
 
   useEffect(() => {
-    if (removeFetcher.state === 'idle' && removeFetcher.data?.success) {
+    if (
+      removeFetcher.state === 'idle' &&
+      removeFetcher.data &&
+      'success' in removeFetcher.data &&
+      (removeFetcher.data as any).success
+    ) {
       setRemoveDialogOpen(false)
       setRemoveTarget(null)
     }
@@ -1308,6 +1284,7 @@ export default function ViewTransaction() {
     setNewRoomName('')
   }
 
+
   useEffect(() => {
     if (!addDialogOpen || !addRoom) return
     const term = addSearch.trim()
@@ -1388,10 +1365,7 @@ export default function ViewTransaction() {
                         </span>
                         <div className='flex flex-wrap gap-2 text-sm text-muted-foreground justify-end'>
                           {room.items.map(item => (
-                            <span
-                              key={item.name}
-                              className='px-2 py-1 rounded bg-muted'
-                            >
+                            <span key={item.name} className='px-2 py-1 rounded bg-muted'>
                               {item.name}
                               {item.count > 1 ? ` x${item.count}` : ''}
                             </span>
@@ -1403,6 +1377,7 @@ export default function ViewTransaction() {
                 )}
               </CardContent>
             </Card>
+
           </div>
 
           <Card>
@@ -1438,7 +1413,9 @@ export default function ViewTransaction() {
         </div>
 
         <div className='flex justify-end mt-4 gap-2'>
-          <Button onClick={openAddDialog}>Add Slab</Button>
+          <Button onClick={openAddDialog}>
+            Add Slab
+          </Button>
           <Button
             variant='outline'
             onClick={() => navigate(`/employee/transactions${location.search}`)}
@@ -1477,13 +1454,12 @@ export default function ViewTransaction() {
             <div className='space-y-3'>
               <div className='grid grid-cols-2 gap-2'>
                 <Input
+                 autoFocus={true}
                   type='number'
                   min='0'
                   step='0.01'
                   value={partialLength}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setPartialLength(e.target.value)
-                  }
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPartialLength(e.target.value)}
                   disabled={partialSubmitting}
                   placeholder='Length'
                 />
@@ -1492,9 +1468,7 @@ export default function ViewTransaction() {
                   min='0'
                   step='0.01'
                   value={partialWidth}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setPartialWidth(e.target.value)
-                  }
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPartialWidth(e.target.value)}
                   disabled={partialSubmitting}
                   placeholder='Width'
                 />
@@ -1548,8 +1522,7 @@ export default function ViewTransaction() {
             <DialogHeader>
               <DialogTitle>Remove Slab</DialogTitle>
               <p className='text-sm text-muted-foreground'>
-                Are you sure you want to remove slab {removeTarget.bundle} from this
-                sale?
+                Are you sure you want to remove slab {removeTarget.bundle} from this sale?
               </p>
             </DialogHeader>
             <div className='flex justify-end gap-2'>
