@@ -6,7 +6,7 @@ import { getEmployeeUser } from '~/utils/session.server'
 
 const userIdSchema = z.int().positive()
 
-export async function fetchCallMedia(
+async function fetchCallMedia(
   callId: number,
   companyId: number,
 ): Promise<string> {
