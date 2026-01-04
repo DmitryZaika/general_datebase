@@ -14,18 +14,12 @@ import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
 import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
 import { LOST_REASONS } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 
-type SalesBySeller = {
-  seller_id: number
-  seller_name: string
-  sales_count: number
-  total_revenue: number
-  avg_ticket: number
-}
 
 type DealsByRep = {
   rep_id: number
@@ -71,11 +65,13 @@ type CustomersTableCustomer = {
   source: string | null
   referral_source: string | null
   invalid_lead: string | null
+  sales_rep_name: string | null
 }
 
 type CustomersTableDeal = {
   id: number
   customer_id: number
+  sales_rep_name: string
   amount: number | null
   status: string | null
   lost_reason: string | null
@@ -101,6 +97,7 @@ type CustomersTableRow = {
   status: string
   lost_reason: string
   amount: string
+  sales_rep_name: string
   className?: string
   createdSortValue?: number
 }
@@ -162,21 +159,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       's.sale_date IS NOT NULL',
       ...dateFilters,
     ]
-
-    const salesBySeller = await selectMany<SalesBySeller>(
-      db,
-      `SELECT u.id AS seller_id, u.name AS seller_name, COUNT(s.id) AS sales_count,
-              COALESCE(SUM(s.price), 0) AS total_revenue,
-              COALESCE(AVG(s.price), 0) AS avg_ticket
-       FROM sales s
-       JOIN users u ON s.seller_id = u.id AND u.is_deleted = 0
-       WHERE ${salesWhere.join(' AND ')}${hasRepFilter ? ' AND u.name = ?' : ''}
-       GROUP BY u.id, u.name
-       ORDER BY total_revenue DESC`,
-      hasRepFilter
-        ? [user.company_id, ...dateParams, salesRepParam]
-        : [user.company_id, ...dateParams],
-    )
 
     const dealsByRep = await selectMany<DealsByRep>(
       db,
@@ -383,8 +365,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               c.created_date,
               c.source,
               c.referral_source,
-              c.invalid_lead
+              c.invalid_lead,
+              u.name as sales_rep_name
        FROM customers c
+       LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0 AND u.company_id = c.company_id
        WHERE ${customersTableWhere.join(' AND ')}
        ORDER BY c.created_date DESC`,
       customersTableParams,
@@ -411,9 +395,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               d.customer_id,
               d.amount,
               d.status,
-              d.lost_reason
+              d.lost_reason,
+              COALESCE(u.name, u2.name, '') as sales_rep_name
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
+       LEFT JOIN users u ON d.user_id = u.id AND u.is_deleted = 0 AND u.company_id = c.company_id
+       LEFT JOIN users u2 ON c.sales_rep = u2.id AND u2.is_deleted = 0 AND u2.company_id = c.company_id
        WHERE ${customersDealsWhere.join(' AND ')}
        ORDER BY d.created_at DESC`,
       customersDealsParams,
@@ -510,7 +497,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     )
 
     return {
-      salesBySeller,
       dealsByRep,
       dealsByStage,
       lists,
@@ -557,7 +543,7 @@ export default function AdminStatistics() {
   )
   const [to, setTo] = useState<Date | undefined>(toDate ? new Date(toDate) : undefined)
   const [customersPage, setCustomersPage] = useState(1)
-  const customersPageSize = 50
+  const customersPageSize = 500
   const [highlightCustomerId, setHighlightCustomerId] = useState<number | null>(null)
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -736,14 +722,66 @@ export default function AdminStatistics() {
     { accessorKey: 'total', header: 'Total' },
   ]
 
+  const truncateValue = (value: string | number | null | undefined) => {
+    const str = value === null || value === undefined ? '' : String(value)
+    if (str.length > 20) return { text: `${str.slice(0, 20)}...`, title: str }
+    return { text: str, title: str }
+  }
+
+  const renderTruncated = (value: string | number | null | undefined) => {
+    const { text, title } = truncateValue(value)
+    if (!title || text === title) return <span>{text}</span>
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className='inline-block max-w-full truncate align-middle'>{text}</span>
+        </TooltipTrigger>
+        <TooltipContent side='top'>{title}</TooltipContent>
+      </Tooltip>
+    )
+  }
+
   const customersColumns: ColumnDef<CustomersTableRow>[] = [
-    { header: 'Date', accessorKey: 'created_date' },
-    { header: 'Source', accessorKey: 'source' },
-    { header: 'Reference', accessorKey: 'referral_source' },
-    { header: 'Name', accessorKey: 'name' },
-    { header: 'Status', accessorKey: 'status' },
-    { header: 'Lost reason', accessorKey: 'lost_reason' },
-    { header: 'Amount', accessorKey: 'amount' },
+    {
+      header: 'Date',
+      accessorKey: 'created_date',
+      cell: ({ row }) => renderTruncated(row.original.created_date),
+    },
+    {
+      header: 'Source',
+      accessorKey: 'source',
+      cell: ({ row }) => renderTruncated(row.original.source),
+    },
+    {
+      header: 'Sales Rep',
+      accessorKey: 'sales_rep_name',
+      cell: ({ row }) => renderTruncated(row.original.sales_rep_name),
+    },
+    {
+      header: 'Reference',
+      accessorKey: 'referral_source',
+      cell: ({ row }) => renderTruncated(row.original.referral_source),
+    },
+    {
+      header: 'Name',
+      accessorKey: 'name',
+      cell: ({ row }) => renderTruncated(row.original.name),
+    },
+    {
+      header: 'Status',
+      accessorKey: 'status',
+      cell: ({ row }) => renderTruncated(row.original.status),
+    },
+    {
+      header: 'Lost reason',
+      accessorKey: 'lost_reason',
+      cell: ({ row }) => renderTruncated(row.original.lost_reason),
+    },
+    {
+      header: 'Amount',
+      accessorKey: 'amount',
+      cell: ({ row }) => renderTruncated(row.original.amount),
+    },
   ]
 
   const lostReasonColumns = useMemo(() => {
@@ -902,6 +940,7 @@ export default function AdminStatistics() {
           status,
           lost_reason: lostReason,
           amount,
+      sales_rep_name: customer.sales_rep_name || '',
         }
       })
       .sort((a, b) => (b.createdSortValue || 0) - (a.createdSortValue || 0))
@@ -989,10 +1028,10 @@ export default function AdminStatistics() {
         </div>
       </div>
 
-      <div className='mt-8'>
+      {/* <div className='mt-8'>
         <h2 className='text-xl font-semibold mb-4'>Lost Reasons by Sales Rep</h2>
         <DataTable columns={lostReasonColumns} data={lostReasonRows} />
-      </div>
+      </div> */}
 
       <div className='mt-8'>
         <div className='flex flex-col md:flex-row items-center justify-between mb-2'>

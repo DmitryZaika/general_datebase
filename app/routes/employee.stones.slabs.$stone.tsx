@@ -50,6 +50,8 @@ interface Slab {
     slab_notes?: string
     square_feet?: number
     sink?: string
+    room_name?: string
+    slab_square_feet?: number
   }
   parent_transaction?: {
     customer_name: string
@@ -72,6 +74,8 @@ const TransactionSchema = z.object({
   slab_notes: z.string().nullable().optional(),
   square_feet: z.coerce.number().prefault(0),
   sink_names: z.string().nullable().optional(),
+  room_name: z.string().nullable().optional(),
+  slab_square_feet: z.coerce.number().prefault(0).nullable().optional(),
 })
 
 type Transaction = z.infer<typeof TransactionSchema>
@@ -198,6 +202,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         sales.notes as sale_notes,
         slab_inventory.notes as slab_notes,
         sales.square_feet,
+        slab_inventory.room as room_name,
+        slab_inventory.square_feet as slab_square_feet,
         (
           SELECT GROUP_CONCAT(sink_type.name SEPARATOR ', ')
           FROM sinks
@@ -260,6 +266,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           sale_notes: transaction.sale_notes || '',
           slab_notes: transaction.slab_notes || '',
           square_feet: transaction.square_feet || 0,
+          room_name: transaction.room_name || '',
+          slab_square_feet: transaction.slab_square_feet ?? undefined,
           sink: transaction.sink_names || '',
         }
       }
@@ -429,6 +437,7 @@ export default function SlabsModal() {
     const isEditing = editingSlab === slab.id
     const isHighlighted = highlightedSlab === slab.id
     const hasParent = slab.parent_id !== null
+    const roomLabel = (slab.transaction?.room_name ?? '').trim()
 
     return (
       <TooltipProvider key={slab.id}>
@@ -561,6 +570,15 @@ export default function SlabsModal() {
                         {slab.transaction.square_feet}
                       </p>
                     )}
+
+                    {roomLabel.length > 1 &&
+                      roomLabel.toLowerCase() !== 'room' &&
+                      (slab.transaction.slab_square_feet ?? 0) > 0 && (
+                        <p>
+                          <strong>Room Square Feet ({roomLabel}):</strong>{' '}
+                          {slab.transaction.slab_square_feet}
+                        </p>
+                      )}
 
                     {slab.transaction.sink &&
                       formatSinkList(slab.transaction.sink)
