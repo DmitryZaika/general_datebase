@@ -935,7 +935,7 @@ export default function ViewTransaction() {
           </Button>
           <Button
             variant='outline'
-            onClick={() => navigate(`/employee/transactions${location.search}`)}
+            onClick={() => navigate(`/admin/transactions${location.search}`)}
           >
             Close
           </Button>

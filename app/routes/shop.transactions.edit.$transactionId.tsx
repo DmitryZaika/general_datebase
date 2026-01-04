@@ -17,13 +17,16 @@ import { Button } from '~/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
+import { getSlabInventorySinks } from '~/crud/sinks'
+import { AddSlabToSale, getActualParentInSale, getExistingSlabInSale, getFirstChildFromParentPreferWithSale, getFirstChildSlabInSale, getFirstUnsoldChildFromParent, getSlabInventoryChildren, getSlabInventoryParent, getSlabsInSale, insertNewSlabInventory, removeOldSlabFromSale, selectForRoom, selectForRoomUuid, updateChildSlabInventory } from '~/crud/slab_inventory'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
 import { commitSession, getSession } from '~/sessions.server'
 import type { SaleDetails, SaleSink, SaleSlab } from '~/types/sales'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
+
 
 function formatDate(dateString: string) {
   if (!dateString) return ''
@@ -43,7 +46,7 @@ const roomKeyFromSink = (sink: Pick<SaleSink, 'room' | 'room_uuid'>) =>
 
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const user = await getEmployeeUser(request)
+  const user = await getAdminUser(request)
   if (!params.transactionId) {
     return forceRedirectError(request.headers, 'No transaction ID provided')
   }
@@ -90,58 +93,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     )
   }
 
-  const slabs = await selectMany<SaleSlab>(
-    db,
-    `SELECT
-      slab_inventory.id,
-      slab_inventory.stone_id,
-      slab_inventory.bundle,
-      stones.name as stone_name,
-      slab_inventory.cut_date,
-      slab_inventory.notes,
-      slab_inventory.square_feet,
-      slab_inventory.length,
-      slab_inventory.width,
-      HEX(slab_inventory.room_uuid) as room_uuid,
-      slab_inventory.room,
-      slab_inventory.parent_id,
-      (SELECT COUNT(*) FROM slab_inventory c WHERE c.parent_id = slab_inventory.id AND c.deleted_at IS NULL) as child_count
-     FROM slab_inventory
-     JOIN stones ON slab_inventory.stone_id = stones.id
-     WHERE slab_inventory.sale_id = ?
-     ORDER BY slab_inventory.id`,
-    [saleId],
-  )
+ 
 
-  const sinks = await selectMany<SaleSink>(
-    db,
-    `SELECT
-      sinks.id,
-      sinks.sink_type_id,
-      sink_type.name,
-      sinks.price,
-      sinks.is_deleted,
-      sinks.slab_id,
-      slab_inventory.room,
-      HEX(slab_inventory.room_uuid) as room_uuid
-     FROM sinks
-     JOIN sink_type ON sinks.sink_type_id = sink_type.id
-     JOIN slab_inventory ON sinks.slab_id = slab_inventory.id
-     WHERE slab_inventory.sale_id = ? AND sinks.is_deleted = 0
-     ORDER BY sinks.id`,
-    [saleId],
-  )
+ 
 
   return {
     sale,
-    slabs,
-    sinks,
+    slabs: await getSlabInventoryChildren(saleId),
+    sinks: await getSlabInventorySinks(saleId),
     companyId: user.company_id,
   }
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const user = await getEmployeeUser(request)
+  const user = await getAdminUser(request)
   if (!params.transactionId) {
     return forceRedirectError(request.headers, 'No transaction ID provided')
   }
@@ -187,19 +152,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return null
     }
 
-    const slabs = await selectMany<{
-      id: number
-      sale_id: number
-      cut_date: string | null
-      stone_id: number
-      parent_id: number | null
-      length: number
-      width: number
-    }>(
-      db,
-      `SELECT id, sale_id, cut_date, stone_id, parent_id, length, width FROM slab_inventory WHERE id = ? AND sale_id = ?`,
-      [slabId, saleId],
-    )
+const slabs = await getSlabsInSale(slabId, saleId)
 
     if (slabs.length === 0) {
       return null
@@ -287,27 +240,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return null
     }
     await db.execute(`DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`, [slabId])
-    await db.execute(
-      `UPDATE slab_inventory
-         SET sale_id = NULL,
-             notes = NULL,
-             price = NULL,
-             square_feet = NULL,
-             cut_date = NULL,
-             room = NULL,
-             waterfall = NULL,
-             corbels = NULL,
-             seam = NULL,
-             stove = NULL,
-             extras = NULL,
-             room_uuid = NULL,
-             edge = NULL,
-             backsplash = NULL,
-             tear_out = NULL,
-             ten_year_sealer = NULL
-       WHERE id = ? AND sale_id = ?`,
-      [slabId, saleId],
-    )
+   await removeOldSlabFromSale(slabId, saleId)
+
+   
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Success', 'Slab removed from sale'))
     return data({ success: true }, {
@@ -332,95 +267,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const newSlabId = Number(formData.get('newSlabId'))
     if (!oldSlabId || !newSlabId) return null
 
-    const oldSlab = await selectMany<{
-      notes: string | null
-      price: number | null
-      square_feet: number | null
-      cut_date: string | null
-      room: string | null
-      room_uuid: string | null
-      seam: string | null
-      backsplash: string | null
-      tear_out: string | null
-      stove: string | null
-      ten_year_sealer: string | null
-      waterfall: string | null
-      corbels: string | null
-      extras: string | null
-      edge: string | null
-    }>(
-      db,
-      `SELECT notes, price, square_feet, cut_date, room, room_uuid, seam, backsplash, tear_out, stove, ten_year_sealer, waterfall, corbels, extras, edge
-         FROM slab_inventory
-        WHERE id = ? AND sale_id = ?`,
-      [oldSlabId, saleId],
-    )
+  const existingSlabInSale = await getExistingSlabInSale(oldSlabId, saleId)
 
-    const template = oldSlab[0] ?? {}
+    const template = existingSlabInSale[0] ?? {}
 
-    await db.execute(
-      `UPDATE slab_inventory
-         SET sale_id = ?,
-             room = ?,
-             room_uuid = ?,
-             seam = ?,
-             backsplash = ?,
-             tear_out = ?,
-             square_feet = ?,
-             stove = ?,
-             ten_year_sealer = ?,
-             waterfall = ?,
-             corbels = ?,
-             price = ?,
-             extras = ?,
-             edge = ?,
-             notes = ?,
-             cut_date = ?
-       WHERE id = ? AND sale_id IS NULL`,
-      [
-        saleId,
-        template.room ?? null,
-        template.room_uuid ?? null,
-        template.seam ?? null,
-        template.backsplash ?? null,
-        template.tear_out ?? null,
-        template.square_feet ?? null,
-        template.stove ?? null,
-        template.ten_year_sealer ?? null,
-        template.waterfall ?? null,
-        template.corbels ?? null,
-        template.price ?? null,
-        template.extras ?? null,
-        template.edge ?? null,
-        template.notes ?? null,
-        template.cut_date ?? null,
-        newSlabId,
-      ],
-    )
-
+    await updateChildSlabInventory(oldSlabId, saleId, template, newSlabId)
     await db.execute(`DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL`, [oldSlabId])
-
-    await db.execute(
-      `UPDATE slab_inventory
-         SET sale_id = NULL,
-             notes = NULL,
-             price = NULL,
-             square_feet = NULL,
-             cut_date = NULL,
-             room = NULL,
-             room_uuid = NULL,
-             seam = NULL,
-             backsplash = NULL,
-             tear_out = NULL,
-             stove = NULL,
-             ten_year_sealer = NULL,
-             waterfall = NULL,
-             corbels = NULL,
-             extras = NULL,
-             edge = NULL
-       WHERE id = ? AND sale_id = ?`,
-      [oldSlabId, saleId],
-    )
+  await removeOldSlabFromSale(oldSlabId, saleId)
 
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Success', 'Slab replaced'))
@@ -456,209 +309,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
     ) {
       return null
     }
-    const parent = await selectMany<{
-      stone_id: number
-      bundle: string
-      url: string | null
-      parent_id: number | null
-      sale_id: number | null
-      notes: string | null
-      price: number | null
-      square_feet: number | null
-      room: string | null
-      room_uuid: Buffer | null
-      seam: string | null
-      backsplash: string | null
-      tear_out: string | null
-      stove: string | null
-      ten_year_sealer: string | null
-      waterfall: string | null
-      corbels: string | null
-      extras: string | null
-      edge: string | null
-      length: number
-      width: number
-    }>(
-      db,
-      `SELECT length, width, stone_id, bundle, url, parent_id, sale_id, notes, price, square_feet, room, room_uuid, seam, backsplash, tear_out, stove, ten_year_sealer, waterfall, corbels, extras, edge
-         FROM slab_inventory
-        WHERE id = ? AND sale_id = ?`,
-      [slabId, saleId],
-    )
-    if (parent.length === 0) return null
+    const foundParent = await getSlabInventoryParent(slabId, saleId)
+    if (foundParent.length === 0) return null
 
-    const soldChild = await selectMany<{
-      id: number
-      stone_id: number
-      bundle: string
-      url: string | null
-      parent_id: number | null
-      notes: string | null
-      price: number | null
-      square_feet: number | null
-      room: string | null
-      room_uuid: Buffer | null
-      seam: string | null
-      backsplash: string | null
-      tear_out: string | null
-      stove: string | null
-      ten_year_sealer: string | null
-      waterfall: string | null
-      corbels: string | null
-      extras: string | null
-      edge: string | null
-      length: number
-      width: number
-      sale_id: number | null
-    }>(
-      db,
-      `SELECT
-          si.id,
-          si.stone_id,
-          si.bundle,
-          si.url,
-          si.parent_id,
-          si.notes,
-          si.price,
-          si.square_feet,
-          si.room,
-          si.room_uuid,
-          si.seam,
-          si.backsplash,
-          si.tear_out,
-          si.stove,
-          si.ten_year_sealer,
-          si.waterfall,
-          si.corbels,
-          si.extras,
-          si.edge,
-          si.length,
-          si.width,
-          si.sale_id
-        FROM slab_inventory si
-       WHERE si.parent_id = ?
-         AND si.deleted_at IS NULL
-         AND si.sale_id IS NOT NULL
-       ORDER BY si.id ASC
-       LIMIT 1`,
-      [slabId],
-    )
+   const soldChild = await getFirstChildSlabInSale(slabId)
 
     const childCandidate =
       soldChild.length > 0
         ? soldChild
-        : await selectMany<{
-            id: number
-            stone_id: number
-            bundle: string
-            url: string | null
-            parent_id: number | null
-            notes: string | null
-            price: number | null
-            square_feet: number | null
-            room: string | null
-            room_uuid: Buffer | null
-            seam: string | null
-            backsplash: string | null
-            tear_out: string | null
-            stove: string | null
-            ten_year_sealer: string | null
-            waterfall: string | null
-            corbels: string | null
-            extras: string | null
-            edge: string | null
-            length: number
-            width: number
-            sale_id: number | null
-          }>(
-            db,
-            `SELECT
-                si.id,
-                si.stone_id,
-                si.bundle,
-                si.url,
-                si.parent_id,
-                si.notes,
-                si.price,
-                si.square_feet,
-                si.room,
-                si.room_uuid,
-                si.seam,
-                si.backsplash,
-                si.tear_out,
-                si.stove,
-                si.ten_year_sealer,
-                si.waterfall,
-                si.corbels,
-                si.extras,
-                si.edge,
-                si.length,
-                si.width,
-                si.sale_id
-              FROM slab_inventory si
-             WHERE si.parent_id = ?
-               AND si.deleted_at IS NULL
-             ORDER BY (si.sale_id IS NOT NULL) DESC, si.id ASC
-             LIMIT 1`,
-            [slabId],
-          )
+        : await getFirstChildFromParentPreferWithSale(slabId)
 
     let actualParentInSale = null
-    if (parent[0].parent_id) {
-      const p = await selectMany<{
-        id: number
-        stone_id: number
-        bundle: string
-        url: string | null
-        parent_id: number | null
-        notes: string | null
-        price: number | null
-        square_feet: number | null
-        room: string | null
-        room_uuid: Buffer | null
-        seam: string | null
-        backsplash: string | null
-        tear_out: string | null
-        stove: string | null
-        ten_year_sealer: string | null
-        waterfall: string | null
-        corbels: string | null
-        extras: string | null
-        edge: string | null
-        length: number
-        width: number
-        sale_id: number | null
-      }>(
-        db,
-        `SELECT
-            si.id,
-            si.stone_id,
-            si.bundle,
-            si.url,
-            si.parent_id,
-            si.notes,
-            si.price,
-            si.square_feet,
-            si.room,
-            si.room_uuid,
-            si.seam,
-            si.backsplash,
-            si.tear_out,
-            si.stove,
-            si.ten_year_sealer,
-            si.waterfall,
-            si.corbels,
-            si.extras,
-            si.edge,
-            si.length,
-            si.width,
-            si.sale_id
-           FROM slab_inventory si
-          WHERE si.id = ?
-            AND si.deleted_at IS NULL
-            AND si.sale_id IS NOT NULL`,
-        [parent[0].parent_id],
-      )
+    if (foundParent[0].parent_id) {
+      const p = await getActualParentInSale(foundParent[0].parent_id)
       if (p.length > 0) {
         actualParentInSale = p[0]
       }
@@ -668,8 +331,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       soldChild[0] ??
       childCandidate[0] ??
       actualParentInSale ??
-      (parent[0].sale_id ? { ...parent[0], id: slabId, sale_id: saleId, length: parent[0].length, width: parent[0].width } : null)
-    const template = soldTarget ?? parent[0]
+      (foundParent[0].sale_id ? { ...foundParent[0], id: slabId, sale_id: saleId, length: foundParent[0].length, width: foundParent[0].width } : null)
+    const template = soldTarget ?? foundParent[0]
 
     const canUpdateSold = replaceFirst && soldTarget && soldTarget.sale_id !== null
 
@@ -697,21 +360,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
           [slabId],
         )
         if (baseDims.length > 0) {
-          const matchChild = await selectMany<{ id: number }>(
-            db,
-            `SELECT id FROM slab_inventory
-             WHERE parent_id = ?
-             AND sale_id IS NULL
-             AND length = ?
-             AND width = ?
-             ORDER BY id ASC
-             LIMIT 1`,
-            [slabId, baseDims[0].length, baseDims[0].width],
-          )
-          if (matchChild.length > 0) {
+          const firstUnsoldChild = await getFirstUnsoldChildFromParent(slabId, baseDims[0].length, baseDims[0].width)
+          if (firstUnsoldChild.length > 0) {
             await db.execute(
               `UPDATE slab_inventory SET length = ?, width = ? WHERE id = ?`,
-              [length, width, matchChild[0].id],
+              [length, width, firstUnsoldChild[0].id],
             )
             handled = true
           }
@@ -721,79 +374,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     if (!handled) {
       const parentForNew = (soldTarget && soldTarget.sale_id === null) ? (soldTarget.parent_id ?? soldTarget.id) : slabId
-      await db.execute(
-        `INSERT INTO slab_inventory (
-           stone_id,
-           bundle,
-           parent_id,
-           sale_id,
-           length,
-           width,
-           url,
-           notes,
-           price,
-           square_feet,
-           room,
-           room_uuid,
-           seam,
-           backsplash,
-           tear_out,
-           stove,
-           ten_year_sealer,
-           waterfall,
-           corbels,
-           extras,
-           edge
-         )
-         VALUES (
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?,
-           ?
-         )`,
-        [
-          template.stone_id,
-          template.bundle,
-          parentForNew,
-          soldTarget && soldTarget.sale_id !== null ? soldTarget.sale_id : null,
-          length,
-          width,
-          template.url ?? null,
-          template.notes ?? null,
-          template.price ?? null,
-          template.square_feet ?? null,
-          template.room ?? null,
-          template.room_uuid ?? null,
-          template.seam ?? null,
-          template.backsplash ?? null,
-          template.tear_out ?? null,
-          template.stove ?? null,
-          template.ten_year_sealer ?? null,
-          template.waterfall ?? null,
-          template.corbels ?? null,
-          template.extras ?? null,
-          template.edge ?? null,
-        ],
-      )
-    }
-
+    await insertNewSlabInventory(template, parentForNew, soldTarget, length, width)}
     if (!addAnother) {
       await db.execute(
         `UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ? AND sale_id = ?`,
@@ -833,77 +414,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const roomUuid =
       typeof roomUuidRaw === 'string' && roomUuidRaw.trim() !== '' ? roomUuidRaw.trim() : null
     if (!slabId || !room) return null
-    const templateQuery = roomUuid
-      ? `SELECT room_uuid, seam, room, backsplash, tear_out, square_feet, stove, ten_year_sealer, waterfall, corbels, price, extras, edge
-           FROM slab_inventory
-          WHERE sale_id = ? AND HEX(room_uuid) = ?
-          ORDER BY id
-          LIMIT 1`
-      : `SELECT room_uuid, seam, room, backsplash, tear_out, square_feet, stove, ten_year_sealer, waterfall, corbels, price, extras, edge
-           FROM slab_inventory
-          WHERE sale_id = ? AND (room = ? OR ? IS NULL)
-          ORDER BY id
-          LIMIT 1`
 
-    const templateParams = roomUuid ? [saleId, roomUuid] : [saleId, room, room]
-
-    type TemplateRow = {
-      room_uuid: Buffer | null
-      seam: string | null
-      room: string | null
-      backsplash: string | null
-      tear_out: string | null
-      square_feet: number | null
-      stove: string | null
-      ten_year_sealer: string | null
-      waterfall: string | null
-      corbels: string | null
-      price: number | null
-      extras: string | null
-      edge: string | null
-    }
-    const templateRows = await selectMany<TemplateRow>(db, templateQuery, templateParams)
+    const templateRows = roomUuid ? await selectForRoomUuid(saleId, roomUuid) : await selectForRoom(saleId, room)
     const template = templateRows[0] ?? null
     const roomUuidValue =
       template?.room_uuid ?? (roomUuid ? Buffer.from(roomUuid, 'hex') : null)
 
-    await db.execute(
-      `UPDATE slab_inventory
-         SET sale_id = ?,
-             room = ?,
-             room_uuid = ?,
-             seam = ?,
-             backsplash = ?,
-             tear_out = ?,
-             square_feet = ?,
-             stove = ?,
-             ten_year_sealer = ?,
-             waterfall = ?,
-             corbels = ?,
-             price = ?,
-             extras = ?,
-             edge = ?,
-             notes = NULL,
-             cut_date = NULL
-       WHERE id = ? AND sale_id IS NULL`,
-      [
-        saleId,
-        room,
-        roomUuidValue,
-        template?.seam ?? null,
-        template?.backsplash ?? null,
-        template?.tear_out ?? null,
-        template?.square_feet ?? null,
-        template?.stove ?? null,
-        template?.ten_year_sealer ?? null,
-        template?.waterfall ?? null,
-        template?.corbels ?? null,
-        template?.price ?? null,
-        template?.extras ?? null,
-        template?.edge ?? null,
-        slabId,
-      ],
-    )
+    await AddSlabToSale(template, slabId, saleId, room, roomUuidValue)
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Success', 'Slab added to sale'))
     return data({ success: true }, {
@@ -1418,7 +935,7 @@ export default function ViewTransaction() {
           </Button>
           <Button
             variant='outline'
-            onClick={() => navigate(`/employee/transactions${location.search}`)}
+            onClick={() => navigate(`/shop/transactions${location.search}`)}
           >
             Close
           </Button>
