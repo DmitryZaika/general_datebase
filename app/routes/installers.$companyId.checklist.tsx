@@ -2,7 +2,8 @@ import { useMutation } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
-import { InputItem } from '~/components/molecules/InputItem'
+import { CustomerSearch } from '~/components/molecules/CustomerSearch'
+import { EmailInput } from '~/components/molecules/EmailInput'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SignatureInput, type SigRef } from '~/components/molecules/SignatureInput'
 import { AddressInput } from '~/components/organisms/AddressInput'
@@ -18,6 +19,15 @@ import {
 } from '~/hooks/useChecklistQueue'
 import { type ChecklistFormData, checklistResolver } from '~/schemas/checklist'
 import { getEmployeeUser } from '~/utils/session.server'
+
+type CustomerDetails = { name?: string; address?: string | null; email?: string | null }
+
+async function fetchCustomerDetails(customerId: number): Promise<CustomerDetails | null> {
+  const res = await fetch(`/api/customers/${customerId}`)
+  if (!res.ok) return null
+  const data: { customer?: CustomerDetails } = await res.json()
+  return data.customer ?? null
+}
 
 const checklistItems: Array<[keyof ChecklistFormData, string]> = [
   ['material_correct', 'Material is correct'],
@@ -49,6 +59,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 const defaultValues: ChecklistFormData = {
   customer_name: '',
   customer_id: null,
+  email: '',
   installation_address: '',
   material_correct: '',
   seams_satisfaction: '',
@@ -68,6 +79,7 @@ export default function AdminChecklists() {
     resolver: checklistResolver,
     defaultValues,
   })
+  const selectedCustomerId = form.watch('customer_id')
   const localStorageLockedRef = useRef<boolean>(false)
   const { toast } = useToast()
 
@@ -309,9 +321,49 @@ export default function AdminChecklists() {
             <FormField
               control={form.control}
               name='customer_name'
-              render={({ field }) => (
-                <InputItem name='Customer Name' placeholder='Customer' field={field} />
+              render={({ field, fieldState }) => (
+                <CustomerSearch
+                  onCustomerChange={async customerId => {
+                    if (!customerId) {
+                      form.setValue('customer_id', null, { shouldValidate: true })
+                      form.setValue('installation_address', '', { shouldValidate: true })
+                      form.setValue('email', '', { shouldValidate: true })
+                      field.onChange('')
+                      return
+                    }
+                    form.setValue('customer_id', customerId, { shouldValidate: true })
+                    const details = await fetchCustomerDetails(customerId)
+                    const name = details?.name ?? ''
+                    const address = details?.address ?? ''
+                    const email = details?.email ?? ''
+                    field.onChange(name)
+                    if (address) {
+                      form.setValue('installation_address', address, { shouldValidate: true })
+                    }
+                    if (email) {
+                      form.setValue('email', email, { shouldValidate: true })
+                    }
+                  }}
+                  onNameInput={value => {
+                    form.setValue('customer_id', null, { shouldValidate: true })
+                    field.onChange(value)
+                  }}
+                  companyId={companyId}
+                  source='check-list'
+                  selectedCustomer={selectedCustomerId ?? undefined}
+                  error={fieldState.error?.message}
+                  setError={
+                    fieldState.error?.message
+                      ? error => form.setError('customer_name', { message: error ?? undefined })
+                      : () => {}
+                  }
+                />
               )}
+            />
+            <FormField
+              control={form.control}
+              name='email'
+              render={({ field }) => <EmailInput field={field} />}
             />
             <AddressInput form={form} field='installation_address' type='project' />
             <div className='my-4 space-y-2'>
