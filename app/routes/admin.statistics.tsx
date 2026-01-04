@@ -1086,7 +1086,7 @@ export default function AdminStatistics() {
           Top Campaigns by Customers Acquired
         </h2>
         <p className='text-sm text-muted-foreground mb-4'>
-          Conversion = Won Deals (Stage ID 4) ÷ Total Deals per Campaign
+          Conversion = Won Deals ÷ Total Deals per Campaign
         </p>
         <DataTable
           columns={campaignAcquisitionColumns}
