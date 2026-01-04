@@ -104,16 +104,6 @@ type CustomersTableRow = {
 
 type DealsList = { id: number; name: string; position: number }
 
-type LeadsFunnelByRep = {
-  rep_id: number
-  rep_name: string
-  total_leads: number
-  invalid_leads: number
-  contacted_leads: number
-  quote_leads: number
-  lost_leads: number
-}
-
 type LostReasonsByRep = {
   rep_name: string
   lost_reason: string
@@ -496,6 +486,47 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         : [user.company_id, user.company_id, ...dealsDateParams],
     )
 
+    // === Top 8 campaigns by customers acquired + conversion %
+    // === Conversion = Won / (Won + Lost) — only closed deals counted ===
+    const customersByCampaign = await selectMany<{
+      compaign_name: string
+      customers_acquired: number
+      closed_deals: number // won + lost
+      won_deals: number
+      conversion_percent: number
+    }>(
+      db,
+      `SELECT
+         c.compaign_name,
+         COUNT(DISTINCT c.id) AS customers_acquired,
+         COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END) AS closed_deals,
+         COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) AS won_deals,
+         ROUND(
+           100.0 *
+           COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) /
+           NULLIF(
+             COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END),
+             0
+           ),
+           1
+         ) AS conversion_percent
+       FROM customers c
+       INNER JOIN deals d
+         ON d.customer_id = c.id
+         AND d.deleted_at IS NULL
+       WHERE c.company_id = ?
+         AND c.deleted_at IS NULL
+         AND c.invalid_lead IS NULL
+         AND c.compaign_name IS NOT NULL
+         AND TRIM(c.compaign_name) <> ''
+         ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
+         ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
+       GROUP BY c.compaign_name
+       ORDER BY customers_acquired DESC
+       LIMIT 8`,
+      [user.company_id, ...(fromDate ? [fromDate] : []), ...(toDate ? [toDate] : [])],
+    )
+
     return {
       dealsByRep,
       dealsByStage,
@@ -514,6 +545,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       customersDeals,
       conversionMetricsByRep,
       lostReasonsByRep,
+      customersByCampaign,
     }
   } catch (error) {
     return redirect(`/login?error=${error}`)
@@ -534,6 +566,7 @@ export default function AdminStatistics() {
     customersDeals,
     conversionMetricsByRep,
     lostReasonsByRep,
+    customersByCampaign,
   } = useLoaderData<typeof loader>()
 
   const navigate = useNavigate()
@@ -869,6 +902,34 @@ export default function AdminStatistics() {
     })
   }, [lostReasonsByRep, dealsByRep])
 
+  // === Customers Acquired by Campaign + Conversion % ===
+  type CampaignAcquisition = {
+    campaign_name: string
+    customers_acquired: number
+    conversion_percent: string // formatted as "XX.X%"
+  }
+
+  const campaignAcquisitionColumns: ColumnDef<CampaignAcquisition>[] = [
+    { accessorKey: 'campaign_name', header: 'Campaign Name' },
+    { accessorKey: 'customers_acquired', header: 'Customers Acquired' },
+    {
+      accessorKey: 'conversion_percent',
+      header: 'Conversion %',
+      cell: ({ row }) => (
+        <span className='font-medium'>{row.original.conversion_percent}</span>
+      ),
+    },
+  ]
+
+  const campaignAcquisitionRows = useMemo(() => {
+    return customersByCampaign.map(row => ({
+      campaign_name: row.compaign_name,
+      customers_acquired: row.customers_acquired,
+      conversion_percent:
+        row.conversion_percent != null ? `${row.conversion_percent}%` : '0.0%',
+    }))
+  }, [customersByCampaign])
+
   const handleFiltersSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const params = new URLSearchParams(location.search)
@@ -1019,6 +1080,20 @@ export default function AdminStatistics() {
           <DataTable columns={customersByRepColumns} data={customersByRep} />
         </div>
       </div>
+
+      <div className='mt-12'>
+        <h2 className='text-xl font-semibold mb-4'>
+          Top Campaigns by Customers Acquired
+        </h2>
+        <p className='text-sm text-muted-foreground mb-4'>
+          Conversion = Won Deals (Stage ID 4) ÷ Total Deals per Campaign
+        </p>
+        <DataTable
+          columns={campaignAcquisitionColumns}
+          data={campaignAcquisitionRows}
+        />
+      </div>
+
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mt-8'>
         <div className='border rounded p-4 col-span-2'>
           <h2 className='text-xl font-semibold mb-2'>
