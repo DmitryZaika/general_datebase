@@ -46,7 +46,7 @@ interface Customer {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user: { company_id: number; is_admin: boolean }
+  let user: { id: number; company_id: number; is_admin: boolean }
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
@@ -78,6 +78,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     params,
   )
 
+  const positions = await selectMany<{ name: string }>(
+    db,
+    `SELECT p.name
+       FROM users_positions up
+       JOIN positions p ON p.id = up.position_id
+      WHERE up.user_id = ? AND up.company_id = ?`,
+    [user.id, user.company_id],
+  )
+
+  const isSalesManager = positions.some(role => role.name === 'sales_manager')
+
   const processed = customers.map(c => ({
     ...c,
     className:
@@ -90,6 +101,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return {
     customers: processed,
     isAdmin: user.is_admin,
+    isSalesManager,
   }
 }
 
@@ -214,10 +226,10 @@ function CustomerActions({ customer }: { customer: Customer }) {
   const { toast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
-  const { isAdmin } = useLoaderData<{ isAdmin: boolean }>()
+  const { isSalesManager } = useLoaderData<{ isSalesManager: boolean }>()
   const actions: Record<string, string> = {
     edit: `edit/${customer.id}${location.search}`,
-    ...(isAdmin ? { delete: `delete/${customer.id}${location.search}` } : {}),
+    ...(isSalesManager ? { delete: `delete/${customer.id}${location.search}` } : {}),
     invalid: `invalid/${customer.id}${location.search}`,
   }
 
