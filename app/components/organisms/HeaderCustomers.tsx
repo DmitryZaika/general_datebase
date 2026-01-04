@@ -45,9 +45,10 @@ export default function HeaderCustomers() {
   const viewId = segments[0] === 'customer' && segments.length >= 3 ? segments[2] : ''
   const isStonesView = viewId === 'stones'
   const buttonLink = getButtonLink({ location, companyId })
+  const isSurvey = location.pathname.includes('survey')
   return (
     <header className='flex justify-between items-center p-4'>
-      {!isLogin && (
+      {!isLogin && !isSurvey && (
         <Link to={buttonLink}>
           <LoadingButton loading={loading}>
             {isStonesView ? 'Customer Account' : 'Stones'}
