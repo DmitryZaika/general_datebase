@@ -23,6 +23,7 @@ import { cn } from '~/lib/utils'
 import '~/styles/instructions.css'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
+import { isEmptyRichText, stripHtmlTags } from '~/utils/stringHelpers'
 
 interface Instructions {
   id: number
@@ -148,19 +149,13 @@ const InstructionHeader: FC<InstructionHeaderProps> = ({
   </div>
 )
 
-const isEmptyContent = (html: string): boolean => {
-  if (!html?.trim()) return true
-  if (html === '<p><br></p>') return true
-  return stripHtml(html).trim() === ''
-}
-
 const InstructionItem: FC<InstructionItemProps> = ({
   instruction,
   onEdit,
   onDelete,
 }) => {
   const hasChildren = instruction.children.length > 0
-  const hasContent = !isEmptyContent(instruction.rich_text)
+  const hasContent = !isEmptyRichText(instruction.rich_text)
   const hasExpandableContent = hasContent || hasChildren
 
   const handleEdit = (e: React.MouseEvent) => {
@@ -297,8 +292,6 @@ const findInstructionById = (
   return null
 }
 
-const stripHtml = (html: string): string => html.replace(/<[^>]*>/g, '')
-
 const searchAllInstructions = (
   term: string,
   nodes: InstructionNode[],
@@ -312,7 +305,7 @@ const searchAllInstructions = (
     visited.add(node.id)
 
     const titleMatch = node.title.toLowerCase().includes(search)
-    const contentMatch = stripHtml(node.rich_text).toLowerCase().includes(search)
+    const contentMatch = stripHtmlTags(node.rich_text).toLowerCase().includes(search)
 
     if (titleMatch) {
       results.push({ ...node, matchType: 'title' })
