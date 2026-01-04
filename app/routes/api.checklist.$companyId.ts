@@ -39,8 +39,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
           customer_id, installer_id, customer_name, installation_address,
           material_correct, seams_satisfaction, appliances_fit, backsplashes_correct,
           edges_correct, holes_drilled, cleanup_completed, comments, signature,
-          company_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          company_id, email
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       formData.customer_id || null,
       installerId,
@@ -56,6 +56,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       formData.comments || null,
       formData.signature,
       companyId,
+      formData.email || null,
     ],
   )
 
