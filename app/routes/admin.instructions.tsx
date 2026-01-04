@@ -108,13 +108,60 @@ function buildInstructionTree(instructions: Instructions[]): InstructionNode[] {
   return rootNodes
 }
 
+interface InstructionHeaderProps {
+  title: string
+  onEdit: (e: React.MouseEvent) => void
+  onDelete: (e: React.MouseEvent) => void
+  textAlign?: 'left' | 'center'
+}
+
+const InstructionHeader: FC<InstructionHeaderProps> = ({
+  title,
+  onEdit,
+  onDelete,
+  textAlign,
+}) => (
+  <div className='flex items-center justify-between flex-1 gap-6'>
+    <h3 className={cn('font-bold text-2xl text-gray-900', textAlign && `text-${textAlign}`)}>
+      {title}
+    </h3>
+    <div className='flex items-center gap-2 shrink-0'>
+      <button
+        type='button'
+        onClick={onEdit}
+        className='p-2 rounded-md transition-colors'
+        aria-label='Edit instruction'
+        title='Edit instruction'
+      >
+        <Pencil className='w-4 h-4 text-gray-600 hover:text-blue-600 transition-colors' />
+      </button>
+      <button
+        type='button'
+        onClick={onDelete}
+        className='p-2 rounded-md transition-colors'
+        aria-label='Delete instruction'
+        title='Delete instruction'
+      >
+        <Trash2 className='w-4 h-4 text-gray-600 hover:text-red-600 transition-colors' />
+      </button>
+    </div>
+  </div>
+)
+
+const isEmptyContent = (html: string): boolean => {
+  if (!html?.trim()) return true
+  if (html === '<p><br></p>') return true
+  return stripHtml(html).trim() === ''
+}
+
 const InstructionItem: FC<InstructionItemProps> = ({
   instruction,
   onEdit,
   onDelete,
 }) => {
   const hasChildren = instruction.children.length > 0
-  const hasTitle = Boolean(instruction.title)
+  const hasContent = !isEmptyContent(instruction.rich_text)
+  const hasExpandableContent = hasContent || hasChildren
 
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -126,38 +173,31 @@ const InstructionItem: FC<InstructionItemProps> = ({
     onDelete(instruction.id)
   }
 
-  if (hasTitle) {
+  if (instruction.title) {
+    if (!hasExpandableContent) {
+      return (
+        <div className='border-b border-gray-200 last:border-b-0 py-5 px-6'>
+          <InstructionHeader
+            title={instruction.title}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        </div>
+      )
+    }
+
     return (
       <AccordionItem
         value={instruction.id.toString()}
         className='border-b border-gray-200 last:border-b-0'
       >
         <AccordionTrigger className='py-5 px-6 [&[data-state=open]_h3]:underline [&[data-state=open]_h3]:underline-offset-4'>
-          <div className='flex items-center justify-between flex-1 gap-6'>
-            <h3 className='font-bold text-2xl text-gray-900 text-left'>
-              {instruction.title}
-            </h3>
-            <div className='flex items-center gap-2 shrink-0'>
-              <button
-                type='button'
-                onClick={handleEdit}
-                className='p-2 rounded-md transition-colors'
-                aria-label='Edit instruction'
-                title='Edit instruction'
-              >
-                <Pencil className='w-4 h-4 text-gray-600 hover:text-blue-600 transition-colors' />
-              </button>
-              <button
-                type='button'
-                onClick={handleDelete}
-                className='p-2 rounded-md transition-colors'
-                aria-label='Delete instruction'
-                title='Delete instruction'
-              >
-                <Trash2 className='w-4 h-4 text-gray-600 hover:text-red-600 transition-colors' />
-              </button>
-            </div>
-          </div>
+          <InstructionHeader
+            title={instruction.title}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            textAlign='left'
+          />
         </AccordionTrigger>
         <AccordionContent>
           <div
@@ -166,10 +206,12 @@ const InstructionItem: FC<InstructionItemProps> = ({
               '!border-transparent': !hasChildren,
             })}
           >
-            <article
-              className='prose prose-base max-w-none instructions px-6 py-5 bg-gray-50 rounded-lg shadow-md'
-              dangerouslySetInnerHTML={{ __html: instruction.rich_text }}
-            />
+            {hasContent && (
+              <article
+                className='prose prose-base max-w-none instructions px-6 py-5 bg-gray-50 rounded-lg shadow-md'
+                dangerouslySetInnerHTML={{ __html: instruction.rich_text }}
+              />
+            )}
             {hasChildren && (
               <section className='mt-6'>
                 <Accordion type='multiple' className='space-y-3'>
@@ -201,10 +243,7 @@ const InstructionItem: FC<InstructionItemProps> = ({
           <div className='flex items-center gap-3 shrink-0'>
             <button
               type='button'
-              onClick={e => {
-                e.stopPropagation()
-                onEdit(instruction.id)
-              }}
+              onClick={handleEdit}
               className='p-2 rounded-md transition-colors'
               aria-label='Edit instruction'
               title='Edit instruction'
@@ -213,10 +252,7 @@ const InstructionItem: FC<InstructionItemProps> = ({
             </button>
             <button
               type='button'
-              onClick={e => {
-                e.stopPropagation()
-                onDelete(instruction.id)
-              }}
+              onClick={handleDelete}
               className='p-2 rounded-md transition-colors'
               aria-label='Delete instruction'
               title='Delete instruction'
