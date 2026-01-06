@@ -60,6 +60,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     ],
   )
 
+  // sendEmail(formData.email, 'Checklist saved to database')
+
   // Flash success
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Checklist saved to database'))
