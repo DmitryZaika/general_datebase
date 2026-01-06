@@ -154,7 +154,9 @@ export const RoomSubForm = ({
   useEffect(() => {
     if (isEdit) return
     if (stone?.name) {
-      fetch(`/api/stones/search?name=${encodeURIComponent(stone?.name)}`)
+      fetch(
+        `/api/stones/search/${companyId}?name=${encodeURIComponent(stone?.name)}`,
+      )
         .then(response => response.json())
         .then(data => {
           const foundStone = data.stones?.find((s: Stone) => s.id === stone?.id)
