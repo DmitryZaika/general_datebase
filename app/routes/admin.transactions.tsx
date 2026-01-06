@@ -355,6 +355,7 @@ export default function AdminTransactions() {
               <div className='absolute z-50 w-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'>
                 {transactions
                   .filter(tx => {
+                    if ((tx.total_slabs ?? 0) === 0) return false
                     const term = searchTerm.toLowerCase()
                     return (
                       tx.customer_name.toLowerCase().includes(term) ||
