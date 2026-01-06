@@ -24,7 +24,7 @@ import { useToast } from '~/hooks/use-toast'
 import { commitSession, getSession } from '~/sessions.server'
 import type { SaleDetails, SaleSink, SaleSlab } from '~/types/sales'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser, getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 
@@ -106,7 +106,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const user = await getAdminUser(request)
+  const user = await getEmployeeUser(request)
   if (!params.transactionId) {
     return forceRedirectError(request.headers, 'No transaction ID provided')
   }
