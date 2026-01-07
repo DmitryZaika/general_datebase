@@ -351,6 +351,7 @@ export default function AdminChecklists() {
                   companyId={companyId}
                   source='check-list'
                   selectedCustomer={selectedCustomerId ?? undefined}
+                  value={field.value}
                   error={fieldState.error?.message}
                   setError={
                     fieldState.error?.message
