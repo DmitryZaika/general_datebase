@@ -1,7 +1,9 @@
 import { type ActionFunctionArgs, data } from 'react-router'
 import { db } from '~/db.server'
+import { sendEmail } from '~/lib/email.server'
 import { checklistSchema } from '~/schemas/checklist'
 import { commitSession, getSession } from '~/sessions.server'
+import { selectId } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
@@ -60,7 +62,23 @@ export async function action({ request, params }: ActionFunctionArgs) {
     ],
   )
 
-  // sendEmail(formData.email, 'Checklist saved to database')
+  if (formData.email) {
+    const companyInfo = await selectId<{ name: string }>(
+      db,
+      'SELECT name FROM company WHERE id = ?',
+      companyId,
+    )
+    const companyName = companyInfo?.name || 'Granite Depot'
+    const origin = new URL(request.url).origin
+    const surveyUrl = `${origin}/customer/${companyId}/survey`
+
+    await sendEmail({
+      to: formData.email,
+      subject: `${companyName} - Post-Installation Survey`,
+      html: `<p>Thank you for choosing ${companyName}!</p><p>Please fill out our post-installation survey to help us improve: <a href="${surveyUrl}">${surveyUrl}</a></p>`,
+      text: `Thank you for choosing ${companyName}! Please fill out our post-installation survey to help us improve: ${surveyUrl}`,
+    })
+  }
 
   // Flash success
   const session = await getSession(request.headers.get('Cookie'))
