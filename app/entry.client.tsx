@@ -13,7 +13,11 @@ startTransition(() => {
 })
 
 // Register Service Worker
-if ('serviceWorker' in navigator && typeof window !== 'undefined') {
+if (
+  'serviceWorker' in navigator &&
+  typeof window !== 'undefined' &&
+  import.meta.env.PROD
+) {
   window.addEventListener('load', () => {
     const wb = new Workbox('/service-worker.js')
 
@@ -41,5 +45,15 @@ if ('serviceWorker' in navigator && typeof window !== 'undefined') {
         60 * 60 * 1000,
       )
     })
+  })
+} else if (
+  'serviceWorker' in navigator &&
+  typeof window !== 'undefined' &&
+  import.meta.env.DEV
+) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    for (const registration of registrations) {
+      registration.unregister()
+    }
   })
 }
