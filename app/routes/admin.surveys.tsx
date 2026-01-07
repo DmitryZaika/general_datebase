@@ -85,7 +85,7 @@ export default function AdminSurveys() {
                 ) : null}
 
                 <div className='flex justify-between text-sm'>
-                  <span>Installation</span>
+                  <span>Installation team</span>
                   <span>{item.installation_rating}/5</span>
                 </div>
                 {item.installation_comments ? (
