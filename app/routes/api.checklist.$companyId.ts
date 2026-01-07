@@ -68,7 +68,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       'SELECT name FROM company WHERE id = ?',
       companyId,
     )
-    const companyName = companyInfo?.name || 'Granite Depot'
+    const companyName = companyInfo?.name || "Our Company"
     const origin = new URL(request.url).origin
     const surveyUrl = `${origin}/customer/${companyId}/survey`
 

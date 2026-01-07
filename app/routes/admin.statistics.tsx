@@ -110,6 +110,13 @@ type LostReasonsByRep = {
   count: number
 }
 
+type SalesRepRating = {
+  rep_id: number
+  rep_name: string
+  avg_rating: number
+  responses: number
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request)
@@ -527,6 +534,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [user.company_id, ...(fromDate ? [fromDate] : []), ...(toDate ? [toDate] : [])],
     )
 
+    const surveyWhere: string[] = ['cs.company_id = ?']
+    const surveyParams: (string | number)[] = [user.company_id]
+    if (fromDate) {
+      surveyWhere.push('DATE(cs.created_at) >= ?')
+      surveyParams.push(fromDate)
+    }
+    if (toDate) {
+      surveyWhere.push('DATE(cs.created_at) <= ?')
+      surveyParams.push(toDate)
+    }
+    if (hasRepFilter) {
+      surveyWhere.push('u.name = ?')
+      surveyParams.push(salesRepParam)
+    }
+
+    const salesRepRatings = await selectMany<SalesRepRating>(
+      db,
+      `SELECT 
+        cs.sales_rep_id AS rep_id,
+        u.name AS rep_name,
+        ROUND(AVG(cs.sales_rep_rating), 2) AS avg_rating,
+        COUNT(*) AS responses
+      FROM customer_surveys cs
+      JOIN users u ON cs.sales_rep_id = u.id
+      WHERE ${surveyWhere.join(' AND ')}
+      GROUP BY cs.sales_rep_id, u.name
+      ORDER BY avg_rating DESC`,
+      surveyParams,
+    )
+
     return {
       dealsByRep,
       dealsByStage,
@@ -546,6 +583,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       conversionMetricsByRep,
       lostReasonsByRep,
       customersByCampaign,
+      salesRepRatings,
     }
   } catch (error) {
     return redirect(`/login?error=${error}`)
@@ -567,6 +605,7 @@ export default function AdminStatistics() {
     conversionMetricsByRep,
     lostReasonsByRep,
     customersByCampaign,
+    salesRepRatings,
   } = useLoaderData<typeof loader>()
 
   const navigate = useNavigate()
@@ -930,6 +969,16 @@ export default function AdminStatistics() {
     }))
   }, [customersByCampaign])
 
+  const salesRepRatingColumns: ColumnDef<SalesRepRating>[] = [
+    { accessorKey: 'rep_name', header: 'Sales Rep' },
+    {
+      accessorKey: 'avg_rating',
+      header: 'Avg Rating',
+      cell: ({ row }) => <span className='font-semibold'>{row.original.avg_rating}</span>,
+    },
+    { accessorKey: 'responses', header: 'Responses' },
+  ]
+
   const handleFiltersSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const params = new URLSearchParams(location.search)
@@ -1068,6 +1117,11 @@ export default function AdminStatistics() {
           <h2 className='text-xl font-semibold mb-2'>Deals by Stage</h2>
           <DataTable columns={dealsStageColumns} data={stageRows} />
         </div>
+      </div>
+
+      <div className='mb-8'>
+        <h2 className='text-xl font-semibold mb-2'>Sales Rep Ratings</h2>
+        <DataTable columns={salesRepRatingColumns} data={salesRepRatings} />
       </div>
 
       <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>

@@ -201,8 +201,8 @@ const getItems = (
         icon: DollarSign,
       },
       {
-        title: 'Invoices',
-        url: `/admin/invoices`,
+        title: 'Survey',
+        url: `/admin/surveys`,
         icon: Receipt,
       },
       {
@@ -263,7 +263,10 @@ export function EmployeeSidebar({
   const inventoryItems = items.filter(item => inventoryTitles.includes(item.title))
   const crmItems = items.filter(item => crmTitles.includes(item.title))
   const resourcesItems = items.filter(item => resourceTitles.includes(item.title))
-  const operationsItems = items.filter(item => operationTitles.includes(item.title))
+  const operationsItems =
+    itemsBase === 'employee'
+      ? items.filter(item => operationTitles.includes(item.title))
+      : []
 
   const excluded = [
     ...inventoryTitles,
