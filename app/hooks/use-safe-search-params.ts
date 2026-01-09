@@ -4,6 +4,15 @@ import type { ZodSchema } from 'zod'
 function objectToURLSearchParams(obj: Record<string, unknown>): URLSearchParams {
   const sp = new URLSearchParams()
   for (const [key, val] of Object.entries(obj)) {
+    if (val === undefined) continue
+    if (val === null) {
+      sp.set(key, 'null')
+      continue
+    }
+    if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+      sp.set(key, String(val))
+      continue
+    }
     sp.set(key, JSON.stringify(val))
   }
   return sp

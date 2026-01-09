@@ -4,11 +4,10 @@ import {
   Calendar as CalendarIcon,
   GripVertical,
   Mail,
-  PaperclipIcon,
-  Pencil,
+  Pencil
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, useFetcher } from 'react-router'
+import { Link, useFetcher, useLocation } from 'react-router'
 import { formatMoney, updateNumber } from './functions'
 import { Button } from './ui/button'
 import { Calendar } from './ui/calendar'
@@ -62,6 +61,7 @@ export default function DealItem({
   readonly = false,
   highlighted = false,
 }: DealItemProps) {
+  const location = useLocation()
   const [localDate, setLocalDate] = useState<string | null>(deal.due_date ?? null)
   const [editAmount, setEditAmount] = useState(false)
   const [editDesc, setEditDesc] = useState(false)
@@ -78,6 +78,15 @@ export default function DealItem({
 
   const hasImages =
     (Array.isArray(deal.images) && deal.images.length > 0) || Boolean(deal.has_images)
+
+  const editBase = location.pathname.startsWith('/admin')
+    ? '/admin/deals'
+    : '/employee/deals'
+  const fromState = `${location.pathname}${location.search}`
+  const projectUrl = `${editBase}/edit/${deal.id}/project${location.search}`
+  const mailUrl = readonly
+    ? `${editBase}/edit/${deal.id}/history${location.search}`
+    : `edit/${deal.id}/history`
 
   useEffect(() => {
     setLocalDate(deal.due_date ?? null)
@@ -153,9 +162,19 @@ export default function DealItem({
               <GripVertical className='w-4 h-4' />
             </button>
           )}
-          <h3 className='text-xl font-medium truncate whitespace-normal flex-1 select-none'>
-            {deal.name}
-          </h3>
+          {readonly ? (
+            <Link
+              to={projectUrl}
+              className='text-xl font-medium truncate whitespace-normal flex-1 select-none hover:underline'
+              onPointerDown={e => e.stopPropagation()}
+            >
+              {deal.name}
+            </Link>
+          ) : (
+            <h3 className='text-xl font-medium truncate whitespace-normal flex-1 select-none'>
+              {deal.name}
+            </h3>
+          )}
         </div>
         {!readonly && (
           <Link
@@ -339,26 +358,16 @@ export default function DealItem({
           </p>
         )}
 
-        {(hasEmail || hasImages) && (
+        {hasEmail && (
           <div className='flex flex-col items-center gap-1'>
-            {hasEmail && (
-              <Link
-                to={`edit/${deal.id}/history`}
-                className='text-slate-500 hover:text-black'
-                onPointerDown={e => e.stopPropagation()}
-              >
-                <Mail className='w-4 h-4' />
-              </Link>
-            )}
-            {hasImages && (
-              <Link
-                to={`edit/${deal.id}/images`}
-                className='text-slate-500 hover:text-black'
-                onPointerDown={e => e.stopPropagation()}
-              >
-                <PaperclipIcon className='w-4 h-4' />
-              </Link>
-            )}
+            <Link
+              to={mailUrl}
+              className='text-slate-500 hover:text-black'
+              onPointerDown={e => e.stopPropagation()}
+              state={{ from: fromState }}
+            >
+              <Mail className='w-4 h-4 absolute right-2 bottom-1' />
+            </Link>
           </div>
         )}
       </div>
