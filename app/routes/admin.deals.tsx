@@ -27,6 +27,7 @@ type AdminDeal = {
   sales_rep: string | null
   user_id: number | null
   has_email?: boolean
+  has_images?: boolean
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -75,14 +76,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const emailsMap: Record<number, boolean> = {}
     for (const row of emailCounts) emailsMap[row.deal_id] = Number(row.count) > 0
 
-    return { deals, customers, lists, emailsMap }
+    const imagesCounts = await selectMany<{ deal_id: number; count: number }>(
+      db,
+      'SELECT deal_id, COUNT(*) as count FROM deals_images GROUP BY deal_id',
+    )
+    const imagesMap: Record<number, boolean> = {}
+    for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
+
+    return { deals, customers, lists, emailsMap, imagesMap }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export default function AdminDeals() {
-  const { deals, customers, lists, emailsMap } = useLoaderData<typeof loader>()
+  const { deals, customers, lists, emailsMap, imagesMap } =
+    useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -100,6 +109,7 @@ export default function AdminDeals() {
     sales_rep?: string | null
     user_id?: number | null
     has_email?: boolean
+    has_images?: boolean
   }
 
   const toDeal = (d: AdminDeal): Deal => {
@@ -122,6 +132,7 @@ export default function AdminDeals() {
       sales_rep: d.sales_rep ?? undefined,
       user_id: d.user_id ?? undefined,
       has_email: emailsMap?.[d.id] || false,
+      has_images: imagesMap?.[d.id] || false,
     }
   }
 

@@ -4,7 +4,8 @@ import {
   Calendar as CalendarIcon,
   GripVertical,
   Mail,
-  Pencil
+  PaperclipIcon,
+  Pencil,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLocation } from 'react-router'
@@ -87,6 +88,9 @@ export default function DealItem({
   const mailUrl = readonly
     ? `${editBase}/edit/${deal.id}/history${location.search}`
     : `edit/${deal.id}/history`
+  const imagesUrl = readonly
+    ? `${editBase}/edit/${deal.id}/images${location.search}`
+    : `edit/${deal.id}/images`
 
   useEffect(() => {
     setLocalDate(deal.due_date ?? null)
@@ -317,57 +321,71 @@ export default function DealItem({
         </p>
       )}
 
-      <div className='flex items-center justify-between gap-2 w-full'>
-        {deal.list_id !== 5 && deal.list_id !== 4 && !readonly && (
-          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-            <PopoverTrigger asChild>
-              <button
-                className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
-                onClick={e => e.stopPropagation()}
-                onPointerDown={e => e.stopPropagation()}
-              >
-                {localDate ? (
-                  formatDisplay(localDate)
-                ) : (
-                  <CalendarIcon className='w-4 h-4' />
-                )}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className='w-auto p-0' align='start' side='bottom'>
-              <Calendar
-                mode='single'
-                selected={formatDate(localDate)}
-                defaultMonth={formatDate(localDate)}
-                onSelect={(date: Date | undefined) => {
-                  if (date) {
-                    const year = date.getFullYear()
-                    const month = String(date.getMonth() + 1).padStart(2, '0')
-                    const day = String(date.getDate()).padStart(2, '0')
-                    const dateStr = `${year}-${month}-${day}`
-                    submitDate(dateStr)
-                    setCalendarOpen(false)
-                  }
-                }}
-              />
-            </PopoverContent>
-          </Popover>
-        )}
-        {deal.list_id !== 5 && deal.list_id !== 4 && readonly && localDate && (
-          <p className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}>
-            {formatDisplay(localDate)}
-          </p>
-        )}
+      <div className='flex items-center gap-2 w-full'>
+        <div className='mr-auto flex items-center'>
+          {deal.list_id !== 5 && deal.list_id !== 4 && !readonly && (
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
+                  onClick={e => e.stopPropagation()}
+                  onPointerDown={e => e.stopPropagation()}
+                >
+                  {localDate ? (
+                    formatDisplay(localDate)
+                  ) : (
+                    <CalendarIcon className='w-4 h-4' />
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className='w-auto p-0' align='start' side='bottom'>
+                <Calendar
+                  mode='single'
+                  selected={formatDate(localDate)}
+                  defaultMonth={formatDate(localDate)}
+                  onSelect={(date: Date | undefined) => {
+                    if (date) {
+                      const year = date.getFullYear()
+                      const month = String(date.getMonth() + 1).padStart(2, '0')
+                      const day = String(date.getDate()).padStart(2, '0')
+                      const dateStr = `${year}-${month}-${day}`
+                      submitDate(dateStr)
+                      setCalendarOpen(false)
+                    }
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+          )}
+          {deal.list_id !== 5 && deal.list_id !== 4 && readonly && localDate && (
+            <p className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}>
+              {formatDisplay(localDate)}
+            </p>
+          )}
+        </div>
 
-        {hasEmail && (
-          <div className='flex flex-col items-center gap-1'>
-            <Link
-              to={mailUrl}
-              className='text-slate-500 hover:text-black'
-              onPointerDown={e => e.stopPropagation()}
-              state={{ from: fromState }}
-            >
-              <Mail className='w-4 h-4 absolute right-2 bottom-1' />
-            </Link>
+        {(hasEmail || hasImages) && (
+          <div className='flex items-center gap-2'>
+            {hasEmail && (
+              <Link
+                to={mailUrl}
+                className='text-slate-500 hover:text-black'
+                onPointerDown={e => e.stopPropagation()}
+                state={{ from: fromState }}
+              >
+                <Mail className='w-4 h-4' />
+              </Link>
+            )}
+            {hasImages && (
+              <Link
+                to={imagesUrl}
+                className='text-slate-500 hover:text-black'
+                onPointerDown={e => e.stopPropagation()}
+                state={{ from: fromState }}
+              >
+                <PaperclipIcon className='w-4 h-4' />
+              </Link>
+            )}
           </div>
         )}
       </div>
