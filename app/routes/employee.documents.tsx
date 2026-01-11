@@ -1,12 +1,9 @@
-import { lazy, Suspense } from 'react'
+import type { ColumnDef } from '@tanstack/react-table'
 import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
-import { ClientOnly } from 'remix-utils/client-only'
-import { Accordion, AccordionContent, AccordionItem } from '~/components/ui/accordion'
+import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
-
-const DocumentRenderer = lazy(() => import('~/components/DisplayPDF.client'))
 
 interface ItemDocument {
   id: number
@@ -28,31 +25,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   )
   return { documents }
 }
-
-function Fallback() {
-  return <div>Loading...</div>
-}
+const columns: ColumnDef<ItemDocument>[] = [
+  {
+    accessorKey: 'name',
+    header: 'Name',
+    cell: ({ row }) => (
+      <a
+        href={row.original.url || ''}
+        target='_blank'
+        className='text-blue-600 underline hover:text-blue-800'
+      >
+        {row.original.name}
+      </a>
+    ),
+  },
+]
 
 export default function Documents() {
   const { documents } = useLoaderData<typeof loader>()
 
   return (
-    <Accordion type='single' defaultValue='documents'>
-      <AccordionItem value='documents'>
-        <AccordionContent>
-          <Accordion type='multiple'>
-            <AccordionContent>
-              <ClientOnly fallback={<Fallback />}>
-                {() => (
-                  <Suspense fallback={<Fallback />}>
-                    <DocumentRenderer documents={documents} />
-                  </Suspense>
-                )}
-              </ClientOnly>
-            </AccordionContent>
-          </Accordion>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+    <div className='ml-4'>
+      <h1 className='text-2xl font-bold'>Documents</h1>
+      <DataTable columns={columns} data={documents} />
+    </div>
   )
 }

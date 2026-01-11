@@ -20,7 +20,6 @@ import { LOST_REASONS } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 
-
 type DealsByRep = {
   rep_id: number
   rep_name: string
@@ -495,6 +494,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     // === Top 8 campaigns by customers acquired + conversion %
     // === Conversion = Won / (Won + Lost) — only closed deals counted ===
+    const customersByCampaignParams: (string | number)[] = [user.company_id]
+    if (fromDate) customersByCampaignParams.push(fromDate)
+    if (toDate) customersByCampaignParams.push(toDate)
+    if (hasRepFilter) customersByCampaignParams.push(salesRepParam)
+
     const customersByCampaign = await selectMany<{
       compaign_name: string
       customers_acquired: number
@@ -504,34 +508,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }>(
       db,
       `SELECT
-         c.compaign_name,
-         COUNT(DISTINCT c.id) AS customers_acquired,
-         COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END) AS closed_deals,
-         COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) AS won_deals,
-         ROUND(
-           100.0 *
-           COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) /
-           NULLIF(
-             COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END),
-             0
-           ),
-           1
-         ) AS conversion_percent
-       FROM customers c
-       INNER JOIN deals d
-         ON d.customer_id = c.id
-         AND d.deleted_at IS NULL
-       WHERE c.company_id = ?
-         AND c.deleted_at IS NULL
-         AND c.invalid_lead IS NULL
-         AND c.compaign_name IS NOT NULL
-         AND TRIM(c.compaign_name) <> ''
-         ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
-         ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
-       GROUP BY c.compaign_name
-       ORDER BY customers_acquired DESC
-       LIMIT 8`,
-      [user.company_id, ...(fromDate ? [fromDate] : []), ...(toDate ? [toDate] : [])],
+             c.compaign_name,
+             COUNT(DISTINCT c.id) AS customers_acquired,
+             COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END) AS closed_deals,
+             COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) AS won_deals,
+             ROUND(
+               100.0 *
+               COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) /
+               NULLIF(
+                 COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END),
+                 0
+               ),
+               1
+             ) AS conversion_percent
+           FROM customers c
+           INNER JOIN deals d
+             ON d.customer_id = c.id
+             AND d.deleted_at IS NULL
+           ${hasRepFilter ? 'INNER JOIN users u ON d.user_id = u.id AND u.is_deleted = 0 AND u.company_id = c.company_id' : ''}
+           WHERE c.company_id = ?
+             AND c.deleted_at IS NULL
+             AND c.invalid_lead IS NULL
+             AND c.compaign_name IS NOT NULL
+             AND TRIM(c.compaign_name) <> ''
+             ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
+             ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
+             ${hasRepFilter ? ' AND u.name = ?' : ''}
+           GROUP BY c.compaign_name
+           ORDER BY customers_acquired DESC
+           LIMIT 8`,
+      customersByCampaignParams,
     )
 
     const surveyWhere: string[] = ['cs.company_id = ?']
@@ -1050,7 +1056,7 @@ export default function AdminStatistics() {
           status,
           lost_reason: lostReason,
           amount,
-      sales_rep_name: customer.sales_rep_name || '',
+          sales_rep_name: customer.sales_rep_name || '',
         }
       })
       .sort((a, b) => (b.createdSortValue || 0) - (a.createdSortValue || 0))
