@@ -454,28 +454,30 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
 
   return (
     <div style={styles.item(depth)}>
-      <div style={styles.titleRow} onClick={() => hasChildren && toggleExpand(node.id)}>
-        {hasChildren ? (
-          <span style={styles.arrow}>{isOpen ? '▼' : '▶'}</span>
-        ) : (
-          <span style={styles.arrow} />
-        )}
+      <div style={styles.titleRow} onClick={() => toggleExpand(node.id)}>
+        <span style={styles.arrow}>{isOpen ? '▼' : '▶'}</span>
         <p style={styles.title}>{node.title ?? '(no title)'}</p>
       </div>
-      <div dangerouslySetInnerHTML={{ __html: node.rich_text }} />
-      {hasChildren && isOpen && (
-        <div>
-          {children.map(child => (
-            <InstructionNode
-              key={child.id}
-              node={child}
-              depth={depth + 1}
-              childrenOf={childrenOf}
-              expanded={expanded}
-              toggleExpand={toggleExpand}
-            />
-          ))}
-        </div>
+
+      {isOpen && (
+        <>
+          <div dangerouslySetInnerHTML={{ __html: node.rich_text }} />
+
+          {hasChildren && (
+            <div>
+              {children.map(child => (
+                <InstructionNode
+                  key={child.id}
+                  node={child}
+                  depth={depth + 1}
+                  childrenOf={childrenOf}
+                  expanded={expanded}
+                  toggleExpand={toggleExpand}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -608,6 +610,8 @@ export default function TeachMode() {
 
   useActionToast(actionData, toast)
 
+  const [showSidebar, setShowSidebar] = React.useState(false)
+
   const answerChoicesByQuestion = useAnswerChoicesByQuestion(answerChoices)
   const { childrenOf, roots } = useInstructionTree(instructions)
   const { expanded, toggleExpand } = useExpandedState()
@@ -627,115 +631,168 @@ export default function TeachMode() {
   } = useAssessmentState(questions, answerChoicesByQuestion, userId, submit)
 
   return (
-    <div style={{ padding: 20 }}>
-      {/* Instructions Section */}
-      <div style={{ marginBottom: 40 }}>
-        <h2
-          style={{
-            marginBottom: 20,
-            color: '#333',
-            borderBottom: '2px solid #007bff',
-            paddingBottom: 10,
-          }}
-        >
-          Training Instructions
-        </h2>
-        {roots.map(root => (
-          <div key={root.id} style={styles.rootBox}>
-            <InstructionNode
-              node={root}
-              depth={0}
-              childrenOf={childrenOf}
-              expanded={expanded}
-              toggleExpand={toggleExpand}
-            />
-          </div>
-        ))}
-      </div>
+    <div style={{ position: 'relative', minHeight: '100vh' }}>
+      {/* Main Content Area */}
+      <div
+        style={{
+          padding: 20,
+          marginRight: showSidebar ? '600px' : '0',
+          transition: 'margin-right 0.3s ease',
+        }}
+      >
+        {/* Toggle Button */}
+        <div style={{ marginBottom: 20 }}>
+          <Button onClick={() => setShowSidebar(!showSidebar)}>
+            {showSidebar ? 'Hide Training Instructions' : 'Show Training Instructions'}
+          </Button>
+        </div>
 
-      {/* Assessment Section */}
-      {questions.length > 0 && (
-        <div>
-          <h2
+        {/* Assessment Section */}
+        {questions.length > 0 ? (
+          <div>
+            <h2
+              style={{
+                marginBottom: 20,
+                color: '#333',
+                borderBottom: '2px solid #28a745',
+                paddingBottom: 10,
+              }}
+            >
+              Practice Assessment
+            </h2>
+            <p style={{ marginBottom: 20, color: '#666', fontStyle: 'italic' }}>
+              Test your knowledge with these questions based on the training materials.
+            </p>
+            {!isAssessmentStarted ? (
+              <Button onClick={startAssessment}>Start Assessment</Button>
+            ) : !isSubmitted ? (
+              <>
+                {shuffledQuestions.map((question, index) => (
+                  <QuestionComponent
+                    key={question.id}
+                    question={question}
+                    index={index}
+                    choices={shuffledChoicesByQuestion[question.id] || []}
+                    selectedAnswer={selectedAnswers[question.id]}
+                    isSubmitted={isSubmitted}
+                    correctAnswer={getCorrectAnswer(question.id)}
+                    isCorrect={isAnswerCorrect(question.id)}
+                    onAnswerSelect={handleAnswerSelect}
+                  />
+                ))}
+                <Button onClick={submitAssessment}>Submit Assessment</Button>
+              </>
+            ) : (
+              <>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '20px',
+                    marginBottom: 20,
+                  }}
+                >
+                  <h3 style={{ margin: 0, color: '#333' }}>Your Score: {score}%</h3>
+                  <Button onClick={startAssessment}>Take Assessment Again</Button>
+                </div>
+                {shuffledQuestions.map((question, index) => (
+                  <QuestionComponent
+                    key={question.id}
+                    question={question}
+                    index={index}
+                    choices={shuffledChoicesByQuestion[question.id] || []}
+                    selectedAnswer={selectedAnswers[question.id]}
+                    isSubmitted={isSubmitted}
+                    correctAnswer={getCorrectAnswer(question.id)}
+                    isCorrect={isAnswerCorrect(question.id)}
+                    onAnswerSelect={handleAnswerSelect}
+                  />
+                ))}
+              </>
+            )}
+          </div>
+        ) : (
+          <div
             style={{
-              marginBottom: 20,
-              color: '#333',
-              borderBottom: '2px solid #28a745',
-              paddingBottom: 10,
+              textAlign: 'center',
+              padding: 40,
+              color: '#666',
+              backgroundColor: '#f8f9fa',
+              borderRadius: 8,
+              border: '1px solid #dee2e6',
             }}
           >
-            Practice Assessment
-          </h2>
-          <p style={{ marginBottom: 20, color: '#666', fontStyle: 'italic' }}>
-            Test your knowledge with these questions based on the training materials
-            above.
-          </p>
-          {!isAssessmentStarted ? (
-            <Button onClick={startAssessment}>Start Assessment</Button>
-          ) : !isSubmitted ? (
-            <>
-              {shuffledQuestions.map((question, index) => (
-                <QuestionComponent
-                  key={question.id}
-                  question={question}
-                  index={index}
-                  choices={shuffledChoicesByQuestion[question.id] || []}
-                  selectedAnswer={selectedAnswers[question.id]}
-                  isSubmitted={isSubmitted}
-                  correctAnswer={getCorrectAnswer(question.id)}
-                  isCorrect={isAnswerCorrect(question.id)}
-                  onAnswerSelect={handleAnswerSelect}
-                />
-              ))}
-              <Button onClick={submitAssessment}>Submit Assessment</Button>
-            </>
-          ) : (
-            <>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '20px',
-                  marginBottom: 20,
-                }}
-              >
-                <h3 style={{ margin: 0, color: '#333' }}>Your Score: {score}%</h3>
-                <Button onClick={startAssessment}>Take Assessment Again</Button>
-              </div>
-              {shuffledQuestions.map((question, index) => (
-                <QuestionComponent
-                  key={question.id}
-                  question={question}
-                  index={index}
-                  choices={shuffledChoicesByQuestion[question.id] || []}
-                  selectedAnswer={selectedAnswers[question.id]}
-                  isSubmitted={isSubmitted}
-                  correctAnswer={getCorrectAnswer(question.id)}
-                  isCorrect={isAnswerCorrect(question.id)}
-                  onAnswerSelect={handleAnswerSelect}
-                />
-              ))}
-            </>
-          )}
-        </div>
-      )}
+            <h3 style={{ marginBottom: 10 }}>No Questions Available</h3>
+            <p>
+              Questions will appear here once your administrator creates them based on
+              the training materials.
+            </p>
+          </div>
+        )}
+      </div>
 
-      {questions.length === 0 && (
+      {/* Sidebar */}
+      {showSidebar && (
         <div
           style={{
-            textAlign: 'center',
-            padding: 40,
-            color: '#666',
-            backgroundColor: '#f8f9fa',
-            borderRadius: 8,
-            border: '1px solid #dee2e6',
+            position: 'fixed',
+            top: '80px',
+            right: 0,
+            width: '600px',
+            height: 'calc(100vh - 80px)',
+            backgroundColor: '#fff',
+            boxShadow: '-2px 0 10px rgba(0,0,0,0.1)',
+            overflowY: 'auto',
+            zIndex: 1000,
+            transition: 'transform 0.3s ease',
           }}
         >
-          <h3 style={{ marginBottom: 10 }}>No Questions Available</h3>
-          <p>
-            Questions will appear here once your administrator creates them based on the
-            training materials.
-          </p>
+          {/* Sidebar Header */}
+          <div
+            style={{
+              position: 'sticky',
+              top: 0,
+              backgroundColor: '#fff',
+              borderBottom: '2px solid #007bff',
+              padding: '15px 20px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              zIndex: 1,
+            }}
+          >
+            <h2 style={{ margin: 0, color: '#333' }}>Training Instructions</h2>
+            <button
+              onClick={() => setShowSidebar(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#666',
+                lineHeight: 1,
+                padding: '0 5px',
+              }}
+              title='Close sidebar'
+            >
+              X
+            </button>
+          </div>
+
+          {/* Sidebar Content */}
+          <div style={{ padding: '20px' }}>
+            {roots.map(root => (
+              <div key={root.id} style={styles.rootBox}>
+                <InstructionNode
+                  node={root}
+                  depth={0}
+                  childrenOf={childrenOf}
+                  expanded={expanded}
+                  toggleExpand={toggleExpand}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
