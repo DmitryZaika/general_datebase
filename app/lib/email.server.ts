@@ -11,7 +11,7 @@ const ses = new SESClient({
 import { SendEmailCommand } from '@aws-sdk/client-ses'
 
 interface SendEmail {
-  to: string
+  to: string | string[]
   from?: string
   subject: string
   html?: string
@@ -41,7 +41,7 @@ export async function sendEmail({
 
   return await ses.send(
     new SendEmailCommand({
-      Destination: { ToAddresses: [to] },
+      Destination: { ToAddresses: Array.isArray(to) ? to : [to] },
       ReplyToAddresses: replyTo,
       Source: from || 'noreply@granite-manager.com',
       Message: {
