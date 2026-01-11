@@ -14,18 +14,12 @@ import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
 import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
 import { LOST_REASONS } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 
-type SalesBySeller = {
-  seller_id: number
-  seller_name: string
-  sales_count: number
-  total_revenue: number
-  avg_ticket: number
-}
 
 type DealsByRep = {
   rep_id: number
@@ -71,11 +65,13 @@ type CustomersTableCustomer = {
   source: string | null
   referral_source: string | null
   invalid_lead: string | null
+  sales_rep_name: string | null
 }
 
 type CustomersTableDeal = {
   id: number
   customer_id: number
+  sales_rep_name: string
   amount: number | null
   status: string | null
   lost_reason: string | null
@@ -101,26 +97,24 @@ type CustomersTableRow = {
   status: string
   lost_reason: string
   amount: string
+  sales_rep_name: string
   className?: string
   createdSortValue?: number
 }
 
 type DealsList = { id: number; name: string; position: number }
 
-type LeadsFunnelByRep = {
-  rep_id: number
-  rep_name: string
-  total_leads: number
-  invalid_leads: number
-  contacted_leads: number
-  quote_leads: number
-  lost_leads: number
-}
-
 type LostReasonsByRep = {
   rep_name: string
   lost_reason: string
   count: number
+}
+
+type SalesRepRating = {
+  rep_id: number
+  rep_name: string
+  avg_rating: number
+  responses: number
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -162,21 +156,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       's.sale_date IS NOT NULL',
       ...dateFilters,
     ]
-
-    const salesBySeller = await selectMany<SalesBySeller>(
-      db,
-      `SELECT u.id AS seller_id, u.name AS seller_name, COUNT(s.id) AS sales_count,
-              COALESCE(SUM(s.price), 0) AS total_revenue,
-              COALESCE(AVG(s.price), 0) AS avg_ticket
-       FROM sales s
-       JOIN users u ON s.seller_id = u.id AND u.is_deleted = 0
-       WHERE ${salesWhere.join(' AND ')}${hasRepFilter ? ' AND u.name = ?' : ''}
-       GROUP BY u.id, u.name
-       ORDER BY total_revenue DESC`,
-      hasRepFilter
-        ? [user.company_id, ...dateParams, salesRepParam]
-        : [user.company_id, ...dateParams],
-    )
 
     const dealsByRep = await selectMany<DealsByRep>(
       db,
@@ -383,8 +362,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               c.created_date,
               c.source,
               c.referral_source,
-              c.invalid_lead
+              c.invalid_lead,
+              u.name as sales_rep_name
        FROM customers c
+       LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0 AND u.company_id = c.company_id
        WHERE ${customersTableWhere.join(' AND ')}
        ORDER BY c.created_date DESC`,
       customersTableParams,
@@ -411,9 +392,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               d.customer_id,
               d.amount,
               d.status,
-              d.lost_reason
+              d.lost_reason,
+              COALESCE(u.name, u2.name, '') as sales_rep_name
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
+       LEFT JOIN users u ON d.user_id = u.id AND u.is_deleted = 0 AND u.company_id = c.company_id
+       LEFT JOIN users u2 ON c.sales_rep = u2.id AND u2.is_deleted = 0 AND u2.company_id = c.company_id
        WHERE ${customersDealsWhere.join(' AND ')}
        ORDER BY d.created_at DESC`,
       customersDealsParams,
@@ -509,8 +493,78 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         : [user.company_id, user.company_id, ...dealsDateParams],
     )
 
+    // === Top 8 campaigns by customers acquired + conversion %
+    // === Conversion = Won / (Won + Lost) — only closed deals counted ===
+    const customersByCampaign = await selectMany<{
+      compaign_name: string
+      customers_acquired: number
+      closed_deals: number // won + lost
+      won_deals: number
+      conversion_percent: number
+    }>(
+      db,
+      `SELECT
+         c.compaign_name,
+         COUNT(DISTINCT c.id) AS customers_acquired,
+         COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END) AS closed_deals,
+         COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) AS won_deals,
+         ROUND(
+           100.0 *
+           COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) /
+           NULLIF(
+             COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END),
+             0
+           ),
+           1
+         ) AS conversion_percent
+       FROM customers c
+       INNER JOIN deals d
+         ON d.customer_id = c.id
+         AND d.deleted_at IS NULL
+       WHERE c.company_id = ?
+         AND c.deleted_at IS NULL
+         AND c.invalid_lead IS NULL
+         AND c.compaign_name IS NOT NULL
+         AND TRIM(c.compaign_name) <> ''
+         ${fromDate ? ' AND DATE(c.created_date) >= ?' : ''}
+         ${toDate ? ' AND DATE(c.created_date) <= ?' : ''}
+       GROUP BY c.compaign_name
+       ORDER BY customers_acquired DESC
+       LIMIT 8`,
+      [user.company_id, ...(fromDate ? [fromDate] : []), ...(toDate ? [toDate] : [])],
+    )
+
+    const surveyWhere: string[] = ['cs.company_id = ?']
+    const surveyParams: (string | number)[] = [user.company_id]
+    if (fromDate) {
+      surveyWhere.push('DATE(cs.created_at) >= ?')
+      surveyParams.push(fromDate)
+    }
+    if (toDate) {
+      surveyWhere.push('DATE(cs.created_at) <= ?')
+      surveyParams.push(toDate)
+    }
+    if (hasRepFilter) {
+      surveyWhere.push('u.name = ?')
+      surveyParams.push(salesRepParam)
+    }
+
+    const salesRepRatings = await selectMany<SalesRepRating>(
+      db,
+      `SELECT 
+        cs.sales_rep_id AS rep_id,
+        u.name AS rep_name,
+        ROUND(AVG(cs.sales_rep_rating), 2) AS avg_rating,
+        COUNT(*) AS responses
+      FROM customer_surveys cs
+      JOIN users u ON cs.sales_rep_id = u.id
+      WHERE ${surveyWhere.join(' AND ')}
+      GROUP BY cs.sales_rep_id, u.name
+      ORDER BY avg_rating DESC`,
+      surveyParams,
+    )
+
     return {
-      salesBySeller,
       dealsByRep,
       dealsByStage,
       lists,
@@ -528,6 +582,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       customersDeals,
       conversionMetricsByRep,
       lostReasonsByRep,
+      customersByCampaign,
+      salesRepRatings,
     }
   } catch (error) {
     return redirect(`/login?error=${error}`)
@@ -548,6 +604,8 @@ export default function AdminStatistics() {
     customersDeals,
     conversionMetricsByRep,
     lostReasonsByRep,
+    customersByCampaign,
+    salesRepRatings,
   } = useLoaderData<typeof loader>()
 
   const navigate = useNavigate()
@@ -557,7 +615,7 @@ export default function AdminStatistics() {
   )
   const [to, setTo] = useState<Date | undefined>(toDate ? new Date(toDate) : undefined)
   const [customersPage, setCustomersPage] = useState(1)
-  const customersPageSize = 50
+  const customersPageSize = 500
   const [highlightCustomerId, setHighlightCustomerId] = useState<number | null>(null)
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -736,14 +794,66 @@ export default function AdminStatistics() {
     { accessorKey: 'total', header: 'Total' },
   ]
 
+  const truncateValue = (value: string | number | null | undefined) => {
+    const str = value === null || value === undefined ? '' : String(value)
+    if (str.length > 20) return { text: `${str.slice(0, 20)}...`, title: str }
+    return { text: str, title: str }
+  }
+
+  const renderTruncated = (value: string | number | null | undefined) => {
+    const { text, title } = truncateValue(value)
+    if (!title || text === title) return <span>{text}</span>
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className='inline-block max-w-full truncate align-middle'>{text}</span>
+        </TooltipTrigger>
+        <TooltipContent side='top'>{title}</TooltipContent>
+      </Tooltip>
+    )
+  }
+
   const customersColumns: ColumnDef<CustomersTableRow>[] = [
-    { header: 'Date', accessorKey: 'created_date' },
-    { header: 'Source', accessorKey: 'source' },
-    { header: 'Reference', accessorKey: 'referral_source' },
-    { header: 'Name', accessorKey: 'name' },
-    { header: 'Status', accessorKey: 'status' },
-    { header: 'Lost reason', accessorKey: 'lost_reason' },
-    { header: 'Amount', accessorKey: 'amount' },
+    {
+      header: 'Date',
+      accessorKey: 'created_date',
+      cell: ({ row }) => renderTruncated(row.original.created_date),
+    },
+    {
+      header: 'Source',
+      accessorKey: 'source',
+      cell: ({ row }) => renderTruncated(row.original.source),
+    },
+    {
+      header: 'Sales Rep',
+      accessorKey: 'sales_rep_name',
+      cell: ({ row }) => renderTruncated(row.original.sales_rep_name),
+    },
+    {
+      header: 'Reference',
+      accessorKey: 'referral_source',
+      cell: ({ row }) => renderTruncated(row.original.referral_source),
+    },
+    {
+      header: 'Name',
+      accessorKey: 'name',
+      cell: ({ row }) => renderTruncated(row.original.name),
+    },
+    {
+      header: 'Status',
+      accessorKey: 'status',
+      cell: ({ row }) => renderTruncated(row.original.status),
+    },
+    {
+      header: 'Lost reason',
+      accessorKey: 'lost_reason',
+      cell: ({ row }) => renderTruncated(row.original.lost_reason),
+    },
+    {
+      header: 'Amount',
+      accessorKey: 'amount',
+      cell: ({ row }) => renderTruncated(row.original.amount),
+    },
   ]
 
   const lostReasonColumns = useMemo(() => {
@@ -831,6 +941,44 @@ export default function AdminStatistics() {
     })
   }, [lostReasonsByRep, dealsByRep])
 
+  // === Customers Acquired by Campaign + Conversion % ===
+  type CampaignAcquisition = {
+    campaign_name: string
+    customers_acquired: number
+    conversion_percent: string // formatted as "XX.X%"
+  }
+
+  const campaignAcquisitionColumns: ColumnDef<CampaignAcquisition>[] = [
+    { accessorKey: 'campaign_name', header: 'Campaign Name' },
+    { accessorKey: 'customers_acquired', header: 'Customers Acquired' },
+    {
+      accessorKey: 'conversion_percent',
+      header: 'Conversion %',
+      cell: ({ row }) => (
+        <span className='font-medium'>{row.original.conversion_percent}</span>
+      ),
+    },
+  ]
+
+  const campaignAcquisitionRows = useMemo(() => {
+    return customersByCampaign.map(row => ({
+      campaign_name: row.compaign_name,
+      customers_acquired: row.customers_acquired,
+      conversion_percent:
+        row.conversion_percent != null ? `${row.conversion_percent}%` : '0.0%',
+    }))
+  }, [customersByCampaign])
+
+  const salesRepRatingColumns: ColumnDef<SalesRepRating>[] = [
+    { accessorKey: 'rep_name', header: 'Sales Rep' },
+    {
+      accessorKey: 'avg_rating',
+      header: 'Avg Rating',
+      cell: ({ row }) => <span className='font-semibold'>{row.original.avg_rating}</span>,
+    },
+    { accessorKey: 'responses', header: 'Responses' },
+  ]
+
   const handleFiltersSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const params = new URLSearchParams(location.search)
@@ -902,6 +1050,7 @@ export default function AdminStatistics() {
           status,
           lost_reason: lostReason,
           amount,
+      sales_rep_name: customer.sales_rep_name || '',
         }
       })
       .sort((a, b) => (b.createdSortValue || 0) - (a.createdSortValue || 0))
@@ -970,6 +1119,11 @@ export default function AdminStatistics() {
         </div>
       </div>
 
+      <div className='mb-8'>
+        <h2 className='text-xl font-semibold mb-2'>Sales Rep Ratings</h2>
+        <DataTable columns={salesRepRatingColumns} data={salesRepRatings} />
+      </div>
+
       <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
         <div>
           <h2 className='text-xl font-semibold mb-2'>Customers by Source</h2>
@@ -980,6 +1134,20 @@ export default function AdminStatistics() {
           <DataTable columns={customersByRepColumns} data={customersByRep} />
         </div>
       </div>
+
+      <div className='mt-12'>
+        <h2 className='text-xl font-semibold mb-4'>
+          Top Campaigns by Customers Acquired
+        </h2>
+        <p className='text-sm text-muted-foreground mb-4'>
+          Conversion = Won Deals ÷ Total Deals per Campaign
+        </p>
+        <DataTable
+          columns={campaignAcquisitionColumns}
+          data={campaignAcquisitionRows}
+        />
+      </div>
+
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mt-8'>
         <div className='border rounded p-4 col-span-2'>
           <h2 className='text-xl font-semibold mb-2'>
@@ -989,10 +1157,10 @@ export default function AdminStatistics() {
         </div>
       </div>
 
-      <div className='mt-8'>
+      {/* <div className='mt-8'>
         <h2 className='text-xl font-semibold mb-4'>Lost Reasons by Sales Rep</h2>
         <DataTable columns={lostReasonColumns} data={lostReasonRows} />
-      </div>
+      </div> */}
 
       <div className='mt-8'>
         <div className='flex flex-col md:flex-row items-center justify-between mb-2'>

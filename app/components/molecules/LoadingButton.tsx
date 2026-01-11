@@ -12,7 +12,7 @@ export function LoadingButton({
   ...props
 }: LoadingButtonProps) {
   return (
-    <Button {...props} type={type}>
+    <Button {...props} type={type} disabled={loading || props.disabled}>
       {loading ? <Spinner size={20} /> : children}
     </Button>
   )

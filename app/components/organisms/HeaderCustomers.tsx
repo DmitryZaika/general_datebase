@@ -45,28 +45,27 @@ export default function HeaderCustomers() {
   const viewId = segments[0] === 'customer' && segments.length >= 3 ? segments[2] : ''
   const isStonesView = viewId === 'stones'
   const buttonLink = getButtonLink({ location, companyId })
+  const isSurvey = location.pathname.includes('survey')
   return (
-    <>
-      <header className='flex justify-between items-center p-4'>
-        {!isLogin && (
-          <Link to={buttonLink}>
-            <LoadingButton loading={loading}>
-              {isStonesView ? 'Customer Account' : 'Stones'}
-            </LoadingButton>
-          </Link>
-        )}
-        <div className='flex-1 flex justify-center'>
-          <a href={isLogin ? '/' : 'stones'}>
-            <img
-              src={logoUrl}
-              alt='Logo'
-              className={
-                isLogin ? 'h-36 md:h-36 object-contain' : 'h-12 md:h-16 object-contain'
-              }
-            />
-          </a>
-        </div>
-      </header>
-    </>
+    <header className='flex justify-between items-center p-4'>
+      {!isLogin && !isSurvey && (
+        <Link to={buttonLink}>
+          <LoadingButton loading={loading}>
+            {isStonesView ? 'Customer Account' : 'Stones'}
+          </LoadingButton>
+        </Link>
+      )}
+      <div className='flex-1 flex justify-center'>
+        <a href={isLogin ? '/' : 'stones'}>
+          <img
+            src={logoUrl}
+            alt='Logo'
+            className={
+              isLogin ? 'h-36 md:h-36 object-contain' : 'h-12 md:h-16 object-contain'
+            }
+          />
+        </a>
+      </div>
+    </header>
   )
 }

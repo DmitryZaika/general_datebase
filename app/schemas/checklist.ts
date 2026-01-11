@@ -4,6 +4,13 @@ import { z } from 'zod'
 export const checklistSchema = z.object({
   customer_name: z.string().min(1, 'Required'),
   installation_address: z.string().min(1, 'Required'),
+  email: z
+    .string()
+    .trim()
+    .email('Invalid email')
+    .optional()
+    .or(z.literal(''))
+    .nullable(),
   material_correct: z.union([z.literal('on'), z.literal('')]).optional(),
   seams_satisfaction: z.union([z.literal('on'), z.literal('')]).optional(),
   appliances_fit: z.union([z.literal('on'), z.literal('')]).optional(),

@@ -154,7 +154,9 @@ export const RoomSubForm = ({
   useEffect(() => {
     if (isEdit) return
     if (stone?.name) {
-      fetch(`/api/stones/search?name=${encodeURIComponent(stone?.name)}`)
+      fetch(
+        `/api/stones/search/${companyId}?name=${encodeURIComponent(stone?.name)}`,
+      )
         .then(response => response.json())
         .then(data => {
           const foundStone = data.stones?.find((s: Stone) => s.id === stone?.id)
@@ -522,7 +524,7 @@ export const RoomSubForm = ({
                   onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
                     field.onChange(event)
                     handleExtraChange(
-                      parseInt(event.target.value) || 0,
+                      parseInt(event.target.value, 10) || 0,
                       'corbels_price',
                     )
                   },

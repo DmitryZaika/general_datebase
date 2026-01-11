@@ -235,7 +235,13 @@ export default function Survey() {
                     name='Sales rep'
                     placeholder='Select rep'
                     options={options}
-                    field={field}
+                    field={{
+                      ...field,
+                      onChange: val => {
+                        const num = Number(val)
+                        field.onChange(Number.isNaN(num) ? undefined : num)
+                      },
+                    }}
                     disabled={submitted}
                   />
                 )}

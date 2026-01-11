@@ -3,38 +3,28 @@ import { Pencil } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
 import {
-  type LoaderFunctionArgs,
-  redirect,
-  useLoaderData,
-  useNavigate,
+    type LoaderFunctionArgs,
+    redirect,
+    useLoaderData,
+    useLocation,
+    useNavigate,
 } from 'react-router'
-import { AiImproveButton } from '~/components/molecules/AiImproveButton'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { Button } from '~/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
 } from '~/components/ui/dialog'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
 } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
-import { useToast } from '~/hooks/use-toast'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
-import { getEmployeeUser, type User } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 
 interface Attachment {
   id: number
@@ -66,7 +56,7 @@ interface AIEmailResponse {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let user: User
   try {
-    user = await getEmployeeUser(request)
+    user = await getAdminUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -260,24 +250,17 @@ function MessageDate({ message }: { message: Message }) {
 
 export default function EmailChatDialog() {
   const navigate = useNavigate()
-  const [showSelect, setShowSelect] = useState(false)
-  const [selectActive, setSelectActive] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('')
-  const { toast } = useToast()
+  const location = useLocation()
   const {
     customerName,
     customerEmail,
     messages,
     dealId,
     subject,
-    threadId,
-    currentUserSignature,
+  
   } = useLoaderData<typeof loader>()
   const [chatMessages, setChatMessages] = useState<Message[]>(messages)
-  const [messageText, setMessageText] = useState('')
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [isSending, setIsSending] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+ 
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   const getDisplayBody = (body: string, signature: string | null | undefined) => {
@@ -292,23 +275,16 @@ export default function EmailChatDialog() {
     return withoutDash.trimEnd()
   }
 
-  useEffect(() => {
-    setChatMessages(messages)
-  }, [messages])
+
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [chatMessages.length])
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-    }
-  }, [messageText])
+
 
   const handleClose = () => {
-    navigate(`/employee/deals/edit/${dealId}/history`)
+    navigate(`/admin/deals/edit/${dealId}/history${location.search}`)
   }
 
   const getInitials = (name: string) => {
@@ -322,96 +298,10 @@ export default function EmailChatDialog() {
   const lastMessageFromMe = [...chatMessages].reverse().find(m => !m.isFromCustomer)
   const lastReadMessageId = lastMessageFromMe?.read_at ? lastMessageFromMe.id : null
 
-  const handleTemplateSelect = (value: string) => {
-    setSelectedTemplate(value)
-    setSelectActive(false)
-    handleGenerate(value)
-  }
 
-  const handleGenerate = async (templateOverride?: string) => {
-    const template = templateOverride || selectedTemplate
-    if (!template) {
-      return
-    }
-    setIsGenerating(true)
-    setMessageText('')
-    try {
-      await generateAIEmailForChat(template, dealId, subject, threadId, body => {
-        setMessageText(body)
-      })
-    } catch (error) {
-      if (error instanceof Error) {
-        alert(`Failed to generate AI email: ${error.message}`)
-      } else {
-        alert('Failed to generate AI email')
-      }
-    } finally {
-      setIsGenerating(false)
-    }
-  }
 
-  const handleSend = async () => {
-    const body = messageText.trim()
-    if (!body) return
-    if (!customerEmail) {
-      alert('Customer email is missing')
-      return
-    }
-    const emailSubject = subject?.trim() ? subject : 'Follow up'
 
-    setIsSending(true)
-    try {
-      const response = await fetch('/api/employee/sendEmail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: customerEmail,
-          subject: emailSubject,
-          body,
-          dealId,
-          threadId,
-        }),
-      })
 
-      if (!response.ok) {
-        let errorText = ''
-        try {
-          const payload: unknown = await response.json()
-          if (payload && typeof payload === 'object' && 'error' in payload) {
-            const value = payload.error
-            if (typeof value === 'string') {
-              errorText = value
-            }
-          }
-        } catch {
-          errorText = await response.text().catch(() => '')
-        }
-        throw new Error(errorText || 'Email failed to send')
-      }
-
-      setChatMessages(prev => [
-        ...prev,
-        {
-          id: Date.now(),
-          subject: emailSubject,
-          body,
-          signature: currentUserSignature,
-          sent_at: new Date().toISOString(),
-          isFromCustomer: false,
-        },
-      ])
-      setMessageText('')
-      toast({ title: 'Success', description: 'Email sent!', variant: 'success' })
-    } catch (error) {
-      if (error instanceof Error) {
-        alert(error.message)
-      } else {
-        alert('Email failed to send')
-      }
-    } finally {
-      setIsSending(false)
-    }
-  }
 
   function showDate(message: Message, index: number) {
     return (
@@ -537,82 +427,6 @@ export default function EmailChatDialog() {
             </div>
           ))}
           <div ref={bottomRef} />
-        </div>
-
-        <div className='p-4 border-t'>
-          <div className='flex items-end gap-2'>
-            {showSelect ? (
-              <div className='flex gap-2 items-end'>
-                <Select
-                  open={selectActive}
-                  onOpenChange={setSelectActive}
-                  value={selectedTemplate}
-                  onValueChange={value => handleTemplateSelect(value)}
-                >
-                  <SelectTrigger className='w-37.5'>
-                    <SelectValue placeholder='Select template' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='follow-up'>Follow-up</SelectItem>
-                    <SelectItem value='reply'>Reply</SelectItem>
-                    <SelectItem value='thank-you'>Thank You</SelectItem>
-                    <SelectItem value='feedback-request'>Feedback Request</SelectItem>
-                    <SelectItem value='referral'>Referral</SelectItem>
-                  </SelectContent>
-                </Select>
-                <LoadingButton
-                  loading={isGenerating}
-                  type='button'
-                  onClick={() => handleGenerate()}
-                >
-                  Generate
-                </LoadingButton>
-              </div>
-            ) : (
-              <Button
-                type='button'
-                onClick={() => {
-                  setShowSelect(true)
-                  setSelectActive(true)
-                }}
-              >
-                Generate with AI
-              </Button>
-            )}
-            <AiImproveButton
-              getText={() => messageText}
-              setText={value => setMessageText(value)}
-              buttonSize='icon'
-              iconClassName='text-lg'
-            />
-            <textarea
-              ref={textareaRef}
-              value={messageText}
-              onChange={e => {
-                setMessageText(e.target.value)
-                if (textareaRef.current) {
-                  textareaRef.current.style.height = 'auto'
-                  textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-                }
-              }}
-              placeholder='Send a message'
-              rows={1}
-              className='flex-1 min-h-9.5 max-h-40 rounded-sm border border-zinc-300 bg-transparent px-4 py-2 text-sm outline-none resize-none overflow-y-auto'
-            />
-            <div className='flex items-center gap-1 mb-1'>
-              <LoadingButton
-                loading={isSending}
-                type='button'
-                variant='ghost'
-                size='icon'
-                className='text-zinc-500'
-                disabled={isSending || messageText.trim() === ''}
-                onClick={handleSend}
-              >
-                <span className='text-xl'>➤</span>
-              </LoadingButton>
-            </div>
-          </div>
         </div>
       </DialogContent>
     </Dialog>

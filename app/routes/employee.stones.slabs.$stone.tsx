@@ -50,6 +50,8 @@ interface Slab {
     slab_notes?: string
     square_feet?: number
     sink?: string
+    room_name?: string
+    slab_square_feet?: number
   }
   parent_transaction?: {
     customer_name: string
@@ -72,6 +74,8 @@ const TransactionSchema = z.object({
   slab_notes: z.string().nullable().optional(),
   square_feet: z.coerce.number().prefault(0),
   sink_names: z.string().nullable().optional(),
+  room_name: z.string().nullable().optional(),
+  slab_square_feet: z.coerce.number().prefault(0).nullable().optional(),
 })
 
 type Transaction = z.infer<typeof TransactionSchema>
@@ -198,6 +202,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         sales.notes as sale_notes,
         slab_inventory.notes as slab_notes,
         sales.square_feet,
+        slab_inventory.room as room_name,
+        slab_inventory.square_feet as slab_square_feet,
         (
           SELECT GROUP_CONCAT(sink_type.name SEPARATOR ', ')
           FROM sinks
@@ -260,6 +266,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           sale_notes: transaction.sale_notes || '',
           slab_notes: transaction.slab_notes || '',
           square_feet: transaction.square_feet || 0,
+          room_name: transaction.room_name || '',
+          slab_square_feet: transaction.slab_square_feet ?? undefined,
           sink: transaction.sink_names || '',
         }
       }
@@ -429,6 +437,7 @@ export default function SlabsModal() {
     const isEditing = editingSlab === slab.id
     const isHighlighted = highlightedSlab === slab.id
     const hasParent = slab.parent_id !== null
+    const roomLabel = (slab.transaction?.room_name ?? '').trim()
 
     return (
       <TooltipProvider key={slab.id}>
@@ -476,11 +485,6 @@ export default function SlabsModal() {
                 >
                   {slab.bundle}
                 </span>
-                {slab.is_leftover && (
-                  <span className='px-2 py-0.5 rounded-md text-xs bg-purple-100 text-purple-800 font-medium'>
-                    Leftover
-                  </span>
-                )}
               </div>
 
               <div className='flex items-center gap-2 w-full'>
@@ -566,6 +570,15 @@ export default function SlabsModal() {
                         {slab.transaction.square_feet}
                       </p>
                     )}
+
+                    {roomLabel.length > 1 &&
+                      roomLabel.toLowerCase() !== 'room' &&
+                      (slab.transaction.slab_square_feet ?? 0) > 0 && (
+                        <p>
+                          <strong>Room Square Feet ({roomLabel}):</strong>{' '}
+                          {slab.transaction.slab_square_feet}
+                        </p>
+                      )}
 
                     {slab.transaction.sink &&
                       formatSinkList(slab.transaction.sink)
@@ -655,21 +668,46 @@ export default function SlabsModal() {
 
   orderedBundles.forEach(bundle => {
     const bundleSlabs = slabsByBundle[bundle]
+    // Sort by ID to ensure consistent order
+    bundleSlabs.sort((a, b) => a.id - b.id)
 
-    const parents = bundleSlabs.filter(slab => slab.parent_id === null)
+    const processedIds = new Set<number>()
 
-    parents.forEach(parent => {
-      sortedSlabs.push(parent)
+    // 1. Handle explicit roots (parent_id is null)
+    const roots = bundleSlabs.filter(s => s.parent_id === null)
+    roots.forEach(root => {
+      sortedSlabs.push(root)
+      processedIds.add(root.id)
 
-      const children = bundleSlabs.filter(slab => slab.parent_id === parent.id)
-      sortedSlabs.push(...children)
+      // Find direct children in this bundle
+      const children = bundleSlabs.filter(s => s.parent_id === root.id)
+      children.forEach(child => {
+        if (!processedIds.has(child.id)) {
+          sortedSlabs.push(child)
+          processedIds.add(child.id)
+        }
+      })
     })
+
+    // 2. Handle remaining slabs (orphans or missing parents)
+    const remaining = bundleSlabs.filter(s => !processedIds.has(s.id))
+    if (remaining.length > 0) {
+      // Group by parent_id to keep siblings together
+      const byParent = remaining.reduce((acc, slab) => {
+        const key = slab.parent_id ?? 'root'
+        if (!acc[key]) acc[key] = []
+        acc[key].push(slab)
+        return acc
+      }, {} as Record<string | number, Slab[]>)
+
+      Object.values(byParent).forEach(group => {
+        sortedSlabs.push(...group)
+        group.forEach(s => processedIds.add(s.id))
+      })
+    }
   })
 
-  // Ensure slabs that reference a missing parent (orphans) are still shown
-  const addedIds = new Set(sortedSlabs.map(s => s.id))
-  const orphanSlabs = allSlabs.filter(s => !addedIds.has(s.id))
-  const uniqueSlabs = [...sortedSlabs, ...orphanSlabs]
+  const uniqueSlabs = sortedSlabs
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>

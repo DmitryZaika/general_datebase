@@ -116,6 +116,74 @@ export async function loader({ request }: LoaderFunctionArgs) {
          LIMIT ${prefetchedLimit}`,
         [user.id, user.company_id, ...nameParams, user.id, prefixLike, like],
       )
+    } else if (searchType === 'phone') {
+      const digits = term.replace(/\D/g, '')
+      const last10 = digits.length > 10 ? digits.slice(-10) : digits
+      const phoneExpr =
+        "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.phone,'-',''),' ',''),'(',''),')',''),'+',''),'.','')"
+
+      if (!digits) {
+        customers = await selectMany<Customer>(
+          db,
+          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.email, c.company_name
+           FROM customers c
+           LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
+           WHERE c.company_id = ? AND c.deleted_at IS NULL
+             AND c.phone LIKE ?
+           ORDER BY
+             CASE
+               WHEN d.id IS NOT NULL THEN 0
+               WHEN c.sales_rep = ? THEN 1
+               ELSE 2
+             END,
+             CASE
+               WHEN c.phone LIKE ? THEN 0
+               WHEN c.phone LIKE ? THEN 1
+               ELSE 2
+             END,
+             c.name ASC
+           LIMIT 15`,
+          [user.id, user.company_id, like, user.id, prefixLike, like],
+        )
+      } else {
+        const likeDigits = `%${digits}%`
+        const prefixDigits = `${digits}%`
+        const likeLast10 = `%${last10}%`
+        const prefixLast10 = `${last10}%`
+
+        customers = await selectMany<Customer>(
+          db,
+          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.email, c.company_name
+           FROM customers c
+           LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
+           WHERE c.company_id = ? AND c.deleted_at IS NULL
+             AND (${phoneExpr} LIKE ? OR ${phoneExpr} LIKE ?)
+           ORDER BY
+             CASE
+               WHEN d.id IS NOT NULL THEN 0
+               WHEN c.sales_rep = ? THEN 1
+               ELSE 2
+             END,
+             CASE
+               WHEN ${phoneExpr} LIKE ? OR ${phoneExpr} LIKE ? THEN 0
+               WHEN ${phoneExpr} LIKE ? OR ${phoneExpr} LIKE ? THEN 1
+               ELSE 2
+             END,
+             c.name ASC
+           LIMIT 15`,
+          [
+            user.id,
+            user.company_id,
+            likeDigits,
+            likeLast10,
+            user.id,
+            prefixDigits,
+            prefixLast10,
+            likeDigits,
+            likeLast10,
+          ],
+        )
+      }
     } else {
       customers = await selectMany<Customer>(
         db,

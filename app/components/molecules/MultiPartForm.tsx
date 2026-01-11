@@ -1,5 +1,6 @@
+import { useEffect, useRef } from 'react'
 import type { FieldValues, UseFormReturn } from 'react-hook-form'
-import { Form, useSubmit } from 'react-router'
+import { Form, useNavigation, useSubmit } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { FormProvider } from '~/components/ui/form'
 
@@ -26,7 +27,16 @@ export function MultiPartForm<TFieldValues extends FieldValues = FieldValues>({
   className?: string
 }) {
   const submit = useSubmit()
+  const navigation = useNavigation()
   const token = useAuthenticityToken()
+
+  const isSubmittingRef = useRef(false)
+
+  useEffect(() => {
+    if (navigation.state === 'idle') {
+      isSubmittingRef.current = false
+    }
+  }, [navigation.state])
 
   return (
     <FormProvider {...form}>
@@ -35,6 +45,12 @@ export function MultiPartForm<TFieldValues extends FieldValues = FieldValues>({
         id='customerForm'
         method='post'
         onSubmit={form.handleSubmit(data => {
+          if (navigation.state !== 'idle' || isSubmittingRef.current) {
+            return
+          }
+
+          isSubmittingRef.current = true
+
           const formData = createFromData(data)
           formData.append('csrf', token)
           submit(formData, {

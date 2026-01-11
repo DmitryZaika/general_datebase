@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LoaderFunctionArgs,
+  Outlet,
   redirect,
   useLoaderData,
   useLocation,
@@ -25,6 +26,8 @@ type AdminDeal = {
   due_date: string | null
   sales_rep: string | null
   user_id: number | null
+  has_email?: boolean
+  has_images?: boolean
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -66,16 +69,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [companyId],
     )
 
-    // Sales reps for filter
+    const emailCounts = await selectMany<{ deal_id: number; count: number }>(
+      db,
+      'SELECT deal_id, COUNT(*) as count FROM emails WHERE deleted_at IS NULL AND deal_id IS NOT NULL GROUP BY deal_id',
+    )
+    const emailsMap: Record<number, boolean> = {}
+    for (const row of emailCounts) emailsMap[row.deal_id] = Number(row.count) > 0
 
-    return { deals, customers, lists }
+    const imagesCounts = await selectMany<{ deal_id: number; count: number }>(
+      db,
+      'SELECT deal_id, COUNT(*) as count FROM deals_images GROUP BY deal_id',
+    )
+    const imagesMap: Record<number, boolean> = {}
+    for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
+
+    return { deals, customers, lists, emailsMap, imagesMap }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export default function AdminDeals() {
-  const { deals, customers, lists } = useLoaderData<typeof loader>()
+  const { deals, customers, lists, emailsMap, imagesMap } =
+    useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -92,6 +108,8 @@ export default function AdminDeals() {
     due_date?: string | null
     sales_rep?: string | null
     user_id?: number | null
+    has_email?: boolean
+    has_images?: boolean
   }
 
   const toDeal = (d: AdminDeal): Deal => {
@@ -113,6 +131,8 @@ export default function AdminDeals() {
         : null,
       sales_rep: d.sales_rep ?? undefined,
       user_id: d.user_id ?? undefined,
+      has_email: emailsMap?.[d.id] || false,
+      has_images: imagesMap?.[d.id] || false,
     }
   }
 
@@ -227,6 +247,7 @@ export default function AdminDeals() {
           )
         })}
       </div>
+      <Outlet />
     </div>
   )
 }

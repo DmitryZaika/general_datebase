@@ -33,7 +33,7 @@ import { toastData } from '~/utils/toastHelpers.server'
 
 const userSchema = z.object({
   email: z.email(),
-  password: z.string().min(4),
+  password: z.coerce.string().min(4),
 })
 
 const userResolver = zodResolver(userSchema)

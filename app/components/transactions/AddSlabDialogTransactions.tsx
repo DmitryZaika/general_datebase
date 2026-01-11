@@ -22,7 +22,6 @@ interface StoneOption {
 interface SlabOption {
   id: number
   bundle: string
-  is_leftover: boolean
   parent_id?: number | null
   child_count?: number
 }
@@ -136,7 +135,6 @@ export function AddSlabDialog({
                                 ? true
                                 : (slab.child_count ?? 0) > 0
                             const statuses = [isPartial ? 'Partial' : 'Full']
-                            if (slab.is_leftover) statuses.push('Leftover')
                             return statuses.join(' • ')
                           })()}
                         </div>

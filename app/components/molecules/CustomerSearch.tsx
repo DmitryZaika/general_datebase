@@ -44,6 +44,8 @@ interface CustomerSearchProps {
   error: string | undefined
   setError: (error: string | null) => void
   setCreatedDealId?: (id: number) => void
+  onNameInput?: (name: string) => void
+  value?: string | null
 }
 
 const fetchCustomers = async (customerName: string, searchType: SelectOption) => {
@@ -188,10 +190,19 @@ export function CustomerSearch({
   error,
   setError,
   setCreatedDealId,
+  onNameInput,
+  value,
 }: CustomerSearchProps) {
   const [searchTerm, setSearchTerm] = useState<string | null>(null)
   const [selectedOption, setSelectedOption] = useState<SelectOption>(selectOptions[0])
   const [name, setName] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (value === '' || value === null) {
+      setName(null)
+      setSearchTerm(null)
+    }
+  }, [value])
   const inputRef = useRef<HTMLInputElement>(null)
   const searchWrapRef = useRef<HTMLDivElement>(null)
   const [isListOpen, setIsListOpen] = useState<boolean>(false)
@@ -279,6 +290,7 @@ export function CustomerSearch({
             if (error) {
               setError(null)
             }
+            onNameInput?.(e.target.value)
           }}
           onFocus={() => {
             if (searchTerm && searchTerm.length > 0) {
@@ -306,7 +318,12 @@ export function CustomerSearch({
                     handleFinal(c.id)
                   }}
                 >
-                  {c.name}
+                  <div className='flex flex-col'>
+                    <span>{c.name}</span>
+                    {c.address ? (
+                      <span className='text-xs text-gray-500'>{c.address}</span>
+                    ) : null}
+                  </div>
                 </CommandItem>
               ))}
             </CommandGroup>

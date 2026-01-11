@@ -1,5 +1,6 @@
+import { useEffect, useRef } from 'react'
 import type { FieldValues, UseFormReturn } from 'react-hook-form'
-import { useSubmit } from 'react-router'
+import { useNavigation, useSubmit } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 
 export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
@@ -10,7 +11,16 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
   navigateOnSubmit: boolean = false,
 ) {
   const submit = useSubmit()
+  const navigation = useNavigation()
   const token = useAuthenticityToken()
+
+  const isSubmittingRef = useRef(false)
+
+  useEffect(() => {
+    if (navigation.state === 'idle') {
+      isSubmittingRef.current = false
+    }
+  }, [navigation.state])
 
   const cleanData = (data: object) => {
     return Object.fromEntries(
@@ -27,6 +37,12 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
 
   const fullSubmit = form.handleSubmit(
     data => {
+      if (navigation.state !== 'idle' || isSubmittingRef.current) {
+        return
+      }
+
+      isSubmittingRef.current = true
+
       const sanitizedData = cleanData(data)
       sanitizedData.csrf = token
 

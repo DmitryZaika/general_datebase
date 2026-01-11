@@ -123,15 +123,11 @@ export function useChecklistQueue({
   const refreshQueue = useCallback(async () => {
     if (!isIndexedDBAvailable()) return
 
-    try {
-      const count = await getPendingCount()
-      const submissions = await getAllPending()
+    const count = await getPendingCount()
+    const submissions = await getAllPending()
 
-      setPendingCount(count)
-      setPendingSubmissions(submissions)
-    } catch (error) {
-      console.error('[Queue] Failed to refresh queue:', error)
-    }
+    setPendingCount(count)
+    setPendingSubmissions(submissions)
   }, [])
 
   useEffect(() => {
@@ -197,7 +193,13 @@ export function useChecklistQueue({
 
           await submitChecklistAPI(submission.data, submission.companyId)
           await removeFromQueue(submission.id!)
-          onSuccess?.()
+
+          if (
+            typeof window !== 'undefined' &&
+            window.location.pathname.includes('/checklist')
+          ) {
+            onSuccess?.()
+          }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error)
           const isValidation = isValidationError(errorMessage)

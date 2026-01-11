@@ -2,25 +2,25 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { Search } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
-  type ActionFunctionArgs,
-  type LoaderFunctionArgs,
-  Outlet,
-  redirect,
-  useLoaderData,
-  useLocation,
-  useNavigate,
-  useSearchParams,
+    type ActionFunctionArgs,
+    type LoaderFunctionArgs,
+    Outlet,
+    redirect,
+    useLoaderData,
+    useLocation,
+    useNavigate,
+    useSearchParams,
 } from 'react-router'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { PageLayout } from '~/components/PageLayout'
 import { DataTable } from '~/components/ui/data-table'
 import { Input } from '~/components/ui/input'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from '~/components/ui/select'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
@@ -597,6 +597,7 @@ export default function EmployeeTransactions() {
               <div className='absolute z-50 w-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'>
                 {transactions
                   .filter(tx => {
+                    if ((tx.total_slabs ?? 0) === 0) return false
                     const term = searchTerm.toLowerCase()
                     return (
                       tx.customer_name.toLowerCase().includes(term) ||
