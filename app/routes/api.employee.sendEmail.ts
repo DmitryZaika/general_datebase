@@ -9,7 +9,7 @@ import { selectId } from '~/utils/queryHelpers'
 import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 
 export const customerSchema = z.object({
-  to: z.email(),
+  to: z.union([z.email(), z.array(z.email())]),
   subject: z.string().min(1).max(100),
   body: z.string().min(1).max(10000),
   dealId: z.coerce.number().min(1).int().optional(),
