@@ -1,5 +1,5 @@
 import { format } from 'date-fns'
-import { Pencil } from 'lucide-react'
+import { FileText, Pencil } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -10,6 +10,7 @@ import {
 } from 'react-router'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -279,6 +280,10 @@ export default function EmailChatDialog() {
   const [isSending, setIsSending] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const [currentImages, setCurrentImages] = useState<
+    { id: number; url: string; name: string; type: string; available: null }[]
+  >([])
+  const [currentImageId, setCurrentImageId] = useState<number | null>(null)
 
   const getDisplayBody = (body: string, signature: string | null | undefined) => {
     const b = (body || '').trimEnd()
@@ -491,35 +496,67 @@ export default function EmailChatDialog() {
                     </div>
                   ) : null}
                   {message.attachments && message.attachments.length > 0 ? (
-                    <div className='mt-3 space-y-2'>
+                    <div className='mt-3 flex flex-wrap gap-3'>
                       {message.attachments.map(attachment => {
                         const mime = `${attachment.content_type}/${attachment.content_subtype}`
                         const label = attachment.filename || mime
+                        const contentType = attachment.content_type.toLowerCase()
                         const isImage =
-                          attachment.content_type.toLowerCase() === 'image'
+                          contentType === 'image' || contentType.startsWith('image/')
+                        const isPdf =
+                          (contentType === 'application' &&
+                            attachment.content_subtype.toLowerCase() === 'pdf') ||
+                          mime.toLowerCase().includes('pdf')
                         const href = attachment.signed_url || attachment.url
                         const linkClass = message.isFromCustomer
                           ? 'text-blue-700 underline'
                           : 'text-white underline'
 
                         return (
-                          <div key={attachment.id} className='space-y-2'>
-                            {href ? (
+                          <div key={attachment.id} className='space-y-2 max-w-[140px]'>
+                            {!isImage && href ? (
                               <a
                                 href={href}
                                 target='_blank'
                                 rel='noreferrer'
                                 className={linkClass}
-                              ></a>
+                                download={isPdf ? undefined : undefined}
+                              >
+                                <span className='inline-flex items-center gap-1'>
+                                  <FileText className='h-4 w-4' />
+                                  <span>{label}</span>
+                                </span>
+                              </a>
                             ) : null}
                             {isImage && href ? (
-                              <a href={href} target='_blank' rel='noreferrer'>
+                              <button
+                                type='button'
+                                className='block cursor-pointer'
+                                onClick={() => {
+                                  const imgs =
+                                    message.attachments
+                                      ?.filter(
+                                        a =>
+                                          a.content_type.toLowerCase() === 'image' &&
+                                          (a.signed_url || a.url),
+                                      )
+                                      .map(img => ({
+                                        id: img.id,
+                                        url: img.signed_url || img.url,
+                                        name: img.filename || `${img.content_type}/${img.content_subtype}`,
+                                        type: 'email',
+                                        available: null,
+                                      })) || []
+                                  setCurrentImages(imgs)
+                                  setCurrentImageId(attachment.id)
+                                }}
+                              >
                                 <img
                                   src={href}
                                   alt={label}
                                   className='max-h-48 rounded-md border border-black/10'
                                 />
-                              </a>
+                              </button>
                             ) : null}
                           </div>
                         )
@@ -615,6 +652,14 @@ export default function EmailChatDialog() {
           </div>
         </div>
       </DialogContent>
+      <SuperCarousel
+        type='email'
+        currentId={currentImageId ?? undefined}
+        setCurrentId={id => setCurrentImageId(id ?? null)}
+        images={currentImages}
+        userRole='employee'
+        showInfo={false}
+      />
     </Dialog>
   )
 }
