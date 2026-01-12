@@ -336,6 +336,8 @@ const SidebarInstructionNode: React.FC<InstructionNodeProps> = ({
   const children = childrenOf(node.id)
   const hasChildren = children.length > 0
   const isOpen = expanded[node.id] ?? false
+  const [additionalDetails, setAdditionalDetails] = React.useState('')
+
   const {
     text,
     values,
@@ -365,6 +367,23 @@ const SidebarInstructionNode: React.FC<InstructionNodeProps> = ({
       <div style={styles.titleRow} onClick={() => toggleExpand(node.id)}>
         <span style={styles.arrow}>{isOpen ? '▼' : '▶'}</span>
         <p style={styles.title}>{node.title ?? '(no title)'}</p>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+        <input
+          type='text'
+          value={additionalDetails}
+          onChange={e => setAdditionalDetails(e.target.value)}
+          placeholder='Additional Question Details'
+          onClick={e => e.stopPropagation()}
+          style={{
+            flex: 1,
+            padding: '6px 10px',
+            borderRadius: 4,
+            border: '1px solid #ccc',
+            fontSize: '0.9rem',
+          }}
+        />
         <Button
           variant='outline'
           size='sm'
@@ -373,9 +392,8 @@ const SidebarInstructionNode: React.FC<InstructionNodeProps> = ({
             if (!isOpen) {
               toggleExpand(node.id)
             }
-            handleGenerate()
+            handleGenerate(e, additionalDetails)
           }}
-          style={{ marginLeft: 10 }}
         >
           Generate Question
         </Button>
@@ -493,7 +511,7 @@ const SidebarInstructionNode: React.FC<InstructionNodeProps> = ({
                 </Button>
               </Form>
               <Button
-                onClick={() => handleGenerate()}
+                onClick={() => handleGenerate(undefined, additionalDetails)}
                 style={{
                   marginTop: 15,
                 }}
@@ -986,12 +1004,20 @@ export function orderSiblings(list: InstructionMedium[]): InstructionMedium[] {
 
 const parentKey = (pid: number | null) => (pid && pid !== 0 ? pid : null)
 
-function buildQuestionPrompt(title: string, content: string) {
+function buildQuestionPrompt(
+  title: string,
+  content: string,
+  additionalDetails?: string,
+) {
+  const additionalContext = additionalDetails
+    ? `\n\nAdditional Requirements/Focus:\n${additionalDetails}\n`
+    : ''
+
   const prompt = `You are a creative and varied question generator. You MUST return ONLY valid JSON. Never wrap it in code blocks or explanations.
  Return a JSON object with exactly these keys: "question", "options", and "answer".
  Based on the following educational content, create a multiple choice question:
  Title: ${title}
- Content: ${content}
+ Content: ${content}${additionalContext}
  Guidelines for diversity:
  - Vary the style of the question each time (scenario-based, cause/effect, "what could happen if...", "which of the following statements...", etc.)
  - Avoid reusing the same phrasing or structure as previous questions
@@ -1314,7 +1340,7 @@ export function useQuestionGenerator({
   setRejectedQuestions: React.Dispatch<React.SetStateAction<Set<number>>>
 }) {
   const handleGenerate = React.useCallback(
-    (e?: React.MouseEvent) => {
+    (e?: React.MouseEvent, additionalDetails?: string) => {
       if (e) e.stopPropagation()
 
       // Reset saved/rejected state for this node
@@ -1340,7 +1366,7 @@ export function useQuestionGenerator({
       }
 
       const prompt = encodeURIComponent(
-        buildQuestionPrompt(content.title, content.content),
+        buildQuestionPrompt(content.title, content.content, additionalDetails),
       )
       const sse = new EventSource(`/api/chat?query=${prompt}&isNew=true`)
 
