@@ -5,7 +5,7 @@
 // External Dependencies
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
-import { FileText, ImageIcon, PaperclipIcon } from 'lucide-react'
+import { FileText, ImageIcon } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -713,14 +713,14 @@ function attachmentIcon(fileName: string) {
                   getText={() => form.getValues('text')}
                   setText={value => form.setValue('text', value)}
                 />
-                <Button
+                {/* <Button
                   type='button'
                   size='icon'
                   aria-label='Attachment'
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <PaperclipIcon className='h-4 w-4' />
-                </Button>
+                </Button> */}
                 <Button type='submit'>Send Email</Button>
               </div>
             </div>
