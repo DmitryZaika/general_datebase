@@ -8,6 +8,8 @@ import {
   redirect,
   useLoaderData,
   useNavigate,
+  useSearchParams,
+  useLocation,
 } from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
 import {
@@ -18,6 +20,7 @@ import {
 } from '~/components/ui/accordion'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { cn } from '~/lib/utils'
 import '~/styles/instructions.css'
@@ -59,12 +62,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
   const user = await getAdminUser(request)
+  const url = new URL(request.url)
+  const allowGeneral = !!user.is_superuser
+  const requestedMode = url.searchParams.get('type') === 'general' ? 'general' : 'company'
+  const mode = allowGeneral && requestedMode === 'general' ? 'general' : 'company'
+  const companyId = mode === 'general' ? 0 : user.company_id
   const instructions = await selectMany<Instructions>(
     db,
     'SELECT id, title, parent_id, after_id, rich_text FROM instructions WHERE company_id = ?',
-    [user.company_id],
+    [companyId],
   )
-  return { instructions }
+  return { instructions, allowGeneral, mode }
 }
 
 function buildInstructionTree(instructions: Instructions[]): InstructionNode[] {
@@ -322,8 +330,10 @@ const searchAllInstructions = (
 }
 
 export default function AdminInstructions() {
-  const { instructions } = useLoaderData<typeof loader>()
+  const { instructions, allowGeneral, mode } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [showDropdown, setShowDropdown] = useState(false)
@@ -347,8 +357,8 @@ export default function AdminInstructions() {
     return selected ? [selected] : instructionTree
   }, [selectedId, instructionTree])
 
-  const handleEdit = (id: number) => navigate(`edit/${id}`)
-  const handleDelete = (id: number) => navigate(`delete/${id}`)
+  const handleEdit = (id: number) => navigate(`edit/${id}${location.search}`)
+  const handleDelete = (id: number) => navigate(`delete/${id}${location.search}`)
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -371,10 +381,29 @@ export default function AdminInstructions() {
     setShowDropdown(false)
   }
 
+  const handleTabChange = (value: string) => {
+    if (!allowGeneral) return
+    if (value === 'general') {
+      setSearchParams({ type: 'general' })
+    } else {
+      setSearchParams({ type: 'company' })
+    }
+  }
+
   return (
     <PageLayout title='Instructions'>
+      {allowGeneral && (
+        <div className='mb-4'>
+          <Tabs value={mode} onValueChange={handleTabChange}>
+            <TabsList>
+              <TabsTrigger value='company'>Company instructions</TabsTrigger>
+              <TabsTrigger value='general'>General instructions</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
       <header className='flex gap-4 justify-between mb-6'>
-        <Link to='add' relative='path'>
+        <Link to={`add${location.search || ''}`} relative='path'>
           <Button
             size='lg'
             className='gap-2 shadow-sm hover:shadow-md transition-shadow'

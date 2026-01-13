@@ -95,7 +95,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [dealId],
   )
 
-  const customerEmail = customerRows?.[0]?.email || ''
+  const normalizeEmail = (email: string | null | undefined) => email?.trim().toLowerCase() || ''
+  const customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
 
   if (customerEmail) {
     await db.execute(
@@ -144,7 +145,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const [emailRows] = await db.execute<RowDataPacket[]>(emailQuery, emailParams)
 
   const messages: Message[] = (emailRows || []).map(row => {
-    const isFromCustomer = row.sender_email === customerEmail
+    const senderEmail = normalizeEmail(row.sender_email)
+    const isFromCustomer = senderEmail === customerEmail
     return {
       id: row.id,
       subject: row.subject,

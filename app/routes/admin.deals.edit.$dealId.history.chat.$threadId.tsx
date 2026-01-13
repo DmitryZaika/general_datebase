@@ -3,23 +3,23 @@ import { Pencil } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
 import {
-    type LoaderFunctionArgs,
-    redirect,
-    useLoaderData,
-    useLocation,
-    useNavigate,
+  type LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useNavigate,
 } from 'react-router'
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from '~/components/ui/dialog'
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -84,7 +84,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [dealId],
   )
 
-  const customerEmail = customerRows?.[0]?.email || ''
+  const normalizeEmail = (email: string | null | undefined) => email?.trim().toLowerCase() || ''
+  const customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
 
   if (customerEmail) {
     await db.execute(
@@ -133,7 +134,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const [emailRows] = await db.execute<RowDataPacket[]>(emailQuery, emailParams)
 
   const messages: Message[] = (emailRows || []).map(row => {
-    const isFromCustomer = row.sender_email === customerEmail
+    const senderEmail = normalizeEmail(row.sender_email)
+    const isFromCustomer = senderEmail === customerEmail
     return {
       id: row.id,
       subject: row.subject,
