@@ -5,8 +5,9 @@
 // External Dependencies
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
+import { FileText, ImageIcon } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   redirect,
@@ -25,6 +26,7 @@ import {
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { QuillInput } from '~/components/molecules/QuillInput'
+import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -47,6 +49,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '~/components/ui/tooltip'
 // Server Utilities
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
@@ -534,9 +542,11 @@ export default function DealEmailDialog() {
   const location = useLocation()
   const { email, dealId, companyId } = useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
+  const [attachments, setAttachments] = useState<File[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<EmailFormData>({
     resolver: emailResolver,
@@ -618,6 +628,45 @@ export default function DealEmailDialog() {
     }
   }
 
+  const removeAttachment = (file: File) => {
+    setAttachments(prev =>
+      prev.filter(
+        f =>
+          !(
+            f.name === file.name &&
+            f.size === file.size &&
+            f.lastModified === file.lastModified
+          ),
+      ),
+    )
+  }
+
+  const formatFileName = (name: string) => {
+    if (name.length <= 15) return name
+    return `${name.slice(0, 15)}...`
+  }
+
+const imageExt = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+  'gif',
+  'bmp',
+  'svg',
+  'heic',
+  'heif',
+  'tiff',
+  'tif',
+])
+
+function attachmentIcon(fileName: string) {
+  const parts = fileName.split('.')
+  const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : ''
+  if (ext && imageExt.has(ext)) return <ImageIcon className='h-4 w-4' />
+  return <FileText className='h-4 w-4' />
+}
+
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
       <DialogContent className='sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5'>
@@ -630,11 +679,56 @@ export default function DealEmailDialog() {
             className='flex-1 flex flex-col'
           >
             <AuthenticityTokenInput />
-            <EmailFormFields
-              form={form}
+            <EmailFormFields 
+              form={form}              
               companyId={companyId}
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
+            />
+            {attachments.length > 0 ? (
+              <TooltipProvider>
+                <div className='mt-3 flex flex-wrap gap-2'>
+                  {attachments.map(file => {
+                    const isTruncated = file.name.length > 15
+                    const displayName = formatFileName(file.name)
+                    const badge = (
+                      <Badge
+                        key={`${file.name}-${file.size}-${file.lastModified}`}
+                        className='cursor-pointer select-none'
+                        onClick={() => removeAttachment(file)}
+                      >
+                        <span className='flex items-center gap-1'>
+                          {attachmentIcon(file.name)}
+                          <span>{displayName}</span>
+                          <span className='ml-1'>×</span>
+                        </span>
+                      </Badge>
+                    )
+
+                    if (!isTruncated) return badge
+
+                    return (
+                      <Tooltip key={`${file.name}-${file.size}-${file.lastModified}`}>
+                        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+                        <TooltipContent side='top'>{file.name}</TooltipContent>
+                      </Tooltip>
+                    )
+                  })}
+                </div>
+              </TooltipProvider>
+            ) : null}
+            <input
+              ref={fileInputRef}
+              type='file'
+              className='hidden'
+              multiple
+              onChange={e => {
+                const files = e.currentTarget.files
+                if (files && files.length > 0) {
+                  setAttachments(prev => [...prev, ...Array.from(files)])
+                }
+                e.currentTarget.value = ''
+              }}
             />
             <div className='mt-4 flex justify-between gap-2 w-full'>
               <Button
@@ -642,7 +736,7 @@ export default function DealEmailDialog() {
                 onClick={() => setShowAIMenu(!showAIMenu)}
                 variant={showAIMenu ? 'secondary' : 'default'}
               >
-                {showAIMenu ? 'Hide' : 'Toggle'} AI Assistant Menu
+                 AI Settings
               </Button>
               <LoadingButton
                 type='button'
@@ -651,11 +745,20 @@ export default function DealEmailDialog() {
               >
                 Generate
               </LoadingButton>
+             
               <div className='ml-auto flex items-center gap-2'>
                 <AiImproveButton
                   getText={() => form.getValues('text')}
                   setText={value => form.setValue('text', value)}
                 />
+                {/* <Button
+                  type='button'
+                  size='icon'
+                  aria-label='Attachment'
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <PaperclipIcon className='h-4 w-4' />
+                </Button> */}
                 <Button type='submit'>Send Email</Button>
               </div>
             </div>

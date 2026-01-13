@@ -1,5 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+  useSearchParams,
+} from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
 import {
   Accordion,
@@ -8,6 +13,7 @@ import {
   AccordionTrigger,
 } from '~/components/ui/accordion'
 import { Input } from '~/components/ui/input'
+import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import '~/styles/instructions.css'
 import type { Instruction } from '~/types'
@@ -240,16 +246,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
   const user = await getEmployeeUser(request)
+  const url = new URL(request.url)
+  const mode = url.searchParams.get('type') === 'general' ? 'general' : 'company'
+  const companyId = mode === 'general' ? 0 : user.company_id
   const instructions = await selectMany<Instruction>(
     db,
     'SELECT id, title, parent_id, after_id, rich_text FROM instructions WHERE company_id = ?',
-    [user.company_id],
+    [companyId],
   )
-  return { instructions }
+  return { instructions, mode }
 }
 
 export default function Instructions() {
-  const { instructions } = useLoaderData<typeof loader>()
+  const { instructions, mode } = useLoaderData<typeof loader>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const finalInstructions = cleanData(instructions)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [expandedIds, setExpandedIds] = useState<number[]>([])
@@ -483,8 +493,22 @@ export default function Instructions() {
     })
   }, [expandedIds, nodeMap])
 
+  const handleTabChange = (value: string) => {
+    if (value === 'general') {
+      setSearchParams({ type: 'general' })
+    } else {
+      setSearchParams({ type: 'company' })
+    }
+  }
+
   return (
     <PageLayout title='Instructions'>
+      <Tabs value={mode} onValueChange={handleTabChange} className='mb-4'>
+        <TabsList>
+          <TabsTrigger value='company'>Company instructions</TabsTrigger>
+          <TabsTrigger value='general'>General instructions</TabsTrigger>
+        </TabsList>
+      </Tabs>
       <div className='flex w-full mt-0'>
         <div className='flex-grow'>
           <Accordion

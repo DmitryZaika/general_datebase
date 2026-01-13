@@ -8,8 +8,10 @@ import {
   useActionData,
   useLoaderData,
   useSubmit,
+  useSearchParams,
 } from 'react-router'
 import { Button } from '~/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
 import type { InstructionSlim } from '~/types'
@@ -157,13 +159,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
+  const url = new URL(request.url)
+  const mode = url.searchParams.get('type') === 'general' ? 'general' : 'company'
+  const companyId = mode === 'general' ? 0 : user.company_id
+
   const [instructions, questions, answerChoices] = await Promise.all([
-    getInstructions(user.company_id),
-    getQuestions(user.company_id),
-    getAnswerChoices(user.company_id),
+    getInstructions(companyId),
+    getQuestions(companyId),
+    getAnswerChoices(companyId),
   ])
 
-  return { instructions, questions, answerChoices, userId: user.id }
+  return { instructions, questions, answerChoices, userId: user.id, mode }
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -597,13 +603,15 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
 // MAIN COMPONENT
 
 export default function TeachMode() {
-  const { instructions, questions, answerChoices, userId } = useLoaderData() as {
+  const { instructions, questions, answerChoices, userId, mode } = useLoaderData() as {
     instructions: InstructionMedium[]
     questions: Question[]
     answerChoices: AnswerChoice[]
     userId: number
+    mode: 'company' | 'general'
   }
 
+  const [, setSearchParams] = useSearchParams()
   const submit = useSubmit()
   const { toast } = useToast()
   const actionData = useActionData<{ success?: boolean; error?: string }>()
@@ -630,8 +638,24 @@ export default function TeachMode() {
     isAnswerCorrect,
   } = useAssessmentState(questions, answerChoicesByQuestion, userId, submit)
 
+  const handleTabChange = (value: string) => {
+    if (value === 'general') {
+      setSearchParams({ type: 'general' })
+    } else {
+      setSearchParams({ type: 'company' })
+    }
+  }
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
+      <div style={{ padding: '0 20px' }}>
+        <Tabs value={mode} onValueChange={handleTabChange} className='mb-4'>
+          <TabsList>
+            <TabsTrigger value='company'>Company instructions</TabsTrigger>
+            <TabsTrigger value='general'>General instructions</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
       {/* Main Content Area */}
       <div
         style={{

@@ -272,7 +272,7 @@ export default function Survey() {
               </div>
             </SectionCard>
 
-            <SectionCard title='How did you like the technician?'>
+            <SectionCard title='How did you like the template technician?'>
               <div className='space-y-2'>
                 <StarRating
                   name='technician_rating'
