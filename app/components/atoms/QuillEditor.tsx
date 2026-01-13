@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuill } from 'react-quilljs'
 
 import 'quill/dist/quill.snow.css'
@@ -10,24 +10,30 @@ interface IQuillEditorProps {
 
 export function QuillEditor({ value, onChange }: IQuillEditorProps) {
   const { quill, quillRef } = useQuill()
+  const isInternalChange = useRef(false)
 
   useEffect(() => {
-    if (quill) {
-      quill.clipboard.dangerouslyPasteHTML(value)
+    if (quill && !isInternalChange.current) {
+      const currentContent = quill.root.innerHTML
+      if (currentContent !== value && value !== undefined) {
+        quill.clipboard.dangerouslyPasteHTML(value)
+      }
     }
-  }, [quill])
+    isInternalChange.current = false
+  }, [quill, value])
 
   useEffect(() => {
     if (quill) {
       quill.on('text-change', () => {
+        isInternalChange.current = true
         onChange(quill.root.innerHTML)
       })
     }
-  }, [quill])
+  }, [quill, onChange])
 
   return (
-    <div className='h-64'>
-      <div ref={quillRef} />
+    <div className='quill-container h-64 flex flex-col'>
+      <div ref={quillRef} className='flex-1 overflow-y-auto' />
     </div>
   )
 }
