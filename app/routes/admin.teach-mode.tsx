@@ -11,10 +11,12 @@ import {
   useActionData,
   useLoaderData,
   useRevalidator,
+  useSearchParams,
   useSubmit,
 } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Switch } from '~/components/ui/switch'
+import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
 import type { InstructionSlim } from '~/types'
@@ -527,7 +529,13 @@ const SidebarInstructionNode: React.FC<InstructionNodeProps> = ({
 }
 
 export default function TeachMode() {
-  const { instructions, questions, answerChoices } = useLoaderData()
+  const { instructions, questions, answerChoices, allowGeneral, mode } = useLoaderData() as {
+    instructions: InstructionMedium[]
+    questions: Question[]
+    answerChoices: AnswerChoice[]
+    allowGeneral: boolean
+    mode: 'company' | 'general'
+  }
   const actionData = useActionData()
   const submit = useSubmit()
   const revalidator = useRevalidator()
@@ -541,6 +549,7 @@ export default function TeachMode() {
   )
   const [showManualEntry, setShowManualEntry] = React.useState(false)
   const [showSidebar, setShowSidebar] = React.useState(false)
+  const [, setSearchParams] = useSearchParams()
 
   useUpdateSavedQuestions(actionData, setSavedQuestions)
 
@@ -550,8 +559,27 @@ export default function TeachMode() {
   const { childrenOf, roots } = useInstructionTree(instructions)
   const { expanded, toggleExpand } = useExpandedState()
 
+  const handleTabChange = (value: string) => {
+    if (!allowGeneral) return
+    if (value === 'general') {
+      setSearchParams({ type: 'general' })
+    } else {
+      setSearchParams({ type: 'company' })
+    }
+  }
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
+      {allowGeneral && (
+        <div style={{ padding: 20, paddingBottom: 0 }}>
+          <Tabs value={mode} onValueChange={handleTabChange} className='mb-4'>
+            <TabsList>
+              <TabsTrigger value='company'>Company instructions</TabsTrigger>
+              <TabsTrigger value='general'>General instructions</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
       {/* Main Content Area */}
       <div
         style={{
@@ -726,13 +754,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
+  const url = new URL(request.url)
+  const allowGeneral = !!user.is_superuser
+  const requestedMode = url.searchParams.get('type') === 'general' ? 'general' : 'company'
+  const mode = allowGeneral && requestedMode === 'general' ? 'general' : 'company'
+  const companyId = mode === 'general' ? 0 : user.company_id
+
   const [instructions, questions, answerChoices] = await Promise.all([
-    getInstructions(user.company_id),
-    getQuestions(user.company_id),
-    getAnswerChoices(user.company_id),
+    getInstructions(companyId),
+    getQuestions(companyId),
+    getAnswerChoices(companyId),
   ])
 
-  return { instructions, questions, answerChoices }
+  return { instructions, questions, answerChoices, allowGeneral, mode }
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -743,27 +777,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
+  const url = new URL(request.url)
+  const allowGeneral = !!user.is_superuser
+  const requestedMode = url.searchParams.get('type') === 'general' ? 'general' : 'company'
+  const mode = allowGeneral && requestedMode === 'general' ? 'general' : 'company'
+  const companyId = mode === 'general' ? 0 : user.company_id
+
   const formData = await request.formData()
   const intent = formData.get('intent') as string | null
 
   switch (intent) {
     case 'toggle-visibility':
-      return toggleVisibility(user, formData)
+      return toggleVisibility(user, formData, companyId)
     case 'create-question':
-      return createQuestion(user, formData)
+      return createQuestion(user, formData, companyId)
     case 'edit-question':
-      return editQuestion(user, formData)
+      return editQuestion(user, formData, companyId)
     case 'delete-question':
-      return deleteQuestion(user, formData)
+      return deleteQuestion(user, formData, companyId)
     default:
       // Handle the default save question case
-      return saveGeneratedQuestion(user, formData)
+      return saveGeneratedQuestion(user, formData, companyId)
   }
 }
 
 // CRUD FUNCTIONS
 
-async function toggleVisibility(user: SessionUser, formData: FormData) {
+async function toggleVisibility(user: SessionUser, formData: FormData, companyId: number) {
   const questionId = parseInt(formData.get('questionId') as string)
   const visible = formData.get('visible') === 'true'
 
@@ -772,7 +812,7 @@ async function toggleVisibility(user: SessionUser, formData: FormData) {
   try {
     await db.execute(
       'UPDATE questions SET is_visible_to_employees = ? WHERE id = ? AND company_id = ?',
-      [visible ? 1 : 0, questionId, user.company_id],
+      [visible ? 1 : 0, questionId, companyId],
     )
     return { success: true }
   } catch (error) {
@@ -781,7 +821,7 @@ async function toggleVisibility(user: SessionUser, formData: FormData) {
   }
 }
 
-async function createQuestion(user: SessionUser, formData: FormData) {
+async function createQuestion(user: SessionUser, formData: FormData, companyId: number) {
   const questionText = formData.get('questionText') as string
   const options = JSON.parse(formData.get('options') as string)
   const correctAnswerId = parseInt(formData.get('correctAnswerId') as string)
@@ -799,7 +839,7 @@ async function createQuestion(user: SessionUser, formData: FormData) {
   try {
     const [questionResult] = await db.execute(
       'INSERT INTO questions (text, instruction_id, question_type, company_id) VALUES (?, NULL, ?, ?)',
-      [questionText, 'MC', user.company_id],
+      [questionText, 'MC', companyId],
     )
     const questionId = (questionResult as any).insertId
 
@@ -819,7 +859,7 @@ async function createQuestion(user: SessionUser, formData: FormData) {
   }
 }
 
-async function editQuestion(user: SessionUser, formData: FormData) {
+async function editQuestion(user: SessionUser, formData: FormData, companyId: number) {
   const questionId = parseInt(formData.get('questionId') as string)
   const questionText = formData.get('questionText') as string
   const options = JSON.parse(formData.get('options') as string)
@@ -840,7 +880,7 @@ async function editQuestion(user: SessionUser, formData: FormData) {
   try {
     const [questionCheck] = await db.execute(
       'SELECT id FROM questions WHERE id = ? AND company_id = ?',
-      [questionId, user.company_id],
+      [questionId, companyId],
     )
 
     if (!questionCheck || (questionCheck as any).length === 0) {
@@ -851,7 +891,7 @@ async function editQuestion(user: SessionUser, formData: FormData) {
 
     await db.execute(
       'UPDATE questions SET text = ?, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND company_id = ?',
-      [questionText, questionId, user.company_id],
+      [questionText, questionId, companyId],
     )
 
     for (const option of options) {
@@ -887,14 +927,14 @@ async function editQuestion(user: SessionUser, formData: FormData) {
   }
 }
 
-async function deleteQuestion(user: SessionUser, formData: FormData) {
+async function deleteQuestion(user: SessionUser, formData: FormData, companyId: number) {
   const questionId = parseInt(formData.get('questionId') as string)
   if (isNaN(questionId)) return { error: 'Invalid question ID' }
 
   try {
     const [questionCheck] = await db.execute(
       'SELECT id FROM questions WHERE id = ? AND company_id = ?',
-      [questionId, user.company_id],
+      [questionId, companyId],
     )
     if (!questionCheck || (questionCheck as any).length === 0) {
       return {
@@ -904,7 +944,7 @@ async function deleteQuestion(user: SessionUser, formData: FormData) {
 
     await db.execute(
       'UPDATE questions SET deleted_at = CURRENT_TIMESTAMP, updated_date = CURRENT_TIMESTAMP WHERE id = ? AND company_id = ?',
-      [questionId, user.company_id],
+      [questionId, companyId],
     )
 
     return { success: true, questionId }
@@ -916,7 +956,7 @@ async function deleteQuestion(user: SessionUser, formData: FormData) {
   }
 }
 
-async function saveGeneratedQuestion(user: SessionUser, formData: FormData) {
+async function saveGeneratedQuestion(user: SessionUser, formData: FormData, companyId: number) {
   const questionText = formData.get('questionText') as string
   const optionsString = formData.get('options') as string
   const options = optionsString.split(',').map(s => s.trim())
@@ -936,7 +976,7 @@ async function saveGeneratedQuestion(user: SessionUser, formData: FormData) {
   try {
     const [instructionCheck] = await db.execute(
       'SELECT id FROM instructions WHERE id = ? AND company_id = ?',
-      [instructionId, user.company_id],
+      [instructionId, companyId],
     )
 
     if (!instructionCheck || (instructionCheck as any).length === 0) {
@@ -947,7 +987,7 @@ async function saveGeneratedQuestion(user: SessionUser, formData: FormData) {
 
     const [questionResult] = await db.execute(
       'INSERT INTO questions (text, instruction_id, question_type, company_id) VALUES (?, ?, ?, ?)',
-      [questionText, instructionId, 'MC', user.company_id],
+      [questionText, instructionId, 'MC', companyId],
     )
 
     const questionId = (questionResult as any).insertId

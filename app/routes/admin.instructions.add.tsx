@@ -45,8 +45,6 @@ const instructionschema = z.object({
   rich_text: z.string(),
 })
 
-type FormData = z.infer<typeof instructionschema>
-
 const resolver = zodResolver(instructionschema)
 
 export async function action({ request }: ActionFunctionArgs) {
