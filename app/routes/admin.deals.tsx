@@ -1,6 +1,8 @@
+import { Mail } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LoaderFunctionArgs,
+  Link,
   Outlet,
   redirect,
   useLoaderData,
@@ -10,6 +12,7 @@ import {
 import DealsList from '~/components/DealsList'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
+import { Button } from '~/components/ui/button'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
@@ -188,7 +191,15 @@ export default function AdminDeals() {
   return (
     <div className='w-full'>
       <div className='w-full flex justify-between items-center mb-2'>
-        <SalesRepsFilter />
+        <div className='flex items-center gap-4'>
+          <SalesRepsFilter />
+          <Link to='email-templates' className='p-2 mt-4'>
+            <Button variant='outline'>
+              <Mail className='w-4 h-4 mr-2' />
+              Manage Email Templates
+            </Button>
+          </Link>
+        </div>
         <FindCustomer
           className='mt-0'
           onEdit={customerId => {
