@@ -1,6 +1,7 @@
-import { SESClient } from '@aws-sdk/client-ses'
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
+import { createTransport } from 'nodemailer'
 
-const ses = new SESClient({
+const sesClient = new SESv2Client({
   region: process.env.AWS_REGION ?? 'us-east-2',
   credentials: {
     accessKeyId: process.env.AWS_EMAIL || '',
@@ -8,7 +9,12 @@ const ses = new SESClient({
   },
 })
 
-import { SendEmailCommand } from '@aws-sdk/client-ses'
+const transporter = createTransport({
+  SES: { sesClient, SendEmailCommand },
+})
+
+type MailOptions = Parameters<typeof transporter.sendMail>[0]
+type NodeMailerAttachments = MailOptions['attachments']
 
 interface SendEmail {
   to: string | string[]
@@ -17,8 +23,8 @@ interface SendEmail {
   html?: string
   text?: string
   replyTo?: string[]
-  configurationSet?: string
   headers?: Record<string, string>
+  attachments?: NodeMailerAttachments
 }
 
 interface Body {
@@ -33,24 +39,22 @@ export async function sendEmail({
   html,
   text,
   replyTo,
-  configurationSet,
+  attachments,
 }: SendEmail) {
   const body: Body = {}
   if (html) body.Html = { Data: html, Charset: 'UTF-8' }
   if (text) body.Text = { Data: text, Charset: 'UTF-8' }
 
-  return await ses.send(
-    new SendEmailCommand({
-      Destination: { ToAddresses: Array.isArray(to) ? to : [to] },
-      ReplyToAddresses: replyTo,
-      Source: from || 'noreply@granite-manager.com',
-      Message: {
-        Subject: { Data: subject, Charset: 'UTF-8' },
-        Body: body,
-      },
-      ConfigurationSetName: configurationSet,
-    }),
-  )
+  const toSend: MailOptions = {
+    to: Array.isArray(to) ? to : [to],
+    replyTo,
+    from: from || 'noreply@granite-manager.com',
+    subject,
+    html: body,
+    attachments,
+  }
+
+  return await transporter.sendMail(toSend)
 }
 
 export async function sendPaymentEmail(to: string, uuid: string) {
