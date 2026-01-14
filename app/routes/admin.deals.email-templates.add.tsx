@@ -13,6 +13,7 @@ import { toastData } from '~/utils/toastHelpers.server'
 
 const templateSchema = z.object({
   template_name: z.string().min(1, 'Template name is required'),
+  template_subject: z.string().min(1, 'Template subject is required'),
   template_body: z.string().min(1, 'Template body is required'),
 })
 
@@ -40,9 +41,9 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   await db.execute<ResultSetHeader>(
-    `INSERT INTO email_templates (template_name, template_body, company_id)
-     VALUES (?, ?, ?)`,
-    [data.template_name, data.template_body, user.company_id],
+    `INSERT INTO email_templates (template_name, template_subject, template_body, company_id)
+     VALUES (?, ?, ?, ?)`,
+    [data.template_name, data.template_subject, data.template_body, user.company_id],
   )
 
   const session = await getSession(request.headers.get('Cookie'))
@@ -55,6 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 const defaultValues: FormData = {
   template_name: '',
+  template_subject: '',
   template_body: '',
 }
 
