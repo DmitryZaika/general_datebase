@@ -130,6 +130,13 @@ const SYSTEM_PROMPT = `
 
   Use the proper spacing and formatting for the text.
 
+  SUBJECT LINE RULES (CRITICAL):
+  • Style: Casual, short, and "boring". Like a quick email from a colleague or friend.
+  • Length: Maximum 2-5 words.
+  • Capitalization: Use sentence case (Only the first letter capitalized). NEVER use Title Case.
+  • Punctuation: No exclamation marks (!). No questions marks (?) unless absolutely necessary.
+  • Content: Avoid "salesy" words like "Special", "Offer", "Unlock", "Dream".
+
   EMAIL CATEGORY DEFINITIONS
 
   FIRST-CONTACT
@@ -377,7 +384,21 @@ function buildUserPrompt(
 
   prompt += formatSenderInfo(userInfo)
 
-  prompt += `First provide ONLY the subject line. Then newline: ---BODY---. Then write the body. Do NOT include any signature, sender name, sender title, sender company, or closing phrase such as “Best,” “Thanks,” “Regards,” or similar. The system will insert the signature manually.`
+  prompt += `
+  STRICT INSTRUCTION FOR SUBJECT LINE:
+  1. FORMAT: Use standard Sentence case. **The first letter MUST be capitalized.** (e.g., "Your kitchen", NOT "your kitchen").
+  2. STYLE: Casual and short (2-5 words). No "salesy" adjectives.
+  3. CONTENT: specific to the project.
+  
+  Examples of CORRECT subjects:
+  - "Your quartzite quote"
+  - "Your countertop quote"
+  - "Your kitchen quote"
+  - "Countertop quote request"
+  - "In-home estimate request"
+  - "Countertop inquiry"
+  - "Thank you for your inquiry!"
+`
 
   return prompt
 }
