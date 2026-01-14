@@ -10,17 +10,22 @@ import type { RowDataPacket } from 'mysql2'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
-  type LoaderFunctionArgs,
   redirect,
   useLoaderData,
   useLocation,
   useNavigate,
+  type LoaderFunctionArgs,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
+import {
+  EmailTemplateSearch,
+  type EmailTemplate,
+} from '~/components/molecules/EmailTemplateSearch'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { QuillInput } from '~/components/molecules/QuillInput'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import {
@@ -44,7 +49,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import { Textarea } from '~/components/ui/textarea'
 import {
   Tooltip,
   TooltipContent,
@@ -171,6 +175,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     customerName: rows[0].name || '',
     senderInfo,
     dealId,
+    companyId: user.company_id || 0,
   }
 }
 
@@ -314,9 +319,18 @@ async function generateAIEmail(
 
 function EmailFormFields({
   form,
+  companyId,
+  selectedTemplate,
+  onTemplateChange,
 }: {
   form: ReturnType<typeof useForm<EmailFormData>>
+  companyId: number
+  selectedTemplate: EmailTemplate | undefined
+  onTemplateChange: (template: EmailTemplate | undefined) => void
 }) {
+  const bodyValue = form.watch('text')
+  const hasPlaceholders = bodyValue?.includes('{{') && bodyValue?.includes('}}')
+
   return (
     <div className='flex-1 space-y-4'>
       <FormField
@@ -338,19 +352,31 @@ function EmailFormFields({
           <InputItem name='Subject' field={field} placeholder='Email subject' />
         )}
       />
+      <EmailTemplateSearch
+        companyId={companyId}
+        value={selectedTemplate}
+        onChange={template => {
+          onTemplateChange(template)
+          if (template) {
+            form.setValue('text', template.template_body)
+          }
+        }}
+      />
       <FormField
         control={form.control}
         name='text'
         render={({ field }) => (
-          <FormItem>
-            <FormLabel>Body</FormLabel>
-            <FormControl>
-              <Textarea placeholder='Email body' className='min-h-[200px]' {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
+          <QuillInput name='Body' field={field} className='mb-4' />
         )}
       />
+      {selectedTemplate && hasPlaceholders && (
+        <div className='p-3 bg-amber-50 border border-amber-200 rounded-md'>
+          <p className='text-sm text-amber-800'>
+            Replace the <code className='bg-amber-100 px-1 rounded'>{'{{placeholders}}'}</code> with
+            actual values before sending (e.g., client name, date, etc.).
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -514,10 +540,11 @@ function sendEmail(to: string, subject: string, body: string, dealId: number) {
 export default function DealEmailDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { email, dealId } = useLoaderData<typeof loader>()
+  const { email, dealId, companyId } = useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
   const [attachments, setAttachments] = useState<File[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -564,6 +591,12 @@ export default function DealEmailDialog() {
   })
 
   const fullSubmit = (values: EmailFormData) => {
+    if (selectedTemplate && (values.text.includes('{{') || values.text.includes('}}'))) {
+      form.setError('text', {
+        message: 'Please replace all {{placeholders}} with actual values before sending',
+      })
+      return
+    }
     mutate(values)
   }
 
@@ -636,7 +669,7 @@ function attachmentIcon(fileName: string) {
 
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
-      <DialogContent className='sm:max-w-[600px] overflow-auto flex flex-col min-h-[400px] max-h-[95vh] p-5'>
+      <DialogContent className='sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5'>
         <DialogHeader>
           <DialogTitle>Send Email</DialogTitle>
         </DialogHeader>
@@ -646,7 +679,12 @@ function attachmentIcon(fileName: string) {
             className='flex-1 flex flex-col'
           >
             <AuthenticityTokenInput />
-            <EmailFormFields form={form} />
+            <EmailFormFields 
+              form={form}              
+              companyId={companyId}
+              selectedTemplate={selectedTemplate}
+              onTemplateChange={setSelectedTemplate}
+            />
             {attachments.length > 0 ? (
               <TooltipProvider>
                 <div className='mt-3 flex flex-wrap gap-2'>
