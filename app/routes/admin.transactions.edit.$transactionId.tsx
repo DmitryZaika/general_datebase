@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { getSlabInventorySinks } from '~/crud/sinks'
-import { AddSlabToSale, getActualParentInSale, getExistingSlabInSale, getFirstChildFromParentPreferWithSale, getFirstChildSlabInSale, getFirstUnsoldChildFromParent, getSlabInventoryChildren, getSlabInventoryParent, getSlabsInSale, insertNewSlabInventory, removeOldSlabFromSale, selectForRoom, selectForRoomUuid, updateChildSlabInventory } from '~/crud/slab_inventory'
+import { AddSlabToSale, getActualParentInSale, getExistingSlabInSale, getFirstChildFromParentPreferWithSale, getFirstChildSlabInSale, getFirstUnsoldChildFromParent, getSlabInventoryChildren, getSlabInventoryParent, getSlabsInSale, insertChildSlabInventory, removeOldSlabFromSale, selectForRoom, selectForRoomUuid, updateChildSlabInventory } from '~/crud/slab_inventory'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
 import { commitSession, getSession } from '~/sessions.server'
@@ -139,6 +139,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
       await db.execute(`UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ?`, [
         slabId,
       ])
+      await db.execute(
+        `DELETE FROM slab_inventory WHERE parent_id = ? AND sale_id IS NULL AND deleted_at IS NULL`,
+        [slabId],
+      )
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Slab marked as cut'))
       return data({ success: true }, {
@@ -223,6 +227,8 @@ const slabs = await getSlabsInSale(slabId, saleId)
           )
         }
       }
+
+      
 
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Slab marked as uncut'))
@@ -374,7 +380,7 @@ const slabs = await getSlabsInSale(slabId, saleId)
 
     if (!handled) {
       const parentForNew = (soldTarget && soldTarget.sale_id === null) ? (soldTarget.parent_id ?? soldTarget.id) : slabId
-    await insertNewSlabInventory(template, parentForNew, soldTarget, length, width)}
+    await insertChildSlabInventory(template, parentForNew, soldTarget, length, width)}
     if (!addAnother) {
       await db.execute(
         `UPDATE slab_inventory SET cut_date = CURRENT_TIMESTAMP WHERE id = ? AND sale_id = ?`,

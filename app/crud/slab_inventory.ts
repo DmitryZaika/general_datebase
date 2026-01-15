@@ -345,7 +345,7 @@ export async function getActualParentInSale(parentId: number) {
   )
 }
 
-export async function insertNewSlabInventory(
+export async function insertChildSlabInventory(
   template: SlabInventory,
   parentForNew: number,
   soldTarget: SlabInventory | null,
