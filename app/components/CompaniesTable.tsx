@@ -1,9 +1,9 @@
 import type { ColumnDef } from '@tanstack/react-table'
 import { CopyText } from '~/components/atoms/CopyText'
 import { DataTable } from '~/components/ui/data-table'
-import type { Partner } from '~/types/partner'
+import type { Company } from '~/types/company'
 
-const partnerColumns: ColumnDef<Partner>[] = [
+const companyColumns: ColumnDef<Company>[] = [
   {
     accessorKey: 'company_name',
     header: 'Company Name',
@@ -34,29 +34,29 @@ const partnerColumns: ColumnDef<Partner>[] = [
   },
 ]
 
-interface PartnersTableProps {
-  partners: Partner[]
+interface CompaniesTableProps {
+  companies: Company[]
 }
 
-export default function PartnersTable({ partners }: PartnersTableProps) {
+export default function CompaniesTable({ companies }: CompaniesTableProps) {
   return (
     <div className='w-full bg-white rounded-lg shadow-sm border'>
       <div className='p-6 border-b'>
-        <h2 className='text-2xl font-bold text-gray-900'>Partners</h2>
+        <h2 className='text-2xl font-bold text-gray-900'>Companies</h2>
       </div>
 
       <div className='p-6'>
-        {partners.length > 0 ? (
-          <DataTable columns={partnerColumns} data={partners} />
+        {companies.length > 0 ? (
+          <DataTable columns={companyColumns} data={companies} />
         ) : (
           <div className='text-center py-12'>
-            <div className='text-gray-400 text-lg'>No partners found</div>
+            <div className='text-gray-400 text-lg'>No companies found</div>
           </div>
         )}
       </div>
 
       <div className='p-4 bg-gray-50 border-t text-sm text-gray-600'>
-        Total Partners: <span className='font-semibold'>{partners.length}</span>
+        Total Companies: <span className='font-semibold'>{companies.length}</span>
       </div>
     </div>
   )

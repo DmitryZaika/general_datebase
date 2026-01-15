@@ -10,7 +10,7 @@ import {
   useSearchParams,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import PartnersTable from '~/components/PartnersTable'
+import CompaniesTable from '~/components/CompaniesTable'
 import {
   Select,
   SelectContent,
@@ -22,10 +22,10 @@ import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
-import type { Partner } from '~/types/partner'
+import type { Company } from '~/types/company'
 import { ViewType } from '~/types/viewType'
+import { getCompaniesForUser } from '~/utils/companyQueries'
 import { csrf } from '~/utils/csrf.server'
-import { getPartnersForUser } from '~/utils/partnerQueries'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -71,7 +71,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url)
     const viewParam = url.searchParams.get('view')
     const view = (
-      viewParam === ViewType.PARTNERS ? ViewType.PARTNERS : ViewType.DEALS
+      viewParam === ViewType.COMPANIES ? ViewType.COMPANIES : ViewType.DEALS
     ) as ViewType
 
     const lists = await selectMany<{ id: number; name: string }>(
@@ -105,19 +105,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [user.company_id],
     )
 
-    let partners: Partner[] = []
-    if (view === ViewType.PARTNERS) {
-      partners = await selectMany<Partner>(db, getPartnersForUser(user.id), [user.id])
+    let companies: Company[] = []
+    if (view === ViewType.COMPANIES) {
+      companies = await selectMany<Company>(db, getCompaniesForUser(user.id), [user.id])
     }
 
-    return { deals, customers, lists, imagesMap, emailsMap, partners, view }
+    return { deals, customers, lists, imagesMap, emailsMap, companies, view }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export default function EmployeeDeals() {
-  const { deals, customers, lists, imagesMap, emailsMap, partners, view } =
+  const { deals, customers, lists, imagesMap, emailsMap, companies, view } =
     useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -136,19 +136,19 @@ export default function EmployeeDeals() {
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={ViewType.DEALS}>Deals</SelectItem>
-        <SelectItem value={ViewType.PARTNERS}>Partners</SelectItem>
+        <SelectItem value={ViewType.COMPANIES}>Companies</SelectItem>
       </SelectContent>
     </Select>
   )
 
   return (
     <>
-      {view === ViewType.PARTNERS ? (
+      {view === ViewType.COMPANIES ? (
         <>
           <div className='w-full flex justify-between items-center mb-4'>
             {viewSelect}
           </div>
-          <PartnersTable partners={partners} />
+          <CompaniesTable companies={companies} />
         </>
       ) : (
         <DealsView
