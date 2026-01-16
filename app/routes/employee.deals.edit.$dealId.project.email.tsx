@@ -5,11 +5,12 @@
 // External Dependencies
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
-import { FileText, ImageIcon } from 'lucide-react'
+import { FileText, ImageIcon, PaperclipIcon } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
+  Form,
   redirect,
   useLoaderData,
   useLocation,
@@ -118,6 +119,7 @@ const emailSchema = z.object({
   to: z.email('Valid email address is required'),
   subject: z.string().min(1, 'Subject is required'),
   text: z.string().min(1, 'Email body is required'),
+  attachments: z.array(z.instanceof(File)),
 })
 
 type EmailFormData = z.infer<typeof emailSchema>
@@ -542,11 +544,27 @@ export default function DealEmailDialog() {
   const location = useLocation()
   const { email, dealId, companyId } = useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
-  const [attachments, setAttachments] = useState<File[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const blobToBase64 = (blob: File) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          if (typeof reader.result === 'string') {
+            resolve({
+              name: blob.name,
+              base64: reader.result,
+            })
+          }
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+    }
+
 
   const form = useForm<EmailFormData>({
     resolver: emailResolver,
@@ -554,6 +572,7 @@ export default function DealEmailDialog() {
       to: email,
       subject: '',
       text: '',
+      attachments: [],
     },
   })
 
@@ -629,16 +648,7 @@ export default function DealEmailDialog() {
   }
 
   const removeAttachment = (file: File) => {
-    setAttachments(prev =>
-      prev.filter(
-        f =>
-          !(
-            f.name === file.name &&
-            f.size === file.size &&
-            f.lastModified === file.lastModified
-          ),
-      ),
-    )
+    form.setValue('attachments', form.getValues('attachments').filter(f => f !== file))
   }
 
   const formatFileName = (name: string) => {
@@ -674,7 +684,7 @@ function attachmentIcon(fileName: string) {
           <DialogTitle>Send Email</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <form
+          <Form
             onSubmit={form.handleSubmit(fullSubmit)}
             className='flex-1 flex flex-col'
           >
@@ -685,10 +695,10 @@ function attachmentIcon(fileName: string) {
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
             />
-            {attachments.length > 0 ? (
+            {form.getValues('attachments').length > 0 ? (
               <TooltipProvider>
                 <div className='mt-3 flex flex-wrap gap-2'>
-                  {attachments.map(file => {
+                  {form.getValues('attachments').map(file => {
                     const isTruncated = file.name.length > 15
                     const displayName = formatFileName(file.name)
                     const badge = (
@@ -725,7 +735,7 @@ function attachmentIcon(fileName: string) {
               onChange={e => {
                 const files = e.currentTarget.files
                 if (files && files.length > 0) {
-                  setAttachments(prev => [...prev, ...Array.from(files)])
+                  form.setValue('attachments', [...form.getValues('attachments'), ...Array.from(files)])
                 }
                 e.currentTarget.value = ''
               }}
@@ -751,18 +761,18 @@ function attachmentIcon(fileName: string) {
                   getText={() => form.getValues('text')}
                   setText={value => form.setValue('text', value)}
                 />
-                {/* <Button
+                <Button
                   type='button'
                   size='icon'
                   aria-label='Attachment'
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <PaperclipIcon className='h-4 w-4' />
-                </Button> */}
+                </Button>
                 <Button type='submit'>Send Email</Button>
               </div>
             </div>
-          </form>
+          </Form>
         </FormProvider>
         {showAIMenu && (
           <div className='mt-4'>
