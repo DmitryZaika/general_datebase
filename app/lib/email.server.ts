@@ -15,8 +15,9 @@ const transporter = createTransport({
 
 type MailOptions = Parameters<typeof transporter.sendMail>[0]
 type NodeMailerAttachments = MailOptions['attachments']
+export type MailReturn = Awaited<ReturnType<typeof transporter.sendMail>>
 
-interface SendEmail {
+export interface SendEmail {
   to: string | string[]
   from?: string
   subject: string
@@ -27,11 +28,6 @@ interface SendEmail {
   attachments?: NodeMailerAttachments
 }
 
-interface Body {
-  Html?: { Data: string; Charset: string }
-  Text?: { Data: string; Charset: string }
-}
-
 export async function sendEmail({
   to,
   from,
@@ -40,17 +36,14 @@ export async function sendEmail({
   text,
   replyTo,
   attachments,
-}: SendEmail) {
-  const body: Body = {}
-  if (html) body.Html = { Data: html, Charset: 'UTF-8' }
-  if (text) body.Text = { Data: text, Charset: 'UTF-8' }
-
+}: SendEmail): Promise<MailReturn> {
   const toSend: MailOptions = {
     to: Array.isArray(to) ? to : [to],
     replyTo,
     from: from || 'noreply@granite-manager.com',
     subject,
-    html: body,
+    html: html,
+    text: text,
     attachments,
   }
 
