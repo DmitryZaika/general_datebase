@@ -1,4 +1,4 @@
-import { Mail } from 'lucide-react'
+import { Mail, SettingsIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LoaderFunctionArgs,
@@ -197,6 +197,12 @@ export default function AdminDeals() {
             <Button variant='outline'>
               <Mail className='w-4 h-4 mr-2' />
               Manage Email Templates
+            </Button>
+          </Link>
+          <Link to='manage-lists' className='p-2 mt-4'>
+            <Button variant='outline'>
+              <SettingsIcon className='w-4 h-4 mr-2' />
+              Manage Lists
             </Button>
           </Link>
         </div>
