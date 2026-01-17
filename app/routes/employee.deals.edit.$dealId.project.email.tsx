@@ -361,6 +361,7 @@ function EmailFormFields({
         onChange={template => {
           onTemplateChange(template)
           if (template) {
+            form.setValue('subject', template.template_subject)
             form.setValue('text', template.template_body)
           }
         }}
