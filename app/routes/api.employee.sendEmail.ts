@@ -10,6 +10,7 @@ import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 const attachmentSchema = z.object({
   content: z.base64(),
   filename: z.string(),
+  contentType: z.string(),
 })
 
 export const emailSchema = z.object({
