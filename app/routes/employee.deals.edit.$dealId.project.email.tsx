@@ -11,18 +11,18 @@ import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   Form,
+  type LoaderFunctionArgs,
   redirect,
   useLoaderData,
   useLocation,
   useNavigate,
-  type LoaderFunctionArgs,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import {
-  EmailTemplateSearch,
   type EmailTemplate,
+  EmailTemplateSearch,
 } from '~/components/molecules/EmailTemplateSearch'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -374,7 +374,8 @@ function EmailFormFields({
       {selectedTemplate && hasPlaceholders && (
         <div className='p-3 bg-amber-50 border border-amber-200 rounded-md'>
           <p className='text-sm text-amber-800'>
-            Replace the <code className='bg-amber-100 px-1 rounded'>{'{{placeholders}}'}</code> with
+            Replace the{' '}
+            <code className='bg-amber-100 px-1 rounded'>{'{{placeholders}}'}</code> with
             actual values before sending (e.g., client name, date, etc.).
           </p>
         </div>
@@ -531,11 +532,30 @@ function AIAssistantMenu({
 // ============================================================================
 // MAIN COMPONENT
 // ====
-function sendEmail(to: string, subject: string, body: string, dealId: number, attachments: any[]) {
+function sendEmail(
+  to: string,
+  subject: string,
+  body: string,
+  dealId: number,
+  attachments: File[],
+) {
+  const formData = new FormData()
+
+  formData.append('to', to)
+  formData.append('subject', subject)
+  formData.append('body', body)
+  formData.append('dealId', dealId.toString())
+
+  for (const file of attachments) {
+    // если на бэке ожидается массив
+    formData.append('attachments', file)
+    // либо attachments[] — зависит от реализации сервера
+    // formData.append('attachments[]', file)
+  }
+
   return fetch('/api/employee/sendEmail', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to, subject, body, dealId, attachments }),
+    body: formData,
   }).then(res => {
     if (!res.ok) throw new Error('Failed to send email')
     return res.json()
@@ -552,23 +572,6 @@ export default function DealEmailDialog() {
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const blobToBase64 = (blob: File) => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          if (typeof reader.result === 'string') {
-            resolve({
-              name: blob.name,
-              base64: reader.result,
-            })
-          }
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(blob)
-      })
-    }
-
-
   const form = useForm<EmailFormData>({
     resolver: emailResolver,
     defaultValues: {
@@ -581,10 +584,13 @@ export default function DealEmailDialog() {
 
   const { mutate } = useMutation({
     mutationFn: async (values: EmailFormData) => {
-      const base64Attachments = await Promise.all(
-        values.attachments.map(file => blobToBase64(file)),
+      return sendEmail(
+        values.to,
+        values.subject,
+        values.text,
+        dealId,
+        values.attachments,
       )
-      return sendEmail(values.to, values.subject, values.text, dealId, base64Attachments)
     },
     onSuccess: () => {
       navigate(`../${location.search}`)
@@ -616,9 +622,13 @@ export default function DealEmailDialog() {
   })
 
   const fullSubmit = (values: EmailFormData) => {
-    if (selectedTemplate && (values.text.includes('{{') || values.text.includes('}}'))) {
+    if (
+      selectedTemplate &&
+      (values.text.includes('{{') || values.text.includes('}}'))
+    ) {
       form.setError('text', {
-        message: 'Please replace all {{placeholders}} with actual values before sending',
+        message:
+          'Please replace all {{placeholders}} with actual values before sending',
       })
       return
     }
@@ -654,7 +664,10 @@ export default function DealEmailDialog() {
   }
 
   const removeAttachment = (file: File) => {
-    form.setValue('attachments', form.getValues('attachments').filter(f => f !== file))
+    form.setValue(
+      'attachments',
+      form.getValues('attachments').filter(f => f !== file),
+    )
   }
 
   const formatFileName = (name: string) => {
@@ -662,26 +675,26 @@ export default function DealEmailDialog() {
     return `${name.slice(0, 15)}...`
   }
 
-const imageExt = new Set([
-  'png',
-  'jpg',
-  'jpeg',
-  'webp',
-  'gif',
-  'bmp',
-  'svg',
-  'heic',
-  'heif',
-  'tiff',
-  'tif',
-])
+  const imageExt = new Set([
+    'png',
+    'jpg',
+    'jpeg',
+    'webp',
+    'gif',
+    'bmp',
+    'svg',
+    'heic',
+    'heif',
+    'tiff',
+    'tif',
+  ])
 
-function attachmentIcon(fileName: string) {
-  const parts = fileName.split('.')
-  const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : ''
-  if (ext && imageExt.has(ext)) return <ImageIcon className='h-4 w-4' />
-  return <FileText className='h-4 w-4' />
-}
+  function attachmentIcon(fileName: string) {
+    const parts = fileName.split('.')
+    const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : ''
+    if (ext && imageExt.has(ext)) return <ImageIcon className='h-4 w-4' />
+    return <FileText className='h-4 w-4' />
+  }
 
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
@@ -695,8 +708,8 @@ function attachmentIcon(fileName: string) {
             className='flex-1 flex flex-col'
           >
             <AuthenticityTokenInput />
-            <EmailFormFields 
-              form={form}              
+            <EmailFormFields
+              form={form}
               companyId={companyId}
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
@@ -741,7 +754,10 @@ function attachmentIcon(fileName: string) {
               onChange={e => {
                 const files = e.currentTarget.files
                 if (files && files.length > 0) {
-                  form.setValue('attachments', [...form.getValues('attachments'), ...Array.from(files)])
+                  form.setValue('attachments', [
+                    ...form.getValues('attachments'),
+                    ...Array.from(files),
+                  ])
                 }
                 e.currentTarget.value = ''
               }}
@@ -752,7 +768,7 @@ function attachmentIcon(fileName: string) {
                 onClick={() => setShowAIMenu(!showAIMenu)}
                 variant={showAIMenu ? 'secondary' : 'default'}
               >
-                 AI Settings
+                AI Settings
               </Button>
               <LoadingButton
                 type='button'
@@ -761,7 +777,7 @@ function attachmentIcon(fileName: string) {
               >
                 Generate
               </LoadingButton>
-             
+
               <div className='ml-auto flex items-center gap-2'>
                 <AiImproveButton
                   getText={() => form.getValues('text')}

@@ -1,5 +1,6 @@
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
 import { createTransport } from 'nodemailer'
+import type { Attachment } from 'nodemailer/lib/mailer'
 
 const sesClient = new SESv2Client({
   region: process.env.AWS_REGION ?? 'us-east-2',
@@ -14,7 +15,6 @@ const transporter = createTransport({
 })
 
 type MailOptions = Parameters<typeof transporter.sendMail>[0]
-type NodeMailerAttachments = MailOptions['attachments']
 export type MailReturn = Awaited<ReturnType<typeof transporter.sendMail>>
 
 export interface SendEmail {
@@ -25,7 +25,24 @@ export interface SendEmail {
   text?: string
   replyTo?: string[]
   headers?: Record<string, string>
-  attachments?: NodeMailerAttachments
+  attachments?: File[]
+}
+
+async function filesToAttachments(files?: File[]): Promise<Attachment[] | undefined> {
+  if (!files?.length) return undefined
+
+  const mapped = await Promise.all(
+    files.map(async f => {
+      const ab = await f.arrayBuffer()
+      return {
+        filename: f.name,
+        content: Buffer.from(ab),
+        contentType: f.type || undefined,
+      } satisfies Attachment
+    }),
+  )
+
+  return mapped
 }
 
 export async function sendEmail({
@@ -44,7 +61,7 @@ export async function sendEmail({
     subject,
     html: html,
     text: text,
-    attachments,
+    attachments: await filesToAttachments(attachments),
   }
 
   return await transporter.sendMail(toSend)

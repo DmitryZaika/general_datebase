@@ -7,19 +7,13 @@ import { posthogClient } from '~/utils/posthog.server'
 import { selectId } from '~/utils/queryHelpers'
 import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 
-const attachmentSchema = z.object({
-  content: z.base64(),
-  filename: z.string(),
-  contentType: z.string(),
-})
-
 export const emailSchema = z.object({
   to: z.union([z.email(), z.array(z.email())]),
   subject: z.string().min(1).max(100),
   body: z.string().min(1).max(10000),
   dealId: z.coerce.number().min(1).int().optional(),
   threadId: z.uuid().optional(),
-  attachments: z.array(attachmentSchema).optional(),
+  attachments: z.array(z.instanceof(File)),
 })
 
 type Email = z.infer<typeof emailSchema>
@@ -84,7 +78,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const user = await getEmployeeUser(request).catch(() => null)
   if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
 
-  const raw = await request.json()
+  const formData = await request.formData()
+
+  const raw = {
+    to: formData.get('to'),
+    subject: formData.get('subject'),
+    body: formData.get('body'),
+    dealId: Number(formData.get('dealId')),
+    attachments: formData.getAll('attachments'),
+  }
   const cleaned = emailSchema.parse(raw)
   const threadId = cleaned.threadId || uuidv4()
 
