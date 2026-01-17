@@ -1,22 +1,28 @@
-import type { SendEmailCommandOutput } from '@aws-sdk/client-ses'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { v4 as uuidv4 } from 'uuid'
 import { z } from 'zod'
 import { db } from '~/db.server'
-import { sendEmail } from '~/lib/email.server'
+import { type MailReturn, sendEmail } from '~/lib/email.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectId } from '~/utils/queryHelpers'
 import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 
-export const customerSchema = z.object({
+const attachmentSchema = z.object({
+  content: z.base64(),
+  filename: z.string(),
+  contentType: z.string(),
+})
+
+export const emailSchema = z.object({
   to: z.union([z.email(), z.array(z.email())]),
   subject: z.string().min(1).max(100),
   body: z.string().min(1).max(10000),
   dealId: z.coerce.number().min(1).int().optional(),
   threadId: z.uuid().optional(),
+  attachments: z.array(attachmentSchema).optional(),
 })
 
-type Customer = z.infer<typeof customerSchema>
+type Email = z.infer<typeof emailSchema>
 
 const fromEmail = (companyDomain: string | null, userEmail: string) => {
   const DEFAULT_EMAIL = 'sales@granite-manager.com'
@@ -34,7 +40,7 @@ const appendEmailSignature = (body: string, signature: string | null | undefined
   return `${cleanBody}\n\n${sign}`
 }
 
-const emailToSend = async (user: SessionUser, cleaned: Customer) => {
+const emailToSend = async (user: SessionUser, cleaned: Email) => {
   const userCompany = await selectId<{ domain: string | null }>(
     db,
     'SELECT domain from company where id = ?',
@@ -70,6 +76,7 @@ const emailToSend = async (user: SessionUser, cleaned: Customer) => {
     subject: cleaned.subject,
     html: HTMLBody,
     text: textBody,
+    attachments: cleaned.attachments,
   }
 }
 
@@ -78,11 +85,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
 
   const raw = await request.json()
-  const cleaned = customerSchema.parse(raw)
+  const cleaned = emailSchema.parse(raw)
   const threadId = cleaned.threadId || uuidv4()
 
   const emailInformation = await emailToSend(user, cleaned)
-  let info: SendEmailCommandOutput
+  let info: MailReturn
   try {
     info = await sendEmail(emailInformation)
   } catch (error) {
@@ -95,7 +102,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return data({ error: 'Email failed to send' }, { status: 400 })
   }
 
-  const messageId = info.MessageId
+  const messageId = info.messageId
 
   await db.execute(
     `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id, deal_id)

@@ -1,6 +1,7 @@
-import { SESClient } from '@aws-sdk/client-ses'
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
+import { createTransport } from 'nodemailer'
 
-const ses = new SESClient({
+const sesClient = new SESv2Client({
   region: process.env.AWS_REGION ?? 'us-east-2',
   credentials: {
     accessKeyId: process.env.AWS_EMAIL || '',
@@ -8,22 +9,23 @@ const ses = new SESClient({
   },
 })
 
-import { SendEmailCommand } from '@aws-sdk/client-ses'
+const transporter = createTransport({
+  SES: { sesClient, SendEmailCommand },
+})
 
-interface SendEmail {
+type MailOptions = Parameters<typeof transporter.sendMail>[0]
+type NodeMailerAttachments = MailOptions['attachments']
+export type MailReturn = Awaited<ReturnType<typeof transporter.sendMail>>
+
+export interface SendEmail {
   to: string | string[]
   from?: string
   subject: string
   html?: string
   text?: string
   replyTo?: string[]
-  configurationSet?: string
   headers?: Record<string, string>
-}
-
-interface Body {
-  Html?: { Data: string; Charset: string }
-  Text?: { Data: string; Charset: string }
+  attachments?: NodeMailerAttachments
 }
 
 export async function sendEmail({
@@ -33,24 +35,19 @@ export async function sendEmail({
   html,
   text,
   replyTo,
-  configurationSet,
-}: SendEmail) {
-  const body: Body = {}
-  if (html) body.Html = { Data: html, Charset: 'UTF-8' }
-  if (text) body.Text = { Data: text, Charset: 'UTF-8' }
+  attachments,
+}: SendEmail): Promise<MailReturn> {
+  const toSend: MailOptions = {
+    to: Array.isArray(to) ? to : [to],
+    replyTo,
+    from: from || 'noreply@granite-manager.com',
+    subject,
+    html: html,
+    text: text,
+    attachments,
+  }
 
-  return await ses.send(
-    new SendEmailCommand({
-      Destination: { ToAddresses: Array.isArray(to) ? to : [to] },
-      ReplyToAddresses: replyTo,
-      Source: from || 'noreply@granite-manager.com',
-      Message: {
-        Subject: { Data: subject, Charset: 'UTF-8' },
-        Body: body,
-      },
-      ConfigurationSetName: configurationSet,
-    }),
-  )
+  return await transporter.sendMail(toSend)
 }
 
 export async function sendPaymentEmail(to: string, uuid: string) {
