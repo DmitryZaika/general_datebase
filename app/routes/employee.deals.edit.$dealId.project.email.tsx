@@ -552,14 +552,14 @@ export default function DealEmailDialog() {
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const blobToBase64 = (blob: File) => {
+  const blobToBase64: (blob: File) => Promise<{ filename: string, content: string }> = (blob: File) => {
       return new Promise((resolve, reject) => {
         const reader = new FileReader()
         reader.onloadend = () => {
           if (typeof reader.result === 'string') {
             resolve({
-              name: blob.name,
-              base64: reader.result,
+              filename: blob.name,
+              content: reader.result,
             })
           }
         }
