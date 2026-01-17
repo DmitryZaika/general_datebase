@@ -111,7 +111,7 @@ export function DealsForm({
               </div>
             )}
             <div className='flex justify-end w-full'>
-              <LoadingButton loading={false} type='submit'>
+              <LoadingButton loading={form.formState.isSubmitting} type='submit'>
                 {dealId ? 'Save' : 'Create'}
               </LoadingButton>
             </div>

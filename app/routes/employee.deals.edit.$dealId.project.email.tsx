@@ -16,6 +16,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useNavigation,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
@@ -540,7 +541,6 @@ function sendEmail(
   attachments: File[],
 ) {
   const formData = new FormData()
-
   formData.append('to', to)
   formData.append('subject', subject)
   formData.append('body', body)
@@ -571,7 +571,7 @@ export default function DealEmailDialog() {
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
-
+ const isSubmitting = useNavigation().state !== 'idle'
   const form = useForm<EmailFormData>({
     resolver: emailResolver,
     defaultValues: {
@@ -636,7 +636,7 @@ export default function DealEmailDialog() {
   }
 
   const handleDialogClose = (open: boolean) => {
-    if (!open) navigate(`../b${location.search}`)
+    if (!open) navigate(`../${location.search}`)
   }
 
   const handleGenerateWithAI = async () => {
@@ -791,7 +791,7 @@ export default function DealEmailDialog() {
                 >
                   <PaperclipIcon className='h-4 w-4' />
                 </Button>
-                <Button type='submit'>Send Email</Button>
+                <LoadingButton loading={isSubmitting} type='submit'>Send Email</LoadingButton>
               </div>
             </div>
           </Form>
