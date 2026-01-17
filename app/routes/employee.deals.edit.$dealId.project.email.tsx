@@ -531,11 +531,14 @@ function AIAssistantMenu({
 // ============================================================================
 // MAIN COMPONENT
 // ====
-function sendEmail(to: string, subject: string, body: string, dealId: number) {
-  fetch('/api/employee/sendEmail', {
+function sendEmail(to: string, subject: string, body: string, dealId: number, attachments: any[]) {
+  return fetch('/api/employee/sendEmail', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to, subject, body, dealId }),
+    body: JSON.stringify({ to, subject, body, dealId, attachments }),
+  }).then(res => {
+    if (!res.ok) throw new Error('Failed to send email')
+    return res.json()
   })
 }
 
@@ -578,7 +581,10 @@ export default function DealEmailDialog() {
 
   const { mutate } = useMutation({
     mutationFn: async (values: EmailFormData) => {
-      sendEmail(values.to, values.subject, values.text, dealId)
+      const base64Attachments = await Promise.all(
+        values.attachments.map(file => blobToBase64(file)),
+      )
+      return sendEmail(values.to, values.subject, values.text, dealId, base64Attachments)
     },
     onSuccess: () => {
       navigate(`../${location.search}`)
@@ -620,7 +626,7 @@ export default function DealEmailDialog() {
   }
 
   const handleDialogClose = (open: boolean) => {
-    if (!open) navigate(`../${location.search}`)
+    if (!open) navigate(`../b${location.search}`)
   }
 
   const handleGenerateWithAI = async () => {
@@ -695,15 +701,15 @@ function attachmentIcon(fileName: string) {
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
             />
-            {form.getValues('attachments').length > 0 ? (
+            {form.watch('attachments').length > 0 ? (
               <TooltipProvider>
                 <div className='mt-3 flex flex-wrap gap-2'>
-                  {form.getValues('attachments').map(file => {
+                  {form.watch('attachments').map(file => {
                     const isTruncated = file.name.length > 15
                     const displayName = formatFileName(file.name)
                     const badge = (
                       <Badge
-                        key={`${file.name}-${file.size}-${file.lastModified}`}
+                        key={`${file.name}`}
                         className='cursor-pointer select-none'
                         onClick={() => removeAttachment(file)}
                       >
