@@ -5,11 +5,12 @@
 // External Dependencies
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
-import { FileText, ImageIcon } from 'lucide-react'
+import { FileText, ImageIcon, PaperclipIcon } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
+  Form,
   redirect,
   useLoaderData,
   useLocation,
@@ -118,6 +119,7 @@ const emailSchema = z.object({
   to: z.email('Valid email address is required'),
   subject: z.string().min(1, 'Subject is required'),
   text: z.string().min(1, 'Email body is required'),
+  attachments: z.array(z.instanceof(File)),
 })
 
 type EmailFormData = z.infer<typeof emailSchema>
@@ -529,11 +531,14 @@ function AIAssistantMenu({
 // ============================================================================
 // MAIN COMPONENT
 // ====
-function sendEmail(to: string, subject: string, body: string, dealId: number) {
-  fetch('/api/employee/sendEmail', {
+function sendEmail(to: string, subject: string, body: string, dealId: number, attachments: any[]) {
+  return fetch('/api/employee/sendEmail', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to, subject, body, dealId }),
+    body: JSON.stringify({ to, subject, body, dealId, attachments }),
+  }).then(res => {
+    if (!res.ok) throw new Error('Failed to send email')
+    return res.json()
   })
 }
 
@@ -542,11 +547,27 @@ export default function DealEmailDialog() {
   const location = useLocation()
   const { email, dealId, companyId } = useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
-  const [attachments, setAttachments] = useState<File[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const blobToBase64 = (blob: File) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          if (typeof reader.result === 'string') {
+            resolve({
+              name: blob.name,
+              base64: reader.result,
+            })
+          }
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+    }
+
 
   const form = useForm<EmailFormData>({
     resolver: emailResolver,
@@ -554,12 +575,16 @@ export default function DealEmailDialog() {
       to: email,
       subject: '',
       text: '',
+      attachments: [],
     },
   })
 
   const { mutate } = useMutation({
     mutationFn: async (values: EmailFormData) => {
-      sendEmail(values.to, values.subject, values.text, dealId)
+      const base64Attachments = await Promise.all(
+        values.attachments.map(file => blobToBase64(file)),
+      )
+      return sendEmail(values.to, values.subject, values.text, dealId, base64Attachments)
     },
     onSuccess: () => {
       navigate(`../${location.search}`)
@@ -601,7 +626,7 @@ export default function DealEmailDialog() {
   }
 
   const handleDialogClose = (open: boolean) => {
-    if (!open) navigate(`../${location.search}`)
+    if (!open) navigate(`../b${location.search}`)
   }
 
   const handleGenerateWithAI = async () => {
@@ -629,16 +654,7 @@ export default function DealEmailDialog() {
   }
 
   const removeAttachment = (file: File) => {
-    setAttachments(prev =>
-      prev.filter(
-        f =>
-          !(
-            f.name === file.name &&
-            f.size === file.size &&
-            f.lastModified === file.lastModified
-          ),
-      ),
-    )
+    form.setValue('attachments', form.getValues('attachments').filter(f => f !== file))
   }
 
   const formatFileName = (name: string) => {
@@ -674,7 +690,7 @@ function attachmentIcon(fileName: string) {
           <DialogTitle>Send Email</DialogTitle>
         </DialogHeader>
         <FormProvider {...form}>
-          <form
+          <Form
             onSubmit={form.handleSubmit(fullSubmit)}
             className='flex-1 flex flex-col'
           >
@@ -685,15 +701,15 @@ function attachmentIcon(fileName: string) {
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
             />
-            {attachments.length > 0 ? (
+            {form.watch('attachments').length > 0 ? (
               <TooltipProvider>
                 <div className='mt-3 flex flex-wrap gap-2'>
-                  {attachments.map(file => {
+                  {form.watch('attachments').map(file => {
                     const isTruncated = file.name.length > 15
                     const displayName = formatFileName(file.name)
                     const badge = (
                       <Badge
-                        key={`${file.name}-${file.size}-${file.lastModified}`}
+                        key={`${file.name}`}
                         className='cursor-pointer select-none'
                         onClick={() => removeAttachment(file)}
                       >
@@ -725,7 +741,7 @@ function attachmentIcon(fileName: string) {
               onChange={e => {
                 const files = e.currentTarget.files
                 if (files && files.length > 0) {
-                  setAttachments(prev => [...prev, ...Array.from(files)])
+                  form.setValue('attachments', [...form.getValues('attachments'), ...Array.from(files)])
                 }
                 e.currentTarget.value = ''
               }}
@@ -751,18 +767,18 @@ function attachmentIcon(fileName: string) {
                   getText={() => form.getValues('text')}
                   setText={value => form.setValue('text', value)}
                 />
-                {/* <Button
+                <Button
                   type='button'
                   size='icon'
                   aria-label='Attachment'
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <PaperclipIcon className='h-4 w-4' />
-                </Button> */}
+                </Button>
                 <Button type='submit'>Send Email</Button>
               </div>
             </div>
-          </form>
+          </Form>
         </FormProvider>
         {showAIMenu && (
           <div className='mt-4'>
