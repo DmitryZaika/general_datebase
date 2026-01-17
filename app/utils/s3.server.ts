@@ -105,10 +105,11 @@ const uploadStream = ({
 export async function uploadStreamToS3(
   data: AsyncIterable<Uint8Array>,
   filename: string,
+  folder: string = 'dynamic-images',
 ) {
   const mimeType = mime.lookup(filename) || 'application/octet-stream'
   const stream = uploadStream({
-    Key: `dynamic-images/${filename}`,
+    Key: `${folder}/${filename}`,
     ContentType: mimeType,
   })
   await writeAsyncIterableToWritable(data, stream.writeStream)

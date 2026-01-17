@@ -1,5 +1,5 @@
 import { format } from 'date-fns'
-import { Pencil } from 'lucide-react'
+import { FileText, Pencil } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -9,6 +9,7 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router'
+import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ import {
   TooltipTrigger,
 } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
+import { fileSize } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
 import { getAdminUser, type User } from '~/utils/session.server'
@@ -262,7 +264,11 @@ export default function EmailChatDialog() {
   
   } = useLoaderData<typeof loader>()
   const [chatMessages, setChatMessages] = useState<Message[]>(messages)
- 
+  const [currentImages, setCurrentImages] = useState<
+    { id: number; url: string; name: string; type: string; available: null }[]
+  >([])
+  const [currentImageId, setCurrentImageId] = useState<number | null>(null)
+
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   const getDisplayBody = (body: string, signature: string | null | undefined) => {
@@ -354,12 +360,15 @@ export default function EmailChatDialog() {
                         }`
                   }
                 >
-                  <p className='whitespace-pre-wrap'>
-                    {getDisplayBody(
-                      message.body,
-                      message.isFromCustomer ? null : message.signature,
-                    )}
-                  </p>
+                  <div
+                    className='whitespace-pre-wrap'
+                    dangerouslySetInnerHTML={{
+                      __html: getDisplayBody(
+                        message.body,
+                        message.isFromCustomer ? null : message.signature,
+                      ),
+                    }}
+                  />
                   {!message.isFromCustomer &&
                   message.signature &&
                   message.signature.trim() !== '' ? (
@@ -383,35 +392,82 @@ export default function EmailChatDialog() {
                     </div>
                   ) : null}
                   {message.attachments && message.attachments.length > 0 ? (
-                    <div className='mt-3 space-y-2'>
+                    <div className='mt-3 flex flex-wrap gap-3'>
                       {message.attachments.map(attachment => {
                         const mime = `${attachment.content_type}/${attachment.content_subtype}`
                         const label = attachment.filename || mime
+                        const contentType = attachment.content_type.toLowerCase()
                         const isImage =
-                          attachment.content_type.toLowerCase() === 'image'
+                          contentType === 'image' || contentType.startsWith('image/')
+                        const isPdf =
+                          (contentType === 'application' &&
+                            attachment.content_subtype.toLowerCase() === 'pdf') ||
+                          mime.toLowerCase().includes('pdf')
                         const href = attachment.signed_url || attachment.url
                         const linkClass = message.isFromCustomer
                           ? 'text-blue-700 underline'
                           : 'text-white underline'
 
                         return (
-                          <div key={attachment.id} className='space-y-2'>
-                            {href ? (
+                          <div key={attachment.id} className='space-y-2 max-w-[140px]'>
+                            {isPdf && href ? (
+                              <a
+                                href={href}
+                                target='_blank'
+                                rel='noreferrer'
+                                className='block'
+                                download
+                              >
+                                <div className={`${fileSize} bg-white rounded-md border border-gray-300 flex flex-col items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors p-2 shadow-sm`}>
+                                  <FileText className='h-10 w-10 mb-2 text-gray-400' />
+                                  <span className='text-[10px] text-center break-all line-clamp-2 leading-tight'>
+                                    {label}
+                                  </span>
+                                </div>
+                              </a>
+                            ) : !isImage && href ? (
                               <a
                                 href={href}
                                 target='_blank'
                                 rel='noreferrer'
                                 className={linkClass}
-                              ></a>
+                                download
+                              >
+                                <span className='inline-flex items-center gap-1'>
+                                  <FileText className='h-4 w-4' />
+                                  <span>{label}</span>
+                                </span>
+                              </a>
                             ) : null}
                             {isImage && href ? (
-                              <a href={href} target='_blank' rel='noreferrer'>
+                              <button
+                                type='button'
+                                className='block cursor-pointer'
+                                onClick={() => {
+                                  const imgs =
+                                    message.attachments
+                                      ?.filter(
+                                        a =>
+                                          a.content_type.toLowerCase() === 'image' &&
+                                          (a.signed_url || a.url),
+                                      )
+                                      .map(img => ({
+                                        id: img.id,
+                                        url: img.signed_url || img.url,
+                                        name: img.filename || `${img.content_type}/${img.content_subtype}`,
+                                        type: 'email',
+                                        available: null,
+                                      })) || []
+                                  setCurrentImages(imgs)
+                                  setCurrentImageId(attachment.id)
+                                }}
+                              >
                                 <img
                                   src={href}
                                   alt={label}
-                                  className='max-h-48 rounded-md border border-black/10'
+                                  className={`${fileSize} object-cover rounded-md border border-black/10`}
                                 />
-                              </a>
+                              </button>
                             ) : null}
                           </div>
                         )
@@ -431,6 +487,14 @@ export default function EmailChatDialog() {
           <div ref={bottomRef} />
         </div>
       </DialogContent>
+      <SuperCarousel
+        type='email'
+        currentId={currentImageId ?? undefined}
+        setCurrentId={id => setCurrentImageId(id ?? null)}
+        images={currentImages}
+        userRole='admin'
+        showInfo={false}
+      />
     </Dialog>
   )
 }
