@@ -16,6 +16,8 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
 
   const isSubmittingRef = useRef(false)
 
+  console.log('navigation.state', navigation.state)
+
   useEffect(() => {
     if (navigation.state === 'idle') {
       isSubmittingRef.current = false
@@ -46,12 +48,13 @@ export function useFullSubmit<TFieldValues extends FieldValues = FieldValues>(
       const sanitizedData = cleanData(data)
       sanitizedData.csrf = token
 
-      return submit(sanitizedData, {
+      const answer =  submit(sanitizedData, {
         method: method,
         action: action,
         encType: 'application/x-www-form-urlencoded',
         navigate: navigateOnSubmit,
       })
+      return answer
     },
     () => {
       form.trigger()

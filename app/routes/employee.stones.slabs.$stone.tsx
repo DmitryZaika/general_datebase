@@ -14,6 +14,7 @@ import {
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
@@ -380,6 +381,31 @@ export async function action({ request, params }: ActionFunctionArgs) {
   return null
 }
 
+
+function LoadingLink({ slab }: { slab: Slab }) {
+  const [active, setActive] = useState(false)
+  const navigation = useNavigation()
+  const location = useLocation()
+  const isLoading = navigation.state !== 'idle' && active
+
+  const linkPrefix = slab.sale_id ? `edit/${slab.sale_id}` : `sell/${slab.id}`
+  const link = `${linkPrefix}${location.search}`
+  const linkText = slab.sale_id ? 'Edit' : 'Sell'
+
+ useEffect(() => {
+  if (navigation.state === 'idle') {
+    setActive(false)
+  }
+ }, [navigation.state])
+
+  return (
+    <div className='flex gap-2 ml-auto'>
+      <Link to={link}>
+        <LoadingButton type='button' className='capitalize' loading={isLoading} onClick={() => setActive(true)}>{linkText}</LoadingButton>
+      </Link>
+  </div>)
+}
+
 export default function SlabsModal() {
   const { slabs, linkedSlabs, stone, saleId, canSell } = useLoaderData<typeof loader>()
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -524,21 +550,11 @@ export default function SlabsModal() {
               </div>
 
               {!isEditing && canSell && (
-                <div className='flex gap-2 ml-auto'>
-                  {slab.sale_id ? (
-                    <Link to={`edit/${slab.sale_id}/${location.search}`}>
-                      <Button type='button'>Edit</Button>
-                    </Link>
-                  ) : (
-                    <Link to={`sell/${slab.id}/${location.search}`} className='ml-auto'>
-                      <Button className='px-4 py-2'>Sell</Button>
-                    </Link>
-                  )}
-                </div>
+                <LoadingLink slab={slab} />
               )}
             </div>
-          </TooltipTrigger>
-          {(slab.sale_id || slab.parent_transaction) && (
+            </TooltipTrigger>
+            {(slab.sale_id || slab.parent_transaction) && (
             <TooltipContent className='bg-gray-900 text-white p-2 rounded shadow-lg max-w-xs'>
               <div className='flex flex-col gap-1 text-sm'>
                 {slab.transaction ? (
