@@ -17,6 +17,7 @@ import { useFullSubmit } from '~/hooks/useFullSubmit'
 
 interface EmailTemplateFormData {
   template_name: string
+  template_subject: string
   template_body: string
 }
 
@@ -54,6 +55,18 @@ export function EmailTemplateForm({
                 <InputItem
                   name='Template Name'
                   placeholder='Enter template name'
+                  field={field}
+                />
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='template_subject'
+              render={({ field }) => (
+                <InputItem
+                  name='Template Subject'
+                  placeholder='Enter email subject'
                   field={field}
                 />
               )}

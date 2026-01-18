@@ -198,7 +198,7 @@ export const LeadEdit = () => {
 
             <AddressInput form={form} field='address' type='project' />
             <DialogFooter>
-              <LoadingButton type='submit' loading={false}>
+              <LoadingButton type='submit' loading={form.formState.isSubmitting}>
                 Update Lead
               </LoadingButton>
             </DialogFooter>

@@ -1,5 +1,5 @@
 import { format } from 'date-fns'
-import { FileText, Pencil } from 'lucide-react'
+import { FileText, ImageIcon, PaperclipIcon, Pencil } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -11,6 +11,7 @@ import {
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
+import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -33,6 +34,7 @@ import {
 } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
+import { fileSize } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
@@ -280,12 +282,44 @@ export default function EmailChatDialog() {
   const [messageText, setMessageText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [attachments, setAttachments] = useState<File[]>([])
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [currentImages, setCurrentImages] = useState<
     { id: number; url: string; name: string; type: string; available: null }[]
   >([])
   const [currentImageId, setCurrentImageId] = useState<number | null>(null)
+
+  const removeAttachment = (file: File) => {
+    setAttachments(prev => prev.filter(f => f !== file))
+  }
+
+  const formatFileName = (name: string) => {
+    if (name.length <= 15) return name
+    return `${name.slice(0, 15)}...`
+  }
+
+  const imageExt = new Set([
+    'png',
+    'jpg',
+    'jpeg',
+    'webp',
+    'gif',
+    'bmp',
+    'svg',
+    'heic',
+    'heif',
+    'tiff',
+    'tif',
+  ])
+
+  function attachmentIcon(fileName: string) {
+    const parts = fileName.split('.')
+    const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : ''
+    if (ext && imageExt.has(ext)) return <ImageIcon className='h-4 w-4' />
+    return <FileText className='h-4 w-4' />
+  }
 
   const getDisplayBody = (body: string, signature: string | null | undefined) => {
     const b = (body || '').trimEnd()
@@ -357,9 +391,10 @@ export default function EmailChatDialog() {
     }
   }
 
+
   const handleSend = async () => {
     const body = messageText.trim()
-    if (!body) return
+    if (!body && attachments.length === 0) return
     if (!customerEmail) {
       alert('Customer email is missing')
       return
@@ -368,16 +403,20 @@ export default function EmailChatDialog() {
 
     setIsSending(true)
     try {
+      const formData = new FormData()
+      formData.append('to', customerEmail)
+      formData.append('subject', emailSubject)
+      formData.append('body', body)
+      formData.append('dealId', dealId.toString())
+      formData.append('threadId', threadId)
+
+      attachments.forEach(file => {
+        formData.append('attachments', file)
+      })
+
       const response = await fetch('/api/employee/sendEmail', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: customerEmail,
-          subject: emailSubject,
-          body,
-          dealId,
-          threadId,
-        }),
+        body: formData,
       })
 
       if (!response.ok) {
@@ -396,6 +435,15 @@ export default function EmailChatDialog() {
         throw new Error(errorText || 'Email failed to send')
       }
 
+      const localAttachments: Attachment[] = attachments.map((file, i) => ({
+        id: -Date.now() - i,
+        email_id: -1,
+        content_type: file.type.split('/')[0] || 'application',
+        content_subtype: file.type.split('/')[1] || 'octet-stream',
+        filename: file.name,
+        url: URL.createObjectURL(file),
+      }))
+
       setChatMessages(prev => [
         ...prev,
         {
@@ -405,9 +453,11 @@ export default function EmailChatDialog() {
           signature: currentUserSignature,
           sent_at: new Date().toISOString(),
           isFromCustomer: false,
+          attachments: localAttachments,
         },
       ])
       setMessageText('')
+      setAttachments([])
       toast({ title: 'Success', description: 'Email sent!', variant: 'success' })
     } catch (error) {
       if (error instanceof Error) {
@@ -469,12 +519,15 @@ export default function EmailChatDialog() {
                         }`
                   }
                 >
-                  <p className='whitespace-pre-wrap'>
-                    {getDisplayBody(
-                      message.body,
-                      message.isFromCustomer ? null : message.signature,
-                    )}
-                  </p>
+                  <div
+                    className='whitespace-pre-wrap'
+                    dangerouslySetInnerHTML={{
+                      __html: getDisplayBody(
+                        message.body,
+                        message.isFromCustomer ? null : message.signature,
+                      ),
+                    }}
+                  />
                   {!message.isFromCustomer &&
                   message.signature &&
                   message.signature.trim() !== '' ? (
@@ -516,13 +569,28 @@ export default function EmailChatDialog() {
 
                         return (
                           <div key={attachment.id} className='space-y-2 max-w-[140px]'>
-                            {!isImage && href ? (
+                            {isPdf && href ? (
+                              <a
+                                href={href}
+                                target='_blank'
+                                rel='noreferrer'
+                                className='block'
+                                download
+                              >
+                                <div className={`${fileSize} bg-white rounded-md border border-gray-300 flex flex-col items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors p-2 shadow-sm`}>
+                                  <FileText className='h-10 w-10 mb-2 text-gray-400' />
+                                  <span className='text-[10px] text-center break-all line-clamp-2 leading-tight'>
+                                    {label}
+                                  </span>
+                                </div>
+                              </a>
+                            ) : !isImage && href ? (
                               <a
                                 href={href}
                                 target='_blank'
                                 rel='noreferrer'
                                 className={linkClass}
-                                download={isPdf ? undefined : undefined}
+                                download
                               >
                                 <span className='inline-flex items-center gap-1'>
                                   <FileText className='h-4 w-4' />
@@ -556,7 +624,7 @@ export default function EmailChatDialog() {
                                 <img
                                   src={href}
                                   alt={label}
-                                  className='max-h-48 rounded-md border border-black/10'
+                                  className={`${fileSize} object-cover rounded-md border border-black/10`}
                                 />
                               </button>
                             ) : null}
@@ -579,6 +647,38 @@ export default function EmailChatDialog() {
         </div>
 
         <div className='p-4 border-t'>
+          {attachments.length > 0 && (
+            <div className='mb-2 flex flex-wrap gap-2'>
+              {attachments.map(file => {
+                const isTruncated = file.name.length > 15
+                const displayName = formatFileName(file.name)
+                const badge = (
+                  <Badge
+                    key={`${file.name}-${file.size}`}
+                    className='cursor-pointer select-none'
+                    onClick={() => removeAttachment(file)}
+                  >
+                    <span className='flex items-center gap-1'>
+                      {attachmentIcon(file.name)}
+                      <span>{displayName}</span>
+                      <span className='ml-1'>×</span>
+                    </span>
+                  </Badge>
+                )
+
+                if (!isTruncated) return badge
+
+                return (
+                  <TooltipProvider key={`${file.name}-${file.size}`}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+                      <TooltipContent side='top'>{file.name}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )
+              })}
+            </div>
+          )}
           <div className='flex items-end gap-2'>
             {showSelect ? (
               <div className='flex gap-2 items-end'>
@@ -624,6 +724,26 @@ export default function EmailChatDialog() {
               buttonSize='icon'
               iconClassName='text-lg'
             />
+            <Button
+              type='button'
+              size='icon'
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <PaperclipIcon className='h-5 w-5' />
+            </Button>
+            <input
+              ref={fileInputRef}
+              type='file'
+              className='hidden'
+              multiple
+              onChange={e => {
+                const files = e.currentTarget.files
+                if (files && files.length > 0) {
+                  setAttachments(prev => [...prev, ...Array.from(files)])
+                }
+                e.currentTarget.value = ''
+              }}
+            />
             <textarea
               ref={textareaRef}
               value={messageText}
@@ -645,7 +765,7 @@ export default function EmailChatDialog() {
                 variant='ghost'
                 size='icon'
                 className='text-zinc-500'
-                disabled={isSending || messageText.trim() === ''}
+                disabled={isSending || (messageText.trim() === '' && attachments.length === 0)}
                 onClick={handleSend}
               >
                 <span className='text-xl'>➤</span>
