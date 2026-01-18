@@ -18,10 +18,14 @@ export const emailSchema = z.object({
   attachments: z.array(z.instanceof(File)),
 })
 
+const cleanId = (value: string): string => {
+  return value.slice(1).split('@')[0]
+}
+
 type Email = z.infer<typeof emailSchema>
+const DEFAULT_EMAIL = 'sales@granite-manager.com'
 
 const fromEmail = (companyDomain: string | null, userEmail: string) => {
-  const DEFAULT_EMAIL = 'sales@granite-manager.com'
   if (!companyDomain) return DEFAULT_EMAIL
   if (userEmail.includes(companyDomain)) return userEmail
   return DEFAULT_EMAIL
@@ -107,7 +111,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return data({ error: 'Email failed to send' }, { status: 400 })
   }
 
-  const messageId = info.messageId
+  const messageId = cleanId(info.messageId)
 
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id, deal_id)
