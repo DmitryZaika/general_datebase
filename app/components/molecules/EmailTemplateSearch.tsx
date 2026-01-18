@@ -7,6 +7,7 @@ import { Input } from '../ui/input'
 export interface EmailTemplate {
   id: number
   template_name: string
+  template_subject: string
   template_body: string
 }
 

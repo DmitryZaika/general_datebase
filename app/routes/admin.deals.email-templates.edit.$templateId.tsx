@@ -19,11 +19,13 @@ import { toastData } from '~/utils/toastHelpers.server'
 interface EmailTemplate {
   id: number
   template_name: string
+  template_subject: string
   template_body: string
 }
 
 const templateSchema = z.object({
   template_name: z.string().min(1, 'Template name is required'),
+  template_subject: z.string().min(1, 'Template subject is required'),
   template_body: z.string().min(1, 'Template body is required'),
 })
 
@@ -46,7 +48,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const templates = await selectMany<EmailTemplate>(
     db,
-    `SELECT id, template_name, template_body
+    `SELECT id, template_name, template_subject, template_body
      FROM email_templates
      WHERE id = ? AND company_id = ? AND deleted_at IS NULL`,
     [templateId, user.company_id],
@@ -85,9 +87,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   await db.execute(
     `UPDATE email_templates
-     SET template_name = ?, template_body = ?
+     SET template_name = ?, template_subject = ?, template_body = ?
      WHERE id = ? AND company_id = ?`,
-    [data.template_name, data.template_body, templateId, user.company_id],
+    [data.template_name, data.template_subject, data.template_body, templateId, user.company_id],
   )
 
   const session = await getSession(request.headers.get('Cookie'))
@@ -105,6 +107,7 @@ export default function EditEmailTemplate() {
     resolver,
     defaultValues: {
       template_name: template.template_name,
+      template_subject: template.template_subject,
       template_body: template.template_body,
     },
   })

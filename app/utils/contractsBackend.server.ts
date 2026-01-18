@@ -166,7 +166,7 @@ export async function getCustomerSchemaFromSaleId(
     const roomId = slab.room_id
 
     const extras = extrasSchema.parse(slab.extras || EXTRA_DEFAULTS)
-
+  const cleanSqft = Number(slab.square_feet) || 1
     if (!roomsMap[roomId]) {
       roomsMap[roomId] = {
         room: slab.room || 'kitchen',
@@ -174,7 +174,7 @@ export async function getCustomerSchemaFromSaleId(
         sink_type: sinkMap[slab.id] || [],
         faucet_type: faucetMap[slab.id] || [],
         backsplash: slab.backsplash || 'no',
-        square_feet: slab.square_feet || 0,
+        square_feet: cleanSqft,
         retail_price: slab.retail_price || 0,
         total_price: undefined,
         tear_out: slab.tear_out || 'no',

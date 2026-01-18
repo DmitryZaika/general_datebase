@@ -27,6 +27,7 @@ interface DataTableProps<TData, TValue> {
   rowClassName?: string | ((row: TData) => string)
   paginate?: boolean
   pageSize?: number
+  getRowId?: (row: TData) => string
 }
 
 function getRowClassName<TData>(
@@ -54,6 +55,7 @@ export function DataTable<TData, TValue>({
   rowClassName,
   paginate = false,
   pageSize,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
   const initialPageSize = paginate ? pageSize || 50 : data.length || 1
@@ -69,6 +71,7 @@ export function DataTable<TData, TValue>({
     getSortedRowModel: getSortedRowModel(),
     onPaginationChange: setPagination,
     getPaginationRowModel: getPaginationRowModel(),
+    getRowId,
     state: {
       sorting,
       pagination,

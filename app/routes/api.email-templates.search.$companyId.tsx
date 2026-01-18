@@ -6,6 +6,7 @@ import { getEmployeeUser } from '~/utils/session.server'
 interface EmailTemplate {
   id: number
   template_name: string
+  template_subject: string
   template_body: string
 }
 
@@ -24,7 +25,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const templates = await selectMany<EmailTemplate>(
     db,
-    `SELECT id, template_name, template_body
+    `SELECT id, template_name, template_subject, template_body
      FROM email_templates
      WHERE company_id = ? AND deleted_at IS NULL
      ORDER BY created_at DESC`,

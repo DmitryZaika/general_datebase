@@ -82,6 +82,7 @@ export const BASE_PRICES = {
     bullnose: ({ linearFeet }: { linearFeet: number }) => linearFeet * 18,
   },
 }
+ export const fileSize = 'size-24'
 
 export const CUSTOMER_ITEMS = {
   tripFee: {
