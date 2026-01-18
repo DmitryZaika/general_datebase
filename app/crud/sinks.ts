@@ -1,9 +1,9 @@
-import { db } from "~/db.server";
-import { SaleSink } from "~/types/sales";
-import { selectMany } from "~/utils/queryHelpers";
+import { db } from '~/db.server'
+import type { SaleSink } from '~/types/sales'
+import { selectMany } from '~/utils/queryHelpers'
 
 export async function getSlabInventorySinks(saleId: number) {
-    return await selectMany<SaleSink>(
+  return await selectMany<SaleSink>(
     db,
     `SELECT
       sinks.id,
@@ -20,4 +20,5 @@ export async function getSlabInventorySinks(saleId: number) {
      WHERE slab_inventory.sale_id = ? AND sinks.is_deleted = 0
      ORDER BY sinks.id`,
     [saleId],
-  )}
+  )
+}
