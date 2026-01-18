@@ -110,7 +110,7 @@ export default function DealEmailHistory() {
         columns={customerColumns}
         data={emails}
         onRowClick={(email: EmailHistory) => handleRowClick(email)}
-        rowClassName={(email: EmailHistory) => 'cursor-pointer'}
+        rowClassName={() => 'cursor-pointer'}
         getRowId={(email: EmailHistory) => email.thread_id}
       />
       <Outlet />

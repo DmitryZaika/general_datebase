@@ -3,35 +3,37 @@ import { Plus, Trash2 } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef } from 'react'
 import {
-    type ActionFunctionArgs,
-    data,
-    Form,
-    type LoaderFunctionArgs,
-    redirect,
-    useFetcher,
-    useLoaderData,
-    useNavigate,
-    useNavigation,
-    useSubmit
+  type ActionFunctionArgs,
+  data,
+  Form,
+  type LoaderFunctionArgs,
+  redirect,
+  useFetcher,
+  useLoaderData,
+  useNavigate,
+  useNavigation,
+  useSubmit
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { z } from 'zod'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Button } from '~/components/ui/button'
 import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle
 } from '~/components/ui/card'
 import { Dialog, DialogContent } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Switch } from '~/components/ui/switch'
 import { db } from '~/db.server'
+import { commitSession, getSession } from '~/sessions.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, User } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers.server'
 
 // ============================================================================
 // TYPES & SCHEMAS
@@ -128,20 +130,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
+
+  const session = await getSession(request.headers.get('Cookie'))
   const formData = await request.clone().formData()
   const intent = formData.get('intent')
 
-    if (intent === 'toggle_group') {
+  if (intent === 'toggle_group') {
     const groupId = Number(formData.get('groupId'))
-    // Default group (id=1) visibility can now be toggled if needed, based on user request.
-    // However, if the requirement was "id === 1 cannot be deleted or edited", 
-    // and now "first list can be is_visible false", we allow it for toggle but keep preventions for delete/edit structure.
-    
-    // Previous restriction:
-    // if (groupId === 1) {
-    //   return data({ error: 'Cannot edit Default group' }, { status: 400 })
-    // }
-    
     const isDisplay = formData.get('isDisplay') === 'on'
     await db.execute('UPDATE groups_list SET is_displayed = ? WHERE id = ?', [
       isDisplay,
@@ -165,6 +160,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   switch (values.intent) {
     case 'create_group': {
       await db.execute('INSERT INTO groups_list (name, created_at, company_id) VALUES (?, ?, ?)', [values.name, new Date(), user.company_id])
+      session.flash('message', toastData('Success', 'Group created successfully'))
       break
     }
     case 'delete_group': {
@@ -175,10 +171,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       await db.execute('UPDATE groups_list SET deleted_at = NOW() WHERE id = ?', [
         values.groupId,
       ])
-      // Also soft delete lists in this group?
       await db.execute('UPDATE deals_list SET deleted_at = NOW() WHERE group_id = ?', [
         values.groupId,
       ])
+      session.flash('message', toastData('Success', 'Group and its lists deleted successfully'))
       break
     }
     case 'create_list': {
@@ -186,7 +182,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return data({ error: 'Cannot add lists to Default group' }, { status: 400 })
       }
 
-      // Get next position for this group
       const [posRows] = await db.execute<RowDataPacket[]>(
         'SELECT MAX(position) as maxPos FROM deals_list WHERE group_id = ? AND deleted_at IS NULL',
         [values.groupId],
@@ -197,29 +192,31 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         'INSERT INTO deals_list (name, group_id, position) VALUES (?, ?, ?)',
         [values.name, values.groupId, nextPos],
       )
+      session.flash('message', toastData('Success', 'List created successfully'))
       break
     }
     case 'delete_list': {
-        // Check if list is in Default group
-        const [listRows] = await db.execute<RowDataPacket[]>(
-            `SELECT group_id FROM deals_list WHERE id = ?`, 
-            [values.listId]
-        )
-        const groupId = listRows[0]?.group_id
-        
-        if (groupId === 1) {
-            // Cannot delete any list in Default group
-             return data({ error: 'Cannot delete lists in Default group' }, { status: 400 })
-        }
+      const [listRows] = await db.execute<RowDataPacket[]>(
+        `SELECT group_id FROM deals_list WHERE id = ?`, 
+        [values.listId]
+      )
+      const groupId = listRows[0]?.group_id
+      
+      if (groupId === 1) {
+        return data({ error: 'Cannot delete lists in Default group' }, { status: 400 })
+      }
 
       await db.execute('UPDATE deals_list SET deleted_at = NOW() WHERE id = ?', [
         values.listId,
       ])
+      session.flash('message', toastData('Success', 'List deleted successfully'))
       break
     }
   }
 
-  return data({ success: true })
+  return data({ success: true }, {
+    headers: { 'Set-Cookie': await commitSession(session) },
+  })
 }
 
 // ============================================================================
@@ -345,7 +342,14 @@ export default function ManageLists() {
                       <span className='font-medium truncate'>{list.name}</span>
                       
                       {group.id !== 1 && (
-                        <Form method='post'>
+                        <Form 
+                          method='post'
+                          onSubmit={(e) => {
+                            if (!confirm('Are you sure you want to delete this list?')) {
+                              e.preventDefault()
+                            }
+                          }}
+                        >
                             <input type='hidden' name='intent' value='delete_list' />
                             <input type='hidden' name='listId' value={list.id} />
                             <Button 
