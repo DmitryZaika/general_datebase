@@ -2,7 +2,6 @@ import { useDroppable } from '@dnd-kit/core'
 import { Plus } from 'lucide-react'
 import { Link } from 'react-router'
 import DealsCard from './DealsCard'
-import { ActionDropdown } from './molecules/DataTable/ActionDropdown'
 import { Button } from './ui/button'
 import { Card, CardHeader, CardTitle } from './ui/card'
 
@@ -34,7 +33,7 @@ export default function DealsList({
   readonly = false,
   highlightedDealId,
 }: DealsListProps) {
-  const locked = readonly || [1, 2, 3, 4, 5, 6].includes(id)
+
   const { setNodeRef } = useDroppable({
     id: `list-${id}`,
     data: { type: 'list', listId: id },
@@ -54,19 +53,7 @@ export default function DealsList({
           <span className='text-xs font-medium text-white/90 bg-white/20 rounded-full px-2 py-0.5'>
             {customers.length}
           </span>
-          {!locked && (
-            <div className='flex gap-2 items-center'>
-              <span className='text-xs font-medium text-white/90 bg-white/20 rounded-full px-2 py-0.5'>
-                {customers.length}
-              </span>
-              <ActionDropdown
-                actions={{ edit: `edit-list/${id}`, delete: `delete/${id}` }}
-                label='List actions'
-                className='!text-white hover:!text-black'
-                wrapperClassName='!pr-0'
-              />
-            </div>
-          )}
+          
         </div>
       </CardHeader>
       <DealsCard
