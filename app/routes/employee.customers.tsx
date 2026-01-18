@@ -1,17 +1,22 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef, Row } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Plus,
+} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
-    Link,
-    type LoaderFunctionArgs,
-    Outlet,
-    redirect,
-    useLoaderData,
-    useLocation,
-    useNavigate,
-    useSearchParams,
+  Link,
+  type LoaderFunctionArgs,
+  Outlet,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useSearchParams,
 } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
@@ -23,12 +28,19 @@ import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
 import { DataTable } from '~/components/ui/data-table'
 import { FormField } from '~/components/ui/form'
-import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
 import type { sourceEnum } from '~/schemas/customers'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '~/components/ui/select'
 
 interface Customer {
   id: number
@@ -43,6 +55,9 @@ interface Customer {
   company_id: number
   source: (typeof sourceEnum)[number] | 'user-input'
   invalid_lead: string | null
+  revenue_generated?: number | null
+  projects_count?: number | null
+  company_name?: string | null
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -56,27 +71,56 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url)
   const salesRepFilter = url.searchParams.get('sales_rep')
   const includeInvalid = url.searchParams.get('show_invalid') === '1'
+  const view = url.searchParams.get('view') || 'customers'
 
   const params: number[] = []
   const conditions: string[] = ['c.deleted_at IS NULL', 'c.company_id = ?']
   params.push(user.company_id)
+  
+  if (view === 'companies') {
+    conditions.push("(c.company_name IS NOT NULL AND c.company_name != '')")
+  }
+
   if (salesRepFilter) {
     conditions.push('c.sales_rep = ?')
     params.push(Number(salesRepFilter))
   }
-  if (!includeInvalid) {
+  if (!includeInvalid && view !== 'companies') {
     conditions.push("(c.invalid_lead IS NULL OR c.invalid_lead = '')")
   }
   const where = `WHERE ${conditions.join(' AND ')}`
 
-  const customers = await selectMany<Customer>(
-    db,
-    `SELECT c.id, c.name, c.email, c.phone, c.address, c.sales_rep, c.created_date, u.name AS sales_rep_name, c.company_id, c.source, c.invalid_lead
-     FROM customers c
-     LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
-     ${where}`,
-    params,
-  )
+  let query = `
+    SELECT c.id, c.name, c.email, c.phone, c.address, c.sales_rep, c.created_date, u.name AS sales_rep_name, c.company_id, c.source, c.invalid_lead, c.company_name
+    FROM customers c
+    LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
+    ${where}
+  `
+
+  if (view === 'companies') {
+    query = `
+      SELECT 
+        c.id, c.name, c.email, c.phone, c.address, c.sales_rep, c.created_date, 
+        u.name AS sales_rep_name, c.company_id, c.source, c.invalid_lead, c.company_name,
+        (
+          SELECT SUM(s.price)
+          FROM sales s
+          LEFT JOIN customers sub ON sub.id = s.customer_id
+          WHERE s.customer_id = c.id OR sub.parent_id = c.id
+        ) as revenue_generated,
+        (
+          SELECT COUNT(*)
+          FROM deals d
+          LEFT JOIN customers sub ON sub.id = d.customer_id
+          WHERE d.customer_id = c.id OR sub.parent_id = c.id
+        ) as projects_count
+      FROM customers c
+      LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
+      ${where}
+    `
+  }
+
+  const customers = await selectMany<Customer>(db, query, params)
 
   const positions = await selectMany<{ name: string }>(
     db,
@@ -173,10 +217,50 @@ function SalesRepCell({ customer }: { customer: Customer }) {
   )
 }
 
-const customerColumns: ColumnDef<Customer>[] = [
+function SortableHeader({ title, sortKey }: { title: string; sortKey: string }) {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const currentSortBy = searchParams.get('sortBy')
+  const currentOrder = searchParams.get('order') || 'asc'
+  const isSorted = currentSortBy === sortKey
+
+  const toggleSort = () => {
+    const params = new URLSearchParams(searchParams)
+    if (isSorted) {
+      params.set('order', currentOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      params.set('sortBy', sortKey)
+      params.set('order', 'asc')
+    }
+    navigate({ pathname: location.pathname, search: params.toString() })
+  }
+
+  return (
+    <Button
+      variant='ghost'
+      onClick={toggleSort}
+      className='-ml-3 h-8 p-0 px-2 font-medium hover:bg-slate-100'
+    >
+      {title}
+      {isSorted ? (
+        currentOrder === 'asc' ? (
+          <ArrowUp className='ml-2 h-4 w-4 text-slate-900' />
+        ) : (
+          <ArrowDown className='ml-2 h-4 w-4 text-slate-900' />
+        )
+      ) : (
+        <ArrowUpDown className='ml-2 h-4 w-4 text-slate-400 opacity-50' />
+      )}
+    </Button>
+  )
+}
+
+const customerColumnsBase: ColumnDef<Customer>[] = [
   {
     accessorKey: 'name',
-    header: 'Name of customer',
+    header: () => <SortableHeader title='Name of customer' sortKey='name' />,
     cell: ({ row }: { row: Row<Customer> }) => {
       const name = row.original.name || ''
       const short = name.length > 20 ? `${name.slice(0, 20)}...` : name
@@ -185,30 +269,26 @@ const customerColumns: ColumnDef<Customer>[] = [
   },
   {
     accessorKey: 'phone',
-    header: 'Phone Number',
+    header: () => <SortableHeader title='Phone Number' sortKey='phone' />,
     cell: ({ row }: { row: Row<Customer> }) => (
       <CopyText value={row.original.phone} title={row.original.phone} />
     ),
   },
   {
     accessorKey: 'email',
-    header: 'Email',
+    header: () => <SortableHeader title='Email' sortKey='email' />,
     cell: ({ row }: { row: Row<Customer> }) => (
       <CopyText value={row.original.email} title={row.original.email} />
     ),
   },
-  // {
-  //   accessorKey: 'address',
-  //   header: 'Address',
-  // },
   {
     accessorKey: 'sales_rep',
-    header: 'Sales Rep',
+    header: () => <SortableHeader title='Sales Rep' sortKey='sales_rep_name' />,
     cell: ({ row }: { row: Row<Customer> }) => <SalesRepCell customer={row.original} />,
   },
   {
     accessorKey: 'created_date',
-    header: 'Date',
+    header: () => <SortableHeader title='Date' sortKey='created_date' />,
     cell: ({ row }: { row: Row<Customer> }) => {
       const d = new Date(row.original.created_date)
       return d.toLocaleDateString()
@@ -221,6 +301,8 @@ const customerColumns: ColumnDef<Customer>[] = [
     ),
   },
 ]
+
+import { DataTablePagination } from '~/components/ui/data-table-pagination'
 
 function CustomerActions({ customer }: { customer: Customer }) {
   const { toast } = useToast()
@@ -282,14 +364,84 @@ export default function AdminCustomers() {
   const tabParam = searchParams.get('tab') ?? 'all'
   const showInvalid = searchParams.get('show_invalid') === '1'
   const pageParam = Number(searchParams.get('page') || '1')
+  const pageSizeParam = Number(searchParams.get('pageSize') || '100')
+  const pageSize = Number.isFinite(pageSizeParam) && pageSizeParam > 0 ? pageSizeParam : 100
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
-  const pageSize = 100
+  const viewParam = searchParams.get('view') || 'customers'
 
   const handleTabChange = (tab: string) => {
     const params = new URLSearchParams(searchParams)
     params.set('tab', tab)
     navigate({ pathname: location.pathname, search: params.toString() })
   }
+
+  const handleViewChange = (val: string) => {
+    const params = new URLSearchParams(searchParams)
+    params.set('view', val)
+    // Reset page when switching views
+    params.set('page', '1')
+    navigate({ pathname: location.pathname, search: params.toString() })
+  }
+
+  const columns = useMemo(() => {
+    if (viewParam !== 'companies') return customerColumnsBase
+
+    const currency = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    })
+
+    const newCols = customerColumnsBase.filter(col => 
+      'accessorKey' in col ? col.accessorKey !== 'email' : true
+    )
+    
+    newCols[0] = {
+      accessorKey: 'company_name',
+      header: () => (
+        <SortableHeader title='Name of Company' sortKey='company_name' />
+      ),
+      cell: ({ row }: { row: Row<Customer> }) => {
+        const name = row.original.company_name || row.original.name || ''
+        const short = name.length > 20 ? `${name.slice(0, 20)}...` : name
+        return <CopyText value={name} display={short} title={name} />
+      },
+    }
+
+   
+    const extraCols: ColumnDef<Customer>[] = [
+      {
+        accessorKey: 'revenue_generated',
+        header: () => (
+          <SortableHeader title='Revenue Generated' sortKey='revenue_generated' />
+        ),
+        cell: ({ row }) => {
+          const val = row.original.revenue_generated
+          return (
+            <div className='font-medium text-emerald-600'>
+              {val ? currency.format(val) : '-'}
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: 'projects_count',
+        header: () => (
+          <SortableHeader title='Amount of projects' sortKey='projects_count' />
+        ),
+        cell: ({ row }) => {
+          const val = row.original.projects_count
+          return <div className='font-medium'>{val || 0}</div>
+        },
+      },
+    ]
+
+    newCols.splice(2, 0, ...extraCols)
+    return newCols
+  }, [viewParam])
+
+  const sortByParam = searchParams.get('sortBy')
+  const orderParam = searchParams.get('order') || 'asc'
 
   const filtered = customers.filter((c: Customer) => {
     if (tabParam === 'leads') return c.source === 'leads'
@@ -299,21 +451,35 @@ export default function AdminCustomers() {
     if (tabParam === 'all') return true
   })
 
-  let fullDisplayed = filtered
-  if (
-    tabParam === 'leads' ||
-    tabParam === 'walkin' ||
-    tabParam === 'call-in' ||
-    tabParam === 'other'
-  ) {
-    fullDisplayed = [...filtered].sort(
-      (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
-    )
-  } else if (tabParam === 'all') {
-    fullDisplayed = [...filtered].sort((a, b) =>
-      (a.name ?? '').localeCompare(b.name ?? ''),
-    )
-  }
+  const fullDisplayed = useMemo(() => {
+    let result = [...filtered]
+
+    if (sortByParam) {
+      result.sort((a, b) => {
+        const aVal = String((a as any)[sortByParam] || '').toLowerCase()
+        const bVal = String((b as any)[sortByParam] || '').toLowerCase()
+
+        if (aVal < bVal) return orderParam === 'asc' ? -1 : 1
+        if (aVal > bVal) return orderParam === 'asc' ? 1 : -1
+        return 0
+      })
+    } else {
+      // Default sorting if no param
+      if (
+        tabParam === 'leads' ||
+        tabParam === 'walkin' ||
+        tabParam === 'call-in' ||
+        tabParam === 'other'
+      ) {
+        result.sort(
+          (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
+        )
+      } else if (tabParam === 'all') {
+        result.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+      }
+    }
+    return result
+  }, [filtered, sortByParam, orderParam, tabParam])
 
   const totalPages = Math.max(1, Math.ceil(fullDisplayed.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -362,15 +528,28 @@ export default function AdminCustomers() {
   return (
     <PageLayout title='Customers List'>
       <div className='flex flex-col md:flex-row items-center justify-between'>
-        <div className='flex items-center gap-2'>
-          <Tabs value={tabParam} onValueChange={handleTabChange}>
-            <TabsList>
-              <TabsTrigger value='all'>All Customers</TabsTrigger>
-              <TabsTrigger value='walkin'>Walk-in</TabsTrigger>
-              <TabsTrigger value='leads'>Leads</TabsTrigger>
-              <TabsTrigger value='call-in'>Call-In</TabsTrigger>
-            </TabsList>
-          </Tabs>
+        <div className='flex items-center gap-4'>
+          <Select value={viewParam} onValueChange={handleViewChange}>
+            <SelectTrigger className='w-[180px] bg-white'>
+              <SelectValue placeholder='Select view' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='customers'>Customers</SelectItem>
+              <SelectItem value='companies'>Companies</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={tabParam} onValueChange={handleTabChange}>
+            <SelectTrigger className='w-[180px] bg-white'>
+              <SelectValue placeholder='Select Type' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>All Customers</SelectItem>
+              <SelectItem value='walkin'>Walk-in</SelectItem>
+              <SelectItem value='leads'>Leads</SelectItem>
+              <SelectItem value='call-in'>Call-In</SelectItem>
+            </SelectContent>
+          </Select>
           {tabParam === 'leads' && (
             <div className='ml-4 flex items-center gap-2 cursor-pointer'>
               <Checkbox
@@ -416,41 +595,47 @@ export default function AdminCustomers() {
           </Link>
         )}
       </div>
+      <DataTablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalRows={fullDisplayed.length}
+        onPageChange={p => {
+          const params = new URLSearchParams(searchParams)
+          params.set('page', String(p))
+          navigate({ pathname: location.pathname, search: params.toString() })
+        }}
+        onPageSizeChange={s => {
+          const params = new URLSearchParams(searchParams)
+          params.set('pageSize', String(s))
+          params.set('page', '1')
+          navigate({ pathname: location.pathname, search: params.toString() })
+        }}
+      />
       <DataTable
-        key={`${tabParam}-${currentPage}`}
-        columns={customerColumns}
+        key={`${tabParam}-${currentPage}-${viewParam}-${pageSize}`}
+        columns={columns}
         data={rows}
         rowClassName={getRowClassName}
         onRowClick={handleRowClick}
       />
-      <Outlet />
-      <div className='mt-3 flex items-center justify-center gap-2'>
-        <Button
-          className='px-3 py-1 border rounded disabled:opacity-50'
-          disabled={currentPage <= 1}
-          onClick={() => {
-            const params = new URLSearchParams(searchParams)
-            params.set('page', String(currentPage - 1))
-            navigate({ pathname: location.pathname, search: params.toString() })
-          }}
-        >
-          Prev
-        </Button>
-        <span className='text-sm'>
-          Page {currentPage} / {totalPages}
-        </span>
-        <Button
-          className='px-3 py-1 border rounded disabled:opacity-50'
-          disabled={currentPage >= totalPages}
-          onClick={() => {
-            const params = new URLSearchParams(searchParams)
-            params.set('page', String(currentPage + 1))
-            navigate({ pathname: location.pathname, search: params.toString() })
-          }}
-        >
-          Next
-        </Button>
-      </div>
+      <DataTablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalRows={fullDisplayed.length}
+        onPageChange={p => {
+          const params = new URLSearchParams(searchParams)
+          params.set('page', String(p))
+          navigate({ pathname: location.pathname, search: params.toString() })
+        }}
+        onPageSizeChange={s => {
+          const params = new URLSearchParams(searchParams)
+          params.set('pageSize', String(s))
+          params.set('page', '1')
+          navigate({ pathname: location.pathname, search: params.toString() })
+        }}
+      />
       <Outlet />
     </PageLayout>
   )

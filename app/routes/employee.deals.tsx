@@ -10,7 +10,6 @@ import {
   useSearchParams,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import PartnersTable from '~/components/PartnersTable'
 import {
   Select,
   SelectContent,
@@ -22,10 +21,8 @@ import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
-import type { Partner } from '~/types/partner'
-import { ViewType } from '~/types/viewType'
+import type { Company } from '~/types/company'
 import { csrf } from '~/utils/csrf.server'
-import { getPartnersForUser } from '~/utils/partnerQueries'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -70,14 +67,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const url = new URL(request.url)
     const viewParam = url.searchParams.get('view')
-    const view = (
-      viewParam === ViewType.PARTNERS ? ViewType.PARTNERS : ViewType.DEALS
-    ) as ViewType
+    // Removed view type logic as we are only showing groups now
 
+    const groups = await selectMany<{ id: number; name: string }>(
+      db,
+      'SELECT id, name FROM groups_list WHERE deleted_at IS NULL AND is_displayed = 1 AND (company_id = ? OR id = 1)',
+      [user.company_id],
+    )
+    
+    // Default to the first group if no view param or invalid
+    const activeGroupId = viewParam ? parseInt(viewParam, 10) : groups[0]?.id
+    
+    // Fetch lists for the active group
     const lists = await selectMany<{ id: number; name: string }>(
       db,
-      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL ORDER BY position',
+      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
+      [activeGroupId]
     )
+
     const deals = await selectMany<FullDeal>(
       db,
       `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position,
@@ -104,53 +111,43 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       'SELECT id, name FROM customers WHERE company_id = ? AND deleted_at IS NULL',
       [user.company_id],
     )
+    
+    let companies: Company[] = []
 
-    let partners: Partner[] = []
-    if (view === ViewType.PARTNERS) {
-      partners = await selectMany<Partner>(db, getPartnersForUser(user.id), [user.id])
-    }
-
-    return { deals, customers, lists, imagesMap, emailsMap, partners, view }
+    return { deals, customers, lists, imagesMap, emailsMap, companies, groups, activeGroupId }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export default function EmployeeDeals() {
-  const { deals, customers, lists, imagesMap, emailsMap, partners, view } =
+  const { deals, customers, lists, imagesMap, emailsMap, companies, groups, activeGroupId } =
     useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
 
-  const handleViewChange = (newView: string) => {
+  const handleGroupChange = (newGroupId: string) => {
     const params = new URLSearchParams(searchParams)
-    params.set('view', newView)
+    params.set('view', newGroupId)
     navigate({ pathname: location.pathname, search: params.toString() })
   }
 
   const viewSelect = (
-    <Select value={view} onValueChange={handleViewChange}>
+    <Select value={String(activeGroupId)} onValueChange={handleGroupChange}>
       <SelectTrigger className='w-[200px]'>
-        <SelectValue placeholder='Select view' />
+        <SelectValue placeholder='Select group' />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={ViewType.DEALS}>Deals</SelectItem>
-        <SelectItem value={ViewType.PARTNERS}>Partners</SelectItem>
+        {groups.map(group => (
+            <SelectItem key={group.id} value={String(group.id)}>{group.name}</SelectItem>
+        ))}
       </SelectContent>
     </Select>
   )
 
   return (
     <>
-      {view === ViewType.PARTNERS ? (
-        <>
-          <div className='w-full flex justify-between items-center mb-4'>
-            {viewSelect}
-          </div>
-          <PartnersTable partners={partners} />
-        </>
-      ) : (
         <DealsView
           deals={deals}
           customers={customers}
@@ -159,7 +156,6 @@ export default function EmployeeDeals() {
           emailsMap={emailsMap}
           viewSelect={viewSelect}
         />
-      )}
 
       <Outlet />
     </>

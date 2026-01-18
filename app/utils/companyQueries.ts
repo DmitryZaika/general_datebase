@@ -1,7 +1,7 @@
-export function getPartnersForUser(userId: number): string {
+export function getCompaniesForUser(userId: number): string {
   return `
     SELECT
-      c.id as partner_id,
+      c.id as company_id,
       c.company_name,
       c.name as contact_name,
       c.phone,

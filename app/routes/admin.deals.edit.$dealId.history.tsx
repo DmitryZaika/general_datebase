@@ -52,13 +52,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [dealId],
   )
 
-  const seenSubjects = new Set<string>()
+  const seenThreads = new Set<string>()
   const emails: EmailHistory[] = []
   for (const row of rows || []) {
-    if (seenSubjects.has(row.subject)) {
+    if (seenThreads.has(row.thread_id)) {
       continue
     }
-    seenSubjects.add(row.subject)
+    seenThreads.add(row.thread_id)
     emails.push({
       id: row.id,
       thread_id: row.thread_id,
@@ -114,6 +114,7 @@ export default function DealEmailHistory() {
         data={emails}
         onRowClick={(email: EmailHistory) => handleRowClick(email)}
         rowClassName={(email: EmailHistory) => 'cursor-pointer'}
+        getRowId={(email: EmailHistory) => email.thread_id}
       />
       <Outlet />
     </>

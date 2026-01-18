@@ -1,4 +1,4 @@
-import { Mail } from 'lucide-react'
+import { Mail, SettingsIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LoaderFunctionArgs,
@@ -8,11 +8,19 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from 'react-router'
 import DealsList from '~/components/DealsList'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
 import { Button } from '~/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
@@ -43,14 +51,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const companyId = user.company_id
     const url = new URL(request.url)
     const salesRep = url.searchParams.get('salesRep') || 'All'
+    const viewParam = url.searchParams.get('group')
 
-    // Lists for columns
+    // Groups for filter
+    const groups = await selectMany<{ id: number; name: string }>(
+      db,
+      'SELECT id, name FROM groups_list WHERE deleted_at IS NULL AND is_displayed = 1 AND (company_id = ? OR id = 1)',
+      [companyId],
+    )
+    
+    const activeGroupId = viewParam ? parseInt(viewParam, 10) : groups[0]?.id
+
+    // Lists for columns (filtered by active group)
     const lists = await selectMany<{ id: number; name: string }>(
       db,
-      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL ORDER BY position',
+      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
+      [activeGroupId]
     )
 
     // Deals filtered by company (via customers.company_id) and optionally by sales rep
+    // Note: We might want to filter deals by list IDs that are visible, 
+    // but the current query gets all deals for the company. 
+    // Since we only render lists that belong to the group, deals in other lists won't be shown anyway.
     const dealParams: (string | number)[] = [companyId]
     let dealSql = `
       SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason, d.list_id, d.position, d.due_date, u.name AS sales_rep
@@ -86,17 +108,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const imagesMap: Record<number, boolean> = {}
     for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
 
-    return { deals, customers, lists, emailsMap, imagesMap }
+    return { deals, customers, lists, emailsMap, imagesMap, groups, activeGroupId }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export default function AdminDeals() {
-  const { deals, customers, lists, emailsMap, imagesMap } =
+  const { deals, customers, lists, emailsMap, imagesMap, groups, activeGroupId } =
     useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
+
+  const handleGroupChange = (newGroupId: string) => {
+    const params = new URLSearchParams(searchParams)
+    params.set('group', newGroupId)
+    navigate({ pathname: location.pathname, search: params.toString() })
+  }
 
   type Deal = {
     id: number
@@ -193,10 +222,26 @@ export default function AdminDeals() {
       <div className='w-full flex justify-between items-center mb-2'>
         <div className='flex items-center gap-4'>
           <SalesRepsFilter />
+          <Select value={String(activeGroupId)} onValueChange={handleGroupChange}>
+            <SelectTrigger className='w-[200px] mt-4'>
+              <SelectValue placeholder='Select group' />
+            </SelectTrigger>
+            <SelectContent>
+              {groups.map(group => (
+                  <SelectItem key={group.id} value={String(group.id)}>{group.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Link to='email-templates' className='p-2 mt-4'>
             <Button variant='outline'>
               <Mail className='w-4 h-4 mr-2' />
               Manage Email Templates
+            </Button>
+          </Link>
+          <Link to='manage-lists' className='p-2 mt-4'>
+            <Button variant='outline'>
+              <SettingsIcon className='w-4 h-4 mr-2' />
+              Manage Lists
             </Button>
           </Link>
         </div>
