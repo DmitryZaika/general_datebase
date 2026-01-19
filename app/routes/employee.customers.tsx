@@ -353,6 +353,15 @@ export default function AdminCustomers() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  const { data: reps = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['sales-reps'],
+    queryFn: async () => {
+      const res = await fetch('/api/sales-reps')
+      const json = await res.json()
+      return json.users ?? []
+    },
+  })
+
   const [highlightCustomerId, setHighlightCustomerId] = useState<number | null>(null)
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
@@ -362,6 +371,7 @@ export default function AdminCustomers() {
   }, [])
 
   const tabParam = searchParams.get('tab') ?? 'all'
+  const salesRepParam = searchParams.get('sales_rep')
   const showInvalid = searchParams.get('show_invalid') === '1'
   const pageParam = Number(searchParams.get('page') || '1')
   const pageSizeParam = Number(searchParams.get('pageSize') || '100')
@@ -372,6 +382,17 @@ export default function AdminCustomers() {
   const handleTabChange = (tab: string) => {
     const params = new URLSearchParams(searchParams)
     params.set('tab', tab)
+    navigate({ pathname: location.pathname, search: params.toString() })
+  }
+
+  const handleSalesRepChange = (val: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (val === 'all') {
+      params.delete('sales_rep')
+    } else {
+      params.set('sales_rep', val)
+    }
+    params.set('page', '1')
     navigate({ pathname: location.pathname, search: params.toString() })
   }
 
@@ -456,11 +477,25 @@ export default function AdminCustomers() {
 
     if (sortByParam) {
       result.sort((a, b) => {
-        const aVal = String((a as any)[sortByParam] || '').toLowerCase()
-        const bVal = String((b as any)[sortByParam] || '').toLowerCase()
+        const aVal = (a as any)[sortByParam]
+        const bVal = (b as any)[sortByParam]
 
-        if (aVal < bVal) return orderParam === 'asc' ? -1 : 1
-        if (aVal > bVal) return orderParam === 'asc' ? 1 : -1
+        // Force numeric sort for specific columns or if both are numbers
+        if (
+          sortByParam === 'revenue_generated' ||
+          sortByParam === 'projects_count' ||
+          (typeof aVal === 'number' && typeof bVal === 'number')
+        ) {
+          const aNum = Number(aVal) || 0
+          const bNum = Number(bVal) || 0
+          return orderParam === 'asc' ? aNum - bNum : bNum - aNum
+        }
+
+        const aString = String(aVal || '').toLowerCase()
+        const bString = String(bVal || '').toLowerCase()
+
+        if (aString < bString) return orderParam === 'asc' ? -1 : 1
+        if (aString > bString) return orderParam === 'asc' ? 1 : -1
         return 0
       })
     } else {
@@ -550,6 +585,21 @@ export default function AdminCustomers() {
               <SelectItem value='call-in'>Call-In</SelectItem>
             </SelectContent>
           </Select>
+
+          <Select value={salesRepParam || 'all'} onValueChange={handleSalesRepChange}>
+            <SelectTrigger className='w-[180px] bg-white'>
+              <SelectValue placeholder='Select Sales Rep' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>All Sales Reps</SelectItem>
+              {reps.map(rep => (
+                <SelectItem key={rep.id} value={String(rep.id)}>
+                  {rep.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {tabParam === 'leads' && (
             <div className='ml-4 flex items-center gap-2 cursor-pointer'>
               <Checkbox
