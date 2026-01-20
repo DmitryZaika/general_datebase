@@ -19,7 +19,7 @@ const getCustomerInfo = async (customerId: number): Promise<CustomerDialogSchema
   return {
     name: data.customer.name,
     email: data.customer.email ?? '',
-    phone: data.customer.phone,
+    phone: data.customer.phone ?? '',
     phone_2: data.customer.phone_2 ?? '',
     address: data.customer.address ?? '',
     company_name: data.customer.company_name,

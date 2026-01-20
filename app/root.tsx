@@ -82,6 +82,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   let user = null
   let companyName: string | null = null
+  let companyId: number | undefined
+
   if (activeSession) {
     user = (await getUserBySessionId(activeSession)) || null
     if (user) {
@@ -91,7 +93,30 @@ export async function loader({ request }: LoaderFunctionArgs) {
         user.company_id,
       )
       companyName = company?.name ?? null
+      companyId = user.company_id
     }
+  }
+
+  const url = new URL(request.url)
+  const isContractors = url.pathname.startsWith('/contractors/')
+
+  if (!companyId && isContractors) {
+    const parts = url.pathname.split('/')
+    if (parts[1] === 'contractors' && parts[2]) {
+      const id = parseInt(parts[2], 10)
+      if (!isNaN(id)) {
+        companyId = id
+      }
+    }
+  }
+
+  if (companyId && isContractors && !companyName) {
+    const company = await selectId<{ name: string }>(
+      db,
+      'SELECT name FROM company WHERE id = ?',
+      companyId,
+    )
+    companyName = company?.name ?? null
   }
 
   let stoneSuppliers: ISupplier[] | undefined
@@ -107,7 +132,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     [],
   )
 
-  if (user) {
+  if (companyId) {
     stoneSuppliers = await selectMany<ISupplier>(
       db,
       `SELECT s.id, s.supplier_name
@@ -115,7 +140,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
        INNER JOIN stones st ON s.id = st.supplier_id
        WHERE s.company_id = ?
        GROUP BY s.id, s.supplier_name`,
-      [user.company_id],
+      [companyId],
     )
 
     sinkSuppliers = await selectMany<ISupplier>(
@@ -125,7 +150,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
        INNER JOIN sink_type sk ON s.id = sk.supplier_id
        WHERE s.company_id = ?
        GROUP BY s.id, s.supplier_name`,
-      [user.company_id],
+      [companyId],
     )
 
     faucetSuppliers = await selectMany<ISupplier>(
@@ -135,9 +160,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
        INNER JOIN faucet_type ft ON s.id = ft.supplier_id
        WHERE s.company_id = ?
        GROUP BY s.id, s.supplier_name`,
-      [user.company_id],
+      [companyId],
     )
+  }
 
+  if (user) {
     const [rows] = await db.query<(RowDataPacket & { position: string })[]>(
       `SELECT p.name AS position
        FROM users u
@@ -161,7 +188,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
           ? 'shop_worker'
           : null
 
-    const url = new URL(request.url)
     // Installer users: always redirect to their checklist
     if (hasInstaller) {
       const installerTarget = `/installers/${user.company_id}/checklist`
@@ -216,6 +242,7 @@ export default function App() {
     message,
     token,
     user,
+    companyName,
     stoneSuppliers,
     sinkSuppliers,
     faucetSuppliers,
@@ -232,6 +259,7 @@ export default function App() {
   const isInstallerRoute = pathname.startsWith('/installers')
   const isShopRoute = pathname.startsWith('/shop')
   const isShopWorker = position === 'shop_worker'
+  const isContractors = pathname.startsWith('/contractors')
   const segments = pathname.split('/').filter(Boolean)
   const isCustomerViewPage = segments[0] === 'customer' && segments[2] !== 'stones'
   const mainRef = useRef<HTMLElement | null>(null)
@@ -302,8 +330,9 @@ export default function App() {
                 {isExternalMarketing ||
                 isCheckIn ||
                 isInstallerRoute ||
-                (isShopRoute && isShopWorker) ? (
-                  <MarketingHeader />
+                (isShopRoute && isShopWorker) ||
+                isContractors ? (
+                  <MarketingHeader companyName={companyName ?? undefined} />
                 ) : (
                   <Header
                     isEmployee={user?.is_employee ?? false}

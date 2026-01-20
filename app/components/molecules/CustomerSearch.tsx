@@ -88,6 +88,7 @@ const getOldData = (
     name: currentCustomer.name,
     email: currentCustomer.email ?? '',
     phone: currentCustomer.phone ?? '',
+    phone_2: currentCustomer.phone_2 ?? '',
     address: currentCustomer.address ?? '',
     your_message: rawMessage,
     builder,

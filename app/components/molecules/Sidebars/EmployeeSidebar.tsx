@@ -84,10 +84,15 @@ const getItems = (
     ]
   }
   const isCustomerRoute = base === 'customer'
+  const isContractorsRoute = base === 'contractors'
   const finalList: ISidebarItem[] = [
     {
       title: 'Stones',
-      url: isCustomerRoute ? `/customer/${companyId}/stones` : `/${base}/stones`,
+      url: isCustomerRoute
+        ? `/customer/${companyId}/stones`
+        : isContractorsRoute
+          ? `/contractors/${companyId}/stones`
+          : `/${base}/stones`,
       icon: Layers,
       component: () => (
         <StonesFilters suppliers={suppliers} base={base} colors={colors} />
@@ -229,14 +234,21 @@ export function EmployeeSidebar({
   const location = useLocation()
   const base = getBase(location.pathname)
   const isCustomerRoute = location.pathname.startsWith('/customer/')
+  const isContractorsRoute = location.pathname.startsWith('/contractors/')
   const data = useLoaderData<{ user: { company_id: number } | null }>()
-  const companyIdFromUrl = isCustomerRoute
-    ? location.pathname.split('/').filter(Boolean)[1]
-    : undefined
+  
+  let companyIdFromUrl: string | undefined
+  if (isCustomerRoute) {
+    companyIdFromUrl = location.pathname.split('/').filter(Boolean)[1]
+  } else if (isContractorsRoute) {
+    companyIdFromUrl = location.pathname.split('/').filter(Boolean)[1]
+  }
+
   const companyId = companyIdFromUrl || data?.user?.company_id
-  const itemsBase = isCustomerRoute
-    ? 'customer'
-    : (base as 'employee' | 'admin' | 'customer')
+  
+  let itemsBase = base as 'employee' | 'admin' | 'customer' | 'contractors'
+  if (isCustomerRoute) itemsBase = 'customer'
+  if (isContractorsRoute) itemsBase = 'contractors'
 
   const items = getItems(
     itemsBase,
@@ -467,7 +479,7 @@ export function EmployeeSidebar({
 
               {otherItems.map(item => {
                 const isActive =
-                  isCustomerRoute && item.title === 'Stones'
+                  (isCustomerRoute || isContractorsRoute) && item.title === 'Stones'
                     ? location.pathname.includes('/stones')
                     : location.pathname.startsWith(item.url)
 

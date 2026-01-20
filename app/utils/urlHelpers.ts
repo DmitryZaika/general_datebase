@@ -5,5 +5,8 @@ export const getBase = (pathname: string) => {
   if (pathname.startsWith('/customer')) {
     return 'customer'
   }
+  if (pathname.startsWith('/contractors')) {
+    return 'contractors'
+  }
   return undefined
 }
