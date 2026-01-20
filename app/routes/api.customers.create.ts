@@ -30,10 +30,11 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const [result] = await db.execute<ResultSetHeader>(
-    `INSERT INTO customers (name, phone, email, address, your_message, referral_source, source, company_id, company_name, sales_rep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO customers (name, phone, phone_2, email, address, your_message, referral_source, source, company_id, company_name, sales_rep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       validatedData.name,
       validatedData.phone || null,
+      validatedData.phone_2 || null,
       validatedData.email || null,
       validatedData.address || null,
       validatedData.your_message || null,

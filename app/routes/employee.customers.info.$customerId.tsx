@@ -22,6 +22,7 @@ type CustomerInfo = {
   name: string
   email: string | null
   phone: string | null
+  phone_2: string | null
   address: string | null
   sales_rep_name: string | null
   source: string | null
@@ -81,7 +82,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const customer = await selectId<CustomerInfo>(
     db,
-    `SELECT c.id, c.name, c.email, c.phone, c.address, u.name AS sales_rep_name, c.source, c.parent_id, c.company_name
+    `SELECT c.id, c.name, c.email, c.phone, c.phone_2, c.address, u.name AS sales_rep_name, c.source, c.parent_id, c.company_name
      FROM customers c
      LEFT JOIN deals d ON d.customer_id = c.id AND d.created_at IS NULL
      LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0

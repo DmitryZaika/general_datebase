@@ -5,6 +5,7 @@ type CustomerInfo = {
   name: string
   email: string | null
   phone: string | null
+  phone_2: string | null
   address: string | null
   company_name: string | null
   sales_rep_name: string | null
@@ -95,7 +96,8 @@ export default function CustomerInfoTab() {
         <div className='text-sm text-slate-600 mt-2'>
           {customer.company_name && <div>Company: {customer.company_name}</div>}
           <div>Email: {customer.email || '-'}</div>
-          <div>Phone: {customer.phone || '-'}</div>
+          <div>Phone 1: {customer.phone || '-'}</div>
+          <div>Phone 2: {customer.phone_2 || '-'}</div>
           <div>Address: {customer.address || '-'}</div>
           <div>Sales Rep: {customer.sales_rep_name || 'Not assigned'}</div>
           <div>Source: {customer.source || 'Not assigned'}</div>

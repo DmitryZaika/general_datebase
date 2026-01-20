@@ -166,7 +166,7 @@ export const AddLead = () => {
             <FormField
               control={form.control}
               name='phone'
-              render={({ field }) => <PhoneInput field={field} />}
+              render={({ field }) => <PhoneInput field={field} inputName='Phone' />}
             />
             <FormField
               control={form.control}

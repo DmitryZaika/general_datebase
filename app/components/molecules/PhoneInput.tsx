@@ -6,6 +6,7 @@ interface PhoneInputProps<T extends FieldValues, V extends Path<T>> {
   field: ControllerRenderProps<T, V>
   formClassName?: string
   disabled?: boolean
+  inputName: string
 }
 
 const formatPhoneNumber = (value: string, isDeleting: boolean = false) => {
@@ -35,6 +36,7 @@ export const PhoneInput = <T extends FieldValues, V extends Path<T>>({
   field,
   formClassName,
   disabled,
+  inputName,
 }: PhoneInputProps<T, V>) => {
   const [lastValue, setLastValue] = React.useState(field.value || '')
 
@@ -53,7 +55,7 @@ export const PhoneInput = <T extends FieldValues, V extends Path<T>>({
 
   return (
     <InputItem
-      name='Phone'
+      name={`${inputName}`}
       placeholder='123-456-7890'
       type='tel'
       field={{

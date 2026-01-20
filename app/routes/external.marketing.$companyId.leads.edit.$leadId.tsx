@@ -37,6 +37,7 @@ const leadSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().optional(),
   phone: z.string().optional(),
+  phone_2: z.string().optional(),
   your_message: z.string().optional(),
   address: z.string().optional(),
   source: z.enum(sourceEnum),
@@ -66,12 +67,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       name: string
       email: string
       phone: string
+      phone_2: string
       address: string
       source: string
       your_message: string
     }>(
       db,
-      'SELECT id, name, email, phone, address, source, your_message FROM customers WHERE id = ? AND company_id = ? AND deleted_at IS NULL',
+      'SELECT id, name, email, phone, phone_2, address, source, your_message FROM customers WHERE id = ? AND company_id = ? AND deleted_at IS NULL',
       [leadId, paramCompanyId],
     )
     const lead = leads[0]
@@ -109,12 +111,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   try {
     await db.execute(
-      'UPDATE customers SET name = ?, email = ?, phone = ?, address = ?, your_message = ? WHERE id = ? AND company_id = ?',
+      'UPDATE customers SET name = ?, email = ?, phone = ?, phone_2 = ?, address = ?, your_message = ? WHERE id = ? AND company_id = ?',
       [
         data.name,
         data.email || null,
         data.phone || null,
         data.address || null,
+        data.phone_2 || null,
         data.your_message || null,
         leadId,
         paramCompanyId,
@@ -146,6 +149,7 @@ export const LeadEdit = () => {
       name: lead.name || '',
       email: lead.email || '',
       phone: lead.phone || '',
+      phone_2: lead.phone_2 || '',
       your_message: lead.your_message || '',
       address: lead.address || '',
       source: (lead.source as 'leads' | 'check-in') || 'leads',
@@ -181,7 +185,12 @@ export const LeadEdit = () => {
             <FormField
               control={form.control}
               name='phone'
-              render={({ field }) => <PhoneInput field={field} />}
+              render={({ field }) => <PhoneInput field={field} inputName='Phone 1' />}
+            />
+            <FormField
+              control={form.control}
+              name='phone_2'
+              render={({ field }) => <PhoneInput field={field} inputName='Phone 2' />}
             />
             <FormField
               control={form.control}

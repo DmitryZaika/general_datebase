@@ -100,6 +100,8 @@ export function CustomerForm({
     defaultValues: oldData ?? {
       name: initialName || '',
       email: '',
+      phone: '',
+      phone_2: '',
       address: '',
       source,
       your_message: '',
@@ -185,9 +187,13 @@ export function CustomerForm({
             <FormField
               control={form.control}
               name='phone'
-              render={({ field }) => <PhoneInput field={field} />}
+              render={({ field }) => <PhoneInput field={field} inputName='Phone 1' />}
             />
-
+            <FormField
+              control={form.control}
+              name='phone_2'
+              render={({ field }) => <PhoneInput field={field} inputName='Phone 2' />}
+            />
             <AddressInput form={form} field='address' type='billing' />
             <FormField
               control={form.control}
