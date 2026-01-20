@@ -28,7 +28,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const dealId = parseInt(params.dealId, 10)
 
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT c.name, c.email, c.phone, c.address, c.city, c.state, c.postal_code, c.company_name,
+    `SELECT c.name, c.email, c.phone, c.phone_2, c.address, c.city, c.state, c.postal_code, c.company_name,
             c.remodal_type, c.project_size, c.contact_time, c.remove_and_dispose, c.improve_offer, c.sink,
             c.when_start, c.details, c.compaign_name, c.adset_name, c.ad_name, c.backsplash, c.kitchen_stove,
             c.your_message, c.attached_file, c.qbo_id, c.notes, c.source,d.created_at as deal_created, c.created_date as customer_created
@@ -52,10 +52,16 @@ function AddressLinkCell({
 }) {
   const isMobile = useIsMobile()
   const location = useLocation()
-  const isNameField = row.original.key.toLowerCase() === 'name'
-  const isPhoneField = row.original.key.toLowerCase() === 'phone'
-  const isEmailField = row.original.key.toLowerCase() === 'email'
-  const isAddressField = row.original.key.toLowerCase() === 'address'
+  
+  // Получаем ключ в нижнем регистре один раз для удобства
+  const keyLower = row.original.key.toLowerCase()
+
+  const isNameField = keyLower === 'name'
+  const isPhoneField = keyLower === 'phone'
+  // ИСПРАВЛЕНИЕ: здесь проверяем 'phone 2' с пробелом, так как данные были отформатированы
+  const isPhone2Field = keyLower === 'phone 2' 
+  const isEmailField = keyLower === 'email'
+  const isAddressField = keyLower === 'address'
 
   const handleAddressClick = () => {
     const address = String(
@@ -84,6 +90,21 @@ function AddressLinkCell({
             </Link>
           </div>
         ) : (
+          <CopyText value={row.original.value} className='font-bold' />
+        )
+      ) : isPhone2Field ? (
+        isMobile ? (
+          <div className='flex gap-2 '>
+            <CopyText value={row.original.value} className='font-bold' />
+            <Link
+              to={`tel:${(String(row.original.value || '').match(/[+\d]/g) || []).join('')}`}
+              className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden border-2 border-gray-300 rounded-md px-2'
+            >
+              <PhoneIcon size={17} />
+            </Link>
+          </div>
+        ) : (
+          // Теперь этот блок будет работать для Phone 2
           <CopyText value={row.original.value} className='font-bold' />
         )
       ) : isEmailField ? (
@@ -171,6 +192,7 @@ export default function DealProjectInfo() {
   const otherFields = Object.entries(customer)
     .filter(([k, v]) => v != null && k !== 'attached_file')
     .map(([k, v]) => ({
+      // Здесь происходит преобразование '_' в пробел, поэтому 'phone_2' становится 'Phone 2'
       key: k.replace(/_/g, ' ').replace(/\b\w/g, s => s.toUpperCase()),
       value:
         k === 'customer_created'
