@@ -13,8 +13,6 @@ export async function action({ request }: ActionFunctionArgs) {
   return handleSellSlabAction(request)
 }
 
-
-
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let user: User
   try {
