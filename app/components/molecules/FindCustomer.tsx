@@ -51,32 +51,43 @@ export function FindCustomer({
   const navigate = useNavigate()
   const location = useLocation()
   const { toast } = useToast()
+
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ['customers', 'search', searchTerm, location.pathname],
     queryFn: async (): Promise<Customer[]> => {
-      if (!searchTerm) {
-        const empty: Customer[] = []
-        return empty
-      }
+      if (!searchTerm) return []
+
       const searchType = detectSearchType(searchTerm)
       const url = buildSearchUrl
         ? buildSearchUrl(searchTerm, searchType)
         : `/api/customers/search?term=${encodeURIComponent(searchTerm)}&searchType=${searchType}`
+
       const response = await fetch(url)
-      if (!response.ok) {
-        const empty: Customer[] = []
-        return empty
-      }
+      if (!response.ok) return []
+
       const data = await response.json()
-      const list: Customer[] = data?.customers || []
-      return list
+      return data?.customers || []
     },
     enabled: !!searchTerm,
   })
 
+  // Sort customers: those with available actions (resolveId !== undefined) go first
+  const sortedCustomers = useMemo(() => {
+    if (!resolveId) return customers
+
+    return [...customers].sort((a, b) => {
+      const aHasAction = resolveId(a.id) !== undefined
+      const bHasAction = resolveId(b.id) !== undefined
+
+      if (aHasAction && !bHasAction) return -1
+      if (!aHasAction && bHasAction) return 1
+      return 0
+    })
+  }, [customers, resolveId])
+
   const displayCustomers = useMemo(
-    () => customers.slice(0, visibleCount),
-    [customers, visibleCount],
+    () => sortedCustomers.slice(0, visibleCount),
+    [sortedCustomers, visibleCount],
   )
 
   useEffect(() => {
