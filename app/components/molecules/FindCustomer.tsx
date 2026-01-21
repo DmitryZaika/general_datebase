@@ -134,6 +134,7 @@ export function FindCustomer({
                 <div className='text-sm text-gray-500 flex flex-col '>
                   <p>{customer.email || ''}</p>
                   <p>{customer.phone || ''}</p>
+                  {customer.phone_2 && <p>{customer.phone_2}</p>}
                 </div>
               </div>
               {showActions && (

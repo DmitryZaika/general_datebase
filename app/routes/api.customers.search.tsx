@@ -96,7 +96,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
       customers = await selectMany<Customer>(
         db,
-        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.email, c.company_name
+        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
          WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -121,15 +121,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
       const last10 = digits.length > 10 ? digits.slice(-10) : digits
       const phoneExpr =
         "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.phone,'-',''),' ',''),'(',''),')',''),'+',''),'.','')"
+      const phone2Expr =
+        "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.phone_2,'-',''),' ',''),'(',''),')',''),'+',''),'.','')"
 
       if (!digits) {
         customers = await selectMany<Customer>(
           db,
-          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.email, c.company_name
+          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
            FROM customers c
            LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
            WHERE c.company_id = ? AND c.deleted_at IS NULL
-             AND c.phone LIKE ?
+             AND (c.phone LIKE ? OR c.phone_2 LIKE ?)
            ORDER BY
              CASE
                WHEN d.id IS NOT NULL THEN 0
@@ -137,13 +139,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
                ELSE 2
              END,
              CASE
-               WHEN c.phone LIKE ? THEN 0
-               WHEN c.phone LIKE ? THEN 1
+               WHEN c.phone LIKE ? OR c.phone_2 LIKE ? THEN 0
+               WHEN c.phone LIKE ? OR c.phone_2 LIKE ? THEN 1
                ELSE 2
              END,
              c.name ASC
            LIMIT 15`,
-          [user.id, user.company_id, like, user.id, prefixLike, like],
+          [
+            user.id,
+            user.company_id,
+            like,
+            like,
+            user.id,
+            prefixLike,
+            prefixLike,
+            like,
+            like,
+          ],
         )
       } else {
         const likeDigits = `%${digits}%`
@@ -153,11 +165,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
         customers = await selectMany<Customer>(
           db,
-          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.email, c.company_name
+          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
            FROM customers c
            LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
            WHERE c.company_id = ? AND c.deleted_at IS NULL
-             AND (${phoneExpr} LIKE ? OR ${phoneExpr} LIKE ?)
+             AND (${phoneExpr} LIKE ? OR ${phoneExpr} LIKE ? OR ${phone2Expr} LIKE ? OR ${phone2Expr} LIKE ?)
            ORDER BY
              CASE
                WHEN d.id IS NOT NULL THEN 0
@@ -165,8 +177,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
                ELSE 2
              END,
              CASE
-               WHEN ${phoneExpr} LIKE ? OR ${phoneExpr} LIKE ? THEN 0
-               WHEN ${phoneExpr} LIKE ? OR ${phoneExpr} LIKE ? THEN 1
+               WHEN ${phoneExpr} LIKE ? OR ${phoneExpr} LIKE ? OR ${phone2Expr} LIKE ? OR ${phone2Expr} LIKE ? THEN 0
+               WHEN ${phoneExpr} LIKE ? OR ${phoneExpr} LIKE ? OR ${phone2Expr} LIKE ? OR ${phone2Expr} LIKE ? THEN 1
                ELSE 2
              END,
              c.name ASC
@@ -176,9 +188,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
             user.company_id,
             likeDigits,
             likeLast10,
+            likeDigits,
+            likeLast10,
             user.id,
             prefixDigits,
             prefixLast10,
+            prefixDigits,
+            prefixLast10,
+            likeDigits,
+            likeLast10,
             likeDigits,
             likeLast10,
           ],
@@ -187,7 +205,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     } else {
       customers = await selectMany<Customer>(
         db,
-        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.email, c.company_name
+        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
          WHERE c.company_id = ? AND c.deleted_at IS NULL
