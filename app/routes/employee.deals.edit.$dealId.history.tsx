@@ -1,8 +1,10 @@
+import { useMemo } from 'react'
 import {
   type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
 } from 'react-router'
 import { customerColumns } from '~/components/tables/DealEmails'
@@ -38,15 +40,31 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function DealEmailHistory() {
   const { emails } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const uniqueThreads = useMemo(() => {
+    const threadMap = new Map<string, EmailHistory>()
+
+    emails.forEach(email => {
+      const existing = threadMap.get(email.thread_id)
+
+      if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
+        threadMap.set(email.thread_id, email)
+      }
+    })
+
+    return Array.from(threadMap.values())
+  }, [emails])
+
   const handleRowClick = (email: EmailHistory) => {
-    navigate(`chat/${email.thread_id}`)
+    navigate(`chat/${email.thread_id}${location.search}`)
   }
 
   return (
     <>
       <DataTable
         columns={customerColumns}
-        data={emails}
+        data={uniqueThreads}
         onRowClick={(email: EmailHistory) => handleRowClick(email)}
         rowClassName={() => 'cursor-pointer'}
         getRowId={(email: EmailHistory) => email.thread_id}

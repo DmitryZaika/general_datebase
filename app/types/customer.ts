@@ -10,4 +10,5 @@ export interface Customer {
   company_name: string | null
   source: Sources | null
   your_message: string | null
+  deleted_at: string | null
 }

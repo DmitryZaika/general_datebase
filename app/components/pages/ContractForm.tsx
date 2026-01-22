@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useForm, type Resolver, type UseFormReturn } from 'react-hook-form'
+import { type Resolver, type UseFormReturn, useForm } from 'react-hook-form'
 import {
   Form,
   Link,
@@ -79,7 +79,6 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
   const location = useLocation()
-  console.log(navigation.state)
   const { data: sink_type = [] } = useQuery({
     queryKey: ['sink_type'],
     queryFn: fetchSinkType,
@@ -155,7 +154,6 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
     JSON.stringify(extrasValues),
   ])
   form.setValue('price', Math.round(totalRoomPrice * 100) / 100)
-
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
