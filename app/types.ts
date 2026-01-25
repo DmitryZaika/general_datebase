@@ -91,6 +91,7 @@ export interface Customer {
   name: string
   address?: string | null
   phone?: string | null
+  phone_2?: string | null
   email?: string | null
   postal_code?: string | null
   company_name?: string | null

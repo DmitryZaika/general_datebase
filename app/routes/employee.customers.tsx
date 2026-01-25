@@ -1,11 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef, Row } from '@tanstack/react-table'
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Plus,
-} from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
@@ -28,24 +23,24 @@ import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
 import { DataTable } from '~/components/ui/data-table'
 import { FormField } from '~/components/ui/form'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
 import type { sourceEnum } from '~/schemas/customers'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '~/components/ui/select'
-
 interface Customer {
   id: number
   name: string
   phone: string
+  phone_2?: string | null
   email: string
   address: string
   sales_rep: number | null
@@ -76,7 +71,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const params: number[] = []
   const conditions: string[] = ['c.deleted_at IS NULL', 'c.company_id = ?']
   params.push(user.company_id)
-  
+
   if (view === 'companies') {
     conditions.push("(c.company_name IS NOT NULL AND c.company_name != '')")
   }
@@ -91,7 +86,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const where = `WHERE ${conditions.join(' AND ')}`
 
   let query = `
-    SELECT c.id, c.name, c.email, c.phone, c.address, c.sales_rep, c.created_date, u.name AS sales_rep_name, c.company_id, c.source, c.invalid_lead, c.company_name
+    SELECT c.id, c.name, c.email, c.phone, c.phone_2, c.address, c.sales_rep, c.created_date, u.name AS sales_rep_name, c.company_id, c.source, c.invalid_lead, c.company_name
     FROM customers c
     LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
     ${where}
@@ -100,7 +95,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (view === 'companies') {
     query = `
       SELECT 
-        c.id, c.name, c.email, c.phone, c.address, c.sales_rep, c.created_date, 
+        c.id, c.name, c.email, c.phone, c.phone_2, c.address, c.sales_rep, c.created_date, 
         u.name AS sales_rep_name, c.company_id, c.source, c.invalid_lead, c.company_name,
         (
           SELECT SUM(s.price)
@@ -271,7 +266,12 @@ const customerColumnsBase: ColumnDef<Customer>[] = [
     accessorKey: 'phone',
     header: () => <SortableHeader title='Phone Number' sortKey='phone' />,
     cell: ({ row }: { row: Row<Customer> }) => (
-      <CopyText value={row.original.phone} title={row.original.phone} />
+      <div className='flex flex-col gap-1'>
+        <CopyText value={row.original.phone} title={row.original.phone} />
+        {row.original.phone_2 && (
+          <CopyText value={row.original.phone_2} title={row.original.phone_2} />
+        )}
+      </div>
     ),
   },
   {
@@ -365,7 +365,8 @@ export default function AdminCustomers() {
   const showInvalid = searchParams.get('show_invalid') === '1'
   const pageParam = Number(searchParams.get('page') || '1')
   const pageSizeParam = Number(searchParams.get('pageSize') || '100')
-  const pageSize = Number.isFinite(pageSizeParam) && pageSizeParam > 0 ? pageSizeParam : 100
+  const pageSize =
+    Number.isFinite(pageSizeParam) && pageSizeParam > 0 ? pageSizeParam : 100
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
   const viewParam = searchParams.get('view') || 'customers'
 
@@ -392,15 +393,13 @@ export default function AdminCustomers() {
       maximumFractionDigits: 0,
     })
 
-    const newCols = customerColumnsBase.filter(col => 
-      'accessorKey' in col ? col.accessorKey !== 'email' : true
+    const newCols = customerColumnsBase.filter(col =>
+      'accessorKey' in col ? col.accessorKey !== 'email' : true,
     )
-    
+
     newCols[0] = {
       accessorKey: 'company_name',
-      header: () => (
-        <SortableHeader title='Name of Company' sortKey='company_name' />
-      ),
+      header: () => <SortableHeader title='Name of Company' sortKey='company_name' />,
       cell: ({ row }: { row: Row<Customer> }) => {
         const name = row.original.company_name || row.original.name || ''
         const short = name.length > 20 ? `${name.slice(0, 20)}...` : name
@@ -408,7 +407,6 @@ export default function AdminCustomers() {
       },
     }
 
-   
     const extraCols: ColumnDef<Customer>[] = [
       {
         accessorKey: 'revenue_generated',
@@ -452,19 +450,20 @@ export default function AdminCustomers() {
   })
 
   const fullDisplayed = useMemo(() => {
-    let result = [...filtered]
+    const result = [...filtered]
 
     if (sortByParam) {
       result.sort((a, b) => {
-        const aVal = String((a as any)[sortByParam] || '').toLowerCase()
-        const bVal = String((b as any)[sortByParam] || '').toLowerCase()
+        const key = sortByParam as keyof Customer
+
+        const aVal = String(a[key] ?? '').toLowerCase()
+        const bVal = String(b[key] ?? '').toLowerCase()
 
         if (aVal < bVal) return orderParam === 'asc' ? -1 : 1
         if (aVal > bVal) return orderParam === 'asc' ? 1 : -1
         return 0
       })
     } else {
-      // Default sorting if no param
       if (
         tabParam === 'leads' ||
         tabParam === 'walkin' ||
@@ -472,7 +471,8 @@ export default function AdminCustomers() {
         tabParam === 'other'
       ) {
         result.sort(
-          (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
+          (a, b) =>
+            new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
         )
       } else if (tabParam === 'all') {
         result.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))

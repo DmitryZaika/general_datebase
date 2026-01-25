@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import DOMPurify from 'isomorphic-dompurify'
 import { FileText, Pencil } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
@@ -23,6 +24,7 @@ import {
   TooltipTrigger,
 } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
+import type { Customer } from '~/types/customer'
 import { fileSize } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
@@ -50,11 +52,6 @@ interface Message {
   attachments?: Attachment[]
 }
 
-interface AIEmailResponse {
-  subject?: string
-  bodyText?: string
-}
-
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let user: User
   try {
@@ -78,7 +75,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw new Error('Thread ID is missing')
   }
 
-  const [customerRows] = await db.execute<RowDataPacket[]>(
+  const [customerRows] = await selectMany<Customer>(
+    db,
     `SELECT c.name, c.email
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
@@ -86,8 +84,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [dealId],
   )
 
-  const normalizeEmail = (email: string | null | undefined) => email?.trim().toLowerCase() || ''
-  const customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
+  const normalizeEmail = (email: string | null | undefined) =>
+    email?.trim().toLowerCase() || ''
+  const customerEmail = normalizeEmail(customerRows?.email || '')
 
   if (customerEmail) {
     await db.execute(
@@ -152,7 +151,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   })
 
   return {
-    customerName: customerRows?.[0]?.name || 'Customer',
+    customerName: customerRows?.name || 'Customer',
     customerEmail,
     messages,
     dealId,
@@ -160,90 +159,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     threadId,
     currentUserSignature,
   }
-}
-
-async function processStreamingResponse(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  onStreamBody?: (text: string) => void,
-): Promise<AIEmailResponse> {
-  const decoder = new TextDecoder()
-  let fullText = ''
-  let isInBody = false
-
-  while (true) {
-    const result = await reader.read()
-    if (result.done) {
-      break
-    }
-    const chunk = decoder.decode(result.value, { stream: true })
-    const lines = chunk.split('\n')
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(line.slice(6))
-          if (data.error) {
-            throw new Error(data.error)
-          }
-          if (data.content) {
-            fullText += data.content
-
-            if (fullText.includes('---BODY---')) {
-              isInBody = true
-              const parts = fullText.split('---BODY---')
-              if (onStreamBody) {
-                onStreamBody((parts[1] || '').trim())
-              }
-            } else if (isInBody) {
-              const parts = fullText.split('---BODY---')
-              if (onStreamBody) {
-                onStreamBody((parts[1] || '').trim())
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Parse error:', error)
-        }
-      }
-    }
-  }
-
-  const parts = fullText.split('---BODY---')
-  return { subject: parts[0]?.trim() || '', bodyText: parts[1]?.trim() || '' }
-}
-
-async function generateAIEmailForChat(
-  emailCategory: string,
-  dealId: number,
-  subject: string | null,
-  threadId: string,
-  onStreamBody?: (text: string) => void,
-): Promise<AIEmailResponse> {
-  const variationToken = Math.random().toString(36).slice(2)
-  const requestPayload = {
-    emailCategory,
-    dealId,
-    variationToken,
-    subject: subject || undefined,
-    threadId,
-  }
-
-  const response = await fetch('/api/aiRecommend/email', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestPayload),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Failed to generate AI email: ${response.status} ${errorText}`)
-  }
-
-  if (!response.body) {
-    throw new Error('No response body')
-  }
-
-  return processStreamingResponse(response.body.getReader(), onStreamBody)
 }
 
 function MessageDate({ message }: { message: Message }) {
@@ -255,15 +170,9 @@ function MessageDate({ message }: { message: Message }) {
 export default function EmailChatDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const {
-    customerName,
-    customerEmail,
-    messages,
-    dealId,
-    subject,
-  
-  } = useLoaderData<typeof loader>()
-  const [chatMessages, setChatMessages] = useState<Message[]>(messages)
+  const { customerName, customerEmail, messages, dealId, subject } =
+    useLoaderData<typeof loader>()
+  const [chatMessages, _] = useState<Message[]>(messages)
   const [currentImages, setCurrentImages] = useState<
     { id: number; url: string; name: string; type: string; available: null }[]
   >([])
@@ -283,33 +192,28 @@ export default function EmailChatDialog() {
     return withoutDash.trimEnd()
   }
 
-
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [chatMessages.length])
-
-
 
   const handleClose = () => {
     navigate(`/admin/deals/edit/${dealId}/history${location.search}`)
   }
 
-  const getInitials = (name: string) => {
-    const parts = name.split(' ')
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return ''
+
+    const parts = name.trim().split(' ')
+
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase()
     }
+
     return name.slice(0, 2).toUpperCase()
   }
 
   const lastMessageFromMe = [...chatMessages].reverse().find(m => !m.isFromCustomer)
   const lastReadMessageId = lastMessageFromMe?.read_at ? lastMessageFromMe.id : null
-
-
-
-
-
 
   function showDate(message: Message, index: number) {
     return (
@@ -362,10 +266,13 @@ export default function EmailChatDialog() {
                 >
                   <div
                     className='whitespace-pre-wrap'
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: Content is sanitized via DOMPurify
                     dangerouslySetInnerHTML={{
-                      __html: getDisplayBody(
-                        message.body,
-                        message.isFromCustomer ? null : message.signature,
+                      __html: DOMPurify.sanitize(
+                        getDisplayBody(
+                          message.body,
+                          message.isFromCustomer ? null : message.signature,
+                        ),
                       ),
                     }}
                   />
@@ -418,7 +325,9 @@ export default function EmailChatDialog() {
                                 className='block'
                                 download
                               >
-                                <div className={`${fileSize} bg-white rounded-md border border-gray-300 flex flex-col items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors p-2 shadow-sm`}>
+                                <div
+                                  className={`${fileSize} bg-white rounded-md border border-gray-300 flex flex-col items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors p-2 shadow-sm`}
+                                >
                                   <FileText className='h-10 w-10 mb-2 text-gray-400' />
                                   <span className='text-[10px] text-center break-all line-clamp-2 leading-tight'>
                                     {label}
@@ -454,7 +363,9 @@ export default function EmailChatDialog() {
                                       .map(img => ({
                                         id: img.id,
                                         url: img.signed_url || img.url,
-                                        name: img.filename || `${img.content_type}/${img.content_subtype}`,
+                                        name:
+                                          img.filename ||
+                                          `${img.content_type}/${img.content_subtype}`,
                                         type: 'email',
                                         available: null,
                                       })) || []
