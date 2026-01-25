@@ -48,7 +48,7 @@ interface DealsViewProps {
   lists: List[]
   imagesMap: Record<number, boolean>
   emailsMap: Record<number, boolean>
-  viewSelect?: React.ReactNode
+  groupListSelect?: React.ReactNode
 }
 
 export default function DealsView({
@@ -57,7 +57,7 @@ export default function DealsView({
   lists,
   imagesMap,
   emailsMap,
-  viewSelect,
+  groupListSelect,
 }: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -235,8 +235,8 @@ export default function DealsView({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full flex justify-between items-center mb-4'>
-        {viewSelect}
+      <div className='w-full flex justify-between items-center py-2 px-1'>
+        {groupListSelect}
         <FindCustomer
           disableRowClick
           onEdit={customerId => {
@@ -245,7 +245,7 @@ export default function DealsView({
           }}
           onDelete={customerId => {
             const dealId = findDealIdByCustomer(customerId)
-            if (dealId) navigate(`edit/${dealId}/delete`)
+            if (dealId) navigate(`edit/${dealId}/delete${location.search}`)
           }}
           onSelect={customerId => {
             const dealId = findDealIdByCustomer(customerId)

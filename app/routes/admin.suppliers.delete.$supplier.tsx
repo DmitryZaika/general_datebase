@@ -4,6 +4,7 @@ import { DeleteRow } from '~/components/pages/DeleteRow'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
@@ -28,7 +29,8 @@ export async function action({ params, request }: ActionFunctionArgs) {
 
   try {
     await db.execute(`DELETE FROM suppliers WHERE id = ?`, [supplierId])
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return { error: 'Failed to delete supplier' }
   }
 

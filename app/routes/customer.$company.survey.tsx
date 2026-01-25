@@ -20,6 +20,7 @@ import { FormField } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 
 const surveySchema = z.object({
@@ -88,7 +89,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     return redirect(`/customer/${companyId}/survey?submitted=1`)
   } catch (error) {
-    console.error('Error saving survey:', error)
+    posthogClient.captureException(error)
     return redirect(`/customer/${companyId}/survey?error=1`)
   }
 }

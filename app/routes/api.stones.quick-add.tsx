@@ -2,6 +2,7 @@ import type { ResultSetHeader } from 'mysql2'
 import { type ActionFunctionArgs, data, redirect } from 'react-router'
 import { db } from '~/db.server'
 import { quickAddStoneSchema } from '~/schemas/stones'
+import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 import { generateLeftoverBundle } from '~/utils/slabHelpers.server'
 
@@ -95,7 +96,7 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     // Rollback transaction on any error
     await connection.rollback()
-    console.error('Failed to create stone:', error)
+    posthogClient.captureException(error)
     return data(
       {
         error: 'Failed to create stone',

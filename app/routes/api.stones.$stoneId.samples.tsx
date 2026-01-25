@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { csrf } from '~/utils/csrf.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -73,7 +74,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       queryParams,
     )
     return new Response(JSON.stringify({ success: true }))
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return new Response(JSON.stringify({ error: 'Failed to update' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

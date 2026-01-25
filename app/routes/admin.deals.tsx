@@ -1,8 +1,8 @@
 import { Mail, SettingsIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  type LoaderFunctionArgs,
   Link,
+  type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
@@ -23,7 +23,7 @@ import {
 } from '~/components/ui/select'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 
 type AdminDeal = {
   id: number
@@ -43,7 +43,7 @@ type AdminDeal = {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request)
+    const user: User = await getAdminUser(request)
     if (!user || !user.company_id) {
       return redirect('/login')
     }
@@ -59,19 +59,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       'SELECT id, name FROM groups_list WHERE deleted_at IS NULL AND is_displayed = 1 AND (company_id = ? OR id = 1)',
       [companyId],
     )
-    
+
     const activeGroupId = viewParam ? parseInt(viewParam, 10) : groups[0]?.id
 
     // Lists for columns (filtered by active group)
     const lists = await selectMany<{ id: number; name: string }>(
       db,
       'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
-      [activeGroupId]
+      [activeGroupId],
     )
 
     // Deals filtered by company (via customers.company_id) and optionally by sales rep
-    // Note: We might want to filter deals by list IDs that are visible, 
-    // but the current query gets all deals for the company. 
+    // Note: We might want to filter deals by list IDs that are visible,
+    // but the current query gets all deals for the company.
     // Since we only render lists that belong to the group, deals in other lists won't be shown anyway.
     const dealParams: (string | number)[] = [companyId]
     let dealSql = `
@@ -228,7 +228,9 @@ export default function AdminDeals() {
             </SelectTrigger>
             <SelectContent>
               {groups.map(group => (
-                  <SelectItem key={group.id} value={String(group.id)}>{group.name}</SelectItem>
+                <SelectItem key={group.id} value={String(group.id)}>
+                  {group.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

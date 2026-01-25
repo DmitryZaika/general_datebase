@@ -4,18 +4,11 @@ import React from 'react'
 import { Link, type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { db } from '~/db.server'
-import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 // ═════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═════════════════════════════════════════════════════════════════════════════
-
-interface User {
-  id: number
-  email: string
-  name: string | null
-  company_id: number
-}
 
 interface AnswerAttempt {
   employee_id: number
@@ -56,7 +49,7 @@ interface ProgressRow {
 }
 
 interface LoaderData {
-  admin: SessionUser
+  admin: User
   users: User[]
   allAttempts: AnswerAttempt[]
 }
@@ -70,7 +63,19 @@ async function fetchUsers(companyId: number): Promise<User[]> {
     `SELECT id, email, name, company_id FROM users WHERE company_id = ? ORDER BY name, email`,
     [companyId],
   )
-  return rows
+  return rows.map(
+    (row): User =>
+      ({
+        id: row.id,
+        email: row.email,
+        name: row.name,
+        phone_number: row.phone_number,
+        is_employee: row.is_employee,
+        is_admin: row.is_admin,
+        is_superuser: row.is_superuser,
+        company_id: row.company_id,
+      }) as User,
+  )
 }
 
 async function fetchAnswerAttempts(companyId: number): Promise<AnswerAttempt[]> {
@@ -101,7 +106,7 @@ async function fetchAnswerAttempts(companyId: number): Promise<AnswerAttempt[]> 
 // ═════════════════════════════════════════════════════════════════════════════
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let admin: SessionUser
+  let admin: User
   try {
     admin = await getEmployeeUser(request)
   } catch (error) {

@@ -60,7 +60,7 @@ import {
 // Server Utilities
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -150,7 +150,7 @@ type AIEmailFormData = z.infer<typeof aiEmailSchema>
 // ============================================================================
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  let user: EmployeeUser
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
@@ -190,27 +190,19 @@ async function fetchSenderInfo(user: EmployeeUser): Promise<SenderInfo> {
   if (user.phone_number) senderInfo.senderPhoneNumber = user.phone_number
 
   if (user.company_id) {
-    try {
-      const [companyRows] = await db.execute<RowDataPacket[]>(
-        'SELECT name FROM company WHERE id = ?',
-        [user.company_id],
-      )
-      if (companyRows?.[0]?.name) senderInfo.senderCompany = companyRows[0].name
-    } catch (error) {
-      console.error('Error fetching company:', error)
-    }
+    const [companyRows] = await db.execute<RowDataPacket[]>(
+      'SELECT name FROM company WHERE id = ?',
+      [user.company_id],
+    )
+    if (companyRows?.[0]?.name) senderInfo.senderCompany = companyRows[0].name
   }
 
   if (user.position_id) {
-    try {
-      const [positionRows] = await db.execute<RowDataPacket[]>(
-        'SELECT name FROM positions WHERE id = ?',
-        [user.position_id],
-      )
-      if (positionRows?.[0]?.name) senderInfo.senderPosition = positionRows[0].name
-    } catch (error) {
-      console.error('Error fetching position:', error)
-    }
+    const [positionRows] = await db.execute<RowDataPacket[]>(
+      'SELECT name FROM positions WHERE id = ?',
+      [user.position_id],
+    )
+    if (positionRows?.[0]?.name) senderInfo.senderPosition = positionRows[0].name
   }
 
   return senderInfo
@@ -259,26 +251,22 @@ async function processStreamingResponse(
 
     for (const line of lines) {
       if (line.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(line.slice(6))
-          if (data.error) throw new Error(data.error)
-          if (data.content) {
-            fullText += data.content
+        const data = JSON.parse(line.slice(6))
+        if (data.error) throw new Error(data.error)
+        if (data.content) {
+          fullText += data.content
 
-            if (fullText.includes('---BODY---')) {
-              isInBody = true
-              const parts = fullText.split('---BODY---')
-              if (onStreamSubject) onStreamSubject(parts[0].trim())
-              if (onStreamBody) onStreamBody((parts[1] || '').trim())
-            } else if (isInBody) {
-              const parts = fullText.split('---BODY---')
-              if (onStreamBody) onStreamBody((parts[1] || '').trim())
-            } else {
-              if (onStreamSubject) onStreamSubject(fullText.trim())
-            }
+          if (fullText.includes('---BODY---')) {
+            isInBody = true
+            const parts = fullText.split('---BODY---')
+            if (onStreamSubject) onStreamSubject(parts[0].trim())
+            if (onStreamBody) onStreamBody((parts[1] || '').trim())
+          } else if (isInBody) {
+            const parts = fullText.split('---BODY---')
+            if (onStreamBody) onStreamBody((parts[1] || '').trim())
+          } else {
+            if (onStreamSubject) onStreamSubject(fullText.trim())
           }
-        } catch (parseError) {
-          console.error('Parse error:', parseError)
         }
       }
     }
@@ -388,12 +376,8 @@ function EmailFormFields({
 
 function AIAssistantMenu({
   aiForm,
-  onGenerate,
-  isGenerating,
 }: {
   aiForm: ReturnType<typeof useForm<AIEmailFormData>>
-  onGenerate: () => void
-  isGenerating: boolean
 }) {
   return (
     <div className='flex flex-col gap-4 p-4 border rounded-lg bg-gray-50'>
@@ -572,7 +556,7 @@ export default function DealEmailDialog() {
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
- const isSubmitting = useNavigation().state !== 'idle'
+  const isSubmitting = useNavigation().state !== 'idle'
   const form = useForm<EmailFormData>({
     resolver: emailResolver,
     defaultValues: {
@@ -792,18 +776,16 @@ export default function DealEmailDialog() {
                 >
                   <PaperclipIcon className='h-4 w-4' />
                 </Button>
-                <LoadingButton loading={isSubmitting} type='submit'>Send Email</LoadingButton>
+                <LoadingButton loading={isSubmitting} type='submit'>
+                  Send Email
+                </LoadingButton>
               </div>
             </div>
           </Form>
         </FormProvider>
         {showAIMenu && (
           <div className='mt-4'>
-            <AIAssistantMenu
-              aiForm={aiForm}
-              onGenerate={handleGenerateWithAI}
-              isGenerating={isGenerating}
-            />
+            <AIAssistantMenu aiForm={aiForm} />
           </div>
         )}
       </DialogContent>

@@ -62,7 +62,6 @@ export default function DealItem({
   readonly = false,
   highlighted = false,
 }: DealItemProps) {
-  const location = useLocation()
   const [localDate, setLocalDate] = useState<string | null>(deal.due_date ?? null)
   const [editAmount, setEditAmount] = useState(false)
   const [editDesc, setEditDesc] = useState(false)
@@ -74,7 +73,7 @@ export default function DealItem({
   const [descOverflow, setDescOverflow] = useState(false)
   const [lineHeightPx, setLineHeightPx] = useState<number>(20)
   const fetcher = useFetcher()
-
+  const location = useLocation()
   const hasEmail = Boolean(deal.has_email)
 
   const hasImages =
@@ -182,7 +181,7 @@ export default function DealItem({
         </div>
         {!readonly && (
           <Link
-            to={`edit/${deal.id}/project`}
+            to={`edit/${deal.id}/project${location.search}`}
             className='absolute top-1 right-1 z-20'
             onPointerDown={e => e.stopPropagation()}
           >
@@ -358,7 +357,9 @@ export default function DealItem({
             </Popover>
           )}
           {deal.list_id !== 5 && deal.list_id !== 4 && readonly && localDate && (
-            <p className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}>
+            <p
+              className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}
+            >
               {formatDisplay(localDate)}
             </p>
           )}

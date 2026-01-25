@@ -10,7 +10,7 @@ import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
 interface EmailTemplate {
@@ -26,11 +26,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const templateId = parseInt(params.templateId ?? '', 10)
-  if (isNaN(templateId)) {
+  if (Number.isNaN(templateId)) {
     return redirect('..')
   }
 
-  const user = await getAdminUser(request)
+  const user: User = await getAdminUser(request)
 
   const templates = await selectMany<EmailTemplate>(
     db,
@@ -61,11 +61,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   const templateId = parseInt(params.templateId ?? '', 10)
-  if (isNaN(templateId)) {
+  if (Number.isNaN(templateId)) {
     return redirect('..')
   }
 
-  const user = await getAdminUser(request)
+  const user: User = await getAdminUser(request)
 
   await db.execute(
     `UPDATE email_templates SET deleted_at = NOW() WHERE id = ? AND company_id = ?`,

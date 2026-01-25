@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import type { ActionFunctionArgs } from 'react-router'
 import { z } from 'zod'
+import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 const client = new OpenAI({
@@ -21,14 +22,16 @@ function createErrorResponse(message: string, status: number): Response {
 export async function action({ request }: ActionFunctionArgs) {
   try {
     await getEmployeeUser(request)
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return createErrorResponse('Failed to authorize', 401)
   }
 
   let parsed: z.infer<typeof improveSchema>
   try {
     parsed = improveSchema.parse(await request.json())
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return createErrorResponse('Invalid request data', 400)
   }
 
@@ -52,7 +55,8 @@ export async function action({ request }: ActionFunctionArgs) {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return createErrorResponse('Failed to improve email', 500)
   }
 }

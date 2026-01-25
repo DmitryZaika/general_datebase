@@ -15,7 +15,7 @@ import { DataTable } from '~/components/ui/data-table'
 
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 
 interface Document {
   id: number
@@ -29,7 +29,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
-  const user = await getAdminUser(request)
+  const user: User = await getAdminUser(request)
   const documents = await selectMany<Document>(
     db,
     'SELECT id, name FROM documents WHERE company_id = ?',

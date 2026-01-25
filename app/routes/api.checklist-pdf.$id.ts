@@ -2,6 +2,7 @@ import { PDFDocument, type PDFFont, rgb, StandardFonts } from 'pdf-lib'
 import type { LoaderFunctionArgs } from 'react-router'
 import { gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
 import { db } from '~/db.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectId } from '~/utils/queryHelpers'
 
 interface ChecklistData {
@@ -172,7 +173,8 @@ async function generatePdf(data: ChecklistData): Promise<Uint8Array> {
         height: imgDims.height,
       })
       cursorY -= imgDims.height + 6
-    } catch {
+    } catch (error) {
+      posthogClient.captureException(error)
       drawText('(signature unreadable)', { indent: 10 })
     }
   } else {
@@ -186,6 +188,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
   const checklistId = params.id
 
   if (!checklistId || Number.isNaN(Number(checklistId))) {
+    posthogClient.captureException(new Error('Invalid checklist ID'))
     throw new Response('Invalid checklist ID', { status: 400 })
   }
 
@@ -200,6 +203,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
   )
 
   if (!checklist) {
+    posthogClient.captureException(new Error('Checklist not found'))
     throw new Response('Checklist not found', { status: 404 })
   }
 

@@ -16,6 +16,7 @@ import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { sendEmail } from '~/lib/email.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { getSuperUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 import {
@@ -61,7 +62,12 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   try {
     await sendEmail(data)
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error, 'Failed to send email', {
+      to: data?.to,
+      subject: data?.subject,
+      text: data?.text,
+    })
     session.flash('message', toastData('Error', 'Failed to send email'))
     return redirect('.', {
       headers: { 'Set-Cookie': await commitSession(session) },

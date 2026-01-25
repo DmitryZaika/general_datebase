@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { FaTimes } from 'react-icons/fa'
 import {
-    type ActionFunctionArgs,
-    data,
-    type LoaderFunctionArgs,
-    redirect,
-    Form as RemixForm,
-    useLoaderData,
-    useNavigation,
+  type ActionFunctionArgs,
+  data,
+  type LoaderFunctionArgs,
+  Form as RemixForm,
+  redirect,
+  useLoaderData,
+  useNavigation,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 
@@ -17,12 +17,12 @@ import { MultiPartForm } from '~/components/molecules/MultiPartForm'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
 
@@ -30,6 +30,7 @@ import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -121,11 +122,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
             headers: { 'Set-Cookie': await commitSession(session) },
           },
         )
-      } catch {
-        return { error: 'Failed to save image to database' }
+      } catch (error) {
+        posthogClient.captureException(error)
+        return data({ error: 'Failed to save image to database' })
       }
     } else {
-      return { error: 'Invalid content type. Expected multipart/form-data' }
+      posthogClient.captureException(
+        new Error('Invalid content type. Expected multipart/form-data'),
+      )
+      return data({ error: 'Invalid content type. Expected multipart/form-data' })
     }
   }
 

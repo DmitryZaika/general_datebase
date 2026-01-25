@@ -1,6 +1,6 @@
 import { useDroppable } from '@dnd-kit/core'
 import { Plus } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import DealsCard from './DealsCard'
 import { Button } from './ui/button'
 import { Card, CardHeader, CardTitle } from './ui/card'
@@ -33,12 +33,13 @@ export default function DealsList({
   readonly = false,
   highlightedDealId,
 }: DealsListProps) {
-
   const { setNodeRef } = useDroppable({
     id: `list-${id}`,
     data: { type: 'list', listId: id },
     disabled: readonly,
   })
+
+  const location = useLocation()
 
   return (
     <Card
@@ -53,7 +54,6 @@ export default function DealsList({
           <span className='text-xs font-medium text-white/90 bg-white/20 rounded-full px-2 py-0.5'>
             {customers.length}
           </span>
-          
         </div>
       </CardHeader>
       <DealsCard
@@ -63,7 +63,7 @@ export default function DealsList({
       />
       {!readonly && (
         <div className='p-3 border-t'>
-          <Link to={`add?list_id=${id}`} relative='path'>
+          <Link to={`add?list_id=${id}${location.search}`} relative='path'>
             <Button variant='ghost' type='button' className='w-full flex gap-2'>
               <Plus className='w-4 h-4' /> Add Deal
             </Button>

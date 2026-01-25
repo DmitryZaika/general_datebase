@@ -5,7 +5,8 @@ import OpenAI from 'openai'
 import type { ActionFunctionArgs } from 'react-router'
 import { z } from 'zod'
 import { db } from '~/db.server'
-import { getEmployeeUser } from '~/utils/session.server'
+import { posthogClient } from '~/utils/posthog.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 // ============================================================================
 // OPENAI CLIENT
@@ -64,7 +65,7 @@ async function getUserInfo(user: {
         companyName = rows[0].name
       }
     } catch (err) {
-      console.error('Failed to load company info:', err)
+      posthogClient.captureException(err)
     }
   }
 
@@ -78,7 +79,7 @@ async function getUserInfo(user: {
         positionName = rows[0].name
       }
     } catch (err) {
-      console.error('Failed to load position info:', err)
+      posthogClient.captureException(err)
     }
   }
 
@@ -374,7 +375,7 @@ function buildUserPrompt(
     prompt += `Include this content: ${desiredContent}. `
   }
 
-  if (emailHistory && emailHistory.length) {
+  if (emailHistory?.length) {
     const historyText = emailHistory
       .map((item, index) => {
         const sender = item.isFromCustomer ? 'Customer' : 'You (sales rep)'
@@ -453,6 +454,7 @@ async function createStreamingResponse(
         )
         controller.close()
       } catch (err) {
+        posthogClient.captureException(err)
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ error: 'Streaming failed' })}\n\n`),
         )
@@ -478,17 +480,19 @@ function createErrorResponse(message: string, status: number): Response {
 // ============================================================================
 
 export async function action({ request }: ActionFunctionArgs) {
-  let user
+  let user: User
   try {
     user = await getEmployeeUser(request)
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return createErrorResponse('Failed to authorize', 401)
   }
 
   let params: EmailGenerationParams
   try {
     params = generateSchema.parse(await request.json())
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return createErrorResponse('Invalid request data', 400)
   }
 
@@ -503,7 +507,8 @@ export async function action({ request }: ActionFunctionArgs) {
         Connection: 'keep-alive',
       },
     })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return createErrorResponse('Failed to generate response', 500)
   }
 }

@@ -3,13 +3,15 @@ import { type ActionFunctionArgs, data, type LoaderFunctionArgs } from 'react-ro
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
 import type { Customer } from '~/types/customer'
-import { getEmployeeUser } from '~/utils/session.server'
+import { posthogClient } from '~/utils/posthog.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const user = await getEmployeeUser(request)
+  const user: User = await getEmployeeUser(request)
   const customerId = params.customerId
 
   if (!customerId) {
+    posthogClient.captureException(new Error('Customer ID is required'))
     return data({ error: 'Customer ID is required' }, { status: 400 })
   }
 
@@ -23,11 +25,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     )
 
     if (!customer || customer.length === 0) {
+      posthogClient.captureException(new Error('Customer not found'))
       return data({ error: 'Customer not found' }, { status: 404 })
     }
 
     return data({ customer: customer[0] })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return data({ error: 'Failed to fetch customer' }, { status: 500 })
   }
 }

@@ -17,6 +17,7 @@ import {
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -90,7 +91,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
       for (const slabRow of slabsToUnsell) {
         const parentId = slabRow.id
 
-        // Check if this slab has any sold child slabs
         const [soldChildSlabs] = await db.execute<RowDataPacket[]>(
           'SELECT id FROM slab_inventory WHERE parent_id = ? AND sale_id IS NOT NULL',
           [parentId],
@@ -193,7 +193,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         'Set-Cookie': await commitSession(session),
       },
     })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     const session = await getSession(request.headers.get('Cookie'))
     session.flash(
       'message',

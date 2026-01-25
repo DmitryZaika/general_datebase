@@ -31,6 +31,7 @@ import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
@@ -95,7 +96,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
             headers: { 'Set-Cookie': await commitSession(session) },
           },
         )
-      } catch {
+      } catch (error) {
+        posthogClient.captureException(error)
         return { error: 'Failed to unlink images' }
       }
     } else if (id) {
@@ -170,7 +172,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
               headers: { 'Set-Cookie': await commitSession(session) },
             },
           )
-        } catch {
+        } catch (error) {
+          posthogClient.captureException(error)
           return { error: 'Failed to link images' }
         }
       }
