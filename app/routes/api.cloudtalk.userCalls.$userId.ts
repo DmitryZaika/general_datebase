@@ -1,10 +1,14 @@
 import { type LoaderFunctionArgs, redirect } from 'react-router'
-import { z } from 'zod'
 import { type Calls200Response, fetchValue } from '~/utils/cloudtalk.server'
 import type { User } from '~/utils/session.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
-const userIdSchema = z.int().positive()
+function send422(value: string) {
+  throw new Response(null, {
+    status: 422,
+    statusText: value,
+  })
+}
 
 async function fetchCalls(companyId: number, userId: number) {
   const params = { user_id: userId }
@@ -19,6 +23,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return redirect(`/login?error=${error}`)
   }
 
-  const userId = userIdSchema.parse(params.userId)
-  return fetchCalls(user.company_id, userId)
+  if (!params.userId) {
+    return send422('Missing user ID')
+  }
+  const userId = parseInt(params.userId, 10)
+  return await fetchCalls(user.company_id, userId)
 }

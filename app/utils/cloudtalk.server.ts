@@ -3,7 +3,24 @@ import { selectId } from '~/utils/queryHelpers'
 
 export const BASE_URL = 'https://my.cloudtalk.io/api'
 
-interface CloudtalkResponse<T> {
+export interface Agent {
+  id: number
+  name: string
+  firstname: string
+  lastname: string
+  email: string
+  pass: string
+  daily_price_limit?: number
+  is_daily_limit_ok: boolean
+  status_outbound: boolean
+  availability_status: 'online' | 'offline' | 'paused' | 'calling'
+  extension: number
+  call_number_id: number
+  default_number: string
+  associated_numbers: string[]
+}
+
+interface CollectionsResponse<T> {
   itemsCount: number
   pageCount: number
   pageNumber: number
@@ -178,15 +195,17 @@ export async function getAuthString(companyId: number) {
   ) {
     throw new Error('CloudTalk API credentials not found')
   }
-  return `${companyInfo.cloudtalk_access_key}:${companyInfo.cloudtalk_access_secret}`
+  return btoa(
+    `${companyInfo.cloudtalk_access_key}:${companyInfo.cloudtalk_access_secret}`,
+  )
 }
 
-export async function fetchValue<T>(
+export async function fetchValueRaw(
   url: string,
   companyId: number,
   queryParams: Record<string, string | number>,
-): Promise<CloudtalkResponse<T>> {
-  const auth = getAuthString(companyId)
+): Promise<Response> {
+  const auth = await getAuthString(companyId)
 
   const fullUrl = new URL(`${BASE_URL}/${url}`)
 
@@ -206,5 +225,14 @@ export async function fetchValue<T>(
     throw new Error(`CloudTalk API error: ${response.status} ${response.statusText}`)
   }
 
-  return response.json()
+  return response
+}
+
+export async function fetchValue<T>(
+  url: string,
+  companyId: number,
+  queryParams: Record<string, string | number>,
+): Promise<CollectionsResponse<T>> {
+  const response = await fetchValueRaw(url, companyId, queryParams)
+  return await response.json()
 }
