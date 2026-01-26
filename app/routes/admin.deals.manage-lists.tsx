@@ -10,6 +10,7 @@ import {
   redirect,
   useFetcher,
   useLoaderData,
+  useLocation,
   useNavigate,
   useNavigation,
   useSubmit,
@@ -277,12 +278,12 @@ export default function ManageLists() {
   const submit = useSubmit()
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state !== 'idle'
-
+  const location = useLocation()
   return (
     <Dialog
       open={true}
       onOpenChange={open => {
-        if (!open) navigate('..')
+        if (!open) navigate(`..${location.search}`)
       }}
     >
       <DialogContent className='max-w-5xl overflow-auto max-h-[95vh]'>

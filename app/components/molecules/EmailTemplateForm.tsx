@@ -1,6 +1,6 @@
-import { Form, useNavigate, useNavigation } from 'react-router'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import type { UseFormReturn } from 'react-hook-form'
+import { Form, useLocation, useNavigate, useNavigation } from 'react-router'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { QuillInput } from '~/components/molecules/QuillInput'
@@ -33,12 +33,13 @@ export function EmailTemplateForm({
   submitLabel = 'Save Template',
 }: EmailTemplateFormProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const isSubmitting = useNavigation().state !== 'idle'
   const token = useAuthenticityToken()
   const fullSubmit = useFullSubmit(form)
 
   return (
-    <Dialog open onOpenChange={open => !open && navigate('..')}>
+    <Dialog open onOpenChange={open => !open && navigate(`..${location.search}`)}>
       <DialogContent className='sm:max-w-[800px] max-h-[90vh] overflow-y-auto'>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -88,7 +89,11 @@ export function EmailTemplateForm({
             </p>
 
             <DialogFooter className='gap-2 mt-4'>
-              <Button type='button' variant='outline' onClick={() => navigate('..')}>
+              <Button
+                type='button'
+                variant='outline'
+                onClick={() => navigate(`..${location.search}`)}
+              >
                 Cancel
               </Button>
               <LoadingButton loading={isSubmitting}>{submitLabel}</LoadingButton>
