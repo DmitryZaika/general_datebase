@@ -6,6 +6,7 @@ import {
   formatVariableForTemplate,
   validateTemplateBody,
 } from '~/utils/emailTemplateVariables'
+import { setupQuillImageHandlers } from '~/utils/quillImageUpload'
 import { Button } from '../ui/button'
 import {
   DropdownMenu,
@@ -28,6 +29,17 @@ interface QuillEditorWithVariablesProps {
   onChange: (value: string) => void
   renderInsertButton?: (button: React.ReactNode) => React.ReactNode
   onValidationChange?: (isValid: boolean, error?: string) => void
+}
+
+const QUILL_MODULES = {
+  toolbar: [
+    [{ header: [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ list: 'ordered' }, { list: 'bullet' }],
+    [{ color: [] }, { background: [] }],
+    ['link', 'image'],
+    ['clean'],
+  ],
 }
 
 function findVariableRanges(text: string): VariableRange[] {
@@ -74,9 +86,17 @@ export function QuillEditorWithVariables({
   renderInsertButton,
   onValidationChange,
 }: QuillEditorWithVariablesProps) {
-  const { quill, quillRef } = useQuill()
+  const { quill, quillRef } = useQuill({ modules: QUILL_MODULES })
   const isInternalChange = useRef(false)
+  const imageHandlerSetup = useRef(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+
+  useEffect(() => {
+    if (quill && !imageHandlerSetup.current) {
+      setupQuillImageHandlers(quill)
+      imageHandlerSetup.current = true
+    }
+  }, [quill])
 
   const syncValueToEditor = useCallback(() => {
     if (!quill || isInternalChange.current) return

@@ -102,6 +102,9 @@ const OutlineItem: React.FC<OutlineItemProps> = ({
 }
 
 function isHtmlEmpty(html: string): boolean {
+  if (/<img\s/i.test(html)) {
+    return false
+  }
   const cleaned = html
     .replace(/<[^>]*>/g, '')
     .replace(/&nbsp;/g, '')
