@@ -34,6 +34,7 @@ type FullDeal = {
   position?: number
   list_id: number
   due_date?: string | null
+  is_won?: number | null
 }
 
 type Deal = FullDeal & {
@@ -81,6 +82,7 @@ export default function DealsView({
         : null,
       has_images: imagesMap?.[d.id] || false,
       has_email: emailsMap?.[d.id] || false,
+      is_won: d.is_won,
     }
   }
 
@@ -280,7 +282,7 @@ export default function DealsView({
         />
       </div>
 
-      <div className='flex gap-4 pb-2'>
+      <div className='flex gap-1 '>
         {lists.map(list => (
           <DealsList
             key={list.id}

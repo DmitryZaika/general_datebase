@@ -40,15 +40,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     `SELECT c.name, c.email, c.phone, c.phone_2, c.address, c.city, c.state, c.postal_code, c.company_name,
             c.remodal_type, c.project_size, c.contact_time, c.remove_and_dispose, c.improve_offer, c.sink,
             c.when_start, c.details, c.compaign_name, c.adset_name, c.ad_name, c.backsplash, c.kitchen_stove,
-            c.your_message, c.attached_file, c.qbo_id, c.notes, c.source,d.created_at as deal_created, c.created_date as customer_created
+            c.your_message, c.attached_file, c.qbo_id, c.notes, c.source,d.created_at as deal_created, d.is_won, c.created_date as customer_created
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
       WHERE d.id = ? AND c.company_id = ?`,
     [dealId, user.company_id],
   )
-  if (!rows || rows.length === 0) {
-    return redirect('/employee/deals')
-  }
+  if (!rows || rows.length === 0) return redirect('/employee/deals')
   return { customer: rows[0] }
 }
 
@@ -181,7 +179,7 @@ export default function DealProjectInfo() {
     token,
   }: {
     id: number
-    is_won: number
+    is_won: number | null
     token: string
   }) => {
     const response = await fetch('/api/deals/set-won', {
@@ -202,12 +200,12 @@ export default function DealProjectInfo() {
   const setWonMutation = (
     toast: ToastFunction,
     token: string,
-    onSuccess?: (id: number, is_won: number) => void,
+    onSuccess?: (id: number, is_won: number | null) => void,
   ) => {
     return {
-      mutationFn: (variables: { id: number; is_won: number }) =>
+      mutationFn: (variables: { id: number; is_won: number | null }) =>
         setWon({ ...variables, token }),
-      onSuccess: (_: unknown, variables: { id: number; is_won: number }) => {
+      onSuccess: (_: unknown, variables: { id: number; is_won: number | null }) => {
         onSuccess?.(variables.id, variables.is_won)
       },
       onError: (error: unknown) => {
@@ -233,41 +231,7 @@ export default function DealProjectInfo() {
     }),
   )
 
-  // const { mutate } = useMutation({
-  //   mutationFn: async ({ id, is_won }: { id: number; is_won: number }) => {
-  //     const response = await fetch('/api/deals/set-won', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         'X-CSRF-Token': token || '',
-  //       },
-  //       credentials: 'same-origin',
-  //       body: JSON.stringify({ id, is_won }),
-  //     })
-
-  //     return response.json()
-  //   },
-  //   onError: (error: unknown) => {
-  //     toast({
-  //       title: 'Error',
-  //       description:
-  //         error instanceof Error
-  //           ? error.message
-  //           : 'Something went wrong. Please try again.',
-  //       variant: 'destructive',
-  //     })
-  //   },
-  //   onSuccess: () => {
-  //     toast({
-  //       title: 'Success',
-  //       description: 'Deal status updated',
-  //       variant: 'success',
-  //     })
-  //     navigate(`/employee/deals`)
-  //   },
-  // })
-
-  const handleStatusChange = (status: 1 | 0) => {
+  const handleStatusChange = (status: 1 | 0 | null) => {
     if (!dealId) return
     mutate({ id: Number(dealId), is_won: status })
   }
@@ -313,27 +277,33 @@ export default function DealProjectInfo() {
             : String(v),
     }))
 
+  function MoveButton({
+    status,
+    isWon,
+  }: {
+    status: 0 | 1 | null
+    isWon: 0 | 1 | null
+  }) {
+    const name = { 0: 'Lost', 1: 'Won', null: 'Move to Active' }
+    if (isWon === status) return null
+
+    return (
+      <Button
+        variant={status === 0 ? 'destructive' : status === 1 ? 'success' : 'default'}
+        className='h-7'
+        onClick={() => handleStatusChange(status)}
+      >
+        {name[status as keyof typeof name]}
+      </Button>
+    )
+  }
+
   return (
     <div className='space-y-4'>
       <div className='flex gap-2'>
-        <Button
-          variant='success'
-          aria-label='Won'
-          size='icon'
-          className='h-7'
-          onClick={() => handleStatusChange(1)}
-        >
-          Won
-        </Button>
-        <Button
-          variant='destructive'
-          aria-label='Lost'
-          size='icon'
-          className='h-7'
-          onClick={() => handleStatusChange(0)}
-        >
-          Lost
-        </Button>
+        <MoveButton status={null} isWon={customer.is_won} />
+        <MoveButton status={1} isWon={customer.is_won} />
+        <MoveButton status={0} isWon={customer.is_won} />
       </div>
       <div>
         <DataTable columns={columns} data={otherFields} noHeader />
