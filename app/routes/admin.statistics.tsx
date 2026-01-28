@@ -156,70 +156,70 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               COALESCE(
                 SUM(
                   CASE
-                    WHEN l.name = 'Closed Won' AND d.amount <> 0 THEN d.amount
+                    WHEN d.is_won = 1 AND d.amount <> 0 THEN d.amount
                     ELSE 0
                   END
                 ) /
                 NULLIF(
                   SUM(
                     CASE
-                      WHEN l.name = 'Closed Won' AND d.amount <> 0 THEN 1
+                      WHEN d.is_won = 1 AND d.amount <> 0 THEN 1
                       ELSE 0
                     END
                   ),
                   0
                 ),
               0) AS avg_amount_won,
-              SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) AS won_count,
-              SUM(CASE WHEN l.name = 'Closed Lost' THEN 1 ELSE 0 END) AS lost_count,
+              SUM(CASE WHEN d.is_won = 1 THEN 1 ELSE 0 END) AS won_count,
+              SUM(CASE WHEN d.is_won = 0 THEN 1 ELSE 0 END) AS lost_count,
               COALESCE(
                 SUM(
                   CASE
-                    WHEN l.name NOT IN ('Closed Won', 'Closed Lost') AND d.amount <> 0
+                    WHEN d.is_won IS NULL AND d.amount <> 0
                       THEN d.amount
                     ELSE 0
                   END
                 ),
               0) AS pipeline_amount,
               CASE
-                WHEN SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) +
-                     SUM(CASE WHEN l.name = 'Closed Lost' THEN 1 ELSE 0 END) = 0
+                WHEN SUM(CASE WHEN d.is_won = 1 THEN 1 ELSE 0 END) +
+                     SUM(CASE WHEN d.is_won = 0 THEN 1 ELSE 0 END) = 0
                   THEN 0
                 ELSE ROUND(
-                  100 * SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) /
+                  100 * SUM(CASE WHEN d.is_won = 1 THEN 1 ELSE 0 END) /
                   (
-                    SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN l.name = 'Closed Lost' THEN 1 ELSE 0 END)
+                    SUM(CASE WHEN d.is_won = 1 THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN d.is_won = 0 THEN 1 ELSE 0 END)
                   ),
                   0
                 )
               END AS won_lost_ratio,
-              SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) AS won_count_walkin,
-              SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'check-in' THEN 1 ELSE 0 END) AS lost_count_walkin,
+              SUM(CASE WHEN d.is_won = 1 AND c.source = 'check-in' THEN 1 ELSE 0 END) AS won_count_walkin,
+              SUM(CASE WHEN d.is_won = 0 AND c.source = 'check-in' THEN 1 ELSE 0 END) AS lost_count_walkin,
               CASE
-                WHEN SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) +
-                     SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'check-in' THEN 1 ELSE 0 END) = 0
+                WHEN SUM(CASE WHEN d.is_won = 1 AND c.source = 'check-in' THEN 1 ELSE 0 END) +
+                     SUM(CASE WHEN d.is_won = 0 AND c.source = 'check-in' THEN 1 ELSE 0 END) = 0
                   THEN 0
                 ELSE ROUND(
-                  100 * SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) /
+                  100 * SUM(CASE WHEN d.is_won = 1 AND c.source = 'check-in' THEN 1 ELSE 0 END) /
                   (
-                    SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'check-in' THEN 1 ELSE 0 END)
+                    SUM(CASE WHEN d.is_won = 1 AND c.source = 'check-in' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN d.is_won = 0 AND c.source = 'check-in' THEN 1 ELSE 0 END)
                   ),
                   0
                 )
               END AS won_lost_ratio_walkin,
-              SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) AS won_count_leads,
-              SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'leads' THEN 1 ELSE 0 END) AS lost_count_leads,
+              SUM(CASE WHEN d.is_won = 1 AND c.source = 'leads' THEN 1 ELSE 0 END) AS won_count_leads,
+              SUM(CASE WHEN d.is_won = 0 AND c.source = 'leads' THEN 1 ELSE 0 END) AS lost_count_leads,
               CASE
-                WHEN SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) +
-                     SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'leads' THEN 1 ELSE 0 END) = 0
+                WHEN SUM(CASE WHEN d.is_won = 1 AND c.source = 'leads' THEN 1 ELSE 0 END) +
+                     SUM(CASE WHEN d.is_won = 0 AND c.source = 'leads' THEN 1 ELSE 0 END) = 0
                   THEN 0
                 ELSE ROUND(
-                  100 * SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) /
+                  100 * SUM(CASE WHEN d.is_won = 1 AND c.source = 'leads' THEN 1 ELSE 0 END) /
                   (
-                    SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'leads' THEN 1 ELSE 0 END)
+                    SUM(CASE WHEN d.is_won = 1 AND c.source = 'leads' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN d.is_won = 0 AND c.source = 'leads' THEN 1 ELSE 0 END)
                   ),
                   0
                 )
@@ -247,7 +247,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
        JOIN users u ON d.user_id = u.id AND u.is_deleted = 0 AND u.company_id = ?
-       WHERE c.company_id = ? AND c.deleted_at IS NULL AND d.deleted_at IS NULL AND l.deleted_at IS NULL${
+       WHERE c.company_id = ? AND c.deleted_at IS NULL AND d.deleted_at IS NULL AND l.deleted_at IS NULL AND d.is_won IS NULL${
          dealsDateFilters.length ? ` AND ${dealsDateFilters.join(' AND ')}` : ''
        }${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY l.id, l.name
@@ -420,26 +420,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       db,
       `SELECT
          u.name as rep_name,
-         COUNT(CASE WHEN dl.name = 'Closed Won' THEN 1 END) as total_sold,
+         COUNT(CASE WHEN d.is_won = 1 THEN 1 END) as total_sold,
          COUNT(*) as total_created,
 
          COUNT(CASE
              WHEN c.source = 'leads'
-                  AND dl.name = 'Closed Won'
+                  AND d.is_won = 1
              THEN 1
          END) as leads_sold_same_month,
          COUNT(CASE WHEN c.source = 'leads' THEN 1 END) as leads_created,
 
          COUNT(CASE
              WHEN c.source = 'check-in'
-                  AND dl.name = 'Closed Won'
+                  AND d.is_won = 1
              THEN 1
          END) as walkin_sold_same_month,
          COUNT(CASE WHEN c.source = 'check-in' THEN 1 END) as walkin_created,
 
          COUNT(CASE
              WHEN c.source = 'call-in'
-                  AND dl.name = 'Closed Won'
+                  AND d.is_won = 1
              THEN 1
          END) as callin_sold_same_month,
          COUNT(CASE WHEN c.source = 'call-in' THEN 1 END) as callin_created
@@ -472,7 +472,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          AND c.deleted_at IS NULL
          AND d.deleted_at IS NULL
          AND l.deleted_at IS NULL
-         AND l.name = 'Closed Lost'
+         AND d.is_won = 0
          AND d.lost_reason IS NOT NULL
          AND d.lost_reason <> ''${
            dealsDateFilters.length ? ` AND ${dealsDateFilters.join(' AND ')}` : ''
@@ -502,13 +502,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       `SELECT
              c.compaign_name,
              COUNT(DISTINCT c.id) AS customers_acquired,
-             COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END) AS closed_deals,
-             COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) AS won_deals,
+             COUNT(DISTINCT CASE WHEN d.is_won IS NOT NULL THEN d.id END) AS closed_deals,
+             COUNT(DISTINCT CASE WHEN d.is_won = 1 THEN d.id END) AS won_deals,
              ROUND(
                100.0 *
-               COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) /
+               COUNT(DISTINCT CASE WHEN d.is_won = 1 THEN d.id END) /
                NULLIF(
-                 COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END),
+                 COUNT(DISTINCT CASE WHEN d.is_won IS NOT NULL THEN d.id END),
                  0
                ),
                1
