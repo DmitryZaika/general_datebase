@@ -1,3 +1,4 @@
+import type { ResultSetHeader } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { v4 as uuidv4 } from 'uuid'
 import { z } from 'zod'
@@ -5,9 +6,8 @@ import { db } from '~/db.server'
 import { type MailReturn, sendEmail } from '~/lib/email.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectId } from '~/utils/queryHelpers'
-import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 import { uploadStreamToS3 } from '~/utils/s3.server'
-import { type ResultSetHeader } from 'mysql2'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 export const emailSchema = z.object({
   to: z.union([z.email(), z.array(z.email())]),
@@ -40,7 +40,7 @@ const appendEmailSignature = (body: string, signature: string | null | undefined
   return `${cleanBody}\n\n${sign}`
 }
 
-const emailToSend = async (user: SessionUser, cleaned: Email) => {
+const emailToSend = async (user: User, cleaned: Email) => {
   const userCompany = await selectId<{ domain: string | null }>(
     db,
     'SELECT domain from company where id = ?',
@@ -81,7 +81,7 @@ const emailToSend = async (user: SessionUser, cleaned: Email) => {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const user = await getEmployeeUser(request).catch(() => null)
+  const user: User | null = await getEmployeeUser(request).catch(() => null)
   if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
 
   const formData = await request.formData()
@@ -122,7 +122,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       cleaned.body,
       messageId,
       emailInformation.from,
-      Array.isArray(emailInformation.to) ? emailInformation.to.join(', ') : emailInformation.to,
+      Array.isArray(emailInformation.to)
+        ? emailInformation.to.join(', ')
+        : emailInformation.to,
       threadId,
       cleaned.dealId,
     ],

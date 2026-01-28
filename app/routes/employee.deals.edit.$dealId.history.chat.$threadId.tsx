@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import DOMPurify from 'isomorphic-dompurify'
 import { FileText, ImageIcon, PaperclipIcon, Pencil } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
@@ -6,6 +7,7 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
 } from 'react-router'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
@@ -35,6 +37,7 @@ import {
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
 import { fileSize } from '~/utils/constants'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
@@ -86,6 +89,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const dealId = parseInt(params.dealId, 10)
   const threadId = params.threadId
   if (!threadId) {
+    posthogClient.captureException(new Error('Thread ID is missing'))
     throw new Error('Thread ID is missing')
   }
 
@@ -97,7 +101,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [dealId],
   )
 
-  const normalizeEmail = (email: string | null | undefined) => email?.trim().toLowerCase() || ''
+  const normalizeEmail = (email: string | null | undefined) =>
+    email?.trim().toLowerCase() || ''
   const customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
 
   if (customerEmail) {
@@ -191,29 +196,25 @@ async function processStreamingResponse(
 
     for (const line of lines) {
       if (line.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(line.slice(6))
-          if (data.error) {
-            throw new Error(data.error)
-          }
-          if (data.content) {
-            fullText += data.content
+        const data = JSON.parse(line.slice(6))
+        if (data.error) {
+          throw new Error(data.error)
+        }
+        if (data.content) {
+          fullText += data.content
 
-            if (fullText.includes('---BODY---')) {
-              isInBody = true
-              const parts = fullText.split('---BODY---')
-              if (onStreamBody) {
-                onStreamBody((parts[1] || '').trim())
-              }
-            } else if (isInBody) {
-              const parts = fullText.split('---BODY---')
-              if (onStreamBody) {
-                onStreamBody((parts[1] || '').trim())
-              }
+          if (fullText.includes('---BODY---')) {
+            isInBody = true
+            const parts = fullText.split('---BODY---')
+            if (onStreamBody) {
+              onStreamBody((parts[1] || '').trim())
+            }
+          } else if (isInBody) {
+            const parts = fullText.split('---BODY---')
+            if (onStreamBody) {
+              onStreamBody((parts[1] || '').trim())
             }
           }
-        } catch (error) {
-          console.error('Parse error:', error)
         }
       }
     }
@@ -290,7 +291,7 @@ export default function EmailChatDialog() {
     { id: number; url: string; name: string; type: string; available: null }[]
   >([])
   const [currentImageId, setCurrentImageId] = useState<number | null>(null)
-
+  const location = useLocation()
   const removeAttachment = (file: File) => {
     setAttachments(prev => prev.filter(f => f !== file))
   }
@@ -349,7 +350,7 @@ export default function EmailChatDialog() {
   }, [messageText])
 
   const handleClose = () => {
-    navigate(`/employee/deals/edit/${dealId}/history`)
+    navigate(`/employee/deals/edit/${dealId}/history${location.search}`)
   }
 
   const getInitials = (name: string) => {
@@ -391,7 +392,6 @@ export default function EmailChatDialog() {
     }
   }
 
-
   const handleSend = async () => {
     const body = messageText.trim()
     if (!body && attachments.length === 0) return
@@ -421,18 +421,18 @@ export default function EmailChatDialog() {
 
       if (!response.ok) {
         let errorText = ''
-        try {
-          const payload: unknown = await response.json()
-          if (payload && typeof payload === 'object' && 'error' in payload) {
-            const value = payload.error
-            if (typeof value === 'string') {
-              errorText = value
-            }
+        const payload: unknown = await response.json()
+        if (payload && typeof payload === 'object' && 'error' in payload) {
+          const value = payload.error
+          if (typeof value === 'string') {
+            errorText = value
           }
-        } catch {
-          errorText = await response.text().catch(() => '')
         }
-        throw new Error(errorText || 'Email failed to send')
+        toast({
+          title: 'Failure',
+          description: errorText || 'Email failed to send',
+          variant: 'destructive',
+        })
       }
 
       const localAttachments: Attachment[] = attachments.map((file, i) => ({
@@ -521,10 +521,13 @@ export default function EmailChatDialog() {
                 >
                   <div
                     className='whitespace-pre-wrap'
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
                     dangerouslySetInnerHTML={{
-                      __html: getDisplayBody(
-                        message.body,
-                        message.isFromCustomer ? null : message.signature,
+                      __html: DOMPurify.sanitize(
+                        getDisplayBody(
+                          message.body,
+                          message.isFromCustomer ? null : message.signature,
+                        ),
                       ),
                     }}
                   />
@@ -577,7 +580,9 @@ export default function EmailChatDialog() {
                                 className='block'
                                 download
                               >
-                                <div className={`${fileSize} bg-white rounded-md border border-gray-300 flex flex-col items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors p-2 shadow-sm`}>
+                                <div
+                                  className={`${fileSize} bg-white rounded-md border border-gray-300 flex flex-col items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors p-2 shadow-sm`}
+                                >
                                   <FileText className='h-10 w-10 mb-2 text-gray-400' />
                                   <span className='text-[10px] text-center break-all line-clamp-2 leading-tight'>
                                     {label}
@@ -613,7 +618,9 @@ export default function EmailChatDialog() {
                                       .map(img => ({
                                         id: img.id,
                                         url: img.signed_url || img.url,
-                                        name: img.filename || `${img.content_type}/${img.content_subtype}`,
+                                        name:
+                                          img.filename ||
+                                          `${img.content_type}/${img.content_subtype}`,
                                         type: 'email',
                                         available: null,
                                       })) || []
@@ -765,7 +772,9 @@ export default function EmailChatDialog() {
                 variant='ghost'
                 size='icon'
                 className='text-zinc-500'
-                disabled={isSending || (messageText.trim() === '' && attachments.length === 0)}
+                disabled={
+                  isSending || (messageText.trim() === '' && attachments.length === 0)
+                }
                 onClick={handleSend}
               >
                 <span className='text-xl'>➤</span>

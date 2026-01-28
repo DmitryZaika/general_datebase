@@ -3,6 +3,7 @@ import { DeleteRow } from '~/components/pages/DeleteRow'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { getMarketingUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
@@ -33,7 +34,11 @@ export async function action({ params, request }: ActionFunctionArgs) {
       `UPDATE customers SET deleted_at = NOW() WHERE id = ? AND company_id = ?`,
       [leadId, paramCompanyId],
     )
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error, 'Failed to delete lead', {
+      leadId,
+      paramCompanyId,
+    })
     return { error: 'Failed to delete lead' }
   }
 

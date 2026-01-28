@@ -31,9 +31,10 @@ import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
-import { printAllSlabsQRCodes, type SlabData } from '~/utils/slabQRCode'
+import type { SlabData } from '~/utils/slabQRCode'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 import { useCustomOptionalForm } from '~/utils/useCustomForm'
 
@@ -617,7 +618,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
           headers: { 'Set-Cookie': await commitSession(session) },
         },
       )
-    } catch {
+    } catch (error) {
+      posthogClient.captureException(error)
       return { error: 'Failed to update slab number' }
     }
   }
@@ -659,7 +661,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       } else {
         return forceRedirectError(request.headers, 'No id provided')
       }
-    } catch {
+    } catch (error) {
+      posthogClient.captureException(error)
       return { error: 'Failed to process delete request' }
     }
   }
@@ -697,7 +700,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
 
         return { error: 'Invalid form data' }
-      } catch {
+      } catch (error) {
+        posthogClient.captureException(error)
         return { error: 'Failed to process form data' }
       }
     }
@@ -748,10 +752,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error occurred'
+        posthogClient.captureException(error, stoneId.toString())
         return data({ error: `Failed to add slab: ${errorMessage}` })
       }
     }
 
+    posthogClient.captureException(
+      new Error('Unsupported content type'),
+      stoneId.toString(),
+    )
     return data({ error: 'Unsupported content type' })
   }
 
@@ -939,30 +948,6 @@ export default function EditStoneSlabs() {
       // Refresh the page to show updated data
       navigate(`.${window.location.search}`, { replace: true })
     }
-  }
-
-  // Handle printing all QR codes
-  const handlePrintAllQRCodes = () => {
-    // Gather all slabs including linked ones
-    const allSlabsForPrinting = [...slabs].map(slab => ({
-      ...slab,
-      stoneName: stone.name,
-    })) as SlabData[]
-
-    // Add linked slabs with their source stone names
-    linkedSlabs.forEach(linkedGroup => {
-      linkedGroup.slabs.forEach(linkedSlab => {
-        allSlabsForPrinting.push({
-          id: linkedSlab.id,
-          bundle: linkedSlab.bundle,
-          length: linkedSlab.length,
-          width: linkedSlab.width,
-          stoneName: linkedGroup.source_stone_name,
-        })
-      })
-    })
-
-    printAllSlabsQRCodes(allSlabsForPrinting)
   }
 
   return (

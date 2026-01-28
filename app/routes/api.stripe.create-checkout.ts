@@ -2,6 +2,7 @@ import { type ActionFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { getStripe } from '~/utils/getStripe'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { toastData } from '~/utils/toastHelpers.server'
 
@@ -81,7 +82,8 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     return redirect(session.url)
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     const session = await getSession(request.headers.get('Cookie'))
     session.flash(
       'message',

@@ -2,6 +2,7 @@ import type { ResultSetHeader } from 'mysql2'
 import type { ActionFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { eventSchema, eventUpdateSchema } from '~/schemas/events'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -181,7 +182,8 @@ export async function action({ request }: ActionFunctionArgs) {
           { status: 400 },
         )
     }
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return Response.json(
       { success: false, error: 'Internal server error' },
       { status: 500 },

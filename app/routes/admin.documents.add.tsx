@@ -21,7 +21,7 @@ import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 import { useCustomForm } from '~/utils/useCustomForm'
 import { FormField } from '../components/ui/form'
@@ -46,7 +46,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors }
   }
-  const user = await getAdminUser(request)
+  const user: User = await getAdminUser(request)
   await db.execute(`INSERT INTO documents (name, url, company_id) VALUES (?,  ?, ?);`, [
     data.name,
     data.file,
@@ -61,7 +61,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request)
+    const user: User = await getAdminUser(request)
     return { user }
   } catch (error) {
     return redirect(`/login?error=${error}`)

@@ -1,4 +1,4 @@
-import type { ColumnDef, Row } from '@tanstack/react-table'
+import type { ColumnDef } from '@tanstack/react-table'
 import { format } from 'date-fns'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -16,7 +16,6 @@ import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
-import { LOST_REASONS } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 
@@ -149,13 +148,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       dealsDateParams.push(toDate)
     }
 
-    const salesWhere = [
-      's.company_id = ?',
-      's.cancelled_date IS NULL',
-      's.sale_date IS NOT NULL',
-      ...dateFilters,
-    ]
-
     const dealsByRep = await selectMany<DealsByRep>(
       db,
       `SELECT u.id AS rep_id, u.name AS rep_name,
@@ -164,70 +156,70 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               COALESCE(
                 SUM(
                   CASE
-                    WHEN l.name = 'Closed Won' AND d.amount <> 0 THEN d.amount
+                    WHEN d.is_won = 1 AND d.amount <> 0 THEN d.amount
                     ELSE 0
                   END
                 ) /
                 NULLIF(
                   SUM(
                     CASE
-                      WHEN l.name = 'Closed Won' AND d.amount <> 0 THEN 1
+                      WHEN d.is_won = 1 AND d.amount <> 0 THEN 1
                       ELSE 0
                     END
                   ),
                   0
                 ),
               0) AS avg_amount_won,
-              SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) AS won_count,
-              SUM(CASE WHEN l.name = 'Closed Lost' THEN 1 ELSE 0 END) AS lost_count,
+              SUM(CASE WHEN d.is_won = 1 THEN 1 ELSE 0 END) AS won_count,
+              SUM(CASE WHEN d.is_won = 0 THEN 1 ELSE 0 END) AS lost_count,
               COALESCE(
                 SUM(
                   CASE
-                    WHEN l.name NOT IN ('Closed Won', 'Closed Lost') AND d.amount <> 0
+                    WHEN d.is_won IS NULL AND d.amount <> 0
                       THEN d.amount
                     ELSE 0
                   END
                 ),
               0) AS pipeline_amount,
               CASE
-                WHEN SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) +
-                     SUM(CASE WHEN l.name = 'Closed Lost' THEN 1 ELSE 0 END) = 0
+                WHEN SUM(CASE WHEN d.is_won = 1 THEN 1 ELSE 0 END) +
+                     SUM(CASE WHEN d.is_won = 0 THEN 1 ELSE 0 END) = 0
                   THEN 0
                 ELSE ROUND(
-                  100 * SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) /
+                  100 * SUM(CASE WHEN d.is_won = 1 THEN 1 ELSE 0 END) /
                   (
-                    SUM(CASE WHEN l.name = 'Closed Won' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN l.name = 'Closed Lost' THEN 1 ELSE 0 END)
+                    SUM(CASE WHEN d.is_won = 1 THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN d.is_won = 0 THEN 1 ELSE 0 END)
                   ),
                   0
                 )
               END AS won_lost_ratio,
-              SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) AS won_count_walkin,
-              SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'check-in' THEN 1 ELSE 0 END) AS lost_count_walkin,
+              SUM(CASE WHEN d.is_won = 1 AND c.source = 'check-in' THEN 1 ELSE 0 END) AS won_count_walkin,
+              SUM(CASE WHEN d.is_won = 0 AND c.source = 'check-in' THEN 1 ELSE 0 END) AS lost_count_walkin,
               CASE
-                WHEN SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) +
-                     SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'check-in' THEN 1 ELSE 0 END) = 0
+                WHEN SUM(CASE WHEN d.is_won = 1 AND c.source = 'check-in' THEN 1 ELSE 0 END) +
+                     SUM(CASE WHEN d.is_won = 0 AND c.source = 'check-in' THEN 1 ELSE 0 END) = 0
                   THEN 0
                 ELSE ROUND(
-                  100 * SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) /
+                  100 * SUM(CASE WHEN d.is_won = 1 AND c.source = 'check-in' THEN 1 ELSE 0 END) /
                   (
-                    SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'check-in' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'check-in' THEN 1 ELSE 0 END)
+                    SUM(CASE WHEN d.is_won = 1 AND c.source = 'check-in' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN d.is_won = 0 AND c.source = 'check-in' THEN 1 ELSE 0 END)
                   ),
                   0
                 )
               END AS won_lost_ratio_walkin,
-              SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) AS won_count_leads,
-              SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'leads' THEN 1 ELSE 0 END) AS lost_count_leads,
+              SUM(CASE WHEN d.is_won = 1 AND c.source = 'leads' THEN 1 ELSE 0 END) AS won_count_leads,
+              SUM(CASE WHEN d.is_won = 0 AND c.source = 'leads' THEN 1 ELSE 0 END) AS lost_count_leads,
               CASE
-                WHEN SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) +
-                     SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'leads' THEN 1 ELSE 0 END) = 0
+                WHEN SUM(CASE WHEN d.is_won = 1 AND c.source = 'leads' THEN 1 ELSE 0 END) +
+                     SUM(CASE WHEN d.is_won = 0 AND c.source = 'leads' THEN 1 ELSE 0 END) = 0
                   THEN 0
                 ELSE ROUND(
-                  100 * SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) /
+                  100 * SUM(CASE WHEN d.is_won = 1 AND c.source = 'leads' THEN 1 ELSE 0 END) /
                   (
-                    SUM(CASE WHEN l.name = 'Closed Won' AND c.source = 'leads' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN l.name = 'Closed Lost' AND c.source = 'leads' THEN 1 ELSE 0 END)
+                    SUM(CASE WHEN d.is_won = 1 AND c.source = 'leads' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN d.is_won = 0 AND c.source = 'leads' THEN 1 ELSE 0 END)
                   ),
                   0
                 )
@@ -255,7 +247,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
        JOIN users u ON d.user_id = u.id AND u.is_deleted = 0 AND u.company_id = ?
-       WHERE c.company_id = ? AND c.deleted_at IS NULL AND d.deleted_at IS NULL AND l.deleted_at IS NULL${
+       WHERE c.company_id = ? AND c.deleted_at IS NULL AND d.deleted_at IS NULL AND l.deleted_at IS NULL AND d.is_won IS NULL${
          dealsDateFilters.length ? ` AND ${dealsDateFilters.join(' AND ')}` : ''
        }${hasRepFilter ? ' AND u.name = ?' : ''}
        GROUP BY l.id, l.name
@@ -428,26 +420,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       db,
       `SELECT
          u.name as rep_name,
-         COUNT(CASE WHEN dl.name = 'Closed Won' THEN 1 END) as total_sold,
+         COUNT(CASE WHEN d.is_won = 1 THEN 1 END) as total_sold,
          COUNT(*) as total_created,
 
          COUNT(CASE
              WHEN c.source = 'leads'
-                  AND dl.name = 'Closed Won'
+                  AND d.is_won = 1
              THEN 1
          END) as leads_sold_same_month,
          COUNT(CASE WHEN c.source = 'leads' THEN 1 END) as leads_created,
 
          COUNT(CASE
              WHEN c.source = 'check-in'
-                  AND dl.name = 'Closed Won'
+                  AND d.is_won = 1
              THEN 1
          END) as walkin_sold_same_month,
          COUNT(CASE WHEN c.source = 'check-in' THEN 1 END) as walkin_created,
 
          COUNT(CASE
              WHEN c.source = 'call-in'
-                  AND dl.name = 'Closed Won'
+                  AND d.is_won = 1
              THEN 1
          END) as callin_sold_same_month,
          COUNT(CASE WHEN c.source = 'call-in' THEN 1 END) as callin_created
@@ -480,7 +472,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          AND c.deleted_at IS NULL
          AND d.deleted_at IS NULL
          AND l.deleted_at IS NULL
-         AND l.name = 'Closed Lost'
+         AND d.is_won = 0
          AND d.lost_reason IS NOT NULL
          AND d.lost_reason <> ''${
            dealsDateFilters.length ? ` AND ${dealsDateFilters.join(' AND ')}` : ''
@@ -510,13 +502,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       `SELECT
              c.compaign_name,
              COUNT(DISTINCT c.id) AS customers_acquired,
-             COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END) AS closed_deals,
-             COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) AS won_deals,
+             COUNT(DISTINCT CASE WHEN d.is_won IS NOT NULL THEN d.id END) AS closed_deals,
+             COUNT(DISTINCT CASE WHEN d.is_won = 1 THEN d.id END) AS won_deals,
              ROUND(
                100.0 *
-               COUNT(DISTINCT CASE WHEN d.list_id = 4 THEN d.id END) /
+               COUNT(DISTINCT CASE WHEN d.is_won = 1 THEN d.id END) /
                NULLIF(
-                 COUNT(DISTINCT CASE WHEN d.list_id IN (4, 5) THEN d.id END),
+                 COUNT(DISTINCT CASE WHEN d.is_won IS NOT NULL THEN d.id END),
                  0
                ),
                1
@@ -601,7 +593,6 @@ export default function AdminStatistics() {
     dealsByRep,
     dealsByStage,
     lists,
-    customersTotals,
     customersBySource,
     customersByRep,
     fromDate,
@@ -609,7 +600,6 @@ export default function AdminStatistics() {
     customersTable,
     customersDeals,
     conversionMetricsByRep,
-    lostReasonsByRep,
     customersByCampaign,
     salesRepRatings,
   } = useLoaderData<typeof loader>()
@@ -862,91 +852,6 @@ export default function AdminStatistics() {
     },
   ]
 
-  const lostReasonColumns = useMemo(() => {
-    const reasons = [...Object.values(LOST_REASONS), 'Other']
-
-    return [
-      {
-        accessorKey: 'rep_name',
-        header: 'Sales Rep',
-        cell: ({ getValue }) => (
-          <span className='font-medium'>{(getValue() as string) || 'Unknown'}</span>
-        ),
-      },
-      ...reasons.map(reason => ({
-        accessorKey: reason,
-        header: reason,
-        cell: ({ row }: { row: Row<any> }) => {
-          const val = (row.original as any)[reason]
-          if (!val) return '-'
-          return (
-            <div className='text-xs'>
-              <div className='font-semibold'>{val.count}</div>
-              <div className='text-gray-500'>{val.percent}%</div>
-            </div>
-          )
-        },
-      })),
-      {
-        accessorKey: 'total',
-        header: 'Total Lost',
-        cell: ({ row }) => {
-          const totalLost = (row.original as any).total
-          const totalDeals = (row.original as any).total_deals
-          const pct = totalDeals > 0 ? Math.round((totalLost / totalDeals) * 100) : 0
-          return (
-            <div className='flex flex-col'>
-              <span className='font-bold'>{totalLost}</span>
-              <span className='text-xs text-muted-foreground'>{pct}% of all</span>
-            </div>
-          )
-        },
-      },
-    ] as ColumnDef<unknown>[]
-  }, [])
-
-  const lostReasonRows = useMemo(() => {
-    const map = new Map<string, any>()
-    const standardReasons = new Set(Object.values(LOST_REASONS))
-
-    // Lookup for total deals per rep
-    const dealsCountByRep = new Map<string, number>()
-    dealsByRep.forEach(d => dealsCountByRep.set(d.rep_name, d.deals_count))
-
-    lostReasonsByRep.forEach(item => {
-      if (!map.has(item.rep_name)) {
-        map.set(item.rep_name, {
-          rep_name: item.rep_name,
-          total: 0,
-          total_deals: dealsCountByRep.get(item.rep_name) || 0,
-        })
-      }
-      const entry = map.get(item.rep_name)
-
-      let reasonKey = item.lost_reason
-      if (!standardReasons.has(reasonKey)) {
-        reasonKey = 'Other'
-      }
-
-      if (!entry[reasonKey]) {
-        entry[reasonKey] = { count: 0, percent: 0 }
-      }
-      entry[reasonKey].count += item.count
-
-      entry.total += item.count
-    })
-
-    return Array.from(map.values()).map(entry => {
-      Object.keys(entry).forEach(key => {
-        if (key !== 'rep_name' && key !== 'total' && key !== 'total_deals') {
-          const count = entry[key].count
-          entry[key].percent = Math.round((count / entry.total) * 100)
-        }
-      })
-      return entry
-    })
-  }, [lostReasonsByRep, dealsByRep])
-
   // === Customers Acquired by Campaign + Conversion % ===
   type CampaignAcquisition = {
     campaign_name: string
@@ -980,7 +885,9 @@ export default function AdminStatistics() {
     {
       accessorKey: 'avg_rating',
       header: 'Avg Rating',
-      cell: ({ row }) => <span className='font-semibold'>{row.original.avg_rating}</span>,
+      cell: ({ row }) => (
+        <span className='font-semibold'>{row.original.avg_rating}</span>
+      ),
     },
     { accessorKey: 'responses', header: 'Responses' },
   ]

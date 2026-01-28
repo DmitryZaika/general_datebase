@@ -1,5 +1,4 @@
-// IMPORTS
-
+import DOMPurify from 'isomorphic-dompurify'
 import * as React from 'react'
 import {
   type ActionFunctionArgs,
@@ -18,17 +17,22 @@ import { Button } from '~/components/ui/button'
 import { Switch } from '~/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
-import { useToast } from '~/hooks/use-toast'
+import { type toast as toastType, useToast } from '~/hooks/use-toast'
 import type { InstructionSlim } from '~/types'
 import { DONE_KEY } from '~/utils/constants'
-import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
+import { posthogClient } from '~/utils/posthog.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 import { selectMany } from '../utils/queryHelpers'
-
-// TYPE DEFINITIONS + CONSTANTS
 
 interface InstructionMedium extends InstructionSlim {
   parent_id: number
   after_id: number
+}
+
+interface ActionData {
+  success?: boolean
+  error?: string
+  instructionId?: number
 }
 
 export interface Question {
@@ -122,201 +126,6 @@ interface InstructionNodeProps {
   submit: SubmitFunction
 }
 
-const InstructionNode: React.FC<InstructionNodeProps> = ({
-  node,
-  depth,
-  childrenOf,
-  expanded,
-  toggleExpand,
-  nodeStates,
-  setNodeLoading,
-  setNodeText,
-  appendNodeText,
-  setNodeSaving,
-  setSavedQuestions,
-  setRejectedQuestions,
-  savedQuestions,
-  rejectedQuestions,
-  submit,
-}) => {
-  const children = childrenOf(node.id)
-  const hasChildren = children.length > 0
-  const isOpen = expanded[node.id] ?? false
-  const {
-    text,
-    values,
-    loadingMCQ,
-    isSaving,
-    isSaved,
-    isRejected,
-    handleGenerate,
-    handleSaveQuestion,
-    handleRejectQuestion,
-  } = useInstructionNode({
-    node,
-    setNodeLoading,
-    setNodeText,
-    appendNodeText,
-    setNodeSaving,
-    setSavedQuestions,
-    setRejectedQuestions,
-    nodeStates,
-    submit,
-    savedQuestions,
-    rejectedQuestions,
-  })
-
-  return (
-    <div style={styles.item(depth)}>
-      {/* Arrow controls all content visibility */}
-      <div style={styles.titleRow} onClick={() => toggleExpand(node.id)}>
-        <span style={styles.arrow}>{isOpen ? '▼' : '▶'}</span>
-        <p style={styles.title}>{node.title ?? '(no title)'}</p>
-        <Button
-          variant='outline'
-          size='sm'
-          onClick={e => {
-            e.stopPropagation()
-            // Auto-expand when generating question
-            if (!isOpen) {
-              toggleExpand(node.id)
-            }
-            handleGenerate()
-          }}
-          style={{ marginLeft: 10 }}
-        >
-          Generate Question
-        </Button>
-      </div>
-
-      {/* Content only shows when expanded */}
-      {isOpen && (
-        <>
-          <div dangerouslySetInnerHTML={{ __html: node.rich_text }} />
-
-          {hasChildren && (
-            <div>
-              {children.map(child => (
-                <InstructionNode
-                  key={child.id}
-                  node={child}
-                  depth={depth + 1}
-                  childrenOf={childrenOf}
-                  expanded={expanded}
-                  toggleExpand={toggleExpand}
-                  nodeStates={nodeStates}
-                  setNodeLoading={setNodeLoading}
-                  setNodeText={setNodeText}
-                  appendNodeText={appendNodeText}
-                  setNodeSaving={setNodeSaving}
-                  setSavedQuestions={setSavedQuestions}
-                  setRejectedQuestions={setRejectedQuestions}
-                  savedQuestions={savedQuestions}
-                  rejectedQuestions={rejectedQuestions}
-                  submit={submit}
-                />
-              ))}
-            </div>
-          )}
-
-          {loadingMCQ && (
-            <div style={{ marginTop: 10, color: '#666' }}>
-              <p>Creating a question from this instruction...</p>
-            </div>
-          )}
-
-          {text && !values && (
-            <div
-              style={{
-                marginTop: 10,
-                padding: 10,
-                backgroundColor: '#f5f5f5',
-                borderRadius: 4,
-              }}
-            >
-              <p>Raw response: {text}</p>
-            </div>
-          )}
-
-          {values !== null && (
-            <div
-              className='mt-5 p-5'
-              style={{
-                border: '2px solid #888',
-                borderRadius: 8,
-                marginTop: 20,
-                position: 'relative',
-                display: isRejected ? 'none' : 'block',
-              }}
-            >
-              <button
-                onClick={handleRejectQuestion}
-                style={{
-                  position: 'absolute',
-                  top: 10,
-                  right: 10,
-                  background: 'transparent',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: '#888',
-                  lineHeight: 1,
-                  padding: '0 5px',
-                }}
-                title='Reject question'
-              >
-                X
-              </button>
-              <h2 style={{ marginBottom: 15 }}>{values.question}</h2>
-              {values.options?.map((answer: string, index: number) => {
-                const isCorrect = answer === values.answer
-                return (
-                  <div key={index} style={{ marginBottom: 8 }}>
-                    {answer}
-                    {isCorrect && <strong> (correct answer)</strong>}
-                  </div>
-                )
-              })}
-              <Form method='post' onSubmit={handleSaveQuestion}>
-                <input type='hidden' name='questionText' value={values.question} />
-                <input type='hidden' name='options' value={values.options} />
-                <input type='hidden' name='correctAnswer' value={values.answer} />
-                <input type='hidden' name='instructionId' value={node.id.toString()} />
-                <Button
-                  type='submit'
-                  disabled={isSaving || isSaved}
-                  style={{
-                    marginTop: 15,
-                    marginRight: 10,
-                    backgroundColor: isSaved ? '#28a745' : undefined,
-                    color: isSaved ? 'white' : undefined,
-                    cursor: isSaved ? 'not-allowed' : 'pointer',
-                    opacity: isSaved ? 0.9 : 1,
-                  }}
-                >
-                  {isSaving
-                    ? 'Saving...'
-                    : isSaved
-                      ? 'Question Saved ✓'
-                      : 'Save Question'}
-                </Button>
-              </Form>
-              <Button
-                onClick={() => handleGenerate()}
-                style={{
-                  marginTop: 15,
-                }}
-              >
-                Generate New Question
-              </Button>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
 // Sidebar Instruction Node (full-featured view with generate buttons)
 const SidebarInstructionNode: React.FC<InstructionNodeProps> = ({
   node,
@@ -403,7 +212,9 @@ const SidebarInstructionNode: React.FC<InstructionNodeProps> = ({
 
       {isOpen && (
         <>
-          <div dangerouslySetInnerHTML={{ __html: node.rich_text }} />
+          <div // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(node.rich_text) }}
+          />
 
           {hasChildren && (
             <div>
@@ -529,13 +340,14 @@ const SidebarInstructionNode: React.FC<InstructionNodeProps> = ({
 }
 
 export default function TeachMode() {
-  const { instructions, questions, answerChoices, allowGeneral, mode } = useLoaderData() as {
-    instructions: InstructionMedium[]
-    questions: Question[]
-    answerChoices: AnswerChoice[]
-    allowGeneral: boolean
-    mode: 'company' | 'general'
-  }
+  const { instructions, questions, answerChoices, allowGeneral, mode } =
+    useLoaderData() as {
+      instructions: InstructionMedium[]
+      questions: Question[]
+      answerChoices: AnswerChoice[]
+      allowGeneral: boolean
+      mode: 'company' | 'general'
+    }
   const actionData = useActionData()
   const submit = useSubmit()
   const revalidator = useRevalidator()
@@ -610,11 +422,7 @@ export default function TeachMode() {
               {showManualEntry ? 'Cancel Manual Entry' : 'Add Manual Question'}
             </Button>
 
-            <Link
-              to='/admin/employee-progress'
-              style={{ textDecoration: 'none' }}
-              onClick={() => console.log('Checking Progress')}
-            >
+            <Link to='/admin/employee-progress' style={{ textDecoration: 'none' }}>
               <Button variant='outline' style={{ width: '100%' }}>
                 View Employee Progress
               </Button>
@@ -746,7 +554,7 @@ async function getAnswerChoices(companyId: number) {
 // LOADER AND ACTION
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user: SessionUser
+  let user: User
 
   try {
     user = await getEmployeeUser(request)
@@ -756,7 +564,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const url = new URL(request.url)
   const allowGeneral = !!user.is_superuser
-  const requestedMode = url.searchParams.get('type') === 'general' ? 'general' : 'company'
+  const requestedMode =
+    url.searchParams.get('type') === 'general' ? 'general' : 'company'
   const mode = allowGeneral && requestedMode === 'general' ? 'general' : 'company'
   const companyId = mode === 'general' ? 0 : user.company_id
 
@@ -770,7 +579,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  let user: SessionUser
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
@@ -779,7 +588,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const url = new URL(request.url)
   const allowGeneral = !!user.is_superuser
-  const requestedMode = url.searchParams.get('type') === 'general' ? 'general' : 'company'
+  const requestedMode =
+    url.searchParams.get('type') === 'general' ? 'general' : 'company'
   const mode = allowGeneral && requestedMode === 'general' ? 'general' : 'company'
   const companyId = mode === 'general' ? 0 : user.company_id
 
@@ -788,26 +598,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   switch (intent) {
     case 'toggle-visibility':
-      return toggleVisibility(user, formData, companyId)
+      return toggleVisibility(formData, companyId)
     case 'create-question':
-      return createQuestion(user, formData, companyId)
+      return createQuestion(formData, companyId)
     case 'edit-question':
-      return editQuestion(user, formData, companyId)
+      return editQuestion(formData, companyId)
     case 'delete-question':
-      return deleteQuestion(user, formData, companyId)
+      return deleteQuestion(formData, companyId)
     default:
       // Handle the default save question case
-      return saveGeneratedQuestion(user, formData, companyId)
+      return saveGeneratedQuestion(formData, companyId)
   }
 }
 
 // CRUD FUNCTIONS
 
-async function toggleVisibility(user: SessionUser, formData: FormData, companyId: number) {
+async function toggleVisibility(formData: FormData, companyId: number) {
   const questionId = parseInt(formData.get('questionId') as string)
   const visible = formData.get('visible') === 'true'
 
-  if (isNaN(questionId)) return { error: 'Invalid question ID' }
+  if (Number.isNaN(questionId)) return { error: 'Invalid question ID' }
 
   try {
     await db.execute(
@@ -816,24 +626,31 @@ async function toggleVisibility(user: SessionUser, formData: FormData, companyId
     )
     return { success: true }
   } catch (error) {
-    console.error('Error toggling visibility:', error)
+    posthogClient.captureException(error)
     return { error: 'Failed to toggle visibility' }
   }
 }
 
-async function createQuestion(user: SessionUser, formData: FormData, companyId: number) {
+async function createQuestion(formData: FormData, companyId: number) {
   const questionText = formData.get('questionText') as string
   const options = JSON.parse(formData.get('options') as string)
   const correctAnswerId = parseInt(formData.get('correctAnswerId') as string)
 
-  if (!questionText || !options || options.length === 0 || isNaN(correctAnswerId)) {
+  if (
+    !questionText ||
+    !options ||
+    options.length === 0 ||
+    Number.isNaN(correctAnswerId)
+  ) {
     return { error: 'Missing required question data for create' }
   }
 
-  const validOptions = options.filter((c: any) => !c.is_deleted && c.text.trim() !== '')
+  const validOptions = options.filter(
+    (c: { is_deleted: boolean; text: string }) => !c.is_deleted && c.text.trim() !== '',
+  )
   if (validOptions.length < 2)
     return { error: 'At least two non-empty answer choices are required' }
-  if (!validOptions.some((c: any) => c.id === correctAnswerId))
+  if (!validOptions.some((c: { id: number }) => c.id === correctAnswerId))
     return { error: 'Please select a valid correct answer' }
 
   try {
@@ -841,7 +658,7 @@ async function createQuestion(user: SessionUser, formData: FormData, companyId: 
       'INSERT INTO questions (text, instruction_id, question_type, company_id) VALUES (?, NULL, ?, ?)',
       [questionText, 'MC', companyId],
     )
-    const questionId = (questionResult as any).insertId
+    const questionId = (questionResult as { insertId: number }).insertId
 
     for (const option of validOptions) {
       await db.execute(
@@ -852,29 +669,35 @@ async function createQuestion(user: SessionUser, formData: FormData, companyId: 
 
     return { success: true, questionId }
   } catch (error) {
-    console.error('Error creating question:', error)
+    posthogClient.captureException(error)
     return {
       error: `Failed to create question: ${error instanceof Error ? error.message : 'Unknown error'}`,
     }
   }
 }
 
-async function editQuestion(user: SessionUser, formData: FormData, companyId: number) {
+async function editQuestion(formData: FormData, companyId: number) {
   const questionId = parseInt(formData.get('questionId') as string)
   const questionText = formData.get('questionText') as string
   const options = JSON.parse(formData.get('options') as string)
   const correctAnswerId = parseInt(formData.get('correctAnswerId') as string)
 
-  if (!questionText || !options || options.length === 0 || isNaN(correctAnswerId)) {
+  if (
+    !questionText ||
+    !options ||
+    options.length === 0 ||
+    Number.isNaN(correctAnswerId)
+  ) {
     return { error: 'Missing required question data for edit' }
   }
 
   const validOptions = options.filter(
-    (opt: any) => !opt.is_deleted && opt.text.trim() !== '',
+    (opt: { is_deleted: boolean; text: string }) =>
+      !opt.is_deleted && opt.text.trim() !== '',
   )
   if (validOptions.length < 2)
     return { error: 'At least two non-empty answer choices are required' }
-  if (!validOptions.some((opt: any) => opt.id === correctAnswerId))
+  if (!validOptions.some((opt: { id: number }) => opt.id === correctAnswerId))
     return { error: 'Please select a valid correct answer' }
 
   try {
@@ -883,7 +706,7 @@ async function editQuestion(user: SessionUser, formData: FormData, companyId: nu
       [questionId, companyId],
     )
 
-    if (!questionCheck || (questionCheck as any).length === 0) {
+    if (!questionCheck || (questionCheck as { length: number }).length === 0) {
       return {
         error: 'Invalid question ID or question does not belong to your company',
       }
@@ -920,23 +743,23 @@ async function editQuestion(user: SessionUser, formData: FormData, companyId: nu
 
     return { success: true, questionId }
   } catch (error) {
-    console.error('Error editing question:', error)
+    posthogClient.captureException(error)
     return {
       error: `Failed to edit question: ${error instanceof Error ? error.message : 'Unknown error'}`,
     }
   }
 }
 
-async function deleteQuestion(user: SessionUser, formData: FormData, companyId: number) {
+async function deleteQuestion(formData: FormData, companyId: number) {
   const questionId = parseInt(formData.get('questionId') as string)
-  if (isNaN(questionId)) return { error: 'Invalid question ID' }
+  if (Number.isNaN(questionId)) return { error: 'Invalid question ID' }
 
   try {
     const [questionCheck] = await db.execute(
       'SELECT id FROM questions WHERE id = ? AND company_id = ?',
       [questionId, companyId],
     )
-    if (!questionCheck || (questionCheck as any).length === 0) {
+    if (!questionCheck || (questionCheck as { length: number }).length === 0) {
       return {
         error: 'Invalid question ID or question does not belong to your company',
       }
@@ -949,14 +772,14 @@ async function deleteQuestion(user: SessionUser, formData: FormData, companyId: 
 
     return { success: true, questionId }
   } catch (error) {
-    console.error('Error deleting question:', error)
+    posthogClient.captureException(error)
     return {
       error: `Failed to delete question: ${error instanceof Error ? error.message : 'Unknown error'}`,
     }
   }
 }
 
-async function saveGeneratedQuestion(user: SessionUser, formData: FormData, companyId: number) {
+async function saveGeneratedQuestion(formData: FormData, companyId: number) {
   const questionText = formData.get('questionText') as string
   const optionsString = formData.get('options') as string
   const options = optionsString.split(',').map(s => s.trim())
@@ -979,7 +802,7 @@ async function saveGeneratedQuestion(user: SessionUser, formData: FormData, comp
       [instructionId, companyId],
     )
 
-    if (!instructionCheck || (instructionCheck as any).length === 0) {
+    if (!instructionCheck || (instructionCheck as { length: number }).length === 0) {
       return {
         error: 'Invalid instruction ID or instruction does not belong to your company',
       }
@@ -990,7 +813,7 @@ async function saveGeneratedQuestion(user: SessionUser, formData: FormData, comp
       [questionText, instructionId, 'MC', companyId],
     )
 
-    const questionId = (questionResult as any).insertId
+    const questionId = (questionResult as { insertId: number }).insertId
     for (const option of options) {
       const isCorrect = option === correctAnswer
       await db.execute(
@@ -1001,7 +824,7 @@ async function saveGeneratedQuestion(user: SessionUser, formData: FormData, comp
 
     return { success: true, questionId, instructionId }
   } catch (error) {
-    console.error('Error saving question:', error)
+    posthogClient.captureException(error)
     return {
       error: `Failed to save question: ${error instanceof Error ? error.message : 'Unknown error'}`,
     }
@@ -1420,7 +1243,7 @@ export function useQuestionGenerator({
       })
 
       sse.addEventListener('error', () => {
-        console.error('SSE connection error for node', node.id)
+        // ignore
         sse.close()
         setNodeLoading(node.id, false)
       })
@@ -1580,29 +1403,33 @@ export function useAnswerChoicesByQuestion(answerChoices: AnswerChoice[]) {
 
 //TOASTS + EFFECTS CUSTOM HOOKS
 
-function useActionToast(actionData: any, revalidator: any, toast: any) {
-  const lastRef = React.useRef(null)
+function useActionToast(
+  actionData: ActionData | null,
+  revalidator: ReturnType<typeof useRevalidator>,
+  toaster: typeof toastType,
+) {
+  const lastRef = React.useRef<ActionData | null | undefined>(null)
 
   React.useEffect(() => {
     if (actionData === lastRef.current) return
     lastRef.current = actionData
 
     if (actionData?.success) {
-      toast({ title: 'Success', description: 'Question saved!', variant: 'success' })
+      toaster({ title: 'Success', description: 'Question saved!', variant: 'success' })
       if (revalidator.state === 'idle') revalidator.revalidate()
     } else if (actionData?.error) {
-      toast({ title: 'Error', description: actionData.error, variant: 'destructive' })
+      toaster({ title: 'Error', description: actionData.error, variant: 'destructive' })
     }
-  }, [actionData, revalidator, toast])
+  }, [actionData, revalidator, toaster])
 }
 
 function useUpdateSavedQuestions(
-  actionData: any,
+  actionData: ActionData | null,
   setSavedQuestions: React.Dispatch<React.SetStateAction<Set<number>>>,
 ) {
   React.useEffect(() => {
     if (actionData?.success && actionData?.instructionId) {
-      setSavedQuestions(prev => new Set(prev).add(actionData.instructionId))
+      setSavedQuestions(prev => new Set(prev).add(actionData.instructionId ?? 0))
     }
   }, [actionData, setSavedQuestions])
 }

@@ -1,11 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useState } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
   useSearchParams,
 } from 'react-router'
@@ -53,8 +53,8 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!data.deal_id) {
     await db.execute(
       `INSERT INTO deals
-     (customer_id, amount, description, status, list_id, position, user_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?);`,
+     (customer_id, amount, description, status, list_id, position, user_id, is_won)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.customer_id,
         data.amount,
@@ -63,6 +63,7 @@ export async function action({ request }: ActionFunctionArgs) {
         data.list_id,
         data.position,
         user.id,
+        data.is_won ?? null,
       ],
     )
   } else {
@@ -80,7 +81,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Deal added successfully'))
-  return redirect(`../`, {
+  const url = new URL(request.url)
+  return redirect(`../${url.search}`, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }
@@ -99,26 +101,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AddDeal() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
-  const [open, setOpen] = useState(true)
   const { companyId, user_id } = useLoaderData<typeof loader>()
-  const handleOpenChange = (o: boolean) => {
-    setOpen(o)
-    if (!o) navigate('..')
+  const handleClose = (o: boolean) => {
+    if (!o) navigate(`..${location.search}`)
   }
 
+  const isWonParam = searchParams.get('is_won')
+  const isWon = isWonParam === '1' ? 1 : isWonParam === '0' ? 0 : null
   const listIdParam = parseInt(searchParams.get('list_id') || '', 10)
+
   const hiddenFields: Record<string, string | number | boolean> = {
     status: 'New Customer',
     position: 1,
     company_id: companyId,
+  }
+  if (isWon !== null) {
+    hiddenFields.is_won = isWon
   }
   if (!Number.isNaN(listIdParam)) {
     hiddenFields.list_id = listIdParam
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={true} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create Deal</DialogTitle>

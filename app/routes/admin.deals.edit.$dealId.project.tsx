@@ -8,7 +8,6 @@ import {
   Outlet,
   redirect,
   useLoaderData,
-  useLocation,
 } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
@@ -17,10 +16,10 @@ import { DataTable } from '~/components/ui/data-table'
 import { VCard } from '~/components/VCard'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const user = await getEmployeeUser(request)
+  const user: User = await getEmployeeUser(request)
   if (!params.dealId) {
     throw new Error('Deal ID is missing')
   }
@@ -50,7 +49,6 @@ function AddressLinkCell({
   customer: RowDataPacket
 }) {
   const isMobile = useIsMobile()
-  const location = useLocation()
   const isNameField = row.original.key.toLowerCase() === 'name'
   const isPhoneField = row.original.key.toLowerCase() === 'phone'
   const isEmailField = row.original.key.toLowerCase() === 'email'
@@ -88,7 +86,6 @@ function AddressLinkCell({
       ) : isEmailField ? (
         <div className='flex gap-2 '>
           <CopyText value={row.original.value} className='font-bold' />
-        
         </div>
       ) : isAddressField ? (
         <div className='flex gap-2 '>

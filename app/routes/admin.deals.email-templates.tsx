@@ -1,11 +1,12 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import {
-  type LoaderFunctionArgs,
   Link,
+  type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
 } from 'react-router'
 import { Button } from '~/components/ui/button'
@@ -26,7 +27,7 @@ import {
 } from '~/components/ui/table'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 
 interface EmailTemplate {
   id: number
@@ -35,7 +36,7 @@ interface EmailTemplate {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user
+  let user: User
   try {
     user = await getAdminUser(request)
   } catch (error) {
@@ -60,10 +61,11 @@ export default function ManageEmailTemplates() {
   const { templates } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
+  const location = useLocation()
 
   const handleChange = (open: boolean) => {
     if (!open) {
-      navigate('..')
+      navigate(`..${location.search}`)
     }
   }
 
@@ -94,7 +96,7 @@ export default function ManageEmailTemplates() {
               onChange={e => setSearchTerm(e.target.value)}
               className='flex-1'
             />
-            <Link to='add'>
+            <Link to={`add${location.search}`}>
               <Button>
                 <Plus className='w-4 h-4 mr-2' />
                 Add New Template
@@ -125,12 +127,12 @@ export default function ManageEmailTemplates() {
                       <TableCell>{formatDate(template.created_at)}</TableCell>
                       <TableCell>
                         <div className='flex items-center gap-2'>
-                          <Link to={`edit/${template.id}`}>
+                          <Link to={`edit/${template.id}${location.search}`}>
                             <Button variant='ghost' size='icon'>
                               <Pencil className='w-4 h-4' />
                             </Button>
                           </Link>
-                          <Link to={`delete/${template.id}`}>
+                          <Link to={`delete/${template.id}${location.search}`}>
                             <Button variant='ghost' size='icon'>
                               <Trash2 className='w-4 h-4 text-red-500' />
                             </Button>

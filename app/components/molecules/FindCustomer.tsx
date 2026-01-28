@@ -107,7 +107,7 @@ export function FindCustomer({
   }, [])
 
   return (
-    <div ref={searchRef} className={`relative w-80 mt-2 ${className}`}>
+    <div ref={searchRef} className={`relative w-80  ${className}`}>
       <div className='relative'>
         <Input
           type='text'

@@ -1,21 +1,24 @@
 // IMPORTS
 
+import DOMPurify from 'isomorphic-dompurify'
 import * as React from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   redirect,
+  type SubmitFunction,
   useActionData,
   useLoaderData,
-  useSubmit,
   useSearchParams,
+  useSubmit,
 } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
-import { useToast } from '~/hooks/use-toast'
+import { type toast as toastType, useToast } from '~/hooks/use-toast'
 import type { InstructionSlim } from '~/types'
-import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
+import { posthogClient } from '../utils/posthog.server'
 import { selectMany } from '../utils/queryHelpers'
 
 // TYPE DEFINITIONS
@@ -32,6 +35,12 @@ interface Question {
   question_type: 'MC' | 'TF'
   created_date: string
   updated_date: string
+}
+
+interface ActionData {
+  success?: boolean
+  error?: string
+  message?: string
 }
 
 interface AnswerChoice {
@@ -120,10 +129,10 @@ async function getNextAttemptNumber(
       'SELECT MAX(attempt_number) as max_attempt FROM answer_attempts WHERE employee_id = ? AND question_id = ? AND deleted_at IS NULL',
       [employeeId, questionId],
     )
-    const result = (rows as any)[0]
+    const result = (rows as { max_attempt: number }[])[0]
     return (result?.max_attempt || 0) + 1
   } catch (error) {
-    console.error('Error getting next attempt number:', error)
+    posthogClient.captureException(error)
     return 1
   }
 }
@@ -146,13 +155,12 @@ async function saveAnswerAttempts(
       ],
     )
   }
-  console.log(`Successfully saved ${attempts.length} answer attempts`)
 }
 
 // LOADER AND ACTION
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  let user: SessionUser
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
@@ -173,7 +181,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  let user: SessionUser
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
@@ -187,12 +195,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const attemptsJson = formData.get('attempts') as string
     try {
       const attempts: AnswerAttempt[] = JSON.parse(attemptsJson)
-      console.log('About to save attempts:', attempts)
       await saveAnswerAttempts(user.id, attempts)
-      console.log('Returning success from action')
       return { success: true, message: 'Assessment submitted successfully!' }
     } catch (error) {
-      console.error('Error saving answer attempts:', error)
+      posthogClient.captureException(error)
       return {
         error: `Failed to save attempts: ${error instanceof Error ? error.message : 'Unknown error'}`,
       }
@@ -296,7 +302,7 @@ export function useAssessmentState(
   questions: Question[],
   answerChoicesByQuestion: Map<number, AnswerChoice[]>,
   userId: number,
-  submit: any,
+  submit: SubmitFunction,
 ) {
   const [isAssessmentStarted, setIsAssessmentStarted] = React.useState(false)
   const [shuffledQuestions, setShuffledQuestions] = React.useState<Question[]>([])
@@ -382,8 +388,6 @@ export function useAssessmentState(
       }
     })
 
-    console.log('Submitting attempts (including unanswered):', attempts)
-
     // Submit to server
     const formData = new FormData()
     formData.append('intent', 'submit-assessment')
@@ -413,28 +417,24 @@ export function useAssessmentState(
   }
 }
 
-function useActionToast(actionData: any, toast: any) {
-  const lastRef = React.useRef(null)
+function useActionToast(actionData: ActionData, toaster: typeof toastType) {
+  const lastRef = React.useRef<ActionData | null>(null)
 
   React.useEffect(() => {
     if (!actionData) return
     if (actionData === lastRef.current) return
     lastRef.current = actionData
 
-    console.log('Action data received:', actionData)
-
     if (actionData?.success) {
-      console.log('Showing success toast')
-      toast({
+      toaster({
         title: 'Success',
         description: actionData?.message || 'Assessment submitted successfully!',
         variant: 'success',
       })
     } else if (actionData?.error) {
-      console.log('Showing error toast')
-      toast({ title: 'Error', description: actionData.error, variant: 'destructive' })
+      toaster({ title: 'Error', description: actionData.error, variant: 'destructive' })
     }
-  }, [actionData, toast])
+  }, [actionData, toaster])
 }
 
 // UI COMPONENTS
@@ -467,7 +467,9 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
 
       {isOpen && (
         <>
-          <div dangerouslySetInnerHTML={{ __html: node.rich_text }} />
+          <div // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(node.rich_text) }}
+          />
 
           {hasChildren && (
             <div>
@@ -561,7 +563,6 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
                 name={`question-${question.id}`}
                 value={choice.text}
                 checked={isThisSelected}
-                onChange={() => {}}
                 disabled={isSubmitted}
                 style={{ marginRight: 10, pointerEvents: 'none' }}
               />
@@ -614,9 +615,9 @@ export default function TeachMode() {
   const [, setSearchParams] = useSearchParams()
   const submit = useSubmit()
   const { toast } = useToast()
-  const actionData = useActionData<{ success?: boolean; error?: string }>()
+  const actionData = useActionData<ActionData>()
 
-  useActionToast(actionData, toast)
+  useActionToast(actionData || {}, toast)
 
   const [showSidebar, setShowSidebar] = React.useState(false)
 

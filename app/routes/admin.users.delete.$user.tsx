@@ -10,6 +10,7 @@ import { DeleteRow } from '~/components/pages/DeleteRow'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectId } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
@@ -33,12 +34,14 @@ export async function action({ params, request }: ActionFunctionArgs) {
 
   const userId = parseInt(params.user, 10)
   if (!userId) {
+    posthogClient.captureException(new Error('User ID is required'))
     return { name: undefined }
   }
 
   try {
     await db.execute(`UPDATE users SET is_deleted = 1 WHERE id = ?`, [userId])
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return { error: 'Failed to soft-delete user' }
   }
 
@@ -58,6 +61,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   const userId = params.user ? parseInt(params.user, 10) : null
   if (!userId) {
+    posthogClient.captureException(new Error('User ID is required'))
     return { name: undefined }
   }
 

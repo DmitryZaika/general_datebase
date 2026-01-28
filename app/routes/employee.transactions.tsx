@@ -41,6 +41,7 @@ import {
 import { Switch } from '~/components/ui/switch'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -342,7 +343,10 @@ export async function action({ request }: ActionFunctionArgs) {
       return redirect(redirectUrl, {
         headers: { 'Set-Cookie': await commitSession(session) },
       })
-    } catch {
+    } catch (error) {
+      posthogClient.captureException(error, 'Failed to update status', {
+        transactionId,
+      })
       const session = await getSession(request.headers.get('Cookie'))
       session.flash(
         'message',

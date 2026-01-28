@@ -166,11 +166,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request).catch(err => {
     return redirect(`/login?error=${err}`)
   })
-
   if (!user || user instanceof Response) {
     return redirect('/admin')
   }
-
   if (!params.faucet) {
     return forceRedirectError(request.headers, 'No faucet id provided')
   }

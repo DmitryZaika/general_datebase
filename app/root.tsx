@@ -104,7 +104,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const parts = url.pathname.split('/')
     if (parts[1] === 'contractors' && parts[2]) {
       const id = parseInt(parts[2], 10)
-      if (!isNaN(id)) {
+      if (!Number.isNaN(id)) {
         companyId = id
       }
     }

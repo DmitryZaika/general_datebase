@@ -27,7 +27,7 @@ import {
   getEmployeeUser,
   getUserBySessionId,
   login,
-  type SessionUser,
+  type User,
 } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
@@ -50,7 +50,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { error }
 }
 
-async function getRedirectPath(user: SessionUser): Promise<string> {
+async function getRedirectPath(user: User): Promise<string> {
   const positions = await selectMany<{ position_id: number }>(
     db,
     `SELECT position_id from users_positions where user_id = ?`,

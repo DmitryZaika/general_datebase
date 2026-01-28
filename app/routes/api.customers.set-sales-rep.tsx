@@ -1,5 +1,6 @@
 import { type ActionFunctionArgs, data } from 'react-router'
 import { db } from '~/db.server'
+import { posthogClient } from '~/utils/posthog.server'
 
 export async function action({ request }: ActionFunctionArgs) {
   const body = await request.json()
@@ -76,7 +77,8 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     return data({ success: true })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return data({ error: 'Failed to update' }, { status: 500 })
   }
 }

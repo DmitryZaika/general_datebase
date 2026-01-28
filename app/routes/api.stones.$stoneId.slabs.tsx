@@ -1,5 +1,6 @@
 import { data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -65,7 +66,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }))
 
     return data({ slabs: slabsWithLO })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return new Response(JSON.stringify({ error: 'Failed to fetch slabs' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

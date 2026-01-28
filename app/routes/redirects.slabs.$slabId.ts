@@ -1,5 +1,6 @@
 import { type LoaderFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 
 export async function loader({ params }: LoaderFunctionArgs) {
@@ -24,7 +25,8 @@ export async function loader({ params }: LoaderFunctionArgs) {
     }
 
     return redirect(`/employee/stones/slabs/${slabData[0].stone_id}?slab=${slabId}`)
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error, 'Failed to redirect to slab', { slabId })
     return new Response('Server error', { status: 500 })
   }
 }

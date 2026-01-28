@@ -1,4 +1,5 @@
 import { EnvelopeClosedIcon } from '@radix-ui/react-icons'
+import { useMutation } from '@tanstack/react-query'
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import { MapIcon, PhoneIcon } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
@@ -10,15 +11,23 @@ import {
   redirect,
   useLoaderData,
   useLocation,
+  useNavigate,
+  useParams,
+  useRouteLoaderData,
 } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
+import type { ToastProps } from '~/components/ui/toast'
 import { VCard } from '~/components/VCard'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
+import { toast } from '~/hooks/use-toast'
+import type { loader as rootLoader } from '~/root'
 import { getEmployeeUser } from '~/utils/session.server'
+
+type ToastFunction = (props: ToastProps & { description: string }) => void
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const user = await getEmployeeUser(request)
@@ -31,15 +40,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     `SELECT c.name, c.email, c.phone, c.phone_2, c.address, c.city, c.state, c.postal_code, c.company_name,
             c.remodal_type, c.project_size, c.contact_time, c.remove_and_dispose, c.improve_offer, c.sink,
             c.when_start, c.details, c.compaign_name, c.adset_name, c.ad_name, c.backsplash, c.kitchen_stove,
-            c.your_message, c.attached_file, c.qbo_id, c.notes, c.source,d.created_at as deal_created, c.created_date as customer_created
+            c.your_message, c.attached_file, c.qbo_id, c.notes, c.source,d.created_at as deal_created, d.is_won, c.created_date as customer_created
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
       WHERE d.id = ? AND c.company_id = ?`,
     [dealId, user.company_id],
   )
-  if (!rows || rows.length === 0) {
-    return redirect('/employee/deals')
-  }
+  if (!rows || rows.length === 0) return redirect('/employee/deals')
   return { customer: rows[0] }
 }
 
@@ -52,14 +59,14 @@ function AddressLinkCell({
 }) {
   const isMobile = useIsMobile()
   const location = useLocation()
-  
+
   // Получаем ключ в нижнем регистре один раз для удобства
   const keyLower = row.original.key.toLowerCase()
 
   const isNameField = keyLower === 'name'
   const isPhoneField = keyLower === 'phone'
   // ИСПРАВЛЕНИЕ: здесь проверяем 'phone 2' с пробелом, так как данные были отформатированы
-  const isPhone2Field = keyLower === 'phone 2' 
+  const isPhone2Field = keyLower === 'phone 2'
   const isEmailField = keyLower === 'email'
   const isAddressField = keyLower === 'address'
 
@@ -160,7 +167,75 @@ function AddressLinkCell({
 
 export default function DealProjectInfo() {
   const { customer } = useLoaderData<typeof loader>()
+  const { dealId } = useParams()
+  const rootData = useRouteLoaderData<typeof rootLoader>('root')
+  const token = rootData?.token
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
+  const navigate = useNavigate()
+
+  const setWon = async ({
+    id,
+    is_won,
+    token,
+  }: {
+    id: number
+    is_won: number | null
+    token: string
+  }) => {
+    const response = await fetch('/api/deals/set-won', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': token || '',
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ id, is_won }),
+    })
+    if (!response.ok) {
+      throw new Error('Failed to update deal status')
+    }
+    return response.json()
+  }
+
+  const setWonMutation = (
+    toast: ToastFunction,
+    token: string,
+    onSuccess?: (id: number, is_won: number | null) => void,
+  ) => {
+    return {
+      mutationFn: (variables: { id: number; is_won: number | null }) =>
+        setWon({ ...variables, token }),
+      onSuccess: (_: unknown, variables: { id: number; is_won: number | null }) => {
+        onSuccess?.(variables.id, variables.is_won)
+      },
+      onError: (error: unknown) => {
+        toast({
+          title: 'Error',
+          description:
+            error instanceof Error
+              ? error.message
+              : 'Something went wrong. Please try again.',
+          variant: 'destructive',
+        })
+      },
+    }
+  }
+  const { mutate } = useMutation(
+    setWonMutation(toast, token || '', () => {
+      toast({
+        title: 'Success',
+        description: 'Deal status updated',
+        variant: 'success',
+      })
+      navigate(`/employee/deals`)
+    }),
+  )
+
+  const handleStatusChange = (status: 1 | 0 | null) => {
+    if (!dealId) return
+    mutate({ id: Number(dealId), is_won: status })
+  }
+
   const columns: ColumnDef<{ key: string; value: string }>[] = [
     {
       header: 'Key',
@@ -202,8 +277,34 @@ export default function DealProjectInfo() {
             : String(v),
     }))
 
+  function MoveButton({
+    status,
+    isWon,
+  }: {
+    status: 0 | 1 | null
+    isWon: 0 | 1 | null
+  }) {
+    const name = { 0: 'Lost', 1: 'Won', null: 'Move to Active' }
+    if (isWon === status) return null
+
+    return (
+      <Button
+        variant={status === 0 ? 'destructive' : status === 1 ? 'success' : 'default'}
+        className='h-7'
+        onClick={() => handleStatusChange(status)}
+      >
+        {name[status as keyof typeof name]}
+      </Button>
+    )
+  }
+
   return (
     <div className='space-y-4'>
+      <div className='flex gap-2'>
+        <MoveButton status={null} isWon={customer.is_won} />
+        <MoveButton status={1} isWon={customer.is_won} />
+        <MoveButton status={0} isWon={customer.is_won} />
+      </div>
       <div>
         <DataTable columns={columns} data={otherFields} noHeader />
       </div>

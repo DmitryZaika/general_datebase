@@ -34,6 +34,7 @@ type FullDeal = {
   position?: number
   list_id: number
   due_date?: string | null
+  is_won?: number | null
 }
 
 type Deal = FullDeal & {
@@ -48,7 +49,7 @@ interface DealsViewProps {
   lists: List[]
   imagesMap: Record<number, boolean>
   emailsMap: Record<number, boolean>
-  viewSelect?: React.ReactNode
+  groupListSelect?: React.ReactNode
 }
 
 export default function DealsView({
@@ -57,7 +58,7 @@ export default function DealsView({
   lists,
   imagesMap,
   emailsMap,
-  viewSelect,
+  groupListSelect,
 }: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -81,6 +82,7 @@ export default function DealsView({
         : null,
       has_images: imagesMap?.[d.id] || false,
       has_email: emailsMap?.[d.id] || false,
+      is_won: d.is_won,
     }
   }
 
@@ -235,8 +237,8 @@ export default function DealsView({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full flex justify-between items-center mb-4'>
-        {viewSelect}
+      <div className='w-full flex justify-between items-center py-2 px-1'>
+        {groupListSelect}
         <FindCustomer
           disableRowClick
           onEdit={customerId => {
@@ -245,7 +247,7 @@ export default function DealsView({
           }}
           onDelete={customerId => {
             const dealId = findDealIdByCustomer(customerId)
-            if (dealId) navigate(`edit/${dealId}/delete`)
+            if (dealId) navigate(`edit/${dealId}/delete${location.search}`)
           }}
           onSelect={customerId => {
             const dealId = findDealIdByCustomer(customerId)
@@ -280,7 +282,7 @@ export default function DealsView({
         />
       </div>
 
-      <div className='flex gap-4 pb-2'>
+      <div className='flex gap-1 '>
         {lists.map(list => (
           <DealsList
             key={list.id}

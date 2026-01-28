@@ -14,7 +14,7 @@ import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { validateTemplateBody } from '~/utils/emailTemplateVariables'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
 interface EmailTemplate {
@@ -47,7 +47,7 @@ type FormData = z.infer<typeof templateSchema>
 const resolver = zodResolver(templateSchema)
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  let user
+  let user: User
   try {
     user = await getAdminUser(request)
   } catch (error) {
@@ -55,7 +55,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const templateId = parseInt(params.templateId ?? '', 10)
-  if (isNaN(templateId)) {
+  if (Number.isNaN(templateId)) {
     return redirect('..')
   }
 
@@ -75,7 +75,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  let user
+  let user: User
   try {
     user = await getAdminUser(request)
   } catch (error) {
@@ -89,7 +89,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   const templateId = parseInt(params.templateId ?? '', 10)
-  if (isNaN(templateId)) {
+  if (Number.isNaN(templateId)) {
     return redirect('..')
   }
 
@@ -102,7 +102,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     `UPDATE email_templates
      SET template_name = ?, template_subject = ?, template_body = ?
      WHERE id = ? AND company_id = ?`,
-    [data.template_name, data.template_subject, data.template_body, templateId, user.company_id],
+    [
+      data.template_name,
+      data.template_subject,
+      data.template_body,
+      templateId,
+      user.company_id,
+    ],
   )
 
   const session = await getSession(request.headers.get('Cookie'))

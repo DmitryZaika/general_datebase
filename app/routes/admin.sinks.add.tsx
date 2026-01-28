@@ -25,6 +25,7 @@ import { sinkSchema } from '~/schemas/sinks'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -68,6 +69,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch {
     const sinkId = parseInt(params.sink ?? '0', 10)
     if (!sinkId) {
+      posthogClient.captureException(new Error('Invalid or missing sink ID'))
       return new Response(JSON.stringify({ error: 'Invalid or missing sink ID' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },

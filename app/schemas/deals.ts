@@ -15,6 +15,7 @@ export const dealsSchema = z.object({
   position: z.number(),
   user_id: z.coerce.number(),
   deal_id: z.coerce.number().optional(),
+  is_won: z.coerce.number().nullish(),
 })
 
 export type DealsDialogSchema = z.infer<typeof dealsSchema>

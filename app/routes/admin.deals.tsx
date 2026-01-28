@@ -1,8 +1,8 @@
 import { Mail, SettingsIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  type LoaderFunctionArgs,
   Link,
+  type LoaderFunctionArgs,
   Outlet,
   redirect,
   useLoaderData,
@@ -23,7 +23,7 @@ import {
 } from '~/components/ui/select'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 
 type AdminDeal = {
   id: number
@@ -43,7 +43,7 @@ type AdminDeal = {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request)
+    const user: User = await getAdminUser(request)
     if (!user || !user.company_id) {
       return redirect('/login')
     }
@@ -53,25 +53,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const salesRep = url.searchParams.get('salesRep') || 'All'
     const viewParam = url.searchParams.get('group')
 
+    const isWonParam = url.searchParams.get('is_won')
+    const isWon =
+      isWonParam === 'null'
+        ? null
+        : isWonParam === '1'
+          ? 1
+          : isWonParam === '0'
+            ? 0
+            : null
+
     // Groups for filter
     const groups = await selectMany<{ id: number; name: string }>(
       db,
       'SELECT id, name FROM groups_list WHERE deleted_at IS NULL AND is_displayed = 1 AND (company_id = ? OR id = 1)',
       [companyId],
     )
-    
+
     const activeGroupId = viewParam ? parseInt(viewParam, 10) : groups[0]?.id
 
     // Lists for columns (filtered by active group)
     const lists = await selectMany<{ id: number; name: string }>(
       db,
       'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
-      [activeGroupId]
+      [activeGroupId],
     )
 
     // Deals filtered by company (via customers.company_id) and optionally by sales rep
-    // Note: We might want to filter deals by list IDs that are visible, 
-    // but the current query gets all deals for the company. 
+    // Note: We might want to filter deals by list IDs that are visible,
+    // but the current query gets all deals for the company.
     // Since we only render lists that belong to the group, deals in other lists won't be shown anyway.
     const dealParams: (string | number)[] = [companyId]
     let dealSql = `
@@ -85,6 +95,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       dealSql += ' AND u.name = ?'
       dealParams.push(salesRep)
     }
+
+    if (isWon === null) {
+      dealSql += ' AND d.is_won IS NULL'
+    } else {
+      dealSql += ' AND d.is_won = ?'
+      dealParams.push(isWon)
+    }
+
     const deals = await selectMany<AdminDeal>(db, dealSql, dealParams)
 
     // Customers for names
@@ -108,15 +126,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const imagesMap: Record<number, boolean> = {}
     for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
 
-    return { deals, customers, lists, emailsMap, imagesMap, groups, activeGroupId }
+    return {
+      deals,
+      customers,
+      lists,
+      emailsMap,
+      imagesMap,
+      groups,
+      activeGroupId,
+      isWon,
+    }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export default function AdminDeals() {
-  const { deals, customers, lists, emailsMap, imagesMap, groups, activeGroupId } =
-    useLoaderData<typeof loader>()
+  const {
+    deals,
+    customers,
+    lists,
+    emailsMap,
+    imagesMap,
+    groups,
+    activeGroupId,
+    isWon,
+  } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
@@ -124,6 +159,12 @@ export default function AdminDeals() {
   const handleGroupChange = (newGroupId: string) => {
     const params = new URLSearchParams(searchParams)
     params.set('group', newGroupId)
+    navigate({ pathname: location.pathname, search: params.toString() })
+  }
+
+  const handleStatusChange = (newStatus: string) => {
+    const params = new URLSearchParams(searchParams)
+    params.set('is_won', newStatus)
     navigate({ pathname: location.pathname, search: params.toString() })
   }
 
@@ -228,17 +269,32 @@ export default function AdminDeals() {
             </SelectTrigger>
             <SelectContent>
               {groups.map(group => (
-                  <SelectItem key={group.id} value={String(group.id)}>{group.name}</SelectItem>
+                <SelectItem key={group.id} value={String(group.id)}>
+                  {group.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Link to='email-templates' className='p-2 mt-4'>
+          <Select
+            value={isWon === null ? 'null' : String(isWon)}
+            onValueChange={handleStatusChange}
+          >
+            <SelectTrigger className='w-[200px] mt-4'>
+              <SelectValue placeholder='Select status' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='null'>Active Deals</SelectItem>
+              <SelectItem value='1'>Won</SelectItem>
+              <SelectItem value='0'>Lost</SelectItem>
+            </SelectContent>
+          </Select>
+          <Link to={`email-templates${location.search}`} className='p-2 mt-4'>
             <Button variant='outline'>
               <Mail className='w-4 h-4 mr-2' />
               Manage Email Templates
             </Button>
           </Link>
-          <Link to='manage-lists' className='p-2 mt-4'>
+          <Link to={`manage-lists${location.search}`} className='p-2 mt-4'>
             <Button variant='outline'>
               <SettingsIcon className='w-4 h-4 mr-2' />
               Manage Lists
@@ -253,7 +309,7 @@ export default function AdminDeals() {
           }}
           onDelete={customerId => {
             const dealId = findDealIdByCustomer(customerId)
-            if (dealId) navigate(`edit/${dealId}/delete`)
+            if (dealId) navigate(`edit/${dealId}/delete${location.search}`)
           }}
           onSelect={customerId => {
             const dealId = findDealIdByCustomer(customerId)
