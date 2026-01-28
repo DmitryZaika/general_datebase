@@ -8,13 +8,26 @@ import { EmailTemplateForm } from '~/components/molecules/EmailTemplateForm'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import { validateTemplateBody } from '~/utils/emailTemplateVariables'
 import { getAdminUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
 const templateSchema = z.object({
   template_name: z.string().min(1, 'Template name is required'),
   template_subject: z.string().min(1, 'Template subject is required'),
-  template_body: z.string().min(1, 'Template body is required'),
+  template_body: z
+    .string()
+    .min(1, 'Template body is required')
+    .refine(
+      (val: string) => {
+        const text = val.replace(/<[^>]*>/g, '')
+        const validation = validateTemplateBody(text)
+        return validation.isValid
+      },
+      {
+        message: 'Invalid template body format. Check for unclosed {{ or }}.',
+      },
+    ),
 })
 
 type FormData = z.infer<typeof templateSchema>

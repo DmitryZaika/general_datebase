@@ -3,7 +3,7 @@ import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import type { UseFormReturn } from 'react-hook-form'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { QuillInput } from '~/components/molecules/QuillInput'
+import { QuillInputWithVariables } from '~/components/molecules/QuillInputWithVariables'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -25,17 +25,21 @@ interface EmailTemplateFormProps {
   title: string
   form: UseFormReturn<EmailTemplateFormData>
   submitLabel?: string
+  isEditMode?: boolean
 }
 
 export function EmailTemplateForm({
   title,
   form,
   submitLabel = 'Save Template',
+  isEditMode = false,
 }: EmailTemplateFormProps) {
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state !== 'idle'
   const token = useAuthenticityToken()
   const fullSubmit = useFullSubmit(form)
+  const hasChanges = form.formState.isDirty
+  const isSubmitDisabled = isSubmitting || (isEditMode && !hasChanges)
 
   return (
     <Dialog open onOpenChange={open => !open && navigate('..')}>
@@ -76,22 +80,21 @@ export function EmailTemplateForm({
               control={form.control}
               name='template_body'
               render={({ field }) => (
-                <QuillInput className='mb-4' name='Template Body' field={field} />
+                <QuillInputWithVariables
+                  className='mb-4'
+                  name='Template Body'
+                  field={field}
+                />
               )}
             />
-
-            <p className='p-3 mb-4 text-sm text-blue-800 bg-blue-50 border border-blue-200 rounded-md'>
-              To create dynamic placeholders, use double curly braces like{' '}
-              <span className='font-semibold'>{'{{Client Name}}'}</span>,{' '}
-              <span className='font-semibold'>{'{{Company}}'}</span>,{' '}
-              <span className='font-semibold'>{'{{Date}}'}</span>, etc.
-            </p>
 
             <DialogFooter className='gap-2 mt-4'>
               <Button type='button' variant='outline' onClick={() => navigate('..')}>
                 Cancel
               </Button>
-              <LoadingButton loading={isSubmitting}>{submitLabel}</LoadingButton>
+              <LoadingButton loading={isSubmitting} disabled={isSubmitDisabled}>
+                {submitLabel}
+              </LoadingButton>
             </DialogFooter>
           </Form>
         </FormProvider>

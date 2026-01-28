@@ -60,6 +60,13 @@ import {
 // Server Utilities
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
+import { fetchTemplateVariableData } from '~/services/templateVariables.server'
+import {
+  getUnfilledCustomVariables,
+  hasAnyVariables,
+  replaceTemplateVariables,
+  type TemplateVariableData,
+} from '~/utils/emailTemplateVariables'
 import { getEmployeeUser } from '~/utils/session.server'
 
 // ============================================================================
@@ -171,7 +178,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return redirect('/employee/deals')
   }
 
-  const senderInfo = await fetchSenderInfo(user)
+  const [senderInfo, templateVariableData] = await Promise.all([
+    fetchSenderInfo(user),
+    fetchTemplateVariableData({ user, dealId }),
+  ])
 
   return {
     email: rows[0].email || '',
@@ -179,6 +189,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     senderInfo,
     dealId,
     companyId: user.company_id || 0,
+    templateVariableData,
   }
 }
 
@@ -325,14 +336,17 @@ function EmailFormFields({
   companyId,
   selectedTemplate,
   onTemplateChange,
+  templateVariableData,
 }: {
   form: ReturnType<typeof useForm<EmailFormData>>
   companyId: number
   selectedTemplate: EmailTemplate | undefined
   onTemplateChange: (template: EmailTemplate | undefined) => void
+  templateVariableData: TemplateVariableData
 }) {
-  const bodyValue = form.watch('text')
-  const hasPlaceholders = bodyValue?.includes('{{') && bodyValue?.includes('}}')
+  const bodyText = form.watch('text')
+  const customVariables = getUnfilledCustomVariables(bodyText)
+  const showCustomVariablesInfo = selectedTemplate && customVariables.length > 0
 
   return (
     <div className='flex-1 space-y-4'>
@@ -362,7 +376,11 @@ function EmailFormFields({
           onTemplateChange(template)
           if (template) {
             form.setValue('subject', template.template_subject)
-            form.setValue('text', template.template_body)
+            const filledBody = replaceTemplateVariables(
+              template.template_body,
+              templateVariableData,
+            )
+            form.setValue('text', filledBody)
           }
         }}
       />
@@ -373,13 +391,19 @@ function EmailFormFields({
           <QuillInput name='Body' field={field} className='mb-4' />
         )}
       />
-      {selectedTemplate && hasPlaceholders && (
-        <div className='p-3 bg-amber-50 border border-amber-200 rounded-md'>
-          <p className='text-sm text-amber-800'>
-            Replace the{' '}
-            <code className='bg-amber-100 px-1 rounded'>{'{{placeholders}}'}</code> with
-            actual values before sending (e.g., client name, date, etc.).
+      {showCustomVariablesInfo && (
+        <div className='p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md'>
+          <p>
+            <strong>Action required:</strong> Please replace the following
+            placeholders with actual values before sending:
           </p>
+          <ul className='mt-1 list-disc list-inside'>
+            {customVariables.map(variable => (
+              <li key={variable}>
+                <code className='bg-amber-100 px-1 rounded'>{`{{${variable}}}`}</code>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -566,7 +590,8 @@ function sendEmail(
 export default function DealEmailDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { email, dealId, companyId } = useLoaderData<typeof loader>()
+  const { email, dealId, companyId, templateVariableData } =
+    useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
@@ -623,10 +648,7 @@ export default function DealEmailDialog() {
   })
 
   const fullSubmit = (values: EmailFormData) => {
-    if (
-      selectedTemplate &&
-      (values.text.includes('{{') || values.text.includes('}}'))
-    ) {
+    if (hasAnyVariables(values.text)) {
       form.setError('text', {
         message:
           'Please replace all {{placeholders}} with actual values before sending',
@@ -714,6 +736,7 @@ export default function DealEmailDialog() {
               companyId={companyId}
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
+              templateVariableData={templateVariableData}
             />
             {form.watch('attachments').length > 0 ? (
               <TooltipProvider>
