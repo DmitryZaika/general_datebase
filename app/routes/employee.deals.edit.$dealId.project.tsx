@@ -125,7 +125,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       })
     }
   } catch (error) {
-    posthogClient.captureException(error)
+    posthogClient.captureException(error, 'Failed to update deal', {
+      dealId,
+    })
     return data({ error: 'Failed to update deal' })
   }
 
