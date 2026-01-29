@@ -84,11 +84,6 @@ async function migrateDeals() {
         updatedCount++
       }
     }
-    // 3. Soft-delete the "Closed Won" and "Closed Lost" lists (OUTSIDE the loop)
-    const [listResult] = await conn.execute(
-      `UPDATE deals_list SET deleted_at = NOW() WHERE id IN (4, 5)`,
-    )
-    console.log(`Soft-deleted lists 4 and 5: ${listResult.affectedRows} rows updated.`)
 
     console.log(`Processed and moved 'Lost' deals: ${updatedCount}`)
 
