@@ -581,18 +581,8 @@ export default function DealEmailDialog() {
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const isSubmitting = useNavigation().state !== 'idle'
-  const form = useForm<EmailFormData>({
-    resolver: emailResolver,
-    defaultValues: {
-      to: email,
-      subject: '',
-      text: '',
-      attachments: [],
-    },
-  })
 
-  const { mutate } = useMutation({
+  const { mutate, isPending } = useMutation({
     mutationFn: async (values: EmailFormData) => {
       return sendEmail(
         values.to,
@@ -619,6 +609,18 @@ export default function DealEmailDialog() {
     },
   })
 
+  const isSubmitting = useNavigation().state !== 'idle'
+
+  const form = useForm<EmailFormData>({
+    resolver: emailResolver,
+    defaultValues: {
+      to: email,
+      subject: '',
+      text: '',
+      attachments: [],
+    },
+  })
+
   const aiForm = useForm<AIEmailFormData>({
     resolver: zodResolver(aiEmailSchema),
     defaultValues: {
@@ -638,6 +640,19 @@ export default function DealEmailDialog() {
           'Please replace all {{placeholders}} with actual values before sending',
       })
       return
+    }
+
+    const lowerText = values.text.toLowerCase().trim()
+    const hasAttachmentKeywords =
+      lowerText.includes('attachment') ||
+      lowerText.includes('attached') ||
+      lowerText.includes('file') ||
+      lowerText.includes('files') ||
+      lowerText.includes('attachments')
+
+    if (hasAttachmentKeywords && values.attachments.length === 0) {
+      const confirmed = window.confirm("You didn't attach anything, is that fine?")
+      if (!confirmed) return
     }
     mutate(values)
   }
@@ -799,7 +814,7 @@ export default function DealEmailDialog() {
                 >
                   <PaperclipIcon className='h-4 w-4' />
                 </Button>
-                <LoadingButton loading={isSubmitting} type='submit'>
+                <LoadingButton loading={isSubmitting || isPending} type='submit'>
                   Send Email
                 </LoadingButton>
               </div>
