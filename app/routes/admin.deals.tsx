@@ -1,7 +1,6 @@
-import { Mail, SettingsIcon } from 'lucide-react'
+import { Mail, Menu, SettingsIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
@@ -11,6 +10,7 @@ import {
   useSearchParams,
 } from 'react-router'
 import DealsList from '~/components/DealsList'
+import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { SalesRepsFilter } from '~/components/molecules/SalesRepsFilter'
 import { Button } from '~/components/ui/button'
@@ -79,10 +79,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [activeGroupId],
     )
 
-    // Deals filtered by company (via customers.company_id) and optionally by sales rep
-    // Note: We might want to filter deals by list IDs that are visible,
-    // but the current query gets all deals for the company.
-    // Since we only render lists that belong to the group, deals in other lists won't be shown anyway.
     const dealParams: (string | number)[] = [companyId]
     let dealSql = `
       SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason, d.list_id, d.position, d.due_date, u.name AS sales_rep
@@ -260,11 +256,11 @@ export default function AdminDeals() {
 
   return (
     <div className='w-full'>
-      <div className='w-full flex justify-between items-center mb-2'>
-        <div className='flex items-center gap-4'>
+      <div className='w-full flex flex-col sm:flex-row justify-between items-center mb-1'>
+        <div className='flex items-center gap-2'>
           <SalesRepsFilter />
           <Select value={String(activeGroupId)} onValueChange={handleGroupChange}>
-            <SelectTrigger className='w-[200px] mt-4'>
+            <SelectTrigger className='w-[150px] mt-2'>
               <SelectValue placeholder='Select group' />
             </SelectTrigger>
             <SelectContent>
@@ -275,34 +271,54 @@ export default function AdminDeals() {
               ))}
             </SelectContent>
           </Select>
-          <Select
-            value={isWon === null ? 'null' : String(isWon)}
-            onValueChange={handleStatusChange}
-          >
-            <SelectTrigger className='w-[200px] mt-4'>
-              <SelectValue placeholder='Select status' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='null'>Active Deals</SelectItem>
-              <SelectItem value='1'>Won</SelectItem>
-              <SelectItem value='0'>Lost</SelectItem>
-            </SelectContent>
-          </Select>
-          <Link to={`email-templates${location.search}`} className='p-2 mt-4'>
-            <Button variant='outline'>
-              <Mail className='w-4 h-4 mr-2' />
-              Manage Email Templates
-            </Button>
-          </Link>
-          <Link to={`manage-lists${location.search}`} className='p-2 mt-4'>
-            <Button variant='outline'>
-              <SettingsIcon className='w-4 h-4 mr-2' />
-              Manage Lists
-            </Button>
-          </Link>
+          <CustomDropdownMenu
+            trigger={
+              <Button variant='outline' className='mt-2'>
+                <Menu className='w-4 h-4 mr-2' />
+                <span className='select-none'>Menu</span>
+              </Button>
+            }
+            sections={[
+              {
+                title: 'Status Filter',
+                options: [
+                  {
+                    label: 'Active Deals',
+                    onClick: () => handleStatusChange('null'),
+                    className: isWon === null ? 'bg-accent' : '',
+                  },
+                  {
+                    label: 'Won',
+                    onClick: () => handleStatusChange('1'),
+                    className: isWon === 1 ? 'bg-accent' : '',
+                  },
+                  {
+                    label: 'Lost',
+                    onClick: () => handleStatusChange('0'),
+                    className: isWon === 0 ? 'bg-accent' : '',
+                  },
+                ],
+              },
+              {
+                title: 'Management',
+                options: [
+                  {
+                    label: 'Manage Email Templates',
+                    icon: <Mail className='w-4 h-4' />,
+                    onClick: () => navigate(`email-templates${location.search}`),
+                  },
+                  {
+                    label: 'Manage Lists',
+                    icon: <SettingsIcon className='w-4 h-4' />,
+                    onClick: () => navigate(`manage-lists${location.search}`),
+                  },
+                ],
+              },
+            ]}
+          />
         </div>
         <FindCustomer
-          className='mt-0'
+          className='mt-2 ml-2'
           onEdit={customerId => {
             const dealId = findDealIdByCustomer(customerId)
             if (dealId) navigate(`edit/${dealId}/information${location.search}`)

@@ -237,7 +237,7 @@ export default function DealsView({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full flex justify-between items-center py-2 px-1'>
+      <div className='w-full flex flex-col sm:flex-row justify-between items-center gap-2 py-2 px-1'>
         {groupListSelect}
         <FindCustomer
           disableRowClick

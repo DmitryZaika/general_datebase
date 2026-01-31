@@ -174,7 +174,7 @@ export default function EmployeeDeals() {
       value={activeGroupId ? String(activeGroupId) : ''}
       onValueChange={handleGroupChange}
     >
-      <SelectTrigger className='w-[200px]'>
+      <SelectTrigger className='w-[150px]'>
         <SelectValue placeholder='Select group' />
       </SelectTrigger>
       <SelectContent>
@@ -192,7 +192,7 @@ export default function EmployeeDeals() {
       value={isWon === null ? 'null' : String(isWon)}
       onValueChange={handleStatusChange}
     >
-      <SelectTrigger className='w-[200px]'>
+      <SelectTrigger className='w-[150px]'>
         <SelectValue placeholder='Select status' />
       </SelectTrigger>
       <SelectContent>
