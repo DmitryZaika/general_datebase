@@ -512,7 +512,7 @@ export default function EmailChatDialog() {
                 </div>
               )}
               <div
-                className={`flex items-center gap-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
+                className={`flex items-center gap-2 py-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
               >
                 {!message.isFromCustomer && <MessageDate message={message} />}
                 <div
