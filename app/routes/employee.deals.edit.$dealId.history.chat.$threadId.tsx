@@ -103,7 +103,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const [customerRows] = await db.execute<RowDataPacket[]>(
-    `SELECT c.name, c.email
+    `SELECT c.name, c.email, d.customer_id
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
       WHERE d.id = ?`,
@@ -113,6 +113,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const normalizeEmail = (email: string | null | undefined) =>
     email?.trim().toLowerCase() || ''
   const customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
+  const customerId = customerRows?.[0]?.customer_id
 
   if (customerEmail) {
     await db.execute(
@@ -122,14 +123,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         WHERE deleted_at IS NULL
           AND thread_id = ?
           AND (deal_id = ? OR deal_id IS NULL)
-          AND sender_email = ?
+          AND (sender_email = ? OR sender_email IN (SELECT email FROM customers WHERE id = ? OR parent_id = ?))
           AND employee_read_at IS NULL
       `,
-      [threadId, dealId, customerEmail],
+      [threadId, dealId, customerEmail, customerId, customerId],
     )
   }
 
-  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, u.email_signature as signature, MAX(er.read_at) AS read_at
+  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, e.sender_user_id, u.email_signature as signature, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
        LEFT JOIN users u ON u.id = e.sender_user_id
@@ -143,9 +144,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
      WHERE email_id IN (
        SELECT id
        FROM emails
-       WHERE deleted_at IS NULL AND thread_id = ?
+       WHERE deleted_at IS NULL AND thread_id = ? AND (deal_id = ? OR deal_id IS NULL)
      )`,
-    [threadId],
+    [threadId, dealId],
   )
   const attachments = await Promise.all(
     attachmentsRaw.map(async attachment => {
@@ -156,13 +157,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   )
 
   emailQuery +=
-    ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, u.email_signature ORDER BY e.sent_at ASC'
+    ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, e.sender_user_id, u.email_signature ORDER BY e.sent_at ASC'
 
   const [emailRows] = await db.execute<RowDataPacket[]>(emailQuery, emailParams)
 
   const messages: Message[] = (emailRows || []).map(row => {
-    const senderEmail = normalizeEmail(row.sender_email)
-    const isFromCustomer = senderEmail === customerEmail
+    // If it's not from an employee (no signature and no sender_user_id), it's from the customer
+    const isFromCustomer = !row.signature && !row.sender_user_id
     return {
       id: row.id,
       subject: row.subject,
