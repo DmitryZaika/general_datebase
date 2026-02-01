@@ -421,7 +421,7 @@ export default function AdminDeals() {
           noActionsLabel='No Deals'
         />
       </div>
-      <div className='flex gap-4'>
+      <div className='flex gap-1'>
         {lists.map(list => {
           const listDeals = board[list.id] ?? []
 

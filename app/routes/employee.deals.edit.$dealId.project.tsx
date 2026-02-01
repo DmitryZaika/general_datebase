@@ -13,6 +13,7 @@ import {
   useFetcher,
   useLoaderData,
   useLocation,
+  useNavigate,
 } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
@@ -56,7 +57,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             c.remodal_type, c.project_size, c.contact_time, c.remove_and_dispose, c.improve_offer, c.sink,
             c.when_start, c.details, c.compaign_name, c.adset_name, c.ad_name, c.backsplash, c.kitchen_stove,
             c.your_message, c.attached_file, c.qbo_id, c.notes, c.source,
-            d.created_at as deal_created, d.is_won, l.group_id as current_group_id, c.created_date as customer_created
+            d.created_at as deal_created, d.is_won, d.list_id as current_list_id, l.group_id as current_group_id, c.created_date as customer_created
        FROM deals d JOIN customers c ON d.customer_id = c.id LEFT JOIN deals_list l ON d.list_id = l.id WHERE d.id = ? AND c.company_id = ?`,
     [dealId, user.company_id],
   )
@@ -231,6 +232,8 @@ function AddressLinkCell({
 export default function DealProjectInfo() {
   const { customer, groupLists } = useLoaderData<typeof loader>()
   const fetcher = useFetcher<{ success: boolean; message?: string; error?: string }>()
+  const navigate = useNavigate()
+  const location = useLocation()
   const { toast } = useToast()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
 
@@ -253,6 +256,14 @@ export default function DealProjectInfo() {
   }, [fetcher.state, fetcher.data, toast])
 
   const handleStatusChange = (status: 1 | 0 | null) => {
+    if (status === 0) {
+      const pathParts = location.pathname.split('/')
+      const dealId = pathParts[pathParts.indexOf('edit') + 1]
+      navigate(
+        `/employee/deals/reason?dealId=${dealId}&fromListId=${customer.current_list_id}&fromPos=0&is_won=0${location.search}`,
+      )
+      return
+    }
     fetcher.submit(
       { intent: 'update_status', is_won: status === null ? 'null' : String(status) },
       { method: 'POST' },

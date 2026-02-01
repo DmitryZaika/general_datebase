@@ -254,13 +254,6 @@ export default function DealsView({
       }),
     })
     setActiveId(null)
-
-    if (toListId === 5) {
-      const fromPos = findDeal(activeId)?.position ?? 0
-      navigate(
-        `reason?dealId=${activeId}&fromListId=${fromListId}&fromPos=${fromPos}${location.search}`,
-      )
-    }
   }
 
   return (

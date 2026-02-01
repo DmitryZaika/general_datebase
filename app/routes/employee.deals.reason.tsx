@@ -4,6 +4,7 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
+  useSearchParams,
   useSubmit,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
@@ -43,9 +44,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (intent === 'submit') {
+    if (!reason || reason === 'not_specified') {
+      return redirect(
+        `/employee/deals/reason?dealId=${dealId}&fromListId=${fromListId}&fromPos=${fromPos}&error=Reason is required`,
+      )
+    }
     await db.execute(
       'UPDATE deals SET list_id = 5, lost_reason = ? WHERE id = ? AND user_id = ?',
-      [reason || null, dealId, user.id],
+      [reason, dealId, user.id],
     )
     return redirect('/employee/deals')
   }
@@ -67,6 +73,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 function EmployeeDealsReason() {
   const { dealId, fromListId, fromPos } = useLoaderData<typeof loader>()
+  const [searchParams] = useSearchParams()
+  const error = searchParams.get('error')
   const form = useForm<{ reason: string }>({
     defaultValues: { reason: '' },
   })
@@ -98,17 +106,24 @@ function EmployeeDealsReason() {
               control={form.control}
               name='reason'
               render={({ field }) => (
-                <SelectInputOther
-                  field={field}
-                  placeholder='Select reason'
-                  name={replaceUnderscoresWithSpaces('lost_reason')}
-                  options={Object.keys(LOST_REASONS).map(key => ({
-                    key: key,
-                    value: replaceUnderscoresWithSpaces(
-                      LOST_REASONS[key as keyof typeof LOST_REASONS],
-                    ),
-                  }))}
-                />
+                <div className='space-y-2'>
+                  <SelectInputOther
+                    field={field}
+                    placeholder='Select reason'
+                    name={replaceUnderscoresWithSpaces('lost_reason')}
+                    options={[
+                      ...Object.keys(LOST_REASONS).map(key => ({
+                        key: key,
+                        value: replaceUnderscoresWithSpaces(
+                          LOST_REASONS[key as keyof typeof LOST_REASONS],
+                        ),
+                      })),
+                    ]}
+                  />
+                  {error && (
+                    <p className='text-sm font-medium text-destructive'>{error}</p>
+                  )}
+                </div>
               )}
             />
             <input type='hidden' name='reason' value={reasonValue || ''} />
