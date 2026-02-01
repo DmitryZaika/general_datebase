@@ -68,6 +68,7 @@ import {
 } from '~/components/ui/tooltip'
 // Server Utilities
 import { db } from '~/db.server'
+import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
 import {
@@ -670,6 +671,8 @@ export default function DealEmailDialog() {
     if (!open) navigate(`../${location.search}`)
   }
 
+  const isMobile = useIsMobile()
+
   const handleGenerateWithAI = async () => {
     const isValid = await aiForm.trigger()
     if (!isValid) return
@@ -796,31 +799,57 @@ export default function DealEmailDialog() {
             />
             <div className='mt-4 flex justify-between gap-2 w-full'>
               <div className='flex items-center gap-2'>
-                <CustomDropdownMenu
-                  trigger={
-                    <Button variant='outline' size='sm' className='h-9'>
-                      <MoreVertical className='h-4 w-4 mr-1' />
-                      AI Menu
+                {isMobile ? (
+                  <CustomDropdownMenu
+                    trigger={
+                      <Button variant='outline' size='sm' className='h-9'>
+                        <MoreVertical className='h-4 w-4 mr-1' />
+                        AI Menu
+                      </Button>
+                    }
+                    sections={[
+                      {
+                        title: 'AI Actions',
+                        options: [
+                          {
+                            label: 'AI Settings',
+                            icon: <SettingsIcon className='w-4 h-4' />,
+                            onClick: () => setShowAIMenu(!showAIMenu),
+                          },
+                          {
+                            label: 'Generate',
+                            icon: <Sparkles className='w-4 h-4' />,
+                            onClick: handleGenerateWithAI,
+                          },
+                        ],
+                      },
+                    ]}
+                  />
+                ) : (
+                  <div className='flex items-center gap-2'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      className='h-9'
+                      onClick={() => setShowAIMenu(!showAIMenu)}
+                    >
+                      <SettingsIcon className='h-4 w-4 mr-1' />
+                      AI Settings
                     </Button>
-                  }
-                  sections={[
-                    {
-                      title: 'AI Actions',
-                      options: [
-                        {
-                          label: 'AI Settings',
-                          icon: <SettingsIcon className='w-4 h-4' />,
-                          onClick: () => setShowAIMenu(!showAIMenu),
-                        },
-                        {
-                          label: 'Generate',
-                          icon: <Sparkles className='w-4 h-4' />,
-                          onClick: handleGenerateWithAI,
-                        },
-                      ],
-                    },
-                  ]}
-                />
+                    <LoadingButton
+                      loading={_isGenerating}
+                      type='button'
+                      variant='default'
+                      size='sm'
+                      className='h-9'
+                      onClick={handleGenerateWithAI}
+                    >
+                      <Sparkles className='h-4 w-4 mr-1' />
+                      Generate
+                    </LoadingButton>
+                  </div>
+                )}
               </div>
 
               <div className='ml-auto flex items-center gap-2'>
