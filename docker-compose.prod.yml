@@ -1,0 +1,3 @@
+services:
+  remix-app:
+    image: <aws_account_id>.dkr.ecr.<region>.amazonaws.com/your-repo-name:latest
