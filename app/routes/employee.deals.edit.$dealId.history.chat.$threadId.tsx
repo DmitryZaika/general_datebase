@@ -1,6 +1,14 @@
 import { format } from 'date-fns'
 import DOMPurify from 'isomorphic-dompurify'
-import { FileText, ImageIcon, PaperclipIcon, Pencil } from 'lucide-react'
+import {
+  FileText,
+  ImageIcon,
+  MoreVertical,
+  PaperclipIcon,
+  Pencil,
+  SendIcon,
+  Sparkles,
+} from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -11,6 +19,7 @@ import {
   useNavigate,
 } from 'react-router'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
+import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Badge } from '~/components/ui/badge'
@@ -36,7 +45,7 @@ import {
 } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
-import { fileSize } from '~/utils/constants'
+import { dateClass, fileSize } from '~/utils/constants'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
@@ -480,27 +489,25 @@ export default function EmailChatDialog() {
 
   return (
     <Dialog open={true} onOpenChange={handleClose}>
-      <DialogContent className='sm:max-w-[60%] h-[90%] p-0 flex flex-col'>
-        <DialogHeader className='p-4 border-b'>
+      <DialogContent className='sm:max-w-[90%] h-[95%] p-0 flex flex-col'>
+        <DialogHeader className='p-2 border-b'>
           <div className='flex items-center gap-3'>
-            <div className='w-12 h-12 rounded-full bg-pink-500 flex items-center justify-center text-white font-bold'>
+            <div className='w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white font-bold'>
               {getInitials(customerName)}
             </div>
             <div>
               <DialogTitle className='text-lg font-semibold'>
                 {customerName}
               </DialogTitle>
-              <p className='text-sm text-gray-500'>Email: {customerEmail}</p>
-              <p className='text-sm text-gray-500'>Subject: {subject}</p>
             </div>
           </div>
         </DialogHeader>
 
-        <div className='flex-1 overflow-y-auto p-4 space-y-4'>
+        <div className='flex-1 overflow-y-auto'>
           {chatMessages.map((message, index) => (
             <div key={message.id}>
               {showDate(message, index) && (
-                <div className='text-center text-xs text-gray-500 my-4'>
+                <div className={dateClass}>
                   {format(new Date(message.sent_at), 'MMM d, yyyy')}
                 </div>
               )}
@@ -653,7 +660,7 @@ export default function EmailChatDialog() {
           <div ref={bottomRef} />
         </div>
 
-        <div className='p-4 border-t'>
+        <div className='p-2 border-t'>
           {attachments.length > 0 && (
             <div className='mb-2 flex flex-wrap gap-2'>
               {attachments.map(file => {
@@ -686,99 +693,162 @@ export default function EmailChatDialog() {
               })}
             </div>
           )}
-          <div className='flex items-end gap-2'>
-            {showSelect ? (
-              <div className='flex gap-2 items-end'>
-                <Select
-                  open={selectActive}
-                  onOpenChange={setSelectActive}
-                  value={selectedTemplate}
-                  onValueChange={value => handleTemplateSelect(value)}
-                >
-                  <SelectTrigger className='w-37.5'>
-                    <SelectValue placeholder='Select template' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='follow-up'>Follow-up</SelectItem>
-                    <SelectItem value='reply'>Reply</SelectItem>
-                    <SelectItem value='thank-you'>Thank You</SelectItem>
-                    <SelectItem value='feedback-request'>Feedback Request</SelectItem>
-                    <SelectItem value='referral'>Referral</SelectItem>
-                  </SelectContent>
-                </Select>
-                <LoadingButton
-                  loading={isGenerating}
+          <div className='flex flex-col md:flex-row flex-1 gap-2'>
+            {/* Desktop view for AI and Attachments */}
+            <div className='hidden md:flex items-end gap-2'>
+              {showSelect ? (
+                <div className='flex gap-2 items-end'>
+                  <Select
+                    open={selectActive}
+                    onOpenChange={setSelectActive}
+                    value={selectedTemplate}
+                    onValueChange={value => handleTemplateSelect(value)}
+                  >
+                    <SelectTrigger className='w-37.5'>
+                      <SelectValue placeholder='Select template' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='follow-up'>Follow-up</SelectItem>
+                      <SelectItem value='reply'>Reply</SelectItem>
+                      <SelectItem value='thank-you'>Thank You</SelectItem>
+                      <SelectItem value='feedback-request'>Feedback Request</SelectItem>
+                      <SelectItem value='referral'>Referral</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <LoadingButton
+                    loading={isGenerating}
+                    type='button'
+                    onClick={() => handleGenerate()}
+                  >
+                    Generate
+                  </LoadingButton>
+                </div>
+              ) : (
+                <Button
                   type='button'
-                  onClick={() => handleGenerate()}
+                  onClick={() => {
+                    setShowSelect(true)
+                    setSelectActive(true)
+                  }}
                 >
-                  Generate
+                  Generate with AI
+                </Button>
+              )}
+              <AiImproveButton
+                getText={() => messageText}
+                setText={value => setMessageText(value)}
+                buttonSize='icon'
+                iconClassName='text-lg'
+              />
+            </div>
+
+            <div className='flex items-end flex-1 gap-1 max-h-30 relative'>
+              {/* Mobile view Dropdown */}
+              <div className='md:hidden flex items-center self-center'>
+                <CustomDropdownMenu
+                  align='start'
+                  trigger={
+                    <Button variant='ghost' size='icon' className='h-9 w-9'>
+                      <MoreVertical className='h-5 w-5' />
+                    </Button>
+                  }
+                  sections={[
+                    {
+                      title: 'Actions',
+                      options: [
+                        {
+                          label: 'Attach File',
+                          icon: <PaperclipIcon className='w-4 h-4' />,
+                          onClick: () => fileInputRef.current?.click(),
+                        },
+                        {
+                          label: 'Generate with AI',
+                          icon: <Sparkles className='w-4 h-4' />,
+                          onClick: () => {
+                            setShowSelect(true)
+                            setSelectActive(true)
+                          },
+                        },
+                        {
+                          label: 'Improve message',
+                          icon: <Pencil className='w-4 h-4' />,
+                          onClick: () => {
+                            const improveBtn = document.getElementById(
+                              'mobile-improve-trigger',
+                            )
+                            if (improveBtn) improveBtn.click()
+                          },
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              </div>
+
+              <div className='hidden md:block'>
+                <Button
+                  type='button'
+                  size='icon'
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <PaperclipIcon className='h-5 w-5' />
+                </Button>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type='file'
+                className='hidden'
+                multiple
+                onChange={e => {
+                  const files = e.currentTarget.files
+                  if (files && files.length > 0) {
+                    setAttachments(prev => [...prev, ...Array.from(files)])
+                  }
+                  e.currentTarget.value = ''
+                }}
+              />
+
+              <textarea
+                ref={textareaRef}
+                value={messageText}
+                onChange={e => {
+                  setMessageText(e.target.value)
+                  if (textareaRef.current) {
+                    textareaRef.current.style.height = 'auto'
+                    textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+                  }
+                }}
+                placeholder='Send a message'
+                rows={1}
+                className='flex-1 min-h-9.5 w-full max-h-30 rounded-sm border border-zinc-300 bg-transparent px-1 sm:px-4 py-2 text-sm outline-none resize-none overflow-y-auto border-none'
+              />
+
+              {/* Mobile Improve AI Button (Hidden, triggered by menu) */}
+              <div className='hidden'>
+                <AiImproveButton
+                  id='mobile-improve-trigger'
+                  getText={() => messageText}
+                  setText={value => setMessageText(value)}
+                  buttonSize='icon'
+                  iconClassName='text-lg'
+                />
+              </div>
+
+              <div className='flex gap-1'>
+                <LoadingButton
+                  loading={isSending}
+                  type='button'
+                  variant='default'
+                  size='icon'
+                  disabled={
+                    isSending || (messageText.trim() === '' && attachments.length === 0)
+                  }
+                  onClick={handleSend}
+                >
+                  <SendIcon className='h-2 w-2' />
                 </LoadingButton>
               </div>
-            ) : (
-              <Button
-                type='button'
-                onClick={() => {
-                  setShowSelect(true)
-                  setSelectActive(true)
-                }}
-              >
-                Generate with AI
-              </Button>
-            )}
-            <AiImproveButton
-              getText={() => messageText}
-              setText={value => setMessageText(value)}
-              buttonSize='icon'
-              iconClassName='text-lg'
-            />
-            <Button
-              type='button'
-              size='icon'
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <PaperclipIcon className='h-5 w-5' />
-            </Button>
-            <input
-              ref={fileInputRef}
-              type='file'
-              className='hidden'
-              multiple
-              onChange={e => {
-                const files = e.currentTarget.files
-                if (files && files.length > 0) {
-                  setAttachments(prev => [...prev, ...Array.from(files)])
-                }
-                e.currentTarget.value = ''
-              }}
-            />
-            <textarea
-              ref={textareaRef}
-              value={messageText}
-              onChange={e => {
-                setMessageText(e.target.value)
-                if (textareaRef.current) {
-                  textareaRef.current.style.height = 'auto'
-                  textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-                }
-              }}
-              placeholder='Send a message'
-              rows={1}
-              className='flex-1 min-h-9.5 max-h-40 rounded-sm border border-zinc-300 bg-transparent px-4 py-2 text-sm outline-none resize-none overflow-y-auto'
-            />
-            <div className='flex items-center gap-1 mb-1'>
-              <LoadingButton
-                loading={isSending}
-                type='button'
-                variant='ghost'
-                size='icon'
-                className='text-zinc-500'
-                disabled={
-                  isSending || (messageText.trim() === '' && attachments.length === 0)
-                }
-                onClick={handleSend}
-              >
-                <span className='text-xl'>➤</span>
-              </LoadingButton>
             </div>
           </div>
         </div>

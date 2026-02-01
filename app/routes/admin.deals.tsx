@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { db } from '~/db.server'
+import type { Customer } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, type User } from '~/utils/session.server'
 
@@ -246,12 +247,53 @@ export default function AdminDeals() {
     setBoard(initialBoard)
   }, [JSON.stringify(initialBoard)])
 
-  const findDealIdByCustomer = (customerId: number): number | undefined => {
+  useEffect(() => {
+    const highlight = searchParams.get('highlight')
+    if (highlight) {
+      const dealId = parseInt(highlight, 10)
+      if (!Number.isNaN(dealId)) {
+        // Clear previous timeout if any
+        if (highlightTimeoutRef.current) {
+          clearTimeout(highlightTimeoutRef.current)
+        }
+
+        // Wait a bit for the DOM to settle
+        setTimeout(() => {
+          const el = document.getElementById(`deal-${dealId}`)
+          if (el) {
+            el.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center',
+              inline: 'center',
+            })
+            setHighlightDealId(dealId)
+
+            highlightTimeoutRef.current = setTimeout(() => {
+              setHighlightDealId(null)
+              highlightTimeoutRef.current = null
+              // Optional: remove highlight param from URL
+              const newParams = new URLSearchParams(searchParams)
+              newParams.delete('highlight')
+              navigate(
+                { pathname: location.pathname, search: newParams.toString() },
+                { replace: true },
+              )
+            }, 2010)
+          }
+        }, 100)
+      }
+    }
+  }, [searchParams, board])
+
+  const findDealIdByCustomer = (
+    customerId: number,
+    customer?: Customer,
+  ): number | undefined => {
     for (const l of lists) {
       const hit = board[l.id]?.find(d => d.customer_id === customerId)
       if (hit) return hit.id
     }
-    return undefined
+    return customer?.deal_id ?? undefined
   }
 
   return (
@@ -272,6 +314,9 @@ export default function AdminDeals() {
             </SelectContent>
           </Select>
           <CustomDropdownMenu
+            selectedList={
+              isWon === null ? 'Active Deals' : isWon === 1 ? 'Won' : 'Lost'
+            }
             trigger={
               <Button variant='outline' className='mt-2'>
                 <Menu className='w-4 h-4 mr-2' />
@@ -319,17 +364,34 @@ export default function AdminDeals() {
         </div>
         <FindCustomer
           className='mt-2 ml-2'
-          onEdit={customerId => {
-            const dealId = findDealIdByCustomer(customerId)
+          onEdit={(customerId, customer) => {
+            const dealId = findDealIdByCustomer(customerId, customer)
             if (dealId) navigate(`edit/${dealId}/information${location.search}`)
           }}
-          onDelete={customerId => {
-            const dealId = findDealIdByCustomer(customerId)
+          onDelete={(customerId, customer) => {
+            const dealId = findDealIdByCustomer(customerId, customer)
             if (dealId) navigate(`edit/${dealId}/delete${location.search}`)
           }}
-          onSelect={customerId => {
-            const dealId = findDealIdByCustomer(customerId)
+          onSelect={(customerId, customer) => {
+            const dealId = findDealIdByCustomer(customerId, customer)
             if (!dealId) return
+
+            const isInBoard = lists.some(l => board[l.id]?.some(d => d.id === dealId))
+
+            if (!isInBoard && customer) {
+              const isWonStatus = customer.deal_is_won
+              let newStatus = 'null'
+              if (isWonStatus === 1) newStatus = '1'
+              else if (isWonStatus === 0) newStatus = '0'
+
+              const params = new URLSearchParams(searchParams)
+              if (params.get('is_won') !== newStatus) {
+                params.set('is_won', newStatus)
+                params.set('highlight', String(dealId))
+                navigate({ pathname: location.pathname, search: params.toString() })
+                return
+              }
+            }
 
             if (highlightTimeoutRef.current) {
               clearTimeout(highlightTimeoutRef.current)

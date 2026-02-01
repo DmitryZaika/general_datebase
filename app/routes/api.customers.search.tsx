@@ -98,7 +98,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
       customers = await selectMany<Customer>(
         db,
-        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
+        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
+         (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
+         (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
          WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -129,7 +131,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       if (!digits) {
         customers = await selectMany<Customer>(
           db,
-          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
+          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
+           (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
+           (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
            FROM customers c
            LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
            WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -167,7 +171,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
         customers = await selectMany<Customer>(
           db,
-          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
+          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
+           (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
+           (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
            FROM customers c
            LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
            WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -207,7 +213,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     } else {
       customers = await selectMany<Customer>(
         db,
-        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
+        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
+         (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
+         (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
          WHERE c.company_id = ? AND c.deleted_at IS NULL

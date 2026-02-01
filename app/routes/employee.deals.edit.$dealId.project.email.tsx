@@ -5,7 +5,7 @@
 // External Dependencies
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
-import { FileText, ImageIcon, PaperclipIcon } from 'lucide-react'
+import { FileText, ImageIcon, PaperclipIcon, SendIcon } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -815,7 +815,7 @@ export default function DealEmailDialog() {
                   <PaperclipIcon className='h-4 w-4' />
                 </Button>
                 <LoadingButton loading={isSubmitting || isPending} type='submit'>
-                  Send Email
+                  <SendIcon className='h-4 w-4' />
                 </LoadingButton>
               </div>
             </div>

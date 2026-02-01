@@ -377,7 +377,7 @@ export default function DealItem({
           <div className='flex items-center gap-2'>
             {hasEmail && (
               <Link
-                to={mailUrl}
+                to={mailUrl + location.search}
                 className='text-slate-500 hover:text-black'
                 onPointerDown={e => e.stopPropagation()}
                 state={{ from: fromState }}
@@ -387,7 +387,7 @@ export default function DealItem({
             )}
             {hasImages && (
               <Link
-                to={imagesUrl}
+                to={imagesUrl + location.search}
                 className='text-slate-500 hover:text-black'
                 onPointerDown={e => e.stopPropagation()}
                 state={{ from: fromState }}

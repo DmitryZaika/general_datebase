@@ -10,14 +10,15 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import DealsList from '~/components/DealsList'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
+import type { Customer } from '~/types'
 
-type Customer = {
-  id: number
-  name: string
-}
+// type Customer = {
+//   id: number
+//   name: string
+// }
 
 type List = {
   id: number
@@ -62,6 +63,7 @@ export default function DealsView({
 }: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
 
   const toDeal = (d: FullDeal): Deal => {
     const customer = customers.find(c => c.id === d.customer_id)
@@ -126,6 +128,39 @@ export default function DealsView({
     }
   }, [])
 
+  useEffect(() => {
+    const highlight = searchParams.get('highlight')
+    if (highlight) {
+      const dealId = parseInt(highlight, 10)
+      if (!Number.isNaN(dealId)) {
+        if (highlightTimeoutRef.current) {
+          clearTimeout(highlightTimeoutRef.current)
+        }
+        setTimeout(() => {
+          const el = document.getElementById(`deal-${dealId}`)
+          if (el) {
+            el.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center',
+              inline: 'center',
+            })
+            setHighlightDealId(dealId)
+            highlightTimeoutRef.current = setTimeout(() => {
+              setHighlightDealId(null)
+              highlightTimeoutRef.current = null
+              const newParams = new URLSearchParams(searchParams)
+              newParams.delete('highlight')
+              navigate(
+                { pathname: location.pathname, search: newParams.toString() },
+                { replace: true },
+              )
+            }, 2010)
+          }
+        }, 100)
+      }
+    }
+  }, [searchParams, board])
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -149,12 +184,15 @@ export default function DealsView({
     return undefined
   }
 
-  const findDealIdByCustomer = (customerId: number): number | undefined => {
+  const findDealIdByCustomer = (
+    customerId: number,
+    customer?: Customer,
+  ): number | undefined => {
     for (const l of lists) {
       const hit = board[l.id]?.find(d => d.customer_id === customerId)
       if (hit) return hit.id
     }
-    return undefined
+    return customer?.deal_id ?? undefined
   }
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -241,17 +279,34 @@ export default function DealsView({
         {groupListSelect}
         <FindCustomer
           disableRowClick
-          onEdit={customerId => {
-            const dealId = findDealIdByCustomer(customerId)
+          onEdit={(customerId, customer) => {
+            const dealId = findDealIdByCustomer(customerId, customer)
             if (dealId) navigate(`edit/${dealId}/information${location.search}`)
           }}
-          onDelete={customerId => {
-            const dealId = findDealIdByCustomer(customerId)
+          onDelete={(customerId, customer) => {
+            const dealId = findDealIdByCustomer(customerId, customer)
             if (dealId) navigate(`edit/${dealId}/delete${location.search}`)
           }}
-          onSelect={customerId => {
-            const dealId = findDealIdByCustomer(customerId)
+          onSelect={(customerId, customer) => {
+            const dealId = findDealIdByCustomer(customerId, customer)
             if (!dealId) return
+
+            const isInBoard = lists.some(l => board[l.id]?.some(d => d.id === dealId))
+
+            if (!isInBoard && customer) {
+              const isWonStatus = customer.deal_is_won
+              let newStatus = 'null'
+              if (isWonStatus === 1) newStatus = '1'
+              else if (isWonStatus === 0) newStatus = '0'
+
+              const params = new URLSearchParams(searchParams)
+              if (params.get('is_won') !== newStatus) {
+                params.set('is_won', newStatus)
+                params.set('highlight', String(dealId))
+                navigate({ pathname: location.pathname, search: params.toString() })
+                return
+              }
+            }
 
             if (highlightTimeoutRef.current) {
               clearTimeout(highlightTimeoutRef.current)

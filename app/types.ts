@@ -96,6 +96,8 @@ export interface Customer {
   postal_code?: string | null
   company_name?: string | null
   city?: string | null
+  deal_id?: number | null
+  deal_is_won?: number | null
 }
 
 export interface StoneSearchResult {

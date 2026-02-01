@@ -1,3 +1,4 @@
+import { CheckIcon } from '@radix-ui/react-icons'
 import type { ReactNode } from 'react'
 import { Button } from '~/components/ui/button'
 import {
@@ -16,6 +17,7 @@ export interface DropdownOption {
   disabled?: boolean
   className?: string
   icon?: ReactNode
+  selected?: boolean
 }
 
 export interface DropdownSection {
@@ -43,6 +45,7 @@ export interface CustomDropdownMenuProps {
   options?: DropdownOption[]
   align?: 'start' | 'center' | 'end'
   contentClassName?: string
+  selectedList?: string
 }
 
 export const CustomDropdownMenu = ({
@@ -52,6 +55,7 @@ export const CustomDropdownMenu = ({
   options = [],
   align = 'start',
   contentClassName,
+  selectedList,
 }: CustomDropdownMenuProps) => {
   const allSections: DropdownSection[] = [...sections]
   if (options.length > 0) {
@@ -81,7 +85,8 @@ export const CustomDropdownMenu = ({
                       {option.icon}
                     </span>
                   )}
-                  {option.label}
+                  {option.label}{' '}
+                  {selectedList === option.label && <CheckIcon className='w-4 h-4' />}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuGroup>

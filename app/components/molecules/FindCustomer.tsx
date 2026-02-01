@@ -37,10 +37,10 @@ export function FindCustomer({
   buildSearchUrl?: (term: string, searchType: 'name' | 'phone' | 'email') => string
   buildEditLink?: (customerId: number, search: string) => string
   buildDeleteLink?: (customerId: number, search: string) => string
-  onEdit?: (customerId: number) => void
-  onDelete?: (customerId: number) => void
-  onSelect?: (customerId: number) => void
-  resolveId?: (customerId: number) => number | undefined
+  onEdit?: (customerId: number, customer: Customer) => void
+  onDelete?: (customerId: number, customer: Customer) => void
+  onSelect?: (customerId: number, customer: Customer) => void
+  resolveId?: (customerId: number, customer?: Customer) => number | undefined
   noActionsLabel?: string
   showActions?: boolean
 }) {
@@ -76,8 +76,8 @@ export function FindCustomer({
     if (!resolveId) return customers
 
     return [...customers].sort((a, b) => {
-      const aHasAction = resolveId(a.id) !== undefined
-      const bHasAction = resolveId(b.id) !== undefined
+      const aHasAction = resolveId(a.id, a) !== undefined
+      const bHasAction = resolveId(b.id, b) !== undefined
 
       if (aHasAction && !bHasAction) return -1
       if (!aHasAction && bHasAction) return 1
@@ -135,7 +135,7 @@ export function FindCustomer({
                   onClick={e => {
                     e.stopPropagation()
                     if (onSelect) {
-                      onSelect(customer.id)
+                      onSelect(customer.id, customer)
                       setIsInputFocused(false)
                     }
                   }}
@@ -150,7 +150,7 @@ export function FindCustomer({
               </div>
               {showActions && (
                 <div className='flex items-center space-x-2'>
-                  {resolveId && resolveId(customer.id) === undefined ? (
+                  {resolveId && resolveId(customer.id, customer) === undefined ? (
                     <span className='text-xs text-gray-500'>{noActionsLabel}</span>
                   ) : (
                     <>
@@ -160,7 +160,7 @@ export function FindCustomer({
                         onClick={e => {
                           e.stopPropagation()
                           if (onEdit) {
-                            onEdit(customer.id)
+                            onEdit(customer.id, customer)
                             return
                           }
                           const link = buildEditLink
@@ -178,7 +178,7 @@ export function FindCustomer({
                         onClick={e => {
                           e.stopPropagation()
                           if (onDelete) {
-                            onDelete(customer.id)
+                            onDelete(customer.id, customer)
                             return
                           }
                           ;(async () => {
