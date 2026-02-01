@@ -77,9 +77,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Default to the first group if no view param or invalid
     const activeGroupId = viewParam ? parseInt(viewParam, 10) : groups[0]?.id
 
+    if (!activeGroupId && groups.length > 0) {
+      // Handle case where activeGroupId might be NaN or 0 if that's not intended
+    }
+
     const isWonParam = url.searchParams.get('is_won')
     const isWon =
-      isWonParam === 'null'
+      isWonParam === 'null' || isWonParam === null
         ? null
         : isWonParam === '1'
           ? 1
@@ -152,7 +156,16 @@ export default function EmployeeDeals() {
     groups,
     activeGroupId,
     isWon,
-  } = useLoaderData<typeof loader>()
+  } = useLoaderData<{
+    deals: FullDeal[]
+    customers: { id: number; name: string }[]
+    lists: { id: number; name: string }[]
+    imagesMap: Record<number, boolean>
+    emailsMap: Record<number, boolean>
+    groups: { id: number; name: string }[]
+    activeGroupId: number | undefined
+    isWon: number | null
+  }>()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()

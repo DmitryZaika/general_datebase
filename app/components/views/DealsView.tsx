@@ -9,10 +9,14 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
+import { MoreVertical, Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import DealsList from '~/components/DealsList'
+import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
+import { Button } from '~/components/ui/button'
+import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import type { Customer } from '~/types'
 
 // type Customer = {
@@ -269,7 +273,44 @@ export default function DealsView({
       onDragCancel={() => setActiveId(null)}
     >
       <div className='w-full flex flex-col sm:flex-row justify-between items-center gap-2 py-2 px-1'>
-        {groupListSelect}
+        <div className='flex items-center gap-2 w-full sm:w-auto'>
+          <div className='hidden md:block'>
+            <OriginalSidebarTrigger />
+          </div>
+          {groupListSelect}
+          <div className='hidden md:block'>
+            <Link
+              to={`add?list_id=${lists[0]?.id || 1}${location.search}`}
+              relative='path'
+            >
+              <Button variant='outline' size='sm' className='flex gap-2 h-9'>
+                <Plus className='w-4 h-4' /> Add Deal
+              </Button>
+            </Link>
+          </div>
+          <div className='md:hidden'>
+            <CustomDropdownMenu
+              trigger={
+                <Button variant='ghost' size='icon' className='h-9 w-9'>
+                  <MoreVertical className='w-4 h-4' />
+                </Button>
+              }
+              sections={[
+                {
+                  title: 'Actions',
+                  options: [
+                    {
+                      label: 'Add New Deal',
+                      icon: <Plus className='w-4 h-4' />,
+                      onClick: () =>
+                        navigate(`add?list_id=${lists[0]?.id || 1}${location.search}`),
+                    },
+                  ],
+                },
+              ]}
+            />
+          </div>
+        </div>
         <FindCustomer
           disableRowClick
           onEdit={(customerId, customer) => {
@@ -353,11 +394,13 @@ export default function DealsView({
                   <div className='text-xs text-slate-500 mt-1'>
                     Amount: $ {d.amount ?? 0}
                   </div>
-                  {d.due_date && (
-                    <div className='text-xs text-slate-500 mt-1'>
-                      {new Date(d.due_date).toLocaleDateString()}
-                    </div>
-                  )}
+                  {d.due_date &&
+                    d.due_date !== '0000-00-00' &&
+                    !Number.isNaN(new Date(d.due_date).getTime()) && (
+                      <div className='text-xs text-slate-500 mt-1'>
+                        {new Date(d.due_date).toLocaleDateString()}
+                      </div>
+                    )}
                 </div>
               )
             })()

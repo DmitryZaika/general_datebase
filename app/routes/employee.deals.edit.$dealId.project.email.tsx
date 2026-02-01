@@ -5,7 +5,15 @@
 // External Dependencies
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
-import { FileText, ImageIcon, PaperclipIcon, SendIcon } from 'lucide-react'
+import {
+  FileText,
+  ImageIcon,
+  MoreVertical,
+  PaperclipIcon,
+  SendIcon,
+  SettingsIcon,
+  Sparkles,
+} from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -21,6 +29,7 @@ import {
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
+import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import {
   type EmailTemplate,
   EmailTemplateSearch,
@@ -577,7 +586,7 @@ export default function DealEmailDialog() {
   const { email, dealId, companyId, templateVariableData } =
     useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [_isGenerating, setIsGenerating] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -673,8 +682,8 @@ export default function DealEmailDialog() {
       await generateAIEmail(
         aiForm.getValues(),
         dealId,
-        subject => form.setValue('subject', subject),
-        body => form.setValue('text', body),
+        subject => form.setValue('subject', subject ?? ''),
+        body => form.setValue('text', body ?? ''),
       )
     } catch (error) {
       alert(
@@ -786,20 +795,33 @@ export default function DealEmailDialog() {
               }}
             />
             <div className='mt-4 flex justify-between gap-2 w-full'>
-              <Button
-                type='button'
-                onClick={() => setShowAIMenu(!showAIMenu)}
-                variant={showAIMenu ? 'secondary' : 'default'}
-              >
-                AI Settings
-              </Button>
-              <LoadingButton
-                type='button'
-                loading={isGenerating}
-                onClick={handleGenerateWithAI}
-              >
-                Generate
-              </LoadingButton>
+              <div className='flex items-center gap-2'>
+                <CustomDropdownMenu
+                  trigger={
+                    <Button variant='outline' size='sm' className='h-9'>
+                      <MoreVertical className='h-4 w-4 mr-1' />
+                      AI Menu
+                    </Button>
+                  }
+                  sections={[
+                    {
+                      title: 'AI Actions',
+                      options: [
+                        {
+                          label: 'AI Settings',
+                          icon: <SettingsIcon className='w-4 h-4' />,
+                          onClick: () => setShowAIMenu(!showAIMenu),
+                        },
+                        {
+                          label: 'Generate',
+                          icon: <Sparkles className='w-4 h-4' />,
+                          onClick: handleGenerateWithAI,
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              </div>
 
               <div className='ml-auto flex items-center gap-2'>
                 <AiImproveButton

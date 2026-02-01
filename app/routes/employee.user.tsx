@@ -277,10 +277,15 @@ export default function UserProfile() {
               />
             </div>
 
-            <div className='mt-6'>
+            <div className='mt-6 flex items-center gap-4'>
               <LoadingButton loading={isSubmitting} type='submit'>
                 Save Changes
               </LoadingButton>
+              <Link to='/logout'>
+                <Button variant='destructive' type='button'>
+                  Logout
+                </Button>
+              </Link>
             </div>
           </Form>
         </FormProvider>

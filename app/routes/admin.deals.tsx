@@ -1,6 +1,7 @@
-import { Mail, Menu, SettingsIcon } from 'lucide-react'
+import { Mail, Menu, Plus, SettingsIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import { db } from '~/db.server'
 import type { Customer } from '~/types'
 import { selectMany } from '~/utils/queryHelpers'
@@ -300,6 +302,9 @@ export default function AdminDeals() {
     <div className='w-full'>
       <div className='w-full flex flex-col sm:flex-row justify-between items-center mb-1'>
         <div className='flex items-center gap-2'>
+          <div className='hidden md:block'>
+            <OriginalSidebarTrigger />
+          </div>
           <SalesRepsFilter />
           <Select value={String(activeGroupId)} onValueChange={handleGroupChange}>
             <SelectTrigger className='w-[150px] mt-2'>
@@ -313,6 +318,38 @@ export default function AdminDeals() {
               ))}
             </SelectContent>
           </Select>
+          <div className='hidden md:block'>
+            <Link
+              to={`add?list_id=${lists[0]?.id || 1}${location.search}`}
+              relative='path'
+            >
+              <Button variant='outline' size='sm' className='flex gap-2 h-9 mt-2'>
+                <Plus className='w-4 h-4' /> Add Deal
+              </Button>
+            </Link>
+          </div>
+          <div className='md:hidden mt-2'>
+            <CustomDropdownMenu
+              trigger={
+                <Button variant='ghost' size='icon' className='h-9 w-9'>
+                  <Plus className='w-5 h-5' />
+                </Button>
+              }
+              sections={[
+                {
+                  title: 'Actions',
+                  options: [
+                    {
+                      label: 'Add New Deal',
+                      icon: <Plus className='w-4 h-4' />,
+                      onClick: () =>
+                        navigate(`add?list_id=${lists[0]?.id || 1}${location.search}`),
+                    },
+                  ],
+                },
+              ]}
+            />
+          </div>
           <CustomDropdownMenu
             selectedList={
               isWon === null ? 'Active Deals' : isWon === 1 ? 'Won' : 'Lost'

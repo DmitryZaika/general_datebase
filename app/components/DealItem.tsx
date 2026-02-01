@@ -44,7 +44,8 @@ function parseLocal(dateInput: string | null | undefined): Date {
   return new Date(y, m - 1, d)
 }
 function getDateColor(dateStr: string | null | undefined, listId: number): string {
-  if (!dateStr && listId !== 4 && listId !== 5) return 'text-red-500'
+  if ((!dateStr || dateStr === '0000-00-00') && listId !== 4 && listId !== 5)
+    return 'text-red-500'
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const selected = parseLocal(dateStr)
@@ -140,6 +141,7 @@ export default function DealItem({
   }, [deal.description, editDesc])
 
   function formatDisplay(dateStr: string) {
+    if (dateStr === '0000-00-00') return ''
     const d = parseLocal(dateStr)
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString()
   }
@@ -334,7 +336,7 @@ export default function DealItem({
                     onClick={e => e.stopPropagation()}
                     onPointerDown={e => e.stopPropagation()}
                   >
-                    {localDate ? (
+                    {localDate && localDate !== '0000-00-00' ? (
                       formatDisplay(localDate)
                     ) : (
                       <CalendarIcon className='w-4 h-4' />
@@ -364,6 +366,7 @@ export default function DealItem({
             deal.list_id !== 4 &&
             readonly &&
             localDate &&
+            localDate !== '0000-00-00' &&
             deal.is_won === null && (
               <p
                 className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}

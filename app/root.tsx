@@ -30,7 +30,6 @@ import { getBase } from '~/utils/urlHelpers'
 import { Header } from './components/Header'
 import { Chat } from './components/organisms/Chat'
 import { MarketingHeader } from './components/organisms/MarketingHeader'
-import { SidebarToggle } from './components/SidebarToggle'
 import { Toaster } from './components/ui/toaster'
 import { commitSession, getSession } from './sessions.server'
 import './tailwind.css'
@@ -251,7 +250,7 @@ export default function App() {
   } = useLoaderData<typeof loader>()
   const { pathname } = useLocation()
   const { toast } = useToast()
-  const isMobile = useIsMobile()
+  const _isMobile = useIsMobile()
   const isLogin = pathname === '/login'
   const isDraw = pathname.startsWith('/employee/draw')
   const isCheckIn = pathname.includes('/check-in')
@@ -342,14 +341,6 @@ export default function App() {
                   />
                 )}
                 <div className='relative'>
-                  {!isCustomerViewPage && !isLogin && (
-                    <SidebarToggle
-                      isMobile={isMobile}
-                      isCheckIn={isCheckIn}
-                      isExternalMarketing={isExternalMarketing}
-                      isInstallerRoute={isInstallerRoute}
-                    />
-                  )}
                   <Outlet />
                 </div>
               </AuthenticityTokenProvider>
