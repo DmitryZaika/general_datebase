@@ -4,11 +4,12 @@ REGION := us-east-2
 REPO_NAME := granite-manager-remix
 EC2_USER := ec2-user
 EC2_IP := your-ec2-ip-address
+REMOTE_ENV_PATH := /home/ec2-user/general_datebase/.env
 
 # Full Image URI
 IMAGE_URI := $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/$(REPO_NAME):latest
 
-.PHONY: local-test build-push deploy-prod login
+.PHONY: local-test build-push deploy-prod login push-env
 
 # 1. Login to AWS ECR
 login:
@@ -37,6 +38,10 @@ deploy-prod:
 		docker compose -f docker-compose.yml -f docker-compose.prod.yml pull && \
 		docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d && \
 		docker image prune -f" # <--- Safely cleans up the OLD version's layers
+
+push-env:
+	ssh $(EC2_USER)@$(EC2_IP) "mkdir -p /home/ec2-user/general_datebase"
+	scp ./.env $(EC2_USER)@$(EC2_IP):$(REMOTE_ENV_PATH)
 
 # 5. Clean up local Docker junk
 clean:

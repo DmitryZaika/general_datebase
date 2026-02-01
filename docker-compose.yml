@@ -17,3 +17,12 @@ services:
       - ./nginx/50x.html:/usr/share/nginx/html/50x.html:ro
     depends_on:
       - remix-app
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/lib/letsencrypt:/var/lib/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+    # This command checks for renewal every 12 hours
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
