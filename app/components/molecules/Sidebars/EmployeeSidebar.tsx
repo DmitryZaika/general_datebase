@@ -333,13 +333,13 @@ export function EmployeeSidebar({
 
   return (
     <Sidebar>
-      {isMobile && (
+      {isMobile && data?.user && (
         <SidebarHeader className='py-2 px-3'>
           <div className='flex gap-2 justify-center'>
-            {data?.user?.is_admin || data?.user?.is_superuser ? (
+            {data.user.is_admin || data.user.is_superuser ? (
               <Link to={targetPath} className='w-full' onClick={handleLinkClick}>
                 <LinkButton className='select-none w-full'>
-                  {isAdminPage ? 'Admin' : 'Employee'}
+                  {isAdminPage ? 'Employee' : 'Admin'}
                 </LinkButton>
               </Link>
             ) : null}
@@ -349,7 +349,7 @@ export function EmployeeSidebar({
               </LinkButton>
             </Link>
           </div>
-          {data?.user?.is_superuser && isAdminPage ? (
+          {data.user.is_superuser && isAdminPage ? (
             <Link to='/admin/users' onClick={handleLinkClick}>
               <Button className='w-full'>Users</Button>
             </Link>
