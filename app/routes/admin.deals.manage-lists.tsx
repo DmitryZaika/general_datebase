@@ -1,7 +1,22 @@
+import {
+  closestCorners,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Trash2 } from 'lucide-react'
+import { GripVertical, Plus, Trash2 } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   type ActionFunctionArgs,
   data,
@@ -31,6 +46,7 @@ import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Switch } from '~/components/ui/switch'
 import { db } from '~/db.server'
+import { cn } from '~/lib/utils'
 import { commitSession, getSession } from '~/sessions.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -68,12 +84,23 @@ const deleteListSchema = z.object({
   listId: z.coerce.number(),
 })
 
+const reorderListsSchema = z.object({
+  intent: z.literal('reorder_lists'),
+  updates: z.array(
+    z.object({
+      id: z.coerce.number(),
+      position: z.number(),
+    }),
+  ),
+})
+
 const actionSchema = z.discriminatedUnion('intent', [
   createGroupSchema,
   deleteGroupSchema,
   toggleGroupSchema,
   createListSchema,
   deleteListSchema,
+  reorderListsSchema,
 ])
 
 type DealList = {
@@ -222,6 +249,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       session.flash('message', toastData('Success', 'List deleted successfully'))
       break
     }
+    case 'reorder_lists': {
+      for (const update of values.updates) {
+        await db.execute('UPDATE deals_list SET position = ? WHERE id = ?', [
+          update.position,
+          update.id,
+        ])
+      }
+      return data({ success: true })
+    }
   }
 
   return data(
@@ -235,6 +271,65 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 // ============================================================================
 // COMPONENT
 // ============================================================================
+
+function SortableListItem({ list, groupId }: { list: DealList; groupId: number }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: list.id,
+      disabled: groupId === 1,
+    })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'flex items-center justify-between p-2 bg-secondary/50 rounded-md border border-border/50 text-sm',
+        isDragging && 'opacity-50 shadow-lg border-primary/50',
+      )}
+    >
+      <div className='flex items-center gap-2 flex-1 min-w-0'>
+        {groupId !== 1 && (
+          <div
+            {...attributes}
+            {...listeners}
+            className='cursor-grab active:cursor-grabbing p-1 hover:bg-secondary rounded'
+          >
+            <GripVertical className='h-3 w-3 text-muted-foreground' />
+          </div>
+        )}
+        <span className='font-medium truncate'>{list.name}</span>
+      </div>
+
+      {groupId !== 1 && (
+        <Form
+          method='post'
+          onSubmit={e => {
+            if (!confirm('Are you sure you want to delete this list?')) {
+              e.preventDefault()
+            }
+          }}
+        >
+          <input type='hidden' name='intent' value='delete_list' />
+          <input type='hidden' name='listId' value={list.id} />
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-6 w-6 hover:bg-destructive/10 hover:text-destructive ml-2'
+          >
+            <Trash2 className='h-3 w-3' />
+          </Button>
+        </Form>
+      )}
+    </div>
+  )
+}
 
 function CreateListForm({ groupId }: { groupId: number }) {
   const fetcher = useFetcher<{ success?: boolean; error?: string }>()
@@ -274,11 +369,52 @@ function CreateListForm({ groupId }: { groupId: number }) {
 }
 
 export default function ManageLists() {
-  const { groups } = useLoaderData<typeof loader>()
+  const { groups: initialGroups } = useLoaderData<typeof loader>()
+  const [groups, setGroups] = useState(initialGroups)
   const submit = useSubmit()
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state !== 'idle'
   const location = useLocation()
+
+  useEffect(() => {
+    setGroups(initialGroups)
+  }, [initialGroups])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+  )
+
+  const handleDragEnd = (event: DragEndEvent, groupId: number) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const group = groups.find(g => g.id === groupId)
+    if (!group) return
+
+    const oldIndex = group.lists.findIndex(l => l.id === active.id)
+    const newIndex = group.lists.findIndex(l => l.id === over.id)
+
+    const newLists = arrayMove(group.lists, oldIndex, newIndex)
+
+    // Update local state
+    setGroups(prev => prev.map(g => (g.id === groupId ? { ...g, lists: newLists } : g)))
+
+    // Submit to server
+    const updates = newLists.map((list, index) => ({
+      id: list.id,
+      position: index,
+    }))
+
+    const formData = new FormData()
+    formData.append('intent', 'reorder_lists')
+    formData.append('updates', JSON.stringify(updates))
+    submit(formData, { method: 'post' })
+  }
+
   return (
     <Dialog
       open={true}
@@ -368,45 +504,32 @@ export default function ManageLists() {
                 </CardHeader>
                 <CardContent className='p-3 pt-0'>
                   <div className='space-y-2'>
-                    <div className='grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3'>
-                      {group.lists.map(list => (
-                        <div
-                          key={list.id}
-                          className='flex items-center justify-between p-2 bg-secondary/50 rounded-md border border-border/50 text-sm'
-                        >
-                          <span className='font-medium truncate'>{list.name}</span>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCorners}
+                      onDragEnd={event => handleDragEnd(event, group.id)}
+                    >
+                      <SortableContext
+                        items={group.lists.map(l => l.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className='grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3'>
+                          {group.lists.map(list => (
+                            <SortableListItem
+                              key={list.id}
+                              list={list}
+                              groupId={group.id}
+                            />
+                          ))}
 
-                          {group.id !== 1 && (
-                            <Form
-                              method='post'
-                              onSubmit={e => {
-                                if (
-                                  !confirm('Are you sure you want to delete this list?')
-                                ) {
-                                  e.preventDefault()
-                                }
-                              }}
-                            >
-                              <input type='hidden' name='intent' value='delete_list' />
-                              <input type='hidden' name='listId' value={list.id} />
-                              <Button
-                                variant='ghost'
-                                size='icon'
-                                className='h-6 w-6 hover:bg-destructive/10 hover:text-destructive ml-2'
-                              >
-                                <Trash2 className='h-3 w-3' />
-                              </Button>
-                            </Form>
+                          {group.lists.length === 0 && (
+                            <div className='text-xs text-muted-foreground italic p-2'>
+                              No lists yet
+                            </div>
                           )}
                         </div>
-                      ))}
-
-                      {group.lists.length === 0 && (
-                        <div className='text-xs text-muted-foreground italic p-2'>
-                          No lists yet
-                        </div>
-                      )}
-                    </div>
+                      </SortableContext>
+                    </DndContext>
                   </div>
                 </CardContent>
                 {group.id !== 1 && (

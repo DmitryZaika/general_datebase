@@ -349,13 +349,14 @@ export default function DealProjectInfo() {
 
   return (
     <div className='space-y-4'>
-      <div className='flex gap-2 items-center flex-wrap'>
-        <MoveButton status={null} isWon={customer.is_won} />
-        <MoveButton status={1} isWon={customer.is_won} />
-        <MoveButton status={0} isWon={customer.is_won} />
-
+      <div className='flex gap-2 items-center justify-between'>
+        <div className='flex gap-2 items-center'>
+          <MoveButton status={null} isWon={customer.is_won} />
+          <MoveButton status={1} isWon={customer.is_won} />
+          <MoveButton status={0} isWon={customer.is_won} />
+        </div>
         <Select onValueChange={handleGroupChange} defaultValue={currentGroupId}>
-          <SelectTrigger className='w-[200px] h-7'>
+          <SelectTrigger className='w-[150px] h-7'>
             <SelectValue placeholder='Select Group' />
           </SelectTrigger>
           <SelectContent>

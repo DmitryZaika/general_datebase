@@ -44,6 +44,7 @@ type FullDeal = {
 
 type Deal = FullDeal & {
   name: string
+  company_name?: string | null
   has_images?: boolean
   has_email?: boolean
 }
@@ -75,6 +76,7 @@ export default function DealsView({
       id: d.id,
       customer_id: d.customer_id,
       name: customer ? customer.name : `Customer #${d.customer_id}`,
+      company_name: customer?.company_name,
       amount: d.amount,
       description: d.description,
       status: d.status ?? undefined,
