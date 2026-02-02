@@ -1,4 +1,5 @@
 import { Outlet, useLocation, useNavigate } from 'react-router'
+import { DealActivityPanel } from '~/components/molecules/DealActivityPanel'
 import { DealProgressBar } from '~/components/molecules/DealProgressBar'
 import {
   Dialog,
@@ -7,17 +8,22 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
+import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 
 interface DealPageProps {
+  dealId: number
   stages?: { id: number; name: string; position: number }[]
   history?: { list_id: number; entered_at: string; exited_at: string | null }[]
   currentListId?: number
+  activities?: DealActivity[]
 }
 
 export default function DealsEdit({
+  dealId,
   stages,
   history,
   currentListId,
+  activities,
 }: DealPageProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -32,7 +38,7 @@ export default function DealsEdit({
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-125 overflow-auto flex flex-col justify-baseline min-h-[390px] max-h-[95vh] p-5'>
+      <DialogContent className='sm:max-w-[1100px] overflow-auto flex flex-col justify-baseline min-h-[600px] max-h-[95vh] p-5'>
         <DialogHeader>
           <DialogTitle>Edit Deal</DialogTitle>
         </DialogHeader>
@@ -45,19 +51,26 @@ export default function DealsEdit({
             />
           </div>
         )}
-        <Tabs
-          value={location.pathname.split('/').pop()}
-          onValueChange={value => navigate(`${value}${location.search}`)}
-        >
-          <TabsList className='mb-5 grid grid-cols-5'>
-            <TabsTrigger value='project'>Project</TabsTrigger>
-            <TabsTrigger value='information'>General</TabsTrigger>
-            <TabsTrigger value='images'>Images</TabsTrigger>
-            <TabsTrigger value='documents'>Documents</TabsTrigger>
-            <TabsTrigger value='history'>Email</TabsTrigger>
-          </TabsList>
-          <Outlet />
-        </Tabs>
+        <div className='grid grid-cols-[1.7fr_2fr] flex-1 min-h-0'>
+          <div className='overflow-auto min-h-0 pl-2 pr-4'>
+            <Tabs
+              value={location.pathname.split('/').pop()}
+              onValueChange={value => navigate(`${value}${location.search}`)}
+            >
+              <TabsList className='mb-5 grid grid-cols-5'>
+                <TabsTrigger value='project'>Project</TabsTrigger>
+                <TabsTrigger value='information'>General</TabsTrigger>
+                <TabsTrigger value='images'>Images</TabsTrigger>
+                <TabsTrigger value='documents'>Documents</TabsTrigger>
+                <TabsTrigger value='history'>Email</TabsTrigger>
+              </TabsList>
+              <Outlet />
+            </Tabs>
+          </div>
+          <div className='border-l pl-4 pr-2 overflow-auto min-h-0'>
+            <DealActivityPanel dealId={dealId} activities={activities} />
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )
