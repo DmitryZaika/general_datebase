@@ -36,6 +36,11 @@ export const HARDCODED_IGNORES = [
   'seam_price',
 ]
 
+export const getSearchString = (url: URL) => {
+  const searchParams = url.searchParams.toString()
+  return searchParams ? `?${searchParams}` : ''
+}
+
 export const dateClass = 'text-center text-xs text-gray-500 my-1'
 
 export const FAUCET_TYPES = ['single handle', 'double handle'] as const
