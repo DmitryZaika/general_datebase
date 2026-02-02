@@ -119,6 +119,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         dealId,
         user.id,
       ])
+      await db.execute(
+        'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
+        [dealId],
+      )
+      await db.execute(
+        'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+        [dealId, targetListId],
+      )
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Group updated successfully'))
       return redirect(`/employee/deals${searchString}`, {

@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import type { ResultSetHeader } from 'mysql2'
 import { db } from '~/db.server'
 import { dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
@@ -51,7 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
   )
   const initialStatus = listRows[0]?.name || 'New Customer'
   if (!data.deal_id) {
-    await db.execute(
+    const [result] = await db.execute<ResultSetHeader>(
       `INSERT INTO deals
      (customer_id, amount, description, status, list_id, position, user_id, is_won)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
@@ -65,6 +66,10 @@ export async function action({ request }: ActionFunctionArgs) {
         user.id,
         data.is_won ?? null,
       ],
+    )
+    await db.execute(
+      'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+      [result.insertId, data.list_id],
     )
   } else {
     await db.execute(`UPDATE deals SET amount = ?, description = ? WHERE id = ?`, [
