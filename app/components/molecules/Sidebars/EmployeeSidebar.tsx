@@ -10,6 +10,8 @@ import {
   Layers,
   Lightbulb,
   type LucideProps,
+  Mail,
+  MailIcon,
   Package,
   Receipt,
   ShowerHead,
@@ -114,6 +116,11 @@ const getItems = (
       url: `/employee/deals`,
       icon: DollarSign,
     })
+    finalList.push({
+      title: 'Emails',
+      url: `/employee/emails`,
+      icon: MailIcon,
+    })
   }
   if (['admin', 'employee'].includes(base)) {
     finalList.push(
@@ -205,6 +212,11 @@ const getItems = (
         icon: DollarSign,
       },
       {
+        title: 'Emails',
+        url: `/admin/emails`,
+        icon: Mail,
+      },
+      {
         title: 'Transactions',
         url: `/admin/transactions`,
         icon: DollarSign,
@@ -290,7 +302,7 @@ export function EmployeeSidebar({
 
   const inventoryTitles = ['Stones', 'Sinks', 'Faucets']
 
-  const crmTitles = ['Customers', 'Deals', 'Statistic']
+  const crmTitles = ['Customers', 'Deals', 'Statistic', 'Emails']
   const resourceTitles = [
     'Suppliers',
     'Supports',
