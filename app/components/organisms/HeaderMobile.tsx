@@ -31,19 +31,24 @@ export function BurgerMenu() {
 export function HeaderMobile({ className }: HeaderMobileProps) {
   const location = useLocation()
   const isCustomerPage = location.pathname.startsWith('/customer')
-  const data = useLoaderData<{ user: { company_id: number } | null }>()
+  const data = useLoaderData<{
+    user: { company_id: number; is_admin: boolean; is_superuser: boolean } | null
+  }>()
   const companyId = isCustomerPage
     ? location.pathname.split('/').filter(Boolean)[1]
     : data?.user?.company_id
   const id = Number(companyId)
   const companyLogo =
     id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
+
   return (
     <header className={clsx('flex justify-between', className)}>
-      <div className='logo'>
-        <a className='flex justify-center' href='/'>
-          <img src={companyLogo} alt='Logo' className='h-18 md:h-16 object-contain' />
-        </a>
+      <div className='flex items-center gap-2'>
+        <div className='logo'>
+          <a className='flex justify-center' href='/'>
+            <img src={companyLogo} alt='Logo' className='h-18 md:h-16 object-contain' />
+          </a>
+        </div>
       </div>
       <div className='flex items-center gap-2'>
         <Notification />
