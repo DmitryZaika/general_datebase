@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import bcrypt from 'bcryptjs'
+import { Copy, Send } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
-import { FaCopy, FaTelegramPlane } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   Form,
@@ -141,14 +141,14 @@ function TelegramLink({ email }: { email: string }) {
       <Link to={`https://t.me/granitemanager_bot?start=${userEmail}`}>
         {' '}
         <Button>
-          <FaTelegramPlane className='mr-2' size={16} />
+          <Send className='mr-2' size={16} />
           Connect to Telegram Bot
         </Button>
       </Link>
       <div className='mt-2 flex items-center gap-2 p-2 bg-gray-100 rounded border w-80'>
         <code className='flex-1 text-sm font-mono'>{commandText}</code>
         <Button variant='ghost' size='sm' onClick={handleCopy} className='p-1 h-auto'>
-          <FaCopy size={14} />
+          <Copy size={14} />
         </Button>
       </div>
     </div>

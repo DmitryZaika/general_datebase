@@ -70,7 +70,12 @@ const deleteGroupSchema = z.object({
 const toggleGroupSchema = z.object({
   intent: z.literal('toggle_group'),
   groupId: z.coerce.number(),
-  isDisplay: z.coerce.boolean(), // or string "on" if standard form
+  isDisplay: z.coerce.boolean(),
+})
+
+const setDefaultGroupSchema = z.object({
+  intent: z.literal('set_default_group'),
+  groupId: z.coerce.number(),
 })
 
 const createListSchema = z.object({
@@ -98,6 +103,7 @@ const actionSchema = z.discriminatedUnion('intent', [
   createGroupSchema,
   deleteGroupSchema,
   toggleGroupSchema,
+  setDefaultGroupSchema,
   createListSchema,
   deleteListSchema,
   reorderListsSchema,
@@ -114,6 +120,7 @@ type DealGroup = {
   id: number
   name: string
   is_display: boolean
+  is_default: boolean
   lists: DealList[]
 }
 
@@ -130,7 +137,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const allGroups = await selectMany<Omit<DealGroup, 'lists'>>(
     db,
-    'SELECT id, name, is_displayed as is_display FROM groups_list WHERE deleted_at IS NULL AND (company_id = ? OR id = 1) ORDER BY created_at',
+    'SELECT id, name, is_displayed as is_display, is_default FROM groups_list WHERE deleted_at IS NULL AND (company_id = ? OR id = 1) ORDER BY created_at',
     [user.company_id],
   )
 
@@ -142,6 +149,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const groups: DealGroup[] = allGroups.map(g => ({
     ...g,
     is_display: Boolean(g.is_display),
+    is_default: Boolean(g.is_default),
     lists: allLists.filter(l => l.group_id === g.id),
   }))
 
@@ -161,19 +169,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const session = await getSession(request.headers.get('Cookie'))
-  const formData = await request.clone().formData()
-  const intent = formData.get('intent')
-
-  if (intent === 'toggle_group') {
-    const groupId = Number(formData.get('groupId'))
-    const isDisplay = formData.get('isDisplay') === 'on'
-    await db.execute('UPDATE groups_list SET is_displayed = ? WHERE id = ?', [
-      isDisplay,
-      groupId,
-    ])
-    return data({ success: true })
-  }
-
   const resolver = zodResolver(actionSchema)
   const {
     errors,
@@ -189,6 +184,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const values = validData
 
   switch (values.intent) {
+    case 'toggle_group': {
+      const groupId = values.groupId
+      const isDisplay = values.isDisplay
+      await db.execute('UPDATE groups_list SET is_displayed = ? WHERE id = ?', [
+        isDisplay,
+        groupId,
+      ])
+      return data({ success: true })
+    }
+    case 'set_default_group': {
+      const groupId = values.groupId
+      // 1. Set all other groups for this company to is_default = 0
+      await db.execute(
+        'UPDATE groups_list SET is_default = 0 WHERE company_id = ? OR id = 1',
+        [user.company_id],
+      )
+      // 2. Set the selected group to is_default = 1
+      await db.execute('UPDATE groups_list SET is_default = 1 WHERE id = ?', [groupId])
+      session.flash('message', toastData('Success', 'Default group updated'))
+      break
+    }
     case 'create_group': {
       await db.execute(
         'INSERT INTO groups_list (name, created_at, company_id) VALUES (?, ?, ?)',
@@ -455,26 +471,43 @@ export default function ManageLists() {
                       {group.name} {group.id === 1 && '(Default)'}
                     </CardTitle>
 
-                    {/* Toggle Visibility */}
-                    <Form method='post' className='flex items-center gap-2'>
-                      <input type='hidden' name='intent' value='toggle_group' />
-                      <input type='hidden' name='groupId' value={group.id} />
+                    {/* Default Toggle */}
+                    <div className='flex items-center gap-2 border-l pl-4 ml-2'>
+                      <Form method='post' className='flex items-center gap-2'>
+                        <input type='hidden' name='intent' value='toggle_group' />
+                        <input type='hidden' name='groupId' value={group.id} />
+                        <Switch
+                          name='isDisplay'
+                          checked={group.is_display}
+                          // disabled={group.id === 1} // Re-enabled for id=1 as per request
+                          onCheckedChange={checked => {
+                            const formData = new FormData()
+                            formData.append('intent', 'toggle_group')
+                            formData.append('groupId', String(group.id))
+                            formData.append('isDisplay', String(checked))
+                            submit(formData, { method: 'post' })
+                          }}
+                        />
+                        <Label className='text-xs text-muted-foreground'>
+                          {group.is_display ? 'Visible' : 'Hidden'}
+                        </Label>
+                      </Form>
                       <Switch
-                        name='isDisplay'
-                        checked={group.is_display}
-                        // disabled={group.id === 1} // Re-enabled for id=1 as per request
+                        checked={group.is_default}
                         onCheckedChange={checked => {
+                          if (!checked) return // Cannot uncheck the default one, must check another
                           const formData = new FormData()
-                          formData.append('intent', 'toggle_group')
+                          formData.append('intent', 'set_default_group')
                           formData.append('groupId', String(group.id))
-                          if (checked) formData.append('isDisplay', 'on')
                           submit(formData, { method: 'post' })
                         }}
                       />
-                      <Label className='text-xs text-muted-foreground'>
-                        {group.is_display ? 'Visible' : 'Hidden'}
+                      <Label className='text-xs font-medium'>
+                        {group.is_default ? 'Default' : 'Assign leads here'}
                       </Label>
-                    </Form>
+                    </div>
+
+                    {/* Toggle Visibility */}
                   </div>
 
                   {group.id !== 1 && (

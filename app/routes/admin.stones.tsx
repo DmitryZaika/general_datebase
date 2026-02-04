@@ -2,9 +2,8 @@
 
 import { GridIcon, TableIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
+import { Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { FaPencilAlt, FaTimes } from 'react-icons/fa'
 import {
   Link,
   type LoaderFunctionArgs,
@@ -344,7 +343,7 @@ export default function AdminStones() {
                       title='Edit Stone'
                       aria-label={`Edit ${stone.name}/information`}
                     >
-                      <FaPencilAlt />
+                      <Pencil size={16} />
                     </Link>
                     <Link
                       to={`delete/${stone.id}${location.search}`}
@@ -352,7 +351,7 @@ export default function AdminStones() {
                       title='Delete Stone'
                       aria-label={`Delete ${stone.name}`}
                     >
-                      <FaTimes />
+                      <X size={16} />
                     </Link>
                   </div>
                 </div>

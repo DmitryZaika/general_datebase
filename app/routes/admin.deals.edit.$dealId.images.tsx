@@ -1,5 +1,5 @@
+import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { FaTimes } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   data,
@@ -246,7 +246,7 @@ export default function DealEditImages() {
                   className='size-6 p-0 text-white bg-red-600 hover:bg-red-700 rounded-full'
                   title='Delete image'
                 >
-                  <FaTimes size={10} />
+                  <X size={10} />
                 </Button>
               </div>
             </div>

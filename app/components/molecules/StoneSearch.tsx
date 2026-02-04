@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { CheckIcon, MinusIcon } from 'lucide-react'
+import { CheckIcon, ChevronRight, Edit, MinusIcon, Search, Trash } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { FaChevronRight, FaEdit, FaSearch, FaTrash } from 'react-icons/fa'
 import { useLocation, useNavigate } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
@@ -121,7 +120,7 @@ export function StoneSearch({
           className='pr-10 py-2 rounded-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition'
         />
         <div className='absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-500'>
-          <FaSearch />
+          <Search />
         </div>
       </div>
 
@@ -142,7 +141,7 @@ export function StoneSearch({
               }}
               className='p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-none flex justify-between items-center'
             >
-              <div className='flex-1 flex-row '>
+              <div className='flex-1 flex-col'>
                 <div className='font-medium text-gray-800'>
                   {stone.name}
                   {(mode === 'samples'
@@ -168,12 +167,12 @@ export function StoneSearch({
               </div>
 
               {userRole === 'employee' && mode === 'default' && (
-                <div className='flex items-center space-x-2'>
+                <div className='flex items-center flex-col'>
                   <Button
                     variant='ghost'
                     size='icon'
                     onClick={e => handleSlabsClick(stone.id, e)}
-                    className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                    className='h-9 w-9 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
                   >
                     Slabs
                   </Button>
@@ -181,7 +180,7 @@ export function StoneSearch({
               )}
 
               {userRole === 'employee' && mode === 'samples' && (
-                <div className='flex items-center space-x-2'>
+                <div className='flex items-center flex-col'>
                   <Button
                     variant='ghost'
                     size='icon'
@@ -193,7 +192,7 @@ export function StoneSearch({
                         setTimeout(() => setDoneStoneId(null), 1000)
                       }
                     }}
-                    className='h-11 w-11 text-red-500 hover:text-red-700 hover:bg-red-100'
+                    className='h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-100'
                   >
                     {doneStoneId === stone.id ? (
                       <CheckIcon className='w-4 h-4 text-green-600' />
@@ -212,7 +211,7 @@ export function StoneSearch({
                     onClick={e => handleEditClick(stone.id, e)}
                     className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
                   >
-                    <FaEdit style={{ minWidth: '20px', minHeight: '20px' }} />
+                    <Edit style={{ minWidth: '20px', minHeight: '20px' }} />
                   </Button>
                   <Button
                     variant='ghost'
@@ -220,13 +219,13 @@ export function StoneSearch({
                     onClick={e => handleDeleteClick(stone.id, e)}
                     className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
                   >
-                    <FaTrash style={{ minWidth: '16px', minHeight: '16px' }} />
+                    <Trash style={{ minWidth: '20px', minHeight: '20px' }} />
                   </Button>
                 </>
               )}
 
               {userRole === 'customer' && (
-                <FaChevronRight className='h-4 w-4 text-gray-400' />
+                <ChevronRight className='h-4 w-4 text-gray-400' />
               )}
             </div>
           ))}
