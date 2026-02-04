@@ -1,8 +1,7 @@
 // admin.supports.tsx
 
-import { Plus } from 'lucide-react'
+import { Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { FaPencilAlt, FaTimes } from 'react-icons/fa'
 import {
   Link,
   type LoaderFunctionArgs,
@@ -90,7 +89,7 @@ export default function AdminSupports() {
                     title='Edit Support'
                     aria-label={`Edit ${support.name}`}
                   >
-                    <FaPencilAlt />
+                    <Pencil size={16} />
                   </Link>
 
                   <Link
@@ -99,7 +98,7 @@ export default function AdminSupports() {
                     title='Delete Support'
                     aria-label={`Delete ${support.name}`}
                   >
-                    <FaTimes />
+                    <X size={16} />
                   </Link>
                 </div>
 

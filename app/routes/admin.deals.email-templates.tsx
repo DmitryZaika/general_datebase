@@ -129,7 +129,7 @@ export default function ManageEmailTemplates() {
                         <div className='flex items-center gap-2'>
                           <Link to={`edit/${template.id}${location.search}`}>
                             <Button variant='ghost' size='icon'>
-                              <Pencil className='w-4 h-4' />
+                              <Pencil size={16} />
                             </Button>
                           </Link>
                           <Link to={`delete/${template.id}${location.search}`}>

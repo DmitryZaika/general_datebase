@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { Edit, Search, Trash } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FaEdit, FaSearch, FaTrash } from 'react-icons/fa'
 import { useLocation, useNavigate } from 'react-router'
 import { useToast } from '~/hooks/use-toast'
 import type { Customer } from '~/types'
@@ -118,7 +118,7 @@ export function FindCustomer({
           className='pr-10 rounded-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition'
         />
         <div className='absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-500'>
-          <FaSearch />
+          <Search />
         </div>
       </div>
 
@@ -149,7 +149,7 @@ export function FindCustomer({
                 </div>
               </div>
               {showActions && (
-                <div className='flex items-center space-x-2'>
+                <div className='flex items-center flex-col '>
                   {resolveId && resolveId(customer.id, customer) === undefined ? (
                     <span className='text-xs text-gray-500'>{noActionsLabel}</span>
                   ) : (
@@ -168,9 +168,9 @@ export function FindCustomer({
                             : `${editBasePath}/edit/${customer.id}${location.search}`
                           navigate(link)
                         }}
-                        className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                        className='h-9 w-9 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
                       >
-                        <FaEdit style={{ minWidth: '20px', minHeight: '20px' }} />
+                        <Edit style={{ minWidth: '20px', minHeight: '20px' }} />
                       </Button>
                       <Button
                         variant='ghost'
@@ -205,9 +205,9 @@ export function FindCustomer({
                             navigate(link)
                           })()
                         }}
-                        className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                        className='h-9 w-9 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
                       >
-                        <FaTrash style={{ minWidth: '16px', minHeight: '16px' }} />
+                        <Trash style={{ minWidth: '20px', minHeight: '20px' }} />
                       </Button>
                     </>
                   )}

@@ -1,8 +1,7 @@
 // app/routes/admin.sinks.tsx
 
-import { Plus } from 'lucide-react'
+import { Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { FaPencilAlt, FaTimes } from 'react-icons/fa'
 import {
   Link,
   type LoaderFunctionArgs,
@@ -182,7 +181,7 @@ export default function AdminSinks() {
                     title='Edit Sink'
                     aria-label={`Edit ${sink.name}`}
                   >
-                    <FaPencilAlt />
+                    <Pencil size={16} />
                   </Link>
                   <Link
                     to={`delete/${sink.id}`}
@@ -190,7 +189,7 @@ export default function AdminSinks() {
                     title='Delete Sink'
                     aria-label={`Delete ${sink.name}`}
                   >
-                    <FaTimes />
+                    <X size={16} />
                   </Link>
                 </div>
               </div>

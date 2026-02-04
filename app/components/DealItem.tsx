@@ -189,7 +189,10 @@ export default function DealItem({
             className='absolute top-1 right-1 z-20'
             onPointerDown={e => e.stopPropagation()}
           >
-            <Pencil className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black' />
+            <Pencil
+              size={16}
+              className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black'
+            />
           </Link>
         )}
       </div>

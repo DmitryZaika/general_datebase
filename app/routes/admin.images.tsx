@@ -1,8 +1,7 @@
 // admin.images.tsx
 
-import { Plus } from 'lucide-react'
+import { Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { FaPencilAlt, FaTimes } from 'react-icons/fa'
 import {
   Link,
   type LoaderFunctionArgs,
@@ -93,7 +92,7 @@ export default function AdminImages() {
                     title='Edit Image'
                     aria-label={`Edit ${image.name}`}
                   >
-                    <FaPencilAlt />
+                    <Pencil size={16} />
                   </Link>
                   <Link
                     to={`delete/${image.id}`}
@@ -101,7 +100,7 @@ export default function AdminImages() {
                     title='Delete Image'
                     aria-label={`Delete ${image.name}`}
                   >
-                    <FaTimes />
+                    <X size={16} />
                   </Link>
                 </div>
                 <div className='mt-2 text-center'>

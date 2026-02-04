@@ -1,5 +1,5 @@
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FaChevronDown, FaChevronUp } from 'react-icons/fa'
 import { useNavigation } from 'react-router'
 import { LinkSpan } from '~/components/atoms/LinkSpan'
 import { CheckOption } from '~/components/molecules/CheckOption'
@@ -112,9 +112,9 @@ export function SinksFilters({ base, suppliers }: IProps) {
           >
             <span>Suppliers</span>{' '}
             {suppliersExpanded ? (
-              <FaChevronUp className='ml-1 text-gray-500' size={12} />
+              <ChevronUp className='ml-1 text-gray-500' size={12} />
             ) : (
-              <FaChevronDown className='ml-1 text-gray-500' size={12} />
+              <ChevronDown className='ml-1 text-gray-500' size={12} />
             )}
             {searchParams.supplier !== 0 && (
               <LinkSpan

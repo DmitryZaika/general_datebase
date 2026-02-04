@@ -1,4 +1,4 @@
-import { CheckIcon } from '@radix-ui/react-icons'
+import { CheckIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from '~/components/ui/button'
 import {

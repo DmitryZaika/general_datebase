@@ -547,7 +547,7 @@ export default function EmailChatDialog() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
-                              <Pencil className='w-2 h-2 opacity-70' />
+                              <Pencil size={16} className='w-2 h-2 opacity-70' />
                               Signature
                             </span>
                           </TooltipTrigger>
