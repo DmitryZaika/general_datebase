@@ -1,7 +1,6 @@
-import { Mail, Menu, Plus, SettingsIcon } from 'lucide-react'
+import { Mail, Menu, SettingsIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
@@ -105,9 +104,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const deals = await selectMany<AdminDeal>(db, dealSql, dealParams)
 
     // Customers for names
-    const customers = await selectMany<{ id: number; name: string }>(
+    const customers = await selectMany<{
+      id: number
+      name: string
+      company_name?: string
+    }>(
       db,
-      'SELECT id, name FROM customers WHERE company_id = ? AND deleted_at IS NULL',
+      'SELECT id, name, company_name FROM customers WHERE company_id = ? AND deleted_at IS NULL',
       [companyId],
     )
 
@@ -171,6 +174,7 @@ export default function AdminDeals() {
     id: number
     customer_id: number
     name: string
+    company_name?: string | null
     amount?: number | null
     description?: string | null
     status?: string | null
@@ -190,6 +194,7 @@ export default function AdminDeals() {
       id: d.id,
       customer_id: d.customer_id,
       name: customer ? customer.name : `Customer #${d.customer_id}`,
+      company_name: customer?.company_name,
       amount: d.amount,
       description: d.description,
       status: d.status ?? undefined,
@@ -318,38 +323,7 @@ export default function AdminDeals() {
               ))}
             </SelectContent>
           </Select>
-          <div className='hidden md:block'>
-            <Link
-              to={`add?list_id=${lists[0]?.id || 1}${location.search}`}
-              relative='path'
-            >
-              <Button variant='outline' size='sm' className='flex gap-2 h-9 mt-2'>
-                <Plus className='w-4 h-4' /> Add Deal
-              </Button>
-            </Link>
-          </div>
-          <div className='md:hidden mt-2'>
-            <CustomDropdownMenu
-              trigger={
-                <Button variant='ghost' size='icon' className='h-9 w-9'>
-                  <Plus className='w-5 h-5' />
-                </Button>
-              }
-              sections={[
-                {
-                  title: 'Actions',
-                  options: [
-                    {
-                      label: 'Add New Deal',
-                      icon: <Plus className='w-4 h-4' />,
-                      onClick: () =>
-                        navigate(`add?list_id=${lists[0]?.id || 1}${location.search}`),
-                    },
-                  ],
-                },
-              ]}
-            />
-          </div>
+
           <CustomDropdownMenu
             selectedList={
               isWon === null ? 'Active Deals' : isWon === 1 ? 'Won' : 'Lost'

@@ -30,6 +30,7 @@ interface DealItemProps {
     has_email?: boolean
     sales_rep?: string | null
     is_won?: number | null
+    company_name?: string | null
   }
   readonly?: boolean
   highlighted?: boolean
@@ -174,11 +175,11 @@ export default function DealItem({
               className='text-xl font-medium truncate whitespace-normal flex-1 select-none hover:underline'
               onPointerDown={e => e.stopPropagation()}
             >
-              {deal.name}
+              {deal.company_name ? deal.company_name : deal.name}
             </Link>
           ) : (
             <h3 className='text-xl font-medium truncate whitespace-normal flex-1 select-none'>
-              {deal.name}
+              {deal.company_name ? deal.company_name : deal.name}
             </h3>
           )}
         </div>
