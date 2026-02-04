@@ -1,48 +1,84 @@
 # --- Configuration ---
-AWS_ACCOUNT_ID := 123456789012
+AWS_ACCOUNT_ID := 741448943665
 REGION := us-east-2
 REPO_NAME := granite-manager-remix
 EC2_USER := ec2-user
 EC2_IP := your-ec2-ip-address
-REMOTE_ENV_PATH := /home/ec2-user/general_datebase/.env
+DOMAIN := granite-manager.com
 
 # Full Image URI
 IMAGE_URI := $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/$(REPO_NAME):latest
 
-.PHONY: local-test build-push deploy-prod login push-env
+.PHONY: local-test build-push deploy-prod login push-env setup-host local-setup
 
-# 1. Login to AWS ECR
-login:
-	aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com
+################
+# Local Commands
+################
+local-setup:
+		@echo "Setting up local SSL directories..."
+		sudo mkdir -p /var/www/certbot
+		sudo mkdir -p /etc/letsencrypt
+		sudo curl -s https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf -o /etc/letsencrypt/options-ssl-nginx.conf
+		# On Mac, we need to ensure the current user has access to these sudo-created folders
+		sudo chown -R $(shell id -un):$(shell id -gn) /var/www/certbot /etc/letsencrypt
 
-# 2. Local Testing (Builds locally and runs with Nginx)
+
+local-certs: local-setup
+	@echo "Generating dummy self-signed certs for $(DOMAIN)..."
+	# Create the specific 'live' directory structure Nginx expects
+	sudo mkdir -p /etc/letsencrypt/live/$(DOMAIN)
+
+	# Generate the certs directly into that nested folder
+	sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+		-keyout /etc/letsencrypt/live/$(DOMAIN)/privkey.pem \
+		-out /etc/letsencrypt/live/$(DOMAIN)/fullchain.pem \
+		-subj "/C=US/ST=State/L=City/O=Organization/CN=$(DOMAIN)"
+
+	# Create the DH params in the root of letsencrypt as per standard configs
+	sudo openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
+
+	# Fix permissions again to ensure Docker can read the new subfolders
+	sudo chown -R $(shell id -un):$(shell id -gn) /etc/letsencrypt
+
+# Local Testing (Builds locally and runs with Nginx)
 local-test:
 	docker compose up --build
 
-# 3. Build & Push (The "Heavy Lifting" done on your PC)
+clean:
+	docker system prune -f
+
+
+################
+# Prod Commands
+################
+login:
+	aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com
+
+# New target to prepare the EC2 filesystem for SSL
+setup-host:
+	ssh $(EC2_USER)@$(EC2_IP) "\
+		sudo mkdir -p /var/www/certbot && \
+		sudo mkdir -p /etc/letsencrypt && \
+		sudo curl -s https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf -o /etc/letsencrypt/options-ssl-nginx.conf && \
+		sudo chown -R $(EC2_USER):$(EC2_USER) /var/www/certbot /etc/letsencrypt"
+
+
+# Build & Push (The "Heavy Lifting" done on your PC)
 build-push: login
 	docker build -t $(REPO_NAME) .
 	docker tag $(REPO_NAME):latest $(IMAGE_URI)
 	docker push $(IMAGE_URI)
 
-# 4. Deploy to EC2
-# This copies the config files and tells EC2 to pull the new image
-prune:
-	ssh $(EC2_USER)@$(EC2_IP) "docker system prune -f"
 
-# 2. UPDATED: Deployment now cleans up "dangling" images automatically
+# UPDATED: Deployment now cleans up "dangling" images automatically
 deploy-prod:
-	scp docker-compose.yml docker-compose.prod.yml nginx.conf $(EC2_USER)@$(EC2_IP):~/
+	scp docker-compose.yml docker-compose.prod.yml nginx.conf .env $(EC2_USER)@$(EC2_IP):~/
 	ssh $(EC2_USER)@$(EC2_IP) "\
 		aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com && \
 		docker compose -f docker-compose.yml -f docker-compose.prod.yml pull && \
 		docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d && \
 		docker image prune -f" # <--- Safely cleans up the OLD version's layers
 
-push-env:
-	ssh $(EC2_USER)@$(EC2_IP) "mkdir -p /home/ec2-user/general_datebase"
-	scp ./.env $(EC2_USER)@$(EC2_IP):$(REMOTE_ENV_PATH)
 
-# 5. Clean up local Docker junk
-clean:
-	docker system prune -f
+prune:
+	ssh $(EC2_USER)@$(EC2_IP) "docker system prune -f"

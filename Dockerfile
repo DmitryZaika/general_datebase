@@ -1,37 +1,36 @@
-# --- Stage 1: Build ---
-FROM node:20-alpine AS builder
+# --- Stage 1: Dependencies ---
+# We install everything (including devDependencies) here
+FROM node:24-alpine AS deps
 WORKDIR /app
-
-# Install build dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm ci  # 'npm ci' is faster and more reliable than 'install' for Docker
 
-# Copy all source files
+# --- Stage 2: Builder ---
+# We copy the node_modules from Stage 1 and build the app
+FROM node:24-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Run your multi-step build command
-# This handles tsc, react-router build, and your custom SW scripts
 RUN npm run build
 
-# Remove development dependencies to keep the 'node_modules' lean
+# Remove development dependencies *after* building
+# This is the "magic" step to shrink that 588MB
 RUN npm prune --production
 
-# --- Stage 2: Production Runtime ---
-FROM node:20-alpine AS runner
+# --- Stage 3: Runner (The Final Image) ---
+# We start with a fresh image and ONLY grab the essentials
+FROM node:24-alpine AS runner
 WORKDIR /app
 
-# Set production environment
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copy only the necessary files from the builder
+# Copy ONLY the production-ready files
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 
-# Expose the port remix-router-serve uses
 EXPOSE 3000
 
-# Start the app using the command from your package.json
 CMD ["npm", "start"]
