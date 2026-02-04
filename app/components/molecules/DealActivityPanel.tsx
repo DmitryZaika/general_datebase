@@ -4,15 +4,27 @@ import {
   CalendarIcon,
   ChevronDown,
   ChevronUp,
+  AlertCircle,
   CirclePlus,
   Clock,
+  Pencil,
   Trash2,
   X,
 } from 'lucide-react'
-import { useCallback, useMemo, useReducer } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '~/components/ui/alert-dialog'
 import { Badge } from '~/components/ui/badge'
-import { Button } from '~/components/ui/button'
+import { Button, buttonVariants } from '~/components/ui/button'
 import { Calendar } from '~/components/ui/calendar'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Input } from '~/components/ui/input'
@@ -125,6 +137,30 @@ const isOverdue = (deadline: string): boolean => {
   return endOfDay.getTime() < Date.now()
 }
 
+type DeadlineUrgency = 'overdue' | 'today' | 'soon' | 'normal'
+
+const getDeadlineUrgency = (deadline: string): DeadlineUrgency => {
+  if (isOverdue(deadline)) return 'overdue'
+  const diffDays = calendarDayDiff(new Date(deadline))
+  if (diffDays === 0) return 'today'
+  if (diffDays <= 2) return 'soon'
+  return 'normal'
+}
+
+const URGENCY_LABEL_STYLE: Readonly<Record<DeadlineUrgency, string>> = {
+  overdue: 'text-red-600 bg-red-50 border-red-200',
+  today: 'text-orange-600 bg-orange-50 border-orange-200',
+  soon: 'text-amber-600',
+  normal: 'text-gray-500',
+}
+
+const URGENCY_BORDER_STYLE: Readonly<Record<DeadlineUrgency, string>> = {
+  overdue: 'border-l-2 border-l-red-400',
+  today: 'border-l-2 border-l-orange-400',
+  soon: 'border-l-2 border-l-amber-300',
+  normal: '',
+}
+
 const DAY_MS = 86_400_000
 
 const calendarDayDiff = (target: Date): number => {
@@ -170,6 +206,7 @@ type FormAction =
   | { type: 'SET_DEADLINE_DATE'; payload: Date | undefined }
   | { type: 'SET_DEADLINE_TIME'; payload: { hours: number; minutes: number } }
   | { type: 'SET_PRIORITY'; payload: ActivityPriority }
+  | { type: 'SET_EDIT'; payload: DealActivity }
   | { type: 'RESET' }
 
 const formReducer = (state: FormState, action: FormAction): FormState => {
@@ -192,6 +229,12 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
     }
     case 'SET_PRIORITY':
       return { ...state, priority: action.payload }
+    case 'SET_EDIT':
+      return {
+        name: action.payload.name,
+        deadline: action.payload.deadline ? new Date(action.payload.deadline) : undefined,
+        priority: action.payload.priority,
+      }
     case 'RESET':
       return INITIAL_FORM_STATE
   }
@@ -199,30 +242,34 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
 
 // --- Hooks ---
 
-function useActivityForm(dealId: number) {
+function useActivityForm(dealId: number, editingActivityId: number | null) {
   const fetcher = useFetcher()
   const [form, dispatch] = useReducer(formReducer, INITIAL_FORM_STATE)
 
   const isSubmitting = fetcher.state !== 'idle'
   const isValid = form.name.trim().length > 0
+  const isEditing = editingActivityId !== null
 
   const submit = useCallback(() => {
     if (!isValid) return
 
-    fetcher.submit(
-      {
-        intent: 'create',
-        name: form.name.trim(),
-        deadline: toDeadlinePayload(form.deadline ?? null),
-        priority: form.priority,
-      },
-      { method: 'POST', action: buildApiAction(dealId) },
-    )
+    const payload: Record<string, string> = {
+      intent: isEditing ? 'update' : 'create',
+      name: form.name.trim(),
+      deadline: toDeadlinePayload(form.deadline ?? null),
+      priority: form.priority,
+    }
+
+    if (isEditing) {
+      payload.activityId = String(editingActivityId)
+    }
+
+    fetcher.submit(payload, { method: 'POST', action: buildApiAction(dealId) })
 
     dispatch({ type: 'RESET' })
-  }, [fetcher, form, dealId, isValid])
+  }, [fetcher, form, dealId, isValid, isEditing, editingActivityId])
 
-  return { form, dispatch, isSubmitting, isValid, submit }
+  return { form, dispatch, isSubmitting, isValid, isEditing, submit }
 }
 
 function useActivityAction(dealId: number) {
@@ -248,13 +295,18 @@ function useActivityAction(dealId: number) {
   )
 
   const remove = useCallback(
-    (activityId: number) => {
+    (activityId: number, activityName: string) => {
       deleteFetcher.submit(
         { intent: 'delete', activityId: String(activityId) },
         { method: 'POST', action: buildApiAction(dealId) },
       )
+      toast({
+        title: 'Activity deleted',
+        description: `"${activityName}" has been removed`,
+        variant: 'success',
+      })
     },
-    [deleteFetcher, dealId],
+    [deleteFetcher, dealId, toast],
   )
 
   return {
@@ -281,14 +333,19 @@ function PriorityBadge({ priority }: { priority: ActivityPriority }) {
 }
 
 function DeadlineLabel({ deadline }: { deadline: string }) {
+  const urgency = getDeadlineUrgency(deadline)
+  const hasPill = urgency === 'overdue' || urgency === 'today'
+  const Icon = urgency === 'overdue' ? AlertCircle : Clock
+
   return (
     <span
       className={cn(
         'flex items-center gap-0.5 text-[10px]',
-        isOverdue(deadline) ? 'text-red-500' : 'text-gray-500',
+        URGENCY_LABEL_STYLE[urgency],
+        hasPill && 'rounded-full px-1.5 py-0.5 border',
       )}
     >
-      <Clock className='h-2.5 w-2.5' />
+      <Icon className='h-2.5 w-2.5' />
       {formatDeadline(deadline)}
     </span>
   )
@@ -351,15 +408,23 @@ function SectionHeader({
 function ActivityItem({
   activity,
   dealId,
+  onEdit,
+  isBeingEdited,
 }: {
   activity: DealActivity
   dealId: number
+  onEdit: (activity: DealActivity) => void
+  isBeingEdited: boolean
 }) {
   const { toggle, remove, isToggling, isDeleting, togglingData } =
     useActivityAction(dealId)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const isDone = !!activity.is_completed
   const optimisticDone = togglingData?.get('intent') === 'toggle' ? !isDone : isDone
+  const urgency = !optimisticDone && activity.deadline
+    ? getDeadlineUrgency(activity.deadline)
+    : 'normal'
 
   return (
     <div
@@ -367,6 +432,8 @@ function ActivityItem({
         'group flex items-start gap-2 rounded-md px-2 py-1.5 transition-all hover:bg-gray-50',
         optimisticDone && 'opacity-60',
         isDeleting && 'opacity-0 scale-95 pointer-events-none',
+        isBeingEdited && 'bg-blue-50 ring-1 ring-blue-200',
+        URGENCY_BORDER_STYLE[urgency],
       )}
     >
       <Checkbox
@@ -380,7 +447,7 @@ function ActivityItem({
         <span
           className={cn(
             'text-sm leading-tight block',
-            optimisticDone && 'text-gray-600',
+            optimisticDone && 'text-gray-400 line-through',
           )}
         >
           {activity.name}
@@ -397,14 +464,46 @@ function ActivityItem({
         </div>
       </div>
 
-      <Button
-        variant='ghost'
-        size='icon'
-        className='h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-red-500'
-        onClick={() => remove(activity.id)}
-      >
-        <Trash2 className='h-3 w-3' />
-      </Button>
+      <div className='flex items-center gap-0.5 shrink-0'>
+        {!optimisticDone && (
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-6 w-6 shrink-0 text-gray-600 hover:text-blue-500'
+            onClick={() => onEdit(activity)}
+          >
+            <Pencil className='h-3 w-3' />
+          </Button>
+        )}
+
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-6 w-6 shrink-0 text-gray-600 hover:text-red-500'
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            <Trash2 className='h-3 w-3' />
+          </Button>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Activity</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete &quot;{activity.name}&quot;?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className={buttonVariants({ variant: 'destructive' })}
+                onClick={() => remove(activity.id, activity.name)}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   )
 }
@@ -449,19 +548,68 @@ function DeadlineControls({
   )
 }
 
-function ActivityForm({ dealId }: { dealId: number }) {
-  const { form, dispatch, isSubmitting, isValid, submit } = useActivityForm(dealId)
+function ActivityForm({
+  dealId,
+  editingActivity,
+  onCancelEdit,
+}: {
+  dealId: number
+  editingActivity: DealActivity | null
+  onCancelEdit: () => void
+}) {
+  const { form, dispatch, isSubmitting, isValid, isEditing, submit } = useActivityForm(
+    dealId,
+    editingActivity?.id ?? null,
+  )
+  const inputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    if (editingActivity) {
+      dispatch({ type: 'SET_EDIT', payload: editingActivity })
+      requestAnimationFrame(() => inputRef.current?.focus())
+    }
+  }, [editingActivity])
+
+  const handleCancel = () => {
+    dispatch({ type: 'RESET' })
+    onCancelEdit()
+  }
+
+  const handleSubmit = () => {
+    submit()
+    if (isEditing) {
+      toast({
+        title: 'Activity updated',
+        description: `Changes saved`,
+        variant: 'success',
+      })
+      onCancelEdit()
+    }
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      submit()
+      handleSubmit()
+    }
+    if (e.key === 'Escape' && isEditing) {
+      handleCancel()
     }
   }
 
   return (
     <div className='space-y-2 mb-4'>
+      {isEditing && (
+        <div className='flex items-center justify-between rounded-md bg-blue-50 px-2.5 py-1.5 text-xs text-blue-700'>
+          <span>Editing: {editingActivity?.name}</span>
+          <button type='button' onClick={handleCancel} className='hover:text-blue-900'>
+            <X className='h-3.5 w-3.5' />
+          </button>
+        </div>
+      )}
       <Input
+        ref={inputRef}
         placeholder='Activity name'
         value={form.name}
         onChange={e => dispatch({ type: 'SET_NAME', payload: e.target.value })}
@@ -526,13 +674,19 @@ function ActivityForm({ dealId }: { dealId: number }) {
       </div>
 
       <Button
-        onClick={submit}
+        onClick={handleSubmit}
         disabled={!isValid || isSubmitting}
         size='sm'
         className='w-full h-9 text-sm'
       >
-        <CirclePlus className='mr-1.5 h-3.5 w-3.5' />
-        {isSubmitting ? 'Adding...' : 'Add Activity'}
+        {isEditing ? (
+          isSubmitting ? 'Saving...' : 'Save Changes'
+        ) : (
+          <>
+            <CirclePlus className='mr-1.5 h-3.5 w-3.5' />
+            {isSubmitting ? 'Adding...' : 'Add Activity'}
+          </>
+        )}
       </Button>
     </div>
   )
@@ -541,9 +695,13 @@ function ActivityForm({ dealId }: { dealId: number }) {
 function ActivityList({
   dealId,
   activities,
+  onEdit,
+  editingActivityId,
 }: {
   dealId: number
   activities: DealActivity[]
+  onEdit: (activity: DealActivity) => void
+  editingActivityId: number | null
 }) {
   const [isHistoryOpen, setIsHistoryOpen] = useReducer((s: boolean) => !s, true)
 
@@ -567,7 +725,7 @@ function ActivityList({
                   transition={ITEM_TRANSITION}
                   style={{ overflow: 'hidden' }}
                 >
-                  <ActivityItem activity={activity} dealId={dealId} />
+                  <ActivityItem activity={activity} dealId={dealId} onEdit={onEdit} isBeingEdited={editingActivityId === activity.id} />
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -599,7 +757,7 @@ function ActivityList({
                     exit='exit'
                     transition={ITEM_TRANSITION}
                   >
-                    <ActivityItem activity={activity} dealId={dealId} />
+                    <ActivityItem activity={activity} dealId={dealId} onEdit={onEdit} isBeingEdited={editingActivityId === activity.id} />
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -621,12 +779,18 @@ interface DealActivityPanelProps {
 }
 
 export function DealActivityPanel({ dealId, activities = [] }: DealActivityPanelProps) {
+  const [editingActivity, setEditingActivity] = useState<DealActivity | null>(null)
+
   return (
     <div className='flex flex-col h-full'>
       <h3 className='text-base font-semibold mb-3'>Activity</h3>
-      <ActivityForm dealId={dealId} />
+      <ActivityForm
+        dealId={dealId}
+        editingActivity={editingActivity}
+        onCancelEdit={() => setEditingActivity(null)}
+      />
       <div className='flex-1 overflow-y-auto min-h-0'>
-        <ActivityList dealId={dealId} activities={activities} />
+        <ActivityList dealId={dealId} activities={activities} onEdit={setEditingActivity} editingActivityId={editingActivity?.id ?? null} />
       </div>
     </div>
   )

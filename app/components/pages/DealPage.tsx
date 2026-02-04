@@ -38,7 +38,7 @@ export default function DealsEdit({
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[1100px] overflow-auto flex flex-col justify-baseline min-h-[600px] max-h-[95vh] p-5'>
+      <DialogContent className='sm:max-w-[1100px] overflow-auto md:overflow-hidden flex flex-col justify-baseline h-auto min-h-[600px] max-h-[95vh] md:h-[85vh] p-5'>
         <DialogHeader>
           <DialogTitle>Edit Deal</DialogTitle>
         </DialogHeader>
@@ -51,8 +51,8 @@ export default function DealsEdit({
             />
           </div>
         )}
-        <div className='grid grid-cols-[1.7fr_2fr] flex-1 min-h-0'>
-          <div className='overflow-auto min-h-0 pl-2 pr-4'>
+        <div className='grid grid-cols-1 md:grid-cols-[1.75fr_2fr] flex-1 min-h-0 overflow-auto md:overflow-hidden'>
+          <div className='pl-2 pr-2 md:pr-4 md:overflow-auto md:min-h-0'>
             <Tabs
               value={location.pathname.split('/').pop()}
               onValueChange={value => navigate(`${value}${location.search}`)}
@@ -67,7 +67,7 @@ export default function DealsEdit({
               <Outlet />
             </Tabs>
           </div>
-          <div className='border-l pl-4 pr-2 overflow-auto min-h-0'>
+          <div className='border-t md:border-t-0 md:border-l pt-4 md:pt-0 pl-2 md:pl-4 pr-2 md:overflow-auto md:min-h-0'>
             <DealActivityPanel dealId={dealId} activities={activities} />
           </div>
         </div>

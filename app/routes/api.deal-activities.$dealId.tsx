@@ -88,6 +88,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return handleToggle(formData, dealId, user.company_id)
     }
 
+    if (intent === 'update') {
+      return handleUpdate(formData, dealId, user.company_id)
+    }
+
     if (intent === 'delete') {
       return handleDelete(formData, dealId, user.company_id)
     }
@@ -126,6 +130,54 @@ async function handleCreate(formData: FormData, dealId: number, companyId: numbe
     `INSERT INTO deal_activities (deal_id, company_id, name, deadline, priority)
      VALUES (?, ?, ?, ?, ?)`,
     [dealId, companyId, name.trim(), deadlineValue, priority],
+  )
+
+  return success()
+}
+
+async function handleUpdate(formData: FormData, dealId: number, companyId: number) {
+  const activityId = formData.get('activityId')
+
+  if (!activityId || isNaN(Number(activityId))) {
+    return badRequest('Valid activity ID is required')
+  }
+
+  const name = formData.get('name')
+  const deadline = formData.get('deadline')
+  const priority = String(formData.get('priority') || ActivityPriority.Medium)
+
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return badRequest('Activity name is required')
+  }
+
+  if (name.trim().length > 255) {
+    return badRequest('Activity name must be 255 characters or less')
+  }
+
+  if (!isValidPriority(priority)) {
+    return badRequest(`Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}`)
+  }
+
+  const rows = await selectMany<{ id: number }>(
+    db,
+    'SELECT id FROM deal_activities WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
+    [Number(activityId), dealId, companyId],
+  )
+
+  if (!rows.length) {
+    return notFound('Activity not found')
+  }
+
+  const rawDeadline = deadline && String(deadline).trim() ? String(deadline).trim() : null
+  const deadlineValue: Nullable<string> = rawDeadline ? toMySQLDatetime(rawDeadline) : null
+
+  if (rawDeadline && !deadlineValue) {
+    return badRequest('Invalid deadline date format')
+  }
+
+  await db.execute(
+    `UPDATE deal_activities SET name = ?, deadline = ?, priority = ? WHERE id = ? AND deal_id = ? AND company_id = ?`,
+    [name.trim(), deadlineValue, priority, Number(activityId), dealId, companyId],
   )
 
   return success()
