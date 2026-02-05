@@ -21,7 +21,6 @@ import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
-import type { Company } from '~/types/company'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -74,25 +73,45 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       'SELECT id, name FROM groups_list WHERE deleted_at IS NULL AND is_displayed = 1 AND (company_id = ? OR id = 1)',
       [user.company_id],
     )
-    
+
     // Default to the first group if no view param or invalid
     const activeGroupId = viewParam ? parseInt(viewParam, 10) : groups[0]?.id
-    
+
+    if (!activeGroupId && groups.length > 0) {
+      // Handle case where activeGroupId might be NaN or 0 if that's not intended
+    }
+
+    const isWonParam = url.searchParams.get('is_won')
+    const isWon =
+      isWonParam === 'null' || isWonParam === null
+        ? null
+        : isWonParam === '1'
+          ? 1
+          : isWonParam === '0'
+            ? 0
+            : null
+
     // Fetch lists for the active group
     const lists = await selectMany<{ id: number; name: string }>(
       db,
       'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
-      [activeGroupId]
+      [activeGroupId],
     )
 
-    const deals = await selectMany<FullDeal>(
-      db,
-      `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position,
-       DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at
+    let query = `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position,
+       DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at, is_won
        FROM deals
-       WHERE deleted_at IS NULL AND user_id = ?`,
-      [user.id],
-    )
+       WHERE deleted_at IS NULL AND user_id = ?`
+    const queryParams: number[] = [user.id]
+
+    if (isWon === null) {
+      query += ' AND is_won IS NULL'
+    } else {
+      query += ' AND is_won = ?'
+      queryParams.push(isWon)
+    }
+
+    const deals = await selectMany<FullDeal>(db, query, queryParams)
     const imagesCounts = await selectMany<{ deal_id: number; count: number }>(
       db,
       'SELECT deal_id, COUNT(*) as count FROM deals_images GROUP BY deal_id',
@@ -106,23 +125,51 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const emailsMap: Record<number, boolean> = {}
     for (const row of emailCounts) emailsMap[row.deal_id] = Number(row.count) > 0
 
-    const customers = await selectMany<{ id: number; name: string }>(
+    const customers = await selectMany<{
+      id: number
+      name: string
+      company_name?: string
+    }>(
       db,
-      'SELECT id, name FROM customers WHERE company_id = ? AND deleted_at IS NULL',
+      'SELECT id, name, company_name FROM customers WHERE company_id = ? AND deleted_at IS NULL',
       [user.company_id],
     )
-    
-    let companies: Company[] = []
 
-    return { deals, customers, lists, imagesMap, emailsMap, companies, groups, activeGroupId }
+    return {
+      deals,
+      customers,
+      lists,
+      imagesMap,
+      emailsMap,
+      groups,
+      activeGroupId,
+      isWon,
+    }
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
 }
 
 export default function EmployeeDeals() {
-  const { deals, customers, lists, imagesMap, emailsMap, companies, groups, activeGroupId } =
-    useLoaderData<typeof loader>()
+  const {
+    deals,
+    customers,
+    lists,
+    imagesMap,
+    emailsMap,
+    groups,
+    activeGroupId,
+    isWon,
+  } = useLoaderData<{
+    deals: FullDeal[]
+    customers: { id: number; name: string }[]
+    lists: { id: number; name: string }[]
+    imagesMap: Record<number, boolean>
+    emailsMap: Record<number, boolean>
+    groups: { id: number; name: string }[]
+    activeGroupId: number | undefined
+    isWon: number | null
+  }>()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
@@ -133,29 +180,61 @@ export default function EmployeeDeals() {
     navigate({ pathname: location.pathname, search: params.toString() })
   }
 
-  const viewSelect = (
-    <Select value={String(activeGroupId)} onValueChange={handleGroupChange}>
-      <SelectTrigger className='w-[200px]'>
+  const handleStatusChange = (newStatus: string) => {
+    const params = new URLSearchParams(searchParams)
+    params.set('is_won', newStatus)
+    navigate({ pathname: location.pathname, search: params.toString() })
+  }
+
+  const groupSelect = (
+    <Select
+      value={activeGroupId ? String(activeGroupId) : ''}
+      onValueChange={handleGroupChange}
+    >
+      <SelectTrigger className='w-[150px]'>
         <SelectValue placeholder='Select group' />
       </SelectTrigger>
       <SelectContent>
         {groups.map(group => (
-            <SelectItem key={group.id} value={String(group.id)}>{group.name}</SelectItem>
+          <SelectItem key={group.id} value={String(group.id)}>
+            {group.name}
+          </SelectItem>
         ))}
+      </SelectContent>
+    </Select>
+  )
+
+  const statusSelect = (
+    <Select
+      value={isWon === null ? 'null' : String(isWon)}
+      onValueChange={handleStatusChange}
+    >
+      <SelectTrigger className='w-[150px]'>
+        <SelectValue placeholder='Select status' />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value='null'>Active Deals</SelectItem>
+        <SelectItem value='1'>Won</SelectItem>
+        <SelectItem value='0'>Lost</SelectItem>
       </SelectContent>
     </Select>
   )
 
   return (
     <>
-        <DealsView
-          deals={deals}
-          customers={customers}
-          lists={lists}
-          imagesMap={imagesMap}
-          emailsMap={emailsMap}
-          viewSelect={viewSelect}
-        />
+      <DealsView
+        deals={deals}
+        customers={customers}
+        lists={lists}
+        imagesMap={imagesMap}
+        emailsMap={emailsMap}
+        groupListSelect={
+          <div className='flex gap-2 '>
+            {groupSelect}
+            {statusSelect}
+          </div>
+        }
+      />
 
       <Outlet />
     </>

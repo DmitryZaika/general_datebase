@@ -12,8 +12,9 @@ import { EmailTemplateForm } from '~/components/molecules/EmailTemplateForm'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import { validateTemplateBody } from '~/utils/emailTemplateVariables'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
 interface EmailTemplate {
@@ -26,7 +27,19 @@ interface EmailTemplate {
 const templateSchema = z.object({
   template_name: z.string().min(1, 'Template name is required'),
   template_subject: z.string().min(1, 'Template subject is required'),
-  template_body: z.string().min(1, 'Template body is required'),
+  template_body: z
+    .string()
+    .min(1, 'Template body is required')
+    .refine(
+      (val: string) => {
+        const text = val.replace(/<[^>]*>/g, '')
+        const validation = validateTemplateBody(text)
+        return validation.isValid
+      },
+      {
+        message: 'Invalid template body format. Check for unclosed {{ or }}.',
+      },
+    ),
 })
 
 type FormData = z.infer<typeof templateSchema>
@@ -34,7 +47,7 @@ type FormData = z.infer<typeof templateSchema>
 const resolver = zodResolver(templateSchema)
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  let user
+  let user: User
   try {
     user = await getAdminUser(request)
   } catch (error) {
@@ -42,7 +55,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const templateId = parseInt(params.templateId ?? '', 10)
-  if (isNaN(templateId)) {
+  if (Number.isNaN(templateId)) {
     return redirect('..')
   }
 
@@ -62,7 +75,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  let user
+  let user: User
   try {
     user = await getAdminUser(request)
   } catch (error) {
@@ -76,7 +89,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   const templateId = parseInt(params.templateId ?? '', 10)
-  if (isNaN(templateId)) {
+  if (Number.isNaN(templateId)) {
     return redirect('..')
   }
 
@@ -89,7 +102,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     `UPDATE email_templates
      SET template_name = ?, template_subject = ?, template_body = ?
      WHERE id = ? AND company_id = ?`,
-    [data.template_name, data.template_subject, data.template_body, templateId, user.company_id],
+    [
+      data.template_name,
+      data.template_subject,
+      data.template_body,
+      templateId,
+      user.company_id,
+    ],
   )
 
   const session = await getSession(request.headers.get('Cookie'))
@@ -112,5 +131,5 @@ export default function EditEmailTemplate() {
     },
   })
 
-  return <EmailTemplateForm title='Edit Email Template' form={form} />
+  return <EmailTemplateForm title='Edit Email Template' form={form} isEditMode />
 }

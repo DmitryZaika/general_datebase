@@ -1,14 +1,25 @@
 import { format } from 'date-fns'
-import { FileText, ImageIcon, PaperclipIcon, Pencil } from 'lucide-react'
+import DOMPurify from 'isomorphic-dompurify'
+import {
+  FileText,
+  ImageIcon,
+  MoreVertical,
+  PaperclipIcon,
+  Pencil,
+  SendIcon,
+  Sparkles,
+} from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef, useState } from 'react'
 import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
 } from 'react-router'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
+import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Badge } from '~/components/ui/badge'
@@ -34,7 +45,8 @@ import {
 } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
 import { useToast } from '~/hooks/use-toast'
-import { fileSize } from '~/utils/constants'
+import { dateClass, fileSize } from '~/utils/constants'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
@@ -86,19 +98,22 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const dealId = parseInt(params.dealId, 10)
   const threadId = params.threadId
   if (!threadId) {
+    posthogClient.captureException(new Error('Thread ID is missing'))
     throw new Error('Thread ID is missing')
   }
 
   const [customerRows] = await db.execute<RowDataPacket[]>(
-    `SELECT c.name, c.email
+    `SELECT c.name, c.email, d.customer_id
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
       WHERE d.id = ?`,
     [dealId],
   )
 
-  const normalizeEmail = (email: string | null | undefined) => email?.trim().toLowerCase() || ''
+  const normalizeEmail = (email: string | null | undefined) =>
+    email?.trim().toLowerCase() || ''
   const customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
+  const customerId = customerRows?.[0]?.customer_id
 
   if (customerEmail) {
     await db.execute(
@@ -108,14 +123,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         WHERE deleted_at IS NULL
           AND thread_id = ?
           AND (deal_id = ? OR deal_id IS NULL)
-          AND sender_email = ?
+          AND (sender_email = ? OR sender_email IN (SELECT email FROM customers WHERE id = ? OR parent_id = ?))
           AND employee_read_at IS NULL
       `,
-      [threadId, dealId, customerEmail],
+      [threadId, dealId, customerEmail, customerId, customerId],
     )
   }
 
-  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, u.email_signature as signature, MAX(er.read_at) AS read_at
+  let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, e.sender_user_id, u.email_signature as signature, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
        LEFT JOIN users u ON u.id = e.sender_user_id
@@ -129,9 +144,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
      WHERE email_id IN (
        SELECT id
        FROM emails
-       WHERE deleted_at IS NULL AND thread_id = ?
+       WHERE deleted_at IS NULL AND thread_id = ? AND (deal_id = ? OR deal_id IS NULL)
      )`,
-    [threadId],
+    [threadId, dealId],
   )
   const attachments = await Promise.all(
     attachmentsRaw.map(async attachment => {
@@ -142,13 +157,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   )
 
   emailQuery +=
-    ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, u.email_signature ORDER BY e.sent_at ASC'
+    ' GROUP BY e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, e.sender_user_id, u.email_signature ORDER BY e.sent_at ASC'
 
   const [emailRows] = await db.execute<RowDataPacket[]>(emailQuery, emailParams)
 
   const messages: Message[] = (emailRows || []).map(row => {
-    const senderEmail = normalizeEmail(row.sender_email)
-    const isFromCustomer = senderEmail === customerEmail
+    // If it's not from an employee (no signature and no sender_user_id), it's from the customer
+    const isFromCustomer = !row.signature && !row.sender_user_id
     return {
       id: row.id,
       subject: row.subject,
@@ -191,29 +206,25 @@ async function processStreamingResponse(
 
     for (const line of lines) {
       if (line.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(line.slice(6))
-          if (data.error) {
-            throw new Error(data.error)
-          }
-          if (data.content) {
-            fullText += data.content
+        const data = JSON.parse(line.slice(6))
+        if (data.error) {
+          throw new Error(data.error)
+        }
+        if (data.content) {
+          fullText += data.content
 
-            if (fullText.includes('---BODY---')) {
-              isInBody = true
-              const parts = fullText.split('---BODY---')
-              if (onStreamBody) {
-                onStreamBody((parts[1] || '').trim())
-              }
-            } else if (isInBody) {
-              const parts = fullText.split('---BODY---')
-              if (onStreamBody) {
-                onStreamBody((parts[1] || '').trim())
-              }
+          if (fullText.includes('---BODY---')) {
+            isInBody = true
+            const parts = fullText.split('---BODY---')
+            if (onStreamBody) {
+              onStreamBody((parts[1] || '').trim())
+            }
+          } else if (isInBody) {
+            const parts = fullText.split('---BODY---')
+            if (onStreamBody) {
+              onStreamBody((parts[1] || '').trim())
             }
           }
-        } catch (error) {
-          console.error('Parse error:', error)
         }
       }
     }
@@ -290,7 +301,7 @@ export default function EmailChatDialog() {
     { id: number; url: string; name: string; type: string; available: null }[]
   >([])
   const [currentImageId, setCurrentImageId] = useState<number | null>(null)
-
+  const location = useLocation()
   const removeAttachment = (file: File) => {
     setAttachments(prev => prev.filter(f => f !== file))
   }
@@ -349,7 +360,7 @@ export default function EmailChatDialog() {
   }, [messageText])
 
   const handleClose = () => {
-    navigate(`/employee/deals/edit/${dealId}/history`)
+    navigate(`/employee/deals/edit/${dealId}/history${location.search}`)
   }
 
   const getInitials = (name: string) => {
@@ -391,7 +402,6 @@ export default function EmailChatDialog() {
     }
   }
 
-
   const handleSend = async () => {
     const body = messageText.trim()
     if (!body && attachments.length === 0) return
@@ -421,18 +431,18 @@ export default function EmailChatDialog() {
 
       if (!response.ok) {
         let errorText = ''
-        try {
-          const payload: unknown = await response.json()
-          if (payload && typeof payload === 'object' && 'error' in payload) {
-            const value = payload.error
-            if (typeof value === 'string') {
-              errorText = value
-            }
+        const payload: unknown = await response.json()
+        if (payload && typeof payload === 'object' && 'error' in payload) {
+          const value = payload.error
+          if (typeof value === 'string') {
+            errorText = value
           }
-        } catch {
-          errorText = await response.text().catch(() => '')
         }
-        throw new Error(errorText || 'Email failed to send')
+        toast({
+          title: 'Failure',
+          description: errorText || 'Email failed to send',
+          variant: 'destructive',
+        })
       }
 
       const localAttachments: Attachment[] = attachments.map((file, i) => ({
@@ -480,32 +490,30 @@ export default function EmailChatDialog() {
 
   return (
     <Dialog open={true} onOpenChange={handleClose}>
-      <DialogContent className='sm:max-w-[60%] h-[90%] p-0 flex flex-col'>
-        <DialogHeader className='p-4 border-b'>
+      <DialogContent className='max-w-[100%] sm:max-w-[90%] sm:max-w-[900px] h-[95%] p-0 flex flex-col'>
+        <DialogHeader className='p-2 border-b'>
           <div className='flex items-center gap-3'>
-            <div className='w-12 h-12 rounded-full bg-pink-500 flex items-center justify-center text-white font-bold'>
+            <div className='w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white font-bold'>
               {getInitials(customerName)}
             </div>
             <div>
               <DialogTitle className='text-lg font-semibold'>
                 {customerName}
               </DialogTitle>
-              <p className='text-sm text-gray-500'>Email: {customerEmail}</p>
-              <p className='text-sm text-gray-500'>Subject: {subject}</p>
             </div>
           </div>
         </DialogHeader>
 
-        <div className='flex-1 overflow-y-auto p-4 space-y-4'>
+        <div className='flex-1 overflow-y-auto'>
           {chatMessages.map((message, index) => (
             <div key={message.id}>
               {showDate(message, index) && (
-                <div className='text-center text-xs text-gray-500 my-4'>
+                <div className={dateClass}>
                   {format(new Date(message.sent_at), 'MMM d, yyyy')}
                 </div>
               )}
               <div
-                className={`flex items-center gap-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
+                className={`flex items-center gap-2 py-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
               >
                 {!message.isFromCustomer && <MessageDate message={message} />}
                 <div
@@ -521,10 +529,13 @@ export default function EmailChatDialog() {
                 >
                   <div
                     className='whitespace-pre-wrap'
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
                     dangerouslySetInnerHTML={{
-                      __html: getDisplayBody(
-                        message.body,
-                        message.isFromCustomer ? null : message.signature,
+                      __html: DOMPurify.sanitize(
+                        getDisplayBody(
+                          message.body,
+                          message.isFromCustomer ? null : message.signature,
+                        ),
                       ),
                     }}
                   />
@@ -536,7 +547,7 @@ export default function EmailChatDialog() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
-                              <Pencil className='w-2 h-2 opacity-70' />
+                              <Pencil size={16} className='w-2 h-2 opacity-70' />
                               Signature
                             </span>
                           </TooltipTrigger>
@@ -577,7 +588,9 @@ export default function EmailChatDialog() {
                                 className='block'
                                 download
                               >
-                                <div className={`${fileSize} bg-white rounded-md border border-gray-300 flex flex-col items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors p-2 shadow-sm`}>
+                                <div
+                                  className={`${fileSize} bg-white rounded-md border border-gray-300 flex flex-col items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors p-2 shadow-sm`}
+                                >
                                   <FileText className='h-10 w-10 mb-2 text-gray-400' />
                                   <span className='text-[10px] text-center break-all line-clamp-2 leading-tight'>
                                     {label}
@@ -613,7 +626,9 @@ export default function EmailChatDialog() {
                                       .map(img => ({
                                         id: img.id,
                                         url: img.signed_url || img.url,
-                                        name: img.filename || `${img.content_type}/${img.content_subtype}`,
+                                        name:
+                                          img.filename ||
+                                          `${img.content_type}/${img.content_subtype}`,
                                         type: 'email',
                                         available: null,
                                       })) || []
@@ -646,7 +661,7 @@ export default function EmailChatDialog() {
           <div ref={bottomRef} />
         </div>
 
-        <div className='p-4 border-t'>
+        <div className='p-2 border-t'>
           {attachments.length > 0 && (
             <div className='mb-2 flex flex-wrap gap-2'>
               {attachments.map(file => {
@@ -679,97 +694,162 @@ export default function EmailChatDialog() {
               })}
             </div>
           )}
-          <div className='flex items-end gap-2'>
-            {showSelect ? (
-              <div className='flex gap-2 items-end'>
-                <Select
-                  open={selectActive}
-                  onOpenChange={setSelectActive}
-                  value={selectedTemplate}
-                  onValueChange={value => handleTemplateSelect(value)}
-                >
-                  <SelectTrigger className='w-37.5'>
-                    <SelectValue placeholder='Select template' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='follow-up'>Follow-up</SelectItem>
-                    <SelectItem value='reply'>Reply</SelectItem>
-                    <SelectItem value='thank-you'>Thank You</SelectItem>
-                    <SelectItem value='feedback-request'>Feedback Request</SelectItem>
-                    <SelectItem value='referral'>Referral</SelectItem>
-                  </SelectContent>
-                </Select>
-                <LoadingButton
-                  loading={isGenerating}
+          <div className='flex flex-col md:flex-row flex-1 gap-2'>
+            {/* Desktop view for AI and Attachments */}
+            <div className='hidden md:flex items-end gap-2'>
+              {showSelect ? (
+                <div className='flex gap-2 items-end'>
+                  <Select
+                    open={selectActive}
+                    onOpenChange={setSelectActive}
+                    value={selectedTemplate}
+                    onValueChange={value => handleTemplateSelect(value)}
+                  >
+                    <SelectTrigger className='w-37.5'>
+                      <SelectValue placeholder='Select template' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='follow-up'>Follow-up</SelectItem>
+                      <SelectItem value='reply'>Reply</SelectItem>
+                      <SelectItem value='thank-you'>Thank You</SelectItem>
+                      <SelectItem value='feedback-request'>Feedback Request</SelectItem>
+                      <SelectItem value='referral'>Referral</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <LoadingButton
+                    loading={isGenerating}
+                    type='button'
+                    onClick={() => handleGenerate()}
+                  >
+                    Generate
+                  </LoadingButton>
+                </div>
+              ) : (
+                <Button
                   type='button'
-                  onClick={() => handleGenerate()}
+                  onClick={() => {
+                    setShowSelect(true)
+                    setSelectActive(true)
+                  }}
                 >
-                  Generate
+                  Generate with AI
+                </Button>
+              )}
+              <AiImproveButton
+                getText={() => messageText}
+                setText={value => setMessageText(value)}
+                buttonSize='icon'
+                iconClassName='text-lg'
+              />
+            </div>
+
+            <div className='flex items-end flex-1 gap-1 max-h-30 relative'>
+              {/* Mobile view Dropdown */}
+              <div className='md:hidden flex items-center self-center'>
+                <CustomDropdownMenu
+                  align='start'
+                  trigger={
+                    <Button variant='ghost' size='icon' className='h-9 w-9'>
+                      <MoreVertical className='h-5 w-5' />
+                    </Button>
+                  }
+                  sections={[
+                    {
+                      title: 'Actions',
+                      options: [
+                        {
+                          label: 'Attach File',
+                          icon: <PaperclipIcon className='w-4 h-4' />,
+                          onClick: () => fileInputRef.current?.click(),
+                        },
+                        {
+                          label: 'Generate with AI',
+                          icon: <Sparkles className='w-4 h-4' />,
+                          onClick: () => {
+                            setShowSelect(true)
+                            setSelectActive(true)
+                          },
+                        },
+                        {
+                          label: 'Improve message',
+                          icon: <Pencil className='w-4 h-4' />,
+                          onClick: () => {
+                            const improveBtn = document.getElementById(
+                              'mobile-improve-trigger',
+                            )
+                            if (improveBtn) improveBtn.click()
+                          },
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              </div>
+
+              <div className='hidden md:block'>
+                <Button
+                  type='button'
+                  size='icon'
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <PaperclipIcon className='h-5 w-5' />
+                </Button>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type='file'
+                className='hidden'
+                multiple
+                onChange={e => {
+                  const files = e.currentTarget.files
+                  if (files && files.length > 0) {
+                    setAttachments(prev => [...prev, ...Array.from(files)])
+                  }
+                  e.currentTarget.value = ''
+                }}
+              />
+
+              <textarea
+                ref={textareaRef}
+                value={messageText}
+                onChange={e => {
+                  setMessageText(e.target.value)
+                  if (textareaRef.current) {
+                    textareaRef.current.style.height = 'auto'
+                    textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+                  }
+                }}
+                placeholder='Send a message'
+                rows={1}
+                className='flex-1 min-h-9.5 w-full max-h-30 rounded-sm border border-zinc-300 bg-transparent px-1 sm:px-4 py-2 text-sm outline-none resize-none overflow-y-auto border-none'
+              />
+
+              {/* Mobile Improve AI Button (Hidden, triggered by menu) */}
+              <div className='hidden'>
+                <AiImproveButton
+                  id='mobile-improve-trigger'
+                  getText={() => messageText}
+                  setText={value => setMessageText(value)}
+                  buttonSize='icon'
+                  iconClassName='text-lg'
+                />
+              </div>
+
+              <div className='flex gap-1'>
+                <LoadingButton
+                  loading={isSending}
+                  type='button'
+                  variant='default'
+                  size='icon'
+                  disabled={
+                    isSending || (messageText.trim() === '' && attachments.length === 0)
+                  }
+                  onClick={handleSend}
+                >
+                  <SendIcon className='h-2 w-2' />
                 </LoadingButton>
               </div>
-            ) : (
-              <Button
-                type='button'
-                onClick={() => {
-                  setShowSelect(true)
-                  setSelectActive(true)
-                }}
-              >
-                Generate with AI
-              </Button>
-            )}
-            <AiImproveButton
-              getText={() => messageText}
-              setText={value => setMessageText(value)}
-              buttonSize='icon'
-              iconClassName='text-lg'
-            />
-            <Button
-              type='button'
-              size='icon'
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <PaperclipIcon className='h-5 w-5' />
-            </Button>
-            <input
-              ref={fileInputRef}
-              type='file'
-              className='hidden'
-              multiple
-              onChange={e => {
-                const files = e.currentTarget.files
-                if (files && files.length > 0) {
-                  setAttachments(prev => [...prev, ...Array.from(files)])
-                }
-                e.currentTarget.value = ''
-              }}
-            />
-            <textarea
-              ref={textareaRef}
-              value={messageText}
-              onChange={e => {
-                setMessageText(e.target.value)
-                if (textareaRef.current) {
-                  textareaRef.current.style.height = 'auto'
-                  textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-                }
-              }}
-              placeholder='Send a message'
-              rows={1}
-              className='flex-1 min-h-9.5 max-h-40 rounded-sm border border-zinc-300 bg-transparent px-4 py-2 text-sm outline-none resize-none overflow-y-auto'
-            />
-            <div className='flex items-center gap-1 mb-1'>
-              <LoadingButton
-                loading={isSending}
-                type='button'
-                variant='ghost'
-                size='icon'
-                className='text-zinc-500'
-                disabled={isSending || (messageText.trim() === '' && attachments.length === 0)}
-                onClick={handleSend}
-              >
-                <span className='text-xl'>➤</span>
-              </LoadingButton>
             </div>
           </div>
         </div>

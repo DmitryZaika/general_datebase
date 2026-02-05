@@ -17,24 +17,28 @@ import {
   Users,
 } from 'lucide-react'
 import { useState } from 'react'
-import { useLoaderData, useLocation } from 'react-router'
+import { Link, useLoaderData, useLocation } from 'react-router'
 import { Collapsible } from '~/components/Collapsible'
 import { CorbelIcon } from '~/components/icons/CorbelIcon'
 import { SinkIcon } from '~/components/icons/SinkIcon'
+import { LinkButton } from '~/components/molecules/LinkButton'
+import { Button } from '~/components/ui/button'
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from '~/components/ui/sidebar'
 import type { ISupplier } from '~/schemas/suppliers'
+import { getMirroredUrl } from '~/utils/headerNav'
 import { getBase } from '~/utils/urlHelpers'
 import { FaucetsFilters } from './FaucetsFilters'
 import { SinksFilters } from './SinksFilters'
@@ -222,6 +226,7 @@ const getItems = (
       },
     )
   }
+
   return finalList
 }
 
@@ -235,8 +240,10 @@ export function EmployeeSidebar({
   const base = getBase(location.pathname)
   const isCustomerRoute = location.pathname.startsWith('/customer/')
   const isContractorsRoute = location.pathname.startsWith('/contractors/')
-  const data = useLoaderData<{ user: { company_id: number } | null }>()
-  
+  const data = useLoaderData<{
+    user: { company_id: number; is_admin: boolean; is_superuser: boolean } | null
+  }>()
+
   let companyIdFromUrl: string | undefined
   if (isCustomerRoute) {
     companyIdFromUrl = location.pathname.split('/').filter(Boolean)[1]
@@ -245,13 +252,35 @@ export function EmployeeSidebar({
   }
 
   const companyId = companyIdFromUrl || data?.user?.company_id
-  
-  let itemsBase = base as 'employee' | 'admin' | 'customer' | 'contractors'
-  if (isCustomerRoute) itemsBase = 'customer'
-  if (isContractorsRoute) itemsBase = 'contractors'
+
+  const { isMobile, setOpenMobile } = useSidebar()
+  const isAdminPage = location.pathname.startsWith('/admin')
+  const isCustomerPage = location.pathname.startsWith('/customer')
+  const targetPath = getMirroredUrl(isAdminPage, location)
+
+  const buildCustomerUrl = () => {
+    if (!isCustomerPage && location.pathname.startsWith('/admin/stones')) {
+      return `/customer/${companyId}/stones${location.search}`
+    }
+    return isCustomerPage
+      ? `/employee/stones${location.search}`
+      : `/customer/${companyId}/stones${location.search}`
+  }
+
+  const handleLinkClick = () => {
+    if (isMobile) setOpenMobile(false)
+  }
+
+  const itemsBase =
+    (base === 'employee' ||
+    base === 'admin' ||
+    base === 'customer' ||
+    base === 'contractors'
+      ? base
+      : null) || 'employee'
 
   const items = getItems(
-    itemsBase,
+    isCustomerRoute ? 'customer' : isContractorsRoute ? 'contractors' : itemsBase,
     suppliers,
     colors,
     sinkSuppliers,
@@ -304,9 +333,31 @@ export function EmployeeSidebar({
 
   return (
     <Sidebar>
+      {isMobile && data?.user && (
+        <SidebarHeader className='py-2 px-3'>
+          <div className='flex gap-2 justify-center'>
+            {data.user.is_admin || data.user.is_superuser ? (
+              <Link to={targetPath} className='w-full' onClick={handleLinkClick}>
+                <LinkButton className='select-none w-full'>
+                  {isAdminPage ? 'Employee' : 'Admin'}
+                </LinkButton>
+              </Link>
+            ) : null}
+            <Link to={buildCustomerUrl()} className='w-full' onClick={handleLinkClick}>
+              <LinkButton className='select-none w-full'>
+                {isCustomerPage ? 'Employee' : 'Customer'}
+              </LinkButton>
+            </Link>
+          </div>
+          {data.user.is_superuser && isAdminPage ? (
+            <Link to='/admin/users' onClick={handleLinkClick}>
+              <Button className='w-full'>Users</Button>
+            </Link>
+          ) : null}
+        </SidebarHeader>
+      )}
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Granite Depot</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {/* INVENTORY */}

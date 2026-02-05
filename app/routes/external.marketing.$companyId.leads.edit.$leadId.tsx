@@ -29,6 +29,7 @@ import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { cn } from '~/lib/utils'
 import { sourceEnum } from '~/schemas/customers'
 import { commitSession, getSession } from '~/sessions.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getMarketingUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -123,7 +124,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         paramCompanyId,
       ],
     )
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error, 'Failed to update lead', {
+      leadId,
+      paramCompanyId,
+    })
     return { error: 'Failed to update lead' }
   }
 

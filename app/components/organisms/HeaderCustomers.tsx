@@ -7,6 +7,7 @@ import {
   loginLogo,
 } from '~/constants/logos'
 import { LoadingButton } from '../molecules/LoadingButton'
+import { BurgerMenu } from './HeaderMobile'
 
 function getButtonLink({
   location,
@@ -48,13 +49,16 @@ export default function HeaderCustomers() {
   const isSurvey = location.pathname.includes('survey')
   return (
     <header className='flex justify-between items-center p-4'>
-      {!isLogin && !isSurvey && (
-        <Link to={buttonLink}>
-          <LoadingButton loading={loading}>
-            {isStonesView ? 'Customer Account' : 'Stones'}
-          </LoadingButton>
-        </Link>
-      )}
+      <div className='flex items-center gap-2'>
+        <div className='md:hidden'></div>
+        {!isLogin && !isSurvey && (
+          <Link to={buttonLink}>
+            <LoadingButton loading={loading}>
+              {isStonesView ? 'Customer Account' : 'Stones'}
+            </LoadingButton>
+          </Link>
+        )}
+      </div>
       <div className='flex-1 flex justify-center'>
         <a href={isLogin ? '/' : 'stones'}>
           <img
@@ -65,6 +69,9 @@ export default function HeaderCustomers() {
             }
           />
         </a>
+      </div>
+      <div className='md:hidden'>
+        <BurgerMenu />
       </div>
     </header>
   )

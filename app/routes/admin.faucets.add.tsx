@@ -26,8 +26,9 @@ import { commitSession, getSession } from '~/sessions.server'
 import { FAUCET_TYPES } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 import { useCustomForm } from '~/utils/useCustomForm'
 import { FormField } from '../components/ui/form'
@@ -48,7 +49,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (errors || !data) {
     return { errors }
   }
-  const user = await getAdminUser(request)
+  const user: User = await getAdminUser(request)
   try {
     await db.execute<mysql.ResultSetHeader>(
       `INSERT INTO faucet_type (name, type, url, company_id, is_display, is_deleted, supplier_id, retail_price, cost)
@@ -67,6 +68,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   } catch {
     const faucetId = parseInt(params.faucet ?? '0', 10)
     if (!faucetId) {
+      posthogClient.captureException(new Error('Invalid or missing faucet ID'))
       return new Response(JSON.stringify({ error: 'Invalid or missing faucet ID' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -83,7 +85,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request)
+    const user: User = await getAdminUser(request)
     const suppliers = await selectMany<{
       id: number
       supplier_name: string

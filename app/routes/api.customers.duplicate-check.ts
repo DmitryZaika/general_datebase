@@ -1,6 +1,7 @@
 import { data, type LoaderFunctionArgs } from 'react-router'
 import z from 'zod'
 import { db } from '~/db.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -18,11 +19,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let parsed: z.infer<typeof querySchema>
   try {
     parsed = querySchema.parse({ phone, email })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return data({ error: 'Invalid parameters' }, { status: 422 })
   }
 
   if (!parsed.phone && !parsed.email) {
+    posthogClient.captureException(new Error('No phone or email provided'))
     return data({ matches: [] })
   }
 

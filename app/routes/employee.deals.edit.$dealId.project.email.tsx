@@ -5,7 +5,15 @@
 // External Dependencies
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
-import { FileText, ImageIcon, PaperclipIcon } from 'lucide-react'
+import {
+  FileText,
+  ImageIcon,
+  MoreVertical,
+  PaperclipIcon,
+  SendIcon,
+  SettingsIcon,
+  Sparkles,
+} from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -21,6 +29,7 @@ import {
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
+import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import {
   type EmailTemplate,
   EmailTemplateSearch,
@@ -59,8 +68,16 @@ import {
 } from '~/components/ui/tooltip'
 // Server Utilities
 import { db } from '~/db.server'
+import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
-import { getEmployeeUser } from '~/utils/session.server'
+import { fetchTemplateVariableData } from '~/services/templateVariables.server'
+import {
+  getUnfilledCustomVariables,
+  hasAnyVariables,
+  replaceTemplateVariables,
+  type TemplateVariableData,
+} from '~/utils/emailTemplateVariables'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -150,7 +167,7 @@ type AIEmailFormData = z.infer<typeof aiEmailSchema>
 // ============================================================================
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  let user: EmployeeUser
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {
@@ -171,7 +188,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return redirect('/employee/deals')
   }
 
-  const senderInfo = await fetchSenderInfo(user)
+  const [senderInfo, templateVariableData] = await Promise.all([
+    fetchSenderInfo(user),
+    fetchTemplateVariableData({ user, dealId }),
+  ])
 
   return {
     email: rows[0].email || '',
@@ -179,6 +199,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     senderInfo,
     dealId,
     companyId: user.company_id || 0,
+    templateVariableData,
   }
 }
 
@@ -190,27 +211,19 @@ async function fetchSenderInfo(user: EmployeeUser): Promise<SenderInfo> {
   if (user.phone_number) senderInfo.senderPhoneNumber = user.phone_number
 
   if (user.company_id) {
-    try {
-      const [companyRows] = await db.execute<RowDataPacket[]>(
-        'SELECT name FROM company WHERE id = ?',
-        [user.company_id],
-      )
-      if (companyRows?.[0]?.name) senderInfo.senderCompany = companyRows[0].name
-    } catch (error) {
-      console.error('Error fetching company:', error)
-    }
+    const [companyRows] = await db.execute<RowDataPacket[]>(
+      'SELECT name FROM company WHERE id = ?',
+      [user.company_id],
+    )
+    if (companyRows?.[0]?.name) senderInfo.senderCompany = companyRows[0].name
   }
 
   if (user.position_id) {
-    try {
-      const [positionRows] = await db.execute<RowDataPacket[]>(
-        'SELECT name FROM positions WHERE id = ?',
-        [user.position_id],
-      )
-      if (positionRows?.[0]?.name) senderInfo.senderPosition = positionRows[0].name
-    } catch (error) {
-      console.error('Error fetching position:', error)
-    }
+    const [positionRows] = await db.execute<RowDataPacket[]>(
+      'SELECT name FROM positions WHERE id = ?',
+      [user.position_id],
+    )
+    if (positionRows?.[0]?.name) senderInfo.senderPosition = positionRows[0].name
   }
 
   return senderInfo
@@ -259,26 +272,22 @@ async function processStreamingResponse(
 
     for (const line of lines) {
       if (line.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(line.slice(6))
-          if (data.error) throw new Error(data.error)
-          if (data.content) {
-            fullText += data.content
+        const data = JSON.parse(line.slice(6))
+        if (data.error) throw new Error(data.error)
+        if (data.content) {
+          fullText += data.content
 
-            if (fullText.includes('---BODY---')) {
-              isInBody = true
-              const parts = fullText.split('---BODY---')
-              if (onStreamSubject) onStreamSubject(parts[0].trim())
-              if (onStreamBody) onStreamBody((parts[1] || '').trim())
-            } else if (isInBody) {
-              const parts = fullText.split('---BODY---')
-              if (onStreamBody) onStreamBody((parts[1] || '').trim())
-            } else {
-              if (onStreamSubject) onStreamSubject(fullText.trim())
-            }
+          if (fullText.includes('---BODY---')) {
+            isInBody = true
+            const parts = fullText.split('---BODY---')
+            if (onStreamSubject) onStreamSubject(parts[0].trim())
+            if (onStreamBody) onStreamBody((parts[1] || '').trim())
+          } else if (isInBody) {
+            const parts = fullText.split('---BODY---')
+            if (onStreamBody) onStreamBody((parts[1] || '').trim())
+          } else {
+            if (onStreamSubject) onStreamSubject(fullText.trim())
           }
-        } catch (parseError) {
-          console.error('Parse error:', parseError)
         }
       }
     }
@@ -325,14 +334,17 @@ function EmailFormFields({
   companyId,
   selectedTemplate,
   onTemplateChange,
+  templateVariableData,
 }: {
   form: ReturnType<typeof useForm<EmailFormData>>
   companyId: number
   selectedTemplate: EmailTemplate | undefined
   onTemplateChange: (template: EmailTemplate | undefined) => void
+  templateVariableData: TemplateVariableData
 }) {
-  const bodyValue = form.watch('text')
-  const hasPlaceholders = bodyValue?.includes('{{') && bodyValue?.includes('}}')
+  const bodyText = form.watch('text')
+  const customVariables = getUnfilledCustomVariables(bodyText)
+  const showCustomVariablesInfo = selectedTemplate && customVariables.length > 0
 
   return (
     <div className='flex-1 space-y-4'>
@@ -362,7 +374,11 @@ function EmailFormFields({
           onTemplateChange(template)
           if (template) {
             form.setValue('subject', template.template_subject)
-            form.setValue('text', template.template_body)
+            const filledBody = replaceTemplateVariables(
+              template.template_body,
+              templateVariableData,
+            )
+            form.setValue('text', filledBody)
           }
         }}
       />
@@ -373,13 +389,19 @@ function EmailFormFields({
           <QuillInput name='Body' field={field} className='mb-4' />
         )}
       />
-      {selectedTemplate && hasPlaceholders && (
-        <div className='p-3 bg-amber-50 border border-amber-200 rounded-md'>
-          <p className='text-sm text-amber-800'>
-            Replace the{' '}
-            <code className='bg-amber-100 px-1 rounded'>{'{{placeholders}}'}</code> with
-            actual values before sending (e.g., client name, date, etc.).
+      {showCustomVariablesInfo && (
+        <div className='p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md'>
+          <p>
+            <strong>Action required:</strong> Please replace the following placeholders
+            with actual values before sending:
           </p>
+          <ul className='mt-1 list-disc list-inside'>
+            {customVariables.map(variable => (
+              <li key={variable}>
+                <code className='bg-amber-100 px-1 rounded'>{`{{${variable}}}`}</code>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -388,12 +410,8 @@ function EmailFormFields({
 
 function AIAssistantMenu({
   aiForm,
-  onGenerate,
-  isGenerating,
 }: {
   aiForm: ReturnType<typeof useForm<AIEmailFormData>>
-  onGenerate: () => void
-  isGenerating: boolean
 }) {
   return (
     <div className='flex flex-col gap-4 p-4 border rounded-lg bg-gray-50'>
@@ -566,24 +584,15 @@ function sendEmail(
 export default function DealEmailDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { email, dealId, companyId } = useLoaderData<typeof loader>()
+  const { email, dealId, companyId, templateVariableData } =
+    useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [_isGenerating, setIsGenerating] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
- const isSubmitting = useNavigation().state !== 'idle'
-  const form = useForm<EmailFormData>({
-    resolver: emailResolver,
-    defaultValues: {
-      to: email,
-      subject: '',
-      text: '',
-      attachments: [],
-    },
-  })
 
-  const { mutate } = useMutation({
+  const { mutate, isPending } = useMutation({
     mutationFn: async (values: EmailFormData) => {
       return sendEmail(
         values.to,
@@ -610,6 +619,18 @@ export default function DealEmailDialog() {
     },
   })
 
+  const isSubmitting = useNavigation().state !== 'idle'
+
+  const form = useForm<EmailFormData>({
+    resolver: emailResolver,
+    defaultValues: {
+      to: email,
+      subject: '',
+      text: '',
+      attachments: [],
+    },
+  })
+
   const aiForm = useForm<AIEmailFormData>({
     resolver: zodResolver(aiEmailSchema),
     defaultValues: {
@@ -623,15 +644,25 @@ export default function DealEmailDialog() {
   })
 
   const fullSubmit = (values: EmailFormData) => {
-    if (
-      selectedTemplate &&
-      (values.text.includes('{{') || values.text.includes('}}'))
-    ) {
+    if (hasAnyVariables(values.text)) {
       form.setError('text', {
         message:
           'Please replace all {{placeholders}} with actual values before sending',
       })
       return
+    }
+
+    const lowerText = values.text.toLowerCase().trim()
+    const hasAttachmentKeywords =
+      lowerText.includes('attachment') ||
+      lowerText.includes('attached') ||
+      lowerText.includes('file') ||
+      lowerText.includes('files') ||
+      lowerText.includes('attachments')
+
+    if (hasAttachmentKeywords && values.attachments.length === 0) {
+      const confirmed = window.confirm("You didn't attach anything, is that fine?")
+      if (!confirmed) return
     }
     mutate(values)
   }
@@ -639,6 +670,8 @@ export default function DealEmailDialog() {
   const handleDialogClose = (open: boolean) => {
     if (!open) navigate(`../${location.search}`)
   }
+
+  const isMobile = useIsMobile()
 
   const handleGenerateWithAI = async () => {
     const isValid = await aiForm.trigger()
@@ -652,8 +685,8 @@ export default function DealEmailDialog() {
       await generateAIEmail(
         aiForm.getValues(),
         dealId,
-        subject => form.setValue('subject', subject),
-        body => form.setValue('text', body),
+        subject => form.setValue('subject', subject ?? ''),
+        body => form.setValue('text', body ?? ''),
       )
     } catch (error) {
       alert(
@@ -714,6 +747,7 @@ export default function DealEmailDialog() {
               companyId={companyId}
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
+              templateVariableData={templateVariableData}
             />
             {form.watch('attachments').length > 0 ? (
               <TooltipProvider>
@@ -764,20 +798,59 @@ export default function DealEmailDialog() {
               }}
             />
             <div className='mt-4 flex justify-between gap-2 w-full'>
-              <Button
-                type='button'
-                onClick={() => setShowAIMenu(!showAIMenu)}
-                variant={showAIMenu ? 'secondary' : 'default'}
-              >
-                AI Settings
-              </Button>
-              <LoadingButton
-                type='button'
-                loading={isGenerating}
-                onClick={handleGenerateWithAI}
-              >
-                Generate
-              </LoadingButton>
+              <div className='flex items-center gap-2'>
+                {isMobile ? (
+                  <CustomDropdownMenu
+                    trigger={
+                      <Button variant='outline' size='sm' className='h-9'>
+                        <MoreVertical className='h-4 w-4 mr-1' />
+                        AI Menu
+                      </Button>
+                    }
+                    sections={[
+                      {
+                        title: 'AI Actions',
+                        options: [
+                          {
+                            label: 'AI Settings',
+                            icon: <SettingsIcon className='w-4 h-4' />,
+                            onClick: () => setShowAIMenu(!showAIMenu),
+                          },
+                          {
+                            label: 'Generate',
+                            icon: <Sparkles className='w-4 h-4' />,
+                            onClick: handleGenerateWithAI,
+                          },
+                        ],
+                      },
+                    ]}
+                  />
+                ) : (
+                  <div className='flex items-center gap-2'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      className='h-9'
+                      onClick={() => setShowAIMenu(!showAIMenu)}
+                    >
+                      <SettingsIcon className='h-4 w-4 mr-1' />
+                      AI Settings
+                    </Button>
+                    <LoadingButton
+                      loading={_isGenerating}
+                      type='button'
+                      variant='default'
+                      size='sm'
+                      className='h-9'
+                      onClick={handleGenerateWithAI}
+                    >
+                      <Sparkles className='h-4 w-4 mr-1' />
+                      Generate
+                    </LoadingButton>
+                  </div>
+                )}
+              </div>
 
               <div className='ml-auto flex items-center gap-2'>
                 <AiImproveButton
@@ -792,18 +865,16 @@ export default function DealEmailDialog() {
                 >
                   <PaperclipIcon className='h-4 w-4' />
                 </Button>
-                <LoadingButton loading={isSubmitting} type='submit'>Send Email</LoadingButton>
+                <LoadingButton loading={isSubmitting || isPending} type='submit'>
+                  <SendIcon className='h-4 w-4' />
+                </LoadingButton>
               </div>
             </div>
           </Form>
         </FormProvider>
         {showAIMenu && (
           <div className='mt-4'>
-            <AIAssistantMenu
-              aiForm={aiForm}
-              onGenerate={handleGenerateWithAI}
-              isGenerating={isGenerating}
-            />
+            <AIAssistantMenu aiForm={aiForm} />
           </div>
         )}
       </DialogContent>

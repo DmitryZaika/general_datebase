@@ -2,6 +2,7 @@ import { data, type LoaderFunctionArgs } from 'react-router'
 import z from 'zod'
 import { db } from '~/db.server'
 import type { Customer } from '~/types'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getMarketingUser } from '~/utils/session.server'
 
@@ -13,11 +14,13 @@ const customerSchema = z.object({
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const companyId = Number(params.companyId)
   if (!Number.isFinite(companyId) || companyId <= 0) {
+    posthogClient.captureException(new Error('Invalid company ID'))
     return data({ customers: [] })
   }
   try {
     await getMarketingUser(request, companyId)
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return data({ customers: [] }, { status: 401 })
   }
 
@@ -30,7 +33,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   let searchType: 'name' | 'phone' | 'email'
   try {
     ;({ term, searchType } = customerSchema.parse(customerData))
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error, 'Invalid search parameters', { customerData })
     return data({ error: 'Invalid search parameters' }, { status: 422 })
   }
 
@@ -57,7 +61,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     )
 
     return data({ customers })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error, 'Failed to search customers', { companyId })
     return data({ error: 'Failed to search customers' }, { status: 500 })
   }
 }

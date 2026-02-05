@@ -2,8 +2,9 @@ import { data, type LoaderFunctionArgs } from 'react-router'
 import z from 'zod'
 import { db } from '~/db.server'
 import type { Customer } from '~/types'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 function levenshtein(a: string, b: string) {
   if (a === b) return 0
@@ -49,7 +50,7 @@ export const customerSchema = z.object({
 })
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await getEmployeeUser(request)
+  const user: User = await getEmployeeUser(request)
   const url = new URL(request.url)
   const customerData = {
     term: url.searchParams.get('term'),
@@ -59,7 +60,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let searchType: 'name' | 'phone' | 'email'
   try {
     ;({ term, searchType } = customerSchema.parse(customerData))
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return data({ error: 'Invalid search parameters' }, { status: 422 })
   }
 
@@ -96,7 +98,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
       customers = await selectMany<Customer>(
         db,
-        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
+        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
+         (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
+         (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
          WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -127,7 +131,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       if (!digits) {
         customers = await selectMany<Customer>(
           db,
-          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
+          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
+           (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
+           (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
            FROM customers c
            LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
            WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -165,7 +171,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
         customers = await selectMany<Customer>(
           db,
-          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
+          `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
+           (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
+           (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
            FROM customers c
            LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
            WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -205,7 +213,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     } else {
       customers = await selectMany<Customer>(
         db,
-        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name
+        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
+         (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
+         (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
          WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -242,7 +252,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     return data({ customers })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return data({ error: 'Failed to search customers' }, { status: 500 })
   }
 }

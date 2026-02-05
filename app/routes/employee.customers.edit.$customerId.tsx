@@ -9,7 +9,7 @@ import {
 import { v4 as uuidv4 } from 'uuid'
 import { CustomerForm } from '~/components/pages/CustomerForm'
 import type { CustomerDialogSchema } from '~/schemas/customers'
-import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 const getCustomerInfo = async (customerId: number): Promise<CustomerDialogSchema> => {
   const response = await fetch(`/api/customers/${customerId}`)
@@ -31,7 +31,7 @@ const getCustomerInfo = async (customerId: number): Promise<CustomerDialogSchema
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const customerId = parseInt(params.customerId || '0')
-  let user: SessionUser
+  let user: User
   try {
     user = await getEmployeeUser(request)
   } catch (error) {

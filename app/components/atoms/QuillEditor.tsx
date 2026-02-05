@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useQuill } from 'react-quilljs'
+import { setupQuillImageHandlers } from '~/utils/quillImageUpload'
 
 import 'quill/dist/quill.snow.css'
 
@@ -8,9 +9,28 @@ interface IQuillEditorProps {
   onChange: (value: string) => void
 }
 
+const QUILL_MODULES = {
+  toolbar: [
+    [{ header: [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ list: 'ordered' }, { list: 'bullet' }],
+    [{ color: [] }, { background: [] }],
+    ['link', 'image'],
+    ['clean'],
+  ],
+}
+
 export function QuillEditor({ value, onChange }: IQuillEditorProps) {
-  const { quill, quillRef } = useQuill()
+  const { quill, quillRef } = useQuill({ modules: QUILL_MODULES })
   const isInternalChange = useRef(false)
+  const imageHandlerSetup = useRef(false)
+
+  useEffect(() => {
+    if (quill && !imageHandlerSetup.current) {
+      setupQuillImageHandlers(quill)
+      imageHandlerSetup.current = true
+    }
+  }, [quill])
 
   useEffect(() => {
     if (quill && !isInternalChange.current) {
@@ -22,14 +42,21 @@ export function QuillEditor({ value, onChange }: IQuillEditorProps) {
     isInternalChange.current = false
   }, [quill, value])
 
-  useEffect(() => {
+  const handleTextChange = useCallback(() => {
     if (quill) {
-      quill.on('text-change', () => {
-        isInternalChange.current = true
-        onChange(quill.root.innerHTML)
-      })
+      isInternalChange.current = true
+      onChange(quill.root.innerHTML)
     }
   }, [quill, onChange])
+
+  useEffect(() => {
+    if (quill) {
+      quill.on('text-change', handleTextChange)
+      return () => {
+        quill.off('text-change', handleTextChange)
+      }
+    }
+  }, [quill, handleTextChange])
 
   return (
     <div className='quill-container h-64 flex flex-col'>

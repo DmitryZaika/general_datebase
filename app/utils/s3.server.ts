@@ -117,6 +117,33 @@ export async function uploadStreamToS3(
   return file.Location
 }
 
+export async function uploadToSpecificBucket(
+  data: AsyncIterable<Uint8Array>,
+  filename: string,
+  bucket: string,
+  folder: string = '',
+) {
+  const s3 = getClient()
+  const pass = new PassThrough()
+  const mimeType = mime.lookup(filename) || 'application/octet-stream'
+  const key = folder ? `${folder}/${filename}` : filename
+
+  const upload = new Upload({
+    client: s3,
+    params: {
+      Bucket: bucket,
+      Key: key,
+      Body: pass,
+      ContentDisposition: 'inline',
+      ContentType: mimeType,
+    },
+  })
+
+  await writeAsyncIterableToWritable(data, pass)
+  const file = await upload.done()
+  return file.Location
+}
+
 export const s3UploadHandler = async (
   fileUpload: FileUpload,
   folder: string,

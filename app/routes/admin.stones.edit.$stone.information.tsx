@@ -19,6 +19,7 @@ import { commitSession, getSession } from '~/sessions.server'
 import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
@@ -134,7 +135,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return redirect(`../..${searchString}`, {
       headers: { 'Set-Cookie': await commitSession(session) },
     })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return { errors: { message: 'Failed to update stone' } }
   }
 }

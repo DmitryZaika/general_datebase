@@ -1,3 +1,4 @@
+import DOMPurify from 'isomorphic-dompurify'
 import { useCallback, useMemo, useState } from 'react'
 import {
   type LoaderFunctionArgs,
@@ -102,6 +103,9 @@ const OutlineItem: React.FC<OutlineItemProps> = ({
 }
 
 function isHtmlEmpty(html: string): boolean {
+  if (/<img\s/i.test(html)) {
+    return false
+  }
   const cleaned = html
     .replace(/<[^>]*>/g, '')
     .replace(/&nbsp;/g, '')
@@ -134,7 +138,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({
             <div
               className='prose max-w-[calc(100%-50px)] md:max-w-[calc(100%-75px)] lg:max-w-[calc(100%-65px)] w-full instructions ml-3 sm:ml-5 md:ml-10'
               // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
-              dangerouslySetInnerHTML={{ __html: instruction.text }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(instruction.text) }}
             />
           )}
           {instruction.children.length > 0 && (
@@ -170,7 +174,7 @@ const InstructionItem: React.FC<InstructionItemProps> = ({
           <div
             className='prose overflow-auto break-words w-full ml-5'
             // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
-            dangerouslySetInnerHTML={{ __html: instruction.text }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(instruction.text) }}
           />
         )}
         {instruction.children.length > 0 && (
@@ -259,7 +263,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Instructions() {
   const { instructions, mode } = useLoaderData<typeof loader>()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [_, setSearchParams] = useSearchParams()
   const finalInstructions = cleanData(instructions)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [expandedIds, setExpandedIds] = useState<number[]>([])
@@ -483,7 +487,7 @@ export default function Instructions() {
     const expandedSet = new Set(expandedIds)
     return expandedIds.filter(id => {
       let current = nodeMap.get(id)
-      while (current && current.parent_id) {
+      while (current?.parent_id) {
         if (!expandedSet.has(current.parent_id)) {
           return false
         }

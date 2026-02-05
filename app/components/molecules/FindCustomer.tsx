@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { Edit, Search, Trash } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FaEdit, FaSearch, FaTrash } from 'react-icons/fa'
 import { useLocation, useNavigate } from 'react-router'
 import { useToast } from '~/hooks/use-toast'
 import type { Customer } from '~/types'
@@ -37,10 +37,10 @@ export function FindCustomer({
   buildSearchUrl?: (term: string, searchType: 'name' | 'phone' | 'email') => string
   buildEditLink?: (customerId: number, search: string) => string
   buildDeleteLink?: (customerId: number, search: string) => string
-  onEdit?: (customerId: number) => void
-  onDelete?: (customerId: number) => void
-  onSelect?: (customerId: number) => void
-  resolveId?: (customerId: number) => number | undefined
+  onEdit?: (customerId: number, customer: Customer) => void
+  onDelete?: (customerId: number, customer: Customer) => void
+  onSelect?: (customerId: number, customer: Customer) => void
+  resolveId?: (customerId: number, customer?: Customer) => number | undefined
   noActionsLabel?: string
   showActions?: boolean
 }) {
@@ -76,8 +76,8 @@ export function FindCustomer({
     if (!resolveId) return customers
 
     return [...customers].sort((a, b) => {
-      const aHasAction = resolveId(a.id) !== undefined
-      const bHasAction = resolveId(b.id) !== undefined
+      const aHasAction = resolveId(a.id, a) !== undefined
+      const bHasAction = resolveId(b.id, b) !== undefined
 
       if (aHasAction && !bHasAction) return -1
       if (!aHasAction && bHasAction) return 1
@@ -107,7 +107,7 @@ export function FindCustomer({
   }, [])
 
   return (
-    <div ref={searchRef} className={`relative w-80 mt-2 ${className}`}>
+    <div ref={searchRef} className={`relative w-80  ${className}`}>
       <div className='relative'>
         <Input
           type='text'
@@ -118,7 +118,7 @@ export function FindCustomer({
           className='pr-10 rounded-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition'
         />
         <div className='absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-500'>
-          <FaSearch />
+          <Search />
         </div>
       </div>
 
@@ -135,7 +135,7 @@ export function FindCustomer({
                   onClick={e => {
                     e.stopPropagation()
                     if (onSelect) {
-                      onSelect(customer.id)
+                      onSelect(customer.id, customer)
                       setIsInputFocused(false)
                     }
                   }}
@@ -149,8 +149,8 @@ export function FindCustomer({
                 </div>
               </div>
               {showActions && (
-                <div className='flex items-center space-x-2'>
-                  {resolveId && resolveId(customer.id) === undefined ? (
+                <div className='flex items-center flex-col '>
+                  {resolveId && resolveId(customer.id, customer) === undefined ? (
                     <span className='text-xs text-gray-500'>{noActionsLabel}</span>
                   ) : (
                     <>
@@ -160,7 +160,7 @@ export function FindCustomer({
                         onClick={e => {
                           e.stopPropagation()
                           if (onEdit) {
-                            onEdit(customer.id)
+                            onEdit(customer.id, customer)
                             return
                           }
                           const link = buildEditLink
@@ -168,9 +168,9 @@ export function FindCustomer({
                             : `${editBasePath}/edit/${customer.id}${location.search}`
                           navigate(link)
                         }}
-                        className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                        className='h-9 w-9 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
                       >
-                        <FaEdit style={{ minWidth: '20px', minHeight: '20px' }} />
+                        <Edit style={{ minWidth: '20px', minHeight: '20px' }} />
                       </Button>
                       <Button
                         variant='ghost'
@@ -178,7 +178,7 @@ export function FindCustomer({
                         onClick={e => {
                           e.stopPropagation()
                           if (onDelete) {
-                            onDelete(customer.id)
+                            onDelete(customer.id, customer)
                             return
                           }
                           ;(async () => {
@@ -205,9 +205,9 @@ export function FindCustomer({
                             navigate(link)
                           })()
                         }}
-                        className='h-11 w-11 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                        className='h-9 w-9 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
                       >
-                        <FaTrash style={{ minWidth: '16px', minHeight: '16px' }} />
+                        <Trash style={{ minWidth: '20px', minHeight: '20px' }} />
                       </Button>
                     </>
                   )}

@@ -26,6 +26,7 @@ import {
 } from '~/components/ui/select'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { getAdminUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
@@ -81,7 +82,8 @@ export async function action({ request }: ActionFunctionArgs) {
         'Set-Cookie': await commitSession(session),
       },
     })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     const session = await getSession(request.headers.get('Cookie'))
     session.flash(
       'message',

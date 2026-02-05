@@ -30,7 +30,6 @@ import { getBase } from '~/utils/urlHelpers'
 import { Header } from './components/Header'
 import { Chat } from './components/organisms/Chat'
 import { MarketingHeader } from './components/organisms/MarketingHeader'
-import { SidebarToggle } from './components/SidebarToggle'
 import { Toaster } from './components/ui/toaster'
 import { commitSession, getSession } from './sessions.server'
 import './tailwind.css'
@@ -104,7 +103,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const parts = url.pathname.split('/')
     if (parts[1] === 'contractors' && parts[2]) {
       const id = parseInt(parts[2], 10)
-      if (!isNaN(id)) {
+      if (!Number.isNaN(id)) {
         companyId = id
       }
     }
@@ -251,7 +250,7 @@ export default function App() {
   } = useLoaderData<typeof loader>()
   const { pathname } = useLocation()
   const { toast } = useToast()
-  const isMobile = useIsMobile()
+  const _isMobile = useIsMobile()
   const isLogin = pathname === '/login'
   const isDraw = pathname.startsWith('/employee/draw')
   const isCheckIn = pathname.includes('/check-in')
@@ -261,7 +260,8 @@ export default function App() {
   const isShopWorker = position === 'shop_worker'
   const isContractors = pathname.startsWith('/contractors')
   const segments = pathname.split('/').filter(Boolean)
-  const isCustomerViewPage = segments[0] === 'customer' && segments[2] !== 'stones'
+  const isCustomerViewPage =
+    segments[0] === 'customer' && segments[2] !== 'stones' && segments[2] !== undefined
   const mainRef = useRef<HTMLElement | null>(null)
   const [isAtBottom, setIsAtBottom] = useState(false)
   useEffect(() => {
@@ -342,14 +342,6 @@ export default function App() {
                   />
                 )}
                 <div className='relative'>
-                  {!isCustomerViewPage && !isLogin && (
-                    <SidebarToggle
-                      isMobile={isMobile}
-                      isCheckIn={isCheckIn}
-                      isExternalMarketing={isExternalMarketing}
-                      isInstallerRoute={isInstallerRoute}
-                    />
-                  )}
                   <Outlet />
                 </div>
               </AuthenticityTokenProvider>

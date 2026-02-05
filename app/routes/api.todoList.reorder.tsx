@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -27,7 +28,8 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     return Response.json({ success: true })
-  } catch {
+  } catch (error) {
+    posthogClient.captureException(error)
     return new Response('Error updating positions', { status: 500 })
   }
 }

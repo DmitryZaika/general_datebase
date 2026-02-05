@@ -1,4 +1,4 @@
-import { OriginalSidebarTrigger, SidebarTrigger } from './ui/sidebar'
+import { OriginalSidebarTrigger } from './ui/sidebar'
 
 interface SidebarToggleProps {
   isMobile: boolean
@@ -17,5 +17,7 @@ export function SidebarToggle({
 
   if (!shouldShow) return null
 
-  return isMobile ? <SidebarTrigger /> : <OriginalSidebarTrigger />
+  if (isMobile) return null
+
+  return <OriginalSidebarTrigger />
 }

@@ -1,8 +1,5 @@
 import { useDroppable } from '@dnd-kit/core'
-import { Plus } from 'lucide-react'
-import { Link } from 'react-router'
 import DealsCard from './DealsCard'
-import { Button } from './ui/button'
 import { Card, CardHeader, CardTitle } from './ui/card'
 
 interface DealsListProps {
@@ -33,7 +30,6 @@ export default function DealsList({
   readonly = false,
   highlightedDealId,
 }: DealsListProps) {
-
   const { setNodeRef } = useDroppable({
     id: `list-${id}`,
     data: { type: 'list', listId: id },
@@ -43,7 +39,7 @@ export default function DealsList({
   return (
     <Card
       ref={setNodeRef}
-      className={`min-w-[18rem] w-72 max-h-[calc(100vh-13rem)] flex flex-col h-full shadow-sm ${id === 4 ? 'bg-green-100' : id === 5 ? 'bg-red-100' : ''}`}
+      className={`min-w-[18rem] max-w-[22rem] flex-1 w-full max-h-[calc(100vh-10rem)] flex flex-col h-full shadow-sm `}
     >
       <CardHeader className='bg-black rounded-t-xl py-2 px-3'>
         <div className='flex justify-between items-center'>
@@ -53,7 +49,6 @@ export default function DealsList({
           <span className='text-xs font-medium text-white/90 bg-white/20 rounded-full px-2 py-0.5'>
             {customers.length}
           </span>
-          
         </div>
       </CardHeader>
       <DealsCard
@@ -61,15 +56,6 @@ export default function DealsList({
         readonly={readonly}
         highlightedDealId={highlightedDealId}
       />
-      {!readonly && (
-        <div className='p-3 border-t'>
-          <Link to={`add?list_id=${id}`} relative='path'>
-            <Button variant='ghost' type='button' className='w-full flex gap-2'>
-              <Plus className='w-4 h-4' /> Add Deal
-            </Button>
-          </Link>
-        </div>
-      )}
     </Card>
   )
 }

@@ -1,5 +1,5 @@
+import { LinkIcon, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { FaLink, FaTimes } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   data,
@@ -31,6 +31,7 @@ import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
@@ -95,7 +96,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
             headers: { 'Set-Cookie': await commitSession(session) },
           },
         )
-      } catch {
+      } catch (error) {
+        posthogClient.captureException(error)
         return { error: 'Failed to unlink images' }
       }
     } else if (id) {
@@ -170,7 +172,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
               headers: { 'Set-Cookie': await commitSession(session) },
             },
           )
-        } catch {
+        } catch (error) {
+          posthogClient.captureException(error)
           return { error: 'Failed to link images' }
         }
       }
@@ -403,7 +406,7 @@ export default function SelectImages() {
           variant='outline'
           className='flex items-center gap-2'
         >
-          <FaLink size={14} />
+          <LinkIcon size={14} />
           Link Images from Different Stone
         </Button>
       </div>
@@ -422,7 +425,7 @@ export default function SelectImages() {
                   type='submit'
                   className='size-4 p-4 text-white bg-gray-800 bg-opacity-60 rounded-full transition'
                 >
-                  <FaTimes />
+                  <X />
                 </Button>
               </RemixForm>
             </div>
@@ -444,7 +447,7 @@ export default function SelectImages() {
                   className='text-red-500 border-red-300 hover:bg-red-50 flex items-center gap-1'
                   onClick={() => handleUnlinkClick(parseInt(sourceId), data.name)}
                 >
-                  <FaTimes size={12} />
+                  <X size={12} />
                   Unlink
                 </Button>
               </div>

@@ -2,28 +2,29 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { Search } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
-    type ActionFunctionArgs,
-    type LoaderFunctionArgs,
-    Outlet,
-    redirect,
-    useLoaderData,
-    useLocation,
-    useNavigate,
-    useSearchParams,
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+  Outlet,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useSearchParams,
 } from 'react-router'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { PageLayout } from '~/components/PageLayout'
 import { DataTable } from '~/components/ui/data-table'
 import { Input } from '~/components/ui/input'
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '~/components/ui/select'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getShopWorkerUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -335,7 +336,10 @@ export async function action({ request }: ActionFunctionArgs) {
       return redirect(redirectUrl, {
         headers: { 'Set-Cookie': await commitSession(session) },
       })
-    } catch {
+    } catch (error) {
+      posthogClient.captureException(error, 'Failed to mark transaction as installed', {
+        transactionId,
+      })
       const session = await getSession(request.headers.get('Cookie'))
       session.flash(
         'message',
@@ -363,14 +367,6 @@ export default function EmployeeTransactions() {
   const searchRef = useRef<HTMLDivElement>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [isInputFocused, setIsInputFocused] = useState(false)
-  const [installDialogOpen, setInstallDialogOpen] = useState(false)
-  const [selectedTransactionId, setSelectedTransactionId] = useState<number | null>(
-    null,
-  )
-  const [installDate, setInstallDate] = useState<string>(
-    new Date().toISOString().slice(0, 10),
-  )
-  const [isPaid, setIsPaid] = useState(true)
 
   const handleSalesRepChange = (value: string) => {
     const next = new URLSearchParams(searchParams)
@@ -429,7 +425,7 @@ export default function EmployeeTransactions() {
         const stoneCounts: { [key: string]: number } = {}
 
         stonesArr.forEach(item => {
-          const [stone, status] = item.split(':')
+          const [stone, _] = item.split(':')
           stoneCounts[stone] = (stoneCounts[stone] || 0) + 1
           // If any occurrence is active, consider active (or handle mixed status differently if needed)
           // Here we assume if ALL occurrences of a stone name are deleted, it's deleted.

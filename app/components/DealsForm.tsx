@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { FormProvider, type UseFormReturn, useForm } from 'react-hook-form'
-import { Form, Link } from 'react-router'
+import { Form, Link, useLocation } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { CustomerSearch } from '~/components/molecules/CustomerSearch'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
@@ -77,6 +77,7 @@ export function DealsForm({
   dealId?: number
   user_id: number
 }) {
+  const location = useLocation()
   const form = useForm({
     resolver: zodResolver(dealsSchema),
     defaultValues: { ...hiddenFields, ...(initial || {}), user_id },
@@ -103,7 +104,7 @@ export function DealsForm({
           <div className='flex justify-between gap-2 w-full'>
             {dealId && (
               <div className='flex justify-start'>
-                <Link to={`../delete`} relative='path'>
+                <Link to={`../delete${location.search}`} relative='path'>
                   <Button variant='destructive' type='button' className='mb-4'>
                     Delete
                   </Button>

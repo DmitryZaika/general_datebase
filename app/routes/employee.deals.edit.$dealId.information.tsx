@@ -54,7 +54,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   )
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Deal updated successfully'))
-  return redirect(`/employee/deals`, {
+  const url = new URL(request.url)
+  return redirect(`/employee/deals${url.search}`, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }

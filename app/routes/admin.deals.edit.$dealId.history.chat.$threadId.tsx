@@ -25,7 +25,7 @@ import {
 } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
 import type { Customer } from '~/types/customer'
-import { fileSize } from '~/utils/constants'
+import { dateClass, fileSize } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
 import { getAdminUser, type User } from '~/utils/session.server'
@@ -152,7 +152,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   return {
     customerName: customerRows?.name || 'Customer',
-    customerEmail,
     messages,
     dealId,
     subject: emailRows?.[0]?.subject || null,
@@ -170,8 +169,7 @@ function MessageDate({ message }: { message: Message }) {
 export default function EmailChatDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { customerName, customerEmail, messages, dealId, subject } =
-    useLoaderData<typeof loader>()
+  const { customerName, messages, dealId } = useLoaderData<typeof loader>()
   const [chatMessages, _] = useState<Message[]>(messages)
   const [currentImages, setCurrentImages] = useState<
     { id: number; url: string; name: string; type: string; available: null }[]
@@ -225,7 +223,7 @@ export default function EmailChatDialog() {
 
   return (
     <Dialog open={true} onOpenChange={handleClose}>
-      <DialogContent className='sm:max-w-[60%] h-[90%] p-0 flex flex-col'>
+      <DialogContent className='max-w-[100%] sm:max-w-[90%] sm:max-w-[900px] h-[95%] p-0 flex flex-col'>
         <DialogHeader className='p-4 border-b'>
           <div className='flex items-center gap-3'>
             <div className='w-12 h-12 rounded-full bg-pink-500 flex items-center justify-center text-white font-bold'>
@@ -235,17 +233,15 @@ export default function EmailChatDialog() {
               <DialogTitle className='text-lg font-semibold'>
                 {customerName}
               </DialogTitle>
-              <p className='text-sm text-gray-500'>Email: {customerEmail}</p>
-              <p className='text-sm text-gray-500'>Subject: {subject}</p>
             </div>
           </div>
         </DialogHeader>
 
-        <div className='flex-1 overflow-y-auto p-4 space-y-4'>
+        <div className='flex-1 overflow-y-auto'>
           {chatMessages.map((message, index) => (
             <div key={message.id}>
               {showDate(message, index) && (
-                <div className='text-center text-xs text-gray-500 my-4'>
+                <div className={dateClass}>
                   {format(new Date(message.sent_at), 'MMM d, yyyy')}
                 </div>
               )}
@@ -284,7 +280,7 @@ export default function EmailChatDialog() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
-                              <Pencil className='w-2 h-2 opacity-70' />
+                              <Pencil size={16} className='w-2 h-2 opacity-70' />
                               Signature
                             </span>
                           </TooltipTrigger>

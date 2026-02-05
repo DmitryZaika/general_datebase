@@ -29,6 +29,8 @@ interface DealItemProps {
     has_images?: boolean
     has_email?: boolean
     sales_rep?: string | null
+    is_won?: number | null
+    company_name?: string | null
   }
   readonly?: boolean
   highlighted?: boolean
@@ -43,7 +45,8 @@ function parseLocal(dateInput: string | null | undefined): Date {
   return new Date(y, m - 1, d)
 }
 function getDateColor(dateStr: string | null | undefined, listId: number): string {
-  if (!dateStr && listId !== 4 && listId !== 5) return 'text-red-500'
+  if ((!dateStr || dateStr === '0000-00-00') && listId !== 4 && listId !== 5)
+    return 'text-red-500'
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const selected = parseLocal(dateStr)
@@ -62,7 +65,6 @@ export default function DealItem({
   readonly = false,
   highlighted = false,
 }: DealItemProps) {
-  const location = useLocation()
   const [localDate, setLocalDate] = useState<string | null>(deal.due_date ?? null)
   const [editAmount, setEditAmount] = useState(false)
   const [editDesc, setEditDesc] = useState(false)
@@ -74,7 +76,7 @@ export default function DealItem({
   const [descOverflow, setDescOverflow] = useState(false)
   const [lineHeightPx, setLineHeightPx] = useState<number>(20)
   const fetcher = useFetcher()
-
+  const location = useLocation()
   const hasEmail = Boolean(deal.has_email)
 
   const hasImages =
@@ -140,6 +142,7 @@ export default function DealItem({
   }, [deal.description, editDesc])
 
   function formatDisplay(dateStr: string) {
+    if (dateStr === '0000-00-00') return ''
     const d = parseLocal(dateStr)
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString()
   }
@@ -172,21 +175,24 @@ export default function DealItem({
               className='text-xl font-medium truncate whitespace-normal flex-1 select-none hover:underline'
               onPointerDown={e => e.stopPropagation()}
             >
-              {deal.name}
+              {deal.company_name ? deal.company_name : deal.name}
             </Link>
           ) : (
             <h3 className='text-xl font-medium truncate whitespace-normal flex-1 select-none'>
-              {deal.name}
+              {deal.company_name ? deal.company_name : deal.name}
             </h3>
           )}
         </div>
         {!readonly && (
           <Link
-            to={`edit/${deal.id}/project`}
+            to={`edit/${deal.id}/project${location.search}`}
             className='absolute top-1 right-1 z-20'
             onPointerDown={e => e.stopPropagation()}
           >
-            <Pencil className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black' />
+            <Pencil
+              size={16}
+              className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black'
+            />
           </Link>
         )}
       </div>
@@ -323,52 +329,62 @@ export default function DealItem({
 
       <div className='flex items-center gap-2 w-full'>
         <div className='mr-auto flex items-center'>
-          {deal.list_id !== 5 && deal.list_id !== 4 && !readonly && (
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
-                  onClick={e => e.stopPropagation()}
-                  onPointerDown={e => e.stopPropagation()}
-                >
-                  {localDate ? (
-                    formatDisplay(localDate)
-                  ) : (
-                    <CalendarIcon className='w-4 h-4' />
-                  )}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className='w-auto p-0' align='start' side='bottom'>
-                <Calendar
-                  mode='single'
-                  selected={formatDate(localDate)}
-                  defaultMonth={formatDate(localDate)}
-                  onSelect={(date: Date | undefined) => {
-                    if (date) {
-                      const year = date.getFullYear()
-                      const month = String(date.getMonth() + 1).padStart(2, '0')
-                      const day = String(date.getDate()).padStart(2, '0')
-                      const dateStr = `${year}-${month}-${day}`
-                      submitDate(dateStr)
-                      setCalendarOpen(false)
-                    }
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
-          )}
-          {deal.list_id !== 5 && deal.list_id !== 4 && readonly && localDate && (
-            <p className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}>
-              {formatDisplay(localDate)}
-            </p>
-          )}
+          {deal.list_id !== 5 &&
+            deal.list_id !== 4 &&
+            !readonly &&
+            deal.is_won === null && (
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
+                    onClick={e => e.stopPropagation()}
+                    onPointerDown={e => e.stopPropagation()}
+                  >
+                    {localDate && localDate !== '0000-00-00' ? (
+                      formatDisplay(localDate)
+                    ) : (
+                      <CalendarIcon className='w-4 h-4' />
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className='w-auto p-0' align='start' side='bottom'>
+                  <Calendar
+                    mode='single'
+                    selected={formatDate(localDate)}
+                    defaultMonth={formatDate(localDate)}
+                    onSelect={(date: Date | undefined) => {
+                      if (date) {
+                        const year = date.getFullYear()
+                        const month = String(date.getMonth() + 1).padStart(2, '0')
+                        const day = String(date.getDate()).padStart(2, '0')
+                        const dateStr = `${year}-${month}-${day}`
+                        submitDate(dateStr)
+                        setCalendarOpen(false)
+                      }
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
+          {deal.list_id !== 5 &&
+            deal.list_id !== 4 &&
+            readonly &&
+            localDate &&
+            localDate !== '0000-00-00' &&
+            deal.is_won === null && (
+              <p
+                className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}
+              >
+                {formatDisplay(localDate)}
+              </p>
+            )}
         </div>
 
         {(hasEmail || hasImages) && (
           <div className='flex items-center gap-2'>
             {hasEmail && (
               <Link
-                to={mailUrl}
+                to={mailUrl + location.search}
                 className='text-slate-500 hover:text-black'
                 onPointerDown={e => e.stopPropagation()}
                 state={{ from: fromState }}
@@ -378,7 +394,7 @@ export default function DealItem({
             )}
             {hasImages && (
               <Link
-                to={imagesUrl}
+                to={imagesUrl + location.search}
                 className='text-slate-500 hover:text-black'
                 onPointerDown={e => e.stopPropagation()}
                 state={{ from: fromState }}

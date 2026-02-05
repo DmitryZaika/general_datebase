@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { getAdminUser } from '~/utils/session.server'
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -38,7 +39,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     )
 
     return data({ chartData })
-  } catch {
-    return data({ chartData: [] })
+  } catch (error) {
+    posthogClient.captureException(error)
+    return data({ chartData: [] }, { status: 500 })
   }
 }

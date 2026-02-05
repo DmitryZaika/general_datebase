@@ -1,6 +1,5 @@
-import { Plus } from 'lucide-react'
+import { Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { FaPencilAlt, FaTimes } from 'react-icons/fa'
 import {
   Link,
   type LoaderFunctionArgs,
@@ -174,7 +173,7 @@ export default function AdminFaucets() {
                     title='Edit Faucet'
                     aria-label={`Edit ${faucet.name}`}
                   >
-                    <FaPencilAlt />
+                    <Pencil size={16} />
                   </Link>
                   <Link
                     to={`delete/${faucet.id}`}
@@ -182,7 +181,7 @@ export default function AdminFaucets() {
                     title='Delete Faucet'
                     aria-label={`Delete ${faucet.name}`}
                   >
-                    <FaTimes />
+                    <X size={16} />
                   </Link>
                 </div>
               </div>

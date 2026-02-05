@@ -17,7 +17,8 @@ export function SalesRepsFilter({ className }: { className?: string }) {
 
   const current = useMemo(() => {
     const params = new URLSearchParams(location.search)
-    return params.get('salesRep') || 'All'
+    const val = params.get('salesRep')
+    return val === 'All' ? undefined : val || undefined
   }, [location.search])
 
   useEffect(() => {
@@ -47,16 +48,15 @@ export function SalesRepsFilter({ className }: { className?: string }) {
   }
 
   return (
-    <div className={`px-2 py-2 min-w-30 ${className}`}>
-      <div className='text-xs text-slate-500 mb-1'>Sales Rep</div>
+    <div className={`px-2  mt-2 min-w-30 ${className}`}>
       <Select value={current} onValueChange={onChange}>
-        <SelectTrigger className='h-8'>
+        <SelectTrigger className='h-9'>
           <SelectValue placeholder='Sales Rep' />
         </SelectTrigger>
         <SelectContent>
           {names.map(name => (
             <SelectItem key={name} value={name}>
-              {name}
+              {name || 'Select Value'}
             </SelectItem>
           ))}
         </SelectContent>

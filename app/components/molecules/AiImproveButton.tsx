@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button, type ButtonProps } from '~/components/ui/button'
 
 type AiImproveButtonProps = {
+  id?: string
   getText: () => string
   setText: (value: string) => void
   className?: string
@@ -11,6 +12,7 @@ type AiImproveButtonProps = {
 }
 
 export function AiImproveButton({
+  id,
   getText,
   setText,
   className,
@@ -56,6 +58,7 @@ export function AiImproveButton({
 
   return (
     <Button
+      id={id}
       type='button'
       variant={buttonVariant}
       size={buttonSize}

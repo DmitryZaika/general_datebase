@@ -2,6 +2,7 @@ import type { ResultSetHeader } from 'mysql2'
 import { type ActionFunctionArgs, data, redirect } from 'react-router'
 import { z } from 'zod'
 import { db } from '~/db.server'
+import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 const quickEditSchema = z.object({
@@ -65,7 +66,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       },
     })
   } catch (error) {
-    console.error('Failed to update stone:', error)
+    posthogClient.captureException(error)
     return data(
       {
         error: 'Failed to update stone',

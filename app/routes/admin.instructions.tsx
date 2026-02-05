@@ -1,3 +1,4 @@
+import DOMPurify from 'isomorphic-dompurify'
 import { Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import type { FC } from 'react'
 import { useMemo, useState } from 'react'
@@ -7,9 +8,9 @@ import {
   Outlet,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
   useSearchParams,
-  useLocation,
 } from 'react-router'
 import { PageLayout } from '~/components/PageLayout'
 import {
@@ -64,7 +65,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request)
   const url = new URL(request.url)
   const allowGeneral = !!user.is_superuser
-  const requestedMode = url.searchParams.get('type') === 'general' ? 'general' : 'company'
+  const requestedMode =
+    url.searchParams.get('type') === 'general' ? 'general' : 'company'
   const mode = allowGeneral && requestedMode === 'general' ? 'general' : 'company'
   const companyId = mode === 'general' ? 0 : user.company_id
   const instructions = await selectMany<Instructions>(
@@ -131,7 +133,12 @@ const InstructionHeader: FC<InstructionHeaderProps> = ({
   textAlign,
 }) => (
   <div className='flex items-center justify-between flex-1 gap-6'>
-    <h3 className={cn('font-bold text-2xl text-gray-900', textAlign && `text-${textAlign}`)}>
+    <h3
+      className={cn(
+        'font-bold text-2xl text-gray-900',
+        textAlign && `text-${textAlign}`,
+      )}
+    >
       {title}
     </h3>
     <div className='flex items-center gap-2 shrink-0'>
@@ -212,7 +219,10 @@ const InstructionItem: FC<InstructionItemProps> = ({
             {hasContent && (
               <article
                 className='prose prose-base max-w-none instructions px-6 py-5 bg-gray-50 rounded-lg shadow-md'
-                dangerouslySetInnerHTML={{ __html: instruction.rich_text }}
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(instruction.rich_text),
+                }}
               />
             )}
             {hasChildren && (
@@ -241,7 +251,10 @@ const InstructionItem: FC<InstructionItemProps> = ({
         <div className='flex items-start justify-between gap-6'>
           <div
             className='prose prose-base max-w-none instructions flex-1'
-            dangerouslySetInnerHTML={{ __html: instruction.rich_text }}
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(instruction.rich_text),
+            }}
           />
           <div className='flex items-center gap-3 shrink-0'>
             <button
@@ -251,7 +264,10 @@ const InstructionItem: FC<InstructionItemProps> = ({
               aria-label='Edit instruction'
               title='Edit instruction'
             >
-              <Pencil className='w-5 h-5 text-gray-600 hover:text-blue-600 transition-colors' />
+              <Pencil
+                size={16}
+                className='w-5 h-5 text-gray-600 hover:text-blue-600 transition-colors'
+              />
             </button>
             <button
               type='button'
@@ -260,7 +276,10 @@ const InstructionItem: FC<InstructionItemProps> = ({
               aria-label='Delete instruction'
               title='Delete instruction'
             >
-              <Trash2 className='w-5 h-5 text-gray-600 hover:text-red-600 transition-colors' />
+              <Trash2
+                size={16}
+                className='w-5 h-5 text-gray-600 hover:text-red-600 transition-colors'
+              />
             </button>
           </div>
         </div>
@@ -332,7 +351,7 @@ const searchAllInstructions = (
 export default function AdminInstructions() {
   const { instructions, allowGeneral, mode } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [_, setSearchParams] = useSearchParams()
   const location = useLocation()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)

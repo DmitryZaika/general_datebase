@@ -1,36 +1,51 @@
-import type { ListObjectsV2CommandOutput } from '@aws-sdk/client-s3'
-import pkg from '@aws-sdk/client-s3'
+import { Readable } from 'node:stream' // Импортируем для проверки типов
+import {
+  GetObjectCommand,
+  type GetObjectCommandOutput,
+  ListObjectsV2Command,
+  type ListObjectsV2CommandOutput,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
 import dotenv from 'dotenv'
 import type { RowDataPacket } from 'mysql2'
 import mysql from 'mysql2/promise'
 import { withIconSuffix } from '~/utils/files'
 import { compressImage } from '~/utils/files.server'
-
-const { S3Client, ListObjectsV2Command } = pkg
-
-// если не добавлял — достанем команды из pkg (у тебя уже есть ListObjectsV2Command)
-const { GetObjectCommand, PutObjectCommand } = pkg as {
-  GetObjectCommand: any
-  PutObjectCommand: any
-}
-
-/** Вспомогалка: ReadableStream/Blob → Buffer (Node) */
-async function bodyToBuffer(body: unknown): Promise<Buffer> {
-  // Node Readable
-  if (body && typeof (body as any).pipe === 'function') {
-    const chunks: Buffer[] = []
-    for await (const chunk of body as any) chunks.push(Buffer.from(chunk))
-    return Buffer.concat(chunks)
-  }
-  // Blob
-  if (body && typeof (body as any).arrayBuffer === 'function') {
-    const ab = await (body as any).arrayBuffer()
-    return Buffer.from(ab)
-  }
-  throw new Error('Unsupported S3 Body type')
-}
+import { posthogClient } from '~/utils/posthog.server'
 
 dotenv.config()
+
+/** Вспомогалка: ReadableStream/Blob → Buffer (Node) */
+// Мы берем тип Body прямо из ответа команды S3
+async function bodyToBuffer(body: GetObjectCommandOutput['Body']): Promise<Buffer> {
+  if (!body) {
+    return Buffer.from([])
+  }
+
+  // Проверка: это Node.js Readable stream?
+  if (body instanceof Readable) {
+    const chunks: Buffer[] = []
+    for await (const chunk of body) {
+      chunks.push(Buffer.from(chunk))
+    }
+    return Buffer.concat(chunks)
+  }
+
+  // Проверка: это Web Blob/File? (если вдруг используется полифил)
+  // Используем проверку наличия метода, но типизируем безопаснее
+  if ('arrayBuffer' in body && typeof body.arrayBuffer === 'function') {
+    const ab = await body.arrayBuffer()
+    return Buffer.from(ab)
+  }
+
+  // Если это уже Uint8Array или Buffer (в некоторых версиях SDK)
+  if (body instanceof Uint8Array) {
+    return Buffer.from(body)
+  }
+
+  throw new Error('Unsupported S3 Body type')
+}
 
 // ──────────────────────────── DB CONNECTION ────────────────────────────────
 const db = await mysql.createPool({
@@ -42,9 +57,6 @@ const db = await mysql.createPool({
   connectionLimit: 10,
 })
 
-// ──────────────────────────── S3 IMPORTS (CJS RUNTIME + TYPE ONLY) ────────
-// Runtime — через default (CJS-модуль)
-
 // ──────────────────────────── ENV VALIDATION ───────────────────────────────
 function req(name: string): string {
   const v = process.env[name]?.trim()
@@ -52,8 +64,8 @@ function req(name: string): string {
   return v
 }
 
-const STORAGE_REGION = req('STORAGE_REGION') // напр. "us-east-2"
-const STORAGE_BUCKET = req('STORAGE_BUCKET') // напр. "granite-database"
+const STORAGE_REGION = req('STORAGE_REGION')
+const STORAGE_BUCKET = req('STORAGE_BUCKET')
 const STORAGE_ACCESS_KEY = req('STORAGE_ACCESS_KEY')
 const STORAGE_SECRET = req('STORAGE_SECRET')
 
@@ -67,9 +79,6 @@ const s3 = new S3Client({
 })
 
 // ──────────────────────────── HELPERS ──────────────────────────────────────
-/**
- * Безопасно кодируем key в URL, не трогая слеши.
- */
 function encodeKeyForUrl(key: string): string {
   return key
     .split('/')
@@ -77,48 +86,41 @@ function encodeKeyForUrl(key: string): string {
     .join('/')
 }
 
-/**
- * Формируем полный HTTPS URL в виртуально-хостовом стиле.
- * Пример: https://granite-database.s3.us-east-2.amazonaws.com/dynamic-images/stones/a.jpg
- */
 function toS3HttpsUrl(bucket: string, region: string, key: string): string {
   const encodedKey = encodeKeyForUrl(key)
   return `https://${bucket}.s3.${region}.amazonaws.com/${encodedKey}`
 }
 
-/**
- * Простейшая функция: взять файл из S3, сделать иконку 240x160, залить по новому ключу
- * @param srcKey  - исходный ключ в бакете, например: "dynamic-images/stones/foo.jpg"
- * @param destKey - ключ-назначение (куда положить), например: "dynamic-images/stones/foo.icon.jpg"
- */
 export async function processAndUploadImage(
   srcKey: string,
   destKey: string,
 ): Promise<void> {
-  // 1) скачать исходник
-  const got = await s3.send(
+  // 1) Скачать исходник
+  // Явно указываем, что ожидаем output от GetObjectCommand
+  const got: GetObjectCommandOutput = await s3.send(
     new GetObjectCommand({
       Bucket: STORAGE_BUCKET,
       Key: srcKey,
     }),
   )
-  const buffer = await bodyToBuffer((got as any).Body)
 
-  // 2) сделать уменьшенную копию
+  const buffer = await bodyToBuffer(got.Body)
+
+  // 2) Сделать уменьшенную копию
   const iconBuffer = await compressImage(buffer)
 
-  // 3) залить в S3 по новому ключу
+  // 3) Залить в S3
   await s3.send(
     new PutObjectCommand({
       Bucket: STORAGE_BUCKET,
       Key: destKey,
       Body: iconBuffer,
-      // Сохраняем Content-Type, если знаем, иначе JPEG по умолчанию
-      ContentType: (got as any).ContentType ?? 'image/jpeg',
+      ContentType: got.ContentType ?? 'image/jpeg', // TS теперь знает про ContentType
       CacheControl: 'public, max-age=31536000, immutable',
     }),
   )
 }
+
 // ──────────────────────────── LIST FILES FUNCTION ──────────────────────────
 async function listAllStoneImages(): Promise<string[]> {
   const prefix = 'dynamic-images/stones/'
@@ -159,21 +161,37 @@ async function main() {
 
   const files = await listAllStoneImages()
 
-  const missingFiles = dbUrls.filter(file => !files.includes(withIconSuffix(file)))
+  // Создаем Set для быстрого поиска (оптимизация, необязательно, но полезно)
+  const filesSet = new Set(files)
+
+  const missingFiles = dbUrls.filter(file => !filesSet.has(withIconSuffix(file)))
+  posthogClient.capture({
+    event: 'found_missing_icons_to_process',
+    properties: {
+      count: missingFiles.length,
+    },
+  })
+
+  const bucketUrlPrefix = `https://${STORAGE_BUCKET}.s3.${STORAGE_REGION}.amazonaws.com/`
+
   for (const file of missingFiles) {
-    const cleanFile = file.replace(
-      'https://granite-database.s3.us-east-2.amazonaws.com/',
-      '',
-    )
-    await processAndUploadImage(cleanFile, withIconSuffix(cleanFile))
+    const cleanFile = file.replace(bucketUrlPrefix, '')
+    try {
+      await processAndUploadImage(cleanFile, withIconSuffix(cleanFile))
+    } catch (error) {
+      posthogClient.captureException(error, 'Failed to process image', {
+        file: cleanFile,
+      })
+    }
   }
 }
 
 main()
-  .catch(() => {
+  .catch(e => {
+    posthogClient.captureException(e, 'Fatal error')
     process.exitCode = 1
   })
   .finally(async () => {
-    await db.end() // закрыть пул
-    s3.destroy() // закрыть S3 клиент
+    await db.end()
+    s3.destroy()
   })

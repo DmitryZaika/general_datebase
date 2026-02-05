@@ -31,8 +31,6 @@ const supplierschema = z.object({
   notes: z.string().optional(),
 })
 
-type FormData = z.infer<typeof supplierschema>
-
 const resolver = zodResolver(supplierschema)
 
 export async function action({ request, params }: ActionFunctionArgs) {

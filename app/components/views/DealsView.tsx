@@ -9,15 +9,20 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
+import { MoreVertical, Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import DealsList from '~/components/DealsList'
+import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
+import { Button } from '~/components/ui/button'
+import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
+import type { Customer } from '~/types'
 
-type Customer = {
-  id: number
-  name: string
-}
+// type Customer = {
+//   id: number
+//   name: string
+// }
 
 type List = {
   id: number
@@ -34,10 +39,12 @@ type FullDeal = {
   position?: number
   list_id: number
   due_date?: string | null
+  is_won?: number | null
 }
 
 type Deal = FullDeal & {
   name: string
+  company_name?: string | null
   has_images?: boolean
   has_email?: boolean
 }
@@ -48,7 +55,7 @@ interface DealsViewProps {
   lists: List[]
   imagesMap: Record<number, boolean>
   emailsMap: Record<number, boolean>
-  viewSelect?: React.ReactNode
+  groupListSelect?: React.ReactNode
 }
 
 export default function DealsView({
@@ -57,10 +64,11 @@ export default function DealsView({
   lists,
   imagesMap,
   emailsMap,
-  viewSelect,
+  groupListSelect,
 }: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
 
   const toDeal = (d: FullDeal): Deal => {
     const customer = customers.find(c => c.id === d.customer_id)
@@ -68,6 +76,7 @@ export default function DealsView({
       id: d.id,
       customer_id: d.customer_id,
       name: customer ? customer.name : `Customer #${d.customer_id}`,
+      company_name: customer?.company_name,
       amount: d.amount,
       description: d.description,
       status: d.status ?? undefined,
@@ -81,6 +90,7 @@ export default function DealsView({
         : null,
       has_images: imagesMap?.[d.id] || false,
       has_email: emailsMap?.[d.id] || false,
+      is_won: d.is_won,
     }
   }
 
@@ -124,6 +134,39 @@ export default function DealsView({
     }
   }, [])
 
+  useEffect(() => {
+    const highlight = searchParams.get('highlight')
+    if (highlight) {
+      const dealId = parseInt(highlight, 10)
+      if (!Number.isNaN(dealId)) {
+        if (highlightTimeoutRef.current) {
+          clearTimeout(highlightTimeoutRef.current)
+        }
+        setTimeout(() => {
+          const el = document.getElementById(`deal-${dealId}`)
+          if (el) {
+            el.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center',
+              inline: 'center',
+            })
+            setHighlightDealId(dealId)
+            highlightTimeoutRef.current = setTimeout(() => {
+              setHighlightDealId(null)
+              highlightTimeoutRef.current = null
+              const newParams = new URLSearchParams(searchParams)
+              newParams.delete('highlight')
+              navigate(
+                { pathname: location.pathname, search: newParams.toString() },
+                { replace: true },
+              )
+            }, 2010)
+          }
+        }, 100)
+      }
+    }
+  }, [searchParams, board])
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -147,12 +190,15 @@ export default function DealsView({
     return undefined
   }
 
-  const findDealIdByCustomer = (customerId: number): number | undefined => {
+  const findDealIdByCustomer = (
+    customerId: number,
+    customer?: Customer,
+  ): number | undefined => {
     for (const l of lists) {
       const hit = board[l.id]?.find(d => d.customer_id === customerId)
       if (hit) return hit.id
     }
-    return undefined
+    return customer?.deal_id ?? undefined
   }
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -214,13 +260,6 @@ export default function DealsView({
       }),
     })
     setActiveId(null)
-
-    if (toListId === 5) {
-      const fromPos = findDeal(activeId)?.position ?? 0
-      navigate(
-        `reason?dealId=${activeId}&fromListId=${fromListId}&fromPos=${fromPos}${location.search}`,
-      )
-    }
   }
 
   return (
@@ -235,21 +274,75 @@ export default function DealsView({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full flex justify-between items-center mb-4'>
-        {viewSelect}
+      <div className='w-full flex flex-col sm:flex-row justify-between items-center gap-2 py-2 px-1'>
+        <div className='flex items-center gap-2 w-full sm:w-auto'>
+          <div className='hidden md:block'>
+            <OriginalSidebarTrigger />
+          </div>
+          {groupListSelect}
+          <div className='hidden md:block'>
+            <Link
+              to={`add?list_id=${lists[0]?.id || 1}${location.search}`}
+              relative='path'
+            >
+              <Button variant='outline' size='sm' className='flex gap-2 h-9'>
+                <Plus className='w-4 h-4' /> Add Deal
+              </Button>
+            </Link>
+          </div>
+          <div className='md:hidden'>
+            <CustomDropdownMenu
+              trigger={
+                <Button variant='ghost' size='icon' className='h-9 w-9'>
+                  <MoreVertical className='w-4 h-4' />
+                </Button>
+              }
+              sections={[
+                {
+                  title: 'Actions',
+                  options: [
+                    {
+                      label: 'Add New Deal',
+                      icon: <Plus className='w-4 h-4' />,
+                      onClick: () =>
+                        navigate(`add?list_id=${lists[0]?.id || 1}${location.search}`),
+                    },
+                  ],
+                },
+              ]}
+            />
+          </div>
+        </div>
         <FindCustomer
           disableRowClick
-          onEdit={customerId => {
-            const dealId = findDealIdByCustomer(customerId)
+          onEdit={(customerId, customer) => {
+            const dealId = findDealIdByCustomer(customerId, customer)
             if (dealId) navigate(`edit/${dealId}/information${location.search}`)
           }}
-          onDelete={customerId => {
-            const dealId = findDealIdByCustomer(customerId)
-            if (dealId) navigate(`edit/${dealId}/delete`)
+          onDelete={(customerId, customer) => {
+            const dealId = findDealIdByCustomer(customerId, customer)
+            if (dealId) navigate(`edit/${dealId}/delete${location.search}`)
           }}
-          onSelect={customerId => {
-            const dealId = findDealIdByCustomer(customerId)
+          onSelect={(customerId, customer) => {
+            const dealId = findDealIdByCustomer(customerId, customer)
             if (!dealId) return
+
+            const isInBoard = lists.some(l => board[l.id]?.some(d => d.id === dealId))
+
+            if (!isInBoard && customer) {
+              const isWonStatus = customer.deal_is_won
+              let newStatus = 'null'
+              if (isWonStatus === 1) newStatus = '1'
+              else if (isWonStatus === 0) newStatus = '0'
+
+              const params = new URLSearchParams(searchParams)
+              if (params.get('is_won') !== newStatus) {
+                params.set('is_won', newStatus)
+                params.set('highlight', String(dealId))
+                navigate({ pathname: location.pathname, search: params.toString() })
+                return
+              }
+            }
 
             if (highlightTimeoutRef.current) {
               clearTimeout(highlightTimeoutRef.current)
@@ -280,7 +373,7 @@ export default function DealsView({
         />
       </div>
 
-      <div className='flex gap-4 pb-2'>
+      <div className='flex gap-1 '>
         {lists.map(list => (
           <DealsList
             key={list.id}
@@ -303,11 +396,13 @@ export default function DealsView({
                   <div className='text-xs text-slate-500 mt-1'>
                     Amount: $ {d.amount ?? 0}
                   </div>
-                  {d.due_date && (
-                    <div className='text-xs text-slate-500 mt-1'>
-                      {new Date(d.due_date).toLocaleDateString()}
-                    </div>
-                  )}
+                  {d.due_date &&
+                    d.due_date !== '0000-00-00' &&
+                    !Number.isNaN(new Date(d.due_date).getTime()) && (
+                      <div className='text-xs text-slate-500 mt-1'>
+                        {new Date(d.due_date).toLocaleDateString()}
+                      </div>
+                    )}
                 </div>
               )
             })()

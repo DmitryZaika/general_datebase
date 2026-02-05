@@ -18,6 +18,7 @@ import { ImageCard } from '~/components/organisms/ImageCard'
 import { StoneTable } from '~/components/organisms/StoneTable'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
+import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
@@ -96,9 +97,10 @@ function InteractiveCard({
         type='slabs'
         itemId={stone.id}
         fieldList={{
-          Available: stone.available === 0 && isRegularStock 
-            ? 'Regular Stock' 
-            : `${stone.available} / ${displayedAmount}${isRegularStock ? ' (Regular stock)' : ''}`,
+          Available:
+            stone.available === 0 && isRegularStock
+              ? 'Regular Stock'
+              : `${stone.available} / ${displayedAmount}${isRegularStock ? ' (Regular stock)' : ''}`,
           Type: capitalizeFirstLetter(stone.type),
           Price:
             stone.retail_price === 0
@@ -165,10 +167,15 @@ export default function Stones() {
 
   useEffect(() => {
     const inStock = stones.filter(
-      stone => (Number(stone.available) > 0 || stone.regular_stock) && Boolean(stone.is_display),
+      stone =>
+        (Number(stone.available) > 0 || stone.regular_stock) &&
+        Boolean(stone.is_display),
     )
     const outOfStock = stones.filter(
-      stone => Number(stone.available) <= 0 && !stone.regular_stock && Boolean(stone.is_display),
+      stone =>
+        Number(stone.available) <= 0 &&
+        !stone.regular_stock &&
+        Boolean(stone.is_display),
     )
     const notDisplayed = stones.filter(stone => !stone.is_display)
 
@@ -303,6 +310,9 @@ export default function Stones() {
     <>
       <div className='flex justify-between flex-wrap items-center items-end mb-2'>
         <div className='flex items-center gap-4'>
+          <div className='hidden md:block'>
+            <OriginalSidebarTrigger />
+          </div>
           <Button
             variant='outline'
             onClick={toggleViewMode}

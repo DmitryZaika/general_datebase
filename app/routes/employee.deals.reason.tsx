@@ -4,6 +4,7 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
+  useSearchParams,
   useSubmit,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
@@ -17,8 +18,10 @@ import {
 } from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
 import { db } from '~/db.server'
-import { LOST_REASONS } from '~/utils/constants'
+import { commitSession, getSession } from '~/sessions.server'
+import { getSearchString, LOST_REASONS } from '~/utils/constants'
 import { getEmployeeUser } from '~/utils/session.server'
+import { toastData } from '~/utils/toastHelpers.server'
 import { replaceUnderscoresWithSpaces } from '~/utils/words'
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -31,7 +34,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const reason = String(formData.get('reason') || '')
 
   if (!Number.isFinite(dealId) || dealId <= 0) {
-    return redirect('/employee/deals')
+    return redirect(`/employee/deals${getSearchString(new URL(request.url))}`)
   }
 
   if (intent === 'cancel') {
@@ -39,18 +42,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       'UPDATE deals SET list_id = ?, position = ? WHERE id = ? AND user_id = ?',
       [fromListId || null, fromPos || 0, dealId, user.id],
     )
-    return redirect(`/employee/deals?highlight=${dealId}`)
+    return redirect(
+      `/employee/deals${getSearchString(new URL(request.url))}?highlight=${dealId}`,
+    )
   }
 
   if (intent === 'submit') {
+    if (!reason || reason === 'not_specified') {
+      return redirect(
+        `/employee/deals${getSearchString(new URL(request.url))}?dealId=${dealId}&fromListId=${fromListId}&fromPos=${fromPos}&error=Reason is required`,
+      )
+    }
     await db.execute(
-      'UPDATE deals SET list_id = 5, lost_reason = ? WHERE id = ? AND user_id = ?',
-      [reason || null, dealId, user.id],
+      'UPDATE deals SET lost_reason = ?, is_won = 0 WHERE id = ? AND user_id = ?',
+      [reason, dealId, user.id],
     )
-    return redirect('/employee/deals')
+
+    const session = await getSession(request.headers.get('Cookie'))
+    session.flash(
+      'message',
+      toastData('Success', 'Deal lost reason updated successfully'),
+    )
+    return redirect(`/employee/deals${getSearchString(new URL(request.url))}`, {
+      headers: { 'Set-Cookie': await commitSession(session) },
+    })
   }
 
-  return redirect('/employee/deals')
+  return redirect(`/employee/deals${getSearchString(new URL(request.url))}`)
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -67,6 +85,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 function EmployeeDealsReason() {
   const { dealId, fromListId, fromPos } = useLoaderData<typeof loader>()
+  const [searchParams] = useSearchParams()
+  const error = searchParams.get('error')
   const form = useForm<{ reason: string }>({
     defaultValues: { reason: '' },
   })
@@ -98,17 +118,24 @@ function EmployeeDealsReason() {
               control={form.control}
               name='reason'
               render={({ field }) => (
-                <SelectInputOther
-                  field={field}
-                  placeholder='Select reason'
-                  name={replaceUnderscoresWithSpaces('lost_reason')}
-                  options={Object.keys(LOST_REASONS).map(key => ({
-                    key: key,
-                    value: replaceUnderscoresWithSpaces(
-                      LOST_REASONS[key as keyof typeof LOST_REASONS],
-                    ),
-                  }))}
-                />
+                <div className='space-y-2'>
+                  <SelectInputOther
+                    field={field}
+                    placeholder='Select reason'
+                    name={replaceUnderscoresWithSpaces('lost_reason')}
+                    options={[
+                      ...Object.keys(LOST_REASONS).map(key => ({
+                        key: key,
+                        value: replaceUnderscoresWithSpaces(
+                          LOST_REASONS[key as keyof typeof LOST_REASONS],
+                        ),
+                      })),
+                    ]}
+                  />
+                  {error && (
+                    <p className='text-sm font-medium text-destructive'>{error}</p>
+                  )}
+                </div>
               )}
             />
             <input type='hidden' name='reason' value={reasonValue || ''} />

@@ -24,7 +24,7 @@ import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
 
 import { csrf } from '~/utils/csrf.server'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 import { FormField, FormProvider } from '../components/ui/form'
 
@@ -36,8 +36,6 @@ const supplierschema = z.object({
   email: z.union([z.email().optional(), z.literal('')]),
   notes: z.string().optional(),
 })
-
-type FormData = z.infer<typeof supplierschema>
 
 const resolver = zodResolver(supplierschema)
 
@@ -57,7 +55,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (errors) {
     return { errors, receivedValues }
   }
-  const user = getAdminUser(request)
+  const user: User = await getAdminUser(request)
   await db.execute(
     `INSERT INTO suppliers  (website, supplier_name, manager,  phone, email, notes, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -67,7 +65,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data.phone ?? null,
       data.email ?? null,
       data.notes ?? null,
-      (await user).company_id,
+      user.company_id,
     ],
   )
   const session = await getSession(request.headers.get('Cookie'))
@@ -79,7 +77,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const user = await getAdminUser(request)
+    const user: User = await getAdminUser(request)
     return { user }
   } catch (error) {
     return redirect(`/login?error=${error}`)
