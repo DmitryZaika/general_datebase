@@ -1,41 +1,37 @@
-# --- Stage 1: Install Dependencies ---
-FROM node:24-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-# Clean install including devDependencies
-RUN npm ci
+# use the official Bun image
+# see all versions at https://hub.docker.com/r/oven/bun/tags
+FROM oven/bun:alpine AS base
+WORKDIR /usr/src/app
 
-# --- Stage 2: Build the App ---
-FROM node:24-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# install dependencies into temp directory
+# this will cache them and speed up future builds
+FROM base AS install
+RUN mkdir -p /temp/dev
+COPY package.json bun.lock /temp/dev/
+RUN cd /temp/dev && bun install --frozen-lockfile
+
+# install with --production (exclude devDependencies)
+RUN mkdir -p /temp/prod
+COPY package.json bun.lock /temp/prod/
+RUN cd /temp/prod && bun install --frozen-lockfile --production
+
+# copy node_modules from temp directory
+# then copy all (non-ignored) project files into the image
+FROM base AS prerelease
+COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
 
-# Run your complex build script (tsc, vite, sw-scripts)
-RUN npm run build
-
-# THE TRICK: Delete everything NOT needed for production
-# This removes the 150MB+ of compilers/linters we just identified
-RUN npm prune --production
-
-# --- Stage 3: Production Runtime ---
-FROM node:24-alpine AS runner
-WORKDIR /app
-
-# Set environment
+# [optional] tests & build
 ENV NODE_ENV=production
-ENV PORT=3000
+RUN bun run build
 
-# Copy only the compiled results and the "pruned" node_modules
-COPY --from=builder /app/build ./build
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
+# copy production dependencies and source code into final image
+FROM base AS release
+COPY --from=install /temp/prod/node_modules node_modules
+COPY --from=prerelease /usr/src/app/build ./build
+COPY --from=prerelease /usr/src/app/package.json .
 
-# Security: run as non-root user
-USER node
-
-EXPOSE 3000
-
-# Start using the server-side entry point
-CMD ["npm", "start"]
+# run the app
+USER bun
+EXPOSE 3000/tcp
+ENTRYPOINT [ "bun", "run", "start"]
