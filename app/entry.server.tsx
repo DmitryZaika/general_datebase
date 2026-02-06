@@ -16,8 +16,7 @@ export default async function handleRequest(
     <ServerRouter context={routerContext} url={request.url} />,
     {
       signal: request.signal,
-      onError(error) {
-        console.error(error)
+      onError() {
         status = 500
       },
     },
