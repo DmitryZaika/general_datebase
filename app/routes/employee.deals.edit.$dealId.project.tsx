@@ -268,7 +268,7 @@ export default function DealProjectInfo() {
       const pathParts = location.pathname.split('/')
       const dealId = pathParts[pathParts.indexOf('edit') + 1]
       navigate(
-        `/employee/deals/reason?dealId=${dealId}&fromListId=${customer.current_list_id}&fromPos=0&is_won=0${location.search}`,
+        `/employee/deals/reason?dealId=${dealId}&fromListId=${customer.current_list_id}${location.search}`,
       )
       return
     }
