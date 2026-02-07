@@ -11,6 +11,7 @@ type SurveyItem = {
   sales_rep_comments: string | null
   technician_rating: number
   technician_comments: string | null
+  installer_name: string | null
   installation_rating: number
   installation_comments: string | null
   created_at: string
@@ -35,9 +36,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       cs.installation_rating,
       cs.installation_comment AS installation_comments,
       cs.created_at,
-      u.name AS sales_rep_name
+      u.name AS sales_rep_name,
+      i.name AS installer_name
     FROM customer_surveys cs
     LEFT JOIN users u ON cs.sales_rep_id = u.id
+    LEFT JOIN users i ON cs.installer_id = i.id
     WHERE cs.company_id = ?
     ORDER BY cs.created_at DESC`,
     [user.company_id],
@@ -60,12 +63,19 @@ export default function AdminSurveys() {
           {items.map(item => (
             <Card key={item.id} className='hover:shadow-lg transition-shadow'>
               <CardHeader>
-                <CardTitle className='text-sm'>
-                  {item.sales_rep_name || 'Sales rep not specified'}
-                </CardTitle>
-                <p className='text-xs text-gray-600'>
-                  {new Date(item.created_at).toLocaleDateString()}
-                </p>
+                <div className='flex justify-between items-start'>
+                  <div>
+                    <CardTitle className='text-sm'>
+                      Sales rep: {item.sales_rep_name || 'Sales rep not specified'}
+                    </CardTitle>
+                    <CardTitle className='text-sm'>
+                      Installer: {item.installer_name || 'Not specified'}
+                    </CardTitle>
+                  </div>
+                  <p className='text-xs text-gray-600'>
+                    {new Date(item.created_at).toLocaleDateString()}
+                  </p>
+                </div>
               </CardHeader>
               <CardContent className='space-y-3'>
                 <div className='flex justify-between text-sm'>
