@@ -83,11 +83,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       const isWonRaw = formData.get('is_won')
       const isWon = isWonRaw === 'null' ? null : Number(isWonRaw)
 
-      await db.execute(`UPDATE deals SET is_won = ? WHERE id = ? AND user_id = ?`, [
-        isWon,
-        dealId,
-        user.id,
-      ])
+      await db.execute(
+        `UPDATE deals SET is_won = ?, lost_reason = NULL WHERE id = ? AND user_id = ?`,
+        [isWon, dealId, user.id],
+      )
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Deal status updated successfully'))
       return redirect(`/employee/deals${searchString}`, {
@@ -267,9 +266,10 @@ export default function DealProjectInfo() {
     if (status === 0) {
       const pathParts = location.pathname.split('/')
       const dealId = pathParts[pathParts.indexOf('edit') + 1]
-      navigate(
-        `/employee/deals/reason?dealId=${dealId}&fromListId=${customer.current_list_id}${location.search}`,
-      )
+      const params = new URLSearchParams(location.search)
+      params.set('dealId', dealId)
+      params.set('fromListId', String(customer.current_list_id))
+      navigate(`/employee/deals/reason?${params.toString()}`)
       return
     }
     fetcher.submit(
@@ -311,7 +311,8 @@ export default function DealProjectInfo() {
         v != null &&
         k !== 'attached_file' &&
         k !== 'current_group_id' &&
-        k !== 'is_won',
+        k !== 'is_won' &&
+        k !== 'current_list_id',
     )
     .map(([k, v]) => ({
       key: k.replace(/_/g, ' ').replace(/\b\w/g, s => s.toUpperCase()),

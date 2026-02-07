@@ -67,11 +67,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
       `INSERT INTO customer_surveys (
         sales_rep_id,
         sales_rep_rating,
-        sales_rep_comments,
+        sales_rep_comment,
         technician_rating,
-        technician_comments,
+        technician_comment,
         installation_rating,
-        installation_comments,
+        installation_comment,
         company_id,
         created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,

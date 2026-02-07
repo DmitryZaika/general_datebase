@@ -282,7 +282,11 @@ export default function DealsView({
           {groupListSelect}
           <div className='hidden md:block'>
             <Link
-              to={`add?list_id=${lists[0]?.id || 1}${location.search}`}
+              to={`add?${(() => {
+                const params = new URLSearchParams(searchParams)
+                params.set('list_id', String(lists[0]?.id || 1))
+                return params.toString()
+              })()}`}
               relative='path'
             >
               <Button variant='outline' size='sm' className='flex gap-2 h-9'>
@@ -304,8 +308,11 @@ export default function DealsView({
                     {
                       label: 'Add New Deal',
                       icon: <Plus className='w-4 h-4' />,
-                      onClick: () =>
-                        navigate(`add?list_id=${lists[0]?.id || 1}${location.search}`),
+                      onClick: () => {
+                        const params = new URLSearchParams(searchParams)
+                        params.set('list_id', String(lists[0]?.id || 1))
+                        navigate(`add?${params.toString()}`)
+                      },
                     },
                   ],
                 },

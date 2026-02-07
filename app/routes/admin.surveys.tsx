@@ -29,11 +29,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     `SELECT 
       cs.id,
       cs.sales_rep_rating,
-      cs.sales_rep_comments,
+      cs.sales_rep_comment AS sales_rep_comments,
       cs.technician_rating,
-      cs.technician_comments,
+      cs.technician_comment AS technician_comments,
       cs.installation_rating,
-      cs.installation_comments,
+      cs.installation_comment AS installation_comments,
       cs.created_at,
       u.name AS sales_rep_name
     FROM customer_surveys cs
@@ -99,4 +99,3 @@ export default function AdminSurveys() {
     </div>
   )
 }
-
