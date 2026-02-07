@@ -3,7 +3,7 @@ AWS_ACCOUNT_ID := 741448943665
 REGION := us-east-2
 REPO_NAME := granite-manager-remix
 EC2_USER := ec2-user
-EC2_IP := your-ec2-ip-address
+EC2_IP := ec2-16-58-227-251.us-east-2.compute.amazonaws.com
 DOMAIN := granite-manager.com
 
 # Full Image URI
@@ -54,11 +54,18 @@ clean:
 login:
 	aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com
 
-# New target to prepare the EC2 filesystem for SSL
+# New target to prepare the EC2 filesystem and install Docker
 setup-host:
 	ssh $(EC2_USER)@$(EC2_IP) "\
-		sudo mkdir -p /var/www/certbot && \
-		sudo mkdir -p /etc/letsencrypt && \
+		sudo dnf update -y && \
+		sudo dnf install -y docker && \
+		sudo systemctl enable --now docker && \
+		sudo usermod -aG docker $(EC2_USER) && \
+		sudo mkdir -p /usr/local/lib/docker/cli-plugins && \
+		sudo curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose && \
+		sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose && \
+		sudo ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose && \
+		sudo mkdir -p /var/www/certbot /etc/letsencrypt && \
 		sudo curl -s https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf -o /etc/letsencrypt/options-ssl-nginx.conf && \
 		sudo chown -R $(EC2_USER):$(EC2_USER) /var/www/certbot /etc/letsencrypt"
 
@@ -70,14 +77,16 @@ build-push: login
 	docker push $(IMAGE_URI)
 
 
-# UPDATED: Deployment now cleans up "dangling" images automatically
+check-aws:
+	ssh $(EC2_USER)@$(EC2_IP) "aws sts get-caller-identity || echo 'AWS CLI not configured!'"
+
+
 deploy-prod:
-	scp docker-compose.yml docker-compose.prod.yml nginx.conf .env $(EC2_USER)@$(EC2_IP):~/
-	ssh $(EC2_USER)@$(EC2_IP) "\
-		aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com && \
-		docker compose -f docker-compose.yml -f docker-compose.prod.yml pull && \
-		docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d && \
-		docker image prune -f" # <--- Safely cleans up the OLD version's layers
+	scp -r docker-compose.yml docker-compose.prod.yml nginx .env $(EC2_USER)@$(EC2_IP):~/
+	ssh $(EC2_USER)@$(EC2_IP) "aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com && \
+		docker-compose -f docker-compose.yml -f docker-compose.prod.yml pull && \
+		docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d && \
+		docker image prune -f"
 
 
 prune:
