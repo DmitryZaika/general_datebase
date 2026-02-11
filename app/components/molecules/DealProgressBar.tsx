@@ -14,6 +14,7 @@ interface DealProgressBarProps {
   stages: StageInfo[]
   history: StageHistory[]
   currentListId: number
+  isClosed?: boolean
 }
 
 function formatDuration(ms: number): string {
@@ -29,16 +30,22 @@ function formatDuration(ms: number): string {
 function getStageDuration(
   stageId: number,
   history: StageHistory[],
+  isClosed?: boolean,
 ): string | null {
   const entries = history.filter(h => h.list_id === stageId)
   if (entries.length === 0) return null
+
+  const lastEntry = history[history.length - 1]
+  const closedAt = lastEntry?.entered_at ? new Date(lastEntry.entered_at).getTime() : Date.now()
 
   let totalMs = 0
   for (const entry of entries) {
     const start = new Date(entry.entered_at).getTime()
     const end = entry.exited_at
       ? new Date(entry.exited_at).getTime()
-      : Date.now()
+      : isClosed
+        ? closedAt
+        : Date.now()
     totalMs += end - start
   }
 
@@ -59,6 +66,7 @@ export function DealProgressBar({
   stages,
   history,
   currentListId,
+  isClosed,
 }: DealProgressBarProps) {
   const sorted = [...stages].sort((a, b) => a.position - b.position)
   const currentIndex = sorted.findIndex(s => s.id === currentListId)
@@ -73,7 +81,7 @@ export function DealProgressBar({
           const isActive = isCompleted || isCurrent
 
           const duration = isActive
-            ? getStageDuration(stage.id, history)
+            ? getStageDuration(stage.id, history, isClosed)
             : null
           const displayText = isActive ? (duration ?? '-') : '0 days'
 

@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -7,6 +8,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useRevalidator,
   useSearchParams,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
@@ -125,6 +127,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const emailsMap: Record<number, boolean> = {}
     for (const row of emailCounts) emailsMap[row.deal_id] = Number(row.count) > 0
 
+    const nearestActivities = await selectMany<{
+      deal_id: number
+      name: string
+      deadline: string | null
+    }>(
+      db,
+      `SELECT deal_id, name, deadline
+       FROM deal_activities
+       WHERE deleted_at IS NULL AND is_completed = 0 AND company_id = ?
+       ORDER BY
+         CASE WHEN deadline IS NULL THEN 1 ELSE 0 END,
+         deadline ASC,
+         CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,
+         created_at ASC`,
+      [user.company_id],
+    )
+    const nearestActivityMap: Record<number, { name: string; deadline: string | null }> = {}
+    for (const a of nearestActivities) {
+      if (!nearestActivityMap[a.deal_id]) {
+        nearestActivityMap[a.deal_id] = { name: a.name, deadline: a.deadline }
+      }
+    }
+
     const customers = await selectMany<{
       id: number
       name: string
@@ -141,6 +166,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       lists,
       imagesMap,
       emailsMap,
+      nearestActivityMap,
       groups,
       activeGroupId,
       isWon,
@@ -157,6 +183,7 @@ export default function EmployeeDeals() {
     lists,
     imagesMap,
     emailsMap,
+    nearestActivityMap,
     groups,
     activeGroupId,
     isWon,
@@ -166,6 +193,7 @@ export default function EmployeeDeals() {
     lists: { id: number; name: string }[]
     imagesMap: Record<number, boolean>
     emailsMap: Record<number, boolean>
+    nearestActivityMap: Record<number, { name: string; deadline: string | null }>
     groups: { id: number; name: string }[]
     activeGroupId: number | undefined
     isWon: number | null
@@ -173,6 +201,15 @@ export default function EmployeeDeals() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
+  const revalidator = useRevalidator()
+
+  useEffect(() => {
+    const state = location.state as { shouldRevalidate?: boolean } | null
+    if (state?.shouldRevalidate) {
+      revalidator.revalidate()
+      navigate(location.pathname + location.search, { replace: true, state: {} })
+    }
+  }, [location.state])
 
   const handleGroupChange = (newGroupId: string) => {
     const params = new URLSearchParams(searchParams)
@@ -228,6 +265,7 @@ export default function EmployeeDeals() {
         lists={lists}
         imagesMap={imagesMap}
         emailsMap={emailsMap}
+        nearestActivityMap={nearestActivityMap}
         groupListSelect={
           <div className='flex gap-2 '>
             {groupSelect}

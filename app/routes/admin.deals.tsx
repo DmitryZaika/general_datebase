@@ -7,6 +7,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useRevalidator,
   useSearchParams,
 } from 'react-router'
 import DealsList from '~/components/DealsList'
@@ -128,12 +129,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const imagesMap: Record<number, boolean> = {}
     for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
 
+    const nearestActivities = await selectMany<{
+      deal_id: number
+      name: string
+      deadline: string | null
+    }>(
+      db,
+      `SELECT deal_id, name, deadline
+       FROM deal_activities
+       WHERE deleted_at IS NULL AND is_completed = 0 AND company_id = ?
+       ORDER BY
+         CASE WHEN deadline IS NULL THEN 1 ELSE 0 END,
+         deadline ASC,
+         CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,
+         created_at ASC`,
+      [companyId],
+    )
+    const nearestActivityMap: Record<number, { name: string; deadline: string | null }> = {}
+    for (const a of nearestActivities) {
+      if (!nearestActivityMap[a.deal_id]) {
+        nearestActivityMap[a.deal_id] = { name: a.name, deadline: a.deadline }
+      }
+    }
+
     return {
       deals,
       customers,
       lists,
       emailsMap,
       imagesMap,
+      nearestActivityMap,
       groups,
       activeGroupId,
       isWon,
@@ -150,6 +175,7 @@ export default function AdminDeals() {
     lists,
     emailsMap,
     imagesMap,
+    nearestActivityMap,
     groups,
     activeGroupId,
     isWon,
@@ -157,6 +183,15 @@ export default function AdminDeals() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
+  const revalidator = useRevalidator()
+
+  useEffect(() => {
+    const state = location.state as { shouldRevalidate?: boolean } | null
+    if (state?.shouldRevalidate) {
+      revalidator.revalidate()
+      navigate(location.pathname + location.search, { replace: true, state: {} })
+    }
+  }, [location.state])
 
   const handleGroupChange = (newGroupId: string) => {
     const params = new URLSearchParams(searchParams)
@@ -186,10 +221,13 @@ export default function AdminDeals() {
     user_id?: number | null
     has_email?: boolean
     has_images?: boolean
+    nearest_activity_name?: string | null
+    nearest_activity_deadline?: string | null
   }
 
   const toDeal = (d: AdminDeal): Deal => {
     const customer = customers.find(c => c.id === d.customer_id)
+    const activity = nearestActivityMap?.[d.id]
     return {
       id: d.id,
       customer_id: d.customer_id,
@@ -210,18 +248,22 @@ export default function AdminDeals() {
       user_id: d.user_id ?? undefined,
       has_email: emailsMap?.[d.id] || false,
       has_images: imagesMap?.[d.id] || false,
+      nearest_activity_name: activity?.name ?? null,
+      nearest_activity_deadline: activity?.deadline ?? null,
     }
   }
 
   const sortDeals = (arr: Deal[]) => {
     const copy = [...arr]
     copy.sort((a, b) => {
-      const aHas = Boolean(a.due_date)
-      const bHas = Boolean(b.due_date)
+      const aDate = a.nearest_activity_deadline ?? a.due_date
+      const bDate = b.nearest_activity_deadline ?? b.due_date
+      const aHas = Boolean(aDate)
+      const bHas = Boolean(bDate)
       if (!aHas && !bHas) return 0
       if (!aHas) return -1
       if (!bHas) return 1
-      return new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
+      return new Date(aDate || 0).getTime() - new Date(bDate || 0).getTime()
     })
     return copy
   }
@@ -236,7 +278,7 @@ export default function AdminDeals() {
     }
     for (const l of lists) board[l.id] = sortDeals(board[l.id])
     return board
-  }, [JSON.stringify(deals), JSON.stringify(customers), JSON.stringify(lists)])
+  }, [JSON.stringify(deals), JSON.stringify(customers), JSON.stringify(lists), JSON.stringify(nearestActivityMap)])
 
   const [board, setBoard] = useState<Record<number, Deal[]>>(initialBoard)
   const [highlightDealId, setHighlightDealId] = useState<number | null>(null)

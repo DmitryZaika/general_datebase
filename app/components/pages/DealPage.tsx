@@ -16,6 +16,7 @@ interface DealPageProps {
   history?: { list_id: number; entered_at: string; exited_at: string | null }[]
   currentListId?: number
   activities?: DealActivity[]
+  isWon?: number | null
 }
 
 export default function DealsEdit({
@@ -24,12 +25,17 @@ export default function DealsEdit({
   history,
   currentListId,
   activities,
+  isWon,
 }: DealPageProps) {
   const navigate = useNavigate()
   const location = useLocation()
+
   const handleChange = (open: boolean) => {
     if (!open) {
-      navigate(`..${location.search}`)
+      const basePath = location.pathname.includes('/admin/')
+        ? '/admin/deals'
+        : '/employee/deals'
+      navigate(`${basePath}${location.search}`, { state: { shouldRevalidate: true } })
     }
   }
 
@@ -48,6 +54,7 @@ export default function DealsEdit({
               stages={stages}
               history={history}
               currentListId={currentListId}
+              isClosed={isWon !== null && isWon !== undefined}
             />
           </div>
         )}

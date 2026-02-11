@@ -1,63 +1,56 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { format } from 'date-fns'
 import {
-  Calendar as CalendarIcon,
+  AlertCircle,
+  CalendarOff,
+  Clock,
   GripVertical,
   Mail,
   PaperclipIcon,
   Pencil,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link, useFetcher, useLocation } from 'react-router'
+import { cn } from '~/lib/utils'
+import type { DealCardData } from '~/types/deals'
 import { formatMoney, updateNumber } from './functions'
-import { Button } from './ui/button'
-import { Calendar } from './ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 interface DealItemProps {
-  deal: {
-    id: number
-    name: string
-    amount?: number | null
-    description?: string | null
-    status?: string | null
-    lost_reason?: string | null
-    list_id: number
-    position?: number | null
-    due_date?: string | null
-    images?: string[] | null
-    has_images?: boolean
-    has_email?: boolean
-    sales_rep?: string | null
-    is_won?: number | null
-    company_name?: string | null
-  }
+  deal: DealCardData
   readonly?: boolean
   highlighted?: boolean
 }
 
-function parseLocal(dateInput: string | null | undefined): Date {
-  if (!dateInput) return new Date(NaN)
-  const dateStr = typeof dateInput === 'string' ? dateInput : ''
-  const parts = dateStr.split('-')
-  if (parts.length !== 3) return new Date(NaN)
-  const [y, m, d] = parts.map(Number)
-  return new Date(y, m - 1, d)
-}
-function getDateColor(dateStr: string | null | undefined, listId: number): string {
-  if ((!dateStr || dateStr === '0000-00-00') && listId !== 4 && listId !== 5)
-    return 'text-red-500'
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const selected = parseLocal(dateStr)
-  if (Number.isNaN(selected.getTime())) return 'text-gray-700'
-  if (selected.getTime() === today.getTime()) return 'text-yellow-500'
-  return selected < today ? 'text-red-500' : 'text-gray-500'
+interface ActivityDeadlineInfo {
+  color: string
+  icon: 'alert' | 'clock'
+  label: string
+  hasPill: boolean
 }
 
-function formatDate(date: string | null): Date | undefined {
-  if (!date) return undefined
-  return new Date(`${date}T00:00:00`)
+function getActivityDeadlineInfo(deadline: string): ActivityDeadlineInfo {
+  const date = new Date(deadline)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const deadlineDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const diffDays = Math.round((deadlineDay.getTime() - today.getTime()) / 86_400_000)
+  const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
+  const timeSuffix = hasTime ? ` ${format(date, 'HH:mm')}` : ''
+
+  if (diffDays < 0) {
+    return { color: 'text-red-600 bg-red-50', icon: 'alert', label: `${Math.abs(diffDays)}d overdue`, hasPill: true }
+  }
+  if (diffDays === 0) {
+    return { color: 'text-orange-600 bg-orange-50', icon: 'clock', label: `Today${timeSuffix}`, hasPill: true }
+  }
+  if (diffDays === 1) {
+    return { color: 'text-amber-600', icon: 'clock', label: `Tomorrow${timeSuffix}`, hasPill: false }
+  }
+  if (diffDays <= 2) {
+    return { color: 'text-amber-600', icon: 'clock', label: format(date, 'MMM d') + timeSuffix, hasPill: false }
+  }
+  return { color: 'text-gray-500', icon: 'clock', label: format(date, 'MMM d') + timeSuffix, hasPill: false }
 }
 
 export default function DealItem({
@@ -65,16 +58,8 @@ export default function DealItem({
   readonly = false,
   highlighted = false,
 }: DealItemProps) {
-  const [localDate, setLocalDate] = useState<string | null>(deal.due_date ?? null)
   const [editAmount, setEditAmount] = useState(false)
-  const [editDesc, setEditDesc] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [calendarOpen, setCalendarOpen] = useState(false)
-  const descTextareaRef = useRef<HTMLTextAreaElement | null>(null)
-  const descDisplayRef = useRef<HTMLParagraphElement | null>(null)
-  const [descExpanded, setDescExpanded] = useState(false)
-  const [descOverflow, setDescOverflow] = useState(false)
-  const [lineHeightPx, setLineHeightPx] = useState<number>(20)
   const fetcher = useFetcher()
   const location = useLocation()
   const hasEmail = Boolean(deal.has_email)
@@ -94,10 +79,6 @@ export default function DealItem({
     ? `${editBase}/edit/${deal.id}/images${location.search}`
     : `edit/${deal.id}/images`
 
-  useEffect(() => {
-    setLocalDate(deal.due_date ?? null)
-  }, [deal.due_date])
-
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: deal.id,
     data: { listId: deal.list_id, position: deal.position, type: 'deal' },
@@ -109,43 +90,9 @@ export default function DealItem({
     transition,
   }
 
-  function submitDate(dateStr: string) {
-    const fd = new FormData()
-    fd.append('id', String(deal.id))
-    fd.append('date', dateStr)
-    fetcher.submit(fd, { method: 'post', action: '/api/deals/update-date' })
-    setLocalDate(dateStr)
-  }
-
-  function resizeTextarea(el: HTMLTextAreaElement | null) {
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }
-
-  useEffect(() => {
-    if (editDesc) {
-      resizeTextarea(descTextareaRef.current)
-    }
-  }, [editDesc])
-
-  useEffect(() => {
-    if (editDesc) return
-    const el = descDisplayRef.current
-    if (!el) return
-    const styles = window.getComputedStyle(el)
-    const lh = parseFloat(styles.lineHeight)
-    const computedLineHeight = Number.isFinite(lh) ? lh : 20
-    setLineHeightPx(computedLineHeight)
-    const maxH = computedLineHeight * 4
-    setDescOverflow(el.scrollHeight > maxH + 1)
-  }, [deal.description, editDesc])
-
-  function formatDisplay(dateStr: string) {
-    if (dateStr === '0000-00-00') return ''
-    const d = parseLocal(dateStr)
-    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString()
-  }
+  const deadlineInfo = deal.nearest_activity_deadline
+    ? getActivityDeadlineInfo(deal.nearest_activity_deadline)
+    : null
 
   return (
     <div
@@ -245,80 +192,12 @@ export default function DealItem({
         </div>
       )}
 
-      {editDesc ? (
-        <textarea
-          className='border rounded p-1  w-full text-sm'
-          ref={descTextareaRef}
-          defaultValue={deal.description ?? ''}
-          autoFocus
-          onFocus={e => e.currentTarget.select()}
-          rows={1}
-          style={{
-            overflow: 'hidden',
-            resize: 'none',
-            position: 'relative',
-            zIndex: 20,
-          }}
-          onInput={e => resizeTextarea(e.currentTarget)}
-          onBlur={async e => {
-            const fd = new FormData()
-            fd.append('id', String(deal.id))
-            fd.append('description', e.currentTarget.value.trim())
-            setIsSaving(true)
-            await fetcher.submit(fd, {
-              method: 'post',
-              action: '/api/deals/update-desc',
-            })
-            setIsSaving(false)
-            setEditDesc(false)
-          }}
-          onPointerDown={e => e.stopPropagation()}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              e.currentTarget.blur()
-            }
-          }}
-        />
-      ) : deal.description ? (
-        <div className='w-full'>
-          <p
-            ref={descDisplayRef}
-            className={`text-sm leading-5 text-slate-500 mt-1 break-words whitespace-pre-wrap ${readonly ? '' : 'cursor-pointer'}`}
-            onClick={() => !readonly && setEditDesc(true)}
-            onPointerDown={e => e.stopPropagation()}
-            style={{
-              maxHeight: descExpanded ? 'none' : `${lineHeightPx * 4}px`,
-              overflow: descExpanded ? 'visible' : 'hidden',
-            }}
-          >
-            {deal.description}
-          </p>
-          {descOverflow && (
-            <div className='mt-1'>
-              <Button
-                variant='ghost'
-                size='sm'
-                className='h-6 px-2 text-xs'
-                onClick={() => setDescExpanded(v => !v)}
-                onPointerDown={e => e.stopPropagation()}
-                style={{ position: 'relative', zIndex: 20 }}
-              >
-                {descExpanded ? 'Show less' : 'Show more'}
-              </Button>
-            </div>
-          )}
-        </div>
+      {deal.nearest_activity_name ? (
+        <p className='text-sm leading-5 text-slate-600 mt-1 truncate w-full'>
+          {deal.nearest_activity_name}
+        </p>
       ) : (
-        !readonly && (
-          <p
-            className='text-sm text-slate-500 mt-1 break-words whitespace-pre-wrap cursor-pointer'
-            onClick={() => setEditDesc(true)}
-            onPointerDown={e => e.stopPropagation()}
-          >
-            Add description
-          </p>
-        )
+        <p className='text-xs text-slate-400 mt-1 italic'>No upcoming activities</p>
       )}
 
       {deal.status === 'Closed Lost' && deal.lost_reason && (
@@ -329,55 +208,27 @@ export default function DealItem({
 
       <div className='flex items-center gap-2 w-full'>
         <div className='mr-auto flex items-center'>
-          {deal.list_id !== 5 &&
-            deal.list_id !== 4 &&
-            !readonly &&
-            deal.is_won === null && (
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
-                    onClick={e => e.stopPropagation()}
-                    onPointerDown={e => e.stopPropagation()}
-                  >
-                    {localDate && localDate !== '0000-00-00' ? (
-                      formatDisplay(localDate)
-                    ) : (
-                      <CalendarIcon className='w-4 h-4' />
-                    )}
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className='w-auto p-0' align='start' side='bottom'>
-                  <Calendar
-                    mode='single'
-                    selected={formatDate(localDate)}
-                    defaultMonth={formatDate(localDate)}
-                    onSelect={(date: Date | undefined) => {
-                      if (date) {
-                        const year = date.getFullYear()
-                        const month = String(date.getMonth() + 1).padStart(2, '0')
-                        const day = String(date.getDate()).padStart(2, '0')
-                        const dateStr = `${year}-${month}-${day}`
-                        submitDate(dateStr)
-                        setCalendarOpen(false)
-                      }
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            )}
-          {deal.list_id !== 5 &&
-            deal.list_id !== 4 &&
-            readonly &&
-            localDate &&
-            localDate !== '0000-00-00' &&
-            deal.is_won === null && (
-              <p
-                className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}
-              >
-                {formatDisplay(localDate)}
-              </p>
-            )}
+          {deadlineInfo ? (
+            <span
+              className={cn(
+                'flex items-center gap-1 text-xs font-medium',
+                deadlineInfo.color,
+                deadlineInfo.hasPill && 'rounded-full px-2 py-0.5',
+              )}
+            >
+              {deadlineInfo.icon === 'alert' ? (
+                <AlertCircle className='w-3 h-3' />
+              ) : (
+                <Clock className='w-3 h-3' />
+              )}
+              {deadlineInfo.label}
+            </span>
+          ) : deal.nearest_activity_name ? (
+            <span className='flex items-center gap-1 text-xs text-gray-400 italic'>
+              <CalendarOff className='w-3 h-3' />
+              No deadline
+            </span>
+          ) : null}
         </div>
 
         {(hasEmail || hasImages) && (

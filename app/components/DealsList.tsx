@@ -1,23 +1,11 @@
 import { useDroppable } from '@dnd-kit/core'
+import type { DealCardData } from '~/types/deals'
 import DealsCard from './DealsCard'
 import { Card, CardHeader, CardTitle } from './ui/card'
 
 interface DealsListProps {
   title: string
-  customers: {
-    id: number
-    name: string
-    amount?: number | null
-    description?: string | null
-    status?: string | null
-    lost_reason?: string | null
-    list_id: number
-    position?: number
-    due_date?: string | null
-    sales_rep?: string | null
-    has_images?: boolean
-    has_email?: boolean
-  }[]
+  customers: DealCardData[]
   id: number
   readonly?: boolean
   highlightedDealId?: number

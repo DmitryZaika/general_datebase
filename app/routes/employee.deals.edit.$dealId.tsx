@@ -16,9 +16,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const dealRows = await selectMany<{
       list_id: number
       group_id: number
+      is_won: number | null
     }>(
       db,
-      `SELECT d.list_id, l.group_id
+      `SELECT d.list_id, l.group_id, d.is_won
        FROM deals d
        JOIN deals_list l ON d.list_id = l.id
        JOIN customers c ON d.customer_id = c.id
@@ -28,7 +29,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
     if (!dealRows.length) return redirect('/employee/deals')
 
-    const { list_id, group_id } = dealRows[0]
+    const { list_id, group_id, is_won } = dealRows[0]
 
     const [stages, history, activities] = await Promise.all([
       selectMany<{ id: number; name: string; position: number }>(
@@ -51,14 +52,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       ),
     ])
 
-    return { dealId, stages, history, currentListId: list_id, activities }
+    return { dealId, stages, history, currentListId: list_id, activities, isWon: is_won }
   } catch {
     return redirect('/login')
   }
 }
 
 export default function DealEditLayout() {
-  const { dealId, stages, history, currentListId, activities } =
+  const { dealId, stages, history, currentListId, activities, isWon } =
     useLoaderData<typeof loader>()
   return (
     <DealPage
@@ -67,6 +68,7 @@ export default function DealEditLayout() {
       history={history}
       currentListId={currentListId}
       activities={activities}
+      isWon={isWon}
     />
   )
 }

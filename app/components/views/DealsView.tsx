@@ -18,11 +18,8 @@ import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { Button } from '~/components/ui/button'
 import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import type { Customer } from '~/types'
-
-// type Customer = {
-//   id: number
-//   name: string
-// }
+import type { DealCardData } from '~/types/deals'
+import type { Nullable } from '~/types/utils'
 
 type List = {
   id: number
@@ -32,22 +29,17 @@ type List = {
 type FullDeal = {
   id: number
   customer_id: number
-  amount?: number | null
-  description?: string | null
-  status?: string | null
-  lost_reason?: string | null
+  amount?: Nullable<number>
+  description?: Nullable<string>
+  status?: Nullable<string>
+  lost_reason?: Nullable<string>
   position?: number
   list_id: number
-  due_date?: string | null
-  is_won?: number | null
+  due_date?: Nullable<string>
+  is_won?: Nullable<number>
 }
 
-type Deal = FullDeal & {
-  name: string
-  company_name?: string | null
-  has_images?: boolean
-  has_email?: boolean
-}
+type Deal = FullDeal & DealCardData
 
 interface DealsViewProps {
   deals: FullDeal[]
@@ -55,6 +47,7 @@ interface DealsViewProps {
   lists: List[]
   imagesMap: Record<number, boolean>
   emailsMap: Record<number, boolean>
+  nearestActivityMap?: Record<number, { name: string; deadline: Nullable<string> }>
   groupListSelect?: React.ReactNode
 }
 
@@ -64,6 +57,7 @@ export default function DealsView({
   lists,
   imagesMap,
   emailsMap,
+  nearestActivityMap,
   groupListSelect,
 }: DealsViewProps) {
   const navigate = useNavigate()
@@ -72,6 +66,7 @@ export default function DealsView({
 
   const toDeal = (d: FullDeal): Deal => {
     const customer = customers.find(c => c.id === d.customer_id)
+    const activity = nearestActivityMap?.[d.id]
     return {
       id: d.id,
       customer_id: d.customer_id,
@@ -91,18 +86,22 @@ export default function DealsView({
       has_images: imagesMap?.[d.id] || false,
       has_email: emailsMap?.[d.id] || false,
       is_won: d.is_won,
+      nearest_activity_name: activity?.name ?? null,
+      nearest_activity_deadline: activity?.deadline ?? null,
     }
   }
 
   const sortDeals = (arr: Deal[]) => {
     const copy = [...arr]
     copy.sort((a, b) => {
-      const aHas = Boolean(a.due_date)
-      const bHas = Boolean(b.due_date)
+      const aDate = a.nearest_activity_deadline ?? a.due_date
+      const bDate = b.nearest_activity_deadline ?? b.due_date
+      const aHas = Boolean(aDate)
+      const bHas = Boolean(bDate)
       if (!aHas && !bHas) return 0
       if (!aHas) return -1
       if (!bHas) return 1
-      return new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
+      return new Date(aDate || 0).getTime() - new Date(bDate || 0).getTime()
     })
     return copy
   }
@@ -117,7 +116,7 @@ export default function DealsView({
     }
     for (const l of lists) board[l.id] = sortDeals(board[l.id])
     return board
-  }, [JSON.stringify(deals), JSON.stringify(customers), JSON.stringify(lists)])
+  }, [JSON.stringify(deals), JSON.stringify(customers), JSON.stringify(lists), JSON.stringify(nearestActivityMap)])
 
   const [board, setBoard] = useState<Record<number, Deal[]>>(initialBoard)
   const [activeId, setActiveId] = useState<number | null>(null)
@@ -399,17 +398,17 @@ export default function DealsView({
               if (!d) return null
               return (
                 <div className='w-72 border rounded-lg p-2 shadow-md bg-white'>
-                  <div className='text-lg font-semibold truncate'>{d.name}</div>
+                  <div className='text-lg font-semibold truncate'>
+                    {d.company_name ?? d.name}
+                  </div>
                   <div className='text-xs text-slate-500 mt-1'>
                     Amount: $ {d.amount ?? 0}
                   </div>
-                  {d.due_date &&
-                    d.due_date !== '0000-00-00' &&
-                    !Number.isNaN(new Date(d.due_date).getTime()) && (
-                      <div className='text-xs text-slate-500 mt-1'>
-                        {new Date(d.due_date).toLocaleDateString()}
-                      </div>
-                    )}
+                  {d.nearest_activity_name && (
+                    <div className='text-xs text-slate-600 mt-1 truncate'>
+                      {d.nearest_activity_name}
+                    </div>
+                  )}
                 </div>
               )
             })()
