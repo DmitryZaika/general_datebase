@@ -38,7 +38,7 @@ export default function DealsEdit({
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[1100px] overflow-auto md:overflow-hidden flex flex-col justify-baseline h-auto min-h-[600px] max-h-[95vh] md:h-[85vh] py-4 px-1 sm:p-5  '>
+      <DialogContent className='sm:max-w-[1100px] overflow-auto md:overflow-hidden flex flex-col justify-baseline h-auto min-h-[600px] max-h-[95vh] md:h-[85vh] py-4 px-1 sm:px-2 sm:py-5  '>
         <DialogHeader>
           <DialogTitle className='px-1 sm:px-2'>Edit Deal</DialogTitle>
         </DialogHeader>
@@ -52,7 +52,7 @@ export default function DealsEdit({
           </div>
         )}
         <div className='grid grid-cols-1 md:grid-cols-[2fr_2fr] flex-1 min-h-0 overflow-auto md:overflow-hidden'>
-          <div className='px-1 sm:px-2  md:overflow-auto md:min-h-0'>
+          <div className='px-1 sm:px-1  md:overflow-auto md:min-h-0'>
             <Tabs
               value={location.pathname.split('/').pop()}
               onValueChange={value => navigate(`${value}${location.search}`)}
