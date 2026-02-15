@@ -35,6 +35,7 @@ const userSchema = z.object({
   email: z.email('Invalid email address'),
   password: z.union([z.string(), z.null(), z.undefined()]).optional(),
   email_signature: z.string().optional(),
+  email_name: z.string().optional(),
 })
 
 const resolver = zodResolver(userSchema)
@@ -44,6 +45,7 @@ interface UserData extends RowDataPacket {
   email: string | null
   phone_number: string | null
   email_signature: string | null
+  email_name: string | null
   telegram_id: boolean
 }
 
@@ -70,9 +72,16 @@ export async function action({ request }: ActionFunctionArgs) {
       'name = ?',
       'email = ?',
       'phone_number = ?',
+      'email_name = ?',
       'email_signature = ?',
     ]
-    const params = [data.name, data.email, data.phone_number, data.email_signature]
+    const params = [
+      data.name,
+      data.email,
+      data.phone_number ?? null,
+      data.email_name ?? null,
+      data.email_signature ?? null,
+    ]
 
     // Only hash and update password if provided
     if (data.password && data.password.trim() !== '') {
@@ -109,7 +118,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = await getEmployeeUser(request)
 
     ;[rows] = await db.query<UserData[]>(
-      `SELECT name, email, phone_number, email_signature, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ? AND is_deleted = 0`,
+      `SELECT name, email, phone_number, email_signature, email_name, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ? AND is_deleted = 0`,
       [user.id],
     )
 
@@ -170,6 +179,7 @@ export default function UserProfile() {
       email: userData.email || '',
       password: '',
       email_signature: userData.email_signature || '',
+      email_name: userData.email_name || '',
     },
   })
 
@@ -245,6 +255,17 @@ export default function UserProfile() {
                     name='Password'
                     type='password'
                     placeholder='Leave empty to keep current password'
+                    field={field}
+                  />
+                )}
+              />
+              <FormField
+                control={form.control}
+                name='email_name'
+                render={({ field }) => (
+                  <InputItem
+                    name='Email Name'
+                    placeholder='Your email name'
                     field={field}
                   />
                 )}

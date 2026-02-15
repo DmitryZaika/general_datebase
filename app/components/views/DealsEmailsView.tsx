@@ -3,6 +3,7 @@ import { Inbox, Paperclip, RotateCw, Send } from 'lucide-react'
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { cn } from '~/lib/utils'
+import { Button } from '../ui/button'
 
 export interface Email {
   id: number
@@ -82,12 +83,9 @@ export default function DealsEmailsView({
     <div className='flex h-[calc(100vh-100px)] w-full bg-background font-sans'>
       {/* Sidebar */}
       <div className='w-64 flex-shrink-0 flex flex-col py-4 pr-4'>
-        {/* <Button
-          className='w-full'
-          onClick={() => navigate('sendEmail')}
-        >
+        <Button className='w-full' onClick={() => navigate('sendEmail')}>
           New email
-        </Button> */}
+        </Button>
 
         <nav className='flex-1 space-y-1 pr-2'>
           {navItems.map(item => (
@@ -181,7 +179,13 @@ export default function DealsEmailsView({
                           : email.sender_name || email.sender_email}
                       </div>
                     )}
-
+                    <div>
+                      <div className='w-48 flex-shrink-0 truncate text-sm text-gray-900 font-medium pl-1'>
+                        {activeTab === 'inbox'
+                          ? email.sender_name || email.sender_email
+                          : email.receiver_name || email.receiver_email}
+                      </div>
+                    </div>
                     {/* Sender */}
                     <div className='w-48 flex-shrink-0 truncate text-sm text-gray-900 font-medium pl-1'>
                       {activeTab === 'inbox'

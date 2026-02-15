@@ -46,14 +46,20 @@ const emailToSend = async (user: User, cleaned: Email) => {
     'SELECT domain from company where id = ?',
     user.company_id,
   )
-  const userSignature = await selectId<{ email_signature: string | null }>(
+
+  // Изменено: получаем и подпись, и имя (email_name)
+  const userData = await selectId<{
+    email_signature: string | null
+    email_name: string | null
+  }>(
     db,
-    'SELECT email_signature FROM users WHERE id = ? AND is_deleted = 0',
+    'SELECT email_signature, email_name FROM users WHERE id = ? AND is_deleted = 0',
     user.id,
   )
+
   const bodyWithSignature = appendEmailSignature(
     cleaned.body,
-    userSignature?.email_signature,
+    userData?.email_signature,
   )
 
   const softOptOutText = "\n\nIf you'd prefer I stop, just reply and tell me."
@@ -68,7 +74,12 @@ const emailToSend = async (user: User, cleaned: Email) => {
     </body>
   </html>`
 
-  const from = fromEmail(userCompany?.domain || null, user.email)
+  const emailAddress = fromEmail(userCompany?.domain || null, user.email)
+
+  // Изменено: формируем строку отправителя в формате "Имя <email>"
+  const from = userData?.email_name
+    ? `"${userData.email_name}" <${emailAddress}>`
+    : emailAddress
 
   return {
     to: cleaned.to,
