@@ -1,5 +1,5 @@
+import { Check, LinkIcon, Pencil, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { FaCheck, FaLink, FaPencilAlt, FaTimes } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   data,
@@ -156,7 +156,7 @@ function SlabItem({
               variant='blue'
               disabled={!newBundle.trim()}
             >
-              <FaCheck style={{ height: '1.2rem', width: '1.2rem' }} />
+              <Check style={{ height: '1.2rem', width: '1.2rem' }} />
             </Button>
           ) : (
             <>
@@ -165,7 +165,7 @@ function SlabItem({
                 className='size-9 flex items-center gap-2'
                 variant='outline'
               >
-                <FaPencilAlt style={{ height: '1.2rem', width: '1.2rem' }} />
+                <Pencil style={{ height: '1.2rem', width: '1.2rem' }} />
               </Button>
               {/* <Button
                 onClick={(e) => {
@@ -186,7 +186,7 @@ function SlabItem({
               disabled={isSubmitting}
               className='size-9 flex items-center gap-2'
             >
-              <FaTimes />
+              <X />
             </Button>
           )}
         </div>
@@ -426,7 +426,7 @@ function ImagePreviewDialog({
           className='absolute top-4 right-4 text-white hover:bg-black/20'
           onClick={() => setSelectedImage(null)}
         >
-          <FaTimes />
+          <X />
           <span className='sr-only'>Close</span>
         </Button>
         {selectedImage && (
@@ -961,7 +961,7 @@ export default function EditStoneSlabs() {
             variant='outline'
             className='flex items-center gap-2 rounded-md'
           >
-            <FaLink size={14} />
+            <LinkIcon size={14} />
             Link Slabs from Different Stone
           </Button>
         </div>
@@ -1012,7 +1012,7 @@ export default function EditStoneSlabs() {
                     handleUnlinkClick(item.source_stone_id, item.source_stone_name)
                   }
                 >
-                  <FaTimes size={12} />
+                  <X size={12} />
                   Unlink
                 </Button>
               </div>

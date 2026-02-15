@@ -1,7 +1,22 @@
+import {
+  closestCorners,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Trash2 } from 'lucide-react'
+import { GripVertical, Plus, Trash2 } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   type ActionFunctionArgs,
   data,
@@ -31,6 +46,7 @@ import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Switch } from '~/components/ui/switch'
 import { db } from '~/db.server'
+import { cn } from '~/lib/utils'
 import { commitSession, getSession } from '~/sessions.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -54,7 +70,12 @@ const deleteGroupSchema = z.object({
 const toggleGroupSchema = z.object({
   intent: z.literal('toggle_group'),
   groupId: z.coerce.number(),
-  isDisplay: z.coerce.boolean(), // or string "on" if standard form
+  isDisplay: z.coerce.boolean(),
+})
+
+const setDefaultGroupSchema = z.object({
+  intent: z.literal('set_default_group'),
+  groupId: z.coerce.number(),
 })
 
 const createListSchema = z.object({
@@ -68,12 +89,24 @@ const deleteListSchema = z.object({
   listId: z.coerce.number(),
 })
 
+const reorderListsSchema = z.object({
+  intent: z.literal('reorder_lists'),
+  updates: z.array(
+    z.object({
+      id: z.coerce.number(),
+      position: z.number(),
+    }),
+  ),
+})
+
 const actionSchema = z.discriminatedUnion('intent', [
   createGroupSchema,
   deleteGroupSchema,
   toggleGroupSchema,
+  setDefaultGroupSchema,
   createListSchema,
   deleteListSchema,
+  reorderListsSchema,
 ])
 
 type DealList = {
@@ -87,6 +120,7 @@ type DealGroup = {
   id: number
   name: string
   is_display: boolean
+  is_default: boolean
   lists: DealList[]
 }
 
@@ -103,7 +137,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const allGroups = await selectMany<Omit<DealGroup, 'lists'>>(
     db,
-    'SELECT id, name, is_displayed as is_display FROM groups_list WHERE deleted_at IS NULL AND (company_id = ? OR id = 1) ORDER BY created_at',
+    'SELECT id, name, is_displayed as is_display, is_default FROM groups_list WHERE deleted_at IS NULL AND (company_id = ? OR id = 1) ORDER BY created_at',
     [user.company_id],
   )
 
@@ -115,6 +149,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const groups: DealGroup[] = allGroups.map(g => ({
     ...g,
     is_display: Boolean(g.is_display),
+    is_default: Boolean(g.is_default),
     lists: allLists.filter(l => l.group_id === g.id),
   }))
 
@@ -134,19 +169,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const session = await getSession(request.headers.get('Cookie'))
-  const formData = await request.clone().formData()
-  const intent = formData.get('intent')
-
-  if (intent === 'toggle_group') {
-    const groupId = Number(formData.get('groupId'))
-    const isDisplay = formData.get('isDisplay') === 'on'
-    await db.execute('UPDATE groups_list SET is_displayed = ? WHERE id = ?', [
-      isDisplay,
-      groupId,
-    ])
-    return data({ success: true })
-  }
-
   const resolver = zodResolver(actionSchema)
   const {
     errors,
@@ -162,6 +184,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const values = validData
 
   switch (values.intent) {
+    case 'toggle_group': {
+      const groupId = values.groupId
+      const isDisplay = values.isDisplay
+      await db.execute('UPDATE groups_list SET is_displayed = ? WHERE id = ?', [
+        isDisplay,
+        groupId,
+      ])
+      return data({ success: true })
+    }
+    case 'set_default_group': {
+      const groupId = values.groupId
+      // 1. Set all other groups for this company to is_default = 0
+      await db.execute(
+        'UPDATE groups_list SET is_default = 0 WHERE company_id = ? OR id = 1',
+        [user.company_id],
+      )
+      // 2. Set the selected group to is_default = 1
+      await db.execute('UPDATE groups_list SET is_default = 1 WHERE id = ?', [groupId])
+      session.flash('message', toastData('Success', 'Default group updated'))
+      break
+    }
     case 'create_group': {
       await db.execute(
         'INSERT INTO groups_list (name, created_at, company_id) VALUES (?, ?, ?)',
@@ -222,6 +265,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       session.flash('message', toastData('Success', 'List deleted successfully'))
       break
     }
+    case 'reorder_lists': {
+      for (const update of values.updates) {
+        await db.execute('UPDATE deals_list SET position = ? WHERE id = ?', [
+          update.position,
+          update.id,
+        ])
+      }
+      return data({ success: true })
+    }
   }
 
   return data(
@@ -235,6 +287,65 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 // ============================================================================
 // COMPONENT
 // ============================================================================
+
+function SortableListItem({ list, groupId }: { list: DealList; groupId: number }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: list.id,
+      disabled: groupId === 1,
+    })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'flex items-center justify-between p-2 bg-secondary/50 rounded-md border border-border/50 text-sm',
+        isDragging && 'opacity-50 shadow-lg border-primary/50',
+      )}
+    >
+      <div className='flex items-center gap-2 flex-1 min-w-0'>
+        {groupId !== 1 && (
+          <div
+            {...attributes}
+            {...listeners}
+            className='cursor-grab active:cursor-grabbing p-1 hover:bg-secondary rounded'
+          >
+            <GripVertical className='h-3 w-3 text-muted-foreground' />
+          </div>
+        )}
+        <span className='font-medium truncate'>{list.name}</span>
+      </div>
+
+      {groupId !== 1 && (
+        <Form
+          method='post'
+          onSubmit={e => {
+            if (!confirm('Are you sure you want to delete this list?')) {
+              e.preventDefault()
+            }
+          }}
+        >
+          <input type='hidden' name='intent' value='delete_list' />
+          <input type='hidden' name='listId' value={list.id} />
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-6 w-6 hover:bg-destructive/10 hover:text-destructive ml-2'
+          >
+            <Trash2 className='h-3 w-3' />
+          </Button>
+        </Form>
+      )}
+    </div>
+  )
+}
 
 function CreateListForm({ groupId }: { groupId: number }) {
   const fetcher = useFetcher<{ success?: boolean; error?: string }>()
@@ -274,11 +385,52 @@ function CreateListForm({ groupId }: { groupId: number }) {
 }
 
 export default function ManageLists() {
-  const { groups } = useLoaderData<typeof loader>()
+  const { groups: initialGroups } = useLoaderData<typeof loader>()
+  const [groups, setGroups] = useState(initialGroups)
   const submit = useSubmit()
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state !== 'idle'
   const location = useLocation()
+
+  useEffect(() => {
+    setGroups(initialGroups)
+  }, [initialGroups])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+  )
+
+  const handleDragEnd = (event: DragEndEvent, groupId: number) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const group = groups.find(g => g.id === groupId)
+    if (!group) return
+
+    const oldIndex = group.lists.findIndex(l => l.id === active.id)
+    const newIndex = group.lists.findIndex(l => l.id === over.id)
+
+    const newLists = arrayMove(group.lists, oldIndex, newIndex)
+
+    // Update local state
+    setGroups(prev => prev.map(g => (g.id === groupId ? { ...g, lists: newLists } : g)))
+
+    // Submit to server
+    const updates = newLists.map((list, index) => ({
+      id: list.id,
+      position: index,
+    }))
+
+    const formData = new FormData()
+    formData.append('intent', 'reorder_lists')
+    formData.append('updates', JSON.stringify(updates))
+    submit(formData, { method: 'post' })
+  }
+
   return (
     <Dialog
       open={true}
@@ -319,26 +471,43 @@ export default function ManageLists() {
                       {group.name} {group.id === 1 && '(Default)'}
                     </CardTitle>
 
-                    {/* Toggle Visibility */}
-                    <Form method='post' className='flex items-center gap-2'>
-                      <input type='hidden' name='intent' value='toggle_group' />
-                      <input type='hidden' name='groupId' value={group.id} />
+                    {/* Default Toggle */}
+                    <div className='flex items-center gap-2 border-l pl-4 ml-2'>
+                      <Form method='post' className='flex items-center gap-2'>
+                        <input type='hidden' name='intent' value='toggle_group' />
+                        <input type='hidden' name='groupId' value={group.id} />
+                        <Switch
+                          name='isDisplay'
+                          checked={group.is_display}
+                          // disabled={group.id === 1} // Re-enabled for id=1 as per request
+                          onCheckedChange={checked => {
+                            const formData = new FormData()
+                            formData.append('intent', 'toggle_group')
+                            formData.append('groupId', String(group.id))
+                            formData.append('isDisplay', String(checked))
+                            submit(formData, { method: 'post' })
+                          }}
+                        />
+                        <Label className='text-xs text-muted-foreground'>
+                          {group.is_display ? 'Visible' : 'Hidden'}
+                        </Label>
+                      </Form>
                       <Switch
-                        name='isDisplay'
-                        checked={group.is_display}
-                        // disabled={group.id === 1} // Re-enabled for id=1 as per request
+                        checked={group.is_default}
                         onCheckedChange={checked => {
+                          if (!checked) return // Cannot uncheck the default one, must check another
                           const formData = new FormData()
-                          formData.append('intent', 'toggle_group')
+                          formData.append('intent', 'set_default_group')
                           formData.append('groupId', String(group.id))
-                          if (checked) formData.append('isDisplay', 'on')
                           submit(formData, { method: 'post' })
                         }}
                       />
-                      <Label className='text-xs text-muted-foreground'>
-                        {group.is_display ? 'Visible' : 'Hidden'}
+                      <Label className='text-xs font-medium'>
+                        {group.is_default ? 'Default' : 'Assign leads here'}
                       </Label>
-                    </Form>
+                    </div>
+
+                    {/* Toggle Visibility */}
                   </div>
 
                   {group.id !== 1 && (
@@ -368,45 +537,32 @@ export default function ManageLists() {
                 </CardHeader>
                 <CardContent className='p-3 pt-0'>
                   <div className='space-y-2'>
-                    <div className='grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3'>
-                      {group.lists.map(list => (
-                        <div
-                          key={list.id}
-                          className='flex items-center justify-between p-2 bg-secondary/50 rounded-md border border-border/50 text-sm'
-                        >
-                          <span className='font-medium truncate'>{list.name}</span>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCorners}
+                      onDragEnd={event => handleDragEnd(event, group.id)}
+                    >
+                      <SortableContext
+                        items={group.lists.map(l => l.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className='grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3'>
+                          {group.lists.map(list => (
+                            <SortableListItem
+                              key={list.id}
+                              list={list}
+                              groupId={group.id}
+                            />
+                          ))}
 
-                          {group.id !== 1 && (
-                            <Form
-                              method='post'
-                              onSubmit={e => {
-                                if (
-                                  !confirm('Are you sure you want to delete this list?')
-                                ) {
-                                  e.preventDefault()
-                                }
-                              }}
-                            >
-                              <input type='hidden' name='intent' value='delete_list' />
-                              <input type='hidden' name='listId' value={list.id} />
-                              <Button
-                                variant='ghost'
-                                size='icon'
-                                className='h-6 w-6 hover:bg-destructive/10 hover:text-destructive ml-2'
-                              >
-                                <Trash2 className='h-3 w-3' />
-                              </Button>
-                            </Form>
+                          {group.lists.length === 0 && (
+                            <div className='text-xs text-muted-foreground italic p-2'>
+                              No lists yet
+                            </div>
                           )}
                         </div>
-                      ))}
-
-                      {group.lists.length === 0 && (
-                        <div className='text-xs text-muted-foreground italic p-2'>
-                          No lists yet
-                        </div>
-                      )}
-                    </div>
+                      </SortableContext>
+                    </DndContext>
                   </div>
                 </CardContent>
                 {group.id !== 1 && (

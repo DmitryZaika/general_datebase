@@ -697,7 +697,58 @@ export default function DealEmailDialog() {
     }
   }
 
+  const [previews, setPreviews] = useState<Record<string, string>>({})
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.currentTarget.files
+    if (files && files.length > 0) {
+      addFiles(Array.from(files))
+    }
+    e.currentTarget.value = ''
+  }
+
+  const addFiles = (newFiles: File[]) => {
+    form.setValue('attachments', [...form.getValues('attachments'), ...newFiles])
+
+    newFiles.forEach(file => {
+      const parts = file.name.split('.')
+      const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : ''
+      if (ext && imageExt.has(ext)) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setPreviews(prev => ({
+            ...prev,
+            [`${file.name}-${file.size}-${file.lastModified}`]: reader.result as string,
+          }))
+        }
+        reader.readAsDataURL(file)
+      }
+    })
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items
+    const pastedFiles: File[] = []
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        const file = items[i].getAsFile()
+        if (file) pastedFiles.push(file)
+      }
+    }
+
+    if (pastedFiles.length > 0) {
+      addFiles(pastedFiles)
+    }
+  }
+
   const removeAttachment = (file: File) => {
+    const key = `${file.name}-${file.size}-${file.lastModified}`
+    setPreviews(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
     form.setValue(
       'attachments',
       form.getValues('attachments').filter(f => f !== file),
@@ -732,7 +783,10 @@ export default function DealEmailDialog() {
 
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
-      <DialogContent className='sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5'>
+      <DialogContent
+        className='sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5'
+        onPaste={handlePaste}
+      >
         <DialogHeader>
           <DialogTitle>Send Email</DialogTitle>
         </DialogHeader>
@@ -755,16 +809,28 @@ export default function DealEmailDialog() {
                   {form.watch('attachments').map(file => {
                     const isTruncated = file.name.length > 15
                     const displayName = formatFileName(file.name)
+                    const key = `${file.name}-${file.size}-${file.lastModified}`
+                    const previewUrl = previews[key]
                     const badge = (
                       <Badge
-                        key={`${file.name}`}
-                        className='cursor-pointer select-none'
+                        key={key}
+                        className='cursor-pointer select-none p-1 pr-2 flex items-center gap-2'
                         onClick={() => removeAttachment(file)}
                       >
+                        {previewUrl ? (
+                          <img
+                            src={previewUrl}
+                            alt='preview'
+                            className='size-8 sm:size-12 md:size-14 object-cover rounded'
+                          />
+                        ) : (
+                          <div className='size-14 flex items-center justify-center bg-secondary rounded'>
+                            {attachmentIcon(file.name)}
+                          </div>
+                        )}
                         <span className='flex items-center gap-1'>
-                          {attachmentIcon(file.name)}
                           <span>{displayName}</span>
-                          <span className='ml-1'>×</span>
+                          <span className='ml-1 text-xs opacity-70'>×</span>
                         </span>
                       </Badge>
                     )
@@ -786,16 +852,7 @@ export default function DealEmailDialog() {
               type='file'
               className='hidden'
               multiple
-              onChange={e => {
-                const files = e.currentTarget.files
-                if (files && files.length > 0) {
-                  form.setValue('attachments', [
-                    ...form.getValues('attachments'),
-                    ...Array.from(files),
-                  ])
-                }
-                e.currentTarget.value = ''
-              }}
+              onChange={handleFileChange}
             />
             <div className='mt-4 flex justify-between gap-2 w-full'>
               <div className='flex items-center gap-2'>

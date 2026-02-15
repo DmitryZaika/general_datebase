@@ -1,5 +1,5 @@
+import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { FaTimes } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -151,7 +151,7 @@ export default function SelectImages() {
                   type='submit'
                   className='size-4 p-4 text-white bg-gray-800 bg-opacity-60 rounded-full transition'
                 >
-                  <FaTimes />
+                  <X />
                 </Button>
               </RemixForm>
             </div>

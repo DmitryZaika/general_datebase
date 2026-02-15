@@ -125,80 +125,50 @@ type EmailGenerationParams = z.infer<typeof generateSchema>
 // ============================================================================
 
 const SYSTEM_PROMPT = `
-  You are an expert sales email assistant. Your purpose is to generate professional, persuasive, and realistically usable emails. Always follow the user’s formatting instructions exactly. Do not add commentary, labels, placeholders, or a signature. The application will insert the signature separately.
+  You are an expert sales email assistant. Your purpose is to generate professional, persuasive, and realistically usable emails.
 
-  Use all provided sender and recipient information. If any sender details are missing, simply omit them. Never invent names, companies, phone numbers, or facts.
+  *** STRICT NEGATIVE CONSTRAINTS ***
+  1. NO SIGNATURES: Do NOT include "Best", "Sincerely", "Regards", "Cheers".
+  2. NO NAME AT THE END: Do NOT put the sender's name (e.g. "Dema") or company at the end of the email.
+  3. NO PLACEHOLDERS: Do not use [brackets].
+  4. NO META-TAGS: Do not print "[End of text]".
 
-  Use the proper spacing and formatting for the text.
+  *** ENDING RULES (CRITICAL) ***
+  • The application adds the signature automatically.
+  • If you write the name at the end, it will appear TWICE.
+  • STOP writing immediately after the last punctuation mark (usually a question mark).
+  • WRONG: "...let me know. Thanks, Dema."
+  • CORRECT: "...let me know?"
 
-  SUBJECT LINE RULES (CRITICAL):
-  • Style: Casual, short, and "boring". Like a quick email from a colleague or friend.
-  • Length: Maximum 2-5 words.
-  • Capitalization: Use sentence case (Only the first letter capitalized). NEVER use Title Case.
-  • Punctuation: No exclamation marks (!). No questions marks (?) unless absolutely necessary.
-  • Content: Avoid "salesy" words like "Special", "Offer", "Unlock", "Dream".
+  *** HUMAN-LIKE & NATURAL FLOW ***
+  • Be conversational. Write like a human responding to a friend or colleague.
+  • INTELLIGENT RESPONSIVENESS: If the customer asked for a specific action (e.g., "come give a quote"), ADDRESS THAT REQUEST DIRECTLY.
+  • If the source is "Facebook" or "Instagram", phrase it casually.
+
+  SUBJECT LINE RULES:
+  • Style: Casual, short (2-5 words), sentence case. No "salesy" words.
 
   EMAIL CATEGORY DEFINITIONS
+  (Keep your existing category definitions here...)
 
   FIRST-CONTACT
-  Used when the recipient already reached out through another channel. Tone: warm and helpful. Purpose: acknowledge their request, introduce yourself, and ALWAYS end with a specific question to encourage a reply (e.g., about their project details or availability). This is crucial for email deliverability.
-  Examples:
- • “Good morning, [Name]! This is [Sender] from [Company]. Thanks for reaching out about new countertops. Could you tell me a bit more about your project?”
-
-• "Hey [Name], this is [Sender], with [Company]. You asked us to call you back. Looks like you responded to our ad on [Social Media] about updating your kitchen. Are you currently available to provide me with more information about your project?"
-
-• "Hi [Name], this is [Sender]. Thank you for your request to [Company]! I see you’re looking into new countertops. I have a few quick questions to give you an accurate quote. When would be a good time to discuss your project?"
-
-• "Hey [Name], this is [Sender] with [Company]. I just reviewed your request and I have a few questions about your project. When would be a good time to give you a call?"
-
-
-
-  FOLLOW-UP
-  Used when someone has shown interest or received a quote but hasn’t responded. Tone: polite and low-pressure. Purpose: check in, re-open conversation, and offer support.
-  Examples:
-  • “Hi [Name], just checking in to see if you're still considering new countertops…”
-  • “Hi [Name], I wanted to follow up on your quote and see if you had any questions…”
-
-  REPLY
-  Used to respond directly to the recipient’s message. Tone: responsive and clear.
-  Examples:
-  • “Thanks for your question about quartz colors…”
-  • “I appreciate your message. Yes, we can schedule the measurement this week…”
-
-  PROMOTIONAL
-  Used for offers or specials. Tone: upbeat and value-focused.
-  Examples:
-  • “We’re offering a limited-time discount on quartz countertops…”
-  • “We just launched new materials that might be perfect for your project…”
-
-  THANK-YOU
-  Used to express appreciation for a visit, call, inquiry, or purchase. Tone: warm and courteous.
-  Examples:
-  • “Thank you for stopping by our showroom today…”
-  • “Thanks for taking the time to speak with me earlier…”
-
-  FEEDBACK-REQUEST
-  The countertops are ALREADY INSTALLED. Ask for feedback about the installation - how did it go? Are they happy with the result? DO NOT mention quotes, colors, or materials. Focus only on asking about the installation experience. Tone: appreciative and concise.
-
-  REFERRAL
-  Used AFTER the installation is complete. Ask if they know anyone who might also be interested in buying countertops. Tone: friendly and non-pushy. Be creative and natural. DO NOT mention specific colors, materials, or details about what the customer purchased. Keep it general.
-
+  Tone: warm and helpful.
+  Structure:
+  1. Casual opening ("Hi [Name], this is [Sender] with [Company]").
+  2. Acknowledge intent / Analyze request.
+  3. End with a specific question.
+  
   GENERAL RULES
-  • Match the requested tone, formality, and verboseness.
-  • Never include a signature or contact block.
   • PHONE/EMAIL RULES:
-    - FIRST-CONTACT emails: NEVER include phone number or email address. No exceptions.
-    - REPLY emails: Include phone number ONLY if customer explicitly asks (e.g., "can you call?", "give me your number").
-  • Do not invent details.
-  • If the referral source is mentioned as "wordPress", always refer to it as "web-site" in the email text.
-  • Avoid placeholders or brackets in your output. Write full, natural sentences.
-  • Follow the output structure exactly:
-    1. Provide ONLY the subject line (no "Subject:" prefix).
-    2. Next line: ---BODY---
-    3. Then the email body (no signature).
-
-  You generate emails that are clean, professional, and ready to use immediately.
-  `
+    - FIRST-CONTACT: NEVER include phone/email in body.
+    - REPLY: Include phone ONLY if asked.
+  
+  *** OUTPUT STRUCTURE ***
+  1. Provide ONLY the subject line (no "Subject:" prefix).
+  2. Next line: ---BODY---
+  3. Then the email body.
+  4. Stop immediately after the last sentence.
+`
 
 // ============================================================================
 // UTILITIES
@@ -227,10 +197,14 @@ function formatSenderInfo(info: UserInfo): string {
   if (!parts.length) return ''
 
   let result = `Here is my (the sales rep) contact information: ${parts.join(', ')}. `
+
+  result += `INTRODUCTION RULE: Introduce yourself in the FIRST SENTENCE ONLY (e.g., "Hi [Name], this is Dema with Granite Depot..."). `
+  result += `NEVER mention my name or company at the end of the email. `
+  // ----------------------------
+
   result += `PHONE/EMAIL RULES: For FIRST-CONTACT emails - NEVER write phone or email in the body. `
-  result += `Always end FIRST-CONTACT emails with a direct question (e.g., "Could you tell me more about the project?" or "When is a good time for a call?"). `
-  result += `For REPLY emails - include phone ONLY if customer asks ("can you call?", "give me your number"). `
-  result += `Introduce myself using only my first name and company. Use only the first name of the customer. Don't use signature.`
+  result += `Always end FIRST-CONTACT emails with a direct question. `
+  result += `For REPLY emails - include phone ONLY if customer asks. `
   return result
 }
 
@@ -354,26 +328,25 @@ function buildUserPrompt(
   prompt += `Verboseness: ${verboseness}. ${getLengthInstructions(verboseness)} `
   prompt += `Urgency level: ${urgencyLevel}. `
 
-  // Incorporate lead details into the instruction
-  if (customerName) {
-    prompt += `Address the recipient by their name: ${customerName}. `
-  }
-  if (customerCompany) {
-    prompt += `Mention the customer's company: ${customerCompany}. `
-  }
+  // --- CHANGED SECTION START ---
+  // Context block
+  prompt += `\nCONTEXT DETAILS:`
+  if (customerName) prompt += `\n- Recipient Name: ${customerName}`
+  if (customerCompany) prompt += `\n- Recipient Company: ${customerCompany}`
+
+  // Lead Message Logic
   if (leadMessage) {
-    prompt += `Acknowledge how the lead originally came in: ${leadMessage}. `
-  }
-  if (referralSource) {
-    prompt += `Mention the referral source (e.g., Facebook, phone, etc): ${referralSource}. `
-  }
-  if (remodelType) {
-    prompt += `Reference the project type they are interested in: ${remodelType}. `
+    prompt += `\n- Customer's Original Request: "${leadMessage}"`
+    prompt += `\n INSTRUCTION: Analyze the customer's request above. If they asked for a specific action (like a visit, a call, or a quote), respond to that specifically. Do not just say "tell me more" if they already asked you to come over.`
   }
 
+  if (referralSource) prompt += `\n- Source: ${referralSource}`
+  if (remodelType) prompt += `\n- Project Type: ${remodelType}`
+
   if (desiredContent) {
-    prompt += `Include this content: ${desiredContent}. `
+    prompt += `\n- Additional specific content to include: ${desiredContent}`
   }
+  // --- CHANGED SECTION END ---
 
   if (emailHistory?.length) {
     const historyText = emailHistory
@@ -382,29 +355,22 @@ function buildUserPrompt(
         return `Message ${index + 1} from ${sender} on ${item.sentAt}:\n${item.body}`
       })
       .join('\n\n')
-    prompt += `Here is the previous email conversation with this customer. Use it as context and write a natural next email in the same thread without repeating their exact wording:\n${historyText}\n`
+    prompt += `\n\nPREVIOUS CONVERSATION HISTORY:\n${historyText}\n`
+    prompt += `Instruction: Write a natural next step in this thread.`
   }
 
   if (variationToken) {
-    prompt += `Use a slightly different style than any previous email by following this variation hint: ${variationToken}. `
+    prompt += `\nVariation hint: ${variationToken}. `
   }
 
-  prompt += formatSenderInfo(userInfo)
+  prompt += `\n\n${formatSenderInfo(userInfo)}`
 
+  // ... (оставьте часть про Subject Line без изменений)
   prompt += `
   STRICT INSTRUCTION FOR SUBJECT LINE:
-  1. FORMAT: Use standard Sentence case. **The first letter MUST be capitalized.** (e.g., "Your kitchen", NOT "your kitchen").
-  2. STYLE: Casual and short (2-5 words). No "salesy" adjectives.
-  3. CONTENT: specific to the project.
-  
-  Examples of CORRECT subjects:
-  - "Your quartzite quote"
-  - "Your countertop quote"
-  - "Your kitchen quote"
-  - "Countertop quote request"
-  - "In-home estimate request"
-  - "Countertop inquiry"
-  - "Thank you for your inquiry!"
+  1. FORMAT: Sentence case. First letter capitalized.
+  2. STYLE: Casual, short (2-5 words).
+  3. CONTENT: Relevant to the project.
 `
 
   return prompt

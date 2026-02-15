@@ -30,6 +30,7 @@ interface DealItemProps {
     has_email?: boolean
     sales_rep?: string | null
     is_won?: number | null
+    company_name?: string | null
   }
   readonly?: boolean
   highlighted?: boolean
@@ -174,11 +175,11 @@ export default function DealItem({
               className='text-xl font-medium truncate whitespace-normal flex-1 select-none hover:underline'
               onPointerDown={e => e.stopPropagation()}
             >
-              {deal.name}
+              {deal.company_name ? deal.company_name : deal.name}
             </Link>
           ) : (
             <h3 className='text-xl font-medium truncate whitespace-normal flex-1 select-none'>
-              {deal.name}
+              {deal.company_name ? deal.company_name : deal.name}
             </h3>
           )}
         </div>
@@ -188,7 +189,10 @@ export default function DealItem({
             className='absolute top-1 right-1 z-20'
             onPointerDown={e => e.stopPropagation()}
           >
-            <Pencil className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black' />
+            <Pencil
+              size={16}
+              className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black'
+            />
           </Link>
         )}
       </div>

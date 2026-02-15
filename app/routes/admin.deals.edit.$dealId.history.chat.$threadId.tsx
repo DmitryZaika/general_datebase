@@ -223,7 +223,7 @@ export default function EmailChatDialog() {
 
   return (
     <Dialog open={true} onOpenChange={handleClose}>
-      <DialogContent className='sm:max-w-[90%] h-[95%] p-0 flex flex-col'>
+      <DialogContent className='max-w-[100%] sm:max-w-[90%] sm:max-w-[900px] h-[95%] p-0 flex flex-col'>
         <DialogHeader className='p-4 border-b'>
           <div className='flex items-center gap-3'>
             <div className='w-12 h-12 rounded-full bg-pink-500 flex items-center justify-center text-white font-bold'>
@@ -280,7 +280,7 @@ export default function EmailChatDialog() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
-                              <Pencil className='w-2 h-2 opacity-70' />
+                              <Pencil size={16} className='w-2 h-2 opacity-70' />
                               Signature
                             </span>
                           </TooltipTrigger>

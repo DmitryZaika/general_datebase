@@ -125,9 +125,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const emailsMap: Record<number, boolean> = {}
     for (const row of emailCounts) emailsMap[row.deal_id] = Number(row.count) > 0
 
-    const customers = await selectMany<{ id: number; name: string }>(
+    const customers = await selectMany<{
+      id: number
+      name: string
+      company_name?: string
+    }>(
       db,
-      'SELECT id, name FROM customers WHERE company_id = ? AND deleted_at IS NULL',
+      'SELECT id, name, company_name FROM customers WHERE company_id = ? AND deleted_at IS NULL',
       [user.company_id],
     )
 

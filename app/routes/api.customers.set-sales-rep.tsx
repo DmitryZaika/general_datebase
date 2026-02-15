@@ -1,3 +1,4 @@
+import type { ResultSetHeader } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { db } from '~/db.server'
 import { posthogClient } from '~/utils/posthog.server'
@@ -43,9 +44,13 @@ export async function action({ request }: ActionFunctionArgs) {
         )
         const nextPos = (posRows as Array<{ next: number }>)[0]?.next ?? 1
 
-        await db.execute(
+        const [dealResult] = await db.execute<ResultSetHeader>(
           'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
           [customer_id, 'New Customer', listId, nextPos, sales_rep],
+        )
+        await db.execute(
+          'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+          [dealResult.insertId, listId],
         )
       }
     }

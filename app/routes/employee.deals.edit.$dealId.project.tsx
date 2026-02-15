@@ -83,11 +83,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       const isWonRaw = formData.get('is_won')
       const isWon = isWonRaw === 'null' ? null : Number(isWonRaw)
 
-      await db.execute(`UPDATE deals SET is_won = ? WHERE id = ? AND user_id = ?`, [
-        isWon,
-        dealId,
-        user.id,
-      ])
+      await db.execute(
+        `UPDATE deals SET is_won = ?, lost_reason = NULL WHERE id = ? AND user_id = ?`,
+        [isWon, dealId, user.id],
+      )
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Deal status updated successfully'))
       return redirect(`/employee/deals${searchString}`, {
@@ -119,6 +118,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         dealId,
         user.id,
       ])
+      await db.execute(
+        'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
+        [dealId],
+      )
+      await db.execute(
+        'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+        [dealId, targetListId],
+      )
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Group updated successfully'))
       return redirect(`/employee/deals${searchString}`, {
@@ -259,9 +266,10 @@ export default function DealProjectInfo() {
     if (status === 0) {
       const pathParts = location.pathname.split('/')
       const dealId = pathParts[pathParts.indexOf('edit') + 1]
-      navigate(
-        `/employee/deals/reason?dealId=${dealId}&fromListId=${customer.current_list_id}&fromPos=0&is_won=0${location.search}`,
-      )
+      const params = new URLSearchParams(location.search)
+      params.set('dealId', dealId)
+      params.set('fromListId', String(customer.current_list_id))
+      navigate(`/employee/deals/reason?${params.toString()}`)
       return
     }
     fetcher.submit(
@@ -303,10 +311,14 @@ export default function DealProjectInfo() {
         v != null &&
         k !== 'attached_file' &&
         k !== 'current_group_id' &&
-        k !== 'is_won',
+        k !== 'is_won' &&
+        k !== 'current_list_id',
     )
     .map(([k, v]) => ({
-      key: k.replace(/_/g, ' ').replace(/\b\w/g, s => s.toUpperCase()),
+      key:
+        k === 'remove_and_dispose'
+          ? 'Tear Out'
+          : k.replace(/_/g, ' ').replace(/\b\w/g, s => s.toUpperCase()),
       value: k.includes('created')
         ? new Date(String(v)).toLocaleDateString()
         : String(v),
@@ -349,13 +361,14 @@ export default function DealProjectInfo() {
 
   return (
     <div className='space-y-4'>
-      <div className='flex gap-2 items-center flex-wrap'>
-        <MoveButton status={null} isWon={customer.is_won} />
-        <MoveButton status={1} isWon={customer.is_won} />
-        <MoveButton status={0} isWon={customer.is_won} />
-
+      <div className='flex gap-2 items-center justify-between'>
+        <div className='flex gap-2 items-center'>
+          <MoveButton status={null} isWon={customer.is_won} />
+          <MoveButton status={1} isWon={customer.is_won} />
+          <MoveButton status={0} isWon={customer.is_won} />
+        </div>
         <Select onValueChange={handleGroupChange} defaultValue={currentGroupId}>
-          <SelectTrigger className='w-[200px] h-7'>
+          <SelectTrigger className='w-[150px] h-7'>
             <SelectValue placeholder='Select Group' />
           </SelectTrigger>
           <SelectContent>

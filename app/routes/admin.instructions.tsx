@@ -264,7 +264,10 @@ const InstructionItem: FC<InstructionItemProps> = ({
               aria-label='Edit instruction'
               title='Edit instruction'
             >
-              <Pencil className='w-5 h-5 text-gray-600 hover:text-blue-600 transition-colors' />
+              <Pencil
+                size={16}
+                className='w-5 h-5 text-gray-600 hover:text-blue-600 transition-colors'
+              />
             </button>
             <button
               type='button'
@@ -273,7 +276,10 @@ const InstructionItem: FC<InstructionItemProps> = ({
               aria-label='Delete instruction'
               title='Delete instruction'
             >
-              <Trash2 className='w-5 h-5 text-gray-600 hover:text-red-600 transition-colors' />
+              <Trash2
+                size={16}
+                className='w-5 h-5 text-gray-600 hover:text-red-600 transition-colors'
+              />
             </button>
           </div>
         </div>

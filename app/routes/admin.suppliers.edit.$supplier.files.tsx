@@ -1,5 +1,5 @@
+import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { FaTimes } from 'react-icons/fa'
 import {
   type ActionFunctionArgs,
   data,
@@ -185,7 +185,7 @@ export default function EditSupplierFiles() {
                 <AuthenticityTokenInput />
                 <input type='hidden' name='id' value={file.id} />
                 <Button type='submit' disabled={isSubmitting}>
-                  <FaTimes />
+                  <X />
                 </Button>
               </Form>
             </div>

@@ -155,14 +155,14 @@ DialogDescription.displayName = DialogPrimitive.Description.displayName
 
 export {
   Dialog,
-  DialogPortal,
-  DialogOverlay,
-  DialogTrigger,
   DialogClose,
   DialogContent,
-  DialogContentImage, // Exporting the new component
-  DialogHeader,
-  DialogFooter,
-  DialogTitle,
+  DialogContentImage,
   DialogDescription,
+  DialogFooter, // Exporting the new component
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
 }

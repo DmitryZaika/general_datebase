@@ -1,5 +1,5 @@
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
-import { FaChevronDown, FaChevronUp } from 'react-icons/fa'
 import { useNavigation } from 'react-router'
 import { LinkSpan } from '~/components/atoms/LinkSpan'
 import { CheckOption } from '~/components/molecules/CheckOption'
@@ -82,9 +82,9 @@ function FilterGroup<T>({
           <span className='text-md'>{title}</span>
           {collapsed !== undefined &&
             (collapsed ? (
-              <FaChevronDown className='ml-1 text-gray-500' size={12} />
+              <ChevronDown className='ml-1 text-gray-500' size={12} />
             ) : (
-              <FaChevronUp className='ml-1 text-gray-500' size={12} />
+              <ChevronUp className='ml-1 text-gray-500' size={12} />
             ))}
         </>
       ) : (
