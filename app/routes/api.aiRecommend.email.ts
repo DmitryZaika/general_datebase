@@ -106,7 +106,7 @@ const generateSchema = z.object({
     'feedback-request',
     'referral',
   ]),
-  dealId: z.number(),
+  dealId: z.number().optional(),
   threadId: z.uuid().optional(),
   formality: z.enum(['formal', 'neutral', 'casual']).optional(),
   tone: z.enum(['friendly', 'persuasive', 'empathetic', 'urgent']).optional(),
@@ -211,7 +211,8 @@ function formatSenderInfo(info: UserInfo): string {
 /**
  * Retrieves lead fields needed for content generation.
  */
-async function getLeadInfoByDeal(dealId: number): Promise<LeadInfo> {
+async function getLeadInfoByDeal(dealId?: number): Promise<LeadInfo> {
+  if (!dealId) return {}
   const [rows] = await db.execute<RowDataPacket[]>(
     `
        SELECT
@@ -385,11 +386,14 @@ async function createStreamingResponse(
   userInfo: UserInfo,
 ): Promise<ReadableStream> {
   const lead = await getLeadInfoByDeal(params.dealId)
-  const emailHistory = params.skipHistory
-    ? []
-    : params.threadId
+  let emailHistory: EmailHistoryItem[] = []
+
+  if (!params.skipHistory && params.dealId) {
+    emailHistory = params.threadId
       ? await getEmailHistoryByThread(params.dealId, params.threadId)
       : await getEmailHistoryByDeal(params.dealId, params.subject)
+  }
+
   const userPrompt = buildUserPrompt(params, lead, userInfo, emailHistory)
 
   return new ReadableStream({

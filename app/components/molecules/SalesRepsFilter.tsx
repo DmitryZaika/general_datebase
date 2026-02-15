@@ -43,8 +43,11 @@ export function SalesRepsFilter({ className }: { className?: string }) {
     const params = new URLSearchParams(location.search)
     if (value === 'All') params.delete('salesRep')
     else params.set('salesRep', value)
-    const qs = params.toString()
-    navigate(`${location.pathname}${qs ? `?${qs}` : ''}`)
+
+    navigate({
+      pathname: location.pathname,
+      search: params.toString(),
+    })
   }
 
   return (

@@ -126,7 +126,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         ? emailInformation.to.join(', ')
         : emailInformation.to,
       threadId,
-      cleaned.dealId,
+      cleaned.dealId || null,
     ],
   )
 

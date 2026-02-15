@@ -1,5 +1,4 @@
-import { Mail } from 'lucide-react'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
 import DealsEmailsView, { type Email } from '~/components/views/DealsEmailsView'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -38,12 +37,9 @@ export default function EmployeeEmails() {
   }>()
 
   return (
-    <div className='w-full h-full p-4'>
-      <div className='flex items-center gap-2 mb-4'>
-        <Mail className='w-6 h-6 text-gray-500' />
-        <h1 className='text-2xl font-bold'>Emails</h1>
-      </div>
+    <div className='w-full h-full p-2'>
       <DealsEmailsView emails={userEmails} currentUserEmail={userEmail} />
+      <Outlet />
     </div>
   )
 }

@@ -65,14 +65,22 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [user.id],
   )
   const currentUserSignature = userSignatureRows?.[0]?.email_signature || null
-  if (!params.dealId) {
-    throw new Error('Deal ID is missing')
-  }
 
-  const dealId = parseInt(params.dealId, 10)
   const threadId = params.threadId
   if (!threadId) {
     throw new Error('Thread ID is missing')
+  }
+
+  // Find deal_id from thread_id
+  const [dealRows] = await db.execute<RowDataPacket[]>(
+    'SELECT deal_id FROM emails WHERE thread_id = ? AND deal_id IS NOT NULL LIMIT 1',
+    [threadId],
+  )
+
+  const dealId = dealRows?.[0]?.deal_id
+
+  if (!dealId) {
+    throw new Error('No deal associated with this email thread')
   }
 
   const [customerRows] = await selectMany<Customer>(
@@ -169,7 +177,7 @@ function MessageDate({ message }: { message: Message }) {
 export default function EmailChatDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { customerName, messages, dealId } = useLoaderData<typeof loader>()
+  const { customerName, messages } = useLoaderData<typeof loader>()
   const [chatMessages, _] = useState<Message[]>(messages)
   const [currentImages, setCurrentImages] = useState<
     { id: number; url: string; name: string; type: string; available: null }[]
@@ -195,7 +203,7 @@ export default function EmailChatDialog() {
   }, [chatMessages.length])
 
   const handleClose = () => {
-    navigate(`/admin/deals/edit/${dealId}/history${location.search}`)
+    navigate(`/admin/emails${location.search}`)
   }
 
   const getInitials = (name: string | null | undefined) => {
@@ -246,7 +254,7 @@ export default function EmailChatDialog() {
                 </div>
               )}
               <div
-                className={`flex items-center gap-2 p-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
+                className={`flex items-center gap-2 py-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
               >
                 {!message.isFromCustomer && <MessageDate message={message} />}
                 <div

@@ -30,6 +30,7 @@ export const getMirroredUrl = (isAdminPage: boolean, location: Location) => {
     'deals',
     'transactions',
     'teach-mode',
+    'emails',
   ]
 
   if (supportedSections.includes(currentSection)) {
