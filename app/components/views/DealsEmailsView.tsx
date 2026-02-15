@@ -317,12 +317,12 @@ export default function DealsEmailsView({
                       navigate(`chat/${email.thread_id}${location.search}`)
                     }
                     className={cn(
-                      'group flex items-center gap-3 px-3 py-2.5 hover:shadow-md hover:z-10 relative cursor-pointer transition-all bg-white border-b border-transparent hover:border-gray-200',
+                      'group flex items-center gap-3 px-2 py-2 hover:shadow-md hover:z-10 relative cursor-pointer transition-all bg-white border-b border-transparent hover:border-gray-200',
                       !isRead && 'bg-gray-50 font-semibold',
                       isSelected && 'bg-blue-50',
                     )}
                   >
-                    <div className='pl-2 flex-shrink-0'>
+                    <div className='flex-shrink-0'>
                       <Checkbox
                         checked={isSelected}
                         onCheckedChange={checked => {
@@ -331,6 +331,7 @@ export default function DealsEmailsView({
                           else next.delete(email.thread_id)
                           setSelectedThreads(next)
                         }}
+                        className='size-4.5'
                         onClick={e => e.stopPropagation()}
                       />
                     </div>
