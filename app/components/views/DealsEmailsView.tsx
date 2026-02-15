@@ -1,9 +1,12 @@
 import { format } from 'date-fns'
-import { Inbox, Paperclip, RotateCw, Send } from 'lucide-react'
-import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { Inbox, Paperclip, RotateCw, Search, Send, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { useLocation, useNavigate, useRevalidator } from 'react-router'
+import { useToast } from '~/hooks/use-toast'
 import { cn } from '~/lib/utils'
 import { Button } from '../ui/button'
+import { Checkbox } from '../ui/checkbox'
+import { Input } from '../ui/input'
 
 export interface Email {
   id: number
@@ -33,66 +36,198 @@ export default function DealsEmailsView({
   adminMode = false,
 }: DealsEmailsViewProps) {
   const navigate = useNavigate()
+  const revalidator = useRevalidator()
   const [activeTab, setActiveTab] = useState<Tab>('inbox')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedThreads, setSelectedThreads] = useState<Set<string>>(new Set())
+  const [isDeleting, setIsDeleting] = useState(false)
+  const { toast } = useToast()
   const location = useLocation()
 
-  // Filter emails based on tab
-  const filteredEmails = emails.filter(email => {
-    if (adminMode) {
-      const isFromEmployee = email.sender_user_id != null
-      if (activeTab === 'inbox') {
-        return !isFromEmployee // Incoming (from customer)
-      }
-      if (activeTab === 'sent') {
-        return isFromEmployee // Outgoing (from employee)
-      }
-      return false
-    }
-
-    const isSender =
-      email.sender_email?.toLowerCase() === currentUserEmail.toLowerCase()
+  // Filter and group emails based on tab
+  const filteredEmails = useMemo(() => {
+    const threadMap = new Map<string, Email>()
 
     if (activeTab === 'inbox') {
-      return !isSender // If not sender, then receiver (roughly)
+      // Inbox: latest message in each thread where user is NOT the sender (or just latest message)
+      emails.forEach(email => {
+        const existing = threadMap.get(email.thread_id)
+        if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
+          threadMap.set(email.thread_id, email)
+        }
+      })
+
+      return Array.from(threadMap.values()).filter(email => {
+        if (adminMode) {
+          return email.sender_user_id == null // Incoming from customer
+        }
+        return email.sender_email?.toLowerCase() !== currentUserEmail.toLowerCase()
+      })
     }
+
     if (activeTab === 'sent') {
-      return isSender
+      // Sent: latest message in each thread where user IS the sender
+      emails.forEach(email => {
+        const isSender = adminMode
+          ? email.sender_user_id != null
+          : email.sender_email?.toLowerCase() === currentUserEmail.toLowerCase()
+
+        if (isSender) {
+          const existing = threadMap.get(email.thread_id)
+          if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
+            threadMap.set(email.thread_id, email)
+          }
+        }
+      })
+      return Array.from(threadMap.values())
     }
-    // For now, other tabs are empty or placeholders
-    return false
-  })
+
+    return []
+  }, [emails, activeTab, currentUserEmail, adminMode])
+
+  // Filter by search term
+  const searchedEmails = useMemo(() => {
+    if (!searchTerm.trim()) return filteredEmails
+
+    const term = searchTerm.toLowerCase()
+    return filteredEmails.filter(email => {
+      const subject = email.subject?.toLowerCase() || ''
+      const body = email.body?.toLowerCase() || ''
+      const sender = email.sender_email?.toLowerCase() || ''
+      const receiver = email.receiver_email?.toLowerCase() || ''
+      const senderName = email.sender_name?.toLowerCase() || ''
+      const receiverName = email.receiver_name?.toLowerCase() || ''
+
+      return (
+        subject.includes(term) ||
+        body.includes(term) ||
+        sender.includes(term) ||
+        receiver.includes(term) ||
+        senderName.includes(term) ||
+        receiverName.includes(term)
+      )
+    })
+  }, [filteredEmails, searchTerm])
 
   // Sort by date desc
-  filteredEmails.sort(
-    (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime(),
-  )
+  const sortedEmails = useMemo(() => {
+    return [...searchedEmails].sort(
+      (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime(),
+    )
+  }, [searchedEmails])
+
+  // Calculate counts for nav items
+  const counts = useMemo(() => {
+    const inboxThreads = new Map<string, Email>()
+    const sentThreads = new Map<string, Email>()
+
+    // Inbox count logic
+    emails.forEach(email => {
+      const existing = inboxThreads.get(email.thread_id)
+      if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
+        inboxThreads.set(email.thread_id, email)
+      }
+    })
+    const inboxCount = Array.from(inboxThreads.values()).filter(email => {
+      if (adminMode) return email.sender_user_id == null
+      return email.sender_email?.toLowerCase() !== currentUserEmail.toLowerCase()
+    }).length
+
+    // Sent count logic
+    emails.forEach(email => {
+      const isSender = adminMode
+        ? email.sender_user_id != null
+        : email.sender_email?.toLowerCase() === currentUserEmail.toLowerCase()
+      if (isSender) {
+        const existing = sentThreads.get(email.thread_id)
+        if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
+          sentThreads.set(email.thread_id, email)
+        }
+      }
+    })
+    const sentCount = sentThreads.size
+
+    return { inbox: inboxCount, sent: sentCount }
+  }, [emails, currentUserEmail, adminMode])
 
   const navItems = [
     {
       id: 'inbox',
       label: 'Inbox',
       icon: Inbox,
-      count: emails.filter(
-        e => e.receiver_email?.toLowerCase() === currentUserEmail.toLowerCase(),
-      ).length,
+      count: counts.inbox,
     },
-    { id: 'sent', label: 'Sent', icon: Send, count: 0 },
+    { id: 'sent', label: 'Sent', icon: Send, count: counts.sent },
   ]
+
+  const toggleSelectAll = () => {
+    if (selectedThreads.size === sortedEmails.length && sortedEmails.length > 0) {
+      setSelectedThreads(new Set())
+    } else {
+      setSelectedThreads(new Set(sortedEmails.map(e => e.thread_id)))
+    }
+  }
+
+  const handleDelete = async () => {
+    if (selectedThreads.size === 0) return
+    if (
+      !confirm(`Are you sure you want to delete ${selectedThreads.size} conversations?`)
+    )
+      return
+
+    setIsDeleting(true)
+    try {
+      const res = await fetch('/api/emails/delete-threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadIds: Array.from(selectedThreads) }),
+      })
+
+      if (res.ok) {
+        toast({
+          title: 'Success',
+          description: 'Conversations deleted',
+          variant: 'success',
+        })
+        setSelectedThreads(new Set())
+        revalidator.revalidate()
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to delete conversations',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete conversations',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   return (
     <div className='flex h-[calc(100vh-100px)] w-full bg-background font-sans'>
       {/* Sidebar */}
       <div className='w-64 flex-shrink-0 flex flex-col py-4 pr-4'>
-        <Button className='w-full' onClick={() => navigate('sendEmail')}>
-          New email
-        </Button>
+        {!adminMode && (
+          <Button className='w-full' onClick={() => navigate('sendEmail')}>
+            New email
+          </Button>
+        )}
 
-        <nav className='flex-1 space-y-1 pr-2'>
+        <nav className='flex-1 space-y-1 pr-2 mt-4'>
           {navItems.map(item => (
             <button
               type='button'
               key={item.id}
-              onClick={() => setActiveTab(item.id as Tab)}
+              onClick={() => {
+                setActiveTab(item.id as Tab)
+                setSelectedThreads(new Set())
+              }}
               className={cn(
                 'w-full flex items-center gap-3 px-6 py-2 rounded-r-full text-sm font-medium transition-colors cursor-pointer',
                 activeTab === item.id
@@ -119,37 +254,62 @@ export default function DealsEmailsView({
       <div className='flex-1 flex flex-col bg-white rounded-tl-2xl shadow-sm border border-gray-200 overflow-hidden mr-4 mb-4'>
         {/* Toolbar / Header of list */}
         <div className='flex items-center gap-4 p-3 border-b border-gray-200 bg-white'>
-          {/* <div className='pl-2'>
+          <div className='pl-2 flex items-center gap-2'>
             <Checkbox
               checked={
-                selectedEmails.size === filteredEmails.length &&
-                filteredEmails.length > 0
+                selectedThreads.size === sortedEmails.length && sortedEmails.length > 0
               }
               onCheckedChange={toggleSelectAll}
-              className='data-[state=checked]:bg-gray-600 data-[state=checked]:border-gray-600 border-gray-400'
             />
-          </div> */}
+            {selectedThreads.size > 0 && (
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className='p-1.5 hover:bg-red-50 rounded-full text-red-500 transition-colors'
+                title='Delete selected'
+              >
+                <Trash2 className='h-4 w-4' />
+              </button>
+            )}
+          </div>
+          <div className='relative flex-1 max-w-md ml-2'>
+            <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-gray-500' />
+            <Input
+              type='text'
+              placeholder='Search emails...'
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className='pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
+            />
+          </div>
+          <div className='flex-1' />
           <button
             type='button'
-            onClick={() => window.location.reload()}
+            onClick={() => revalidator.revalidate()}
             className='p-1 hover:bg-gray-100 rounded-full text-gray-500'
           >
-            <RotateCw className='h-4 w-4' />
+            <RotateCw
+              className={cn(
+                'h-4 w-4',
+                revalidator.state === 'loading' && 'animate-spin',
+              )}
+            />
           </button>
         </div>
 
         {/* Email List */}
         <div className='flex-1 overflow-y-auto'>
-          {filteredEmails.length === 0 ? (
+          {sortedEmails.length === 0 ? (
             <div className='p-8 text-center text-muted-foreground'>
-              No conversations in {activeTab}.
+              {searchTerm
+                ? 'No emails found matching your search.'
+                : `No conversations in ${activeTab}.`}
             </div>
           ) : (
             <div className='divide-y divide-gray-100'>
-              {filteredEmails.map(email => {
-                // Assuming isRead=true for now as we don't have read status per user easily available in this view yet
-                // (though admin.deals has email_reads, this view is simpler for now)
+              {sortedEmails.map(email => {
                 const isRead = true
+                const isSelected = selectedThreads.has(email.thread_id)
                 return (
                   <div
                     key={email.id}
@@ -159,18 +319,21 @@ export default function DealsEmailsView({
                     className={cn(
                       'group flex items-center gap-3 px-3 py-2.5 hover:shadow-md hover:z-10 relative cursor-pointer transition-all bg-white border-b border-transparent hover:border-gray-200',
                       !isRead && 'bg-gray-50 font-semibold',
+                      isSelected && 'bg-blue-50',
                     )}
                   >
-                    {/* Checkbox & Star */}
-                    {/* <div className='flex items-center gap-3 flex-shrink-0 pl-2'>
+                    <div className='pl-2 flex-shrink-0'>
                       <Checkbox
-                        checked={selectedEmails.has(email.id)}
-                        onCheckedChange={() => toggleSelect(email.id)}
-                        className='data-[state=checked]:bg-gray-600 data-[state=checked]:border-gray-600 border-gray-300'
+                        checked={isSelected}
+                        onCheckedChange={checked => {
+                          const next = new Set(selectedThreads)
+                          if (checked) next.add(email.thread_id)
+                          else next.delete(email.thread_id)
+                          setSelectedThreads(next)
+                        }}
+                        onClick={e => e.stopPropagation()}
                       />
-                      <Star className='h-5 w-5 text-gray-300 hover:text-yellow-400 cursor-pointer' />
-                    </div> */}
-
+                    </div>
                     {/* Employee Name (Admin Mode) */}
                     {adminMode && (
                       <div className='w-32 flex-shrink-0 truncate text-sm text-gray-500 font-medium pl-1'>
@@ -186,8 +349,8 @@ export default function DealsEmailsView({
                           : email.receiver_name || email.receiver_email}
                       </div>
                     </div>
-                    {/* Sender */}
-                    <div className='w-48 flex-shrink-0 truncate text-sm text-gray-900 font-medium pl-1'>
+                    {/* Sender Email (Small) */}
+                    <div className='w-48 flex-shrink-0 truncate text-xs text-gray-400 pl-1'>
                       {activeTab === 'inbox'
                         ? email.sender_email
                         : email.receiver_email}

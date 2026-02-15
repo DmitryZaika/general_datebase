@@ -21,7 +21,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        WHERE e.deleted_at IS NULL 
        AND (e.sender_email = ? OR e.receiver_email = ?)
        ORDER BY e.sent_at DESC
-       LIMIT 500`,
+       LIMIT 2000`,
       [user.email, user.email],
     )
 

@@ -40,7 +40,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       params.push(Number(salesRepFilter), Number(salesRepFilter))
     }
 
-    query += ` ORDER BY e.sent_at DESC LIMIT 500`
+    query += ` ORDER BY e.sent_at DESC LIMIT 2000`
 
     // Fetch all emails for admin view
     const userEmails = await selectMany<Email>(db, query, params)
