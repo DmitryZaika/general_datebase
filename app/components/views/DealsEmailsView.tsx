@@ -374,7 +374,7 @@ export default function DealsEmailsView({
                     </div>
                     {/* Employee Name (Admin Mode) */}
                     {adminMode && (
-                      <div className='min-w-20 flex-shrink-0 truncate text-sm text-gray-500 font-medium pl-1'>
+                      <div className='w-32 flex-shrink-0 truncate text-sm text-gray-500 font-medium pl-1'>
                         {activeTab === 'inbox'
                           ? email.receiver_name || email.receiver_email
                           : email.sender_name || email.sender_email}
