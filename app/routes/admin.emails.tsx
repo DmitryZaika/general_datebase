@@ -26,14 +26,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     let query = `SELECT e.id, e.thread_id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.sender_user_id,
        (SELECT COUNT(*) FROM email_attachments ea WHERE ea.email_id = e.id) > 0 as has_attachments,
-       COALESCE(s.name, (SELECT name FROM customers WHERE email = e.sender_email LIMIT 1)) as sender_name,
-       COALESCE(r.name, (SELECT name FROM customers WHERE email = e.receiver_email LIMIT 1)) as receiver_name
+       COALESCE(s.name, (SELECT name FROM customers WHERE email = e.sender_email AND company_id = ? LIMIT 1)) as sender_name,
+       COALESCE(r.name, (SELECT name FROM customers WHERE email = e.receiver_email AND company_id = ? LIMIT 1)) as receiver_name
        FROM emails e
        LEFT JOIN users s ON e.sender_user_id = s.id
        LEFT JOIN users r ON e.receiver_email = r.email
-       WHERE e.deleted_at IS NULL`
+       WHERE e.deleted_at IS NULL AND (s.company_id = ? OR r.company_id = ?)`
 
-    const params: (string | number)[] = []
+    const params: (string | number)[] = [
+      user.company_id || 0,
+      user.company_id || 0,
+      user.company_id || 0,
+      user.company_id || 0,
+    ]
 
     if (salesRepFilter) {
       query += ` AND (e.sender_user_id = ? OR r.id = ?)`

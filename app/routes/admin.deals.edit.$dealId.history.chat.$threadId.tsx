@@ -253,7 +253,7 @@ export default function EmailChatDialog() {
                   className={
                     message.isFromCustomer
                       ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%]'
-                      : `bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative ${
+                      : `bg-blue-500 text-white [&_*]:!text-white rounded-2xl px-2 py-2 max-w-[75%] relative ${
                           message.signature && message.signature.trim() !== ''
                             ? 'pb-6 min-w-21.25'
                             : ''
@@ -322,10 +322,10 @@ export default function EmailChatDialog() {
                                 download
                               >
                                 <div
-                                  className={`${fileSize} bg-white rounded-md border border-gray-300 flex flex-col items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors p-2 shadow-sm`}
+                                  className={`${fileSize} bg-zinc-600 rounded-md border border-zinc-800 flex flex-col items-center justify-center text-zinc-900 hover:bg-zinc-800 transition-colors p-2 shadow-md`}
                                 >
-                                  <FileText className='h-10 w-10 mb-2 text-gray-400' />
-                                  <span className='text-[10px] text-center break-all line-clamp-2 leading-tight'>
+                                  <FileText className='h-10 w-10 mb-2 text-blue-600' />
+                                  <span className='text-[10px] font-semibold text-center break-all line-clamp-2 leading-tight'>
                                     {label}
                                   </span>
                                 </div>

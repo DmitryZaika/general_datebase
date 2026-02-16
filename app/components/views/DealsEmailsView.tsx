@@ -317,7 +317,7 @@ export default function DealsEmailsView({
                       navigate(`chat/${email.thread_id}${location.search}`)
                     }
                     className={cn(
-                      'group flex items-center gap-3 px-2 py-2 hover:shadow-md hover:z-10 relative cursor-pointer transition-all bg-white border-b border-transparent hover:border-gray-200',
+                      'group flex items-center gap-1 px-2 py-2 hover:shadow-md hover:z-10 relative cursor-pointer transition-all bg-white border-b border-transparent hover:border-gray-200',
                       !isRead && 'bg-gray-50 font-semibold',
                       isSelected && 'bg-blue-50',
                     )}
@@ -337,7 +337,7 @@ export default function DealsEmailsView({
                     </div>
                     {/* Employee Name (Admin Mode) */}
                     {adminMode && (
-                      <div className='w-32 flex-shrink-0 truncate text-sm text-gray-500 font-medium pl-1'>
+                      <div className='min-w-20 flex-shrink-0 truncate text-sm text-gray-500 font-medium pl-1'>
                         {activeTab === 'inbox'
                           ? email.receiver_name || email.receiver_email
                           : email.sender_name || email.sender_email}
@@ -349,12 +349,11 @@ export default function DealsEmailsView({
                           ? email.sender_name || email.sender_email
                           : email.receiver_name || email.receiver_email}
                       </div>
-                    </div>
-                    {/* Sender Email (Small) */}
-                    <div className='w-48 flex-shrink-0 truncate text-xs text-gray-400 pl-1'>
-                      {activeTab === 'inbox'
-                        ? email.sender_email
-                        : email.receiver_email}
+                      <div className='w-48 flex-shrink-0 truncate text-xs text-gray-400 pl-1'>
+                        {activeTab === 'inbox'
+                          ? email.sender_email
+                          : email.receiver_email}
+                      </div>
                     </div>
 
                     {/* Subject + Body */}
