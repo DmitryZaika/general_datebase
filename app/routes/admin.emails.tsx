@@ -1,18 +1,4 @@
-import {
-  type LoaderFunctionArgs,
-  Outlet,
-  redirect,
-  useLoaderData,
-  useNavigate,
-  useSearchParams,
-} from 'react-router'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
+import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
 import DealsEmailsView, { type Email } from '~/components/views/DealsEmailsView'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -78,42 +64,15 @@ export default function AdminEmails() {
     userEmail: string
     salesReps: { id: number; name: string }[]
   }>()
-  const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const salesRepParam = searchParams.get('sales_rep')
-
-  const handleSalesRepChange = (val: string) => {
-    const params = new URLSearchParams(searchParams)
-    if (val === 'all') {
-      params.delete('sales_rep')
-    } else {
-      params.set('sales_rep', val)
-    }
-    navigate({ search: params.toString() })
-  }
 
   return (
     <div className='w-full h-full p-2 flex flex-col gap-4'>
-      <div className='flex items-center gap-4'>
-        <Select value={salesRepParam || 'all'} onValueChange={handleSalesRepChange}>
-          <SelectTrigger className='w-[200px] bg-white'>
-            <SelectValue placeholder='Select Sales Rep' />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='all'>All Sales Reps</SelectItem>
-            {salesReps.map(rep => (
-              <SelectItem key={rep.id} value={String(rep.id)}>
-                {rep.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
       <div className='flex-1 min-h-0'>
         <DealsEmailsView
           emails={userEmails}
           currentUserEmail={userEmail}
           adminMode={true}
+          salesReps={salesReps}
         />
       </div>
       <Outlet />

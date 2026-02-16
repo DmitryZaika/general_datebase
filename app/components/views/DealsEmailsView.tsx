@@ -1,12 +1,19 @@
 import { format } from 'date-fns'
 import { Inbox, Paperclip, RotateCw, Search, Send, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useLocation, useNavigate, useRevalidator } from 'react-router'
+import { useLocation, useNavigate, useRevalidator, useSearchParams } from 'react-router'
 import { useToast } from '~/hooks/use-toast'
 import { cn } from '~/lib/utils'
 import { Button } from '../ui/button'
 import { Checkbox } from '../ui/checkbox'
 import { Input } from '../ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select'
 
 export interface Email {
   id: number
@@ -20,12 +27,14 @@ export interface Email {
   has_attachments?: boolean | number
   sender_name?: string | null
   receiver_name?: string | null
+  sales_rep?: string | null
 }
 
 interface DealsEmailsViewProps {
   emails: Email[]
   currentUserEmail: string
   adminMode?: boolean
+  salesReps?: { id: number; name: string }[]
 }
 
 type Tab = 'inbox' | 'drafts' | 'outbox' | 'sent' | 'archive'
@@ -34,6 +43,7 @@ export default function DealsEmailsView({
   emails,
   currentUserEmail,
   adminMode = false,
+  salesReps = [],
 }: DealsEmailsViewProps) {
   const navigate = useNavigate()
   const revalidator = useRevalidator()
@@ -43,7 +53,7 @@ export default function DealsEmailsView({
   const [isDeleting, setIsDeleting] = useState(false)
   const { toast } = useToast()
   const location = useLocation()
-
+  const [searchParams] = useSearchParams()
   // Filter and group emails based on tab
   const filteredEmails = useMemo(() => {
     const threadMap = new Map<string, Email>()
@@ -208,15 +218,42 @@ export default function DealsEmailsView({
       setIsDeleting(false)
     }
   }
+  const salesRepParam = searchParams.get('sales_rep')
+
+  const handleSalesRepChange = (val: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (val === 'all') {
+      params.delete('sales_rep')
+    } else {
+      params.set('sales_rep', val)
+    }
+    navigate({ search: params.toString() })
+  }
 
   return (
     <div className='flex h-[calc(100vh-100px)] w-full bg-background font-sans'>
       {/* Sidebar */}
       <div className='w-64 flex-shrink-0 flex flex-col py-4 pr-4'>
-        {!adminMode && (
+        {!adminMode ? (
           <Button className='w-full' onClick={() => navigate('sendEmail')}>
             New email
           </Button>
+        ) : (
+          <div className='flex items-center gap-4'>
+            <Select value={salesRepParam || 'all'} onValueChange={handleSalesRepChange}>
+              <SelectTrigger className='w-[200px] bg-white'>
+                <SelectValue placeholder='Select Sales Rep' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All Sales Reps</SelectItem>
+                {salesReps.map(rep => (
+                  <SelectItem key={rep.id} value={String(rep.id)}>
+                    {rep.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
         <nav className='flex-1 space-y-1 pr-2 mt-4'>
