@@ -1,5 +1,14 @@
 import { format } from 'date-fns'
-import { Inbox, Paperclip, RotateCw, Search, Send, Trash2 } from 'lucide-react'
+import {
+  Inbox,
+  Menu,
+  Paperclip,
+  PenSquare,
+  RotateCw,
+  Search,
+  Send,
+  Trash2,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate, useRevalidator, useSearchParams } from 'react-router'
 import { useToast } from '~/hooks/use-toast'
@@ -14,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select'
+import { Sheet, SheetContent, SheetTrigger } from '../ui/sheet'
 
 export interface Email {
   id: number
@@ -230,67 +240,86 @@ export default function DealsEmailsView({
     navigate({ search: params.toString() })
   }
 
-  return (
-    <div className='flex h-[calc(100vh-100px)] w-full bg-background font-sans'>
-      {/* Sidebar */}
-      <div className='w-64 flex-shrink-0 flex flex-col py-4 pr-4'>
-        {!adminMode ? (
-          <Button className='w-full' onClick={() => navigate('sendEmail')}>
-            New email
-          </Button>
-        ) : (
-          <div className='flex items-center gap-4'>
-            <Select value={salesRepParam || 'all'} onValueChange={handleSalesRepChange}>
-              <SelectTrigger className='w-[200px] bg-white'>
-                <SelectValue placeholder='Select Sales Rep' />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='all'>All Sales Reps</SelectItem>
-                {salesReps.map(rep => (
-                  <SelectItem key={rep.id} value={String(rep.id)}>
-                    {rep.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+  const SidebarContent = () => (
+    <div className='flex flex-col h-full py-4 pr-4'>
+      {!adminMode ? (
+        <Button className='w-full' onClick={() => navigate('sendEmail')}>
+          New email
+        </Button>
+      ) : (
+        <div className='flex items-center gap-4'>
+          <Select value={salesRepParam || 'all'} onValueChange={handleSalesRepChange}>
+            <SelectTrigger className='w-full bg-white'>
+              <SelectValue placeholder='Select Sales Rep' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>All Sales Reps</SelectItem>
+              {salesReps.map(rep => (
+                <SelectItem key={rep.id} value={String(rep.id)}>
+                  {rep.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
-        <nav className='flex-1 space-y-1 pr-2 mt-4'>
-          {navItems.map(item => (
-            <button
-              type='button'
-              key={item.id}
-              onClick={() => {
-                setActiveTab(item.id as Tab)
-                setSelectedThreads(new Set())
-              }}
+      <nav className='flex-1 space-y-1 pr-2 mt-4'>
+        {navItems.map(item => (
+          <button
+            type='button'
+            key={item.id}
+            onClick={() => {
+              setActiveTab(item.id as Tab)
+              setSelectedThreads(new Set())
+            }}
+            className={cn(
+              'w-full flex items-center gap-3 px-6 py-2 rounded-r-full text-sm font-medium transition-colors cursor-pointer',
+              activeTab === item.id
+                ? 'bg-[#e8f0fe] text-[#1967d2]'
+                : 'text-gray-700 hover:bg-gray-100',
+            )}
+          >
+            <item.icon
               className={cn(
-                'w-full flex items-center gap-3 px-6 py-2 rounded-r-full text-sm font-medium transition-colors cursor-pointer',
-                activeTab === item.id
-                  ? 'bg-[#e8f0fe] text-[#1967d2]'
-                  : 'text-gray-700 hover:bg-gray-100',
+                'h-4 w-4',
+                activeTab === item.id ? 'text-[#1967d2]' : 'text-gray-500',
               )}
-            >
-              <item.icon
-                className={cn(
-                  'h-4 w-4',
-                  activeTab === item.id ? 'text-[#1967d2]' : 'text-gray-500',
-                )}
-              />
-              <span className='flex-1 text-left'>{item.label}</span>
-              {item.count > 0 && (
-                <span className='text-xs font-semibold'>{item.count}</span>
-              )}
-            </button>
-          ))}
-        </nav>
+            />
+            <span className='flex-1 text-left'>{item.label}</span>
+            {item.count > 0 && (
+              <span className='text-xs font-semibold'>{item.count}</span>
+            )}
+          </button>
+        ))}
+      </nav>
+    </div>
+  )
+
+  return (
+    <div className='flex h-[calc(100vh-100px)] w-full bg-background font-sans relative'>
+      {/* Desktop Sidebar */}
+      <div className='hidden md:flex w-64 flex-shrink-0 flex-col'>
+        <SidebarContent />
       </div>
 
       {/* Main Content */}
-      <div className='flex-1 flex flex-col bg-white rounded-tl-2xl shadow-sm border border-gray-200 overflow-hidden mr-4 mb-4'>
+      <div className='flex-1 flex flex-col bg-white md:rounded-tl-2xl shadow-sm border border-gray-200 overflow-hidden md:mr-4 md:mb-4 h-full'>
         {/* Toolbar / Header of list */}
-        <div className='flex items-center gap-4 p-3 border-b border-gray-200 bg-white'>
+        <div className='flex items-center gap-2 md:gap-4 p-2 md:p-3 border-b border-gray-200 bg-white'>
+          {/* Mobile Menu Trigger */}
+          <div className='md:hidden'>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant='ghost' size='icon'>
+                  <Menu className='h-5 w-5' />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side='left' className='w-64 p-0 bg-white'>
+                <SidebarContent />
+              </SheetContent>
+            </Sheet>
+          </div>
           <div className='pl-2 flex items-center gap-2'>
             <Checkbox
               checked={
@@ -319,7 +348,7 @@ export default function DealsEmailsView({
               className='pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
             />
           </div>
-          <div className='flex-1' />
+          <div className='flex-1 md:hidden' /> {/* Spacer for mobile */}
           <button
             type='button'
             onClick={() => revalidator.revalidate()}
@@ -347,6 +376,11 @@ export default function DealsEmailsView({
               {sortedEmails.map(email => {
                 const isRead = true
                 const isSelected = selectedThreads.has(email.thread_id)
+                const senderName =
+                  activeTab === 'inbox'
+                    ? email.sender_name || email.sender_email
+                    : email.receiver_name || email.receiver_email
+
                 return (
                   <div
                     key={email.id}
@@ -354,12 +388,12 @@ export default function DealsEmailsView({
                       navigate(`chat/${email.thread_id}${location.search}`)
                     }
                     className={cn(
-                      'group flex items-center gap-1 px-2 py-2 hover:shadow-md hover:z-10 relative cursor-pointer transition-all bg-white border-b border-transparent hover:border-gray-200',
+                      'group flex items-start md:items-center gap-3 px-3 py-3 hover:shadow-md hover:z-10 relative cursor-pointer transition-all bg-white border-b border-transparent hover:border-gray-200',
                       !isRead && 'bg-gray-50 font-semibold',
                       isSelected && 'bg-blue-50',
                     )}
                   >
-                    <div className='flex-shrink-0'>
+                    <div className='flex-shrink-0 mt-1 md:mt-0'>
                       <Checkbox
                         checked={isSelected}
                         onCheckedChange={checked => {
@@ -372,48 +406,81 @@ export default function DealsEmailsView({
                         onClick={e => e.stopPropagation()}
                       />
                     </div>
-                    {/* Employee Name (Admin Mode) */}
-                    {adminMode && (
-                      <div className='w-32 flex-shrink-0 truncate text-sm text-gray-500 font-medium pl-1'>
-                        {activeTab === 'inbox'
-                          ? email.receiver_name || email.receiver_email
-                          : email.sender_name || email.sender_email}
-                      </div>
-                    )}
-                    <div>
-                      <div className='w-48 flex-shrink-0 truncate text-sm text-gray-900 font-medium pl-1'>
-                        {activeTab === 'inbox'
-                          ? email.sender_name || email.sender_email
-                          : email.receiver_name || email.receiver_email}
-                      </div>
-                      <div className='w-48 flex-shrink-0 truncate text-xs text-gray-400 pl-1'>
-                        {activeTab === 'inbox'
-                          ? email.sender_email
-                          : email.receiver_email}
-                      </div>
-                    </div>
 
-                    {/* Subject + Body */}
-                    <div className='flex-1 min-w-0 flex items-center gap-2 text-sm'>
-                      <span className='font-medium text-gray-900 truncate'>
+                    {/* Mobile Layout (Vertical Stack) */}
+                    <div className='flex-1 min-w-0 flex flex-col gap-0.5 md:hidden'>
+                      <div className='flex items-center justify-between gap-2'>
+                        <span className='font-semibold text-gray-900 truncate text-sm'>
+                          {senderName}
+                        </span>
+                        <div className='flex items-center gap-2 flex-shrink-0'>
+                          {Boolean(email.has_attachments) && (
+                            <Paperclip className='h-3.5 w-3.5 text-gray-500' />
+                          )}
+                          <span className='text-xs text-gray-500 whitespace-nowrap'>
+                            {format(new Date(email.sent_at), 'MMM d')}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className='text-sm text-gray-900 truncate font-medium'>
                         {email.subject || '(No Subject)'}
-                      </span>
-                      <span className='text-gray-400'>-</span>
-                      <span className='text-gray-500 truncate'>
+                      </div>
+
+                      <div className='text-sm text-gray-500 truncate'>
                         {email.body
                           ? email.body.replace(/<[^>]*>?/gm, '').slice(0, 100)
                           : ''}
-                      </span>
+                      </div>
+
+                      {/* Admin Mode Extra Info */}
+                      {adminMode && (
+                        <div className='mt-1 text-xs text-gray-400 truncate'>
+                          {activeTab === 'inbox'
+                            ? `To: ${email.receiver_name || email.receiver_email}`
+                            : `From: ${email.sender_name || email.sender_email}`}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Attachments & Date */}
-                    <div className='flex items-center gap-4 flex-shrink-0 text-xs text-gray-500 font-medium justify-end pr-2'>
-                      {Boolean(email.has_attachments) && (
-                        <Paperclip className='h-3.5 w-3.5 text-gray-500' />
+                    {/* Desktop Layout (Horizontal Row) */}
+                    <div className='hidden md:flex flex-1 items-center gap-4 min-w-0'>
+                      {/* Employee Name (Admin Mode) */}
+                      {adminMode && (
+                        <div className='w-32 flex-shrink-0 truncate text-sm text-gray-500 font-medium'>
+                          {activeTab === 'inbox'
+                            ? email.receiver_name || email.receiver_email
+                            : email.sender_name || email.sender_email}
+                        </div>
                       )}
-                      <span className='w-16 text-right'>
-                        {format(new Date(email.sent_at), 'MMM d')}
-                      </span>
+
+                      {/* Sender/Receiver Name */}
+                      <div className='w-48 flex-shrink-0 truncate text-sm text-gray-900 font-medium'>
+                        {senderName}
+                      </div>
+
+                      {/* Subject + Body */}
+                      <div className='flex-1 min-w-0 flex items-center gap-2 text-sm'>
+                        <span className='font-medium text-gray-900 truncate max-w-[200px]'>
+                          {email.subject || '(No Subject)'}
+                        </span>
+                        <span className='text-gray-400'>-</span>
+                        <span className='text-gray-500 truncate'>
+                          {email.body
+                            ? email.body.replace(/<[^>]*>?/gm, '').slice(0, 100)
+                            : ''}
+                        </span>
+                      </div>
+
+                      {/* Attachments & Date */}
+                      <div className='flex items-center gap-4 flex-shrink-0 text-xs text-gray-500 font-medium justify-end'>
+                        {Boolean(email.has_attachments) && (
+                          <Paperclip className='h-3.5 w-3.5 text-gray-500' />
+                        )}
+                        <span className='w-16 text-right'>
+                          {format(new Date(email.sent_at), 'MMM d')}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )
@@ -422,6 +489,16 @@ export default function DealsEmailsView({
           )}
         </div>
       </div>
+
+      {/* Mobile FAB for New Email */}
+      {!adminMode && (
+        <Button
+          className='md:hidden fixed bottom-6 right-6 rounded-full h-14 w-14 shadow-lg z-50 flex items-center justify-center p-0'
+          onClick={() => navigate('sendEmail')}
+        >
+          <PenSquare className='h-6 w-6' />
+        </Button>
+      )}
     </div>
   )
 }
