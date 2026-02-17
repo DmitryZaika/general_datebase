@@ -376,6 +376,7 @@ export default function EmailChatDialog() {
     { id: number; url: string; name: string; type: string; available: null }[]
   >([])
   const [currentImageId, setCurrentImageId] = useState<number | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const location = useLocation()
   const removeAttachment = (file: File) => {
     setAttachments(prev => prev.filter(f => f !== file))
@@ -433,6 +434,27 @@ export default function EmailChatDialog() {
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
     }
   }, [messageText])
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+      const files: File[] = []
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (item.kind === 'file') {
+          const file = item.getAsFile()
+          if (file) files.push(file)
+        }
+      }
+      if (files.length > 0) {
+        e.preventDefault()
+        setAttachments(prev => [...prev, ...files])
+      }
+    }
+    document.addEventListener('paste', handlePaste, true)
+    return () => document.removeEventListener('paste', handlePaste, true)
+  }, [])
 
   const handleClose = () => {
     navigate(`/employee/emails${location.search}`)
@@ -565,9 +587,39 @@ export default function EmailChatDialog() {
     )
   }
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const related = e.relatedTarget
+    if (!related || !(related instanceof Node) || !e.currentTarget.contains(related)) {
+      setIsDragging(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    const files = e.dataTransfer?.files
+    if (files && files.length > 0) {
+      setAttachments(prev => [...prev, ...Array.from(files)])
+    }
+  }
+
   return (
     <Dialog open={true} onOpenChange={handleClose}>
-      <DialogContent className='max-w-[100%] sm:max-w-[90%] sm:max-w-[900px] h-[95%] p-0 flex flex-col'>
+      <DialogContent
+        className={`max-w-[100%] sm:max-w-[90%] sm:max-w-[900px] h-[95%] p-0 flex flex-col transition-colors ${isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <DialogHeader className='p-2 border-b'>
           <div className='flex items-center gap-3'>
             <div className='w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white font-bold'>
