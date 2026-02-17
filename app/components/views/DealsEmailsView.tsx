@@ -38,6 +38,7 @@ export interface Email {
   sender_name?: string | null
   receiver_name?: string | null
   sales_rep?: string | null
+  employee_read_at?: string | null // Важное поле
 }
 
 interface DealsEmailsViewProps {
@@ -64,12 +65,30 @@ export default function DealsEmailsView({
   const { toast } = useToast()
   const location = useLocation()
   const [searchParams] = useSearchParams()
+
+  // 1. ЛОГИКА НЕПРОЧИТАННЫХ СООБЩЕНИЙ
+  // Мы проверяем ВСЕ письма, а не только последние в треде.
+  // Если в треде есть хоть одно письмо от клиента без employee_read_at -> тред непрочитан.
+  const unreadThreadIds = useMemo(() => {
+    const ids = new Set<string>()
+    emails.forEach(email => {
+      // Проверка: Отправитель - клиент (нет sender_user_id) И поле прочитано пустое
+      const isFromCustomer = !email.sender_user_id
+      const isNotRead = !email.employee_read_at
+
+      if (isFromCustomer && isNotRead) {
+        ids.add(email.thread_id)
+      }
+    })
+    return ids
+  }, [emails])
+
   // Filter and group emails based on tab
   const filteredEmails = useMemo(() => {
     const threadMap = new Map<string, Email>()
 
     if (activeTab === 'inbox') {
-      // Inbox: latest message in each thread where user is NOT the sender (or just latest message)
+      // Inbox: latest message in each thread
       emails.forEach(email => {
         const existing = threadMap.get(email.thread_id)
         if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
@@ -138,36 +157,33 @@ export default function DealsEmailsView({
 
   // Calculate counts for nav items
   const counts = useMemo(() => {
-    const inboxThreads = new Map<string, Email>()
-    const sentThreads = new Map<string, Email>()
+    // Подсчет для Inbox (учитываем логику непрочитанных или просто общее кол-во тредов)
+    // Здесь оставляем как было (кол-во тредов), но можно заменить на unreadThreadIds.size если нужно число именно непрочитанных
+    const inboxThreads = new Set<string>()
 
-    // Inbox count logic
     emails.forEach(email => {
-      const existing = inboxThreads.get(email.thread_id)
-      if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
-        inboxThreads.set(email.thread_id, email)
+      // Условие для inbox: входящее письмо
+      const isInbox = adminMode
+        ? email.sender_user_id == null
+        : email.sender_email?.toLowerCase() !== currentUserEmail.toLowerCase()
+
+      if (isInbox) {
+        inboxThreads.add(email.thread_id)
       }
     })
-    const inboxCount = Array.from(inboxThreads.values()).filter(email => {
-      if (adminMode) return email.sender_user_id == null
-      return email.sender_email?.toLowerCase() !== currentUserEmail.toLowerCase()
-    }).length
 
-    // Sent count logic
+    // Подсчет для Sent
+    const sentThreads = new Set<string>()
     emails.forEach(email => {
       const isSender = adminMode
         ? email.sender_user_id != null
         : email.sender_email?.toLowerCase() === currentUserEmail.toLowerCase()
       if (isSender) {
-        const existing = sentThreads.get(email.thread_id)
-        if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
-          sentThreads.set(email.thread_id, email)
-        }
+        sentThreads.add(email.thread_id)
       }
     })
-    const sentCount = sentThreads.size
 
-    return { inbox: inboxCount, sent: sentCount }
+    return { inbox: inboxThreads.size, sent: sentThreads.size }
   }, [emails, currentUserEmail, adminMode])
 
   const navItems = [
@@ -374,7 +390,11 @@ export default function DealsEmailsView({
           ) : (
             <div className='divide-y divide-gray-100'>
               {sortedEmails.map(email => {
-                const isRead = true
+                // 2. ИСПОЛЬЗОВАНИЕ ЛОГИКИ
+                // Тред непрочитан, если мы в Inbox и ID треда есть в списке непрочитанных
+                const isUnread =
+                  activeTab === 'inbox' && unreadThreadIds.has(email.thread_id)
+
                 const isSelected = selectedThreads.has(email.thread_id)
                 const senderName =
                   activeTab === 'inbox'
@@ -384,13 +404,14 @@ export default function DealsEmailsView({
                 return (
                   <div
                     key={email.id}
-                    onClick={() =>
+                    onClick={() => {
                       navigate(`chat/${email.thread_id}${location.search}`)
-                    }
+                    }}
                     className={cn(
-                      'group flex items-start md:items-center gap-3 px-3 py-3 hover:shadow-md hover:z-10 relative cursor-pointer transition-all bg-white border-b border-transparent hover:border-gray-200',
-                      !isRead && 'bg-gray-50 font-semibold',
-                      isSelected && 'bg-blue-50',
+                      'group flex items-start md:items-center gap-3 px-3 py-3 hover:shadow-md hover:z-10 relative cursor-pointer transition-all border-b border-transparent hover:border-gray-200',
+                      // Стили для непрочитанного сообщения: синий фон, жирный шрифт
+                      isUnread ? 'bg-blue-50 font-semibold' : 'bg-white',
+                      isSelected && 'bg-blue-100', // Приоритет выделения
                     )}
                   >
                     <div className='flex-shrink-0 mt-1 md:mt-0'>
@@ -410,20 +431,39 @@ export default function DealsEmailsView({
                     {/* Mobile Layout (Vertical Stack) */}
                     <div className='flex-1 min-w-0 flex flex-col gap-0.5 md:hidden'>
                       <div className='flex items-center justify-between gap-2'>
-                        <span className='font-semibold text-gray-900 truncate text-sm'>
+                        <span
+                          className={cn(
+                            'truncate text-sm',
+                            isUnread
+                              ? 'font-bold text-gray-900'
+                              : 'font-semibold text-gray-900',
+                          )}
+                        >
                           {senderName}
                         </span>
                         <div className='flex items-center gap-2 flex-shrink-0'>
                           {Boolean(email.has_attachments) && (
                             <Paperclip className='h-3.5 w-3.5 text-gray-500' />
                           )}
-                          <span className='text-xs text-gray-500 whitespace-nowrap'>
+                          <span
+                            className={cn(
+                              'text-xs whitespace-nowrap',
+                              isUnread ? 'text-blue-600 font-bold' : 'text-gray-500',
+                            )}
+                          >
                             {format(new Date(email.sent_at), 'MMM d')}
                           </span>
                         </div>
                       </div>
 
-                      <div className='text-sm text-gray-900 truncate font-medium'>
+                      <div
+                        className={cn(
+                          'text-sm truncate',
+                          isUnread
+                            ? 'font-bold text-gray-900'
+                            : 'font-medium text-gray-900',
+                        )}
+                      >
                         {email.subject || '(No Subject)'}
                       </div>
 
@@ -455,13 +495,27 @@ export default function DealsEmailsView({
                       )}
 
                       {/* Sender/Receiver Name */}
-                      <div className='w-48 flex-shrink-0 truncate text-sm text-gray-900 font-medium'>
+                      <div
+                        className={cn(
+                          'w-48 flex-shrink-0 truncate text-sm',
+                          isUnread
+                            ? 'font-bold text-gray-900'
+                            : 'font-medium text-gray-900',
+                        )}
+                      >
                         {senderName}
                       </div>
 
                       {/* Subject + Body */}
                       <div className='flex-1 min-w-0 flex items-center gap-2 text-sm'>
-                        <span className='font-medium text-gray-900 truncate max-w-[200px]'>
+                        <span
+                          className={cn(
+                            'truncate max-w-[200px]',
+                            isUnread
+                              ? 'font-bold text-gray-900'
+                              : 'font-medium text-gray-900',
+                          )}
+                        >
                           {email.subject || '(No Subject)'}
                         </span>
                         <span className='text-gray-400'>-</span>
@@ -477,7 +531,12 @@ export default function DealsEmailsView({
                         {Boolean(email.has_attachments) && (
                           <Paperclip className='h-3.5 w-3.5 text-gray-500' />
                         )}
-                        <span className='w-16 text-right'>
+                        <span
+                          className={cn(
+                            'w-16 text-right',
+                            isUnread ? 'font-bold text-blue-600' : '',
+                          )}
+                        >
                           {format(new Date(email.sent_at), 'MMM d')}
                         </span>
                       </div>
