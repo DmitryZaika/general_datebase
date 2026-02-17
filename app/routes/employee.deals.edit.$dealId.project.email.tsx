@@ -575,9 +575,16 @@ function sendEmail(
   return fetch('/api/employee/sendEmail', {
     method: 'POST',
     body: formData,
-  }).then(res => {
-    if (!res.ok) throw new Error('Failed to send email')
-    return res.json()
+  }).then(async res => {
+    const payload = await res.json().catch(() => null)
+    if (!res.ok) {
+      const msg =
+        payload && typeof payload === 'object' && typeof payload.error === 'string'
+          ? payload.error
+          : 'Failed to send email'
+      throw new Error(msg)
+    }
+    return payload
   })
 }
 
@@ -610,10 +617,10 @@ export default function DealEmailDialog() {
         variant: 'success',
       })
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: 'Failure',
-        description: 'Email could not be sent',
+        description: error.message || 'Email could not be sent',
         variant: 'destructive',
       })
     },

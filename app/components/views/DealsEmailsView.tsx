@@ -13,6 +13,7 @@ import { useMemo, useState } from 'react'
 import { useLocation, useNavigate, useRevalidator, useSearchParams } from 'react-router'
 import { useToast } from '~/hooks/use-toast'
 import { cn } from '~/lib/utils'
+import { parseEmailAddress } from '~/utils/stringHelpers'
 import { Button } from '../ui/button'
 import { Checkbox } from '../ui/checkbox'
 import { Input } from '../ui/input'
@@ -100,7 +101,10 @@ export default function DealsEmailsView({
         if (adminMode) {
           return email.sender_user_id == null // Incoming from customer
         }
-        return email.sender_email?.toLowerCase() !== currentUserEmail.toLowerCase()
+        return (
+          parseEmailAddress(email.sender_email).toLowerCase() !==
+          parseEmailAddress(currentUserEmail).toLowerCase()
+        )
       })
     }
 
@@ -109,7 +113,8 @@ export default function DealsEmailsView({
       emails.forEach(email => {
         const isSender = adminMode
           ? email.sender_user_id != null
-          : email.sender_email?.toLowerCase() === currentUserEmail.toLowerCase()
+          : parseEmailAddress(email.sender_email).toLowerCase() ===
+            parseEmailAddress(currentUserEmail).toLowerCase()
 
         if (isSender) {
           const existing = threadMap.get(email.thread_id)
@@ -132,8 +137,8 @@ export default function DealsEmailsView({
     return filteredEmails.filter(email => {
       const subject = email.subject?.toLowerCase() || ''
       const body = email.body?.toLowerCase() || ''
-      const sender = email.sender_email?.toLowerCase() || ''
-      const receiver = email.receiver_email?.toLowerCase() || ''
+      const sender = parseEmailAddress(email.sender_email).toLowerCase() || ''
+      const receiver = parseEmailAddress(email.receiver_email).toLowerCase() || ''
       const senderName = email.sender_name?.toLowerCase() || ''
       const receiverName = email.receiver_name?.toLowerCase() || ''
 
@@ -165,7 +170,8 @@ export default function DealsEmailsView({
       // Условие для inbox: входящее письмо
       const isInbox = adminMode
         ? email.sender_user_id == null
-        : email.sender_email?.toLowerCase() !== currentUserEmail.toLowerCase()
+        : parseEmailAddress(email.sender_email).toLowerCase() !==
+          parseEmailAddress(currentUserEmail).toLowerCase()
 
       if (isInbox) {
         inboxThreads.add(email.thread_id)
@@ -177,7 +183,8 @@ export default function DealsEmailsView({
     emails.forEach(email => {
       const isSender = adminMode
         ? email.sender_user_id != null
-        : email.sender_email?.toLowerCase() === currentUserEmail.toLowerCase()
+        : parseEmailAddress(email.sender_email).toLowerCase() ===
+          parseEmailAddress(currentUserEmail).toLowerCase()
       if (isSender) {
         sentThreads.add(email.thread_id)
       }

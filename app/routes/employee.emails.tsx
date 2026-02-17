@@ -7,8 +7,9 @@ import { getEmployeeUser, type User } from '~/utils/session.server'
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user: User = await getEmployeeUser(request)
+    const userEmailNorm = (user.email || '').trim().toLowerCase()
+    const userEmailLike = `%<${userEmailNorm}>`
 
-    // Fetch emails where the user is sender or receiver
     const userEmails = await selectMany<Email>(
       db,
       `SELECT e.id, e.thread_id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.sender_user_id, e.employee_read_at,
@@ -18,11 +19,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        FROM emails e
        LEFT JOIN users s ON e.sender_user_id = s.id
        LEFT JOIN users r ON e.receiver_email = r.email
-       WHERE e.deleted_at IS NULL 
-       AND (e.sender_email = ? OR e.receiver_email = ?)
+       WHERE e.deleted_at IS NULL
+       AND (
+         e.sender_user_id = ?
+         OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.sender_email, '<', -1), '>', 1))) = ?
+         OR (e.sender_email NOT LIKE '%<%' AND LOWER(TRIM(e.sender_email)) = ?)
+         OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.receiver_email, '<', -1), '>', 1))) = ?
+         OR (e.receiver_email NOT LIKE '%<%' AND LOWER(TRIM(e.receiver_email)) = ?)
+         OR e.sender_email LIKE ?
+         OR e.receiver_email LIKE ?
+       )
        ORDER BY e.sent_at DESC
        LIMIT 2000`,
-      [user.email, user.email],
+      [
+        user.id,
+        userEmailNorm,
+        userEmailNorm,
+        userEmailNorm,
+        userEmailNorm,
+        userEmailLike,
+        userEmailLike,
+      ],
     )
 
     return {

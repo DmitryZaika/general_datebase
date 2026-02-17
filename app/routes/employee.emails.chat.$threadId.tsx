@@ -50,6 +50,7 @@ import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
+import { parseEmailAddress } from '~/utils/stringHelpers'
 
 interface Attachment {
   id: number
@@ -106,7 +107,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const dealId = dealRows?.[0]?.deal_id || null
 
   const normalizeEmail = (email: string | null | undefined) =>
-    email?.trim().toLowerCase() || ''
+    parseEmailAddress(email).toLowerCase() || ''
 
   let customerName = 'Customer'
   let customerEmail = ''
@@ -186,11 +187,17 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
 
     if (customerId) {
-      updateQuery += ` AND (sender_email = ? OR sender_email IN (SELECT email FROM customers WHERE id = ? OR parent_id = ?))`
-      updateParams.push(customerEmail, customerId, customerId)
+      updateQuery += ` AND (sender_email = ? OR sender_email LIKE ? OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(sender_email, '<', -1), '>', 1))) = ? OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(sender_email, '<', -1), '>', 1))) IN (SELECT LOWER(email) FROM customers WHERE id = ? OR parent_id = ?))`
+      updateParams.push(
+        customerEmail,
+        `%<${customerEmail}>`,
+        customerEmail,
+        customerId,
+        customerId,
+      )
     } else {
-      updateQuery += ` AND sender_email = ?`
-      updateParams.push(customerEmail)
+      updateQuery += ` AND (sender_email = ? OR sender_email LIKE ? OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(sender_email, '<', -1), '>', 1))) = ?)`
+      updateParams.push(customerEmail, `%<${customerEmail}>`, customerEmail)
     }
 
     await db.execute(updateQuery, updateParams)

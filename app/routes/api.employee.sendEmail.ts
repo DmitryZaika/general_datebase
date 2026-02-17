@@ -8,6 +8,7 @@ import { posthogClient } from '~/utils/posthog.server'
 import { selectId } from '~/utils/queryHelpers'
 import { uploadStreamToS3 } from '~/utils/s3.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
+import { parseEmailAddress } from '~/utils/stringHelpers'
 
 export const emailSchema = z.object({
   to: z.union([z.email(), z.array(z.email())]),
@@ -123,6 +124,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const messageId = cleanId(info.messageId)
+  const senderEmail = parseEmailAddress(emailInformation.from || '')
 
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id, deal_id)
@@ -132,10 +134,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       cleaned.subject,
       cleaned.body,
       messageId,
-      emailInformation.from,
+      senderEmail,
       Array.isArray(emailInformation.to)
-        ? emailInformation.to.join(', ')
-        : emailInformation.to,
+        ? (emailInformation.to as string[]).map(parseEmailAddress).join(', ')
+        : parseEmailAddress(emailInformation.to),
       threadId,
       cleaned.dealId || null,
     ],

@@ -50,6 +50,7 @@ import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
+import { parseEmailAddress } from '~/utils/stringHelpers'
 
 interface Attachment {
   id: number
@@ -111,7 +112,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   )
 
   const normalizeEmail = (email: string | null | undefined) =>
-    email?.trim().toLowerCase() || ''
+    parseEmailAddress(email).toLowerCase() || ''
   const customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
   const customerId = customerRows?.[0]?.customer_id
 
@@ -123,10 +124,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         WHERE deleted_at IS NULL
           AND thread_id = ?
           AND (deal_id = ? OR deal_id IS NULL)
-          AND (sender_email = ? OR sender_email IN (SELECT email FROM customers WHERE id = ? OR parent_id = ?))
+          AND (sender_email = ? OR sender_email LIKE ? OR sender_email IN (SELECT email FROM customers WHERE id = ? OR parent_id = ?))
           AND employee_read_at IS NULL
       `,
-      [threadId, dealId, customerEmail, customerId, customerId],
+      [threadId, dealId, customerEmail, `%<${customerEmail}>`, customerId, customerId],
     )
   }
 

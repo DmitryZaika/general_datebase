@@ -29,6 +29,7 @@ import { dateClass, fileSize } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
 import { getAdminUser, type User } from '~/utils/session.server'
+import { parseEmailAddress } from '~/utils/stringHelpers'
 
 interface Attachment {
   id: number
@@ -85,7 +86,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   )
 
   const normalizeEmail = (email: string | null | undefined) =>
-    email?.trim().toLowerCase() || ''
+    parseEmailAddress(email).toLowerCase() || ''
   const customerEmail = normalizeEmail(customerRows?.email || '')
 
   if (customerEmail) {
@@ -96,10 +97,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         WHERE deleted_at IS NULL
           AND thread_id = ?
           AND (deal_id = ? OR deal_id IS NULL)
-          AND sender_email = ?
+          AND (sender_email = ? OR sender_email LIKE ? OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(sender_email, '<', -1), '>', 1))) = ?)
           AND employee_read_at IS NULL
       `,
-      [threadId, dealId, customerEmail],
+      [threadId, dealId, customerEmail, `%<${customerEmail}>`, customerEmail],
     )
   }
 
