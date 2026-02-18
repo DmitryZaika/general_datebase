@@ -366,18 +366,13 @@ export default function DealItem({
                 </PopoverContent>
               </Popover>
             )}
-          {deal.list_id !== 5 &&
-            deal.list_id !== 4 &&
-            readonly &&
-            localDate &&
-            localDate !== '0000-00-00' &&
-            deal.is_won === null && (
-              <p
-                className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}
-              >
-                {formatDisplay(localDate)}
-              </p>
-            )}
+          {readonly && localDate && localDate !== '0000-00-00' && (
+            <p
+              className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}
+            >
+              {formatDisplay(localDate)}
+            </p>
+          )}
         </div>
 
         {(hasEmail || hasImages) && (

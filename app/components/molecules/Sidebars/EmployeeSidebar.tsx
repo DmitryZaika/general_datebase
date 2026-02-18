@@ -82,11 +82,6 @@ const getItems = (
         url: '/shop/samples',
         icon: Package,
       },
-      {
-        title: 'Statistics',
-        url: '/shop/statistics',
-        icon: Calculator,
-      },
     ]
   }
   const isCustomerRoute = base === 'customer'
@@ -287,7 +282,8 @@ export function EmployeeSidebar({
     (base === 'employee' ||
     base === 'admin' ||
     base === 'customer' ||
-    base === 'contractors'
+    base === 'contractors' ||
+    base === 'shop'
       ? base
       : null) || 'employee'
 
@@ -345,7 +341,7 @@ export function EmployeeSidebar({
 
   return (
     <Sidebar>
-      {isMobile && data?.user && (
+      {isMobile && data?.user && itemsBase !== 'shop' && (
         <SidebarHeader className='py-2 px-3'>
           <div className='flex gap-2 justify-center'>
             {data.user.is_admin || data.user.is_superuser ? (
