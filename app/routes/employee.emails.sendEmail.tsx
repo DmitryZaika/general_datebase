@@ -345,7 +345,7 @@ function EmailFormFields({
   const showCustomVariablesInfo = selectedTemplate && customVariables.length > 0
 
   return (
-    <div className='flex-1 space-y-4'>
+    <div className='flex-1 space-y-2'>
       <FormField
         control={form.control}
         name='to'
@@ -811,7 +811,7 @@ export default function DealEmailDialog() {
               canEditTo={!dealId}
             />
             {form.watch('attachments').length > 0 ? (
-              <div className='mt-3 flex flex-wrap gap-2'>
+              <div className='flex flex-wrap gap-2'>
                 {form.watch('attachments').map((file, index) => {
                   const previewKey = `${file.name}-${file.size}-${file.lastModified}`
                   const previewUrl = previews[previewKey]
@@ -819,7 +819,7 @@ export default function DealEmailDialog() {
                   return (
                     <div
                       key={uniqueKey}
-                      className='group relative size-20 sm:size-30 shrink-0 cursor-pointer rounded border border-border overflow-hidden'
+                      className='group relative size-15 sm:size-25 shrink-0 cursor-pointer rounded border border-border overflow-hidden'
                       onClick={() => removeAttachment(index)}
                     >
                       {previewUrl ? (
