@@ -37,7 +37,6 @@ import {
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { QuillInput } from '~/components/molecules/QuillInput'
-import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -60,12 +59,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '~/components/ui/tooltip'
 // Server Utilities
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
@@ -756,22 +749,21 @@ export default function DealEmailDialog() {
     }
   }
 
-  const removeAttachment = (file: File) => {
-    const key = `${file.name}-${file.size}-${file.lastModified}`
-    setPreviews(prev => {
-      const next = { ...prev }
-      delete next[key]
-      return next
-    })
+  const removeAttachment = (index: number) => {
+    const attachments = form.getValues('attachments')
+    const file = attachments[index]
+    if (file) {
+      const previewKey = `${file.name}-${file.size}-${file.lastModified}`
+      setPreviews(prev => {
+        const next = { ...prev }
+        delete next[previewKey]
+        return next
+      })
+    }
     form.setValue(
       'attachments',
-      form.getValues('attachments').filter(f => f !== file),
+      attachments.filter((_, i) => i !== index),
     )
-  }
-
-  const formatFileName = (name: string) => {
-    if (name.length <= 15) return name
-    return `${name.slice(0, 15)}...`
   }
 
   const imageExt = new Set([
@@ -819,48 +811,37 @@ export default function DealEmailDialog() {
               canEditTo={!dealId}
             />
             {form.watch('attachments').length > 0 ? (
-              <TooltipProvider>
-                <div className='mt-3 flex flex-wrap gap-2'>
-                  {form.watch('attachments').map(file => {
-                    const isTruncated = file.name.length > 15
-                    const displayName = formatFileName(file.name)
-                    const key = `${file.name}-${file.size}-${file.lastModified}`
-                    const previewUrl = previews[key]
-                    const badge = (
-                      <Badge
-                        key={key}
-                        className='cursor-pointer select-none p-1 pr-2 flex items-center gap-2'
-                        onClick={() => removeAttachment(file)}
-                      >
-                        {previewUrl ? (
-                          <img
-                            src={previewUrl}
-                            alt='preview'
-                            className='size-8 sm:size-12 md:size-14 object-cover rounded'
-                          />
-                        ) : (
-                          <div className='size-14 flex items-center justify-center bg-secondary rounded'>
-                            {attachmentIcon(file.name)}
-                          </div>
-                        )}
-                        <span className='flex items-center gap-1'>
-                          <span>{displayName}</span>
-                          <span className='ml-1 text-xs opacity-70'>×</span>
+              <div className='mt-3 flex flex-wrap gap-2'>
+                {form.watch('attachments').map((file, index) => {
+                  const previewKey = `${file.name}-${file.size}-${file.lastModified}`
+                  const previewUrl = previews[previewKey]
+                  const uniqueKey = `att-${index}-${previewKey}`
+                  return (
+                    <div
+                      key={uniqueKey}
+                      className='group relative size-20 sm:size-30 shrink-0 cursor-pointer rounded border border-border overflow-hidden'
+                      onClick={() => removeAttachment(index)}
+                    >
+                      {previewUrl ? (
+                        <img
+                          src={previewUrl}
+                          alt={file.name}
+                          className='size-full object-cover transition-all group-hover:grayscale group-hover:brightness-75'
+                        />
+                      ) : (
+                        <div className='size-full flex items-center justify-center bg-muted text-muted-foreground group-hover:bg-muted/80 transition-colors'>
+                          {attachmentIcon(file.name)}
+                        </div>
+                      )}
+                      <div className='absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-1'>
+                        <span className='text-white text-[10px] text-center line-clamp-2 break-all'>
+                          {file.name}
                         </span>
-                      </Badge>
-                    )
-
-                    if (!isTruncated) return badge
-
-                    return (
-                      <Tooltip key={`${file.name}-${file.size}-${file.lastModified}`}>
-                        <TooltipTrigger asChild>{badge}</TooltipTrigger>
-                        <TooltipContent side='top'>{file.name}</TooltipContent>
-                      </Tooltip>
-                    )
-                  })}
-                </div>
-              </TooltipProvider>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             ) : null}
             <input
               ref={fileInputRef}

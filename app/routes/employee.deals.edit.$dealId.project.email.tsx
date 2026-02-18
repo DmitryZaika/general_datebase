@@ -37,7 +37,6 @@ import {
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { QuillInput } from '~/components/molecules/QuillInput'
-import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -60,12 +59,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '~/components/ui/tooltip'
 // Server Utilities
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
@@ -335,12 +328,14 @@ function EmailFormFields({
   selectedTemplate,
   onTemplateChange,
   templateVariableData,
+  onFilesDrop,
 }: {
   form: ReturnType<typeof useForm<EmailFormData>>
   companyId: number
   selectedTemplate: EmailTemplate | undefined
   onTemplateChange: (template: EmailTemplate | undefined) => void
   templateVariableData: TemplateVariableData
+  onFilesDrop?: (files: File[]) => void
 }) {
   const bodyText = form.watch('text')
   const customVariables = getUnfilledCustomVariables(bodyText)
@@ -386,7 +381,12 @@ function EmailFormFields({
         control={form.control}
         name='text'
         render={({ field }) => (
-          <QuillInput name='Body' field={field} className='mb-4' />
+          <QuillInput
+            name='Body'
+            field={field}
+            className='mb-4'
+            onFilesDrop={onFilesDrop}
+          />
         )}
       />
       {showCustomVariablesInfo && (
@@ -598,6 +598,7 @@ export default function DealEmailDialog() {
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (values: EmailFormData) => {
@@ -749,22 +750,46 @@ export default function DealEmailDialog() {
     }
   }
 
-  const removeAttachment = (file: File) => {
-    const key = `${file.name}-${file.size}-${file.lastModified}`
-    setPreviews(prev => {
-      const next = { ...prev }
-      delete next[key]
-      return next
-    })
-    form.setValue(
-      'attachments',
-      form.getValues('attachments').filter(f => f !== file),
-    )
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
   }
 
-  const formatFileName = (name: string) => {
-    if (name.length <= 15) return name
-    return `${name.slice(0, 15)}...`
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const related = e.relatedTarget
+    if (!related || !(related instanceof Node) || !e.currentTarget.contains(related)) {
+      setIsDragging(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    const files = e.dataTransfer?.files
+    if (files && files.length > 0) {
+      addFiles(Array.from(files))
+    }
+  }
+
+  const removeAttachment = (index: number) => {
+    const attachments = form.getValues('attachments')
+    const file = attachments[index]
+    if (file) {
+      const previewKey = `${file.name}-${file.size}-${file.lastModified}`
+      setPreviews(prev => {
+        const next = { ...prev }
+        delete next[previewKey]
+        return next
+      })
+    }
+    form.setValue(
+      'attachments',
+      attachments.filter((_, i) => i !== index),
+    )
   }
 
   const imageExt = new Set([
@@ -785,14 +810,17 @@ export default function DealEmailDialog() {
     const parts = fileName.split('.')
     const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : ''
     if (ext && imageExt.has(ext)) return <ImageIcon className='h-4 w-4' />
-    return <FileText className='h-4 w-4' />
+    return <FileText className='h-8 sm:h-15 w-8 sm:w-15' />
   }
 
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
       <DialogContent
-        className='sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5'
+        className={`sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5 transition-colors ${isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`}
         onPaste={handlePaste}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
         <DialogHeader>
           <DialogTitle>Send Email</DialogTitle>
@@ -809,50 +837,40 @@ export default function DealEmailDialog() {
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
               templateVariableData={templateVariableData}
+              onFilesDrop={files => addFiles(files)}
             />
             {form.watch('attachments').length > 0 ? (
-              <TooltipProvider>
-                <div className='mt-3 flex flex-wrap gap-2'>
-                  {form.watch('attachments').map(file => {
-                    const isTruncated = file.name.length > 15
-                    const displayName = formatFileName(file.name)
-                    const key = `${file.name}-${file.size}-${file.lastModified}`
-                    const previewUrl = previews[key]
-                    const badge = (
-                      <Badge
-                        key={key}
-                        className='cursor-pointer select-none p-1 pr-2 flex items-center gap-2'
-                        onClick={() => removeAttachment(file)}
-                      >
-                        {previewUrl ? (
-                          <img
-                            src={previewUrl}
-                            alt='preview'
-                            className='size-8 sm:size-12 md:size-14 object-cover rounded'
-                          />
-                        ) : (
-                          <div className='size-14 flex items-center justify-center bg-secondary rounded'>
-                            {attachmentIcon(file.name)}
-                          </div>
-                        )}
-                        <span className='flex items-center gap-1'>
-                          <span>{displayName}</span>
-                          <span className='ml-1 text-xs opacity-70'>×</span>
+              <div className='mt-3 flex flex-wrap gap-2'>
+                {form.watch('attachments').map((file, index) => {
+                  const previewKey = `${file.name}-${file.size}-${file.lastModified}`
+                  const previewUrl = previews[previewKey]
+                  const uniqueKey = `att-${index}-${previewKey}`
+                  return (
+                    <div
+                      key={uniqueKey}
+                      className='group relative size-20 sm:size-30 shrink-0 cursor-pointer rounded border border-border overflow-hidden'
+                      onClick={() => removeAttachment(index)}
+                    >
+                      {previewUrl ? (
+                        <img
+                          src={previewUrl}
+                          alt={file.name}
+                          className='size-full object-cover transition-all group-hover:grayscale group-hover:brightness-75'
+                        />
+                      ) : (
+                        <div className='size-full flex items-center justify-center bg-muted text-muted-foreground group-hover:bg-muted/80 transition-colors'>
+                          {attachmentIcon(file.name)}
+                        </div>
+                      )}
+                      <div className='absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-1'>
+                        <span className='text-white text-[10px] text-center line-clamp-2 break-all'>
+                          {file.name}
                         </span>
-                      </Badge>
-                    )
-
-                    if (!isTruncated) return badge
-
-                    return (
-                      <Tooltip key={`${file.name}-${file.size}-${file.lastModified}`}>
-                        <TooltipTrigger asChild>{badge}</TooltipTrigger>
-                        <TooltipContent side='top'>{file.name}</TooltipContent>
-                      </Tooltip>
-                    )
-                  })}
-                </div>
-              </TooltipProvider>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             ) : null}
             <input
               ref={fileInputRef}

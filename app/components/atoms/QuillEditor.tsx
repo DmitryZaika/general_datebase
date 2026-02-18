@@ -7,6 +7,7 @@ import 'quill/dist/quill.snow.css'
 interface IQuillEditorProps {
   value: string
   onChange: (value: string) => void
+  onFilesDrop?: (files: File[]) => void
 }
 
 const QUILL_MODULES = {
@@ -20,7 +21,7 @@ const QUILL_MODULES = {
   ],
 }
 
-export function QuillEditor({ value, onChange }: IQuillEditorProps) {
+export function QuillEditor({ value, onChange, onFilesDrop }: IQuillEditorProps) {
   const { quill, quillRef } = useQuill({ modules: QUILL_MODULES })
   const isInternalChange = useRef(false)
   const imageHandlerSetup = useRef(false)
@@ -58,8 +59,22 @@ export function QuillEditor({ value, onChange }: IQuillEditorProps) {
     }
   }, [quill, handleTextChange])
 
+  const handleDropCapture = useCallback(
+    (e: React.DragEvent) => {
+      const files = e.dataTransfer?.files
+      if (files && files.length > 0 && onFilesDrop) {
+        e.preventDefault()
+        onFilesDrop(Array.from(files))
+      }
+    },
+    [onFilesDrop],
+  )
+
   return (
-    <div className='quill-container h-64 flex flex-col'>
+    <div
+      className='quill-container h-64 flex flex-col'
+      onDropCapture={handleDropCapture}
+    >
       <div ref={quillRef} className='flex-1 overflow-y-auto' />
     </div>
   )
