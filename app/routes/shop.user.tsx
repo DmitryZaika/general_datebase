@@ -26,7 +26,7 @@ import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { getQboUrl } from '~/utils/quickbooks.server'
-import { getEmployeeUser, type User } from '~/utils/session.server'
+import { getShopWorkerUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
 const userSchema = z.object({
@@ -51,7 +51,7 @@ interface UserData extends RowDataPacket {
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    const user = await getEmployeeUser(request)
+    const user = await getShopWorkerUser(request)
 
     try {
       await csrf.validate(request)
@@ -83,14 +83,12 @@ export async function action({ request }: ActionFunctionArgs) {
       data.email_signature ?? null,
     ]
 
-    // Only hash and update password if provided
     if (data.password && data.password.trim() !== '') {
       const hashedPassword = await bcrypt.hash(data.password, 10)
       updateFields.push('password = ?')
       params.push(hashedPassword)
     }
 
-    // Add user ID to params
     params.push(String(user.id))
 
     await db.execute(
@@ -104,7 +102,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Success', 'Your account was updated'))
-    return redirect('/employee/user', {
+    return redirect('/shop/user', {
       headers: { 'Set-Cookie': await commitSession(session) },
     })
   } catch (error) {
@@ -115,7 +113,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export async function loader({ request }: LoaderFunctionArgs) {
   let user: User, rows: UserData[]
   try {
-    user = await getEmployeeUser(request)
+    user = await getShopWorkerUser(request)
 
     ;[rows] = await db.query<UserData[]>(
       `SELECT name, email, phone_number, email_signature, email_name, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ? AND is_deleted = 0`,
@@ -154,7 +152,7 @@ function TelegramLink({ email }: { email: string }) {
           Connect to Telegram Bot
         </Button>
       </Link>
-      <div className='mt-2 flex items-center gap-2 p-2 bg-gray-100 rounded border w-80'>
+      <div className='mt-2 flex gap-2 p-2 bg-gray-100 rounded border w-80'>
         <code className='flex-1 text-sm font-mono'>{commandText}</code>
         <Button variant='ghost' size='sm' onClick={handleCopy} className='p-1 h-auto'>
           <Copy size={14} />
@@ -164,7 +162,7 @@ function TelegramLink({ email }: { email: string }) {
   )
 }
 
-export default function UserProfile() {
+export default function ShopUserProfile() {
   const { userData } = useLoaderData<typeof loader>()
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
@@ -193,22 +191,14 @@ export default function UserProfile() {
   }, [userData.email_signature])
 
   return (
-    <div className='container  py-5'>
-      <h1 className='text-2xl  font-bold mb-6 ml-3'>My Account</h1>
+    <div className='container py-5'>
+      <h1 className='text-2xl font-bold mb-6 ml-3'>My Account</h1>
 
-      <div className='bg-card  rounded-lg shadow p-6 w-full'>
+      <div className='bg-card rounded-lg shadow p-6 w-full'>
         {!userData.telegram_id && userData.email && (
           <TelegramLink email={userData.email} />
         )}
         <h2 className='text-xl font-semibold mb-4'>Personal Information</h2>
-        {/*
-        {data ? (
-          <p>Logged into: {data?.CompanyInfo?.CompanyName}</p>
-        ) : (
-          <Button asChild>
-            <a>Authorize Quickbooks</a>
-          </Button>
-        )} */}
 
         <FormProvider {...form}>
           <Form method='post' onSubmit={fullSubmit}>
@@ -298,7 +288,7 @@ export default function UserProfile() {
               />
             </div>
 
-            <div className='mt-6 flex items-center gap-4'>
+            <div className='mt-6 flex gap-4'>
               <LoadingButton loading={isSubmitting} type='submit'>
                 Save Changes
               </LoadingButton>

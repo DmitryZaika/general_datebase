@@ -315,7 +315,10 @@ export default function DealProjectInfo() {
         k !== 'current_list_id',
     )
     .map(([k, v]) => ({
-      key: k.replace(/_/g, ' ').replace(/\b\w/g, s => s.toUpperCase()),
+      key:
+        k === 'remove_and_dispose'
+          ? 'Tear Out'
+          : k.replace(/_/g, ' ').replace(/\b\w/g, s => s.toUpperCase()),
       value: k.includes('created')
         ? new Date(String(v)).toLocaleDateString()
         : String(v),

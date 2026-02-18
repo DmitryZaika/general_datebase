@@ -84,7 +84,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const dealParams: (string | number)[] = [companyId]
     let dealSql = `
-      SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason, d.list_id, d.position, d.due_date, u.name AS sales_rep
+      SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason, d.list_id, d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') AS due_date, u.name AS sales_rep
       FROM deals d
       JOIN customers c ON d.customer_id = c.id
       JOIN users u ON d.user_id = u.id

@@ -1,10 +1,10 @@
 import { format } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  AlertCircle,
   CalendarIcon,
   ChevronDown,
   ChevronUp,
-  AlertCircle,
   CirclePlus,
   Clock,
   Pencil,
@@ -28,11 +28,7 @@ import { Button, buttonVariants } from '~/components/ui/button'
 import { Calendar } from '~/components/ui/calendar'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Input } from '~/components/ui/input'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '~/components/ui/popover'
+import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -110,7 +106,10 @@ const compareCompletedDesc = (a: DealActivity, b: DealActivity): number => {
 const composeSorters =
   <T,>(...comparators: Array<(a: T, b: T) => number>) =>
   (a: T, b: T): number =>
-    comparators.reduce((result, comparator) => (result !== 0 ? result : comparator(a, b)), 0)
+    comparators.reduce(
+      (result, comparator) => (result !== 0 ? result : comparator(a, b)),
+      0,
+    )
 
 const partitionActivities = (
   activities: DealActivity[] = [],
@@ -121,9 +120,7 @@ const partitionActivities = (
     .filter(a => !a.is_completed)
     .sort(composeSorters(comparePriority, compareDeadlineAsc))
 
-  const done = source
-    .filter(a => !!a.is_completed)
-    .sort(compareCompletedDesc)
+  const done = source.filter(a => !!a.is_completed).sort(compareCompletedDesc)
 
   return { todo, done }
 }
@@ -164,7 +161,11 @@ const URGENCY_BORDER_STYLE: Readonly<Record<DeadlineUrgency, string>> = {
 const DAY_MS = 86_400_000
 
 const calendarDayDiff = (target: Date): number => {
-  const deadlineDay = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+  const deadlineDay = new Date(
+    target.getFullYear(),
+    target.getMonth(),
+    target.getDate(),
+  )
   const today = new Date()
   const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   return Math.round((deadlineDay.getTime() - todayDay.getTime()) / DAY_MS)
@@ -187,8 +188,7 @@ const formatFormDeadline = (d: Date): string => {
   return hasTime ? format(d, 'MMM d, yyyy HH:mm') : format(d, 'MMM d, yyyy')
 }
 
-const buildApiAction = (dealId: number): string =>
-  `/api/deal-activities/${dealId}`
+const buildApiAction = (dealId: number): string => `/api/deal-activities/${dealId}`
 
 const toDeadlinePayload = (deadline: Nullable<Date>): string =>
   deadline ? format(deadline, "yyyy-MM-dd'T'HH:mm:ss") : ''
@@ -232,7 +232,9 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
     case 'SET_EDIT':
       return {
         name: action.payload.name,
-        deadline: action.payload.deadline ? new Date(action.payload.deadline) : undefined,
+        deadline: action.payload.deadline
+          ? new Date(action.payload.deadline)
+          : undefined,
         priority: action.payload.priority,
       }
     case 'RESET':
@@ -326,7 +328,9 @@ function PriorityDot({ priority }: { priority: ActivityPriority }) {
 
 function PriorityBadge({ priority }: { priority: ActivityPriority }) {
   return (
-    <Badge className={cn('text-[10px] px-1.5 py-0 h-4 border', PRIORITY_STYLE[priority])}>
+    <Badge
+      className={cn('text-[10px] px-1.5 py-0 h-4 border', PRIORITY_STYLE[priority])}
+    >
       {PRIORITY_LABEL[priority]}
     </Badge>
   )
@@ -360,9 +364,7 @@ function CompletedLabel({ completedAt }: { completedAt: string }) {
 }
 
 function SectionEmptyState({ label }: { label: string }) {
-  return (
-    <p className='text-xs text-gray-400 py-3 text-center italic'>{label}</p>
-  )
+  return <p className='text-xs text-gray-400 py-3 text-center italic'>{label}</p>
 }
 
 function SectionHeader({
@@ -382,7 +384,11 @@ function SectionHeader({
     <>
       {label} ({count})
       {collapsible &&
-        (isOpen ? <ChevronUp className='h-3 w-3' /> : <ChevronDown className='h-3 w-3' />)}
+        (isOpen ? (
+          <ChevronUp className='h-3 w-3' />
+        ) : (
+          <ChevronDown className='h-3 w-3' />
+        ))}
     </>
   )
 
@@ -422,9 +428,10 @@ function ActivityItem({
 
   const isDone = !!activity.is_completed
   const optimisticDone = togglingData?.get('intent') === 'toggle' ? !isDone : isDone
-  const urgency = !optimisticDone && activity.deadline
-    ? getDeadlineUrgency(activity.deadline)
-    : 'normal'
+  const urgency =
+    !optimisticDone && activity.deadline
+      ? getDeadlineUrgency(activity.deadline)
+      : 'normal'
 
   return (
     <div
@@ -646,7 +653,9 @@ function ActivityForm({
               onTimeChange={(hours, minutes) =>
                 dispatch({ type: 'SET_DEADLINE_TIME', payload: { hours, minutes } })
               }
-              onClear={() => dispatch({ type: 'SET_DEADLINE_DATE', payload: undefined })}
+              onClear={() =>
+                dispatch({ type: 'SET_DEADLINE_DATE', payload: undefined })
+              }
             />
           </PopoverContent>
         </Popover>
@@ -680,7 +689,11 @@ function ActivityForm({
         className='w-full h-9 text-sm'
       >
         {isEditing ? (
-          isSubmitting ? 'Saving...' : 'Save Changes'
+          isSubmitting ? (
+            'Saving...'
+          ) : (
+            'Save Changes'
+          )
         ) : (
           <>
             <CirclePlus className='mr-1.5 h-3.5 w-3.5' />
@@ -725,7 +738,12 @@ function ActivityList({
                   transition={ITEM_TRANSITION}
                   style={{ overflow: 'hidden' }}
                 >
-                  <ActivityItem activity={activity} dealId={dealId} onEdit={onEdit} isBeingEdited={editingActivityId === activity.id} />
+                  <ActivityItem
+                    activity={activity}
+                    dealId={dealId}
+                    onEdit={onEdit}
+                    isBeingEdited={editingActivityId === activity.id}
+                  />
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -743,8 +761,8 @@ function ActivityList({
           isOpen={isHistoryOpen}
           onToggle={setIsHistoryOpen}
         />
-        {isHistoryOpen && (
-          done.length > 0 ? (
+        {isHistoryOpen &&
+          (done.length > 0 ? (
             <div className='space-y-1'>
               <AnimatePresence initial={false}>
                 {done.map(activity => (
@@ -757,15 +775,19 @@ function ActivityList({
                     exit='exit'
                     transition={ITEM_TRANSITION}
                   >
-                    <ActivityItem activity={activity} dealId={dealId} onEdit={onEdit} isBeingEdited={editingActivityId === activity.id} />
+                    <ActivityItem
+                      activity={activity}
+                      dealId={dealId}
+                      onEdit={onEdit}
+                      isBeingEdited={editingActivityId === activity.id}
+                    />
                   </motion.div>
                 ))}
               </AnimatePresence>
             </div>
           ) : (
             <SectionEmptyState label='No completed tasks' />
-          )
-        )}
+          ))}
       </div>
     </div>
   )
@@ -790,7 +812,12 @@ export function DealActivityPanel({ dealId, activities = [] }: DealActivityPanel
         onCancelEdit={() => setEditingActivity(null)}
       />
       <div className='flex-1 overflow-y-auto min-h-0'>
-        <ActivityList dealId={dealId} activities={activities} onEdit={setEditingActivity} editingActivityId={editingActivity?.id ?? null} />
+        <ActivityList
+          dealId={dealId}
+          activities={activities}
+          onEdit={setEditingActivity}
+          editingActivityId={editingActivity?.id ?? null}
+        />
       </div>
     </div>
   )

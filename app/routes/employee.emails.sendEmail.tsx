@@ -102,7 +102,7 @@ interface AIEmailRequest {
     | 'thank-you'
     | 'feedback-request'
     | 'referral'
-  dealId: number
+  dealId?: number
   formality?: 'formal' | 'neutral' | 'casual'
   tone?: 'friendly' | 'persuasive' | 'empathetic' | 'urgent'
   verboseness?: 'concise' | 'detailed'
@@ -167,18 +167,21 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
-  if (!params.dealId) {
-    throw new Error('Deal ID is missing')
-  }
-  const dealId = parseInt(params.dealId, 10)
+  let dealId: number | undefined
+  let email = ''
+  let customerName = ''
 
-  const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT c.email, c.name FROM deals d JOIN customers c ON d.customer_id = c.id WHERE d.id = ? AND d.deleted_at IS NULL`,
-    [dealId],
-  )
+  if (params.dealId) {
+    dealId = parseInt(params.dealId, 10)
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT c.email, c.name FROM deals d JOIN customers c ON d.customer_id = c.id WHERE d.id = ? AND d.deleted_at IS NULL`,
+      [dealId],
+    )
 
-  if (!rows || rows.length === 0) {
-    return redirect('/employee/deals')
+    if (rows && rows.length > 0) {
+      email = rows[0].email || ''
+      customerName = rows[0].name || ''
+    }
   }
 
   const [senderInfo, templateVariableData] = await Promise.all([
@@ -187,8 +190,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   ])
 
   return {
-    email: rows[0].email || '',
-    customerName: rows[0].name || '',
+    email,
+    customerName,
     senderInfo,
     dealId,
     companyId: user.company_id || 0,
@@ -228,7 +231,7 @@ async function fetchSenderInfo(user: EmployeeUser): Promise<SenderInfo> {
 
 function buildAIRequestPayload(
   formData: AIEmailFormData,
-  dealId: number,
+  dealId?: number,
 ): Partial<AIEmailRequest> {
   const variationToken = Math.random().toString(36).slice(2)
   const payload: Partial<AIEmailRequest> = {
@@ -292,7 +295,7 @@ async function processStreamingResponse(
 
 async function generateAIEmail(
   formData: AIEmailFormData,
-  dealId: number,
+  dealId: number | undefined,
   onStreamSubject?: (text: string) => void,
   onStreamBody?: (text: string) => void,
 ): Promise<AIEmailResponse> {
@@ -328,14 +331,14 @@ function EmailFormFields({
   selectedTemplate,
   onTemplateChange,
   templateVariableData,
-  onFilesDrop,
+  canEditTo = false,
 }: {
   form: ReturnType<typeof useForm<EmailFormData>>
   companyId: number
   selectedTemplate: EmailTemplate | undefined
   onTemplateChange: (template: EmailTemplate | undefined) => void
   templateVariableData: TemplateVariableData
-  onFilesDrop?: (files: File[]) => void
+  canEditTo?: boolean
 }) {
   const bodyText = form.watch('text')
   const customVariables = getUnfilledCustomVariables(bodyText)
@@ -351,7 +354,7 @@ function EmailFormFields({
             name='To'
             field={field}
             placeholder='recipient@example.com'
-            disabled={true}
+            disabled={!canEditTo}
           />
         )}
       />
@@ -381,12 +384,7 @@ function EmailFormFields({
         control={form.control}
         name='text'
         render={({ field }) => (
-          <QuillInput
-            name='Body'
-            field={field}
-            className='mb-4'
-            onFilesDrop={onFilesDrop}
-          />
+          <QuillInput name='Body' field={field} className='mb-4' />
         )}
       />
       {showCustomVariablesInfo && (
@@ -556,14 +554,16 @@ function sendEmail(
   to: string,
   subject: string,
   body: string,
-  dealId: number,
+  dealId: number | undefined,
   attachments: File[],
 ) {
   const formData = new FormData()
   formData.append('to', to)
   formData.append('subject', subject)
   formData.append('body', body)
-  formData.append('dealId', dealId.toString())
+  if (dealId) {
+    formData.append('dealId', dealId.toString())
+  }
 
   for (const file of attachments) {
     // если на бэке ожидается массив
@@ -598,7 +598,6 @@ export default function DealEmailDialog() {
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [isDragging, setIsDragging] = useState(false)
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (values: EmailFormData) => {
@@ -611,7 +610,7 @@ export default function DealEmailDialog() {
       )
     },
     onSuccess: () => {
-      navigate(`../${location.search}`)
+      navigate(`/employee/emails${location.search}`)
       toast({
         title: 'Success',
         description: 'Email sent',
@@ -676,7 +675,7 @@ export default function DealEmailDialog() {
   }
 
   const handleDialogClose = (open: boolean) => {
-    if (!open) navigate(`../${location.search}`)
+    if (!open) navigate(`/employee/emails${location.search}`)
   }
 
   const isMobile = useIsMobile()
@@ -750,31 +749,6 @@ export default function DealEmailDialog() {
     }
   }
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const related = e.relatedTarget
-    if (!related || !(related instanceof Node) || !e.currentTarget.contains(related)) {
-      setIsDragging(false)
-    }
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-    const files = e.dataTransfer?.files
-    if (files && files.length > 0) {
-      addFiles(Array.from(files))
-    }
-  }
-
   const removeAttachment = (index: number) => {
     const attachments = form.getValues('attachments')
     const file = attachments[index]
@@ -810,17 +784,14 @@ export default function DealEmailDialog() {
     const parts = fileName.split('.')
     const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : ''
     if (ext && imageExt.has(ext)) return <ImageIcon className='h-4 w-4' />
-    return <FileText className='h-8 sm:h-15 w-8 sm:w-15' />
+    return <FileText className='h-4 w-4' />
   }
 
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
       <DialogContent
-        className={`sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5 transition-colors ${isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`}
+        className='sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5'
         onPaste={handlePaste}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
       >
         <DialogHeader>
           <DialogTitle>Send Email</DialogTitle>
@@ -837,7 +808,7 @@ export default function DealEmailDialog() {
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
               templateVariableData={templateVariableData}
-              onFilesDrop={files => addFiles(files)}
+              canEditTo={!dealId}
             />
             {form.watch('attachments').length > 0 ? (
               <div className='mt-3 flex flex-wrap gap-2'>

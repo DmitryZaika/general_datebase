@@ -5,16 +5,18 @@ export function QuillInput({
   name,
   field,
   className,
+  onFilesDrop,
 }: {
   name: string
   field: object & { onChange: (value: string) => void; value: string }
   className?: string
+  onFilesDrop?: (files: File[]) => void
 }) {
   return (
     <FormItem className={className}>
       <FormLabel>{name}</FormLabel>
       <FormControl>
-        <QuillEditor {...field} />
+        <QuillEditor {...field} onFilesDrop={onFilesDrop} />
       </FormControl>
       <FormMessage />
     </FormItem>
