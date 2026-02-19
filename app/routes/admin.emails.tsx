@@ -10,7 +10,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url)
     const salesRepFilter = url.searchParams.get('sales_rep')
 
-    let query = `SELECT e.id, e.thread_id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.sender_user_id,
+    let query = `SELECT e.id, e.thread_id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.sender_user_id, e.employee_read_at,
        (SELECT COUNT(*) FROM email_attachments ea WHERE ea.email_id = e.id) > 0 as has_attachments,
        COALESCE(s.name, (SELECT name FROM customers WHERE email = e.sender_email AND company_id = ? LIMIT 1)) as sender_name,
        COALESCE(r.name, (SELECT name FROM customers WHERE email = e.receiver_email AND company_id = ? LIMIT 1)) as receiver_name

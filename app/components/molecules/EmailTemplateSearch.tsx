@@ -22,7 +22,10 @@ interface TemplateItemProps {
   onSelect: (template: EmailTemplate) => void
 }
 
-const TemplateItem = memo(function TemplateItem({ template, onSelect }: TemplateItemProps) {
+const TemplateItem = memo(function TemplateItem({
+  template,
+  onSelect,
+}: TemplateItemProps) {
   const previewText = template.template_body.replace(/<[^>]*>/g, '').slice(0, 50)
 
   return (
@@ -41,9 +44,15 @@ interface DropdownListProps {
   onSelect: (template: EmailTemplate) => void
 }
 
-const DropdownList = memo(function DropdownList({ templates, onSelect }: DropdownListProps) {
+const DropdownList = memo(function DropdownList({
+  templates,
+  onSelect,
+}: DropdownListProps) {
   return (
-    <div className='absolute z-20 mt-1 w-full max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg'>
+    <div
+      className='absolute z-20 mt-1 w-full max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg'
+      onMouseDown={e => e.preventDefault()}
+    >
       <ul className='py-1 divide-y divide-gray-100'>
         {templates.map(template => (
           <TemplateItem key={template.id} template={template} onSelect={onSelect} />

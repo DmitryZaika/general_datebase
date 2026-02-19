@@ -29,6 +29,7 @@ function getButtonLink({
 export default function HeaderCustomers() {
   const location = useLocation()
   const isLogin = location.pathname.includes('login')
+  const isCustomersCompanies = location.pathname === '/customers/companies'
   const segments = location.pathname.split('/').filter(Boolean)
   const companyId = segments[1]
   const navigation = useNavigation()
@@ -47,11 +48,16 @@ export default function HeaderCustomers() {
   const isStonesView = viewId === 'stones'
   const buttonLink = getButtonLink({ location, companyId })
   const isSurvey = location.pathname.includes('survey')
+  const showStonesButton = !isLogin && !isSurvey && !isCustomersCompanies
+  const logoSizeClass =
+    isLogin || isCustomersCompanies
+      ? 'h-36 md:h-44 object-contain'
+      : 'h-12 md:h-16 object-contain'
   return (
-    <header className='flex justify-between items-center p-4'>
+    <header className='flex justify-between items-center'>
       <div className='flex items-center gap-2'>
         <div className='md:hidden'></div>
-        {!isLogin && !isSurvey && (
+        {showStonesButton && (
           <Link to={buttonLink}>
             <LoadingButton loading={loading}>
               {isStonesView ? 'Customer Account' : 'Stones'}
@@ -60,15 +66,13 @@ export default function HeaderCustomers() {
         )}
       </div>
       <div className='flex-1 flex justify-center'>
-        <a href={isLogin ? '/' : 'stones'}>
-          <img
-            src={logoUrl}
-            alt='Logo'
-            className={
-              isLogin ? 'h-36 md:h-36 object-contain' : 'h-12 md:h-16 object-contain'
-            }
-          />
-        </a>
+        {isCustomersCompanies ? (
+          <img src={logoUrl} alt='Logo' className={logoSizeClass} />
+        ) : (
+          <a href={isLogin ? '/' : 'stones'}>
+            <img src={logoUrl} alt='Logo' className={logoSizeClass} />
+          </a>
+        )}
       </div>
       <div className='md:hidden'>
         <BurgerMenu />

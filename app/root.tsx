@@ -259,6 +259,7 @@ export default function App() {
   const isShopRoute = pathname.startsWith('/shop')
   const isShopWorker = position === 'shop_worker'
   const isContractors = pathname.startsWith('/contractors')
+  const isCustomersCompanies = pathname === '/customers/companies'
   const segments = pathname.split('/').filter(Boolean)
   const isCustomerViewPage =
     segments[0] === 'customer' && segments[2] !== 'stones' && segments[2] !== undefined
@@ -301,7 +302,8 @@ export default function App() {
     !isExternalMarketing &&
     !(isShopRoute && !isShopWorker) &&
     !isDraw &&
-    !isCustomerViewPage
+    !isCustomerViewPage &&
+    !isCustomersCompanies
 
   return (
     <html lang='en'>

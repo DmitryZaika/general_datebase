@@ -792,7 +792,7 @@ export default function EmailChatDialog() {
                 getText={() => messageText}
                 setText={value => setMessageText(value)}
                 buttonSize='icon'
-                iconClassName='text-lg'
+                iconClassName='text-sm'
               />
             </div>
 
