@@ -175,7 +175,7 @@ const formatDeadline = (deadline: string): string => {
   const date = new Date(deadline)
   const diffDays = calendarDayDiff(date)
   const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
-  const timeSuffix = hasTime ? ` ${format(date, 'HH:mm')}` : ''
+  const timeSuffix = hasTime ? ` ${format(date, 'h:mm a')}` : ''
 
   if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`
   if (diffDays === 0) return `Today${timeSuffix}`
@@ -185,7 +185,7 @@ const formatDeadline = (deadline: string): string => {
 
 const formatFormDeadline = (d: Date): string => {
   const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0
-  return hasTime ? format(d, 'MMM d, yyyy HH:mm') : format(d, 'MMM d, yyyy')
+  return hasTime ? format(d, 'MMM d, yyyy h:mm a') : format(d, 'MMM d, yyyy')
 }
 
 const buildApiAction = (dealId: number): string => `/api/deal-activities/${dealId}`
@@ -229,14 +229,24 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
     }
     case 'SET_PRIORITY':
       return { ...state, priority: action.payload }
-    case 'SET_EDIT':
+    case 'SET_EDIT': {
+      const d = action.payload.deadline
+        ? new Date(action.payload.deadline)
+        : undefined
+      if (d) {
+        const snapped = Math.round(d.getMinutes() / 5) * 5
+        if (snapped >= 60) {
+          d.setHours(d.getHours() + 1, 0, 0, 0)
+        } else {
+          d.setMinutes(snapped, 0, 0)
+        }
+      }
       return {
         name: action.payload.name,
-        deadline: action.payload.deadline
-          ? new Date(action.payload.deadline)
-          : undefined,
+        deadline: d,
         priority: action.payload.priority,
       }
+    }
     case 'RESET':
       return INITIAL_FORM_STATE
   }
@@ -468,6 +478,11 @@ function ActivityItem({
           {optimisticDone && activity.completed_at && (
             <CompletedLabel completedAt={activity.completed_at} />
           )}
+          {activity.created_by && (
+            <span className='text-[10px] text-gray-900 px-1.5 py-0.5'>
+              Created By {activity.created_by}
+            </span>
+          )}
         </div>
       </div>
 
@@ -515,42 +530,126 @@ function ActivityItem({
   )
 }
 
+const HOURS_12 = Array.from({ length: 12 }, (_, i) => i === 0 ? 12 : i)
+const MINUTES_5 = Array.from({ length: 12 }, (_, i) => i * 5)
+
+function to12Hour(h24: number): { hour: number; period: 'AM' | 'PM' } {
+  const period = h24 >= 12 ? 'PM' as const : 'AM' as const
+  const hour = h24 % 12 || 12
+  return { hour, period }
+}
+
+function to24Hour(hour: number, period: 'AM' | 'PM'): number {
+  if (period === 'AM') return hour === 12 ? 0 : hour
+  return hour === 12 ? 12 : hour + 12
+}
+
+function roundTo5(min: number): number {
+  return Math.min(Math.round(min / 5) * 5, 55)
+}
+
 function DeadlineControls({
   deadline,
   onTimeChange,
-  onClear,
+  onClearTime,
+  onClearDate,
 }: {
   deadline: Date | undefined
   onTimeChange: (hours: number, minutes: number) => void
-  onClear: () => void
+  onClearTime: () => void
+  onClearDate: () => void
 }) {
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.value) return
-    const [h, m] = e.target.value.split(':').map(Number)
-    onTimeChange(h, m)
+  if (!deadline) return null
+
+  const hasTime = deadline.getHours() !== 0 || deadline.getMinutes() !== 0
+
+  const current = to12Hour(deadline.getHours())
+  const currentMin = roundTo5(deadline.getMinutes())
+
+  const handleHour = (val: string) => {
+    const h24 = to24Hour(Number(val), current.period)
+    onTimeChange(h24, currentMin)
+  }
+
+  const handleMinute = (val: string) => {
+    const h24 = to24Hour(current.hour, current.period)
+    onTimeChange(h24, Number(val))
+  }
+
+  const handlePeriod = (val: string) => {
+    const h24 = to24Hour(current.hour, val as 'AM' | 'PM')
+    onTimeChange(h24, currentMin)
   }
 
   return (
-    <div className='flex items-center gap-2 px-3 pb-3 border-t pt-2'>
-      <Clock className='h-3.5 w-3.5 text-gray-600 shrink-0' />
-      <input
-        type='time'
-        value={deadline ? format(deadline, 'HH:mm') : ''}
-        onChange={handleChange}
-        disabled={!deadline}
-        className='h-7 text-sm border rounded-md px-2 flex-1 disabled:opacity-50 disabled:cursor-not-allowed'
-      />
-      {deadline && (
+    <div className='px-3 pb-3 border-t pt-2 space-y-2'>
+      {hasTime ? (
+        <div className='flex items-center gap-1.5'>
+          <Clock className='h-3.5 w-3.5 text-gray-600 shrink-0' />
+          <Select value={String(current.hour)} onValueChange={handleHour}>
+            <SelectTrigger className='w-[58px] h-7 text-sm px-2'>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {HOURS_12.map(h => (
+                <SelectItem key={h} value={String(h)}>
+                  {h}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className='text-sm font-medium text-gray-500'>:</span>
+          <Select value={String(currentMin)} onValueChange={handleMinute}>
+            <SelectTrigger className='w-[58px] h-7 text-sm px-2'>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MINUTES_5.map(m => (
+                <SelectItem key={m} value={String(m)}>
+                  {String(m).padStart(2, '0')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={current.period} onValueChange={handlePeriod}>
+            <SelectTrigger className='w-[62px] h-7 text-sm px-2'>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='AM'>AM</SelectItem>
+              <SelectItem value='PM'>PM</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant='ghost'
+            size='icon'
+            type='button'
+            className='h-7 w-7 shrink-0 text-gray-400 hover:text-red-500'
+            onClick={onClearTime}
+          >
+            <X className='h-3.5 w-3.5' />
+          </Button>
+        </div>
+      ) : (
         <Button
           variant='ghost'
-          size='icon'
           type='button'
-          className='h-7 w-7 shrink-0 text-gray-600 hover:text-red-500'
-          onClick={onClear}
+          className='h-7 text-xs text-gray-500 hover:text-gray-700 px-2'
+          onClick={() => onTimeChange(9, 0)}
         >
-          <X className='h-3.5 w-3.5' />
+          <Clock className='h-3 w-3 mr-1.5' />
+          Add time
         </Button>
       )}
+      <Button
+        variant='ghost'
+        type='button'
+        className='h-6 text-xs text-red-400 hover:text-red-600 px-2 w-full'
+        onClick={onClearDate}
+      >
+        <X className='h-3 w-3 mr-1' />
+        Clear deadline
+      </Button>
     </div>
   )
 }
@@ -569,6 +668,7 @@ function ActivityForm({
     editingActivity?.id ?? null,
   )
   const inputRef = useRef<HTMLInputElement>(null)
+  const [deadlineOpen, setDeadlineOpen] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -626,7 +726,7 @@ function ActivityForm({
       />
 
       <div className='flex gap-2'>
-        <Popover>
+        <Popover open={deadlineOpen} onOpenChange={setDeadlineOpen}>
           <PopoverTrigger asChild>
             <Button
               variant='outline'
@@ -653,9 +753,13 @@ function ActivityForm({
               onTimeChange={(hours, minutes) =>
                 dispatch({ type: 'SET_DEADLINE_TIME', payload: { hours, minutes } })
               }
-              onClear={() =>
-                dispatch({ type: 'SET_DEADLINE_DATE', payload: undefined })
+              onClearTime={() =>
+                dispatch({ type: 'SET_DEADLINE_TIME', payload: { hours: 0, minutes: 0 } })
               }
+              onClearDate={() => {
+                dispatch({ type: 'SET_DEADLINE_DATE', payload: undefined })
+                setDeadlineOpen(false)
+              }}
             />
           </PopoverContent>
         </Popover>

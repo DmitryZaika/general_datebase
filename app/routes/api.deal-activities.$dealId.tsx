@@ -23,6 +23,7 @@ export interface DealActivity {
   is_completed: number
   completed_at: Nullable<string>
   created_at: string
+  created_by: Nullable<string>
 }
 
 const VALID_PRIORITIES = Object.values(ActivityPriority)
@@ -32,13 +33,12 @@ function isValidPriority(value: string): value is ActivityPriority {
 }
 
 function toMySQLDatetime(dateString: string): Nullable<string> {
-  const date = new Date(dateString)
-  if (isNaN(date.getTime())) return null
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
-    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  const match = dateString.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/,
   )
+  if (!match) return null
+  const [, y, mo, d, h, mi, s] = match
+  return `${y}-${mo}-${d} ${h}:${mi}:${s}`
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -52,7 +52,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
     const activities = await selectMany<DealActivity>(
       db,
-      `SELECT id, deal_id, company_id, name, deadline, priority, is_completed, completed_at, created_at
+      `SELECT id, deal_id, company_id, name,
+              DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%s') AS deadline,
+              priority, is_completed,
+              DATE_FORMAT(completed_at, '%Y-%m-%dT%H:%i:%s') AS completed_at,
+              DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s') AS created_at,
+              created_by
        FROM deal_activities
        WHERE deal_id = ? AND company_id = ? AND deleted_at IS NULL
        ORDER BY created_at DESC`,
@@ -81,7 +86,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const intent = formData.get('intent')
 
     if (intent === 'create') {
-      return handleCreate(formData, dealId, user.company_id)
+      const createdBy = user.is_admin || user.is_superuser ? user.name : null
+      return handleCreate(formData, dealId, user.company_id, createdBy)
     }
 
     if (intent === 'toggle') {
@@ -102,7 +108,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 }
 
-async function handleCreate(formData: FormData, dealId: number, companyId: number) {
+async function handleCreate(
+  formData: FormData,
+  dealId: number,
+  companyId: number,
+  createdBy: Nullable<string>,
+) {
   const name = formData.get('name')
   const deadline = formData.get('deadline')
   const priority = String(formData.get('priority') || ActivityPriority.Medium)
@@ -127,9 +138,9 @@ async function handleCreate(formData: FormData, dealId: number, companyId: numbe
   }
 
   await db.execute<ResultSetHeader>(
-    `INSERT INTO deal_activities (deal_id, company_id, name, deadline, priority)
-     VALUES (?, ?, ?, ?, ?)`,
-    [dealId, companyId, name.trim(), deadlineValue, priority],
+    `INSERT INTO deal_activities (deal_id, company_id, name, deadline, priority, created_by)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [dealId, companyId, name.trim(), deadlineValue, priority, createdBy],
   )
 
   return success()

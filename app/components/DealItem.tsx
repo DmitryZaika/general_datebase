@@ -36,7 +36,7 @@ function getActivityDeadlineInfo(deadline: string): ActivityDeadlineInfo {
   const deadlineDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
   const diffDays = Math.round((deadlineDay.getTime() - today.getTime()) / 86_400_000)
   const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
-  const timeSuffix = hasTime ? ` ${format(date, 'HH:mm')}` : ''
+  const timeSuffix = hasTime ? ` ${format(date, 'h:mm a')}` : ''
 
   if (diffDays < 0) {
     return { color: 'text-red-600 bg-red-50', icon: 'alert', label: `${Math.abs(diffDays)}d overdue`, hasPill: true }
@@ -67,16 +67,22 @@ export default function DealItem({
   const hasImages =
     (Array.isArray(deal.images) && deal.images.length > 0) || Boolean(deal.has_images)
 
+  const isWon = deal.is_won === 1
+  const isLost = deal.is_won === 0
+  const isClosed = isWon || isLost
+  const hasLostReason = isLost && Boolean(deal.lost_reason)
+  const hasAttachments = hasEmail || hasImages
+
   const editBase = location.pathname.startsWith('/admin')
     ? '/admin/deals'
     : '/employee/deals'
   const fromState = `${location.pathname}${location.search}`
   const projectUrl = `${editBase}/edit/${deal.id}/project${location.search}`
   const mailUrl = readonly
-    ? `${editBase}/edit/${deal.id}/history${location.search}`
+    ? `${editBase}/edit/${deal.id}/history`
     : `edit/${deal.id}/history`
   const imagesUrl = readonly
-    ? `${editBase}/edit/${deal.id}/images${location.search}`
+    ? `${editBase}/edit/${deal.id}/images`
     : `edit/${deal.id}/images`
 
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
@@ -192,15 +198,18 @@ export default function DealItem({
         </div>
       )}
 
-      {deal.nearest_activity_name ? (
-        <p className='text-sm leading-5 text-slate-600 mt-1 truncate w-full'>
-          {deal.nearest_activity_name}
-        </p>
-      ) : (
-        <p className='text-xs text-slate-400 mt-1 italic'>No upcoming activities</p>
-      )}
+      {!isClosed &&
+        (deal.nearest_activity_name ? (
+          <p className='text-sm leading-5 text-slate-600 mt-1 truncate w-full'>
+            {deal.nearest_activity_name}
+          </p>
+        ) : (
+          <p className='text-xs text-red-500 font-semibold mt-1 italic'>
+            No upcoming activities
+          </p>
+        ))}
 
-      {deal.status === 'Closed Lost' && deal.lost_reason && (
+      {hasLostReason && (
         <p className='text-xs text-slate-500 mt-1 break-words whitespace-pre-wrap'>
           {deal.lost_reason}
         </p>
@@ -208,30 +217,31 @@ export default function DealItem({
 
       <div className='flex items-center gap-2 w-full'>
         <div className='mr-auto flex items-center'>
-          {deadlineInfo ? (
-            <span
-              className={cn(
-                'flex items-center gap-1 text-xs font-medium',
-                deadlineInfo.color,
-                deadlineInfo.hasPill && 'rounded-full px-2 py-0.5',
-              )}
-            >
-              {deadlineInfo.icon === 'alert' ? (
-                <AlertCircle className='w-3 h-3' />
-              ) : (
-                <Clock className='w-3 h-3' />
-              )}
-              {deadlineInfo.label}
-            </span>
-          ) : deal.nearest_activity_name ? (
-            <span className='flex items-center gap-1 text-xs text-gray-400 italic'>
-              <CalendarOff className='w-3 h-3' />
-              No deadline
-            </span>
-          ) : null}
+          {!isClosed &&
+            (deadlineInfo ? (
+              <span
+                className={cn(
+                  'flex items-center gap-1 text-xs font-medium',
+                  deadlineInfo.color,
+                  deadlineInfo.hasPill && 'rounded-full px-2 py-0.5',
+                )}
+              >
+                {deadlineInfo.icon === 'alert' ? (
+                  <AlertCircle className='w-3 h-3' />
+                ) : (
+                  <Clock className='w-3 h-3' />
+                )}
+                {deadlineInfo.label}
+              </span>
+            ) : deal.nearest_activity_name ? (
+              <span className='flex items-center gap-1 text-xs text-gray-400 italic'>
+                <CalendarOff className='w-3 h-3' />
+                No deadline
+              </span>
+            ) : null)}
         </div>
 
-        {(hasEmail || hasImages) && (
+        {hasAttachments && (
           <div className='flex items-center gap-2'>
             {hasEmail && (
               <Link

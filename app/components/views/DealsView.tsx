@@ -94,14 +94,19 @@ export default function DealsView({
   const sortDeals = (arr: Deal[]) => {
     const copy = [...arr]
     copy.sort((a, b) => {
-      const aDate = a.nearest_activity_deadline ?? a.due_date
-      const bDate = b.nearest_activity_deadline ?? b.due_date
-      const aHas = Boolean(aDate)
-      const bHas = Boolean(bDate)
-      if (!aHas && !bHas) return 0
-      if (!aHas) return -1
-      if (!bHas) return 1
-      return new Date(aDate || 0).getTime() - new Date(bDate || 0).getTime()
+      const aHasActivity = Boolean(a.nearest_activity_name)
+      const bHasActivity = Boolean(b.nearest_activity_name)
+      if (!aHasActivity && bHasActivity) return -1
+      if (aHasActivity && !bHasActivity) return 1
+
+      if (!aHasActivity && !bHasActivity) return b.id - a.id
+
+      const aDate = a.nearest_activity_deadline
+      const bDate = b.nearest_activity_deadline
+      if (!aDate && !bDate) return 0
+      if (!aDate) return 1
+      if (!bDate) return -1
+      return new Date(aDate).getTime() - new Date(bDate).getTime()
     })
     return copy
   }

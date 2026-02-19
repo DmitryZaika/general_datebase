@@ -133,7 +133,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       deadline: string | null
     }>(
       db,
-      `SELECT deal_id, name, deadline
+      `SELECT deal_id, name, DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%s') AS deadline
        FROM deal_activities
        WHERE deleted_at IS NULL AND is_completed = 0 AND company_id = ?
        ORDER BY
