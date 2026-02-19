@@ -1,6 +1,7 @@
 import type { RowDataPacket } from 'mysql2'
 import { data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
 interface NotificationItem {
@@ -22,7 +23,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         e.thread_id,
         COALESCE(e.deal_id, td.deal_id) AS deal_id,
         e.subject,
-        e.sent_at,
+        DATE_FORMAT(e.sent_at, '%Y-%m-%dT%H:%i:%s') AS sent_at,
         c.name AS customer_name
       FROM emails e
       JOIN (
@@ -54,7 +55,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     [user.id, user.id, userEmail],
   )
 
-  const notifications: NotificationItem[] = (rows || [])
+  const emailNotifications: NotificationItem[] = (rows || [])
     .map(row => {
       const threadId = typeof row.thread_id === 'string' ? row.thread_id : ''
       const dealId = typeof row.deal_id === 'number' ? row.deal_id : 0
@@ -72,6 +73,38 @@ export async function loader({ request }: LoaderFunctionArgs) {
       }
     })
     .filter((n): n is NotificationItem => n !== null)
+
+  const dbRows = await selectMany<{
+    id: number
+    deal_id: number
+    message: string
+    customer_name: string
+    created_at: string
+  }>(
+    db,
+    `SELECT n.id, n.deal_id, n.message,
+            c.name AS customer_name,
+            DATE_FORMAT(n.created_at, '%Y-%m-%dT%H:%i:%s') AS created_at
+     FROM notifications n
+     JOIN deals d ON d.id = n.deal_id AND d.deleted_at IS NULL
+     JOIN customers c ON c.id = d.customer_id
+     WHERE n.user_id = ? AND n.is_done = 0 AND n.due_at <= NOW()
+     ORDER BY n.created_at DESC
+     LIMIT 50`,
+    [user.id],
+  )
+
+  const activityNotifications: NotificationItem[] = dbRows.map(row => ({
+    id: `notif-${row.id}`,
+    title: row.customer_name,
+    message: row.message,
+    href: `/employee/deals/edit/${row.deal_id}/project`,
+    sent_at: row.created_at,
+  }))
+
+  const notifications = [...emailNotifications, ...activityNotifications].sort(
+    (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime(),
+  )
 
   return data(
     { notifications },

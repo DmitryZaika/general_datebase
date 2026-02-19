@@ -86,8 +86,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const intent = formData.get('intent')
 
     if (intent === 'create') {
-      const createdBy = user.is_admin || user.is_superuser ? user.name : null
-      return handleCreate(formData, dealId, user.company_id, createdBy)
+      const createdBy = (user.is_admin || user.is_superuser) ? user.name : null
+      return handleCreate(formData, dealId, user.company_id, createdBy, user.id)
     }
 
     if (intent === 'toggle') {
@@ -113,6 +113,7 @@ async function handleCreate(
   dealId: number,
   companyId: number,
   createdBy: Nullable<string>,
+  userId: number,
 ) {
   const name = formData.get('name')
   const deadline = formData.get('deadline')
@@ -142,6 +143,25 @@ async function handleCreate(
      VALUES (?, ?, ?, ?, ?, ?)`,
     [dealId, companyId, name.trim(), deadlineValue, priority, createdBy],
   )
+
+  if (createdBy) {
+    try {
+      const dealRows = await selectMany<{ user_id: number | null }>(
+        db,
+        'SELECT user_id FROM deals WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+        [dealId],
+      )
+      const assignedUserId = dealRows.length > 0 ? dealRows[0].user_id : null
+      if (assignedUserId && assignedUserId !== userId) {
+        const message = `${createdBy} added: ${name.trim()}`.slice(0, 255)
+        await db.execute(
+          `INSERT INTO notifications (user_id, deal_id, message, due_at)
+           VALUES (?, ?, ?, NOW())`,
+          [assignedUserId, dealId, message],
+        )
+      }
+    } catch {}
+  }
 
   return success()
 }
