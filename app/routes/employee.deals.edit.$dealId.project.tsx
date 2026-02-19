@@ -99,10 +99,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       const groupId = formData.get('group_id')
       if (!groupId) throw new Error('Group ID is missing')
 
-      // Find the list with the SMALLEST ID in this group
       const lists = await selectMany<{ id: number }>(
         db,
-        `SELECT id FROM deals_list WHERE group_id = ? ORDER BY id ASC LIMIT 1`,
+        `SELECT id FROM deals_list WHERE group_id = ? AND deleted_at IS NULL ORDER BY position ASC LIMIT 1`,
         [Number(groupId)],
       )
 

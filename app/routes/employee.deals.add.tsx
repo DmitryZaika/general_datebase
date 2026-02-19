@@ -72,11 +72,28 @@ export async function action({ request }: ActionFunctionArgs) {
       [result.insertId, data.list_id],
     )
   } else {
-    await db.execute(`UPDATE deals SET amount = ?, description = ? WHERE id = ?`, [
-      data.amount,
-      data.description,
-      data.deal_id,
-    ])
+    const prevRows = await selectMany<{ list_id: number }>(
+      db,
+      'SELECT list_id FROM deals WHERE id = ? LIMIT 1',
+      [data.deal_id],
+    )
+    const prevListId = prevRows[0]?.list_id
+
+    await db.execute(
+      `UPDATE deals SET amount = ?, description = ?, status = ?, list_id = ?, position = ? WHERE id = ?`,
+      [data.amount, data.description, initialStatus, data.list_id, data.position, data.deal_id],
+    )
+
+    if (prevListId !== undefined && prevListId !== data.list_id) {
+      await db.execute(
+        'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
+        [data.deal_id],
+      )
+      await db.execute(
+        'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+        [data.deal_id, data.list_id],
+      )
+    }
   }
 
   await db.execute(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
