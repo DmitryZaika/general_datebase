@@ -9,10 +9,12 @@ import {
   FileText,
   ImageIcon,
   MoreVertical,
+  Package,
   PaperclipIcon,
   SendIcon,
   SettingsIcon,
   Sparkles,
+  Upload,
 } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useRef, useState } from 'react'
@@ -28,6 +30,7 @@ import {
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
+import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import {
@@ -596,6 +599,8 @@ export default function DealEmailDialog() {
   const [showAIMenu, setShowAIMenu] = useState(false)
   const [_isGenerating, setIsGenerating] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
+  const [showStonesPicker, setShowStonesPicker] = useState(false)
+  const [showImagesPicker, setShowImagesPicker] = useState(false)
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -863,7 +868,7 @@ export default function DealEmailDialog() {
                         </div>
                       )}
                       <div className='absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
-                        <span className='text-white text-[10px] text-center line-clamp-2 break-all'>
+                        <span className='text-white text-[10px] text-center line-clamp-2 break-all select-none'>
                           {file.name}
                         </span>
                       </div>
@@ -939,14 +944,35 @@ export default function DealEmailDialog() {
                   getText={() => form.getValues('text')}
                   setText={value => form.setValue('text', value)}
                 />
-                <Button
-                  type='button'
-                  size='icon'
-                  aria-label='Attachment'
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <PaperclipIcon className='h-4 w-4' />
-                </Button>
+                <CustomDropdownMenu
+                  side='top'
+                  trigger={
+                    <Button type='button' size='icon' aria-label='Attachment'>
+                      <PaperclipIcon className='h-4 w-4' />
+                    </Button>
+                  }
+                  sections={[
+                    {
+                      options: [
+                        {
+                          label: 'Upload from computer',
+                          icon: <Upload className='h-4 w-4' />,
+                          onClick: () => fileInputRef.current?.click(),
+                        },
+                        {
+                          label: 'From Stones',
+                          icon: <Package className='h-4 w-4' />,
+                          onClick: () => setShowStonesPicker(true),
+                        },
+                        {
+                          label: 'From Images',
+                          icon: <ImageIcon className='h-4 w-4' />,
+                          onClick: () => setShowImagesPicker(true),
+                        },
+                      ],
+                    },
+                  ]}
+                />
                 <LoadingButton loading={isSubmitting || isPending} type='submit'>
                   <SendIcon className='h-4 w-4' />
                 </LoadingButton>
@@ -959,6 +985,27 @@ export default function DealEmailDialog() {
             <AIAssistantMenu aiForm={aiForm} />
           </div>
         )}
+        <AttachmentImagePicker
+          type='stones'
+          companyId={companyId}
+          open={showStonesPicker}
+          onClose={() => setShowStonesPicker(false)}
+          onSelect={files => {
+            addFiles(files)
+            setShowStonesPicker(false)
+          }}
+          onAddFiles={addFiles}
+        />
+        <AttachmentImagePicker
+          type='images'
+          companyId={companyId}
+          open={showImagesPicker}
+          onClose={() => setShowImagesPicker(false)}
+          onSelect={files => {
+            addFiles(files)
+            setShowImagesPicker(false)
+          }}
+        />
       </DialogContent>
     </Dialog>
   )
