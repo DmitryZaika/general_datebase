@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { Check, Images, Search } from 'lucide-react'
+import { Check, ChevronDown, Image, Images, Search } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigation } from 'react-router'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { Checkbox } from '~/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -10,15 +11,30 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
+import { Skeleton } from '~/components/ui/skeleton'
 import { useToast } from '~/hooks/use-toast'
+import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
 import { withIconSuffix } from '~/utils/files'
 
 type PickerType = 'stones' | 'images'
+
+const STONE_LEVELS = [1, 2, 3, 4, 5, 6, 7]
 
 interface StoneItem {
   id: number
   name: string
   url: string | null
+  type?: string | null
+  finishing?: string | null
+  level?: number | null
   installed_count?: number
 }
 
@@ -33,9 +49,16 @@ interface InstalledImage {
   url: string
 }
 
-async function fetchStones(companyId: number, name: string) {
+async function fetchStones(
+  companyId: number,
+  name: string,
+  filters: { type: string; finishing: string; level: number[] },
+) {
   const params = new URLSearchParams()
   if (name.trim()) params.set('name', name.trim())
+  if (filters.type) params.set('type', filters.type)
+  if (filters.finishing) params.set('finishing', filters.finishing)
+  if (filters.level.length > 0) params.set('level', filters.level.join(','))
   const res = await fetch(`/api/stones/list/${companyId}?${params}`, {
     credentials: 'same-origin',
   })
@@ -113,6 +136,9 @@ export function AttachmentImagePicker({
   const [selectedInstalledIds, setSelectedInstalledIds] = useState<Set<number>>(
     new Set(),
   )
+  const [filterType, setFilterType] = useState('')
+  const [filterFinishing, setFilterFinishing] = useState('')
+  const [filterLevel, setFilterLevel] = useState<number[]>([])
   const [activeMain, setActiveMain] = useState(false)
   const [activeInstalled, setActiveInstalled] = useState(false)
   const [activeInstalledProjects, setActiveInstalledProjects] = useState(false)
@@ -129,11 +155,30 @@ export function AttachmentImagePicker({
     }
   }, [navigation.state])
 
-  const fetchFn = type === 'stones' ? fetchStones : fetchImages
+  const stoneFilters = {
+    type: filterType,
+    finishing: filterFinishing,
+    level: filterLevel,
+  }
+  const toggleLevel = useCallback((level: number) => {
+    setFilterLevel(prev =>
+      prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level],
+    )
+  }, [])
   const { data: items = [], isLoading } = useQuery({
-    queryKey: ['attachmentPicker', type, companyId, search],
-    queryFn: () => fetchFn(companyId, search),
+    queryKey: [
+      'attachmentPicker',
+      type,
+      companyId,
+      search,
+      type === 'stones' ? stoneFilters : null,
+    ],
+    queryFn: () =>
+      type === 'stones'
+        ? fetchStones(companyId, search, stoneFilters)
+        : fetchImages(companyId, search),
     enabled: open && companyId > 0,
+    placeholderData: (prev: (StoneItem | ImageItem)[] | undefined) => prev,
   })
 
   const { data: installedImages = [], isLoading: installedLoading } = useQuery({
@@ -289,27 +334,117 @@ export function AttachmentImagePicker({
   return (
     <>
       <Dialog open={open} onOpenChange={o => !o && onClose()}>
-        <DialogContent className='max-w-2xl max-h-[85vh] flex flex-col'>
+        <DialogContent className='max-w-2xl h-[90vh] flex flex-col'>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
-          <div className='relative'>
-            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-            <Input
-              placeholder={placeholder}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className='pl-9'
-            />
+          <div className='flex flex-col gap-2'>
+            <div className='relative'>
+              <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+              <Input
+                placeholder={placeholder}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className='pl-9'
+              />
+            </div>
+            {type === 'stones' && (
+              <div className='flex flex-wrap gap-2'>
+                <Select
+                  value={filterType || '_all'}
+                  onValueChange={v => setFilterType(v === '_all' ? '' : v)}
+                >
+                  <SelectTrigger className='w-[140px] h-8 text-xs'>
+                    <SelectValue placeholder='Type' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='_all' className='text-xs'>
+                      All types
+                    </SelectItem>
+                    {STONE_TYPES.map(t => (
+                      <SelectItem key={t} value={t} className='text-xs capitalize'>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filterFinishing || '_all'}
+                  onValueChange={v => setFilterFinishing(v === '_all' ? '' : v)}
+                >
+                  <SelectTrigger className='w-[140px] h-8 text-xs'>
+                    <SelectValue placeholder='Finishing' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='_all' className='text-xs'>
+                      All finishes
+                    </SelectItem>
+                    {STONE_FINISHES.map(f => (
+                      <SelectItem key={f} value={f} className='text-xs capitalize'>
+                        {f}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Popover>
+                  <PopoverTrigger
+                    className='flex h-8 w-[140px] items-center justify-between rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-zinc-950 data-[state=open]:ring-1 dark:border-zinc-800 dark:focus:ring-zinc-300'
+                    type='button'
+                  >
+                    <span className='text-zinc-500 dark:text-zinc-400'>
+                      {filterLevel.length === 0
+                        ? 'Level'
+                        : filterLevel.sort((a, b) => a - b).join(', ')}
+                    </span>
+                    <ChevronDown className='h-4 w-4 opacity-50' />
+                  </PopoverTrigger>
+                  <PopoverContent className='w-[140px] p-2' align='start'>
+                    <div className='flex flex-col gap-0.5'>
+                      {STONE_LEVELS.map(level => (
+                        <label
+                          key={level}
+                          className='flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                        >
+                          <Checkbox
+                            checked={filterLevel.includes(level)}
+                            onCheckedChange={() => toggleLevel(level)}
+                          />
+                          <span>Level {level}</span>
+                        </label>
+                      ))}
+                      {filterLevel.length > 0 && (
+                        <button
+                          type='button'
+                          onClick={() => setFilterLevel([])}
+                          className='mt-1 rounded-sm px-2 py-1.5 text-left text-xs text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300'
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
           </div>
-          <div className='flex-1 min-h-0 overflow-y-auto'>
-            {isLoading ? (
-              <div className='grid grid-cols-3 sm:grid-cols-4 gap-3 py-4'>
-                {[1, 2, 3, 4, 5, 6].map(i => (
+          <div className='flex-1 min-h-[280px] min-h-0 overflow-y-auto'>
+            {isLoading && list.length === 0 ? (
+              <div className='grid grid-cols-3 sm:grid-cols-4 gap-3 py-2'>
+                {Array.from({ length: 12 }, (_, i) => (
                   <div
                     key={i}
-                    className='aspect-square rounded-md bg-muted animate-pulse'
-                  />
+                    className='relative aspect-square rounded-md overflow-hidden border bg-muted'
+                  >
+                    {type === 'stones' && onAddFiles && (
+                      <div className='absolute top-0 left-0 z-10 flex h-6 w-6 items-center justify-center rounded bg-zinc-200 dark:bg-zinc-700'>
+                        <Images className='h-4 w-4 text-zinc-400 dark:text-zinc-500' />
+                      </div>
+                    )}
+                    <div className='flex h-full w-full items-center justify-center'>
+                      <Image className='h-12 w-12 text-zinc-300 dark:text-zinc-600' />
+                    </div>
+                    <Skeleton className='absolute bottom-0 left-0 right-0 h-7 rounded-none' />
+                  </div>
                 ))}
               </div>
             ) : list.length === 0 ? (
@@ -317,7 +452,9 @@ export function AttachmentImagePicker({
                 No {type} found.
               </p>
             ) : (
-              <div className='grid grid-cols-3 sm:grid-cols-4 gap-3 py-2'>
+              <div
+                className={`grid grid-cols-3 sm:grid-cols-4 gap-3 py-2 ${isLoading ? 'opacity-60 pointer-events-none' : ''}`}
+              >
                 {list.map(item => {
                   const stoneItem = item as StoneItem
                   const key = mainItemKey(item)
@@ -379,18 +516,18 @@ export function AttachmentImagePicker({
               </div>
             )}
           </div>
-          {list.length > 0 && (
-            <div className='flex justify-end pt-2 border-t shrink-0'>
-              <LoadingButton
-                type='button'
-                loading={(navigation.state !== 'idle' && activeMain) || isAddingMain}
-                onClick={handleAddMainToEmail}
-                disabled={selectedMainKeys.size === 0}
-              >
-                Add to the email
-              </LoadingButton>
-            </div>
-          )}
+          <div className='flex justify-end pt-2 border-t shrink-0 min-h-[52px]'>
+            <LoadingButton
+              type='button'
+              loading={
+                isLoading || (navigation.state !== 'idle' && activeMain) || isAddingMain
+              }
+              onClick={handleAddMainToEmail}
+              disabled={selectedMainKeys.size === 0 || isLoading}
+            >
+              Add to the email
+            </LoadingButton>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -402,14 +539,19 @@ export function AttachmentImagePicker({
           <DialogHeader>
             <DialogTitle>Installed Projects – {installedStoneName}</DialogTitle>
           </DialogHeader>
-          <div className='flex-1 min-h-0 overflow-y-auto'>
-            {installedLoading ? (
-              <div className='grid grid-cols-3 sm:grid-cols-4 gap-3 py-4'>
-                {[1, 2, 3, 4, 5, 6].map(i => (
+          <div className='flex-1 min-h-[280px] min-h-0 overflow-y-auto'>
+            {installedLoading && installedImages.length === 0 ? (
+              <div className='grid grid-cols-3 sm:grid-cols-4 gap-3 py-2'>
+                {Array.from({ length: 12 }, (_, i) => (
                   <div
                     key={i}
-                    className='aspect-square rounded-md bg-muted animate-pulse'
-                  />
+                    className='relative aspect-square rounded-md overflow-hidden border bg-muted'
+                  >
+                    <div className='flex h-full w-full items-center justify-center'>
+                      <Image className='h-12 w-12 text-zinc-300 dark:text-zinc-600' />
+                    </div>
+                    <Skeleton className='absolute bottom-0 left-0 right-0 h-7 rounded-none' />
+                  </div>
                 ))}
               </div>
             ) : installedImages.length === 0 ? (
@@ -417,7 +559,9 @@ export function AttachmentImagePicker({
                 No installed project images.
               </p>
             ) : (
-              <div className='grid grid-cols-3 sm:grid-cols-4 gap-3 py-2'>
+              <div
+                className={`grid grid-cols-3 sm:grid-cols-4 gap-3 py-2 ${installedLoading ? 'opacity-60 pointer-events-none' : ''}`}
+              >
                 {installedImages.map(img => {
                   const selected = selectedInstalledIds.has(img.id)
                   return (
@@ -443,20 +587,20 @@ export function AttachmentImagePicker({
               </div>
             )}
           </div>
-          {installedImages.length > 0 && (
-            <div className='flex justify-end pt-2 border-t shrink-0'>
-              <LoadingButton
-                type='button'
-                loading={
-                  (navigation.state !== 'idle' && activeInstalled) || isAddingInstalled
-                }
-                onClick={handleAddInstalledToEmail}
-                disabled={selectedInstalledIds.size === 0}
-              >
-                Add to the email
-              </LoadingButton>
-            </div>
-          )}
+          <div className='flex justify-end pt-2 border-t shrink-0 min-h-[52px]'>
+            <LoadingButton
+              type='button'
+              loading={
+                installedLoading ||
+                (navigation.state !== 'idle' && activeInstalled) ||
+                isAddingInstalled
+              }
+              onClick={handleAddInstalledToEmail}
+              disabled={selectedInstalledIds.size === 0 || installedLoading}
+            >
+              Add to the email
+            </LoadingButton>
+          </div>
         </DialogContent>
       </Dialog>
     </>
