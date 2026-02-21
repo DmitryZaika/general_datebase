@@ -4,7 +4,6 @@ REGION := us-east-2
 REPO_NAME := granite-manager-remix
 EC2_USER := ec2-user
 EC2_IP := ec2-3-147-83-220.us-east-2.compute.amazonaws.com
-DOMAIN := granite-manager.com
 SSH_KEY = ~/colin.pem
 
 # Full Image URI
@@ -12,7 +11,9 @@ IMAGE_URI := $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/$(REPO_NAME):late
 
 .PHONY: local-test build-push deploy-prod login push-env setup-host local-setup logs
 
-# Local Testing (Builds locally and runs with Nginx)
+################
+# Dev Commands
+################
 local-test:
 	docker compose up --build
 
@@ -26,6 +27,9 @@ clean:
 login:
 	aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com
 
+check-aws:
+	ssh -i $(SSH_KEY) $(EC2_USER)@$(EC2_IP) "aws sts get-caller-identity || echo 'AWS CLI not configured!'"
+
 setup-host:
 	ssh -i $(SSH_KEY) $(EC2_USER)@$(EC2_IP) "\
 		sudo dnf update -y && \
@@ -37,10 +41,6 @@ setup-host:
 		sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose && \
 		sudo ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose"
 
-check-aws:
-	ssh -i $(SSH_KEY) $(EC2_USER)@$(EC2_IP) "aws sts get-caller-identity || echo 'AWS CLI not configured!'"
-
-# Build & Push (The "Heavy Lifting" done on your PC)
 build-push: login
 	docker build -t $(REPO_NAME) .
 	docker tag $(REPO_NAME):latest $(IMAGE_URI)
