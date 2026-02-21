@@ -3,27 +3,24 @@ services:
     restart: always
     environment:
       - NODE_ENV=production
+      - HOST=0.0.0.0
     env_file:
       - .env
 
-  nginx:
-    image: nginx:alpine
+  caddy:
+    image: caddy:alpine
     restart: always
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/50x.html:/usr/share/nginx/html/50x.html:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-      - /var/www/certbot:/var/www/certbot:ro
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
       - remix-app
 
-  certbot:
-    image: certbot/certbot
-    volumes:
-      - /etc/letsencrypt:/etc/letsencrypt
-      - /var/www/certbot:/var/www/certbot
-    # This command checks for renewal every 12 hours
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+volumes:
+  socket_data:
+  caddy_data:
+  caddy_config:

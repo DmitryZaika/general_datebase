@@ -1,0 +1,7 @@
+{
+    email colin99delahunty@gmail.com
+}
+
+localhost, granite-manager.com {
+    reverse_proxy remix-app:3000
+}

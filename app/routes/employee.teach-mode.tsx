@@ -749,8 +749,8 @@ export default function TeachMode() {
           >
             <h3 style={{ marginBottom: 10 }}>No Questions Available</h3>
             <p>
-              Questions will appear here once your administrator creates them based on
-              the training materials.
+              Questions appear here once your administrator creates them based on the
+              training materials.
             </p>
           </div>
         )}
