@@ -10,7 +10,7 @@ SSH_KEY = ~/colin.pem
 # Full Image URI
 IMAGE_URI := $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/$(REPO_NAME):latest
 
-.PHONY: local-test build-push deploy-prod login push-env setup-host local-setup
+.PHONY: local-test build-push deploy-prod login push-env setup-host local-setup logs
 
 # Local Testing (Builds locally and runs with Nginx)
 local-test:
@@ -50,9 +50,14 @@ deploy-prod:
 	scp -i $(SSH_KEY) -r docker-compose.yml docker-compose.prod.yml caddy .env $(EC2_USER)@$(EC2_IP):~/
 	ssh -i $(SSH_KEY) $(EC2_USER)@$(EC2_IP) "aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com && \
 		docker-compose -f docker-compose.yml -f docker-compose.prod.yml pull && \
-		docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d && \
+		docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans && \
 		docker image prune -f"
 
+restart:
+	ssh -i $(SSH_KEY) $(EC2_USER)@$(EC2_IP) "cd ~ && docker-compose -f docker-compose.yml -f docker-compose.prod.yml down && docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d"
+
+logs:
+	ssh -i $(SSH_KEY) $(EC2_USER)@$(EC2_IP) "docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail=100"
 
 prune:
 	ssh $(EC2_USER)@$(EC2_IP) "docker system prune -f"
