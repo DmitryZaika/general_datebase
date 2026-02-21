@@ -88,10 +88,10 @@ export default function DealItem({
   const fromState = `${location.pathname}${location.search}`
   const projectUrl = `${editBase}/edit/${deal.id}/project${location.search}`
   const mailUrl = readonly
-    ? `${editBase}/edit/${deal.id}/history${location.search}`
+    ? `${editBase}/edit/${deal.id}/history`
     : `edit/${deal.id}/history`
   const imagesUrl = readonly
-    ? `${editBase}/edit/${deal.id}/images${location.search}`
+    ? `${editBase}/edit/${deal.id}/images`
     : `edit/${deal.id}/images`
 
   useEffect(() => {

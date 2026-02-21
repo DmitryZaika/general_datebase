@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import {
+  Eye,
   Inbox,
   Menu,
   Paperclip,
@@ -39,7 +40,8 @@ export interface Email {
   sender_name?: string | null
   receiver_name?: string | null
   sales_rep?: string | null
-  employee_read_at?: string | null // Важное поле
+  employee_read_at?: string | null
+  client_read_at?: string | null
 }
 
 interface DealsEmailsViewProps {
@@ -47,6 +49,7 @@ interface DealsEmailsViewProps {
   currentUserEmail: string
   adminMode?: boolean
   salesReps?: { id: number; name: string }[]
+  currentUserId?: number | null
 }
 
 type Tab = 'inbox' | 'drafts' | 'outbox' | 'sent' | 'archive'
@@ -56,6 +59,7 @@ export default function DealsEmailsView({
   currentUserEmail,
   adminMode = false,
   salesReps = [],
+  currentUserId = null,
 }: DealsEmailsViewProps) {
   const navigate = useNavigate()
   const revalidator = useRevalidator()
@@ -66,6 +70,9 @@ export default function DealsEmailsView({
   const { toast } = useToast()
   const location = useLocation()
   const [searchParams] = useSearchParams()
+  const selectedSalesRepId = searchParams.get('sales_rep')
+    ? Number(searchParams.get('sales_rep'))
+    : null
 
   // 1. ЛОГИКА НЕПРОЧИТАННЫХ СООБЩЕНИЙ
   // Мы проверяем ВСЕ письма, а не только последние в треде.
@@ -89,32 +96,45 @@ export default function DealsEmailsView({
     const threadMap = new Map<string, Email>()
 
     if (activeTab === 'inbox') {
-      // Inbox: latest message in each thread
+      const isFromCustomer = (e: Email) => e.sender_user_id == null
+
+      const latestByThread = new Map<string, Email>()
       emails.forEach(email => {
-        const existing = threadMap.get(email.thread_id)
+        const existing = latestByThread.get(email.thread_id)
         if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
-          threadMap.set(email.thread_id, email)
+          latestByThread.set(email.thread_id, email)
         }
       })
 
-      return Array.from(threadMap.values()).filter(email => {
-        if (adminMode) {
-          return email.sender_user_id == null // Incoming from customer
+      const latestIncomingByThread = new Map<string, Email>()
+      emails.forEach(email => {
+        if (!isFromCustomer(email)) return
+        const existing = latestIncomingByThread.get(email.thread_id)
+        if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
+          latestIncomingByThread.set(email.thread_id, email)
         }
-        return (
-          parseEmailAddress(email.sender_email).toLowerCase() !==
-          parseEmailAddress(currentUserEmail).toLowerCase()
-        )
       })
+
+      return Array.from(latestByThread.entries())
+        .filter(([, latest]) => {
+          if (isFromCustomer(latest)) return true
+          return latestIncomingByThread.has(latest.thread_id)
+        })
+        .map(([, latest]) => {
+          if (isFromCustomer(latest)) return latest
+          return latestIncomingByThread.get(latest.thread_id) ?? latest
+        })
     }
 
     if (activeTab === 'sent') {
-      // Sent: latest message in each thread where user IS the sender
       emails.forEach(email => {
         const isSender = adminMode
-          ? email.sender_user_id != null
-          : parseEmailAddress(email.sender_email).toLowerCase() ===
-            parseEmailAddress(currentUserEmail).toLowerCase()
+          ? selectedSalesRepId != null
+            ? email.sender_user_id === selectedSalesRepId
+            : email.sender_user_id != null
+          : (currentUserId != null && email.sender_user_id === currentUserId) ||
+            parseEmailAddress(email.sender_email).toLowerCase() ===
+              parseEmailAddress(currentUserEmail).toLowerCase()
 
         if (isSender) {
           const existing = threadMap.get(email.thread_id)
@@ -127,7 +147,14 @@ export default function DealsEmailsView({
     }
 
     return []
-  }, [emails, activeTab, currentUserEmail, adminMode])
+  }, [
+    emails,
+    activeTab,
+    currentUserEmail,
+    currentUserId,
+    adminMode,
+    selectedSalesRepId,
+  ])
 
   // Filter by search term
   const searchedEmails = useMemo(() => {
@@ -160,38 +187,43 @@ export default function DealsEmailsView({
     )
   }, [searchedEmails])
 
-  // Calculate counts for nav items
+  // Calculate counts for nav items (same logic as filtered lists)
   const counts = useMemo(() => {
-    // Подсчет для Inbox (учитываем логику непрочитанных или просто общее кол-во тредов)
-    // Здесь оставляем как было (кол-во тредов), но можно заменить на unreadThreadIds.size если нужно число именно непрочитанных
-    const inboxThreads = new Set<string>()
-
+    const isFromCustomer = (e: Email) => e.sender_user_id == null
+    const latestByThread = new Map<string, Email>()
     emails.forEach(email => {
-      // Условие для inbox: входящее письмо
-      const isInbox = adminMode
-        ? email.sender_user_id == null
-        : parseEmailAddress(email.sender_email).toLowerCase() !==
-          parseEmailAddress(currentUserEmail).toLowerCase()
-
-      if (isInbox) {
-        inboxThreads.add(email.thread_id)
+      const existing = latestByThread.get(email.thread_id)
+      if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
+        latestByThread.set(email.thread_id, email)
       }
     })
+    const latestIncomingByThread = new Set<string>()
+    emails.forEach(email => {
+      if (!isFromCustomer(email)) return
+      latestIncomingByThread.add(email.thread_id)
+    })
+    const inboxThreads = new Set<string>()
+    latestByThread.forEach((latest, threadId) => {
+      if (isFromCustomer(latest)) inboxThreads.add(threadId)
+      else if (latestIncomingByThread.has(threadId)) inboxThreads.add(threadId)
+    })
 
-    // Подсчет для Sent
     const sentThreads = new Set<string>()
     emails.forEach(email => {
       const isSender = adminMode
-        ? email.sender_user_id != null
-        : parseEmailAddress(email.sender_email).toLowerCase() ===
-          parseEmailAddress(currentUserEmail).toLowerCase()
+        ? selectedSalesRepId != null
+          ? email.sender_user_id === selectedSalesRepId
+          : email.sender_user_id != null
+        : (currentUserId != null && email.sender_user_id === currentUserId) ||
+          parseEmailAddress(email.sender_email).toLowerCase() ===
+            parseEmailAddress(currentUserEmail).toLowerCase()
       if (isSender) {
         sentThreads.add(email.thread_id)
       }
     })
 
     return { inbox: inboxThreads.size, sent: sentThreads.size }
-  }, [emails, currentUserEmail, adminMode])
+  }, [emails, currentUserEmail, currentUserId, adminMode, selectedSalesRepId])
 
   const navItems = [
     {
@@ -452,6 +484,23 @@ export default function DealsEmailsView({
                           {Boolean(email.has_attachments) && (
                             <Paperclip className='h-3.5 w-3.5 text-gray-500' />
                           )}
+                          {activeTab === 'sent' && (
+                            <span
+                              title={email.client_read_at ? 'Read by client' : 'Unread'}
+                              aria-label={
+                                email.client_read_at ? 'Read by client' : 'Unread'
+                              }
+                            >
+                              <Eye
+                                className={cn(
+                                  'h-3.5 w-3.5 flex-shrink-0',
+                                  email.client_read_at
+                                    ? 'text-blue-500'
+                                    : 'text-gray-400',
+                                )}
+                              />
+                            </span>
+                          )}
                           <span
                             className={cn(
                               'text-xs whitespace-nowrap',
@@ -496,8 +545,8 @@ export default function DealsEmailsView({
                       {adminMode && (
                         <div className='w-32 flex-shrink-0 truncate text-sm text-gray-500 font-medium'>
                           {activeTab === 'inbox'
-                            ? email.receiver_name || email.receiver_email
-                            : email.sender_name || email.sender_email}
+                            ? email.receiver_name
+                            : email.sender_name}
                         </div>
                       )}
 
@@ -537,6 +586,23 @@ export default function DealsEmailsView({
                       <div className='flex items-center gap-4 flex-shrink-0 text-xs text-gray-500 font-medium justify-end'>
                         {Boolean(email.has_attachments) && (
                           <Paperclip className='h-3.5 w-3.5 text-gray-500' />
+                        )}
+                        {activeTab === 'sent' && (
+                          <span
+                            title={email.client_read_at ? 'Read by client' : 'Unread'}
+                            aria-label={
+                              email.client_read_at ? 'Read by client' : 'Unread'
+                            }
+                          >
+                            <Eye
+                              className={cn(
+                                'h-4 w-4 flex-shrink-0',
+                                email.client_read_at
+                                  ? 'text-blue-500'
+                                  : 'text-gray-400',
+                              )}
+                            />
+                          </span>
                         )}
                         <span
                           className={cn(
