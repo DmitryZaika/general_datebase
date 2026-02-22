@@ -65,6 +65,7 @@
     "embla-carousel-react": "^8.6.0",
     "file-type": "^21.3.0",
     "framer-motion": "^12.34.3",
+    "intuit-oauth": "^4.2.2",
     "isomorphic-dompurify": "^2.36.0",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.562.0",
