@@ -110,7 +110,7 @@ export function DataTable<TData, TValue>({
                 onClick={() => onRowClick?.(row.original)}
               >
                 {row.getVisibleCells().map(cell => (
-                  <TableCell key={cell.id} className='whitespace-nowrap pl-4'>
+                  <TableCell key={cell.id} className='whitespace-nowrap pl-1.5 sm:pl-2 '>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

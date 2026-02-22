@@ -93,63 +93,144 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [user.id],
   )
   const currentUserSignature = userSignatureRows?.[0]?.email_signature || null
-  if (!params.dealId) {
-    throw new Error('Deal ID is missing')
-  }
-
-  const dealId = parseInt(params.dealId, 10)
   const threadId = params.threadId
   if (!threadId) {
     posthogClient.captureException(new Error('Thread ID is missing'))
     throw new Error('Thread ID is missing')
   }
 
-  const [customerRows] = await db.execute<RowDataPacket[]>(
-    `SELECT c.name, c.email, d.customer_id
-       FROM deals d
-       JOIN customers c ON d.customer_id = c.id
-      WHERE d.id = ?`,
-    [dealId],
+  // Find deal_id from thread_id
+  const [dealRows] = await db.execute<RowDataPacket[]>(
+    'SELECT deal_id FROM emails WHERE thread_id = ? AND deal_id IS NOT NULL LIMIT 1',
+    [threadId],
   )
+
+  const dealId = dealRows?.[0]?.deal_id || null
 
   const normalizeEmail = (email: string | null | undefined) =>
     parseEmailAddress(email).toLowerCase() || ''
-  const customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
-  const customerId = customerRows?.[0]?.customer_id
+
+  let customerName = 'Customer'
+  let customerEmail = ''
+  let customerId: number | null = null
+
+  if (dealId) {
+    const [customerRows] = await db.execute<RowDataPacket[]>(
+      `SELECT c.name, c.email, d.customer_id
+         FROM deals d
+         JOIN customers c ON d.customer_id = c.id
+        WHERE d.id = ?`,
+      [dealId],
+    )
+    customerName = customerRows?.[0]?.name || 'Customer'
+    customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
+    customerId = customerRows?.[0]?.customer_id
+  } else {
+    // Try to find customer from email thread participants
+    const [threadEmails] = await db.execute<RowDataPacket[]>(
+      `SELECT sender_email, receiver_email FROM emails WHERE thread_id = ? LIMIT 1`,
+      [threadId],
+    )
+
+    if (threadEmails && threadEmails.length > 0) {
+      const { sender_email, receiver_email } = threadEmails[0]
+      const sEmail = normalizeEmail(sender_email)
+      const rEmail = normalizeEmail(receiver_email)
+
+      // Try to find customer by sender email
+      const [custSender] = await db.execute<RowDataPacket[]>(
+        `SELECT id, name, email FROM customers WHERE email = ?`,
+        [sEmail],
+      )
+
+      if (custSender && custSender.length > 0) {
+        customerName = custSender[0].name
+        customerEmail = normalizeEmail(custSender[0].email)
+        customerId = custSender[0].id
+      } else {
+        // Try to find customer by receiver email
+        const [custReceiver] = await db.execute<RowDataPacket[]>(
+          `SELECT id, name, email FROM customers WHERE email = ?`,
+          [rEmail],
+        )
+
+        if (custReceiver && custReceiver.length > 0) {
+          customerName = custReceiver[0].name
+          customerEmail = normalizeEmail(custReceiver[0].email)
+          customerId = custReceiver[0].id
+        } else {
+          // Fallback: assume the one that is NOT the current user's email is the customer
+          if (sEmail === normalizeEmail(user.email)) {
+            customerName = rEmail
+            customerEmail = rEmail
+          } else {
+            customerName = sEmail
+            customerEmail = sEmail
+          }
+        }
+      }
+    }
+  }
 
   if (customerEmail) {
-    await db.execute(
-      `
+    let updateQuery = `
         UPDATE emails
         SET employee_read_at = NOW()
         WHERE deleted_at IS NULL
           AND thread_id = ?
-          AND (deal_id = ? OR deal_id IS NULL)
-          AND (sender_email = ? OR sender_email LIKE ? OR sender_email IN (SELECT email FROM customers WHERE id = ? OR parent_id = ?))
           AND employee_read_at IS NULL
-      `,
-      [threadId, dealId, customerEmail, `%<${customerEmail}>`, customerId, customerId],
-    )
+      `
+    const updateParams: (string | number)[] = [threadId]
+
+    if (dealId) {
+      updateQuery += ` AND (deal_id = ? OR deal_id IS NULL)`
+      updateParams.push(dealId)
+    }
+
+    if (customerId) {
+      updateQuery += ` AND (sender_email = ? OR sender_email LIKE ? OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(sender_email, '<', -1), '>', 1))) = ? OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(sender_email, '<', -1), '>', 1))) IN (SELECT LOWER(email) FROM customers WHERE id = ? OR parent_id = ?))`
+      updateParams.push(
+        customerEmail,
+        `%<${customerEmail}>`,
+        customerEmail,
+        customerId,
+        customerId,
+      )
+    } else {
+      updateQuery += ` AND (sender_email = ? OR sender_email LIKE ? OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(sender_email, '<', -1), '>', 1))) = ?)`
+      updateParams.push(customerEmail, `%<${customerEmail}>`, customerEmail)
+    }
+
+    await db.execute(updateQuery, updateParams)
   }
 
   let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, e.sender_user_id, u.email_signature as signature, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
        LEFT JOIN users u ON u.id = e.sender_user_id
-      WHERE e.deleted_at IS NULL AND e.thread_id = ? AND (e.deal_id = ? OR e.deal_id IS NULL)`
-  const emailParams: (number | string)[] = [threadId, dealId]
+      WHERE e.deleted_at IS NULL AND e.thread_id = ?`
+  const emailParams: (number | string)[] = [threadId]
 
-  const attachmentsRaw = await selectMany<Attachment>(
-    db,
-    `SELECT id, email_id, content_type, content_subtype, filename, url
+  if (dealId) {
+    emailQuery += ` AND (e.deal_id = ? OR e.deal_id IS NULL)`
+    emailParams.push(dealId)
+  }
+
+  let attachQuery = `SELECT id, email_id, content_type, content_subtype, filename, url
      FROM email_attachments
      WHERE email_id IN (
        SELECT id
        FROM emails
-       WHERE deleted_at IS NULL AND thread_id = ? AND (deal_id = ? OR deal_id IS NULL)
-     )`,
-    [threadId, dealId],
-  )
+       WHERE deleted_at IS NULL AND thread_id = ?`
+  const attachParams: (number | string)[] = [threadId]
+
+  if (dealId) {
+    attachQuery += ` AND (deal_id = ? OR deal_id IS NULL)`
+    attachParams.push(dealId)
+  }
+  attachQuery += ` )`
+
+  const attachmentsRaw = await selectMany<Attachment>(db, attachQuery, attachParams)
   const attachments = await Promise.all(
     attachmentsRaw.map(async attachment => {
       const signed = await presignIfS3Uri(attachment.url)
@@ -180,7 +261,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   })
 
   return {
-    customerName: customerRows?.[0]?.name || 'Customer',
+    customerName,
     customerEmail,
     messages,
     dealId,
@@ -238,7 +319,7 @@ async function processStreamingResponse(
 
 async function generateAIEmailForChat(
   emailCategory: string,
-  dealId: number,
+  dealId: number | null,
   subject: string | null,
   threadId: string,
   onStreamBody?: (text: string) => void,
@@ -246,7 +327,7 @@ async function generateAIEmailForChat(
   const variationToken = Math.random().toString(36).slice(2)
   const requestPayload = {
     emailCategory,
-    dealId,
+    dealId: dealId || undefined,
     variationToken,
     subject: subject || undefined,
     threadId,
@@ -278,6 +359,7 @@ function MessageDate({ message }: { message: Message }) {
 
 export default function EmailChatDialog() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [showSelect, setShowSelect] = useState(false)
   const [selectActive, setSelectActive] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
@@ -384,7 +466,7 @@ export default function EmailChatDialog() {
   }, [])
 
   const handleClose = () => {
-    navigate(`/employee/deals/edit/${dealId}/history${location.search}`)
+    navigate(`/employee/emails${location.search}`)
   }
 
   const getInitials = (name: string) => {
@@ -445,7 +527,9 @@ export default function EmailChatDialog() {
       formData.append('to', customerEmail)
       formData.append('subject', emailSubject)
       formData.append('body', body)
-      formData.append('dealId', dealId.toString())
+      if (dealId) {
+        formData.append('dealId', dealId.toString())
+      }
       formData.append('threadId', threadId)
 
       attachments.forEach(file => {
@@ -540,7 +624,6 @@ export default function EmailChatDialog() {
       setAttachments(prev => [...prev, ...Array.from(files)])
     }
   }
-  const isMobile = useIsMobile()
 
   return (
     <Dialog open={true} onOpenChange={handleClose}>
@@ -798,7 +881,7 @@ export default function EmailChatDialog() {
                 getText={() => messageText}
                 setText={value => setMessageText(value)}
                 buttonSize='icon'
-                iconClassName='text-sm'
+                iconClassName='text-lg'
               />
             </div>
 

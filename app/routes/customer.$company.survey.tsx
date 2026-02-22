@@ -11,7 +11,6 @@ import {
   useNavigation,
   useSearchParams,
 } from 'react-router'
-import { getValidatedFormData } from 'remix-hook-form'
 import z from 'zod'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SelectInput } from '~/components/molecules/SelectItem'
@@ -25,6 +24,7 @@ import { selectMany } from '~/utils/queryHelpers'
 
 const surveySchema = z.object({
   sales_rep_id: z.number().min(1),
+  installer_id: z.number().min(1),
   sales_rep_rating: z.number().min(1).max(5),
   sales_rep_comments: z.string().optional(),
   technician_rating: z.number().min(1).max(5),
@@ -50,33 +50,55 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
      ORDER BY u.name ASC`,
     [companyId],
   )
-  return { companyId, salesReps }
+  const installers: SalesRep[] = await selectMany<SalesRep>(
+    db,
+    `SELECT DISTINCT u.id, u.name
+     FROM users u
+     JOIN users_positions up ON up.user_id = u.id
+     WHERE up.company_id = ?
+       AND up.position_id = 6
+       AND u.is_deleted = 0
+     ORDER BY u.name ASC`,
+    [companyId],
+  )
+  return { companyId, salesReps, installers }
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const companyId = Number(params.company)
-  const { errors, data } = await getValidatedFormData(request, resolver)
-  if (errors) {
-    return { errors }
-  }
-  if (!data) {
-    return { error: 'No data submitted' }
-  }
   try {
+    const formData = await request.formData()
+    const rawData = Object.fromEntries(formData)
+    const result = surveySchema.safeParse({
+      ...rawData,
+      sales_rep_id: Number(rawData.sales_rep_id),
+      installer_id: Number(rawData.installer_id),
+      sales_rep_rating: Number(rawData.sales_rep_rating),
+      technician_rating: Number(rawData.technician_rating),
+      installation_rating: Number(rawData.installation_rating),
+    })
+
+    if (!result.success) {
+      return { errors: result.error.flatten() }
+    }
+
+    const data = result.data
     await db.execute(
       `INSERT INTO customer_surveys (
         sales_rep_id,
+        installer_id,
         sales_rep_rating,
-        sales_rep_comments,
+        sales_rep_comment,
         technician_rating,
-        technician_comments,
+        technician_comment,
         installation_rating,
-        installation_comments,
+        installation_comment,
         company_id,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         data.sales_rep_id,
+        data.installer_id,
         data.sales_rep_rating,
         data.sales_rep_comments,
         data.technician_rating,
@@ -170,11 +192,12 @@ function StarRating({
 }
 
 export default function Survey() {
-  const { companyId, salesReps } = useLoaderData<typeof loader>()
+  const { companyId, salesReps, installers } = useLoaderData<typeof loader>()
   const [searchParams] = useSearchParams()
   const submitted = searchParams.get('submitted') === '1'
   const error = searchParams.get('error') === '1'
   const salesRepSelectRef = useRef<HTMLButtonElement>(null)
+  const installerSelectRef = useRef<HTMLButtonElement>(null)
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
 
@@ -182,11 +205,16 @@ export default function Survey() {
     () => salesReps.map(r => ({ key: r.id, value: r.name })),
     [salesReps],
   )
+  const installerOptions = useMemo(
+    () => installers.map(r => ({ key: r.id, value: r.name })),
+    [installers],
+  )
 
   const form = useForm({
     resolver,
     defaultValues: {
       sales_rep_id: undefined,
+      installer_id: undefined,
       sales_rep_rating: undefined,
       sales_rep_comments: '',
       technician_rating: undefined,
@@ -201,14 +229,18 @@ export default function Survey() {
   const technicianRating = form.watch('technician_rating')
   const installationRating = form.watch('installation_rating')
   useEffect(() => {
-    if (
-      form.formState.submitCount > 0 &&
-      form.formState.errors.sales_rep_id &&
-      salesRepSelectRef.current
-    ) {
-      salesRepSelectRef.current.focus()
+    if (form.formState.submitCount > 0) {
+      if (form.formState.errors.sales_rep_id && salesRepSelectRef.current) {
+        salesRepSelectRef.current.focus()
+      } else if (form.formState.errors.installer_id && installerSelectRef.current) {
+        installerSelectRef.current.focus()
+      }
     }
-  }, [form.formState.submitCount, form.formState.errors.sales_rep_id])
+  }, [
+    form.formState.submitCount,
+    form.formState.errors.sales_rep_id,
+    form.formState.errors.installer_id,
+  ])
 
   return (
     <div className='mx-auto flex w-full max-w-2xl flex-col gap-4 p-4'>
@@ -295,6 +327,27 @@ export default function Survey() {
                   disabled={submitted}
                 />
               </div>
+            </SectionCard>
+            <SectionCard title='Pick your installer'>
+              <FormField
+                control={form.control}
+                name='installer_id'
+                render={({ field }) => (
+                  <SelectInput
+                    name='Installer'
+                    placeholder='Select installer'
+                    options={installerOptions}
+                    field={{
+                      ...field,
+                      onChange: val => {
+                        const num = Number(val)
+                        field.onChange(Number.isNaN(num) ? undefined : num)
+                      },
+                    }}
+                    disabled={submitted}
+                  />
+                )}
+              ></FormField>
             </SectionCard>
 
             <SectionCard title='How did you like the installation team?'>

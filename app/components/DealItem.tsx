@@ -88,10 +88,10 @@ export default function DealItem({
   const fromState = `${location.pathname}${location.search}`
   const projectUrl = `${editBase}/edit/${deal.id}/project${location.search}`
   const mailUrl = readonly
-    ? `${editBase}/edit/${deal.id}/history${location.search}`
+    ? `${editBase}/edit/${deal.id}/history`
     : `edit/${deal.id}/history`
   const imagesUrl = readonly
-    ? `${editBase}/edit/${deal.id}/images${location.search}`
+    ? `${editBase}/edit/${deal.id}/images`
     : `edit/${deal.id}/images`
 
   useEffect(() => {
@@ -366,18 +366,13 @@ export default function DealItem({
                 </PopoverContent>
               </Popover>
             )}
-          {deal.list_id !== 5 &&
-            deal.list_id !== 4 &&
-            readonly &&
-            localDate &&
-            localDate !== '0000-00-00' &&
-            deal.is_won === null && (
-              <p
-                className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}
-              >
-                {formatDisplay(localDate)}
-              </p>
-            )}
+          {readonly && localDate && localDate !== '0000-00-00' && (
+            <p
+              className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}
+            >
+              {formatDisplay(localDate)}
+            </p>
+          )}
         </div>
 
         {(hasEmail || hasImages) && (

@@ -42,6 +42,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       'UPDATE deals SET list_id = ?, position = ? WHERE id = ? AND user_id = ?',
       [fromListId || null, fromPos || 0, dealId, user.id],
     )
+    await db.execute(
+      'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
+      [dealId],
+    )
+    if (fromListId) {
+      await db.execute(
+        'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+        [dealId, fromListId],
+      )
+    }
     return redirect(
       `/employee/deals${getSearchString(new URL(request.url))}?highlight=${dealId}`,
     )
@@ -56,6 +66,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await db.execute(
       'UPDATE deals SET lost_reason = ?, is_won = 0 WHERE id = ? AND user_id = ?',
       [reason, dealId, user.id],
+    )
+    await db.execute(
+      'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
+      [dealId],
+    )
+    await db.execute(
+      'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+      [dealId, 5],
     )
 
     const session = await getSession(request.headers.get('Cookie'))

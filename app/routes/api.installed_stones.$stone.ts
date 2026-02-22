@@ -1,22 +1,21 @@
 import type { LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser } from '~/utils/session.server'
 
-export async function loader({ params }: LoaderFunctionArgs) {
-  // const session = await getSession(request.headers.get("Cookie"));
-  // const activeSession = session.data.sessionId || null;
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  try {
+    await getEmployeeUser(request)
+  } catch {
+    return Response.json({ images: [] }, { status: 401 })
+  }
   if (!params.stone) {
     return new Response('Bad url', { status: 400 })
   }
   const stoneId = parseInt(params.stone)
-
-  // if (!activeSession) {
-  //   return new Response("Unauthorized", { status: 401 });
-  // }
-  // let user = (await getUserBySessionId(activeSession)) || null;
-  // if (!user) {
-  //   return new Response("Unauthorized", { status: 401 });
-  // }
+  if (Number.isNaN(stoneId)) {
+    return Response.json({ images: [] })
+  }
 
   const directImages = await selectMany<{ id: number; url: string }>(
     db,

@@ -12,6 +12,9 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!id || is_won === undefined)
     return data({ error: 'bad payload' }, { status: 400 })
 
-  await db.execute('UPDATE deals SET is_won = ? WHERE id = ?', [is_won, id])
+  await db.execute('UPDATE deals SET is_won = ?, lost_reason = NULL WHERE id = ?', [
+    is_won,
+    id,
+  ])
   return data({ ok: true })
 }

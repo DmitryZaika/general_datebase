@@ -105,9 +105,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         ) as revenue_generated,
         (
           SELECT COUNT(*)
-          FROM deals d
-          LEFT JOIN customers sub ON sub.id = d.customer_id
-          WHERE d.customer_id = c.id OR sub.parent_id = c.id
+          FROM sales s
+          LEFT JOIN customers sub ON sub.id = s.customer_id
+          WHERE s.customer_id = c.id OR sub.parent_id = c.id
         ) as projects_count
       FROM customers c
       LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0

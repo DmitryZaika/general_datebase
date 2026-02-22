@@ -73,7 +73,7 @@ export default function CustomerInfoTab() {
         { label: 'Remodal type', value: project.remodal_type },
         { label: 'Project size', value: project.project_size },
         { label: 'Contact time', value: project.contact_time },
-        { label: 'Remove and dispose', value: project.remove_and_dispose },
+        { label: 'Tear out', value: project.remove_and_dispose },
         { label: 'Improve offer', value: project.improve_offer },
         { label: 'Sink', value: project.sink },
         { label: 'When start', value: project.when_start },
@@ -92,7 +92,9 @@ export default function CustomerInfoTab() {
   return (
     <div className='space-y-4 mt-4'>
       <div className='border rounded p-4'>
-        <div className='text-lg font-semibold'>{customer.company_name ? 'Contact name: ' : '' }  {customer.name}</div>
+        <div className='text-lg font-semibold'>
+          {customer.company_name ? 'Contact name: ' : ''} {customer.name}
+        </div>
         <div className='text-sm text-slate-600 mt-2'>
           {customer.company_name && <div>Company: {customer.company_name}</div>}
           <div>Email: {customer.email || '-'}</div>

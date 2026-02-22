@@ -10,6 +10,8 @@ import {
   Layers,
   Lightbulb,
   type LucideProps,
+  Mail,
+  MailIcon,
   Package,
   Receipt,
   ShowerHead,
@@ -80,11 +82,6 @@ const getItems = (
         url: '/shop/samples',
         icon: Package,
       },
-      {
-        title: 'Statistics',
-        url: '/shop/statistics',
-        icon: Calculator,
-      },
     ]
   }
   const isCustomerRoute = base === 'customer'
@@ -113,6 +110,11 @@ const getItems = (
       title: 'Deals',
       url: `/employee/deals`,
       icon: DollarSign,
+    })
+    finalList.push({
+      title: 'Emails',
+      url: `/employee/emails`,
+      icon: MailIcon,
     })
   }
   if (['admin', 'employee'].includes(base)) {
@@ -200,9 +202,19 @@ const getItems = (
   if (base === 'admin') {
     finalList.push(
       {
+        title: 'Statistic',
+        url: `/admin/statistics`,
+        icon: DollarSign,
+      },
+      {
         title: 'Deals',
         url: `/admin/deals`,
         icon: DollarSign,
+      },
+      {
+        title: 'Emails',
+        url: `/admin/emails`,
+        icon: Mail,
       },
       {
         title: 'Transactions',
@@ -218,11 +230,6 @@ const getItems = (
         title: 'User Panel',
         url: `/admin/users`,
         icon: Users,
-      },
-      {
-        title: 'Statistic',
-        url: `/admin/statistics`,
-        icon: DollarSign,
       },
     )
   }
@@ -275,7 +282,8 @@ export function EmployeeSidebar({
     (base === 'employee' ||
     base === 'admin' ||
     base === 'customer' ||
-    base === 'contractors'
+    base === 'contractors' ||
+    base === 'shop'
       ? base
       : null) || 'employee'
 
@@ -290,7 +298,7 @@ export function EmployeeSidebar({
 
   const inventoryTitles = ['Stones', 'Sinks', 'Faucets']
 
-  const crmTitles = ['Customers', 'Deals', 'Statistic']
+  const crmTitles = ['Customers', 'Deals', 'Statistic', 'Emails']
   const resourceTitles = [
     'Suppliers',
     'Supports',
@@ -333,7 +341,7 @@ export function EmployeeSidebar({
 
   return (
     <Sidebar>
-      {isMobile && data?.user && (
+      {isMobile && data?.user && itemsBase !== 'shop' && (
         <SidebarHeader className='py-2 px-3'>
           <div className='flex gap-2 justify-center'>
             {data.user.is_admin || data.user.is_superuser ? (

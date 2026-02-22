@@ -63,6 +63,17 @@ export async function action({ request }: ActionFunctionArgs) {
         'UPDATE deals SET list_id = ?, status = ?, position = ?, due_date = CASE WHEN ? IN (4,5) THEN NULL ELSE due_date END, lost_reason = IF(? != 5, NULL, lost_reason), updated_at = CASE WHEN ? = 1 THEN NOW() ELSE updated_at END WHERE id = ?',
         [list_id, statusToSet, position, list_id, list_id, movedAcrossLists, id],
       )
+
+      if (movedAcrossLists) {
+        await db.execute(
+          'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
+          [id],
+        )
+        await db.execute(
+          'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+          [id, list_id],
+        )
+      }
     }
     return Response.json({ success: true })
   } catch (error) {

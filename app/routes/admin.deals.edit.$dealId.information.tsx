@@ -9,6 +9,7 @@ import {
 import { getValidatedFormData } from 'remix-hook-form'
 import DealsForm from '~/components/DealsForm'
 import { db } from '~/db.server'
+import { selectMany } from '~/utils/queryHelpers'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
@@ -37,6 +38,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { error: 'Invalid deal id' }
   }
 
+  const prevRows = await selectMany<{ list_id: number }>(
+    db,
+    'SELECT list_id FROM deals WHERE id = ? LIMIT 1',
+    [dealId],
+  )
+  const prevListId = prevRows[0]?.list_id
+
   await db.execute(
     `UPDATE deals
        SET customer_id = ?, amount = ?, description = ?, list_id = ?, position = ?,
@@ -52,6 +60,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
       dealId,
     ],
   )
+
+  if (prevListId !== undefined && prevListId !== data.list_id) {
+    await db.execute(
+      'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
+      [dealId],
+    )
+    await db.execute(
+      'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+      [dealId, data.list_id],
+    )
+  }
+
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Deal updated successfully'))
   return redirect(`/employee/deals`, {

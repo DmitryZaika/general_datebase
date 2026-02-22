@@ -124,7 +124,7 @@ export default function Login() {
   return (
     <div className='flex flex-col items-center justify-center p-5'>
       <Link
-        to='/customer/1/stones'
+        to='/customers/companies'
         className='pb-4 text-blue-500 underline cursor-pointer'
       >
         For Customers

@@ -105,7 +105,7 @@ interface AIEmailRequest {
     | 'thank-you'
     | 'feedback-request'
     | 'referral'
-  dealId: number
+  dealId?: number
   formality?: 'formal' | 'neutral' | 'casual'
   tone?: 'friendly' | 'persuasive' | 'empathetic' | 'urgent'
   verboseness?: 'concise' | 'detailed'
@@ -170,18 +170,21 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
-  if (!params.dealId) {
-    throw new Error('Deal ID is missing')
-  }
-  const dealId = parseInt(params.dealId, 10)
+  let dealId: number | undefined
+  let email = ''
+  let customerName = ''
 
-  const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT c.email, c.name FROM deals d JOIN customers c ON d.customer_id = c.id WHERE d.id = ? AND d.deleted_at IS NULL`,
-    [dealId],
-  )
+  if (params.dealId) {
+    dealId = parseInt(params.dealId, 10)
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT c.email, c.name FROM deals d JOIN customers c ON d.customer_id = c.id WHERE d.id = ? AND d.deleted_at IS NULL`,
+      [dealId],
+    )
 
-  if (!rows || rows.length === 0) {
-    return redirect('/employee/deals')
+    if (rows && rows.length > 0) {
+      email = rows[0].email || ''
+      customerName = rows[0].name || ''
+    }
   }
 
   const [senderInfo, templateVariableData] = await Promise.all([
@@ -190,8 +193,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   ])
 
   return {
-    email: rows[0].email || '',
-    customerName: rows[0].name || '',
+    email,
+    customerName,
     senderInfo,
     dealId,
     companyId: user.company_id || 0,
@@ -231,7 +234,7 @@ async function fetchSenderInfo(user: EmployeeUser): Promise<SenderInfo> {
 
 function buildAIRequestPayload(
   formData: AIEmailFormData,
-  dealId: number,
+  dealId?: number,
 ): Partial<AIEmailRequest> {
   const variationToken = Math.random().toString(36).slice(2)
   const payload: Partial<AIEmailRequest> = {
@@ -295,7 +298,7 @@ async function processStreamingResponse(
 
 async function generateAIEmail(
   formData: AIEmailFormData,
-  dealId: number,
+  dealId: number | undefined,
   onStreamSubject?: (text: string) => void,
   onStreamBody?: (text: string) => void,
 ): Promise<AIEmailResponse> {
@@ -331,6 +334,7 @@ function EmailFormFields({
   selectedTemplate,
   onTemplateChange,
   templateVariableData,
+  canEditTo = false,
   onFilesDrop,
 }: {
   form: ReturnType<typeof useForm<EmailFormData>>
@@ -338,6 +342,7 @@ function EmailFormFields({
   selectedTemplate: EmailTemplate | undefined
   onTemplateChange: (template: EmailTemplate | undefined) => void
   templateVariableData: TemplateVariableData
+  canEditTo?: boolean
   onFilesDrop?: (files: File[]) => void
 }) {
   const bodyText = form.watch('text')
@@ -354,7 +359,7 @@ function EmailFormFields({
             name='To'
             field={field}
             placeholder='recipient@example.com'
-            disabled={true}
+            disabled={!canEditTo}
           />
         )}
       />
@@ -559,14 +564,16 @@ function sendEmail(
   to: string,
   subject: string,
   body: string,
-  dealId: number,
+  dealId: number | undefined,
   attachments: File[],
 ) {
   const formData = new FormData()
   formData.append('to', to)
   formData.append('subject', subject)
   formData.append('body', body)
-  formData.append('dealId', dealId.toString())
+  if (dealId) {
+    formData.append('dealId', dealId.toString())
+  }
 
   for (const file of attachments) {
     // если на бэке ожидается массив
@@ -616,7 +623,7 @@ export default function DealEmailDialog() {
       )
     },
     onSuccess: () => {
-      navigate(`../${location.search}`)
+      navigate(`/employee/emails${location.search}`)
       toast({
         title: 'Success',
         description: 'Email sent',
@@ -681,7 +688,7 @@ export default function DealEmailDialog() {
   }
 
   const handleDialogClose = (open: boolean) => {
-    if (!open) navigate(`../${location.search}`)
+    if (!open) navigate(`/employee/emails${location.search}`)
   }
 
   const isMobile = useIsMobile()
@@ -842,6 +849,7 @@ export default function DealEmailDialog() {
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
               templateVariableData={templateVariableData}
+              canEditTo={!dealId}
               onFilesDrop={files => addFiles(files)}
             />
             {form.watch('attachments').length > 0 ? (

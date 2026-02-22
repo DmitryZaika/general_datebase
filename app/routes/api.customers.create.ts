@@ -60,6 +60,10 @@ export async function action({ request }: ActionFunctionArgs) {
       [customerId, 'New Customer', listId, nextPos, salesRep],
     )
     const dealId = dealResult.insertId
+    await db.execute(
+      'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+      [dealId, listId],
+    )
     return data({
       success: true,
       message: 'Customer created successfully',
