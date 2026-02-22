@@ -48,6 +48,7 @@
         "embla-carousel-react": "^8.6.0",
         "file-type": "^21.3.0",
         "framer-motion": "^12.34.3",
+        "idb": "^8.0.3",
         "intuit-oauth": "^4.2.2",
         "isomorphic-dompurify": "^2.36.0",
         "lodash.debounce": "^4.0.8",
@@ -73,6 +74,7 @@
         "remix-hook-form": "^7.1.1",
         "remix-utils": "^9.0.1",
         "sharp": "^0.34.5",
+        "stripe": "^20.3.1",
         "tailwind-merge": "^3.5.0",
         "tailwindcss-animate": "^1.0.7",
         "use-debounce": "^10.1.0",
@@ -1614,7 +1616,7 @@
 
     "iconv-lite": ["iconv-lite@0.7.2", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw=="],
 
-    "idb": ["idb@7.1.1", "", {}, ""],
+    "idb": ["idb@8.0.3", "", {}, "sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg=="],
 
     "ieee754": ["ieee754@1.2.1", "", {}, ""],
 
@@ -2244,7 +2246,7 @@
 
     "strip-final-newline": ["strip-final-newline@4.0.0", "", {}, ""],
 
-    "stripe": ["stripe@20.1.0", "", { "dependencies": { "qs": "^6.11.0" }, "peerDependencies": { "@types/node": ">=16" } }, ""],
+    "stripe": ["stripe@20.3.1", "", { "peerDependencies": { "@types/node": ">=16" }, "optionalPeers": ["@types/node"] }, "sha512-k990yOT5G5rhX3XluRPw5Y8RLdJDW4dzQ29wWT66piHrbnM2KyamJ1dKgPsw4HzGHRWjDiSSdcI2WdxQUPV3aQ=="],
 
     "strnum": ["strnum@2.1.2", "", {}, ""],
 
@@ -2654,6 +2656,8 @@
 
     "@ts-morph/common/minimatch": ["minimatch@10.1.1", "", { "dependencies": { "@isaacs/brace-expansion": "^5.0.0" } }, ""],
 
+    "@types/stripe/stripe": ["stripe@20.1.0", "", { "dependencies": { "qs": "^6.11.0" }, "peerDependencies": { "@types/node": ">=16" } }, ""],
+
     "accepts/mime-types": ["mime-types@2.1.35", "", { "dependencies": { "mime-db": "1.52.0" } }, ""],
 
     "accepts/negotiator": ["negotiator@0.6.3", "", {}, ""],
@@ -2772,6 +2776,8 @@
 
     "winston/is-stream": ["is-stream@2.0.1", "", {}, ""],
 
+    "workbox-background-sync/idb": ["idb@7.1.1", "", {}, ""],
+
     "workbox-build/@babel/core": ["@babel/core@7.28.5", "", { "dependencies": { "@babel/code-frame": "^7.27.1", "@babel/generator": "^7.28.5", "@babel/helper-compilation-targets": "^7.27.2", "@babel/helper-module-transforms": "^7.28.3", "@babel/helpers": "^7.28.4", "@babel/parser": "^7.28.5", "@babel/template": "^7.27.2", "@babel/traverse": "^7.28.5", "@babel/types": "^7.28.5", "@jridgewell/remapping": "^2.3.5", "convert-source-map": "^2.0.0", "debug": "^4.1.0", "gensync": "^1.0.0-beta.2", "json5": "^2.2.3", "semver": "^6.3.1" } }, ""],
 
     "workbox-build/fs-extra": ["fs-extra@9.1.0", "", { "dependencies": { "at-least-node": "^1.0.0", "graceful-fs": "^4.2.0", "jsonfile": "^6.0.1", "universalify": "^2.0.0" } }, ""],
@@ -2779,6 +2785,8 @@
     "workbox-build/rollup": ["rollup@2.79.2", "", { "optionalDependencies": { "fsevents": "~2.3.2" }, "bin": "dist/bin/rollup" }, ""],
 
     "workbox-build/stringify-object": ["stringify-object@3.3.0", "", { "dependencies": { "get-own-enumerable-property-symbols": "^3.0.0", "is-obj": "^1.0.1", "is-regexp": "^1.0.0" } }, ""],
+
+    "workbox-expiration/idb": ["idb@7.1.1", "", {}, ""],
 
     "wrap-ansi/string-width": ["string-width@4.2.3", "", { "dependencies": { "emoji-regex": "^8.0.0", "is-fullwidth-code-point": "^3.0.0", "strip-ansi": "^6.0.1" } }, ""],
 

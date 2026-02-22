@@ -8,6 +8,6 @@ export const getStripe = () => {
     throw new Error('STRIPE_SECRET_KEY is not set in environment variables')
   }
   return new Stripe(stripeSecretKey, {
-    apiVersion: '2025-12-15.clover',
+    apiVersion: '2026-01-28.clover',
   })
 }
