@@ -59,5 +59,12 @@ restart:
 logs:
 	ssh -i $(SSH_KEY) $(EC2_USER)@$(EC2_IP) "docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail=100"
 
+
+clean-caddy:
+	ssh -i $(SSH_KEY) $(EC2_USER)@$(EC2_IP) "cd ~ && \
+	docker-compose -f docker-compose.yml -f docker-compose.prod.yml down && \
+	docker volume rm $$(docker volume ls -q | grep caddy_data) || true && \
+	docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d"
+
 prune:
 	ssh $(EC2_USER)@$(EC2_IP) "docker system prune -f"

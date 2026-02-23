@@ -7,11 +7,6 @@ localhost {
     reverse_proxy remix-app:3000
 }
 
-# --- Dev Environment (Subdomain) ---
-dev.granite-manager.com {
-    reverse_proxy remix-app:3000
-}
-
 # --- Production Environment ---
 granite-manager.com, www.granite-manager.com {
     reverse_proxy remix-app:3000
