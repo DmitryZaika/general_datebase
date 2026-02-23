@@ -1,0 +1,26 @@
+services:
+  remix-app:
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+    env_file:
+      - .env
+
+  caddy:
+    image: caddy:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - remix-app
+
+volumes:
+  socket_data:
+  caddy_data:
+  caddy_config:

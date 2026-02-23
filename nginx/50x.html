@@ -1,0 +1,1058 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>СЛАВА УКРАЇНІ — ГЕРОЯМ СЛАВА</title>
+  <meta name="theme-color" content="#0057B7" />
+
+  <style>
+    :root{
+      --blue:#0057B7;
+      --yellow:#FFD700;
+      --ink:#0b1220;
+      --paper: rgba(255,255,255,.10);
+      --paper2: rgba(255,255,255,.06);
+      --stroke: rgba(255,255,255,.18);
+      --shadow: 0 18px 60px rgba(0,0,0,.35);
+      --glowBlue: 0 0 18px rgba(0,87,183,.85), 0 0 42px rgba(0,87,183,.35);
+      --glowYellow: 0 0 18px rgba(255,215,0,.75), 0 0 48px rgba(255,215,0,.25);
+      --radius: 22px;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; margin:0; }
+    body{
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,Helvetica,sans-serif;
+      color: #fff;
+      overflow-x:hidden;
+      background:
+        radial-gradient(1200px 700px at 20% 15%, rgba(255,215,0,.35), transparent 60%),
+        radial-gradient(1100px 800px at 75% 70%, rgba(0,87,183,.50), transparent 60%),
+        linear-gradient(180deg, var(--blue) 0%, var(--yellow) 100%);
+    }
+
+    /* ===== Layered fancy background ===== */
+    .bg-mesh, .bg-noise, .bg-stripes{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+    }
+    .bg-stripes{
+      opacity:.35;
+      background:
+        repeating-linear-gradient(125deg,
+          rgba(255,255,255,.14) 0px,
+          rgba(255,255,255,.14) 12px,
+          rgba(255,255,255,0) 12px,
+          rgba(255,255,255,0) 36px);
+      mix-blend-mode: overlay;
+      animation: drift 14s linear infinite;
+      transform: translate3d(0,0,0);
+    }
+    @keyframes drift{
+      0% { transform: translateX(-40px) translateY(-30px); }
+      100% { transform: translateX(40px) translateY(30px); }
+    }
+    .bg-mesh{
+      background:
+        radial-gradient(circle at 12% 22%, rgba(255,255,255,.25), transparent 36%),
+        radial-gradient(circle at 74% 18%, rgba(255,255,255,.22), transparent 34%),
+        radial-gradient(circle at 44% 78%, rgba(255,255,255,.18), transparent 40%);
+      filter: blur(10px);
+      opacity:.6;
+    }
+    .bg-noise{
+      opacity:.15;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+      mix-blend-mode: overlay;
+    }
+
+    /* ===== Canvas animated background ===== */
+    canvas#sky{
+      position: fixed; inset: 0; z-index: 1; pointer-events:none;
+      opacity: .55;
+    }
+
+    /* ===== Layout ===== */
+    .wrap{
+      position:relative;
+      z-index:2;
+      min-height:100%;
+    }
+
+    .topbar{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter: blur(14px);
+      background: linear-gradient(90deg, rgba(0,87,183,.55), rgba(255,215,0,.45));
+      border-bottom:1px solid rgba(255,255,255,.18);
+    }
+    .topbar-inner{
+      max-width:1100px; margin:0 auto; padding:10px 16px;
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      font-weight:900; letter-spacing:.08em;
+      text-transform:uppercase;
+      text-shadow: var(--glowBlue);
+      font-size: 13px;
+      user-select:none;
+    }
+    .brand-badge{
+      width:34px; height:34px; border-radius:12px;
+      background: linear-gradient(180deg, var(--blue), var(--yellow));
+      box-shadow: var(--shadow);
+      border:1px solid rgba(255,255,255,.25);
+      display:grid; place-items:center;
+      position:relative;
+      overflow:hidden;
+    }
+    .brand-badge:after{
+      content:"";
+      position:absolute; inset:-40%;
+      background: radial-gradient(circle, rgba(255,255,255,.55), transparent 55%);
+      animation: spin 6s linear infinite;
+      opacity:.6;
+    }
+    @keyframes spin{
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .brand-badge span{
+      position:relative; z-index:2; font-size:18px;
+      filter: drop-shadow(0 0 10px rgba(255,255,255,.6));
+    }
+
+    .actions{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    .btn{
+      border:1px solid rgba(255,255,255,.24);
+      background: rgba(0,0,0,.22);
+      color:#fff;
+      padding:10px 12px;
+      border-radius:14px;
+      cursor:pointer;
+      font-weight:700;
+      box-shadow: 0 12px 30px rgba(0,0,0,.18);
+      transition: transform .12s ease, background .12s ease, border-color .12s ease;
+      user-select:none;
+    }
+    .btn:hover{ transform: translateY(-1px); background: rgba(0,0,0,.28); border-color: rgba(255,255,255,.35); }
+    .btn.primary{
+      background: linear-gradient(90deg, rgba(0,87,183,.85), rgba(255,215,0,.75));
+      color:#071022;
+      border-color: rgba(255,255,255,.35);
+      text-shadow: 0 1px 0 rgba(255,255,255,.35);
+    }
+    .btn.small{ padding:8px 10px; font-size:12px; border-radius:12px; }
+
+    /* ===== Marquee ===== */
+    .marquee{
+      border-top: 1px solid rgba(255,255,255,.18);
+      border-bottom: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.08);
+      overflow:hidden;
+      white-space:nowrap;
+    }
+    .marquee .track{
+      display:inline-block;
+      padding:10px 0;
+      animation: marquee 18s linear infinite;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      filter: drop-shadow(0 0 10px rgba(0,0,0,.25));
+    }
+    @keyframes marquee{
+      0%{ transform: translateX(0); }
+      100%{ transform: translateX(-50%); }
+    }
+
+    /* ===== Hero ===== */
+    .hero{
+      max-width:1100px;
+      margin: 28px auto 0;
+      padding: 0 16px 18px;
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 16px;
+    }
+    @media (max-width: 920px){
+      .hero{ grid-template-columns:1fr; }
+    }
+
+    .card{
+      border: 1px solid rgba(255,255,255,.22);
+      background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+    .card::before{
+      content:"";
+      position:absolute; inset:-40% -40% auto -40%;
+      height:220px;
+      background: radial-gradient(circle, rgba(255,255,255,.22), transparent 60%);
+      transform: rotate(8deg);
+      pointer-events:none;
+      opacity:.65;
+    }
+
+    .hero-main{
+      padding: 22px 20px 18px;
+    }
+
+    .kicker{
+      display:inline-flex; gap:8px; align-items:center;
+      padding:8px 12px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.22);
+      font-weight:800;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      font-size: 12px;
+    }
+    .kicker strong{ color:#071022; background: rgba(255,215,0,.9); padding:2px 8px; border-radius:999px; }
+    .title{
+      margin: 14px 0 10px;
+      font-size: clamp(34px, 4vw, 56px);
+      line-height: 1.02;
+      font-weight: 1000;
+      letter-spacing:.02em;
+      text-shadow: var(--glowBlue), var(--glowYellow);
+    }
+    .subtitle{
+      margin: 0 0 16px;
+      font-size: 16px;
+      line-height: 1.5;
+      color: rgba(255,255,255,.92);
+      max-width: 62ch;
+    }
+
+    .slogan-row{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin: 10px 0 14px;
+    }
+    .pill{
+      border: 1px solid rgba(255,255,255,.24);
+      background: rgba(0,0,0,.18);
+      border-radius: 999px;
+      padding: 10px 12px;
+      font-weight: 950;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      box-shadow: 0 10px 22px rgba(0,0,0,.18);
+      display:inline-flex; gap:8px; align-items:center;
+    }
+    .pill.blue{ box-shadow: var(--glowBlue); }
+    .pill.yellow{ box-shadow: var(--glowYellow); color:#071022; background: rgba(255,215,0,.86); border-color: rgba(255,255,255,.34); }
+
+    .hero-cta{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top: 8px;
+    }
+
+    .hero-side{
+      padding: 18px;
+      display:grid;
+      gap: 12px;
+      align-content:start;
+    }
+
+    .flag{
+      height: 140px;
+      border-radius: 18px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.26);
+      box-shadow: var(--shadow);
+      position:relative;
+    }
+    .flag .blue{ height:50%; background: var(--blue); }
+    .flag .yellow{ height:50%; background: var(--yellow); }
+    .flag:after{
+      content:"";
+      position:absolute; inset:0;
+      background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,.25) 50%, transparent 65%);
+      transform: translateX(-120%);
+      animation: shine 3.4s ease-in-out infinite;
+      opacity:.9;
+    }
+    @keyframes shine{
+      0% { transform: translateX(-120%); }
+      45%{ transform: translateX(120%); }
+      100%{ transform: translateX(120%); }
+    }
+
+    .statgrid{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 520px){
+      .statgrid{ grid-template-columns:1fr; }
+    }
+    .stat{
+      padding: 12px;
+      border-radius: 18px;
+      border:1px solid rgba(255,255,255,.20);
+      background: rgba(0,0,0,.16);
+      box-shadow: 0 12px 26px rgba(0,0,0,.18);
+    }
+    .stat .num{
+      font-size: 28px;
+      font-weight: 1000;
+      letter-spacing:.02em;
+      text-shadow: var(--glowBlue);
+    }
+    .stat .label{
+      margin-top: 2px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      opacity:.95;
+    }
+
+    /* ===== Sections ===== */
+    .section{
+      max-width:1100px;
+      margin: 14px auto 0;
+      padding: 0 16px 18px;
+    }
+    .section-title{
+      margin: 18px 0 10px;
+      font-size: 18px;
+      letter-spacing:.10em;
+      font-weight: 1000;
+      text-transform:uppercase;
+      text-shadow: 0 0 18px rgba(0,0,0,.20);
+      display:flex; align-items:center; gap:10px;
+    }
+    .section-title .dot{
+      width:10px; height:10px; border-radius:999px;
+      background: rgba(255,255,255,.9);
+      box-shadow: var(--glowBlue);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 920px){
+      .grid{ grid-template-columns:1fr; }
+    }
+
+    .panel{
+      padding: 16px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,.22);
+      background: linear-gradient(180deg, rgba(0,0,0,.18), rgba(255,255,255,.06));
+      box-shadow: var(--shadow);
+      position:relative;
+      overflow:hidden;
+    }
+    .panel h3{
+      margin: 0 0 8px;
+      font-size: 16px;
+      font-weight: 1000;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+    .panel p{
+      margin: 0 0 10px;
+      color: rgba(255,255,255,.92);
+      line-height: 1.55;
+    }
+
+    .slogan-wall{
+      display:flex; flex-wrap:wrap; gap:10px;
+    }
+    .tag{
+      padding: 10px 12px;
+      border-radius: 999px;
+      border:1px solid rgba(255,255,255,.22);
+      background: rgba(255,255,255,.08);
+      font-weight: 950;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      box-shadow: 0 10px 24px rgba(0,0,0,.16);
+    }
+    .tag strong{
+      color:#071022;
+      background: rgba(255,215,0,.92);
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-right: 8px;
+    }
+
+    /* ===== Trident ===== */
+    .tridentBox{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      align-items:center;
+    }
+    .trident{
+      width:100%;
+      height: 240px;
+      display:block;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(0,0,0,.15);
+      box-shadow: var(--shadow);
+    }
+    .trident path{
+      filter: drop-shadow(0 0 16px rgba(255,215,0,.35)) drop-shadow(0 0 22px rgba(0,87,183,.22));
+    }
+    .tridentGlow{
+      animation: glowPulse 2.2s ease-in-out infinite;
+      transform-origin:center;
+    }
+    @keyframes glowPulse{
+      0%,100% { opacity: .88; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.02); }
+    }
+
+    /* ===== Support wall ===== */
+    .support{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .support form{
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .input{
+      flex: 1 1 260px;
+      padding: 12px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.22);
+      background: rgba(0,0,0,.16);
+      color:#fff;
+      outline:none;
+      font-weight: 700;
+    }
+    .input::placeholder{ color: rgba(255,255,255,.70); font-weight:700; }
+
+    .messages{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 920px){
+      .messages{ grid-template-columns:1fr; }
+    }
+    .msg{
+      padding: 12px;
+      border-radius: 18px;
+      border:1px solid rgba(255,255,255,.20);
+      background: rgba(255,255,255,.08);
+      box-shadow: 0 12px 26px rgba(0,0,0,.18);
+      position:relative;
+      overflow:hidden;
+    }
+    .msg::before{
+      content:"";
+      position:absolute; inset:0;
+      background: linear-gradient(90deg, rgba(0,87,183,.20), rgba(255,215,0,.20));
+      opacity:.7;
+      mix-blend-mode: overlay;
+    }
+    .msg .text{
+      position:relative;
+      font-weight: 900;
+      letter-spacing:.02em;
+      line-height: 1.35;
+      text-shadow: 0 0 18px rgba(0,0,0,.18);
+    }
+    .msg .meta{
+      position:relative;
+      margin-top: 8px;
+      font-size: 12px;
+      opacity:.85;
+      font-weight: 800;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      display:flex; justify-content:space-between; gap:10px;
+    }
+
+    /* ===== Footer ===== */
+    footer{
+      padding: 22px 16px 32px;
+      max-width:1100px;
+      margin: 0 auto;
+      opacity:.95;
+    }
+    footer .foot{
+      border:1px solid rgba(255,255,255,.20);
+      background: rgba(0,0,0,.16);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+      display:flex; align-items:center; justify-content:space-between; gap: 10px;
+      flex-wrap: wrap;
+    }
+    .kbd{
+      font-weight: 900;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      font-size: 12px;
+      opacity:.92;
+    }
+    .kbd span{
+      background: rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.20);
+      padding: 4px 8px;
+      border-radius: 10px;
+      margin-left: 6px;
+    }
+
+    /* ===== Floating particles + sparks ===== */
+    .float-layer{
+      position:fixed; inset:0; pointer-events:none; z-index:3;
+    }
+    .float{
+      position:absolute;
+      font-size: 22px;
+      animation: floatUp linear forwards;
+      filter: drop-shadow(0 0 10px rgba(255,255,255,.30));
+      opacity: .95;
+    }
+    @keyframes floatUp{
+      from { transform: translateY(0) rotate(0deg); opacity: 1; }
+      to   { transform: translateY(-110vh) rotate(180deg); opacity: 0; }
+    }
+    .spark{
+      position:absolute;
+      width: 10px; height: 10px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(255,255,255,.95), rgba(255,255,255,0) 70%);
+      animation: pop .65s ease-out forwards;
+      mix-blend-mode: screen;
+      box-shadow: var(--glowYellow);
+    }
+    @keyframes pop{
+      0%{ transform: scale(.6); opacity: 1; }
+      100%{ transform: scale(2.6); opacity: 0; }
+    }
+
+    /* ===== Reduced motion ===== */
+    @media (prefers-reduced-motion: reduce){
+      .bg-stripes, .marquee .track, .flag:after, .tridentGlow{ animation:none !important; }
+    }
+
+    /* ===== Toast ===== */
+    .toast{
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      z-index: 50;
+      background: rgba(0,0,0,.26);
+      border:1px solid rgba(255,255,255,.22);
+      backdrop-filter: blur(14px);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-weight: 900;
+      letter-spacing:.06em;
+      text-transform: uppercase;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      pointer-events:none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .toast.show{
+      opacity: 1;
+      transform: translateX(-50%) translateY(-6px);
+    }
+
+    /* ===== Night mode ===== */
+    body.night{
+      background:
+        radial-gradient(1200px 700px at 20% 15%, rgba(255,215,0,.22), transparent 60%),
+        radial-gradient(1100px 800px at 75% 70%, rgba(0,87,183,.35), transparent 60%),
+        linear-gradient(180deg, #031331 0%, #6b5c00 100%);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg-mesh"></div>
+  <div class="bg-stripes"></div>
+  <div class="bg-noise"></div>
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <div class="float-layer" id="floatLayer" aria-hidden="true"></div>
+
+  <div class="wrap">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand" aria-label="brand">
+          <div class="brand-badge"><span>🇺🇦</span></div>
+          <div>
+            УКРАЇНА • ВІЛЬНА • СИЛЬНА
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn small" id="btnNight">🌙 Ніч</button>
+          <button class="btn small" id="btnSpark">✨ Іскри</button>
+          <button class="btn small" id="btnWave">🌊 Хвилі</button>
+          <button class="btn primary" id="btnConfetti">💙💛 СЛАВА!</button>
+        </div>
+      </div>
+      <div class="marquee" role="note" aria-label="marquee slogans">
+        <div class="track" id="marqueeTrack">
+          &nbsp;СЛАВА УКРАЇНІ • ГЕРОЯМ СЛАВА • СЛАВА НАЦІЇ • СМЕРТЬ ВОРОГАМ (як лозунг) • УКРАЇНА ПОНАД УСЕ • ЄДНІСТЬ • СВОБОДА • ГІДНІСТЬ • 🇺🇦 •
+          &nbsp;СЛАВА УКРАЇНІ • ГЕРОЯМ СЛАВА • СЛАВА НАЦІЇ • СМЕРТЬ ВОРОГАМ (як лозунг) • УКРАЇНА ПОНАД УСЕ • ЄДНІСТЬ • СВОБОДА • ГІДНІСТЬ • 🇺🇦 •
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="card hero-main">
+          <div class="kicker">
+            <span>НЕЗЛАМНІСТЬ</span>
+            <strong>💙💛</strong>
+            <span>ЄДНІСТЬ</span>
+          </div>
+
+          <h1 class="title">СЛАВА УКРАЇНІ!</h1>
+          <p class="subtitle">
+            Яскрава сторінка підтримки — прапор, тризуб, гасла, вогні, конфетті та “стіна підтримки”.
+            Зроблено навмисно гучно, щоб одразу було видно: <b>МИ ЛЮБИМО УКРАЇНУ</b>.
+          </p>
+
+          <div class="slogan-row" aria-label="slogans">
+            <div class="pill blue">🇺🇦 <span>СЛАВА УКРАЇНІ</span></div>
+            <div class="pill yellow">🔥 <span>ГЕРОЯМ СЛАВА</span></div>
+            <div class="pill blue">💙 <span>ЄДНІСТЬ</span></div>
+            <div class="pill yellow">💛 <span>СВОБОДА</span></div>
+          </div>
+
+          <div class="hero-cta">
+            <button class="btn primary" id="btnBurst">🎆 Великий вибух</button>
+            <button class="btn" id="btnHearts">💙💛 Потік сердець</button>
+            <button class="btn" id="btnScroll">⬇️ До стіни підтримки</button>
+          </div>
+        </div>
+
+        <aside class="card hero-side">
+          <div class="flag" aria-label="flag">
+            <div class="blue"></div>
+            <div class="yellow"></div>
+          </div>
+
+          <div class="statgrid" aria-label="stats">
+            <div class="stat">
+              <div class="num" data-count="100">0</div>
+              <div class="label">ПІДТРИМКА</div>
+            </div>
+            <div class="stat">
+              <div class="num" data-count="24">0</div>
+              <div class="label">СИЛА</div>
+            </div>
+            <div class="stat">
+              <div class="num" data-count="365">0</div>
+              <div class="label">НЕЗЛАМНІСТЬ</div>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-top: 2px;">
+            <h3>Натисни “СЛАВА!”</h3>
+            <p>Це запускає конфетті + світлові частинки. Також працюють клавіші: <b>C</b> (confetti), <b>H</b> (hearts), <b>N</b> (ніч).</p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="section">
+        <div class="section-title"><span class="dot"></span> ГАСЛА Й СИМВОЛИ</div>
+        <div class="grid">
+          <div class="panel">
+            <h3>Гасла на весь екран</h3>
+            <p>Максимально “в лоб”, яскраво й урочисто — щоб з першого погляду було видно позицію.</p>
+            <div class="slogan-wall">
+              <div class="tag"><strong>🇺🇦</strong>СЛАВА УКРАЇНІ</div>
+              <div class="tag"><strong>🔥</strong>ГЕРОЯМ СЛАВА</div>
+              <div class="tag"><strong>💙</strong>УКРАЇНА ПОНАД УСЕ</div>
+              <div class="tag"><strong>💛</strong>ЄДНІСТЬ • СВОБОДА • ГІДНІСТЬ</div>
+              <div class="tag"><strong>✨</strong>ВІРА • СИЛА • ПЕРЕМОГА</div>
+              <div class="tag"><strong>⚡</strong>НЕЗЛАМНІСТЬ</div>
+            </div>
+          </div>
+
+          <div class="panel tridentBox">
+            <h3>Тризуб (неон + SVG)</h3>
+            <p>Вбудований SVG з підсвіткою. Натисни “Великий вибух”, щоб зробити його ще яскравішим.</p>
+
+            <svg class="trident" viewBox="0 0 512 512" role="img" aria-label="tryzub">
+              <defs>
+                <linearGradient id="gold" x1="0" x2="1">
+                  <stop offset="0" stop-color="#FFD700"/>
+                  <stop offset="1" stop-color="#fff2a8"/>
+                </linearGradient>
+                <linearGradient id="blueG" x1="0" x2="1">
+                  <stop offset="0" stop-color="#0057B7"/>
+                  <stop offset="1" stop-color="#66b3ff"/>
+                </linearGradient>
+              </defs>
+
+              <!-- Glow background -->
+              <rect x="0" y="0" width="512" height="512" fill="rgba(0,0,0,.0)"/>
+              <g class="tridentGlow">
+                <!-- Stylized trident (decorative) -->
+                <path fill="url(#gold)" d="M256 40c-8 0-14 6-14 14v60c0 18-10 34-26 43-13 7-24 19-30 34-6-15-17-27-30-34-16-9-26-25-26-43V54c0-8-6-14-14-14s-14 6-14 14v60c0 28 15 54 39 68 17 10 28 28 28 48v158c0 23-10 44-28 59l-25 21c-6 5-7 14-2 20 5 6 14 7 20 2l25-21c25-21 39-52 39-81V230c0-13 7-25 18-31 9-5 17-13 23-22 6 9 14 17 23 22 11 6 18 18 18 31v158c0 29 14 60 39 81l25 21c6 5 15 4 20-2 5-6 4-15-2-20l-25-21c-18-15-28-36-28-59V230c0-20 11-38 28-48 24-14 39-40 39-68V54c0-8-6-14-14-14s-14 6-14 14v60c0 18-10 34-26 43-13 7-24 19-30 34-6-15-17-27-30-34-16-9-26-25-26-43V54c0-8-6-14-14-14z"/>
+
+                <!-- Center spear -->
+                <path fill="url(#blueG)" d="M256 122c-10 0-18 8-18 18v262c0 11-5 22-14 29l-18 15c-8 6-9 17-3 25 6 8 17 9 25 3l18-15c17-14 27-35 27-57V140c0-10-8-18-17-18z"/>
+
+                <!-- Bottom emblem -->
+                <path fill="url(#gold)" d="M256 312c-28 0-52 23-52 52 0 33 20 59 52 88 32-29 52-55 52-88 0-29-23-52-52-52zm0 42c6 0 10 4 10 10s-4 10-10 10-10-4-10-10 4-10 10-10z"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="supportSection">
+        <div class="section-title"><span class="dot"></span> СТІНА ПІДТРИМКИ</div>
+        <div class="grid">
+          <div class="panel support">
+            <h3>Додай повідомлення 💙💛</h3>
+            <p>Напиши коротко, що підтримуєш Україну. Зберігається локально в браузері (localStorage).</p>
+
+            <form id="supportForm">
+              <input class="input" id="msgInput" maxlength="80" placeholder="Напр.: Слава Україні! Ми з вами 💙💛" />
+              <button class="btn primary" type="submit">➕ Додати</button>
+              <button class="btn" type="button" id="clearMsgs">🗑 Очистити</button>
+            </form>
+
+            <div class="messages" id="messages"></div>
+          </div>
+
+          <div class="panel">
+            <h3>Палітра та “вогні”</h3>
+            <p>Це чистий візуальний “крик”: синьо-жовта хвиля, неон, частинки, блиск і рух.</p>
+            <div class="slogan-wall">
+              <div class="tag"><strong>🎇</strong>ЯСКРАВО</div>
+              <div class="tag"><strong>⚡</strong>ГОЛОСНО</div>
+              <div class="tag"><strong>💙</strong>СИНЄ</div>
+              <div class="tag"><strong>💛</strong>ЖОВТЕ</div>
+              <div class="tag"><strong>✨</strong>НЕОН</div>
+              <div class="tag"><strong>🎉</strong>КОНФЕТТІ</div>
+            </div>
+
+            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn" id="btnFireworks">🎇 Феєрверк</button>
+              <button class="btn" id="btnGlowUp">🌟 Більше сяйва</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <div class="foot">
+          <div style="font-weight:1000; letter-spacing:.04em;">
+            🇺🇦 <span style="text-shadow: var(--glowBlue), var(--glowYellow);">СЛАВА УКРАЇНІ — ГЕРОЯМ СЛАВА</span>
+          </div>
+          <div class="kbd">
+            Гарячі клавіші:
+            <span>C</span> конфетті
+            <span>H</span> серця
+            <span>N</span> ніч
+            <span>S</span> іскри
+          </div>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <div class="toast" id="toast">СЛАВА УКРАЇНІ! 💙💛</div>
+
+  <script>
+    // ========= Helpers =========
+    const $ = (id) => document.getElementById(id);
+
+    function toast(text){
+      const t = $("toast");
+      t.textContent = text;
+      t.classList.add("show");
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(()=> t.classList.remove("show"), 1200);
+    }
+
+    // ========= Animated counters =========
+    function animateCounters(){
+      document.querySelectorAll("[data-count]").forEach(el=>{
+        const target = parseInt(el.getAttribute("data-count"), 10);
+        const start = 0;
+        const dur = 900 + Math.random()*700;
+        const t0 = performance.now();
+        function tick(now){
+          const p = Math.min(1, (now - t0)/dur);
+          const eased = 1 - Math.pow(1-p, 3);
+          el.textContent = Math.floor(start + (target-start)*eased);
+          if(p<1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
+    }
+    animateCounters();
+
+    // ========= Floating emojis =========
+    const floatLayer = $("floatLayer");
+    function emitFloats(count=18, kind="mix"){
+      const emojis = kind==="hearts"
+        ? ["💙","💛","🇺🇦","✨"]
+        : ["🎉","💙","💛","🇺🇦","✨","🎇","⚡"];
+
+      for(let i=0;i<count;i++){
+        const el = document.createElement("div");
+        el.className = "float";
+        el.textContent = emojis[(Math.random()*emojis.length)|0];
+        const left = Math.random()*100;
+        const size = 18 + Math.random()*22;
+        const dur  = 3.2 + Math.random()*4.2;
+
+        el.style.left = left + "vw";
+        el.style.bottom = (-10 - Math.random()*20) + "vh";
+        el.style.fontSize = size + "px";
+        el.style.animationDuration = dur + "s";
+        el.style.filter = "drop-shadow(0 0 12px rgba(255,255,255,.28))";
+
+        floatLayer.appendChild(el);
+        setTimeout(()=> el.remove(), dur*1000 + 200);
+      }
+    }
+
+    // ========= Confetti (simple DOM particles) =========
+    function confettiBurst(intensity=40){
+      emitFloats(Math.floor(intensity*0.6), "mix");
+
+      for(let i=0;i<intensity;i++){
+        const c = document.createElement("div");
+        c.className = "float";
+        c.textContent = Math.random() > 0.5 ? "💛" : "💙";
+
+        const left = 10 + Math.random()*80;
+        const size = 14 + Math.random()*18;
+        const dur  = 2.6 + Math.random()*2.6;
+        const rot  = (Math.random()*360)|0;
+
+        c.style.left = left + "vw";
+        c.style.bottom = (-5) + "vh";
+        c.style.fontSize = size + "px";
+        c.style.animationDuration = dur + "s";
+        c.style.transform = `rotate(${rot}deg)`;
+        floatLayer.appendChild(c);
+        setTimeout(()=> c.remove(), dur*1000 + 200);
+      }
+
+      toast("СЛАВА УКРАЇНІ! 💙💛");
+    }
+
+    // ========= Sparks (cursor) =========
+    let sparksOn = true;
+    function sparkAt(x,y){
+      if(!sparksOn) return;
+      const s = document.createElement("div");
+      s.className = "spark";
+      s.style.left = (x-5) + "px";
+      s.style.top  = (y-5) + "px";
+      floatLayer.appendChild(s);
+      setTimeout(()=> s.remove(), 700);
+    }
+    window.addEventListener("pointermove", (e)=>{
+      if(Math.random() < 0.35) sparkAt(e.clientX, e.clientY);
+    });
+
+    // ========= Canvas sky waves =========
+    const canvas = $("sky");
+    const ctx = canvas.getContext("2d");
+    let wavesOn = true;
+
+    function resize(){
+      canvas.width = window.innerWidth * devicePixelRatio;
+      canvas.height= window.innerHeight* devicePixelRatio;
+      canvas.style.width = window.innerWidth + "px";
+      canvas.style.height= window.innerHeight + "px";
+      ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    let t = 0;
+    function draw(){
+      if(!wavesOn){
+        ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+        requestAnimationFrame(draw);
+        return;
+      }
+
+      const w = window.innerWidth, h = window.innerHeight;
+      ctx.clearRect(0,0,w,h);
+
+      // soft glow blobs
+      ctx.globalAlpha = 0.12;
+      for(let i=0;i<6;i++){
+        const x = (Math.sin(t*0.001 + i)*0.5+0.5)*w;
+        const y = (Math.cos(t*0.0012 + i*1.7)*0.5+0.5)*h;
+        const r = 160 + 80*Math.sin(t*0.001 + i);
+        const g = ctx.createRadialGradient(x,y,0,x,y,r);
+        g.addColorStop(0, i%2? "rgba(255,215,0,.85)" : "rgba(0,87,183,.85)");
+        g.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x,y, r, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      // wave lines
+      ctx.globalAlpha = 0.22;
+      for(let k=0;k<5;k++){
+        ctx.beginPath();
+        const baseY = (k/5)*h + 60;
+        for(let x=0;x<=w;x+=8){
+          const y = baseY + Math.sin((x*0.012) + t*0.004 + k)*18 + Math.cos(t*0.003 + k)*10;
+          if(x===0) ctx.moveTo(x,y);
+          else ctx.lineTo(x,y);
+        }
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = (k%2===0) ? "rgba(255,255,255,.55)" : "rgba(255,255,255,.35)";
+        ctx.stroke();
+      }
+
+      ctx.globalAlpha = 1;
+      t++;
+      requestAnimationFrame(draw);
+    }
+    draw();
+
+    // ========= Support wall (localStorage) =========
+    const STORAGE_KEY = "ua_support_wall_v1";
+
+    function loadMsgs(){
+      try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+      catch{ return []; }
+    }
+    function saveMsgs(list){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 24)));
+    }
+
+    function renderMsgs(){
+      const box = $("messages");
+      const list = loadMsgs();
+      box.innerHTML = "";
+      if(list.length === 0){
+        const empty = document.createElement("div");
+        empty.className = "msg";
+        empty.innerHTML = `
+          <div class="text">Напиши перше повідомлення підтримки 💙💛</div>
+          <div class="meta"><span>СТІНА</span><span>ГОТОВА</span></div>`;
+        box.appendChild(empty);
+        return;
+      }
+      list.forEach(item=>{
+        const el = document.createElement("div");
+        el.className = "msg";
+        el.innerHTML = `
+          <div class="text">${escapeHtml(item.text)}</div>
+          <div class="meta"><span>${item.tag}</span><span>${item.time}</span></div>`;
+        box.appendChild(el);
+      });
+    }
+
+    function escapeHtml(s){
+      return (s+"").replace(/[&<>"']/g, m => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+      }[m]));
+    }
+
+    const tags = ["💙💛 ПІДТРИМКА","🇺🇦 УКРАЇНА","⚡ НЕЗЛАМНІСТЬ","🔥 СЛАВА!","✨ ЄДНІСТЬ"];
+    $("supportForm").addEventListener("submit", (e)=>{
+      e.preventDefault();
+      const input = $("msgInput");
+      const text = (input.value || "").trim();
+      if(!text){ toast("Напиши текст 💙💛"); return; }
+      const list = loadMsgs();
+      const now = new Date();
+      const time = now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+      list.unshift({ text, time, tag: tags[(Math.random()*tags.length)|0] });
+      saveMsgs(list);
+      input.value = "";
+      renderMsgs();
+      confettiBurst(28);
+    });
+
+    $("clearMsgs").addEventListener("click", ()=>{
+      localStorage.removeItem(STORAGE_KEY);
+      renderMsgs();
+      toast("Очищено");
+    });
+
+    renderMsgs();
+
+    // ========= Buttons =========
+    $("btnConfetti").addEventListener("click", ()=> confettiBurst(52));
+    $("btnBurst").addEventListener("click", ()=>{
+      confettiBurst(90);
+      emitFloats(40, "mix");
+      toast("ГЕРОЯМ СЛАВА! 🔥");
+    });
+    $("btnHearts").addEventListener("click", ()=>{
+      emitFloats(40, "hearts");
+      toast("МИ ЛЮБИМО УКРАЇНУ 💙💛");
+    });
+    $("btnScroll").addEventListener("click", ()=>{
+      $("supportSection").scrollIntoView({behavior:"smooth", block:"start"});
+    });
+    $("btnFireworks").addEventListener("click", ()=>{
+      for(let i=0;i<3;i++) setTimeout(()=> confettiBurst(42), i*220);
+    });
+
+    let glowBoost = 0;
+    $("btnGlowUp").addEventListener("click", ()=>{
+      glowBoost = Math.min(3, glowBoost + 1);
+      document.documentElement.style.setProperty("--shadow",
+        glowBoost===0 ? "0 18px 60px rgba(0,0,0,.35)" :
+        glowBoost===1 ? "0 18px 70px rgba(0,0,0,.38)" :
+        glowBoost===2 ? "0 22px 85px rgba(0,0,0,.42)" :
+                        "0 26px 110px rgba(0,0,0,.46)"
+      );
+      toast(glowBoost>=3 ? "МАКСИМУМ СЯЙВА 🌟" : "Більше сяйва ✨");
+      emitFloats(18, "mix");
+    });
+
+    $("btnNight").addEventListener("click", ()=>{
+      document.body.classList.toggle("night");
+      toast(document.body.classList.contains("night") ? "Нічний режим 🌙" : "Денний режим ☀️");
+    });
+
+    $("btnSpark").addEventListener("click", ()=>{
+      sparksOn = !sparksOn;
+      toast(sparksOn ? "Іскри: УВІМК" : "Іскри: ВИМК");
+    });
+
+    $("btnWave").addEventListener("click", ()=>{
+      wavesOn = !wavesOn;
+      toast(wavesOn ? "Хвилі: УВІМК" : "Хвилі: ВИМК");
+    });
+
+    // ========= Keyboard shortcuts =========
+    window.addEventListener("keydown", (e)=>{
+      const k = e.key.toLowerCase();
+      if(k==="c") confettiBurst(60);
+      if(k==="h") emitFloats(44, "hearts");
+      if(k==="n") $("btnNight").click();
+      if(k==="s") $("btnSpark").click();
+    });
+
+    // ========= Auto: subtle celebration on load =========
+    setTimeout(()=> emitFloats(18, "mix"), 450);
+  </script>
+</body>
+</html>
+

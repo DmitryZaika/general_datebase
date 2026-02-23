@@ -11,3 +11,7 @@ oAuthClient-log.log
 tsconfig.tsbuildinfo
 .DS_Store
 tsconfig.tsbuildinfo
+awscliv2.zip
+aws/dist
+install
+aws/

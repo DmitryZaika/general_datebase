@@ -44,6 +44,7 @@ import {
   TooltipTrigger,
 } from '~/components/ui/tooltip'
 import { db } from '~/db.server'
+import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { dateClass, fileSize } from '~/utils/constants'
 import { posthogClient } from '~/utils/posthog.server'
@@ -358,6 +359,7 @@ function MessageDate({ message }: { message: Message }) {
 
 export default function EmailChatDialog() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [showSelect, setShowSelect] = useState(false)
   const [selectActive, setSelectActive] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
@@ -468,11 +470,15 @@ export default function EmailChatDialog() {
   }
 
   const getInitials = (name: string) => {
-    const parts = name.split(' ')
+    const trimmed = (name ?? '').trim()
+    if (!trimmed) return ''
+    const parts = trimmed.split(/\s+/).filter(Boolean)
     if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase()
+      const a = parts[0][0]
+      const b = parts[1][0]
+      return ((a ?? '') + (b ?? '')).toUpperCase() || ''
     }
-    return name.slice(0, 2).toUpperCase()
+    return trimmed.slice(0, 1).toUpperCase()
   }
 
   const lastMessageFromMe = [...chatMessages].reverse().find(m => !m.isFromCustomer)
@@ -958,6 +964,7 @@ export default function EmailChatDialog() {
                 }}
                 placeholder='Send a message'
                 rows={1}
+                autoFocus={!isMobile}
                 className='flex-1 min-h-9.5 w-full max-h-30 rounded-sm border border-zinc-300 bg-transparent px-1 sm:px-4 py-2 text-sm outline-none resize-none overflow-y-auto border-none'
               />
 

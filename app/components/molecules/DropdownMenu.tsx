@@ -44,6 +44,7 @@ export interface CustomDropdownMenuProps {
    */
   options?: DropdownOption[]
   align?: 'start' | 'center' | 'end'
+  side?: 'top' | 'right' | 'bottom' | 'left'
   contentClassName?: string
   selectedList?: string
 }
@@ -54,6 +55,7 @@ export const CustomDropdownMenu = ({
   sections = [],
   options = [],
   align = 'start',
+  side,
   contentClassName,
   selectedList,
 }: CustomDropdownMenuProps) => {
@@ -67,7 +69,7 @@ export const CustomDropdownMenu = ({
       <DropdownMenuTrigger asChild>
         {trigger ? trigger : <Button variant='outline'>{triggerLabel}</Button>}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={align} className={contentClassName}>
+      <DropdownMenuContent align={align} side={side} className={contentClassName}>
         {allSections.map((section, index) => (
           <div key={index}>
             {index > 0 && <DropdownMenuSeparator />}

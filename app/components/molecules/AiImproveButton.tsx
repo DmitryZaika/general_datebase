@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Button, type ButtonProps } from '~/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 
 type AiImproveButtonProps = {
   id?: string
@@ -57,16 +58,23 @@ export function AiImproveButton({
   }
 
   return (
-    <Button
-      id={id}
-      type='button'
-      variant={buttonVariant}
-      size={buttonSize}
-      className={className}
-      disabled={loading}
-      onClick={handleClick}
-    >
-      <span className={iconClassName ?? 'text-lg leading-none text-white'}>✦</span>
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          id={id}
+          type='button'
+          variant={buttonVariant}
+          size={buttonSize}
+          className={className}
+          disabled={loading}
+          onClick={handleClick}
+        >
+          <span className={iconClassName ?? 'text-lg leading-none text-white'}>✦</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side='top' sideOffset={6}>
+        Improve Text
+      </TooltipContent>
+    </Tooltip>
   )
 }

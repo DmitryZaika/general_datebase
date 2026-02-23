@@ -9,10 +9,12 @@ import {
   FileText,
   ImageIcon,
   MoreVertical,
+  Package,
   PaperclipIcon,
   SendIcon,
   SettingsIcon,
   Sparkles,
+  Upload,
 } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useRef, useState } from 'react'
@@ -28,6 +30,7 @@ import {
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
+import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import {
@@ -332,6 +335,7 @@ function EmailFormFields({
   onTemplateChange,
   templateVariableData,
   canEditTo = false,
+  onFilesDrop,
 }: {
   form: ReturnType<typeof useForm<EmailFormData>>
   companyId: number
@@ -339,13 +343,14 @@ function EmailFormFields({
   onTemplateChange: (template: EmailTemplate | undefined) => void
   templateVariableData: TemplateVariableData
   canEditTo?: boolean
+  onFilesDrop?: (files: File[]) => void
 }) {
   const bodyText = form.watch('text')
   const customVariables = getUnfilledCustomVariables(bodyText)
   const showCustomVariablesInfo = selectedTemplate && customVariables.length > 0
 
   return (
-    <div className='flex-1 space-y-4'>
+    <div className='flex-1 space-y-2'>
       <FormField
         control={form.control}
         name='to'
@@ -384,7 +389,12 @@ function EmailFormFields({
         control={form.control}
         name='text'
         render={({ field }) => (
-          <QuillInput name='Body' field={field} className='mb-4' />
+          <QuillInput
+            name='Body'
+            field={field}
+            className='mb-4'
+            onFilesDrop={onFilesDrop}
+          />
         )}
       />
       {showCustomVariablesInfo && (
@@ -596,8 +606,12 @@ export default function DealEmailDialog() {
   const [showAIMenu, setShowAIMenu] = useState(false)
   const [_isGenerating, setIsGenerating] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
+  const [showStonesPicker, setShowStonesPicker] = useState(false)
+  const [showImagesPicker, setShowImagesPicker] = useState(false)
+  const [showDocumentsPicker, setShowDocumentsPicker] = useState(false)
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (values: EmailFormData) => {
@@ -749,6 +763,31 @@ export default function DealEmailDialog() {
     }
   }
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const related = e.relatedTarget
+    if (!related || !(related instanceof Node) || !e.currentTarget.contains(related)) {
+      setIsDragging(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    const files = e.dataTransfer?.files
+    if (files && files.length > 0) {
+      addFiles(Array.from(files))
+    }
+  }
+
   const removeAttachment = (index: number) => {
     const attachments = form.getValues('attachments')
     const file = attachments[index]
@@ -784,14 +823,17 @@ export default function DealEmailDialog() {
     const parts = fileName.split('.')
     const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : ''
     if (ext && imageExt.has(ext)) return <ImageIcon className='h-4 w-4' />
-    return <FileText className='h-4 w-4' />
+    return <FileText className='h-8 sm:h-15 w-8 sm:w-15' />
   }
 
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
       <DialogContent
-        className='sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5'
+        className={`sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5 transition-colors ${isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`}
         onPaste={handlePaste}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
         <DialogHeader>
           <DialogTitle>Send Email</DialogTitle>
@@ -809,9 +851,10 @@ export default function DealEmailDialog() {
               onTemplateChange={setSelectedTemplate}
               templateVariableData={templateVariableData}
               canEditTo={!dealId}
+              onFilesDrop={files => addFiles(files)}
             />
             {form.watch('attachments').length > 0 ? (
-              <div className='mt-3 flex flex-wrap gap-2'>
+              <div className='flex flex-wrap gap-2'>
                 {form.watch('attachments').map((file, index) => {
                   const previewKey = `${file.name}-${file.size}-${file.lastModified}`
                   const previewUrl = previews[previewKey]
@@ -819,7 +862,7 @@ export default function DealEmailDialog() {
                   return (
                     <div
                       key={uniqueKey}
-                      className='group relative size-20 sm:size-30 shrink-0 cursor-pointer rounded border border-border overflow-hidden'
+                      className='group relative size-15 sm:size-25 shrink-0 cursor-pointer rounded border border-border overflow-hidden'
                       onClick={() => removeAttachment(index)}
                     >
                       {previewUrl ? (
@@ -833,8 +876,8 @@ export default function DealEmailDialog() {
                           {attachmentIcon(file.name)}
                         </div>
                       )}
-                      <div className='absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-1'>
-                        <span className='text-white text-[10px] text-center line-clamp-2 break-all'>
+                      <div className='absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
+                        <span className='text-white text-[10px] text-center line-clamp-2 break-all select-none'>
                           {file.name}
                         </span>
                       </div>
@@ -910,14 +953,40 @@ export default function DealEmailDialog() {
                   getText={() => form.getValues('text')}
                   setText={value => form.setValue('text', value)}
                 />
-                <Button
-                  type='button'
-                  size='icon'
-                  aria-label='Attachment'
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <PaperclipIcon className='h-4 w-4' />
-                </Button>
+                <CustomDropdownMenu
+                  side='top'
+                  trigger={
+                    <Button type='button' size='icon' aria-label='Attachment'>
+                      <PaperclipIcon className='h-4 w-4' />
+                    </Button>
+                  }
+                  sections={[
+                    {
+                      options: [
+                        {
+                          label: 'Upload from computer',
+                          icon: <Upload className='h-4 w-4' />,
+                          onClick: () => fileInputRef.current?.click(),
+                        },
+                        {
+                          label: 'From Stones',
+                          icon: <Package className='h-4 w-4' />,
+                          onClick: () => setShowStonesPicker(true),
+                        },
+                        {
+                          label: 'From Images',
+                          icon: <ImageIcon className='h-4 w-4' />,
+                          onClick: () => setShowImagesPicker(true),
+                        },
+                        {
+                          label: 'From Documents',
+                          icon: <FileText className='h-4 w-4' />,
+                          onClick: () => setShowDocumentsPicker(true),
+                        },
+                      ],
+                    },
+                  ]}
+                />
                 <LoadingButton loading={isSubmitting || isPending} type='submit'>
                   <SendIcon className='h-4 w-4' />
                 </LoadingButton>
@@ -930,6 +999,37 @@ export default function DealEmailDialog() {
             <AIAssistantMenu aiForm={aiForm} />
           </div>
         )}
+        <AttachmentImagePicker
+          type='stones'
+          companyId={companyId}
+          open={showStonesPicker}
+          onClose={() => setShowStonesPicker(false)}
+          onSelect={files => {
+            addFiles(files)
+            setShowStonesPicker(false)
+          }}
+          onAddFiles={addFiles}
+        />
+        <AttachmentImagePicker
+          type='images'
+          companyId={companyId}
+          open={showImagesPicker}
+          onClose={() => setShowImagesPicker(false)}
+          onSelect={files => {
+            addFiles(files)
+            setShowImagesPicker(false)
+          }}
+        />
+        <AttachmentImagePicker
+          type='documents'
+          companyId={companyId}
+          open={showDocumentsPicker}
+          onClose={() => setShowDocumentsPicker(false)}
+          onSelect={files => {
+            addFiles(files)
+            setShowDocumentsPicker(false)
+          }}
+        />
       </DialogContent>
     </Dialog>
   )

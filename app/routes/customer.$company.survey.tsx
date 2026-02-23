@@ -209,7 +209,6 @@ export default function Survey() {
     () => installers.map(r => ({ key: r.id, value: r.name })),
     [installers],
   )
-  console.log('error', error)
 
   const form = useForm({
     resolver,

@@ -128,8 +128,6 @@ export function useOfflineChecklistSync({
       const currentPending = getPending()
       if (currentPending && currentPending.timestamp === pending.timestamp) {
         clearPending()
-      } else {
-        console.log('Pending form was replaced during submission, not clearing')
       }
 
       setHasPendingSubmission(hasPending())
