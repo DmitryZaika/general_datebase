@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Check, ChevronDown, Image, Images, Search } from 'lucide-react'
+import { Check, ChevronDown, FileText, Image, Images, Search } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigation } from 'react-router'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -24,7 +24,7 @@ import { useToast } from '~/hooks/use-toast'
 import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
 import { withIconSuffix } from '~/utils/files'
 
-type PickerType = 'stones' | 'images'
+type PickerType = 'stones' | 'images' | 'documents'
 
 const STONE_LEVELS = [1, 2, 3, 4, 5, 6, 7]
 
@@ -39,6 +39,12 @@ interface StoneItem {
 }
 
 interface ImageItem {
+  id: number
+  name: string
+  url: string | null
+}
+
+interface DocumentItem {
   id: number
   name: string
   url: string | null
@@ -78,6 +84,17 @@ async function fetchImages(companyId: number, name: string) {
   return (data.images ?? []) as ImageItem[]
 }
 
+async function fetchDocuments(companyId: number, name: string) {
+  const params = new URLSearchParams()
+  if (name.trim()) params.set('name', name.trim())
+  const res = await fetch(`/api/documents/list/${companyId}?${params}`, {
+    credentials: 'same-origin',
+  })
+  if (!res.ok) throw new Error('Failed to load documents')
+  const data = await res.json()
+  return (data.documents ?? []) as DocumentItem[]
+}
+
 async function fetchInstalledProjects(stoneId: number): Promise<InstalledImage[]> {
   const res = await fetch(`/api/installed_stones/${stoneId}`, {
     credentials: 'same-origin',
@@ -106,9 +123,24 @@ async function urlToFile(imageUrl: string, fileName: string): Promise<File> {
     if (!proxy.ok) throw new Error(`Failed to load image: ${proxy.status}`)
     blob = await proxy.blob()
   }
-  const ext = fileName.includes('.') ? (fileName.split('.').pop() ?? 'png') : 'png'
+  const ext = (
+    fileName.includes('.') ? (fileName.split('.').pop() ?? '') : ''
+  ).toLowerCase()
+  const docMime: Record<string, string> = {
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  }
   const mime =
-    blob.type || (ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png')
+    blob.type ||
+    (docMime[ext] ??
+      (ext === 'jpg' || ext === 'jpeg'
+        ? 'image/jpeg'
+        : ext === 'png'
+          ? 'image/png'
+          : 'application/octet-stream'))
   return new File([blob], fileName.replace(/[^a-zA-Z0-9.-]/g, '_'), { type: mime })
 }
 
@@ -176,9 +208,12 @@ export function AttachmentImagePicker({
     queryFn: () =>
       type === 'stones'
         ? fetchStones(companyId, search, stoneFilters)
-        : fetchImages(companyId, search),
+        : type === 'documents'
+          ? fetchDocuments(companyId, search)
+          : fetchImages(companyId, search),
     enabled: open && companyId > 0,
-    placeholderData: (prev: (StoneItem | ImageItem)[] | undefined) => prev,
+    placeholderData: (prev: (StoneItem | ImageItem | DocumentItem)[] | undefined) =>
+      prev,
   })
 
   const { data: installedImages = [], isLoading: installedLoading } = useQuery({
@@ -187,13 +222,24 @@ export function AttachmentImagePicker({
     enabled: installedStoneId !== null && installedStoneId > 0,
   })
 
-  const list = items as (StoneItem | ImageItem)[]
-  const title = type === 'stones' ? 'From Stones' : 'From Images'
-  const placeholder = type === 'stones' ? 'Search stones...' : 'Search images...'
+  const list = items as (StoneItem | ImageItem | DocumentItem)[]
+  const title =
+    type === 'stones'
+      ? 'From Stones'
+      : type === 'documents'
+        ? 'From Documents'
+        : 'From Images'
+  const placeholder =
+    type === 'stones'
+      ? 'Search stones...'
+      : type === 'documents'
+        ? 'Search documents...'
+        : 'Search images...'
 
   const getDisplayUrl = useCallback(
     (url: string | null) => {
       if (!url) return null
+      if (type === 'documents') return null
       return type === 'stones' ? withIconSuffix(url) : url
     },
     [type],
@@ -202,12 +248,12 @@ export function AttachmentImagePicker({
   const getDownloadUrl = useCallback((url: string | null) => url, [])
 
   const mainItemKey = useCallback(
-    (item: StoneItem | ImageItem) => `${type}-${item.id}`,
+    (item: StoneItem | ImageItem | DocumentItem) => `${type}-${item.id}`,
     [type],
   )
 
   const toggleMain = useCallback(
-    (item: StoneItem | ImageItem) => {
+    (item: StoneItem | ImageItem | DocumentItem) => {
       setSelectedMainKeys(prev => {
         const key = mainItemKey(item)
         const next = new Set(prev)
@@ -225,7 +271,13 @@ export function AttachmentImagePicker({
     const addFn = onAddFiles ?? onSelect
     const selectedItems = list.filter(item => selectedMainKeys.has(mainItemKey(item)))
     if (selectedItems.length === 0) {
-      toast({ title: 'Select at least one image', variant: 'destructive' })
+      toast({
+        title:
+          type === 'documents'
+            ? 'Select at least one document'
+            : 'Select at least one image',
+        variant: 'destructive',
+      })
       setIsAddingMain(false)
       setActiveMain(false)
       return
@@ -235,12 +287,21 @@ export function AttachmentImagePicker({
       for (const item of selectedItems) {
         const downloadUrl = getDownloadUrl(item.url)
         if (!downloadUrl) continue
-        const ext = downloadUrl.split('.').pop()?.split('?')[0] || 'png'
-        const safeName = `${item.name.replace(/[^a-zA-Z0-9.-]/g, '_')}.${ext}`
+        const ext =
+          downloadUrl.split('.').pop()?.split('?')[0] ||
+          (type === 'documents' ? 'pdf' : 'png')
+        const baseName = item.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+        const safeName = baseName.includes('.') ? baseName : `${baseName}.${ext}`
         files.push(await urlToFile(downloadUrl, safeName))
       }
       if (files.length === 0) {
-        toast({ title: 'No valid images selected', variant: 'destructive' })
+        toast({
+          title:
+            type === 'documents'
+              ? 'No valid documents selected'
+              : 'No valid images selected',
+          variant: 'destructive',
+        })
         return
       }
       addFn(files)
@@ -257,6 +318,7 @@ export function AttachmentImagePicker({
       setActiveMain(false)
     }
   }, [
+    type,
     list,
     selectedMainKeys,
     mainItemKey,
@@ -459,6 +521,7 @@ export function AttachmentImagePicker({
                   const stoneItem = item as StoneItem
                   const key = mainItemKey(item)
                   const selected = selectedMainKeys.has(key)
+                  const showThumb = getDisplayUrl(item.url)
                   return (
                     <div
                       key={item.id}
@@ -495,9 +558,16 @@ export function AttachmentImagePicker({
                         className={`absolute inset-0 hover:ring-2 hover:ring-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all ${selected ? 'scale-[0.94] shadow-[inset_0_2px_12px_rgba(0,0,0,0.25)]' : ''}`}
                         onClick={() => toggleMain(item)}
                       >
-                        {getDisplayUrl(item.url) ? (
+                        {type === 'documents' ? (
+                          <div className='w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground'>
+                            <FileText className='h-10 w-10' />
+                            <span className='text-xs text-center line-clamp-2 px-1'>
+                              {item.name}
+                            </span>
+                          </div>
+                        ) : showThumb ? (
                           <img
-                            src={getDisplayUrl(item.url) ?? ''}
+                            src={showThumb}
                             alt={item.name}
                             className='w-full h-full object-cover'
                           />
@@ -506,9 +576,11 @@ export function AttachmentImagePicker({
                             No image
                           </div>
                         )}
-                        <span className='absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 px-2 truncate'>
-                          {item.name}
-                        </span>
+                        {type !== 'documents' && (
+                          <span className='absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 px-2 truncate'>
+                            {item.name}
+                          </span>
+                        )}
                       </button>
                     </div>
                   )

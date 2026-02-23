@@ -4,7 +4,7 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "build": "tsc -b && react-router build && bun run build:sw && npm run build:sw-inject && npm run copy-sw",
+    "build": "tsc -b && react-router build && npm run build:sw && npm run build:sw-inject && npm run copy-sw",
     "build:sw": "vite build --config vite.sw.config.ts",
     "build:sw-inject": "node scripts/build-sw.js",
     "copy-sw": "node scripts/copy-sw-to-public.js",

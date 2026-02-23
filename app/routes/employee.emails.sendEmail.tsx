@@ -608,6 +608,7 @@ export default function DealEmailDialog() {
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const [showStonesPicker, setShowStonesPicker] = useState(false)
   const [showImagesPicker, setShowImagesPicker] = useState(false)
+  const [showDocumentsPicker, setShowDocumentsPicker] = useState(false)
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -977,6 +978,11 @@ export default function DealEmailDialog() {
                           icon: <ImageIcon className='h-4 w-4' />,
                           onClick: () => setShowImagesPicker(true),
                         },
+                        {
+                          label: 'From Documents',
+                          icon: <FileText className='h-4 w-4' />,
+                          onClick: () => setShowDocumentsPicker(true),
+                        },
                       ],
                     },
                   ]}
@@ -1012,6 +1018,16 @@ export default function DealEmailDialog() {
           onSelect={files => {
             addFiles(files)
             setShowImagesPicker(false)
+          }}
+        />
+        <AttachmentImagePicker
+          type='documents'
+          companyId={companyId}
+          open={showDocumentsPicker}
+          onClose={() => setShowDocumentsPicker(false)}
+          onSelect={files => {
+            addFiles(files)
+            setShowDocumentsPicker(false)
           }}
         />
       </DialogContent>
