@@ -47,7 +47,8 @@ build-push: login
 	docker push $(IMAGE_URI)
 
 deploy-prod:
-	scp -i $(SSH_KEY) -r docker-compose.yml docker-compose.prod.yml caddy .env $(EC2_USER)@$(EC2_IP):~/
+	scp -i $(SSH_KEY) -r docker-compose.yml docker-compose.prod.yml caddy $(EC2_USER)@$(EC2_IP):~/
+	scp -i $(SSH_KEY) .env.prod $(EC2_USER)@$(EC2_IP):~/.env
 	ssh -i $(SSH_KEY) $(EC2_USER)@$(EC2_IP) "aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com && \
 		docker-compose -f docker-compose.yml -f docker-compose.prod.yml pull && \
 		docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans && \
