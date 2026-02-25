@@ -1,3 +1,4 @@
+import { format } from 'date-fns'
 import { useOutletContext } from 'react-router'
 
 type CustomerInfo = {
@@ -10,7 +11,7 @@ type CustomerInfo = {
   company_name: string | null
   sales_rep_name: string | null
   source: string | null
-  created_at: string | null
+  created_date: string | null
   parent_id: number | null
 }
 
@@ -20,6 +21,7 @@ type DealRow = {
   description: string | null
   lost_reason: string | null
   list_name: string
+  created_at: string | null
 }
 
 type ProjectInfo = {
@@ -103,6 +105,12 @@ export default function CustomerInfoTab() {
           <div>Address: {customer.address || '-'}</div>
           <div>Sales Rep: {customer.sales_rep_name || 'Not assigned'}</div>
           <div>Source: {customer.source || 'Not assigned'}</div>
+          <div>
+            Created:{' '}
+            {customer.created_date
+              ? format(new Date(customer.created_date), 'M/d/yyyy')
+              : '-'}
+          </div>
         </div>
       </div>
 
@@ -135,6 +143,12 @@ export default function CustomerInfoTab() {
                   <div className='text-xs text-slate-500'>
                     <span className='font-semibold'>Stage:</span> {d.list_name}
                   </div>
+                  {d.created_at && (
+                    <div className='text-xs text-slate-500'>
+                      <span className='font-semibold'>Created:</span>{' '}
+                      {format(new Date(d.created_at), 'M/d/yyyy')}
+                    </div>
+                  )}
                 </div>
                 {d.description && (
                   <div className='text-sm text-slate-600 mt-1 whitespace-pre-wrap'>
