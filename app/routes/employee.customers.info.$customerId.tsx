@@ -26,7 +26,7 @@ type CustomerInfo = {
   address: string | null
   sales_rep_name: string | null
   source: string | null
-  created_at: string | null
+  created_date: string | null
   parent_id: number | null
   company_name: string | null
 }
@@ -37,6 +37,7 @@ type DealRow = {
   description: string | null
   lost_reason: string | null
   list_name: string
+  created_at: string | null
 }
 
 type ProjectInfo = {
@@ -76,13 +77,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const url = new URL(request.url)
-  if (url.pathname.endsWith(params.customerId!)) {
+  if (url.pathname.endsWith(String(customerId))) {
     return redirect(`${url.pathname}/info${url.search}`)
   }
 
   const customer = await selectId<CustomerInfo>(
     db,
-    `SELECT c.id, c.name, c.email, c.phone, c.phone_2, c.address, u.name AS sales_rep_name, c.source, c.parent_id, c.company_name
+    `SELECT c.id, c.name, c.email, c.phone, c.phone_2, c.address, u.name AS sales_rep_name, c.source, c.parent_id, c.company_name, c.created_date
      FROM customers c
      LEFT JOIN deals d ON d.customer_id = c.id AND d.created_at IS NULL
      LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
@@ -110,7 +111,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const deals = await selectMany<DealRow>(
     db,
-    `SELECT d.id, d.amount, d.description, d.lost_reason, l.name AS list_name
+    `SELECT d.id, d.amount, d.description, d.lost_reason, l.name AS list_name, d.created_at
      FROM deals d
      JOIN deals_list l ON l.id = d.list_id
      WHERE d.customer_id = ? AND d.deleted_at IS NULL AND l.deleted_at IS NULL
@@ -118,7 +119,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [customerId],
   )
 
-  return { customer, deals, project, hasTabs: !!customer?.company_name || hasChildren.length > 0 }
+  return {
+    customer,
+    deals,
+    project,
+    hasTabs: !!customer?.company_name || hasChildren.length > 0,
+  }
 }
 
 export default function CustomerInfoDialog() {

@@ -270,10 +270,14 @@ async function generateAIEmailForChat(
   return processStreamingResponse(response.body.getReader(), onStreamBody)
 }
 
-function MessageDate({ message }: { message: Message }) {
+function MessageDate({ message, className }: { message: Message; className?: string }) {
   const date = new Date(message.sent_at)
   const time = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-  return <p className='text-xs text-gray-500 text-left'>{time}</p>
+  return (
+    <p className={`text-[10px] text-right mt-1 ${className ?? 'text-gray-500'}`}>
+      {time}
+    </p>
+  )
 }
 
 export default function EmailChatDialog() {
@@ -574,7 +578,6 @@ export default function EmailChatDialog() {
               <div
                 className={`flex items-center gap-2 py-2 ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
               >
-                {!message.isFromCustomer && <MessageDate message={message} />}
                 <div
                   className={
                     message.isFromCustomer
@@ -597,6 +600,12 @@ export default function EmailChatDialog() {
                         ),
                       ),
                     }}
+                  />
+                  <MessageDate
+                    message={message}
+                    className={
+                      message.isFromCustomer ? 'text-gray-500' : 'text-white/80'
+                    }
                   />
                   {!message.isFromCustomer &&
                   message.signature &&
@@ -709,7 +718,6 @@ export default function EmailChatDialog() {
                   ) : null}
                 </div>
                 <div className='flex items-center gap-2'>
-                  {message.isFromCustomer && <MessageDate message={message} />}
                   {!message.isFromCustomer && message.id === lastReadMessageId && (
                     <p className='text-xs text-gray-500'>Read</p>
                   )}

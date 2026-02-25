@@ -28,6 +28,7 @@ import { sourceEnum } from '~/schemas/customers'
 import { NullableString } from '~/schemas/general'
 import { commitSession, getSession } from '~/sessions.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
+import { posthogClient } from '~/utils/posthog.server'
 import { getMarketingUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 import { useCustomOptionalForm } from '~/utils/useCustomForm'
@@ -95,26 +96,68 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     file: data.file || '',
   }
 
+  const session = await getSession(request.headers.get('Cookie'))
+
+  if (!LAMBDA_URL) {
+    posthogClient.captureException(
+      new Error('LAMBDA_URL not configured'),
+      'add_lead_config',
+      {
+        paramCompanyId,
+      },
+    )
+    session.flash(
+      'message',
+      toastData('Error', 'Lead service not configured', 'destructive'),
+    )
+    return redirect('..', { headers: { 'Set-Cookie': await commitSession(session) } })
+  }
+
   const cleaned = Object.fromEntries(
     Object.entries(body).map(([key, value]) => [
       key,
       value === 'undefined' ? null : value,
     ]),
   )
-  const response = await fetch(
-    `${`${LAMBDA_URL}v1/webhooks/new-lead-form/${paramCompanyId}`}`,
-    {
+  const webhookUrl = `${LAMBDA_URL.replace(/\/$/, '')}/v1/webhooks/new-lead-form/${paramCompanyId}`
+
+  let response: Response
+  try {
+    response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cleaned),
-    },
-  )
-
-  const session = await getSession(request.headers.get('Cookie'))
+    })
+  } catch (err) {
+    posthogClient.captureException(
+      err instanceof Error ? err : new Error(String(err)),
+      'add_lead_fetch',
+      {
+        paramCompanyId,
+        url: webhookUrl,
+      },
+    )
+    session.flash(
+      'message',
+      toastData(
+        'Error',
+        'Could not reach lead service. Please text Dima.',
+        'destructive',
+      ),
+    )
+    return redirect('..', { headers: { 'Set-Cookie': await commitSession(session) } })
+  }
 
   if (response.ok) {
     session.flash('message', toastData('Success', 'Lead added'))
   } else {
+    posthogClient.captureException(
+      new Error('Failed to add lead'),
+      'failed_to_add_lead',
+      {
+        paramCompanyId,
+      },
+    )
     session.flash('message', toastData('Error', 'Failed to add lead', 'destructive'))
   }
   return redirect('..', { headers: { 'Set-Cookie': await commitSession(session) } })

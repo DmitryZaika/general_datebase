@@ -15,9 +15,10 @@ import {
   SettingsIcon,
   Sparkles,
   Upload,
+  X,
 } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -41,9 +42,19 @@ import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { QuillInput } from '~/components/molecules/QuillInput'
 import { Button } from '~/components/ui/button'
+// Server Utilities
+import {
+  Carousel,
+  type CarouselApi,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '~/components/ui/carousel'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
@@ -62,10 +73,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-// Server Utilities
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
+import { useArrowCarousel } from '~/hooks/useArrowToggle'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
 import {
   getUnfilledCustomVariables,
@@ -601,6 +612,7 @@ export default function DealEmailDialog() {
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>()
   const [showStonesPicker, setShowStonesPicker] = useState(false)
   const [showImagesPicker, setShowImagesPicker] = useState(false)
+  const [showDocumentsPicker, setShowDocumentsPicker] = useState(false)
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -711,7 +723,32 @@ export default function DealEmailDialog() {
   }
 
   const [previews, setPreviews] = useState<Record<string, string>>({})
-
+  const [imageViewerIndex, setImageViewerIndex] = useState<number | null>(null)
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>()
+  useArrowCarousel(carouselApi)
+  const attachments = form.watch('attachments')
+  const carouselImages = attachments
+    .map((file, index) => ({
+      index,
+      name: file.name,
+      previewUrl: previews[`${file.name}-${file.size}-${file.lastModified}`],
+    }))
+    .filter((item): item is { index: number; name: string; previewUrl: string } =>
+      Boolean(item.previewUrl),
+    )
+    .map(({ index, name, previewUrl }) => ({ id: index, url: previewUrl, name }))
+  useEffect(() => {
+    if (!carouselApi) return
+    if (imageViewerIndex !== null) {
+      const idx = carouselImages.findIndex(im => im.id === imageViewerIndex)
+      if (idx !== -1) carouselApi.scrollTo(idx, true)
+    }
+    carouselApi.on('settle', () => {
+      const slides = carouselApi.slidesInView()
+      if (slides.length > 0 && carouselImages[slides[0]])
+        setImageViewerIndex(carouselImages[slides[0]].id)
+    })
+  }, [carouselApi, imageViewerIndex, carouselImages])
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files
     if (files && files.length > 0) {
@@ -853,25 +890,49 @@ export default function DealEmailDialog() {
                   return (
                     <div
                       key={uniqueKey}
-                      className='group relative size-15 sm:size-25 shrink-0 cursor-pointer rounded border border-border overflow-hidden'
-                      onClick={() => removeAttachment(index)}
+                      className='group relative size-15 sm:size-25 shrink-0 rounded border border-border overflow-hidden'
                     >
+                      <button
+                        type='button'
+                        className='absolute top-0 right-0 z-10 p-0.5 rounded-bl bg-black/60 text-white transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-black/80'
+                        onClick={e => {
+                          e.stopPropagation()
+                          removeAttachment(index)
+                        }}
+                        aria-label='Remove attachment'
+                      >
+                        <X className='h-3 w-3 sm:h-4 sm:w-4' />
+                      </button>
                       {previewUrl ? (
-                        <img
-                          src={previewUrl}
-                          alt={file.name}
-                          className='size-full object-cover transition-all group-hover:grayscale group-hover:brightness-75'
-                        />
+                        <button
+                          type='button'
+                          className='size-full cursor-pointer block focus:outline-none'
+                          onClick={e => {
+                            e.stopPropagation()
+                            setImageViewerIndex(index)
+                          }}
+                        >
+                          <img
+                            src={previewUrl}
+                            alt={file.name}
+                            className='size-full object-cover transition-all group-hover:grayscale group-hover:brightness-75'
+                          />
+                        </button>
                       ) : (
-                        <div className='size-full flex items-center justify-center bg-muted text-muted-foreground group-hover:bg-muted/80 transition-colors'>
+                        <div
+                          className='size-full flex items-center justify-center bg-muted text-muted-foreground cursor-pointer group-hover:bg-muted/80 transition-colors'
+                          onClick={() => removeAttachment(index)}
+                        >
                           {attachmentIcon(file.name)}
                         </div>
                       )}
-                      <div className='absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
-                        <span className='text-white text-[10px] text-center line-clamp-2 break-all select-none'>
-                          {file.name}
-                        </span>
-                      </div>
+                      {previewUrl ? (
+                        <div className='absolute inset-0 pointer-events-none bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
+                          <span className='text-white text-[10px] text-center line-clamp-2 break-all select-none'>
+                            {file.name}
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
                   )
                 })}
@@ -969,6 +1030,11 @@ export default function DealEmailDialog() {
                           icon: <ImageIcon className='h-4 w-4' />,
                           onClick: () => setShowImagesPicker(true),
                         },
+                        {
+                          label: 'From Documents',
+                          icon: <FileText className='h-4 w-4' />,
+                          onClick: () => setShowDocumentsPicker(true),
+                        },
                       ],
                     },
                   ]}
@@ -1006,6 +1072,50 @@ export default function DealEmailDialog() {
             setShowImagesPicker(false)
           }}
         />
+        <AttachmentImagePicker
+          type='documents'
+          companyId={companyId}
+          open={showDocumentsPicker}
+          onClose={() => setShowDocumentsPicker(false)}
+          onSelect={files => {
+            addFiles(files)
+            setShowDocumentsPicker(false)
+          }}
+        />
+        <Dialog
+          open={imageViewerIndex !== null}
+          onOpenChange={open => !open && setImageViewerIndex(null)}
+        >
+          <DialogContent
+            closeClassName='z-50 top-40 sm:top-10 md:top-25 lg:top-10 right-0 sm:-right-15 md:-right-25 lg:-right-35 md:opacity-0 md:group-hover:opacity-100'
+            className='flex flex-col justify-center items-center gap-3 bg-transparent group'
+          >
+            <DialogTitle className='sr-only'>Image Gallery</DialogTitle>
+            <DialogDescription className='sr-only'>Image Gallery</DialogDescription>
+            <Carousel
+              className='max-w-screen max-h-screen w-screen h-screen lg:max-w-[90vw] 2xl:max-w-[60vw]'
+              setApi={setCarouselApi}
+              opts={{ dragFree: false }}
+            >
+              <CarouselContent>
+                {carouselImages.map(image => (
+                  <CarouselItem key={image.id}>
+                    <div className='w-full relative select-none'>
+                      <img
+                        src={image.url}
+                        alt={image.name}
+                        className='w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] object-contain z-0 select-none'
+                        onClick={e => e.stopPropagation()}
+                      />
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious />
+              <CarouselNext />
+            </Carousel>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   )

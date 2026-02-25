@@ -303,7 +303,7 @@ export default function AdminStones() {
                 <div
                   id={`stone-${stone.id}`}
                   key={stone.id}
-                  className='relative w-full module-item'
+                  className='group relative w-full module-item'
                 >
                   <div
                     className={`border-2 border-blue-500 rounded cursor-pointer hover:shadow-lg transition-all duration-200 ${
@@ -336,7 +336,7 @@ export default function AdminStones() {
                     </p>
                   </div>
 
-                  <div className='absolute inset-0 flex justify-between items-start p-2 opacity-50 transition-opacity duration-300'>
+                  <div className='absolute inset-0 flex justify-between items-start p-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300'>
                     <Link
                       to={getEditUrl(stone.id)}
                       className='text-white bg-gray-800 bg-opacity-60 rounded-full p-2'
