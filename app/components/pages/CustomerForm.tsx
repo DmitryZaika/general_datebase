@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { FormField, FormProvider } from '~/components/ui/form'
+import { FormField, FormLabel, FormProvider } from '~/components/ui/form'
 import { useToast } from '~/hooks/use-toast'
 import {
   type CustomerDialogSchema,
@@ -229,6 +229,7 @@ export function CustomerForm({
                 field={form.register('company_name')}
               />
             )}
+            <FormLabel>Notes</FormLabel>
             <FormField
               control={form.control}
               name='your_message'
@@ -240,6 +241,7 @@ export function CustomerForm({
                 />
               )}
             />
+
             <DialogFooter>
               <LoadingButton loading={isPending}>Submit</LoadingButton>
             </DialogFooter>

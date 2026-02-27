@@ -12,7 +12,7 @@ interface DealsListProps {
     status?: string | null
     lost_reason?: string | null
     list_id: number
-    position?: number
+    position?: number | null
     due_date?: string | null
     sales_rep?: string | null
     has_images?: boolean
