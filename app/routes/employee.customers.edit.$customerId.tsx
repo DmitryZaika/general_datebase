@@ -11,7 +11,9 @@ import { CustomerForm } from '~/components/pages/CustomerForm'
 import type { CustomerDialogSchema } from '~/schemas/customers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 
-const getCustomerInfo = async (customerId: number): Promise<CustomerDialogSchema> => {
+const getCustomerInfo = async (
+  customerId: number,
+): Promise<CustomerDialogSchema & { sales_rep_name?: string }> => {
   const response = await fetch(`/api/customers/${customerId}`)
   const data = await response.json()
   const rawSource = data.customer.source
@@ -26,6 +28,8 @@ const getCustomerInfo = async (customerId: number): Promise<CustomerDialogSchema
     source: mappedSource,
     your_message: data.customer.your_message ?? '',
     builder: !!data.customer.company_name,
+    sales_rep: data.customer.sales_rep != null ? String(data.customer.sales_rep) : '',
+    sales_rep_name: data.customer.sales_rep_name ?? undefined,
   }
 }
 

@@ -32,6 +32,7 @@ export const customerSignupSchema = z.object({
     ])
     .optional(),
   source: z.enum(sourceEnum),
+  sales_rep: z.number().nullable().optional(),
 })
 
 export type CustomerSignupSchema = z.infer<typeof customerSignupSchema>
@@ -74,6 +75,7 @@ export const customerDialogSchema = z.object({
   builder: z.boolean().default(false),
   company_name: z.string().nullish(),
   source: z.enum(sourceEnum),
+  sales_rep: z.string().optional(),
 })
 
 export type CustomerDialogSchema = z.infer<typeof customerDialogSchema>

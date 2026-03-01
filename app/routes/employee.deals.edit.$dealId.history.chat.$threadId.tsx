@@ -143,6 +143,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     subject: emailRows?.[0]?.subject || null,
     threadId,
     currentUserSignature,
+    companyId: user.company_id ?? 0,
   }
 }
 
@@ -164,6 +165,7 @@ export default function EmployeeDealsHistoryChatRoute() {
       threadId={data.threadId}
       currentUserSignature={data.currentUserSignature}
       customerEmail={data.customerEmail}
+      companyId={data.companyId}
     />
   )
 }

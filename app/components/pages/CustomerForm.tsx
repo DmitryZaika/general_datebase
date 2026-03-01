@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { InputItem } from '~/components/molecules/InputItem'
@@ -37,7 +37,7 @@ interface CustomerFormProps {
   customerId?: number
   source?: (typeof sourceEnum)[number]
   initialName?: string
-  oldData?: CustomerDialogSchema
+  oldData?: CustomerDialogSchema & { sales_rep_name?: string }
 }
 
 type SourceOptions = {
@@ -95,6 +95,26 @@ export function CustomerForm({
     : createCustomerMutation(toastFn, handleSuccess)
   const { mutate, isPending } = useMutation(mutateObject)
 
+  const { data: reps = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['sales-reps'],
+    queryFn: async () => {
+      const res = await fetch('/api/sales-reps')
+      const json = await res.json()
+      return json.users ?? []
+    },
+  })
+
+  const salesRepOptions = useMemo(() => {
+    const base = reps.map(r => ({ key: String(r.id), value: r.name }))
+    const assignedId =
+      oldData?.sales_rep && oldData.sales_rep !== '' ? Number(oldData.sales_rep) : null
+    const assignedName = oldData?.sales_rep_name
+    if (assignedId != null && assignedName && !reps.some(r => r.id === assignedId)) {
+      return [{ key: String(assignedId), value: assignedName }, ...base]
+    }
+    return base
+  }, [reps, oldData?.sales_rep, oldData?.sales_rep_name])
+
   const form = useForm({
     resolver,
     defaultValues: oldData ?? {
@@ -105,6 +125,7 @@ export function CustomerForm({
       address: '',
       source,
       your_message: '',
+      sales_rep: '',
     },
   })
 
@@ -135,7 +156,14 @@ export function CustomerForm({
         return
       }
     }
-    mutate({ ...data, company_id: companyId, id: customerId || 0 })
+    const salesRep =
+      data.sales_rep === '' || data.sales_rep == null ? null : Number(data.sales_rep)
+    mutate({
+      ...data,
+      company_id: companyId,
+      id: customerId || 0,
+      sales_rep: salesRep,
+    })
   }
 
   const dialogTitle = customerId ? 'Edit Customer' : 'Add Customer'
@@ -200,6 +228,18 @@ export function CustomerForm({
               name='source'
               render={({ field }) => (
                 <SelectInput field={field} options={sourceOptions} name='Source' />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='sales_rep'
+              render={({ field }) => (
+                <SelectInput
+                  field={field}
+                  options={salesRepOptions}
+                  name='Sales Rep'
+                  placeholder='Select'
+                />
               )}
             />
             <div className='flex items-center space-x-2 my-2'>

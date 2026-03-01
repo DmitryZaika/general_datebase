@@ -4,12 +4,15 @@ import {
   FileText,
   ImageIcon,
   MoreVertical,
+  Package,
   PaperclipIcon,
   Pencil,
   SendIcon,
   Sparkles,
+  Upload,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -75,6 +78,7 @@ interface EmailChatEmployeeProps extends EmailChatBaseProps {
   threadId: string
   currentUserSignature: string | null
   customerEmail: string
+  companyId: number
 }
 
 export type EmailChatProps = EmailChatBaseProps | EmailChatEmployeeProps
@@ -226,6 +230,9 @@ export function EmailChat(props: EmailChatProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [showStonesPicker, setShowStonesPicker] = useState(false)
+  const [showImagesPicker, setShowImagesPicker] = useState(false)
+  const [showDocumentsPicker, setShowDocumentsPicker] = useState(false)
   const { toast } = useToast()
   const isMobile = useIsMobile()
 
@@ -275,6 +282,10 @@ export function EmailChat(props: EmailChatProps) {
       new Date(chatMessages[index - 1].sent_at).toDateString() !==
         new Date(message.sent_at).toDateString()
     )
+  }
+
+  const addFiles = (newFiles: File[]) => {
+    setAttachments(prev => [...prev, ...newFiles])
   }
 
   const removeAttachment = (file: File) => {
@@ -744,10 +755,29 @@ export function EmailChat(props: EmailChatProps) {
                         title: 'Actions',
                         options: [
                           {
-                            label: 'Attach File',
-                            icon: <PaperclipIcon className='w-4 h-4' />,
+                            label: 'Upload from computer',
+                            icon: <Upload className='w-4 h-4' />,
                             onClick: () => fileInputRef.current?.click(),
                           },
+                          ...(employeeProps.companyId > 0
+                            ? [
+                                {
+                                  label: 'From Stones',
+                                  icon: <Package className='w-4 h-4' />,
+                                  onClick: () => setShowStonesPicker(true),
+                                },
+                                {
+                                  label: 'From Images',
+                                  icon: <ImageIcon className='w-4 h-4' />,
+                                  onClick: () => setShowImagesPicker(true),
+                                },
+                                {
+                                  label: 'From Documents',
+                                  icon: <FileText className='w-4 h-4' />,
+                                  onClick: () => setShowDocumentsPicker(true),
+                                },
+                              ]
+                            : []),
                           {
                             label: 'Generate with AI',
                             icon: <Sparkles className='w-4 h-4' />,
@@ -773,13 +803,50 @@ export function EmailChat(props: EmailChatProps) {
                 </div>
 
                 <div className='hidden md:block'>
-                  <Button
-                    type='button'
-                    size='icon'
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <PaperclipIcon className='h-5 w-5' />
-                  </Button>
+                  {employeeProps.companyId > 0 ? (
+                    <CustomDropdownMenu
+                      side='top'
+                      trigger={
+                        <Button type='button' size='icon' aria-label='Attachment'>
+                          <PaperclipIcon className='h-5 w-5' />
+                        </Button>
+                      }
+                      sections={[
+                        {
+                          options: [
+                            {
+                              label: 'Upload from computer',
+                              icon: <Upload className='h-4 w-4' />,
+                              onClick: () => fileInputRef.current?.click(),
+                            },
+                            {
+                              label: 'From Stones',
+                              icon: <Package className='h-4 w-4' />,
+                              onClick: () => setShowStonesPicker(true),
+                            },
+                            {
+                              label: 'From Images',
+                              icon: <ImageIcon className='h-4 w-4' />,
+                              onClick: () => setShowImagesPicker(true),
+                            },
+                            {
+                              label: 'From Documents',
+                              icon: <FileText className='h-4 w-4' />,
+                              onClick: () => setShowDocumentsPicker(true),
+                            },
+                          ],
+                        },
+                      ]}
+                    />
+                  ) : (
+                    <Button
+                      type='button'
+                      size='icon'
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <PaperclipIcon className='h-5 w-5' />
+                    </Button>
+                  )}
                 </div>
 
                 <input
@@ -843,6 +910,41 @@ export function EmailChat(props: EmailChatProps) {
             <div className='flex flex-col md:flex-row flex-1 gap-2' />
           )}
         </div>
+        {isEmployee && employeeProps && employeeProps.companyId > 0 && (
+          <>
+            <AttachmentImagePicker
+              type='stones'
+              companyId={employeeProps.companyId}
+              open={showStonesPicker}
+              onClose={() => setShowStonesPicker(false)}
+              onSelect={files => {
+                addFiles(files)
+                setShowStonesPicker(false)
+              }}
+              onAddFiles={addFiles}
+            />
+            <AttachmentImagePicker
+              type='images'
+              companyId={employeeProps.companyId}
+              open={showImagesPicker}
+              onClose={() => setShowImagesPicker(false)}
+              onSelect={files => {
+                addFiles(files)
+                setShowImagesPicker(false)
+              }}
+            />
+            <AttachmentImagePicker
+              type='documents'
+              companyId={employeeProps.companyId}
+              open={showDocumentsPicker}
+              onClose={() => setShowDocumentsPicker(false)}
+              onSelect={files => {
+                addFiles(files)
+                setShowDocumentsPicker(false)
+              }}
+            />
+          </>
+        )}
       </DialogContent>
       <SuperCarousel
         type='email'
