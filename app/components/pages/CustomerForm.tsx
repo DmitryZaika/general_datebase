@@ -204,6 +204,7 @@ export function CustomerForm({
                   name={'Name*'}
                   placeholder={'Name of the customer'}
                   field={field}
+                  inputAutoFocus={true}
                 />
               )}
             />

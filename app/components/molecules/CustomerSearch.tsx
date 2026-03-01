@@ -12,7 +12,7 @@ import { Label } from '../ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { RawSelect } from './RawSelect'
 
-const selectOptions = ['name', 'phone', 'email'] as const
+const selectOptions = ['name', 'phone', 'email', 'company'] as const
 type SelectOption = (typeof selectOptions)[number]
 
 function CustomerSearchError({
