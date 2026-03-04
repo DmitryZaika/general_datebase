@@ -21,6 +21,7 @@ import {
 } from '~/components/ui/select'
 import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
+import { CLOSED_LOST_LIST_ID, CLOSED_WON_LIST_ID } from '~/utils/constants'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
@@ -93,12 +94,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ? 0
             : null
 
-    // Fetch lists for the active group
-    const lists = await selectMany<{ id: number; name: string }>(
-      db,
-      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
-      [activeGroupId],
-    )
+    const lists =
+      isWon !== null
+        ? await selectMany<{ id: number; name: string }>(
+            db,
+            'SELECT id, name FROM deals_list WHERE id = ? ORDER BY position',
+            [isWon === 1 ? CLOSED_WON_LIST_ID : CLOSED_LOST_LIST_ID],
+          )
+        : await selectMany<{ id: number; name: string }>(
+            db,
+            'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
+            [activeGroupId],
+          )
 
     let query = `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position,
        DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at, is_won

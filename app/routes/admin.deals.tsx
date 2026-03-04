@@ -23,6 +23,7 @@ import {
 import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
+import { CLOSED_LOST_LIST_ID, CLOSED_WON_LIST_ID } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, type User } from '~/utils/session.server'
 
@@ -71,11 +72,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const activeGroupId = viewParam ? parseInt(viewParam, 10) : groups[0]?.id
 
-    const lists = await selectMany<{ id: number; name: string }>(
-      db,
-      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
-      [activeGroupId],
-    )
+    const lists =
+      isWon !== null
+        ? await selectMany<{ id: number; name: string }>(
+            db,
+            'SELECT id, name FROM deals_list WHERE id = ? ORDER BY position',
+            [isWon === 1 ? CLOSED_WON_LIST_ID : CLOSED_LOST_LIST_ID],
+          )
+        : await selectMany<{ id: number; name: string }>(
+            db,
+            'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
+            [activeGroupId],
+          )
 
     const dealParams: (string | number)[] = [companyId]
     let dealSql = `

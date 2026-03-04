@@ -48,10 +48,14 @@ export function createDealEditLoader(
       const { list_id, group_id, is_won } = dealRows[0]
 
       let effectiveGroupId = group_id
+      let progressListId = list_id
       if (TERMINAL_LIST_IDS.includes(list_id)) {
-        const histGroup = await selectMany<{ group_id: number }>(
+        const histGroup = await selectMany<{
+          group_id: number
+          list_id: number
+        }>(
           db,
-          `SELECT l.group_id FROM deal_stage_history dsh
+          `SELECT l.group_id, dsh.list_id FROM deal_stage_history dsh
            JOIN deals_list l ON dsh.list_id = l.id
            WHERE dsh.deal_id = ? AND dsh.list_id NOT IN (?, ?)
            ORDER BY dsh.entered_at DESC LIMIT 1`,
@@ -59,6 +63,7 @@ export function createDealEditLoader(
         )
         if (histGroup.length > 0) {
           effectiveGroupId = histGroup[0].group_id
+          progressListId = histGroup[0].list_id
         }
       }
 
@@ -100,7 +105,7 @@ export function createDealEditLoader(
         dealId,
         stages,
         history,
-        currentListId: list_id,
+        currentListId: progressListId,
         isClosed,
         isWon: is_won,
         closedAt,
