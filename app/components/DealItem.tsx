@@ -10,7 +10,7 @@ import {
   PaperclipIcon,
   Pencil,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLocation } from 'react-router'
 import { cn } from '~/lib/utils'
 import type { DealCardData } from '~/types/deals'
@@ -60,6 +60,9 @@ export default function DealItem({
 }: DealItemProps) {
   const [editAmount, setEditAmount] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [activityExpanded, setActivityExpanded] = useState(false)
+  const activityRef = useRef<HTMLParagraphElement>(null)
+  const [isActivityTruncated, setIsActivityTruncated] = useState(false)
   const fetcher = useFetcher()
   const location = useLocation()
   const hasEmail = Boolean(deal.has_email)
@@ -95,6 +98,11 @@ export default function DealItem({
     transform: CSS.Transform.toString(transform),
     transition,
   }
+
+  useEffect(() => {
+    const el = activityRef.current
+    if (el) setIsActivityTruncated(el.scrollWidth > el.clientWidth)
+  }, [deal.nearest_activity_name])
 
   const deadlineInfo = deal.nearest_activity_deadline
     ? getActivityDeadlineInfo(deal.nearest_activity_deadline)
@@ -200,9 +208,30 @@ export default function DealItem({
 
       {!isClosed &&
         (deal.nearest_activity_name ? (
-          <p className='text-sm leading-5 text-slate-600 mt-1 truncate w-full'>
-            {deal.nearest_activity_name}
-          </p>
+          <div className='w-full mt-1'>
+            <p
+              ref={activityRef}
+              className={cn(
+                'text-sm leading-5 text-slate-600 w-full',
+                !activityExpanded && 'truncate',
+              )}
+            >
+              {deal.nearest_activity_name}
+            </p>
+            {isActivityTruncated && (
+              <button
+                type='button'
+                className='text-xs text-slate-400 hover:text-slate-600 underline decoration-dotted mt-0.5'
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation()
+                  setActivityExpanded(prev => !prev)
+                }}
+              >
+                {activityExpanded ? 'show less' : 'show more'}
+              </button>
+            )}
+          </div>
         ) : (
           <p className='text-xs text-red-500 font-semibold mt-1 italic'>
             No upcoming activities
