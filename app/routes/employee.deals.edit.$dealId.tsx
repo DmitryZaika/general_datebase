@@ -9,7 +9,7 @@ import { getEmployeeUser } from '~/utils/session.server'
 export const loader = createDealEditLoader(getEmployeeUser, '/employee/deals')
 
 export default function DealEditLayout() {
-  const { dealId, stages, history, currentListId, activities, isWon } =
+  const { dealId, stages, history, currentListId, isClosed, isWon, closedAt, activities } =
     useLoaderData<DealEditLoaderData>()
   return (
     <DealPage
@@ -17,8 +17,10 @@ export default function DealEditLayout() {
       stages={stages}
       history={history}
       currentListId={currentListId}
-      activities={activities}
+      isClosed={isClosed}
       isWon={isWon}
+      closedAt={closedAt}
+      activities={activities}
     />
   )
 }

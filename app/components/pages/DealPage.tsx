@@ -15,8 +15,10 @@ interface DealPageProps {
   stages?: { id: number; name: string; position: number }[]
   history?: { list_id: number; entered_at: string; exited_at: string | null }[]
   currentListId?: number
-  activities?: DealActivity[]
+  isClosed?: boolean
   isWon?: number | null
+  closedAt?: string | null
+  activities?: DealActivity[]
 }
 
 export default function DealsEdit({
@@ -24,8 +26,10 @@ export default function DealsEdit({
   stages,
   history,
   currentListId,
-  activities,
+  isClosed,
   isWon,
+  closedAt,
+  activities,
 }: DealPageProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -54,7 +58,9 @@ export default function DealsEdit({
               stages={stages}
               history={history}
               currentListId={currentListId}
-              isClosed={isWon !== null && isWon !== undefined}
+              isClosed={isClosed}
+              isWon={isWon}
+              closedAt={closedAt}
             />
           </div>
         )}

@@ -3,6 +3,7 @@ import { redirect } from 'react-router'
 import { db } from '~/db.server'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import type { Nullable } from '~/types/utils'
+import { TERMINAL_LIST_IDS } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 
 type UserWithCompany = { company_id: number }
@@ -12,8 +13,10 @@ export interface DealEditLoaderData {
   stages: { id: number; name: string; position: number }[]
   history: { list_id: number; entered_at: string; exited_at: Nullable<string> }[]
   currentListId: number
-  activities: DealActivity[]
+  isClosed: boolean
   isWon: Nullable<number>
+  closedAt: string | null
+  activities: DealActivity[]
 }
 
 export function createDealEditLoader(
@@ -44,11 +47,26 @@ export function createDealEditLoader(
 
       const { list_id, group_id, is_won } = dealRows[0]
 
+      let effectiveGroupId = group_id
+      if (TERMINAL_LIST_IDS.includes(list_id)) {
+        const histGroup = await selectMany<{ group_id: number }>(
+          db,
+          `SELECT l.group_id FROM deal_stage_history dsh
+           JOIN deals_list l ON dsh.list_id = l.id
+           WHERE dsh.deal_id = ? AND dsh.list_id NOT IN (?, ?)
+           ORDER BY dsh.entered_at DESC LIMIT 1`,
+          [dealId, ...TERMINAL_LIST_IDS],
+        )
+        if (histGroup.length > 0) {
+          effectiveGroupId = histGroup[0].group_id
+        }
+      }
+
       const [stages, history, activities] = await Promise.all([
         selectMany<{ id: number; name: string; position: number }>(
           db,
           'SELECT id, name, position FROM deals_list WHERE group_id = ? AND deleted_at IS NULL ORDER BY position',
-          [group_id],
+          [effectiveGroupId],
         ),
         selectMany<{
           list_id: number
@@ -69,13 +87,24 @@ export function createDealEditLoader(
         ),
       ])
 
+      const isClosed =
+        is_won === 1 || is_won === 0 || TERMINAL_LIST_IDS.includes(list_id)
+
+      let closedAt: string | null = null
+      if (isClosed && history.length > 0) {
+        const last = history[history.length - 1]
+        closedAt = last.exited_at ?? last.entered_at
+      }
+
       return {
         dealId,
         stages,
         history,
         currentListId: list_id,
-        activities,
+        isClosed,
         isWon: is_won,
+        closedAt,
+        activities,
       }
     } catch {
       return redirect('/login')

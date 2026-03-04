@@ -20,6 +20,11 @@ import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import type { Customer } from '~/types'
 import type { DealCardData } from '~/types/deals'
 import type { Nullable } from '~/types/utils'
+import {
+  CLOSED_LOST_LIST_ID,
+  CLOSED_WON_LIST_ID,
+  TERMINAL_LIST_IDS,
+} from '~/utils/constants'
 
 type List = {
   id: number
@@ -251,11 +256,24 @@ export default function DealsView({
       const toArr = [...(copy[toListId] || [])]
       const idx = fromArr.findIndex(d => d.id === activeId)
       if (idx === -1) return prev
-      const shouldClearDate = toListId === 4 || toListId === 5
+      const shouldClearDate = TERMINAL_LIST_IDS.includes(toListId)
+      const fromTerminal = TERMINAL_LIST_IDS.includes(fromListId)
       const moved = {
         ...fromArr[idx],
         list_id: toListId,
         due_date: shouldClearDate ? null : fromArr[idx].due_date,
+        is_won:
+          toListId === CLOSED_WON_LIST_ID
+            ? 1
+            : toListId === CLOSED_LOST_LIST_ID
+              ? 0
+              : fromTerminal
+                ? null
+                : fromArr[idx].is_won,
+        lost_reason:
+          toListId === CLOSED_WON_LIST_ID || fromTerminal
+            ? null
+            : fromArr[idx].lost_reason,
       }
       fromArr.splice(idx, 1)
       toArr.push(moved)

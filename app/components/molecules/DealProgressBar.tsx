@@ -15,6 +15,8 @@ interface DealProgressBarProps {
   history: StageHistory[]
   currentListId: number
   isClosed?: boolean
+  isWon?: number | null
+  closedAt?: string | null
 }
 
 function formatDuration(ms: number): string {
@@ -31,12 +33,12 @@ function getStageDuration(
   stageId: number,
   history: StageHistory[],
   isClosed?: boolean,
+  closedAt?: string | null,
 ): string | null {
   const entries = history.filter(h => h.list_id === stageId)
   if (entries.length === 0) return null
 
-  const lastEntry = history[history.length - 1]
-  const closedAt = lastEntry?.entered_at ? new Date(lastEntry.entered_at).getTime() : Date.now()
+  const closedTime = closedAt ? new Date(closedAt).getTime() : null
 
   let totalMs = 0
   for (const entry of entries) {
@@ -44,7 +46,7 @@ function getStageDuration(
     const end = entry.exited_at
       ? new Date(entry.exited_at).getTime()
       : isClosed
-        ? closedAt
+        ? (closedTime ?? start)
         : Date.now()
     totalMs += end - start
   }
@@ -67,6 +69,8 @@ export function DealProgressBar({
   history,
   currentListId,
   isClosed,
+  isWon,
+  closedAt,
 }: DealProgressBarProps) {
   const sorted = [...stages].sort((a, b) => a.position - b.position)
   const currentIndex = sorted.findIndex(s => s.id === currentListId)
@@ -81,7 +85,7 @@ export function DealProgressBar({
           const isActive = isCompleted || isCurrent
 
           const duration = isActive
-            ? getStageDuration(stage.id, history, isClosed)
+            ? getStageDuration(stage.id, history, isClosed, closedAt)
             : null
           const displayText = isActive ? (duration ?? '-') : '0 days'
 
@@ -116,6 +120,7 @@ export function DealProgressBar({
           const isCompleted = index < effectiveIndex
           const isCurrent = index === effectiveIndex
           const isActive = isCompleted || isCurrent
+          const showBadge = isClosed && isCurrent && (isWon === 1 || isWon === 0)
 
           return (
             <div
@@ -134,6 +139,17 @@ export function DealProgressBar({
               >
                 {stage.name}
               </span>
+              {showBadge && (
+                <span
+                  className={`inline-block text-[9px] font-semibold px-1.5 rounded-sm mt-0.5 ${
+                    isWon === 1
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}
+                >
+                  {isWon === 1 ? 'Won' : 'Lost'}
+                </span>
+              )}
             </div>
           )
         })}

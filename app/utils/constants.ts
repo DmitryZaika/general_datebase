@@ -1,5 +1,9 @@
 export const DONE_KEY = '[DONE]035d8eba-9f8c-44c5-a1e0-290d1da033f7[/DONE]'
 
+export const CLOSED_WON_LIST_ID = 4
+export const CLOSED_LOST_LIST_ID = 5
+export const TERMINAL_LIST_IDS = [CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID]
+
 export const LOST_REASONS = {
   'Too expensive': 'Too expensive',
   'Out of area': 'Out of area',
