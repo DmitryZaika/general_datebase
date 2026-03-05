@@ -40,6 +40,7 @@ import {
 } from '~/components/ui/tooltip'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
+import { cn } from '~/lib/utils'
 import { dateClass, fileSize } from '~/utils/constants'
 
 export interface EmailChatAttachment {
@@ -507,7 +508,7 @@ export function EmailChat(props: EmailChatProps) {
                 </div>
               )}
               <div
-                className={`${rowClass} ${message.isFromCustomer ? 'flex-row-reverse justify-end' : 'flex-row-reverse justify-start'}`}
+                className={`${rowClass} ${message.isFromCustomer ? 'flex-row-reverse justify-end pl-2' : 'flex-row-reverse justify-start pr-2'}`}
               >
                 <div
                   className={
@@ -517,11 +518,12 @@ export function EmailChat(props: EmailChatProps) {
                   }
                 >
                   <div
-                    className={
+                    className={cn(
+                      'email-message-body break-words',
                       message.isFromCustomer
-                        ? 'whitespace-pre-wrap'
-                        : 'whitespace-pre-wrap text-white [&_*]:!text-white'
-                    }
+                        ? 'whitespace-pre-wrap [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5'
+                        : 'whitespace-pre-wrap text-white [&_*]:!text-white [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5',
+                    )}
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
                     dangerouslySetInnerHTML={{
                       __html: DOMPurify.sanitize(
@@ -529,6 +531,7 @@ export function EmailChat(props: EmailChatProps) {
                           message.body,
                           message.isFromCustomer ? null : message.signature,
                         ),
+                        { ADD_TAGS: ['ul', 'ol', 'li'] },
                       ),
                     }}
                   />
@@ -556,7 +559,7 @@ export function EmailChat(props: EmailChatProps) {
                   )}
                   <MessageDate
                     message={message}
-                    className={`text-black absolute -bottom-5 ${message.isFromCustomer ? 'left-2' : 'right-2'}`}
+                    className={`text-black absolute -bottom-3.5 ${message.isFromCustomer ? 'left-2' : 'right-2'}`}
                   />
                   {message.attachments && message.attachments.length > 0 ? (
                     <div className='mt-3 flex flex-wrap gap-3'>

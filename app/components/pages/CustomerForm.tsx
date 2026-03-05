@@ -171,7 +171,7 @@ export function CustomerForm({
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent>
+      <DialogContent className='max-h-[95vh] overflow-y-auto'>
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>

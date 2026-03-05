@@ -13,7 +13,6 @@ import {
   useNavigate,
   useSearchParams,
 } from 'react-router'
-import { CopyText } from '~/components/atoms/CopyText'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -258,8 +257,7 @@ const customerColumnsBase: ColumnDef<Customer>[] = [
     header: () => <SortableHeader title='Name of customer' sortKey='name' />,
     cell: ({ row }: { row: Row<Customer> }) => {
       const name = row.original.name || ''
-      const short = name.length > 20 ? `${name.slice(0, 20)}...` : name
-      return <CopyText value={name} display={short} title={name} />
+      return name.length > 20 ? `${name.slice(0, 20)}...` : name
     },
   },
   {
@@ -267,19 +265,15 @@ const customerColumnsBase: ColumnDef<Customer>[] = [
     header: () => <SortableHeader title='Phone Number' sortKey='phone' />,
     cell: ({ row }: { row: Row<Customer> }) => (
       <div className='flex flex-col gap-1'>
-        <CopyText value={row.original.phone} title={row.original.phone} />
-        {row.original.phone_2 && (
-          <CopyText value={row.original.phone_2} title={row.original.phone_2} />
-        )}
+        <span>{row.original.phone || '-'}</span>
+        {row.original.phone_2 && <span>{row.original.phone_2}</span>}
       </div>
     ),
   },
   {
     accessorKey: 'email',
     header: () => <SortableHeader title='Email' sortKey='email' />,
-    cell: ({ row }: { row: Row<Customer> }) => (
-      <CopyText value={row.original.email} title={row.original.email} />
-    ),
+    cell: ({ row }: { row: Row<Customer> }) => row.original.email || '-',
   },
   {
     accessorKey: 'sales_rep',
@@ -310,7 +304,6 @@ function CustomerActions({ customer }: { customer: Customer }) {
   const location = useLocation()
   const { isSalesManager } = useLoaderData<{ isSalesManager: boolean }>()
   const actions: Record<string, string> = {
-    'More info': `info/${customer.id}${location.search}`,
     edit: `edit/${customer.id}${location.search}`,
     ...(isSalesManager ? { delete: `delete/${customer.id}${location.search}` } : {}),
     invalid: `invalid/${customer.id}${location.search}`,
@@ -424,8 +417,7 @@ export default function AdminCustomers() {
       header: () => <SortableHeader title='Name of Company' sortKey='company_name' />,
       cell: ({ row }: { row: Row<Customer> }) => {
         const name = row.original.company_name || row.original.name || ''
-        const short = name.length > 20 ? `${name.slice(0, 20)}...` : name
-        return <CopyText value={name} display={short} title={name} />
+        return name.length > 20 ? `${name.slice(0, 20)}...` : name
       },
     }
 
@@ -555,7 +547,8 @@ export default function AdminCustomers() {
     }, 50)
   }, [searchParams, navigate, location.pathname])
 
-  const getRowClassName = (customer: Customer) => customer.className ?? ''
+  const getRowClassName = (customer: Customer) =>
+    `${customer.className ?? ''} cursor-pointer`.trim()
 
   return (
     <PageLayout title='Customers List'>
@@ -664,6 +657,7 @@ export default function AdminCustomers() {
         columns={columns}
         data={rows}
         rowClassName={getRowClassName}
+        onRowClick={customer => navigate(`info/${customer.id}${location.search}`)}
       />
       <DataTablePagination
         currentPage={currentPage}

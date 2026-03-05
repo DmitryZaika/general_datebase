@@ -11,7 +11,13 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useLocation, useNavigate, useRevalidator, useSearchParams } from 'react-router'
+import {
+  useLocation,
+  useNavigate,
+  useNavigation,
+  useRevalidator,
+  useSearchParams,
+} from 'react-router'
 import { useToast } from '~/hooks/use-toast'
 import { cn } from '~/lib/utils'
 import { parseEmailAddress } from '~/utils/stringHelpers'
@@ -26,6 +32,7 @@ import {
   SelectValue,
 } from '../ui/select'
 import { Sheet, SheetContent, SheetTrigger } from '../ui/sheet'
+import { Skeleton } from '../ui/skeleton'
 
 export interface Email {
   id: number
@@ -50,6 +57,9 @@ interface DealsEmailsViewProps {
   adminMode?: boolean
   salesReps?: { id: number; name: string }[]
   currentUserId?: number | null
+  initialFolder?: 'inbox' | 'sent'
+  inboxCount?: number
+  sentCount?: number
 }
 
 type Tab = 'inbox' | 'drafts' | 'outbox' | 'sent' | 'archive'
@@ -60,16 +70,32 @@ export default function DealsEmailsView({
   adminMode = false,
   salesReps = [],
   currentUserId = null,
+  initialFolder,
+  inboxCount: inboxCountProp,
+  sentCount: sentCountProp,
 }: DealsEmailsViewProps) {
   const navigate = useNavigate()
   const revalidator = useRevalidator()
-  const [activeTab, setActiveTab] = useState<Tab>('inbox')
+  const [searchParams] = useSearchParams()
+  const folderFromUrl = searchParams.get('folder') === 'sent' ? 'sent' : 'inbox'
+  const [activeTabLocal, setActiveTabLocal] = useState<Tab>('inbox')
+  const activeTab = initialFolder != null ? (folderFromUrl as Tab) : activeTabLocal
+  const setActiveTab = (t: Tab) => {
+    if (initialFolder != null) {
+      const next = new URLSearchParams(searchParams)
+      next.set('folder', t)
+      navigate({ search: next.toString() })
+    } else {
+      setActiveTabLocal(t)
+    }
+  }
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedThreads, setSelectedThreads] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
   const { toast } = useToast()
   const location = useLocation()
-  const [searchParams] = useSearchParams()
+  const navigation = useNavigation()
+  const isLoading = navigation.state === 'loading'
   const selectedSalesRepId = searchParams.get('sales_rep')
     ? Number(searchParams.get('sales_rep'))
     : null
@@ -225,14 +251,17 @@ export default function DealsEmailsView({
     return { inbox: inboxThreads.size, sent: sentThreads.size }
   }, [emails, currentUserEmail, currentUserId, adminMode, selectedSalesRepId])
 
+  const inboxCount = inboxCountProp !== undefined ? inboxCountProp : counts.inbox
+  const sentCount = sentCountProp !== undefined ? sentCountProp : counts.sent
+
   const navItems = [
     {
       id: 'inbox',
       label: 'Inbox',
       icon: Inbox,
-      count: counts.inbox,
+      count: inboxCount,
     },
-    { id: 'sent', label: 'Sent', icon: Send, count: counts.sent },
+    { id: 'sent', label: 'Sent', icon: Send, count: sentCount },
   ]
 
   const toggleSelectAll = () => {
@@ -420,7 +449,32 @@ export default function DealsEmailsView({
 
         {/* Email List */}
         <div className='flex-1 overflow-y-auto'>
-          {sortedEmails.length === 0 ? (
+          {isLoading ? (
+            <div className='divide-y divide-gray-100'>
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div
+                  key={i}
+                  className='flex items-start md:items-center gap-3 px-3 py-3'
+                >
+                  <Skeleton className='h-4.5 w-4.5 flex-shrink-0 rounded' />
+                  <div className='flex-1 min-w-0 flex flex-col gap-2 md:hidden'>
+                    <div className='flex justify-between gap-2'>
+                      <Skeleton className='h-4 w-28' />
+                      <Skeleton className='h-3 w-12' />
+                    </div>
+                    <Skeleton className='h-4 w-full max-w-[200px]' />
+                    <Skeleton className='h-3 w-full max-w-[160px]' />
+                  </div>
+                  <div className='hidden md:flex flex-1 items-center gap-4 min-w-0'>
+                    <Skeleton className='h-4 w-32 flex-shrink-0' />
+                    <Skeleton className='h-4 w-48 flex-shrink-0' />
+                    <Skeleton className='h-4 flex-1 max-w-[200px]' />
+                    <Skeleton className='h-4 w-16 flex-shrink-0' />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : sortedEmails.length === 0 ? (
             <div className='p-8 text-center text-muted-foreground'>
               {searchTerm
                 ? 'No emails found matching your search.'

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { type LoaderFunctionArgs, Outlet, useLoaderData } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
@@ -31,12 +31,22 @@ function getStoneUrl(original: string | null) {
   return original ? withIconSuffix(original) : '/placeholder.png'
 }
 
-function sortStones(a: Stone, b: Stone) {
-  const aAmount = a.amount ?? 0
-  const bAmount = b.amount ?? 0
-  if (aAmount === 0 && bAmount !== 0) return 1
-  if (aAmount !== 0 && bAmount === 0) return -1
-  return a.name.localeCompare(b.name)
+function sortStonesLikeAdminEmployee(stones: Stone[]): Stone[] {
+  const inStock = stones.filter(
+    stone =>
+      (Number(stone.available) > 0 || stone.regular_stock) && Boolean(stone.is_display),
+  )
+  const outOfStock = stones.filter(
+    stone =>
+      Number(stone.available) <= 0 && !stone.regular_stock && Boolean(stone.is_display),
+  )
+  const notDisplayed = stones.filter(stone => !stone.is_display)
+  const byName = (a: Stone, b: Stone) => a.name.localeCompare(b.name)
+  return [
+    ...inStock.sort(byName),
+    ...outOfStock.sort(byName),
+    ...notDisplayed.sort(byName),
+  ]
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -66,11 +76,6 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
   const displayedLength = stone.length && stone.length > 0 ? stone.length : '—'
   const isOnSale = !!stone.on_sale
   const isRegularStock = !!stone.regular_stock
-  const createdDate = new Date(stone.created_date)
-  const threeWeeksAgo = new Date()
-  threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 30)
-  const isNew = createdDate > threeWeeksAgo
-
   return (
     <div
       id={`stone-${stone.id}`}
@@ -128,6 +133,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
 
 export default function Stones() {
   const { stones, companyId } = useLoaderData<typeof loader>()
+  const sortedStones = useMemo(() => sortStonesLikeAdminEmployee(stones), [stones])
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const [_, setActiveType] = useState<string | undefined>(undefined)
 
@@ -140,7 +146,7 @@ export default function Stones() {
     setCurrentId(id)
 
     if (id !== undefined) {
-      const stone = stones.find(s => s.id === id)
+      const stone = sortedStones.find(s => s.id === id)
       if (stone) {
         setActiveType(stone.type)
       }
@@ -161,11 +167,11 @@ export default function Stones() {
             type='stones'
             currentId={currentId}
             setCurrentId={handleCarouselChange}
-            images={stones}
+            images={sortedStones}
             userRole='customer'
           />
         </div>
-        {stones.sort(sortStones).map(stone => (
+        {sortedStones.map(stone => (
           <InteractiveCard
             key={stone.id}
             stone={stone}
