@@ -1,4 +1,10 @@
-import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
+import {
+  type LoaderFunctionArgs,
+  Outlet,
+  redirect,
+  useLoaderData,
+  useLocation,
+} from 'react-router'
 import DealsEmailsView, { type Email } from '~/components/views/DealsEmailsView'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -60,15 +66,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 }
 
 export default function AdminEmails() {
+  const location = useLocation()
   const { userEmails, userEmail, salesReps } = useLoaderData<{
     userEmails: Email[]
     userEmail: string
     salesReps: { id: number; name: string }[]
   }>()
+  const isChatOpen = location.pathname.includes('/chat/')
 
   return (
-    <div className='w-full h-full p-2 flex flex-col gap-4'>
-      <div className='flex-1 min-h-0'>
+    <div className='w-full h-full p-2 flex flex-col gap-4 relative'>
+      <div className={`flex-1 min-h-0 ${isChatOpen ? 'pointer-events-none' : ''}`}>
         <DealsEmailsView
           emails={userEmails}
           currentUserEmail={userEmail}
@@ -76,7 +84,13 @@ export default function AdminEmails() {
           salesReps={salesReps}
         />
       </div>
-      <Outlet />
+      {isChatOpen ? (
+        <div className='fixed inset-0 z-50'>
+          <Outlet />
+        </div>
+      ) : (
+        <Outlet />
+      )}
     </div>
   )
 }

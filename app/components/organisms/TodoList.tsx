@@ -327,14 +327,7 @@ export function TodoList() {
       >
         <Button>Todo List</Button>
       </DialogTrigger>
-      <DialogContent
-        hideClose
-        className='h-full p-0 gap-0'
-        position='br'
-        onInteractOutside={e => {
-          e.preventDefault()
-        }}
-      >
+      <DialogContent hideClose className='h-full p-0 gap-0' position='br'>
         <div className='h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto'>
           <DialogFullHeader>
             <span className='text-lg font-bold'>Todo List</span>

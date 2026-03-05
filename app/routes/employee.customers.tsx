@@ -310,6 +310,7 @@ function CustomerActions({ customer }: { customer: Customer }) {
   const location = useLocation()
   const { isSalesManager } = useLoaderData<{ isSalesManager: boolean }>()
   const actions: Record<string, string> = {
+    'More info': `info/${customer.id}${location.search}`,
     edit: `edit/${customer.id}${location.search}`,
     ...(isSalesManager ? { delete: `delete/${customer.id}${location.search}` } : {}),
     invalid: `invalid/${customer.id}${location.search}`,
@@ -523,7 +524,7 @@ export default function AdminCustomers() {
   const displayed = fullDisplayed.slice(startIndex, endIndex)
   const rows = displayed.map((c: Customer) => ({
     ...c,
-    className: `${c.className ?? ''} customer-row-${c.id} cursor-pointer ${
+    className: `${c.className ?? ''} customer-row-${c.id} ${
       highlightCustomerId === c.id ? 'ring-2 ring-blue-400 bg-blue-50' : ''
     }`.trim(),
   }))
@@ -553,10 +554,6 @@ export default function AdminCustomers() {
       )
     }, 50)
   }, [searchParams, navigate, location.pathname])
-
-  const handleRowClick = (customer: Customer) => {
-    navigate(`info/${customer.id}${location.search}`)
-  }
 
   const getRowClassName = (customer: Customer) => customer.className ?? ''
 
@@ -667,7 +664,6 @@ export default function AdminCustomers() {
         columns={columns}
         data={rows}
         rowClassName={getRowClassName}
-        onRowClick={handleRowClick}
       />
       <DataTablePagination
         currentPage={currentPage}

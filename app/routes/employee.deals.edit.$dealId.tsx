@@ -1,71 +1,16 @@
-import type { LoaderFunctionArgs } from 'react-router'
-import { redirect, useLoaderData } from 'react-router'
+import { useLoaderData } from 'react-router'
 import DealPage from '~/components/pages/DealPage'
-import { db } from '~/db.server'
-import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
-import type { Nullable } from '~/types/utils'
-import { selectMany } from '~/utils/queryHelpers'
+import {
+  createDealEditLoader,
+  type DealEditLoaderData,
+} from '~/lib/dealEditLoader.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  try {
-    const user = await getEmployeeUser(request)
-    const dealId = parseInt(params.dealId || '0', 10)
-    if (!dealId) return redirect('/employee/deals')
-
-    const dealRows = await selectMany<{
-      list_id: number
-      group_id: number
-      is_won: number | null
-    }>(
-      db,
-      `SELECT d.list_id, l.group_id, d.is_won
-       FROM deals d
-       JOIN deals_list l ON d.list_id = l.id
-       JOIN customers c ON d.customer_id = c.id
-       WHERE d.id = ? AND d.deleted_at IS NULL AND c.company_id = ?`,
-      [dealId, user.company_id],
-    )
-
-    if (!dealRows.length) return redirect('/employee/deals')
-
-    const { list_id, group_id, is_won } = dealRows[0]
-
-    const [stages, history, activities] = await Promise.all([
-      selectMany<{ id: number; name: string; position: number }>(
-        db,
-        'SELECT id, name, position FROM deals_list WHERE group_id = ? AND deleted_at IS NULL ORDER BY position',
-        [group_id],
-      ),
-      selectMany<{ list_id: number; entered_at: string; exited_at: Nullable<string> }>(
-        db,
-        'SELECT list_id, entered_at, exited_at FROM deal_stage_history WHERE deal_id = ? ORDER BY entered_at',
-        [dealId],
-      ),
-      selectMany<DealActivity>(
-        db,
-        `SELECT id, deal_id, company_id, name,
-                DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%s') AS deadline,
-                priority, is_completed,
-                DATE_FORMAT(completed_at, '%Y-%m-%dT%H:%i:%s') AS completed_at,
-                DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s') AS created_at,
-                created_by
-         FROM deal_activities
-         WHERE deal_id = ? AND company_id = ? AND deleted_at IS NULL
-         ORDER BY created_at DESC`,
-        [dealId, user.company_id],
-      ),
-    ])
-
-    return { dealId, stages, history, currentListId: list_id, activities, isWon: is_won }
-  } catch {
-    return redirect('/login')
-  }
-}
+export const loader = createDealEditLoader(getEmployeeUser, '/employee/deals')
 
 export default function DealEditLayout() {
   const { dealId, stages, history, currentListId, activities, isWon } =
-    useLoaderData<typeof loader>()
+    useLoaderData<DealEditLoaderData>()
   return (
     <DealPage
       dealId={dealId}

@@ -18,9 +18,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     // Get customer details
     const [customer] = await db.query<(Customer & RowDataPacket)[]>(
-      `SELECT id, name, address, phone, phone_2, email, company_name, source, your_message
-       FROM customers
-       WHERE id = ? AND company_id = ? AND deleted_at IS NULL`,
+      `SELECT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name, c.source, c.your_message, c.sales_rep, u.name AS sales_rep_name
+       FROM customers c
+       LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
+       WHERE c.id = ? AND c.company_id = ? AND c.deleted_at IS NULL`,
       [customerId, user.company_id],
     )
 
@@ -49,8 +50,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const userData = await request.json()
   const validatedData = customerSignupSchema.parse(userData)
 
+  const salesRep =
+    validatedData.sales_rep !== undefined && validatedData.sales_rep !== null
+      ? validatedData.sales_rep
+      : null
   await db.execute<ResultSetHeader>(
-    `UPDATE customers SET name = ?, phone = ?, phone_2 = ?, email = ?, address = ?, your_message = ?, referral_source = ?, source = ?, company_id = ?, company_name = ? WHERE id = ?`,
+    `UPDATE customers SET name = ?, phone = ?, phone_2 = ?, email = ?, address = ?, your_message = ?, referral_source = ?, source = ?, company_id = ?, company_name = ?, sales_rep = ?, assigned_date = CASE WHEN ? IS NOT NULL THEN NOW() ELSE assigned_date END WHERE id = ?`,
     [
       validatedData.name,
       validatedData.phone || null,
@@ -62,6 +67,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       validatedData.source,
       validatedData.company_id,
       validatedData.company_name || null,
+      salesRep,
+      salesRep,
       customerId,
     ],
   )

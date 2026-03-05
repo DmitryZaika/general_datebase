@@ -46,7 +46,7 @@ function matchesNameFuzzy(name: string, term: string) {
 
 export const customerSchema = z.object({
   term: z.string(),
-  searchType: z.enum(['name', 'phone', 'email']).prefault('name'),
+  searchType: z.enum(['name', 'phone', 'email', 'company']).prefault('name'),
 })
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -57,7 +57,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     searchType: url.searchParams.get('searchType') || 'name',
   }
   let term: string
-  let searchType: 'name' | 'phone' | 'email'
+  let searchType: 'name' | 'phone' | 'email' | 'company'
   try {
     ;({ term, searchType } = customerSchema.parse(customerData))
   } catch (error) {
@@ -96,6 +96,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
         nameParams.push(`%${short}%`)
       }
 
+      const companyCondition =
+        "(c.company_name IS NOT NULL AND c.company_name != '' AND (c.company_name LIKE ? OR c.company_name LIKE ?))"
+      const whereCondition = `(${nameCondition} OR ${companyCondition})`
+
       customers = await selectMany<Customer>(
         db,
         `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
@@ -104,7 +108,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
          WHERE c.company_id = ? AND c.deleted_at IS NULL
-           AND ${nameCondition}
+           AND ${whereCondition}
          ORDER BY
            CASE
              WHEN d.id IS NOT NULL THEN 0
@@ -118,7 +122,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
            END,
            c.name ASC
          LIMIT ${prefetchedLimit}`,
-        [user.id, user.company_id, ...nameParams, user.id, prefixLike, like],
+        [
+          user.id,
+          user.company_id,
+          ...nameParams,
+          prefixLike,
+          like,
+          user.id,
+          prefixLike,
+          like,
+        ],
       )
     } else if (searchType === 'phone') {
       const digits = term.replace(/\D/g, '')
@@ -210,6 +223,34 @@ export async function loader({ request }: LoaderFunctionArgs) {
           ],
         )
       }
+    } else if (searchType === 'company') {
+      customers = await selectMany<Customer>(
+        db,
+        `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
+         (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
+         (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
+         FROM customers c
+         LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
+         WHERE c.company_id = ? AND c.deleted_at IS NULL
+           AND (c.company_name IS NOT NULL AND c.company_name != '' AND (c.company_name LIKE ? OR c.company_name LIKE ?))
+         ORDER BY
+           CASE
+             WHEN d.id IS NOT NULL THEN 0
+             WHEN c.sales_rep = ? THEN 1
+             ELSE 2
+           END,
+           CASE
+             WHEN c.company_name LIKE ? THEN 0
+             WHEN c.company_name LIKE ? THEN 1
+             ELSE 2
+           END,
+           c.name ASC
+         LIMIT ${prefetchedLimit}`,
+        [user.id, user.company_id, prefixLike, like, user.id, prefixLike, like],
+      )
+      customers = customers
+        .filter(c => matchesNameFuzzy(c.company_name ?? '', term))
+        .slice(0, 15)
     } else {
       customers = await selectMany<Customer>(
         db,
@@ -219,7 +260,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
          WHERE c.company_id = ? AND c.deleted_at IS NULL
-           AND ?? LIKE ?
+           AND (c.email LIKE ? OR c.email LIKE ?)
          ORDER BY
            CASE
              WHEN d.id IS NOT NULL THEN 0
@@ -227,28 +268,24 @@ export async function loader({ request }: LoaderFunctionArgs) {
              ELSE 2
            END,
            CASE
-             WHEN ?? LIKE ? THEN 0
-             WHEN ?? LIKE ? THEN 1
+             WHEN c.email LIKE ? THEN 0
+             WHEN c.email LIKE ? THEN 1
              ELSE 2
            END,
            c.name ASC
          LIMIT 15`,
-        [
-          user.id,
-          user.company_id,
-          searchType,
-          like,
-          user.id,
-          searchType,
-          prefixLike,
-          searchType,
-          like,
-        ],
+        [user.id, user.company_id, prefixLike, like, user.id, prefixLike, like],
       )
     }
 
     if (searchType === 'name') {
-      customers = customers.filter(c => matchesNameFuzzy(c.name, term)).slice(0, 15)
+      customers = customers
+        .filter(
+          c =>
+            matchesNameFuzzy(c.name, term) ||
+            matchesNameFuzzy(c.company_name ?? '', term),
+        )
+        .slice(0, 15)
     }
 
     return data({ customers })

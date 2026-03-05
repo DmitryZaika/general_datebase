@@ -37,6 +37,7 @@ type FullDeal = {
   list_id: number
   due_date?: Nullable<string>
   is_won?: Nullable<number>
+  sales_rep?: Nullable<string>
 }
 
 type Deal = FullDeal & DealCardData
@@ -49,6 +50,9 @@ interface DealsViewProps {
   emailsMap: Record<number, boolean>
   nearestActivityMap?: Record<number, { name: string; deadline: Nullable<string> }>
   groupListSelect?: React.ReactNode
+  readonly?: boolean
+  toolbarLeft?: React.ReactNode
+  showAddDeal?: boolean
 }
 
 export default function DealsView({
@@ -59,6 +63,9 @@ export default function DealsView({
   emailsMap,
   nearestActivityMap,
   groupListSelect,
+  readonly = false,
+  toolbarLeft,
+  showAddDeal = !readonly,
 }: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -88,6 +95,7 @@ export default function DealsView({
       is_won: d.is_won,
       nearest_activity_name: activity?.name ?? null,
       nearest_activity_deadline: activity?.deadline ?? null,
+      sales_rep: d.sales_rep ?? undefined,
     }
   }
 
@@ -266,6 +274,152 @@ export default function DealsView({
     setActiveId(null)
   }
 
+  const toolbar = (
+    <div className='w-full flex flex-col sm:flex-row justify-between items-center gap-2 py-1 px-1'>
+      <div className='flex items-center gap-2 w-full sm:w-auto'>
+        {readonly ? (
+          toolbarLeft
+        ) : (
+          <div className='hidden md:block'>
+            <OriginalSidebarTrigger />
+          </div>
+        )}
+        {!readonly && toolbarLeft}
+        {groupListSelect}
+        {showAddDeal && (
+          <>
+            <div className='hidden md:block'>
+              <Link
+                to={`add?${(() => {
+                  const params = new URLSearchParams(searchParams)
+                  params.set('list_id', String(lists[0]?.id || 1))
+                  return params.toString()
+                })()}`}
+                relative='path'
+              >
+                <Button variant='outline' size='sm' className='flex gap-2 h-9'>
+                  <Plus className='w-4 h-4' /> Add Deal
+                </Button>
+              </Link>
+            </div>
+            <div className='md:hidden'>
+              <CustomDropdownMenu
+                trigger={
+                  <Button variant='ghost' size='icon' className='h-9 w-9'>
+                    <MoreVertical className='w-4 h-4' />
+                  </Button>
+                }
+                sections={[
+                  {
+                    title: 'Actions',
+                    options: [
+                      {
+                        label: 'Add New Deal',
+                        icon: <Plus className='w-4 h-4' />,
+                        onClick: () => {
+                          const params = new URLSearchParams(searchParams)
+                          params.set('list_id', String(lists[0]?.id || 1))
+                          navigate(`add?${params.toString()}`)
+                        },
+                      },
+                    ],
+                  },
+                ]}
+              />
+            </div>
+          </>
+        )}
+      </div>
+      <FindCustomer
+        disableRowClick={!readonly}
+        onEdit={(customerId, customer) => {
+          const dealId = findDealIdByCustomer(customerId, customer)
+          if (dealId) navigate(`edit/${dealId}/information${location.search}`)
+        }}
+        onDelete={(customerId, customer) => {
+          const dealId = findDealIdByCustomer(customerId, customer)
+          if (dealId) navigate(`edit/${dealId}/delete${location.search}`)
+        }}
+        onSelect={(customerId, customer) => {
+          const dealId = findDealIdByCustomer(customerId, customer)
+          if (!dealId) return
+
+          const isInBoard = lists.some(l => board[l.id]?.some(d => d.id === dealId))
+
+          if (!isInBoard && customer) {
+            const isWonStatus = customer.deal_is_won
+            let newStatus = 'null'
+            if (isWonStatus === 1) newStatus = '1'
+            else if (isWonStatus === 0) newStatus = '0'
+
+            const params = new URLSearchParams(searchParams)
+            if (params.get('is_won') !== newStatus) {
+              params.set('is_won', newStatus)
+              params.set('highlight', String(dealId))
+              navigate({ pathname: location.pathname, search: params.toString() })
+              return
+            }
+          }
+
+          if (highlightTimeoutRef.current) {
+            clearTimeout(highlightTimeoutRef.current)
+          }
+
+          setHighlightDealId(null)
+
+          const el = document.getElementById(`deal-${dealId}`)
+          if (el) {
+            el.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center',
+              inline: 'center',
+            })
+          }
+
+          setTimeout(() => {
+            setHighlightDealId(dealId)
+          }, 10)
+
+          highlightTimeoutRef.current = setTimeout(() => {
+            setHighlightDealId(null)
+            highlightTimeoutRef.current = null
+          }, 2010)
+        }}
+        resolveId={findDealIdByCustomer}
+        noActionsLabel='No Deals'
+      />
+    </div>
+  )
+
+  const toListCustomer = (d: Deal) => ({
+    ...d,
+    position: d.position ?? undefined,
+  })
+
+  const listsContent = (
+    <div className='flex gap-1 '>
+      {lists.map(list => (
+        <DealsList
+          key={list.id}
+          title={list.name}
+          customers={(board[list.id] ?? []).map(toListCustomer)}
+          id={list.id}
+          readonly={readonly}
+          highlightedDealId={highlightDealId ?? undefined}
+        />
+      ))}
+    </div>
+  )
+
+  if (readonly) {
+    return (
+      <div className='w-full'>
+        {toolbar}
+        {listsContent}
+      </div>
+    )
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -278,124 +432,8 @@ export default function DealsView({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full flex flex-col sm:flex-row justify-between items-center gap-2 py-1 px-1'>
-        <div className='flex items-center gap-2 w-full sm:w-auto'>
-          <div className='hidden md:block'>
-            <OriginalSidebarTrigger />
-          </div>
-          {groupListSelect}
-          <div className='hidden md:block'>
-            <Link
-              to={`add?${(() => {
-                const params = new URLSearchParams(searchParams)
-                params.set('list_id', String(lists[0]?.id || 1))
-                return params.toString()
-              })()}`}
-              relative='path'
-            >
-              <Button variant='outline' size='sm' className='flex gap-2 h-9'>
-                <Plus className='w-4 h-4' /> Add Deal
-              </Button>
-            </Link>
-          </div>
-          <div className='md:hidden'>
-            <CustomDropdownMenu
-              trigger={
-                <Button variant='ghost' size='icon' className='h-9 w-9'>
-                  <MoreVertical className='w-4 h-4' />
-                </Button>
-              }
-              sections={[
-                {
-                  title: 'Actions',
-                  options: [
-                    {
-                      label: 'Add New Deal',
-                      icon: <Plus className='w-4 h-4' />,
-                      onClick: () => {
-                        const params = new URLSearchParams(searchParams)
-                        params.set('list_id', String(lists[0]?.id || 1))
-                        navigate(`add?${params.toString()}`)
-                      },
-                    },
-                  ],
-                },
-              ]}
-            />
-          </div>
-        </div>
-        <FindCustomer
-          disableRowClick
-          onEdit={(customerId, customer) => {
-            const dealId = findDealIdByCustomer(customerId, customer)
-            if (dealId) navigate(`edit/${dealId}/information${location.search}`)
-          }}
-          onDelete={(customerId, customer) => {
-            const dealId = findDealIdByCustomer(customerId, customer)
-            if (dealId) navigate(`edit/${dealId}/delete${location.search}`)
-          }}
-          onSelect={(customerId, customer) => {
-            const dealId = findDealIdByCustomer(customerId, customer)
-            if (!dealId) return
-
-            const isInBoard = lists.some(l => board[l.id]?.some(d => d.id === dealId))
-
-            if (!isInBoard && customer) {
-              const isWonStatus = customer.deal_is_won
-              let newStatus = 'null'
-              if (isWonStatus === 1) newStatus = '1'
-              else if (isWonStatus === 0) newStatus = '0'
-
-              const params = new URLSearchParams(searchParams)
-              if (params.get('is_won') !== newStatus) {
-                params.set('is_won', newStatus)
-                params.set('highlight', String(dealId))
-                navigate({ pathname: location.pathname, search: params.toString() })
-                return
-              }
-            }
-
-            if (highlightTimeoutRef.current) {
-              clearTimeout(highlightTimeoutRef.current)
-            }
-
-            setHighlightDealId(null)
-
-            const el = document.getElementById(`deal-${dealId}`)
-            if (el) {
-              el.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center',
-                inline: 'center',
-              })
-            }
-
-            setTimeout(() => {
-              setHighlightDealId(dealId)
-            }, 10)
-
-            highlightTimeoutRef.current = setTimeout(() => {
-              setHighlightDealId(null)
-              highlightTimeoutRef.current = null
-            }, 2010)
-          }}
-          resolveId={findDealIdByCustomer}
-          noActionsLabel='No Deals'
-        />
-      </div>
-
-      <div className='flex gap-1 '>
-        {lists.map(list => (
-          <DealsList
-            key={list.id}
-            title={list.name}
-            customers={board[list.id] ?? []}
-            id={list.id}
-            highlightedDealId={highlightDealId ?? undefined}
-          />
-        ))}
-      </div>
-
+      {toolbar}
+      {listsContent}
       <DragOverlay>
         {activeId !== null
           ? (() => {

@@ -17,8 +17,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const userData = await request.json()
   const validatedData = customerSignupSchema.parse(userData)
 
-  let salesRep: number | null = null
-  if (validatedData.source !== 'check-in') {
+  let salesRep: number | null =
+    validatedData.sales_rep !== undefined && validatedData.sales_rep !== null
+      ? validatedData.sales_rep
+      : null
+  if (salesRep === null && validatedData.source !== 'check-in') {
     const [positionRows] = await db.execute<RowDataPacket[]>(
       `SELECT 1 FROM users_positions up
        JOIN positions p ON up.position_id = p.id

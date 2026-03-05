@@ -12,7 +12,7 @@ import { Label } from '../ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { RawSelect } from './RawSelect'
 
-const selectOptions = ['name', 'phone', 'email'] as const
+const selectOptions = ['name', 'phone', 'email', 'company'] as const
 type SelectOption = (typeof selectOptions)[number]
 
 function CustomerSearchError({
@@ -71,7 +71,7 @@ const getOldData = (
   currentCustomer: Customer | undefined | null,
   selectedCustomer: number | undefined,
   source: (typeof sourceEnum)[number] | 'user-input',
-): CustomerDialogSchema | undefined => {
+): (CustomerDialogSchema & { sales_rep_name?: string }) | undefined => {
   if (!currentCustomer) return undefined
   if (!selectedCustomer) return undefined
 
@@ -84,6 +84,8 @@ const getOldData = (
   const rawSource: Sources | 'user-input' =
     typeof currentCustomer.source === 'string' ? currentCustomer.source : source
   const mappedSource: Sources = rawSource === 'user-input' ? 'other' : rawSource
+  const salesRepId =
+    currentCustomer.sales_rep != null ? String(currentCustomer.sales_rep) : ''
   return {
     name: currentCustomer.name,
     email: currentCustomer.email ?? '',
@@ -94,6 +96,8 @@ const getOldData = (
     builder,
     company_name: rawCompany,
     source: mappedSource,
+    sales_rep: salesRepId,
+    sales_rep_name: currentCustomer.sales_rep_name ?? undefined,
   }
 }
 
@@ -123,7 +127,6 @@ const CustomerManager = ({
     queryFn: () => fetchCustomerById(selectedCustomer || 0),
     enabled: !!selectedCustomer,
   })
-
   function handleSuccess(value: number, name: string) {
     setIsOpen(false)
     setSearchTerm(null)

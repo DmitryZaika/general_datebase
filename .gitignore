@@ -4,6 +4,7 @@ node_modules
 /.cache
 /build
 .env
+.env.prod
 public/images
 public/service-worker.js
 build.log
