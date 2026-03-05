@@ -169,6 +169,7 @@ export default function AdminDeals() {
     lists,
     emailsMap,
     imagesMap,
+    nearestActivityMap,
     groups,
     activeGroupId,
     isWon,
@@ -211,6 +212,7 @@ export default function AdminDeals() {
         lists={lists}
         imagesMap={imagesMap}
         emailsMap={emailsMap}
+        nearestActivityMap={nearestActivityMap}
         readonly
         showAddDeal={false}
         toolbarLeft={
