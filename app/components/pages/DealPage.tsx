@@ -9,6 +9,7 @@ import {
 } from '~/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
+import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 
 interface DealPageProps {
   dealId: number
@@ -19,6 +20,7 @@ interface DealPageProps {
   isWon?: number | null
   closedAt?: string | null
   activities?: DealActivity[]
+  notes?: DealNote[]
 }
 
 export default function DealsEdit({
@@ -30,6 +32,7 @@ export default function DealsEdit({
   isWon,
   closedAt,
   activities,
+  notes,
 }: DealPageProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -48,7 +51,7 @@ export default function DealsEdit({
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[1100px] overflow-auto md:overflow-hidden flex flex-col justify-baseline h-auto min-h-[600px] max-h-[95vh] md:h-[85vh] py-4 px-1 sm:px-2 sm:py-5  '>
+      <DialogContent className='sm:max-w-[1100px] overflow-auto md:overflow-hidden flex flex-col justify-baseline h-auto min-h-[600px] max-h-[95vh] md:h-[85vh] py-4 px-1 sm:px-2 sm:py-5'>
         <DialogHeader>
           <DialogTitle className='px-1 sm:px-2'>Edit Deal</DialogTitle>
         </DialogHeader>
@@ -81,7 +84,7 @@ export default function DealsEdit({
             </Tabs>
           </div>
           <div className='border-t md:border-t-0 md:border-l pt-4 md:pt-0 px-1 sm:px-2 pr-2 md:overflow-auto md:min-h-0'>
-            <DealActivityPanel dealId={dealId} activities={activities} />
+            <DealActivityPanel dealId={dealId} activities={activities} notes={notes} />
           </div>
         </div>
       </DialogContent>

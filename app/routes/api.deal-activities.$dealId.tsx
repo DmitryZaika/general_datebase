@@ -4,6 +4,7 @@ import { data, redirect } from 'react-router'
 import { db } from '~/db.server'
 import type { Nullable } from '~/types/utils'
 import { badRequest, handleAuthError, notFound, success } from '~/utils/apiResponse.server'
+import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -74,6 +75,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
+  try {
+    await csrf.validate(request)
+  } catch {
+    return badRequest('Invalid CSRF token')
+  }
+
   try {
     const user = await getEmployeeUser(request)
     const dealId = parseInt(params.dealId || '0', 10)

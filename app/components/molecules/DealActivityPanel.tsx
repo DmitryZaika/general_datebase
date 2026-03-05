@@ -36,13 +36,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { useToast } from '~/hooks/use-toast'
+import { useNoteAction } from '~/hooks/useNoteAction'
+import { buildActivityApiAction } from '~/lib/dealApiHelpers'
 import { cn } from '~/lib/utils'
 import {
   ActivityPriority,
   type DealActivity,
 } from '~/routes/api.deal-activities.$dealId'
+import type { DealNote } from '~/routes/api.deal-notes.$dealId'
+import type {
+  DealActivityPanelProps,
+  DeadlineUrgency,
+  HistoryItem,
+  HistoryTab,
+} from '~/types/dealActivityTypes'
 import type { Nullable } from '~/types/utils'
+import { NoteForm } from './NoteForm'
+import { NoteItem } from './NoteItem'
 
 // --- Configuration ---
 
@@ -78,10 +90,18 @@ const ITEM_VARIANTS = {
 
 const ITEM_TRANSITION = { duration: 0.25, ease: 'easeInOut' as const }
 
-const INITIAL_FORM_STATE: FormState = {
-  name: '',
-  deadline: undefined,
-  priority: ActivityPriority.Medium,
+const URGENCY_LABEL_STYLE: Readonly<Record<DeadlineUrgency, string>> = {
+  overdue: 'text-red-600 bg-red-50 border-red-200',
+  today: 'text-orange-600 bg-orange-50 border-orange-200',
+  soon: 'text-amber-600',
+  normal: 'text-gray-500',
+}
+
+const URGENCY_BORDER_STYLE: Readonly<Record<DeadlineUrgency, string>> = {
+  overdue: 'border-l-2 border-l-red-400',
+  today: 'border-l-2 border-l-orange-400',
+  soon: 'border-l-2 border-l-amber-300',
+  normal: '',
 }
 
 // --- Pure Functions ---
@@ -114,15 +134,22 @@ const composeSorters =
 const partitionActivities = (
   activities: DealActivity[] = [],
 ): { todo: DealActivity[]; done: DealActivity[] } => {
-  const source = activities ?? []
-
-  const todo = source
+  const todo = activities
     .filter(a => !a.is_completed)
     .sort(composeSorters(comparePriority, compareDeadlineAsc))
 
-  const done = source.filter(a => !!a.is_completed).sort(compareCompletedDesc)
+  const done = activities.filter(a => !!a.is_completed).sort(compareCompletedDesc)
 
   return { todo, done }
+}
+
+const DAY_MS = 86_400_000
+
+const calendarDayDiff = (target: Date): number => {
+  const deadlineDay = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+  const today = new Date()
+  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  return Math.round((deadlineDay.getTime() - todayDay.getTime()) / DAY_MS)
 }
 
 const isOverdue = (deadline: string): boolean => {
@@ -134,41 +161,12 @@ const isOverdue = (deadline: string): boolean => {
   return endOfDay.getTime() < Date.now()
 }
 
-type DeadlineUrgency = 'overdue' | 'today' | 'soon' | 'normal'
-
 const getDeadlineUrgency = (deadline: string): DeadlineUrgency => {
   if (isOverdue(deadline)) return 'overdue'
   const diffDays = calendarDayDiff(new Date(deadline))
   if (diffDays === 0) return 'today'
   if (diffDays <= 2) return 'soon'
   return 'normal'
-}
-
-const URGENCY_LABEL_STYLE: Readonly<Record<DeadlineUrgency, string>> = {
-  overdue: 'text-red-600 bg-red-50 border-red-200',
-  today: 'text-orange-600 bg-orange-50 border-orange-200',
-  soon: 'text-amber-600',
-  normal: 'text-gray-500',
-}
-
-const URGENCY_BORDER_STYLE: Readonly<Record<DeadlineUrgency, string>> = {
-  overdue: 'border-l-2 border-l-red-400',
-  today: 'border-l-2 border-l-orange-400',
-  soon: 'border-l-2 border-l-amber-300',
-  normal: '',
-}
-
-const DAY_MS = 86_400_000
-
-const calendarDayDiff = (target: Date): number => {
-  const deadlineDay = new Date(
-    target.getFullYear(),
-    target.getMonth(),
-    target.getDate(),
-  )
-  const today = new Date()
-  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  return Math.round((deadlineDay.getTime() - todayDay.getTime()) / DAY_MS)
 }
 
 const formatDeadline = (deadline: string): string => {
@@ -188,8 +186,6 @@ const formatFormDeadline = (d: Date): string => {
   return hasTime ? format(d, 'MMM d, yyyy h:mm a') : format(d, 'MMM d, yyyy')
 }
 
-const buildApiAction = (dealId: number): string => `/api/deal-activities/${dealId}`
-
 const toDeadlinePayload = (deadline: Nullable<Date>): string =>
   deadline ? format(deadline, "yyyy-MM-dd'T'HH:mm:ss") : ''
 
@@ -208,6 +204,12 @@ type FormAction =
   | { type: 'SET_PRIORITY'; payload: ActivityPriority }
   | { type: 'SET_EDIT'; payload: DealActivity }
   | { type: 'RESET' }
+
+const INITIAL_FORM_STATE: FormState = {
+  name: '',
+  deadline: undefined,
+  priority: ActivityPriority.Medium,
+}
 
 const formReducer = (state: FormState, action: FormAction): FormState => {
   switch (action.type) {
@@ -230,9 +232,7 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
     case 'SET_PRIORITY':
       return { ...state, priority: action.payload }
     case 'SET_EDIT': {
-      const d = action.payload.deadline
-        ? new Date(action.payload.deadline)
-        : undefined
+      const d = action.payload.deadline ? new Date(action.payload.deadline) : undefined
       if (d) {
         const snapped = Math.round(d.getMinutes() / 5) * 5
         if (snapped >= 60) {
@@ -276,10 +276,13 @@ function useActivityForm(dealId: number, editingActivityId: number | null) {
       payload.activityId = String(editingActivityId)
     }
 
-    fetcher.submit(payload, { method: 'POST', action: buildApiAction(dealId) })
+    fetcher.submit(payload, {
+      method: 'POST',
+      action: buildActivityApiAction(dealId),
+    })
 
     dispatch({ type: 'RESET' })
-  }, [fetcher, form, dealId, isValid, isEditing, editingActivityId])
+  }, [fetcher.submit, form, dealId, isValid, isEditing, editingActivityId])
 
   return { form, dispatch, isSubmitting, isValid, isEditing, submit }
 }
@@ -293,7 +296,7 @@ function useActivityAction(dealId: number) {
     (activityId: number, activityName: string, isCurrentlyDone: boolean) => {
       toggleFetcher.submit(
         { intent: 'toggle', activityId: String(activityId) },
-        { method: 'POST', action: buildApiAction(dealId) },
+        { method: 'POST', action: buildActivityApiAction(dealId) },
       )
       if (!isCurrentlyDone) {
         toast({
@@ -303,14 +306,14 @@ function useActivityAction(dealId: number) {
         })
       }
     },
-    [toggleFetcher, dealId, toast],
+    [toggleFetcher.submit, dealId, toast],
   )
 
   const remove = useCallback(
     (activityId: number, activityName: string) => {
       deleteFetcher.submit(
         { intent: 'delete', activityId: String(activityId) },
-        { method: 'POST', action: buildApiAction(dealId) },
+        { method: 'POST', action: buildActivityApiAction(dealId) },
       )
       toast({
         title: 'Activity deleted',
@@ -318,7 +321,7 @@ function useActivityAction(dealId: number) {
         variant: 'success',
       })
     },
-    [deleteFetcher, dealId, toast],
+    [deleteFetcher.submit, dealId, toast],
   )
 
   return {
@@ -330,7 +333,7 @@ function useActivityAction(dealId: number) {
   }
 }
 
-// --- Sub-Components ---
+// --- Shared Sub-Components ---
 
 function PriorityDot({ priority }: { priority: ActivityPriority }) {
   return <span className={cn('h-2 w-2 rounded-full', PRIORITY_DOT_COLOR[priority])} />
@@ -338,9 +341,7 @@ function PriorityDot({ priority }: { priority: ActivityPriority }) {
 
 function PriorityBadge({ priority }: { priority: ActivityPriority }) {
   return (
-    <Badge
-      className={cn('text-[10px] px-1.5 py-0 h-4 border', PRIORITY_STYLE[priority])}
-    >
+    <Badge className={cn('text-[10px] px-1.5 py-0 h-4 border', PRIORITY_STYLE[priority])}>
       {PRIORITY_LABEL[priority]}
     </Badge>
   )
@@ -394,11 +395,7 @@ function SectionHeader({
     <>
       {label} ({count})
       {collapsible &&
-        (isOpen ? (
-          <ChevronUp className='h-3 w-3' />
-        ) : (
-          <ChevronDown className='h-3 w-3' />
-        ))}
+        (isOpen ? <ChevronUp className='h-3 w-3' /> : <ChevronDown className='h-3 w-3' />)}
     </>
   )
 
@@ -421,6 +418,8 @@ function SectionHeader({
   )
 }
 
+// --- Activity Components ---
+
 function ActivityItem({
   activity,
   dealId,
@@ -432,22 +431,19 @@ function ActivityItem({
   onEdit: (activity: DealActivity) => void
   isBeingEdited: boolean
 }) {
-  const { toggle, remove, isToggling, isDeleting, togglingData } =
-    useActivityAction(dealId)
+  const { toggle, remove, isToggling, isDeleting, togglingData } = useActivityAction(dealId)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const isDone = !!activity.is_completed
   const optimisticDone = togglingData?.get('intent') === 'toggle' ? !isDone : isDone
   const urgency =
-    !optimisticDone && activity.deadline
-      ? getDeadlineUrgency(activity.deadline)
-      : 'normal'
+    !optimisticDone && activity.deadline ? getDeadlineUrgency(activity.deadline) : 'normal'
 
   return (
     <div
       className={cn(
-        'group flex items-start gap-2 rounded-md px-2 py-1.5 transition-all hover:bg-gray-50',
-        optimisticDone && 'opacity-60',
+        'group flex items-start gap-2 rounded-md px-2 py-1.5 transition-all',
+        optimisticDone ? 'bg-gray-50' : 'hover:bg-gray-50',
         isDeleting && 'opacity-0 scale-95 pointer-events-none',
         isBeingEdited && 'bg-blue-50 ring-1 ring-blue-200',
         URGENCY_BORDER_STYLE[urgency],
@@ -530,11 +526,13 @@ function ActivityItem({
   )
 }
 
-const HOURS_12 = Array.from({ length: 12 }, (_, i) => i === 0 ? 12 : i)
+// --- Deadline & Time Controls ---
+
+const HOURS_12 = Array.from({ length: 12 }, (_, i) => (i === 0 ? 12 : i))
 const MINUTES_5 = Array.from({ length: 12 }, (_, i) => i * 5)
 
 function to12Hour(h24: number): { hour: number; period: 'AM' | 'PM' } {
-  const period = h24 >= 12 ? 'PM' as const : 'AM' as const
+  const period = h24 >= 12 ? ('PM' as const) : ('AM' as const)
   const hour = h24 % 12 || 12
   return { hour, period }
 }
@@ -562,7 +560,6 @@ function DeadlineControls({
   if (!deadline) return null
 
   const hasTime = deadline.getHours() !== 0 || deadline.getMinutes() !== 0
-
   const current = to12Hour(deadline.getHours())
   const currentMin = roundTo5(deadline.getMinutes())
 
@@ -654,6 +651,8 @@ function DeadlineControls({
   )
 }
 
+// --- Activity Form ---
+
 function ActivityForm({
   dealId,
   editingActivity,
@@ -686,11 +685,7 @@ function ActivityForm({
   const handleSubmit = () => {
     submit()
     if (isEditing) {
-      toast({
-        title: 'Activity updated',
-        description: `Changes saved`,
-        variant: 'success',
-      })
+      toast({ title: 'Activity updated', description: 'Changes saved', variant: 'success' })
       onCancelEdit()
     }
   }
@@ -809,27 +804,201 @@ function ActivityForm({
   )
 }
 
+// --- History Sub-tabs ---
+
+function HistoryTabButtons({
+  activeTab,
+  onTabChange,
+  activitiesCount,
+  notesCount,
+}: {
+  activeTab: HistoryTab
+  onTabChange: (tab: HistoryTab) => void
+  activitiesCount: number
+  notesCount: number
+}) {
+  const tabs: { key: HistoryTab; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'activities', label: `Activities (${activitiesCount})` },
+    { key: 'notes', label: `Notes (${notesCount})` },
+  ]
+
+  return (
+    <div className='flex gap-1 mb-2'>
+      {tabs.map(tab => (
+        <button
+          key={tab.key}
+          type='button'
+          onClick={() => onTabChange(tab.key)}
+          className={cn(
+            'text-[11px] px-2.5 py-1 rounded-full border transition-colors',
+            activeTab === tab.key
+              ? 'bg-gray-900 text-white border-gray-900'
+              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50',
+          )}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// --- Activity List ---
+
 function ActivityList({
   dealId,
   activities,
+  notes,
   onEdit,
   editingActivityId,
 }: {
   dealId: number
   activities: DealActivity[]
+  notes: DealNote[]
   onEdit: (activity: DealActivity) => void
   editingActivityId: number | null
 }) {
   const [isHistoryOpen, setIsHistoryOpen] = useReducer((s: boolean) => !s, true)
+  const [historyTab, setHistoryTab] = useState<HistoryTab>('all')
+  const noteHandlers = useNoteAction(dealId)
 
   const { todo, done } = useMemo(() => partitionActivities(activities), [activities])
+
+  const sortedNotes = useMemo(
+    () =>
+      [...notes].sort((a, b) => {
+        if (a.is_pinned && !b.is_pinned) return -1
+        if (!a.is_pinned && b.is_pinned) return 1
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      }),
+    [notes],
+  )
+
+  const allHistoryItems = useMemo<HistoryItem[]>(() => {
+    const items: HistoryItem[] = [
+      ...done.map(
+        a =>
+          ({
+            type: 'activity' as const,
+            data: a,
+            date: a.completed_at || a.created_at,
+            isPinned: false,
+          }) satisfies HistoryItem,
+      ),
+      ...notes.map(
+        n =>
+          ({
+            type: 'note' as const,
+            data: n,
+            date: n.created_at,
+            isPinned: !!n.is_pinned,
+          }) satisfies HistoryItem,
+      ),
+    ]
+
+    items.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1
+      if (!a.isPinned && b.isPinned) return 1
+      return new Date(b.date).getTime() - new Date(a.date).getTime()
+    })
+
+    return items
+  }, [done, notes])
+
+  const historyCount = done.length + notes.length
+
+  const renderHistoryContent = () => {
+    if (historyTab === 'activities') {
+      if (done.length === 0) return <SectionEmptyState label='No completed activities' />
+      return (
+        <div className='space-y-1.5'>
+          <AnimatePresence initial={false}>
+            {done.map(activity => (
+              <motion.div
+                key={`activity-${activity.id}`}
+                layout
+                variants={ITEM_VARIANTS}
+                initial='initial'
+                animate='animate'
+                exit='exit'
+                transition={ITEM_TRANSITION}
+              >
+                <ActivityItem
+                  activity={activity}
+                  dealId={dealId}
+                  onEdit={onEdit}
+                  isBeingEdited={editingActivityId === activity.id}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )
+    }
+
+    if (historyTab === 'notes') {
+      if (sortedNotes.length === 0) return <SectionEmptyState label='No notes yet' />
+      return (
+        <div className='space-y-1.5'>
+          <AnimatePresence initial={false}>
+            {sortedNotes.map(note => (
+              <motion.div
+                key={`note-${note.id}`}
+                layout
+                variants={ITEM_VARIANTS}
+                initial='initial'
+                animate='animate'
+                exit='exit'
+                transition={ITEM_TRANSITION}
+              >
+                <NoteItem note={note} handlers={noteHandlers} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )
+    }
+
+    // All tab
+    if (allHistoryItems.length === 0) return <SectionEmptyState label='No history yet' />
+
+    return (
+      <div className='space-y-1.5'>
+        <AnimatePresence initial={false}>
+          {allHistoryItems.map(item => (
+            <motion.div
+              key={`${item.type}-${item.data.id}`}
+              layout
+              variants={ITEM_VARIANTS}
+              initial='initial'
+              animate='animate'
+              exit='exit'
+              transition={ITEM_TRANSITION}
+            >
+              {item.type === 'activity' ? (
+                <ActivityItem
+                  activity={item.data}
+                  dealId={dealId}
+                  onEdit={onEdit}
+                  isBeingEdited={editingActivityId === item.data.id}
+                />
+              ) : (
+                <NoteItem note={item.data} handlers={noteHandlers} />
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    )
+  }
 
   return (
     <div className='space-y-4'>
       <div>
         <SectionHeader label='To Do' count={todo.length} />
         {todo.length > 0 ? (
-          <div className='space-y-1'>
+          <div className='space-y-1.5'>
             <AnimatePresence initial={false}>
               {todo.map(activity => (
                 <motion.div
@@ -860,38 +1029,22 @@ function ActivityList({
       <div>
         <SectionHeader
           label='History'
-          count={done.length}
+          count={historyCount}
           collapsible
           isOpen={isHistoryOpen}
           onToggle={setIsHistoryOpen}
         />
-        {isHistoryOpen &&
-          (done.length > 0 ? (
-            <div className='space-y-1'>
-              <AnimatePresence initial={false}>
-                {done.map(activity => (
-                  <motion.div
-                    key={activity.id}
-                    layout
-                    variants={ITEM_VARIANTS}
-                    initial='initial'
-                    animate='animate'
-                    exit='exit'
-                    transition={ITEM_TRANSITION}
-                  >
-                    <ActivityItem
-                      activity={activity}
-                      dealId={dealId}
-                      onEdit={onEdit}
-                      isBeingEdited={editingActivityId === activity.id}
-                    />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          ) : (
-            <SectionEmptyState label='No completed tasks' />
-          ))}
+        {isHistoryOpen && (
+          <>
+            <HistoryTabButtons
+              activeTab={historyTab}
+              onTabChange={setHistoryTab}
+              activitiesCount={done.length}
+              notesCount={notes.length}
+            />
+            {renderHistoryContent()}
+          </>
+        )}
       </div>
     </div>
   )
@@ -899,26 +1052,36 @@ function ActivityList({
 
 // --- Main Component ---
 
-interface DealActivityPanelProps {
-  dealId: number
-  activities?: DealActivity[]
-}
-
-export function DealActivityPanel({ dealId, activities = [] }: DealActivityPanelProps) {
+export function DealActivityPanel({
+  dealId,
+  activities = [],
+  notes = [],
+}: DealActivityPanelProps) {
   const [editingActivity, setEditingActivity] = useState<DealActivity | null>(null)
 
   return (
     <div className='flex flex-col h-full'>
-      <h3 className='text-base font-semibold mb-3'>Activity</h3>
-      <ActivityForm
-        dealId={dealId}
-        editingActivity={editingActivity}
-        onCancelEdit={() => setEditingActivity(null)}
-      />
+      <Tabs defaultValue='activity' onValueChange={() => setEditingActivity(null)}>
+        <TabsList className='mb-3 grid grid-cols-2'>
+          <TabsTrigger value='activity'>Activity</TabsTrigger>
+          <TabsTrigger value='notes'>Notes</TabsTrigger>
+        </TabsList>
+        <TabsContent value='activity'>
+          <ActivityForm
+            dealId={dealId}
+            editingActivity={editingActivity}
+            onCancelEdit={() => setEditingActivity(null)}
+          />
+        </TabsContent>
+        <TabsContent value='notes'>
+          <NoteForm dealId={dealId} />
+        </TabsContent>
+      </Tabs>
       <div className='flex-1 overflow-y-auto min-h-0'>
         <ActivityList
           dealId={dealId}
           activities={activities}
+          notes={notes}
           onEdit={setEditingActivity}
           editingActivityId={editingActivity?.id ?? null}
         />

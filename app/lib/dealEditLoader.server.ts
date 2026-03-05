@@ -1,7 +1,9 @@
 import type { LoaderFunctionArgs } from 'react-router'
 import { redirect } from 'react-router'
 import { db } from '~/db.server'
+import { fetchNotesWithComments } from '~/lib/noteHelpers.server'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
+import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { Nullable } from '~/types/utils'
 import { TERMINAL_LIST_IDS } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
@@ -17,6 +19,7 @@ export interface DealEditLoaderData {
   isWon: Nullable<number>
   closedAt: string | null
   activities: DealActivity[]
+  notes: DealNote[]
 }
 
 export function createDealEditLoader(
@@ -67,7 +70,7 @@ export function createDealEditLoader(
         }
       }
 
-      const [stages, history, activities] = await Promise.all([
+      const [stages, history, activities, notes] = await Promise.all([
         selectMany<{ id: number; name: string; position: number }>(
           db,
           'SELECT id, name, position FROM deals_list WHERE group_id = ? AND deleted_at IS NULL ORDER BY position',
@@ -84,12 +87,13 @@ export function createDealEditLoader(
         ),
         selectMany<DealActivity>(
           db,
-          `SELECT id, deal_id, company_id, name, deadline, priority, is_completed, completed_at, created_at
+          `SELECT id, deal_id, company_id, name, deadline, priority, is_completed, completed_at, created_at, created_by
            FROM deal_activities
            WHERE deal_id = ? AND company_id = ? AND deleted_at IS NULL
            ORDER BY created_at DESC`,
           [dealId, user.company_id],
         ),
+        fetchNotesWithComments(db, dealId, user.company_id),
       ])
 
       const isClosed =
@@ -110,6 +114,7 @@ export function createDealEditLoader(
         isWon: is_won,
         closedAt,
         activities,
+        notes,
       }
     } catch {
       return redirect('/login')
