@@ -104,7 +104,7 @@ export default function SinksModal() {
         ) : (
           <div className='flex items-center gap-4 p-3 rounded-lg border border-gray-200'>
             <img
-              src={sink.url ?? '/placeholder.png'}
+              src={sink.url ?? ''}
               alt={sink.name}
               className='w-20 h-20 object-cover cursor-pointer rounded'
               onClick={() => {

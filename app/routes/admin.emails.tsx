@@ -17,6 +17,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const salesRepFilter = url.searchParams.get('sales_rep')
     const folder = url.searchParams.get('folder')
     const isSent = folder === 'sent'
+    const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
+    const pageSize = 50
+    const search = (url.searchParams.get('search') || '').trim()
+    const searchClause = search
+      ? ` AND (e.subject LIKE ? OR e.body LIKE ? OR e.sender_email LIKE ? OR e.receiver_email LIKE ?)`
+      : ''
+    const searchParamsArr = search
+      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`]
+      : []
 
     const companyId = user.company_id || 0
     const baseWhere = `e.deleted_at IS NULL AND (s.company_id = ? OR r.company_id = ?)`
@@ -41,16 +50,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       : ` AND e.sender_user_id IS NOT NULL`
     const folderParamsSent = salesRepFilter ? [Number(salesRepFilter)] : []
 
-    const whereInbox = `${baseWhere}${salesRepClause}${folderClauseInbox}`
-    const whereSent = `${baseWhere}${salesRepClause}${folderClauseSent}`
-    const paramsInboxWhere = [...baseParamsWhere, ...salesRepParams]
-    const paramsSentWhere = [...baseParamsWhere, ...salesRepParams, ...folderParamsSent]
-    const paramsInboxSelect = [...baseParamsSelect, ...salesRepParams]
+    const whereInbox = `${baseWhere}${salesRepClause}${folderClauseInbox}${searchClause}`
+    const whereSent = `${baseWhere}${salesRepClause}${folderClauseSent}${searchClause}`
+    const subqueryWhereInbox = whereInbox
+      .replaceAll('e.', 'e2.')
+      .replaceAll('s.', 's2.')
+      .replaceAll('r.', 'r2.')
+    const subqueryWhereSent = whereSent
+      .replaceAll('e.', 'e2.')
+      .replaceAll('s.', 's2.')
+      .replaceAll('r.', 'r2.')
+    const paramsInboxWhere = [...baseParamsWhere, ...salesRepParams, ...searchParamsArr]
+    const paramsSentWhere = [
+      ...baseParamsWhere,
+      ...salesRepParams,
+      ...folderParamsSent,
+      ...searchParamsArr,
+    ]
+    const paramsInboxSelect = [
+      ...baseParamsSelect,
+      ...salesRepParams,
+      ...searchParamsArr,
+    ]
     const paramsSentSelect = [
       ...baseParamsSelect,
       ...salesRepParams,
       ...folderParamsSent,
+      ...searchParamsArr,
     ]
+    const offset = (page - 1) * pageSize
 
     const selectList = `SELECT e.id, e.thread_id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.sender_user_id, e.employee_read_at,
        (SELECT MAX(er.read_at) FROM email_reads er WHERE er.message_id = e.message_id) AS client_read_at,
@@ -59,43 +87,70 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        COALESCE(r.name, (SELECT name FROM customers WHERE email = e.receiver_email AND company_id = ? LIMIT 1)) as receiver_name
        FROM emails e
        LEFT JOIN users s ON e.sender_user_id = s.id
-       LEFT JOIN users r ON e.receiver_email = r.email
-       WHERE `
+       LEFT JOIN users r ON e.receiver_email = r.email`
 
-    const [inboxCountRows, sentCountRows, userEmails, salesReps] = await Promise.all([
-      selectMany<{ c: number }>(
-        db,
-        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+    const [inboxCountRows, sentCountRows, totalCountRows, userEmails, salesReps] =
+      await Promise.all([
+        selectMany<{ c: number }>(
+          db,
+          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
          LEFT JOIN users s ON e.sender_user_id = s.id
          LEFT JOIN users r ON e.receiver_email = r.email
          WHERE ${whereInbox}`,
-        paramsInboxWhere,
-      ),
-      selectMany<{ c: number }>(
-        db,
-        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+          paramsInboxWhere,
+        ),
+        selectMany<{ c: number }>(
+          db,
+          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
          LEFT JOIN users s ON e.sender_user_id = s.id
          LEFT JOIN users r ON e.receiver_email = r.email
          WHERE ${whereSent}`,
-        paramsSentWhere,
-      ),
-      selectMany<Email>(
-        db,
-        `${selectList}${isSent ? whereSent : whereInbox} ORDER BY e.sent_at DESC LIMIT 2000`,
-        isSent ? paramsSentSelect : paramsInboxSelect,
-      ),
-      selectMany<{ id: number; name: string }>(
-        db,
-        `SELECT u.id, u.name
+          paramsSentWhere,
+        ),
+        selectMany<{ c: number }>(
+          db,
+          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+         LEFT JOIN users s ON e.sender_user_id = s.id
+         LEFT JOIN users r ON e.receiver_email = r.email
+         WHERE ${isSent ? whereSent : whereInbox}`,
+          isSent ? paramsSentWhere : paramsInboxWhere,
+        ),
+        selectMany<Email>(
+          db,
+          `${selectList}
+         WHERE ${isSent ? whereSent : whereInbox}
+         AND e.thread_id IN (
+           SELECT thread_id FROM (
+             SELECT e2.thread_id, MAX(e2.sent_at) AS mt
+             FROM emails e2
+             LEFT JOIN users s2 ON e2.sender_user_id = s2.id
+             LEFT JOIN users r2 ON e2.receiver_email = r2.email
+             WHERE ${isSent ? subqueryWhereSent : subqueryWhereInbox}
+             GROUP BY e2.thread_id
+             ORDER BY mt DESC
+             LIMIT ${pageSize} OFFSET ${offset}
+           ) t
+         )
+         ORDER BY e.sent_at DESC`,
+          [
+            ...(isSent ? paramsSentSelect : paramsInboxSelect),
+            ...(isSent ? paramsSentWhere : paramsInboxWhere),
+          ],
+        ),
+        selectMany<{ id: number; name: string }>(
+          db,
+          `SELECT u.id, u.name
          FROM users u
          JOIN users_positions up ON up.user_id = u.id
          JOIN positions p ON p.id = up.position_id
          WHERE LOWER(p.name) = 'sales_rep'
            AND u.is_deleted = 0
            AND u.company_id = ?`,
-        [companyId],
-      ),
-    ])
+          [companyId],
+        ),
+      ])
+
+    const totalCount = totalCountRows[0]?.c ?? 0
 
     return {
       userEmails,
@@ -104,6 +159,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       folder: isSent ? 'sent' : 'inbox',
       inboxCount: inboxCountRows[0]?.c ?? 0,
       sentCount: sentCountRows[0]?.c ?? 0,
+      totalCount,
+      currentPage: page,
+      pageSize,
     }
   } catch (error) {
     return redirect(`/login?error=${error}`)
@@ -112,15 +170,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AdminEmails() {
   const location = useLocation()
-  const { userEmails, userEmail, salesReps, folder, inboxCount, sentCount } =
-    useLoaderData<{
-      userEmails: Email[]
-      userEmail: string
-      salesReps: { id: number; name: string }[]
-      folder: 'inbox' | 'sent'
-      inboxCount: number
-      sentCount: number
-    }>()
+  const {
+    userEmails,
+    userEmail,
+    salesReps,
+    folder,
+    inboxCount,
+    sentCount,
+    totalCount,
+    currentPage,
+    pageSize,
+  } = useLoaderData<{
+    userEmails: Email[]
+    userEmail: string
+    salesReps: { id: number; name: string }[]
+    folder: 'inbox' | 'sent'
+    inboxCount: number
+    sentCount: number
+    totalCount: number
+    currentPage: number
+    pageSize: number
+  }>()
   const isChatOpen = location.pathname.includes('/chat/')
 
   return (
@@ -134,6 +204,9 @@ export default function AdminEmails() {
           initialFolder={folder}
           inboxCount={inboxCount}
           sentCount={sentCount}
+          totalCount={totalCount}
+          currentPage={currentPage}
+          pageSize={pageSize}
         />
       </div>
       {isChatOpen ? (

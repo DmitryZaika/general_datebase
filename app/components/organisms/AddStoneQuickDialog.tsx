@@ -35,8 +35,8 @@ interface AddStoneQuickDialogProps {
 const defaultValues = (companyId: number) => ({
   name: '',
   retail_price: 0,
-  length: 0,
-  width: 0,
+  length: '',
+  width: '',
   type: 'granite' as const,
   leftover: true,
   bundles: [{ value: '' }],
@@ -200,7 +200,7 @@ export function AddStoneQuickDialog({
               name='retail_price'
               render={({ field }) => (
                 <InputItem
-                  name='Retail Price*'
+                  name='Price per sqft*'
                   placeholder='Enter price per sqft'
                   field={field}
                   type='number'
@@ -214,7 +214,7 @@ export function AddStoneQuickDialog({
                 name='length'
                 render={({ field }) => (
                   <InputItem
-                    name='Length*'
+                    name='Length'
                     placeholder='Length'
                     field={field}
                     type='number'
@@ -226,7 +226,7 @@ export function AddStoneQuickDialog({
                 name='width'
                 render={({ field }) => (
                   <InputItem
-                    name='Width*'
+                    name='Width'
                     placeholder='Width'
                     field={field}
                     type='number'

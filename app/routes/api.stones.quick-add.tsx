@@ -42,8 +42,8 @@ export async function action({ request }: ActionFunctionArgs) {
         validatedData.name,
         validatedData.type || 'granite',
         validatedData.retail_price,
-        validatedData.width,
-        validatedData.length,
+        validatedData.width ?? 0,
+        validatedData.length ?? 0,
         validatedData.company_id,
         true,
       ],
@@ -59,7 +59,14 @@ export async function action({ request }: ActionFunctionArgs) {
         `INSERT INTO slab_inventory
          (bundle, stone_id, width, length, is_leftover, url)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        [bundle, stoneId, validatedData.width, validatedData.length, true, null],
+        [
+          bundle,
+          stoneId,
+          validatedData.width ?? 0,
+          validatedData.length ?? 0,
+          true,
+          null,
+        ],
       )
       slabs.push({ id: slabResult.insertId })
     } else {
@@ -71,8 +78,8 @@ export async function action({ request }: ActionFunctionArgs) {
           [
             bundle.trim(),
             stoneId,
-            validatedData.width,
-            validatedData.length,
+            validatedData.width ?? 0,
+            validatedData.length ?? 0,
             false,
             null,
           ],

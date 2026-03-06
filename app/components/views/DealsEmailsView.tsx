@@ -51,7 +51,7 @@ export interface Email {
   client_read_at?: string | null
 }
 
-interface DealsEmailsViewProps {
+export interface DealsEmailsViewProps {
   emails: Email[]
   currentUserEmail: string
   adminMode?: boolean
@@ -60,6 +60,9 @@ interface DealsEmailsViewProps {
   initialFolder?: 'inbox' | 'sent'
   inboxCount?: number
   sentCount?: number
+  totalCount?: number
+  currentPage?: number
+  pageSize?: number
 }
 
 type Tab = 'inbox' | 'drafts' | 'outbox' | 'sent' | 'archive'
@@ -73,23 +76,30 @@ export default function DealsEmailsView({
   initialFolder,
   inboxCount: inboxCountProp,
   sentCount: sentCountProp,
+  totalCount: totalCountProp,
+  currentPage: currentPageProp = 1,
+  pageSize: pageSizeProp = 50,
 }: DealsEmailsViewProps) {
   const navigate = useNavigate()
   const revalidator = useRevalidator()
   const [searchParams] = useSearchParams()
   const folderFromUrl = searchParams.get('folder') === 'sent' ? 'sent' : 'inbox'
+  const searchFromUrl = searchParams.get('search') ?? ''
   const [activeTabLocal, setActiveTabLocal] = useState<Tab>('inbox')
   const activeTab = initialFolder != null ? (folderFromUrl as Tab) : activeTabLocal
   const setActiveTab = (t: Tab) => {
     if (initialFolder != null) {
       const next = new URLSearchParams(searchParams)
       next.set('folder', t)
+      next.set('page', '1')
       navigate({ search: next.toString() })
     } else {
       setActiveTabLocal(t)
     }
   }
-  const [searchTerm, setSearchTerm] = useState('')
+  const isServerPagination = totalCountProp !== undefined
+  const [searchTermLocal, setSearchTermLocal] = useState('')
+  const searchTerm = isServerPagination ? searchFromUrl : searchTermLocal
   const [selectedThreads, setSelectedThreads] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
   const { toast } = useToast()
@@ -182,11 +192,12 @@ export default function DealsEmailsView({
     selectedSalesRepId,
   ])
 
-  // Filter by search term
   const searchedEmails = useMemo(() => {
-    if (!searchTerm.trim()) return filteredEmails
+    if (isServerPagination) return filteredEmails
 
-    const term = searchTerm.toLowerCase()
+    if (!searchTermLocal.trim()) return filteredEmails
+
+    const term = searchTermLocal.toLowerCase()
     return filteredEmails.filter(email => {
       const subject = email.subject?.toLowerCase() || ''
       const body = email.body?.toLowerCase() || ''
@@ -204,7 +215,7 @@ export default function DealsEmailsView({
         receiverName.includes(term)
       )
     })
-  }, [filteredEmails, searchTerm])
+  }, [filteredEmails, searchTermLocal, isServerPagination])
 
   // Sort by date desc
   const sortedEmails = useMemo(() => {
@@ -423,14 +434,45 @@ export default function DealsEmailsView({
             )}
           </div>
           <div className='relative flex-1 max-w-md ml-2'>
-            <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-gray-500' />
-            <Input
-              type='text'
-              placeholder='Search emails...'
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className='pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
-            />
+            {isServerPagination ? (
+              <form
+                onSubmit={e => {
+                  e.preventDefault()
+                  const form = e.currentTarget
+                  const q =
+                    (
+                      form.elements.namedItem('search') as HTMLInputElement
+                    )?.value?.trim() ?? ''
+                  const next = new URLSearchParams(searchParams)
+                  if (q) next.set('search', q)
+                  else next.delete('search')
+                  next.set('page', '1')
+                  navigate({ search: next.toString() })
+                }}
+                className='relative'
+              >
+                <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-gray-500' />
+                <Input
+                  name='search'
+                  type='text'
+                  placeholder='Search emails...'
+                  defaultValue={searchFromUrl}
+                  key={searchFromUrl}
+                  className='pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
+                />
+              </form>
+            ) : (
+              <>
+                <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-gray-500' />
+                <Input
+                  type='text'
+                  placeholder='Search emails...'
+                  value={searchTermLocal}
+                  onChange={e => setSearchTermLocal(e.target.value)}
+                  className='pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
+                />
+              </>
+            )}
           </div>
           <div className='flex-1 md:hidden' /> {/* Spacer for mobile */}
           <button
@@ -674,6 +716,44 @@ export default function DealsEmailsView({
             </div>
           )}
         </div>
+
+        {isServerPagination && totalCountProp != null && pageSizeProp != null && (
+          <div className='flex items-center justify-between gap-4 px-3 py-2 border-t border-gray-200 bg-gray-50'>
+            <Button
+              variant='outline'
+              size='sm'
+              disabled={currentPageProp <= 1}
+              onClick={() => {
+                const next = new URLSearchParams(searchParams)
+                next.set('page', String(currentPageProp - 1))
+                navigate({ search: next.toString() })
+              }}
+            >
+              Previous
+            </Button>
+            <span className='text-sm text-gray-600'>
+              Page {currentPageProp} of{' '}
+              {Math.max(1, Math.ceil(totalCountProp / pageSizeProp))}
+              {totalCountProp > 0 && (
+                <span className='ml-1'>
+                  ({totalCountProp} conversation{totalCountProp !== 1 ? 's' : ''})
+                </span>
+              )}
+            </span>
+            <Button
+              variant='outline'
+              size='sm'
+              disabled={currentPageProp >= Math.ceil(totalCountProp / pageSizeProp)}
+              onClick={() => {
+                const next = new URLSearchParams(searchParams)
+                next.set('page', String(currentPageProp + 1))
+                navigate({ search: next.toString() })
+              }}
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Mobile FAB for New Email */}

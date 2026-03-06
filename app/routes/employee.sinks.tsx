@@ -71,7 +71,7 @@ function InteractiveCard({
         title={sink.name}
       >
         <img
-          src={sink.url || '/placeholder.png'}
+          src={sink.url ?? ''}
           alt={sink.name || 'Sink Image'}
           className='object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
           loading='lazy'

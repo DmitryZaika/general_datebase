@@ -13,6 +13,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url)
     const folder = url.searchParams.get('folder')
     const isSent = folder === 'sent'
+    const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
+    const pageSize = 50
+    const search = (url.searchParams.get('search') || '').trim()
+    const searchClause = search
+      ? ` AND (e.subject LIKE ? OR e.body LIKE ? OR e.sender_email LIKE ? OR e.receiver_email LIKE ?)`
+      : ''
+    const searchParams = search
+      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`]
+      : []
 
     const senderCondition = `(
       e.sender_user_id = ?
@@ -31,22 +40,34 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       ? [user.id, userEmailNorm, userEmailNorm, userEmailLike]
       : [userEmailNorm, userEmailNorm, userEmailLike]
 
-    const [inboxCountRows, sentCountRows, userEmails] = await Promise.all([
-      selectMany<{ c: number }>(
-        db,
-        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+    const whereBase = `e.deleted_at IS NULL AND ${folderCondition}${searchClause}`
+    const subqueryWhereBase = whereBase.replaceAll('e.', 'e2.')
+    const paramsWithSearch = [...folderParams, ...searchParams]
+    const offset = (page - 1) * pageSize
+
+    const [inboxCountRows, sentCountRows, totalCountRows, userEmails] =
+      await Promise.all([
+        selectMany<{ c: number }>(
+          db,
+          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
          WHERE e.deleted_at IS NULL AND ${receiverCondition}`,
-        [userEmailNorm, userEmailNorm, userEmailLike],
-      ),
-      selectMany<{ c: number }>(
-        db,
-        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+          [userEmailNorm, userEmailNorm, userEmailLike],
+        ),
+        selectMany<{ c: number }>(
+          db,
+          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
          WHERE e.deleted_at IS NULL AND ${senderCondition}`,
-        [user.id, userEmailNorm, userEmailNorm, userEmailLike],
-      ),
-      selectMany<Email>(
-        db,
-        `SELECT e.id, e.thread_id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.sender_user_id, e.employee_read_at,
+          [user.id, userEmailNorm, userEmailNorm, userEmailLike],
+        ),
+        selectMany<{ c: number }>(
+          db,
+          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+         WHERE ${whereBase}`,
+          paramsWithSearch,
+        ),
+        selectMany<Email>(
+          db,
+          `SELECT e.id, e.thread_id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.sender_user_id, e.employee_read_at,
          (SELECT MAX(er.read_at) FROM email_reads er WHERE er.message_id = e.message_id) AS client_read_at,
          (SELECT COUNT(*) FROM email_attachments ea WHERE ea.email_id = e.id) > 0 as has_attachments,
          COALESCE(s.name, (SELECT name FROM customers WHERE email = e.sender_email LIMIT 1)) as sender_name,
@@ -54,13 +75,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          FROM emails e
          LEFT JOIN users s ON e.sender_user_id = s.id
          LEFT JOIN users r ON e.receiver_email = r.email
-         WHERE e.deleted_at IS NULL
-         AND ${folderCondition}
-         ORDER BY e.sent_at DESC
-         LIMIT 2000`,
-        folderParams,
-      ),
-    ])
+         WHERE ${whereBase}
+         AND e.thread_id IN (
+           SELECT thread_id FROM (
+             SELECT e2.thread_id, MAX(e2.sent_at) AS mt
+             FROM emails e2
+             WHERE ${subqueryWhereBase}
+             GROUP BY e2.thread_id
+             ORDER BY mt DESC
+             LIMIT ${pageSize} OFFSET ${offset}
+           ) t
+         )
+         ORDER BY e.sent_at DESC`,
+          [...paramsWithSearch, ...paramsWithSearch],
+        ),
+      ])
+
+    const totalCount = totalCountRows[0]?.c ?? 0
 
     return {
       userEmails,
@@ -69,6 +100,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       folder: isSent ? 'sent' : 'inbox',
       inboxCount: inboxCountRows[0]?.c ?? 0,
       sentCount: sentCountRows[0]?.c ?? 0,
+      totalCount,
+      currentPage: page,
+      pageSize,
     }
   } catch (error) {
     return redirect(`/login?error=${error}`)
@@ -76,15 +110,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 }
 
 export default function EmployeeEmails() {
-  const { userEmails, userEmail, userId, folder, inboxCount, sentCount } =
-    useLoaderData<{
-      userEmails: Email[]
-      userEmail: string
-      userId: number
-      folder: 'inbox' | 'sent'
-      inboxCount: number
-      sentCount: number
-    }>()
+  const {
+    userEmails,
+    userEmail,
+    userId,
+    folder,
+    inboxCount,
+    sentCount,
+    totalCount,
+    currentPage,
+    pageSize,
+  } = useLoaderData<{
+    userEmails: Email[]
+    userEmail: string
+    userId: number
+    folder: 'inbox' | 'sent'
+    inboxCount: number
+    sentCount: number
+    totalCount: number
+    currentPage: number
+    pageSize: number
+  }>()
 
   return (
     <div className='w-full h-full p-2'>
@@ -95,6 +141,9 @@ export default function EmployeeEmails() {
         initialFolder={folder}
         inboxCount={inboxCount}
         sentCount={sentCount}
+        totalCount={totalCount}
+        currentPage={currentPage}
+        pageSize={pageSize}
       />
       <Outlet />
     </div>

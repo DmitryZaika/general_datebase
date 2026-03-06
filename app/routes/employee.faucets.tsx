@@ -70,7 +70,7 @@ function InteractiveCard({
         title={faucet.name}
       >
         <img
-          src={faucet.url || '/placeholder.png'}
+          src={faucet.url ?? ''}
           alt={faucet.name || 'Faucet Image'}
           className='object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
           loading='lazy'

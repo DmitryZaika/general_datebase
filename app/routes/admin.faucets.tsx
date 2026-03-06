@@ -144,7 +144,7 @@ export default function AdminFaucets() {
                 >
                   <div className='relative'>
                     <img
-                      src={faucet.url || '/placeholder.png'}
+                      src={faucet.url ?? ''}
                       alt={faucet.name || 'Faucet Image'}
                       className='object-cover w-full h-40 rounded select-none cursor-pointer'
                       loading='lazy'

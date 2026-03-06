@@ -107,10 +107,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     [viewId],
   )
 
-  const customerName =
-    (sales[0] && sales[0].customer_name) ||
-    (customerRows[0] && customerRows[0].name) ||
-    ''
+  const customerName = sales[0]?.customer_name || customerRows[0]?.name || ''
 
   // Handle payment status
   if (paymentStatus === 'success' && sessionId) {
@@ -208,7 +205,7 @@ function ImageGalleryCell({ images, title }: { images: string | null; title: str
     .split(',')
     .map(url => url.trim())
     .filter(Boolean)
-    .map(url => (url && url !== 'undefined' ? url : '/placeholder.png'))
+    .map(url => (url && url !== 'undefined' ? url : ''))
   const [isOpen, setIsOpen] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
 

@@ -266,7 +266,7 @@ export default function Samples() {
             }}
           >
             <img
-              src={stone.url || '/placeholder.png'}
+              src={stone.url ?? ''}
               alt={stone.name}
               className='object-cover w-full h-full'
             />

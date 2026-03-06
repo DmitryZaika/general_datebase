@@ -37,7 +37,7 @@ export function Image({
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
           <img
-            src={src || '/path/to/placeholder.png'}
+            src={src ?? ''}
             alt={alt || name || 'Image'}
             className={`object-cover  w-full h-40 border-2  rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300 ${className}`}
             loading='lazy'
@@ -55,7 +55,7 @@ export function Image({
           </button>
 
           <img
-            src={src || '/path/to/placeholder.png'}
+            src={src ?? ''}
             alt={alt || name || 'Image'}
             className='h-[90vh] w-auto max-h-[90vh] max-w-[90vw] object-contain'
             onClick={e => e.stopPropagation()}

@@ -128,7 +128,7 @@ function ChildrenImagesDialog({
           </div>
         )}
         <img
-          src={selectedImage || '/path/to/placeholder.png'}
+          src={selectedImage ?? ''}
           alt={alt || name || 'Image'}
           className='w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] object-contain z-0 select-none'
           onClick={e => e.stopPropagation()}

@@ -27,20 +27,19 @@ interface Stone {
   created_date: string
 }
 
-function getStoneUrl(original: string | null) {
-  return original ? withIconSuffix(original) : '/placeholder.png'
-}
-
 function sortStonesLikeAdminEmployee(stones: Stone[]): Stone[] {
-  const inStock = stones.filter(
+  const withImage = stones.filter(
+    stone => stone.url != null && String(stone.url).trim() !== '',
+  )
+  const inStock = withImage.filter(
     stone =>
       (Number(stone.available) > 0 || stone.regular_stock) && Boolean(stone.is_display),
   )
-  const outOfStock = stones.filter(
+  const outOfStock = withImage.filter(
     stone =>
       Number(stone.available) <= 0 && !stone.regular_stock && Boolean(stone.is_display),
   )
-  const notDisplayed = stones.filter(stone => !stone.is_display)
+  const notDisplayed = withImage.filter(stone => !stone.is_display)
   const byName = (a: Stone, b: Stone) => a.name.localeCompare(b.name)
   return [
     ...inStock.sort(byName),
@@ -108,7 +107,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
         title={stone.name}
       >
         <img
-          src={getStoneUrl(stone.url)}
+          src={stone.url ? withIconSuffix(stone.url) : ''}
           alt={stone.name || 'Stone Image'}
           className='object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
           loading='lazy'

@@ -28,10 +28,6 @@ import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
 import { getAdminUser } from '~/utils/session.server'
 import { capitalizeFirstLetter } from '~/utils/words'
 
-function getStoneUrl(original: string | null) {
-  return original ? withIconSuffix(original) : '/placeholder.png'
-}
-
 type ViewMode = 'grid' | 'table'
 
 const VIEW_MODE = {
@@ -76,7 +72,7 @@ function StoneTable({ stones }: { stones: Stone[] }) {
         return (
           <div className='w-12 h-12 overflow-hidden relative cursor-pointer'>
             <img
-              src={getStoneUrl(stone.url)}
+              src={stone.url ? withIconSuffix(stone.url) : ''}
               alt={stone.name}
               className='object-cover w-full h-full'
             />
@@ -193,18 +189,21 @@ export default function AdminStones() {
   const viewMode: ViewMode = searchParams.viewMode || DEFAULT_VIEW_MODE
 
   useEffect(() => {
-    const inStock = stones.filter(
+    const withImage = stones.filter(
+      stone => stone.url != null && String(stone.url).trim() !== '',
+    )
+    const inStock = withImage.filter(
       stone =>
         (Number(stone.available) > 0 || stone.regular_stock) &&
         Boolean(stone.is_display),
     )
-    const outOfStock = stones.filter(
+    const outOfStock = withImage.filter(
       stone =>
         Number(stone.available) <= 0 &&
         !stone.regular_stock &&
         Boolean(stone.is_display),
     )
-    const notDisplayed = stones.filter(stone => !stone.is_display)
+    const notDisplayed = withImage.filter(stone => !stone.is_display)
 
     const sortedInStock = [...inStock].sort((a, b) => a.name.localeCompare(b.name))
     const sortedOutOfStock = [...outOfStock].sort((a, b) =>
@@ -313,7 +312,7 @@ export default function AdminStones() {
                   >
                     <div className='relative'>
                       <img
-                        src={getStoneUrl(stone.url)}
+                        src={stone.url ? withIconSuffix(stone.url) : ''}
                         alt={stone.name || 'Stone Image'}
                         className='object-cover w-full h-40 rounded select-none'
                         loading='lazy'

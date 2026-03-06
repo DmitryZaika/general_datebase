@@ -149,7 +149,7 @@ export default function AdminSinks() {
                 >
                   <div className='relative'>
                     <img
-                      src={sink.url || '/placeholder.png'}
+                      src={sink.url ?? ''}
                       alt={sink.name || 'Sink Image'}
                       className='object-cover w-full h-40 rounded select-none cursor-pointer'
                       loading='lazy'
