@@ -31,7 +31,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const [, searchParams] = request.url.split('?')
   const queryParams = new URLSearchParams(searchParams)
   const filters = stoneFilterSchema.parse(cleanParams(queryParams))
-  const stones = await stoneQueryBuilder(filters, user.company_id)
+  const allStones = await stoneQueryBuilder(filters, user.company_id)
+  const stones = allStones.filter(s => s.url != null && String(s.url).trim() !== '')
   return { stones, companyId: user.company_id }
 }
 
