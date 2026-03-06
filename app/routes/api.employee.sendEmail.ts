@@ -1,9 +1,13 @@
-import type { ResultSetHeader } from 'mysql2'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { v4 as uuidv4 } from 'uuid'
 import { z } from 'zod'
 import { db } from '~/db.server'
 import { type MailReturn, sendEmail } from '~/lib/email.server'
+import {
+  replaceTemplateVariables,
+  type TemplateVariableData,
+} from '~/utils/emailTemplateVariables'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectId } from '~/utils/queryHelpers'
 import { uploadStreamToS3 } from '~/utils/s3.server'
@@ -39,6 +43,43 @@ const appendEmailSignature = (body: string, signature: string | null | undefined
   if (cleanBody.includes(cleanSignature)) return cleanBody
   const sign = cleanSignature.startsWith('--') ? cleanSignature : `—\n${cleanSignature}`
   return `${cleanBody}\n\n${sign}`
+}
+
+async function fetchCustomerDataByEmail(
+  recipientEmail: string,
+  companyId: number,
+): Promise<TemplateVariableData['customer']> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT name, address FROM customers WHERE email = ? AND company_id = ? AND deleted_at IS NULL LIMIT 1`,
+    [recipientEmail, companyId],
+  )
+
+  if (rows?.[0]) {
+    return {
+      name: rows[0].name || undefined,
+      address: rows[0].address || undefined,
+    }
+  }
+
+  return undefined
+}
+
+async function fetchCompanyData(
+  companyId: number,
+): Promise<TemplateVariableData['company']> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    'SELECT name, address FROM company WHERE id = ?',
+    [companyId],
+  )
+
+  if (rows?.[0]) {
+    return {
+      name: rows[0].name || undefined,
+      address: rows[0].address || undefined,
+    }
+  }
+
+  return undefined
 }
 
 const emailToSend = async (
@@ -152,16 +193,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     senderEmail: string
     receiverEmail: string
     threadId: string
+    personalizedBody: string
   }[] = []
+
+  const companyData = user.company_id
+    ? await fetchCompanyData(user.company_id)
+    : undefined
 
   for (const recipient of cleaned.to) {
     const threadId =
       cleaned.to.length === 1 && cleaned.threadId ? cleaned.threadId : uuidv4()
+
+    const recipientCustomerData = user.company_id
+      ? await fetchCustomerDataByEmail(recipient, user.company_id)
+      : undefined
+
+    const templateVariableData: TemplateVariableData = {
+      user: {
+        name: user.name || undefined,
+        email: user.email,
+        phone_number: user.phone_number || undefined,
+      },
+      customer: recipientCustomerData,
+      company: companyData,
+    }
+
+    const personalizedBody = replaceTemplateVariables(
+      cleaned.body,
+      templateVariableData,
+    )
+
     const emailInformation = await emailToSend(
       user,
       {
         subject: cleaned.subject,
-        body: cleaned.body,
+        body: personalizedBody,
         dealId: cleaned.dealId,
         threadId: cleaned.threadId,
         attachments: cleaned.attachments,
@@ -187,6 +253,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       senderEmail: parseEmailAddress(emailInformation.from || ''),
       receiverEmail: parseEmailAddress(recipient),
       threadId,
+      personalizedBody,
     })
   }
 
@@ -197,7 +264,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       [
         user.id,
         cleaned.subject,
-        cleaned.body,
+        sendResult.personalizedBody,
         sendResult.messageId,
         sendResult.senderEmail,
         sendResult.receiverEmail,

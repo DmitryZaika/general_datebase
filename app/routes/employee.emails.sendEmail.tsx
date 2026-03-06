@@ -72,7 +72,6 @@ import { useToast } from '~/hooks/use-toast'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
 import {
   getUnfilledCustomVariables,
-  hasAnyVariables,
   replaceTemplateVariables,
   type TemplateVariableData,
 } from '~/utils/emailTemplateVariables'
@@ -543,8 +542,8 @@ function EmailFormFields({
       {showCustomVariablesInfo && (
         <div className='p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md'>
           <p>
-            <strong>Action required:</strong> Please replace the following placeholders
-            with actual values before sending:
+            <strong>Action required:</strong> Please replace the following custom
+            placeholders with actual values before sending:
           </p>
           <ul className='mt-1 list-disc list-inside'>
             {customVariables.map(variable => (
@@ -553,6 +552,10 @@ function EmailFormFields({
               </li>
             ))}
           </ul>
+          <p className='mt-2 text-xs text-amber-700'>
+            Note: Standard placeholders like customer names will be filled automatically
+            for each recipient.
+          </p>
         </div>
       )}
     </div>
@@ -817,10 +820,10 @@ export default function DealEmailDialog() {
   })
 
   const fullSubmit = (values: EmailFormData) => {
-    if (hasAnyVariables(values.text)) {
+    const customVariables = getUnfilledCustomVariables(values.text)
+    if (customVariables.length > 0) {
       form.setError('text', {
-        message:
-          'Please replace all {{placeholders}} with actual values before sending',
+        message: `Please replace custom placeholders before sending: ${customVariables.map(v => `{{${v}}}`).join(', ')}`,
       })
       return
     }
