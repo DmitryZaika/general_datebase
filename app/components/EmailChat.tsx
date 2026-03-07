@@ -495,6 +495,9 @@ export function EmailChat(props: EmailChatProps) {
               <DialogTitle className='text-lg font-semibold'>
                 {customerName}
               </DialogTitle>
+              {isEmployee && employeeProps?.customerEmail && (
+                <p className='text-sm text-gray-500'>{employeeProps.customerEmail}</p>
+              )}
             </div>
           </div>
         </DialogHeader>

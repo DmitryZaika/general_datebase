@@ -195,12 +195,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     case 'set_default_group': {
       const groupId = values.groupId
-      // 1. Set all other groups for this company to is_default = 0
       await db.execute(
         'UPDATE groups_list SET is_default = 0 WHERE company_id = ? OR id = 1',
         [user.company_id],
       )
-      // 2. Set the selected group to is_default = 1
       await db.execute('UPDATE groups_list SET is_default = 1 WHERE id = ?', [groupId])
       session.flash('message', toastData('Success', 'Default group updated'))
       break
