@@ -2,6 +2,7 @@ import { format } from 'date-fns'
 import {
   Eye,
   Inbox,
+  Mail,
   Menu,
   Paperclip,
   PenSquare,
@@ -33,6 +34,7 @@ import {
 } from '../ui/select'
 import { Sheet, SheetContent, SheetTrigger } from '../ui/sheet'
 import { Skeleton } from '../ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 
 export interface Email {
   id: number
@@ -57,15 +59,16 @@ export interface DealsEmailsViewProps {
   adminMode?: boolean
   salesReps?: { id: number; name: string }[]
   currentUserId?: number | null
-  initialFolder?: 'inbox' | 'sent'
+  initialFolder?: 'inbox' | 'sent' | 'trash'
   inboxCount?: number
   sentCount?: number
+  trashCount?: number
   totalCount?: number
   currentPage?: number
   pageSize?: number
 }
 
-type Tab = 'inbox' | 'drafts' | 'outbox' | 'sent' | 'archive'
+type Tab = 'inbox' | 'drafts' | 'outbox' | 'sent' | 'archive' | 'trash'
 
 export default function DealsEmailsView({
   emails,
@@ -76,6 +79,7 @@ export default function DealsEmailsView({
   initialFolder,
   inboxCount: inboxCountProp,
   sentCount: sentCountProp,
+  trashCount: trashCountProp,
   totalCount: totalCountProp,
   currentPage: currentPageProp = 1,
   pageSize: pageSizeProp = 50,
@@ -83,7 +87,9 @@ export default function DealsEmailsView({
   const navigate = useNavigate()
   const revalidator = useRevalidator()
   const [searchParams] = useSearchParams()
-  const folderFromUrl = searchParams.get('folder') === 'sent' ? 'sent' : 'inbox'
+  const folderParam = searchParams.get('folder')
+  const folderFromUrl =
+    folderParam === 'sent' ? 'sent' : folderParam === 'trash' ? 'trash' : 'inbox'
   const searchFromUrl = searchParams.get('search') ?? ''
   const [activeTabLocal, setActiveTabLocal] = useState<Tab>('inbox')
   const activeTab = initialFolder != null ? (folderFromUrl as Tab) : activeTabLocal
@@ -102,6 +108,7 @@ export default function DealsEmailsView({
   const searchTerm = isServerPagination ? searchFromUrl : searchTermLocal
   const [selectedThreads, setSelectedThreads] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isMarkingUnread, setIsMarkingUnread] = useState(false)
   const { toast } = useToast()
   const location = useLocation()
   const navigation = useNavigation()
@@ -177,6 +184,16 @@ export default function DealsEmailsView({
           if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
             threadMap.set(email.thread_id, email)
           }
+        }
+      })
+      return Array.from(threadMap.values())
+    }
+
+    if (activeTab === 'trash') {
+      emails.forEach(email => {
+        const existing = threadMap.get(email.thread_id)
+        if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
+          threadMap.set(email.thread_id, email)
         }
       })
       return Array.from(threadMap.values())
@@ -264,6 +281,7 @@ export default function DealsEmailsView({
 
   const inboxCount = inboxCountProp !== undefined ? inboxCountProp : counts.inbox
   const sentCount = sentCountProp !== undefined ? sentCountProp : counts.sent
+  const trashCount = trashCountProp !== undefined ? trashCountProp : 0
 
   const navItems = [
     {
@@ -273,6 +291,7 @@ export default function DealsEmailsView({
       count: inboxCount,
     },
     { id: 'sent', label: 'Sent', icon: Send, count: sentCount },
+    { id: 'trash', label: 'Trash', icon: Trash2, count: trashCount },
   ]
 
   const toggleSelectAll = () => {
@@ -323,6 +342,42 @@ export default function DealsEmailsView({
       setIsDeleting(false)
     }
   }
+
+  const handleMarkUnread = async () => {
+    if (selectedThreads.size === 0) return
+    setIsMarkingUnread(true)
+    try {
+      const res = await fetch('/api/emails/mark-unread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadIds: Array.from(selectedThreads) }),
+      })
+      if (res.ok) {
+        toast({
+          title: 'Success',
+          description: 'Marked as unread',
+          variant: 'success',
+        })
+        setSelectedThreads(new Set())
+        revalidator.revalidate()
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to mark as unread',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to mark as unread',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsMarkingUnread(false)
+    }
+  }
+
   const salesRepParam = searchParams.get('sales_rep')
 
   const handleSalesRepChange = (val: string) => {
@@ -422,15 +477,37 @@ export default function DealsEmailsView({
               }
               onCheckedChange={toggleSelectAll}
             />
-            {selectedThreads.size > 0 && (
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className='p-1.5 hover:bg-red-50 rounded-full text-red-500 transition-colors'
-                title='Delete selected'
-              >
-                <Trash2 className='h-4 w-4' />
-              </button>
+            {selectedThreads.size > 0 && activeTab !== 'trash' && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className='p-1.5 hover:bg-red-50 rounded-full text-red-500 transition-colors'
+                    >
+                      <Trash2 className='h-4 w-4' />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side='top' sideOffset={6}>
+                    Delete selected
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={handleMarkUnread}
+                      disabled={isMarkingUnread}
+                      className='p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors'
+                    >
+                      <Mail className='h-4 w-4' />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side='top' sideOffset={6}>
+                    Mark as unread
+                  </TooltipContent>
+                </Tooltip>
+              </>
             )}
           </div>
           <div className='relative flex-1 max-w-md ml-2'>
@@ -532,7 +609,7 @@ export default function DealsEmailsView({
 
                 const isSelected = selectedThreads.has(email.thread_id)
                 const senderName =
-                  activeTab === 'inbox'
+                  activeTab === 'inbox' || activeTab === 'trash'
                     ? email.sender_name || email.sender_email
                     : email.receiver_name || email.receiver_email
 
@@ -628,7 +705,7 @@ export default function DealsEmailsView({
                       {/* Admin Mode Extra Info */}
                       {adminMode && (
                         <div className='mt-1 text-xs text-gray-400 truncate'>
-                          {activeTab === 'inbox'
+                          {activeTab === 'inbox' || activeTab === 'trash'
                             ? `To: ${email.receiver_name || email.receiver_email}`
                             : `From: ${email.sender_name || email.sender_email}`}
                         </div>
@@ -640,7 +717,7 @@ export default function DealsEmailsView({
                       {/* Employee Name (Admin Mode) */}
                       {adminMode && (
                         <div className='w-32 flex-shrink-0 truncate text-sm text-gray-500 font-medium'>
-                          {activeTab === 'inbox'
+                          {activeTab === 'inbox' || activeTab === 'trash'
                             ? email.receiver_name
                             : email.sender_name}
                         </div>

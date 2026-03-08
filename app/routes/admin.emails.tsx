@@ -17,6 +17,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const salesRepFilter = url.searchParams.get('sales_rep')
     const folder = url.searchParams.get('folder')
     const isSent = folder === 'sent'
+    const isTrash = folder === 'trash'
     const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
     const pageSize = 50
     const search = (url.searchParams.get('search') || '').trim()
@@ -29,6 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const companyId = user.company_id || 0
     const baseWhere = `e.deleted_at IS NULL AND (s.company_id = ? OR r.company_id = ?)`
+    const baseWhereTrash = `e.deleted_at IS NOT NULL AND (s.company_id = ? OR r.company_id = ?)`
     const baseParamsWhere: (string | number)[] = [companyId, companyId]
     const baseParamsSelect: (string | number)[] = [
       companyId,
@@ -52,11 +54,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const whereInbox = `${baseWhere}${salesRepClause}${folderClauseInbox}${searchClause}`
     const whereSent = `${baseWhere}${salesRepClause}${folderClauseSent}${searchClause}`
+    const whereTrash = `${baseWhereTrash}${salesRepClause}${folderClauseInbox}${searchClause}`
     const subqueryWhereInbox = whereInbox
       .replaceAll('e.', 'e2.')
       .replaceAll('s.', 's2.')
       .replaceAll('r.', 'r2.')
     const subqueryWhereSent = whereSent
+      .replaceAll('e.', 'e2.')
+      .replaceAll('s.', 's2.')
+      .replaceAll('r.', 'r2.')
+    const subqueryWhereTrash = whereTrash
       .replaceAll('e.', 'e2.')
       .replaceAll('s.', 's2.')
       .replaceAll('r.', 'r2.')
@@ -78,6 +85,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       ...folderParamsSent,
       ...searchParamsArr,
     ]
+    const paramsTrashWhere = [...baseParamsWhere, ...salesRepParams, ...searchParamsArr]
+    const paramsTrashSelect = [
+      ...baseParamsSelect,
+      ...salesRepParams,
+      ...searchParamsArr,
+    ]
     const offset = (page - 1) * pageSize
 
     const selectList = `SELECT e.id, e.thread_id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.sender_user_id, e.employee_read_at,
@@ -89,66 +102,84 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        LEFT JOIN users s ON e.sender_user_id = s.id
        LEFT JOIN users r ON e.receiver_email = r.email`
 
-    const [inboxCountRows, sentCountRows, totalCountRows, userEmails, salesReps] =
-      await Promise.all([
-        selectMany<{ c: number }>(
-          db,
-          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+    const [
+      inboxCountRows,
+      sentCountRows,
+      trashCountRows,
+      totalCountRows,
+      userEmails,
+      salesReps,
+    ] = await Promise.all([
+      selectMany<{ c: number }>(
+        db,
+        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
          LEFT JOIN users s ON e.sender_user_id = s.id
          LEFT JOIN users r ON e.receiver_email = r.email
          WHERE ${whereInbox}`,
-          paramsInboxWhere,
-        ),
-        selectMany<{ c: number }>(
-          db,
-          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+        paramsInboxWhere,
+      ),
+      selectMany<{ c: number }>(
+        db,
+        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
          LEFT JOIN users s ON e.sender_user_id = s.id
          LEFT JOIN users r ON e.receiver_email = r.email
          WHERE ${whereSent}`,
-          paramsSentWhere,
-        ),
-        selectMany<{ c: number }>(
-          db,
-          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+        paramsSentWhere,
+      ),
+      selectMany<{ c: number }>(
+        db,
+        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
          LEFT JOIN users s ON e.sender_user_id = s.id
          LEFT JOIN users r ON e.receiver_email = r.email
-         WHERE ${isSent ? whereSent : whereInbox}`,
-          isSent ? paramsSentWhere : paramsInboxWhere,
-        ),
-        selectMany<Email>(
-          db,
-          `${selectList}
-         WHERE ${isSent ? whereSent : whereInbox}
+         WHERE ${whereTrash}`,
+        paramsTrashWhere,
+      ),
+      selectMany<{ c: number }>(
+        db,
+        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+         LEFT JOIN users s ON e.sender_user_id = s.id
+         LEFT JOIN users r ON e.receiver_email = r.email
+         WHERE ${isTrash ? whereTrash : isSent ? whereSent : whereInbox}`,
+        isTrash ? paramsTrashWhere : isSent ? paramsSentWhere : paramsInboxWhere,
+      ),
+      selectMany<Email>(
+        db,
+        `${selectList}
+         WHERE ${isTrash ? whereTrash : isSent ? whereSent : whereInbox}
          AND e.thread_id IN (
            SELECT thread_id FROM (
              SELECT e2.thread_id, MAX(e2.sent_at) AS mt
              FROM emails e2
              LEFT JOIN users s2 ON e2.sender_user_id = s2.id
              LEFT JOIN users r2 ON e2.receiver_email = r2.email
-             WHERE ${isSent ? subqueryWhereSent : subqueryWhereInbox}
+             WHERE ${isTrash ? subqueryWhereTrash : isSent ? subqueryWhereSent : subqueryWhereInbox}
              GROUP BY e2.thread_id
              ORDER BY mt DESC
              LIMIT ${pageSize} OFFSET ${offset}
            ) t
          )
          ORDER BY e.sent_at DESC`,
-          [
-            ...(isSent ? paramsSentSelect : paramsInboxSelect),
-            ...(isSent ? paramsSentWhere : paramsInboxWhere),
-          ],
-        ),
-        selectMany<{ id: number; name: string }>(
-          db,
-          `SELECT u.id, u.name
+        [
+          ...(isTrash
+            ? paramsTrashSelect
+            : isSent
+              ? paramsSentSelect
+              : paramsInboxSelect),
+          ...(isTrash ? paramsTrashWhere : isSent ? paramsSentWhere : paramsInboxWhere),
+        ],
+      ),
+      selectMany<{ id: number; name: string }>(
+        db,
+        `SELECT u.id, u.name
          FROM users u
          JOIN users_positions up ON up.user_id = u.id
          JOIN positions p ON p.id = up.position_id
          WHERE LOWER(p.name) = 'sales_rep'
            AND u.is_deleted = 0
            AND u.company_id = ?`,
-          [companyId],
-        ),
-      ])
+        [companyId],
+      ),
+    ])
 
     const totalCount = totalCountRows[0]?.c ?? 0
 
@@ -156,9 +187,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       userEmails,
       userEmail: user.email,
       salesReps,
-      folder: isSent ? 'sent' : 'inbox',
+      folder: isTrash ? 'trash' : isSent ? 'sent' : 'inbox',
       inboxCount: inboxCountRows[0]?.c ?? 0,
       sentCount: sentCountRows[0]?.c ?? 0,
+      trashCount: trashCountRows[0]?.c ?? 0,
       totalCount,
       currentPage: page,
       pageSize,
@@ -177,6 +209,7 @@ export default function AdminEmails() {
     folder,
     inboxCount,
     sentCount,
+    trashCount,
     totalCount,
     currentPage,
     pageSize,
@@ -184,9 +217,10 @@ export default function AdminEmails() {
     userEmails: Email[]
     userEmail: string
     salesReps: { id: number; name: string }[]
-    folder: 'inbox' | 'sent'
+    folder: 'inbox' | 'sent' | 'trash'
     inboxCount: number
     sentCount: number
+    trashCount: number
     totalCount: number
     currentPage: number
     pageSize: number
@@ -204,6 +238,7 @@ export default function AdminEmails() {
           initialFolder={folder}
           inboxCount={inboxCount}
           sentCount={sentCount}
+          trashCount={trashCount}
           totalCount={totalCount}
           currentPage={currentPage}
           pageSize={pageSize}

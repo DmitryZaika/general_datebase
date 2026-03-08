@@ -13,6 +13,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const url = new URL(request.url)
     const folder = url.searchParams.get('folder')
     const isSent = folder === 'sent'
+    const isTrash = folder === 'trash'
     const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
     const pageSize = 50
     const search = (url.searchParams.get('search') || '').trim()
@@ -35,17 +36,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       OR e.receiver_email LIKE ?
     )`
 
-    const folderCondition = isSent ? senderCondition : receiverCondition
-    const folderParams = isSent
-      ? [user.id, userEmailNorm, userEmailNorm, userEmailLike]
-      : [userEmailNorm, userEmailNorm, userEmailLike]
+    const folderCondition = isTrash
+      ? receiverCondition
+      : isSent
+        ? senderCondition
+        : receiverCondition
+    const folderParams = isTrash
+      ? [userEmailNorm, userEmailNorm, userEmailLike]
+      : isSent
+        ? [user.id, userEmailNorm, userEmailNorm, userEmailLike]
+        : [userEmailNorm, userEmailNorm, userEmailLike]
 
-    const whereBase = `e.deleted_at IS NULL AND ${folderCondition}${searchClause}`
+    const deletedClause = isTrash ? 'e.deleted_at IS NOT NULL' : 'e.deleted_at IS NULL'
+    const whereBase = `${deletedClause} AND ${folderCondition}${searchClause}`
     const subqueryWhereBase = whereBase.replaceAll('e.', 'e2.')
     const paramsWithSearch = [...folderParams, ...searchParams]
     const offset = (page - 1) * pageSize
 
-    const [inboxCountRows, sentCountRows, totalCountRows, userEmails] =
+    const [inboxCountRows, sentCountRows, trashCountRows, totalCountRows, userEmails] =
       await Promise.all([
         selectMany<{ c: number }>(
           db,
@@ -58,6 +66,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
          WHERE e.deleted_at IS NULL AND ${senderCondition}`,
           [user.id, userEmailNorm, userEmailNorm, userEmailLike],
+        ),
+        selectMany<{ c: number }>(
+          db,
+          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+         WHERE e.deleted_at IS NOT NULL AND ${receiverCondition}`,
+          [userEmailNorm, userEmailNorm, userEmailLike],
         ),
         selectMany<{ c: number }>(
           db,
@@ -97,9 +111,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       userEmails,
       userEmail: user.email,
       userId: user.id,
-      folder: isSent ? 'sent' : 'inbox',
+      folder: isTrash ? 'trash' : isSent ? 'sent' : 'inbox',
       inboxCount: inboxCountRows[0]?.c ?? 0,
       sentCount: sentCountRows[0]?.c ?? 0,
+      trashCount: trashCountRows[0]?.c ?? 0,
       totalCount,
       currentPage: page,
       pageSize,
@@ -117,6 +132,7 @@ export default function EmployeeEmails() {
     folder,
     inboxCount,
     sentCount,
+    trashCount,
     totalCount,
     currentPage,
     pageSize,
@@ -124,9 +140,10 @@ export default function EmployeeEmails() {
     userEmails: Email[]
     userEmail: string
     userId: number
-    folder: 'inbox' | 'sent'
+    folder: 'inbox' | 'sent' | 'trash'
     inboxCount: number
     sentCount: number
+    trashCount: number
     totalCount: number
     currentPage: number
     pageSize: number
@@ -141,6 +158,7 @@ export default function EmployeeEmails() {
         initialFolder={folder}
         inboxCount={inboxCount}
         sentCount={sentCount}
+        trashCount={trashCount}
         totalCount={totalCount}
         currentPage={currentPage}
         pageSize={pageSize}
