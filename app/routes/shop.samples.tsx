@@ -266,11 +266,15 @@ export default function Samples() {
               setCurrentId(stone.id)
             }}
           >
-            <img
-              src={stone.url ?? ''}
-              alt={stone.name}
-              className='object-cover w-full h-full'
-            />
+            {stone.url ? (
+              <img
+                src={stone.url}
+                alt={stone.name}
+                className='object-cover w-full h-full'
+              />
+            ) : (
+              <div className='w-full h-full bg-gray-200' />
+            )}
             {isOutOfStock && (
               <div className='absolute inset-0 flex items-center justify-center bg-red-500/70'>
                 <span className='text-white text-[8px] font-bold rotate-0 text-center leading-tight px-0.5'>

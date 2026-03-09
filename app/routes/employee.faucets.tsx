@@ -69,13 +69,23 @@ function InteractiveCard({
         }}
         title={faucet.name}
       >
-        <img
-          src={faucet.url ?? ''}
-          alt={faucet.name || 'Faucet Image'}
-          className='object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
-          loading='lazy'
-          onClick={() => setCurrentId(faucet.id, faucetType)}
-        />
+        {faucet.url ? (
+          <img
+            src={faucet.url}
+            alt={faucet.name || 'Faucet Image'}
+            className='object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
+            loading='lazy'
+            onClick={() => setCurrentId(faucet.id, faucetType)}
+          />
+        ) : (
+          <div
+            className='w-full h-40 border-2 rounded cursor-pointer bg-gray-200'
+            onClick={() => setCurrentId(faucet.id, faucetType)}
+            role='button'
+            tabIndex={0}
+            onKeyDown={e => e.key === 'Enter' && setCurrentId(faucet.id, faucetType)}
+          />
+        )}
       </ImageCard>
       {displayedAmount === '—' && !isRegularStock && (
         <div className='absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center cursor-pointer whitespace-nowrap'>

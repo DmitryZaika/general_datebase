@@ -127,12 +127,14 @@ function ChildrenImagesDialog({
             </div>
           </div>
         )}
-        <img
-          src={selectedImage ?? ''}
-          alt={alt || name || 'Image'}
-          className='w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] object-contain z-0 select-none'
-          onClick={e => e.stopPropagation()}
-        />
+        {selectedImage ? (
+          <img
+            src={selectedImage}
+            alt={alt || name || 'Image'}
+            className='w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] object-contain z-0 select-none'
+            onClick={e => e.stopPropagation()}
+          />
+        ) : null}
       </div>
 
       {data?.images && data.images.length > 0 && (

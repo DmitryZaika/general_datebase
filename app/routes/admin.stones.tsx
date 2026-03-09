@@ -71,11 +71,15 @@ function StoneTable({ stones }: { stones: Stone[] }) {
 
         return (
           <div className='w-12 h-12 overflow-hidden relative cursor-pointer'>
-            <img
-              src={stone.url ? withIconSuffix(stone.url) : ''}
-              alt={stone.name}
-              className='object-cover w-full h-full'
-            />
+            {stone.url ? (
+              <img
+                src={withIconSuffix(stone.url)}
+                alt={stone.name}
+                className='object-cover w-full h-full'
+              />
+            ) : (
+              <div className='w-full h-full bg-gray-200' />
+            )}
             {isOutOfStock && !isRegularStock && (
               <div className='absolute inset-0 flex items-center justify-center bg-red-500/70'>
                 <span className='text-white text-[8px] font-bold rotate-0 text-center leading-tight px-0.5'>
@@ -311,12 +315,16 @@ export default function AdminStones() {
                     onClick={handleGridItemClick}
                   >
                     <div className='relative'>
-                      <img
-                        src={stone.url ? withIconSuffix(stone.url) : ''}
-                        alt={stone.name || 'Stone Image'}
-                        className='object-cover w-full h-40 rounded select-none'
-                        loading='lazy'
-                      />
+                      {stone.url ? (
+                        <img
+                          src={withIconSuffix(stone.url)}
+                          alt={stone.name || 'Stone Image'}
+                          className='object-cover w-full h-40 rounded select-none'
+                          loading='lazy'
+                        />
+                      ) : (
+                        <div className='w-full h-40 rounded bg-gray-200' />
+                      )}
                       {displayedAmount === '—' && !isRegularStock && (
                         <div className='absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
                           <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>

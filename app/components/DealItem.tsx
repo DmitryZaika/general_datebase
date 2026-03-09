@@ -3,12 +3,15 @@ import { CSS } from '@dnd-kit/utilities'
 import {
   Calendar as CalendarIcon,
   GripVertical,
+  ListTodo,
   Mail,
   PaperclipIcon,
   Pencil,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLocation } from 'react-router'
+import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
+import { ActivityPriority } from '~/routes/api.deal-activities.$dealId'
 import { formatMoney, updateNumber } from './functions'
 import { Button } from './ui/button'
 import { Calendar } from './ui/calendar'
@@ -28,6 +31,8 @@ interface DealItemProps {
     images?: string[] | null
     has_images?: boolean
     has_email?: boolean
+    has_activities?: boolean
+    activities_icon_color?: 'red' | 'yellow' | 'gray'
     sales_rep?: string | null
     is_won?: number | null
     company_name?: string | null
@@ -60,6 +65,51 @@ function formatDate(date: string | null): Date | undefined {
   return new Date(`${date}T00:00:00`)
 }
 
+const ACTIVITY_PRIORITY_LABEL: Record<ActivityPriority, string> = {
+  [ActivityPriority.High]: 'High',
+  [ActivityPriority.Medium]: 'Medium',
+  [ActivityPriority.Low]: 'Low',
+}
+
+const ACTIVITY_PRIORITY_WEIGHT: Record<ActivityPriority, number> = {
+  [ActivityPriority.High]: 0,
+  [ActivityPriority.Medium]: 1,
+  [ActivityPriority.Low]: 2,
+}
+
+function sortActivities(activities: DealActivity[]): DealActivity[] {
+  return [...activities].sort((a, b) => {
+    const pw =
+      ACTIVITY_PRIORITY_WEIGHT[a.priority] - ACTIVITY_PRIORITY_WEIGHT[b.priority]
+    if (pw !== 0) return pw
+    if (a.deadline && b.deadline)
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+    return a.deadline ? -1 : b.deadline ? 1 : 0
+  })
+}
+
+function formatActivityTime(deadline: string | null): string {
+  if (!deadline) return '—'
+  const d = new Date(deadline)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString(undefined, {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  })
+}
+
+function getActivityDueDateColor(deadline: string | null): string {
+  if (!deadline) return 'text-gray-500'
+  const d = new Date(deadline)
+  if (Number.isNaN(d.getTime())) return 'text-gray-500'
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const deadlineDate = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  if (deadlineDate.getTime() < today.getTime()) return 'text-red-600'
+  if (deadlineDate.getTime() === today.getTime()) return 'text-yellow-600'
+  return 'text-gray-500'
+}
+
 export default function DealItem({
   deal,
   readonly = false,
@@ -70,14 +120,40 @@ export default function DealItem({
   const [editDesc, setEditDesc] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
+  const [activitiesOpen, setActivitiesOpen] = useState(false)
+  const [noActiveActivitiesAfterLoad, setNoActiveActivitiesAfterLoad] = useState(false)
+  const activitiesCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const descTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const descDisplayRef = useRef<HTMLParagraphElement | null>(null)
   const [descExpanded, setDescExpanded] = useState(false)
   const [descOverflow, setDescOverflow] = useState(false)
   const [lineHeightPx, setLineHeightPx] = useState<number>(20)
   const fetcher = useFetcher()
+  const activitiesFetcher = useFetcher<{
+    activities?: DealActivity[]
+    error?: string | null
+  }>()
   const location = useLocation()
   const hasEmail = Boolean(deal.has_email)
+
+  const scheduleActivitiesClose = useCallback(() => {
+    if (activitiesCloseTimeoutRef.current)
+      clearTimeout(activitiesCloseTimeoutRef.current)
+    activitiesCloseTimeoutRef.current = setTimeout(() => setActivitiesOpen(false), 200)
+  }, [])
+
+  const cancelActivitiesClose = useCallback(() => {
+    if (activitiesCloseTimeoutRef.current) {
+      clearTimeout(activitiesCloseTimeoutRef.current)
+      activitiesCloseTimeoutRef.current = null
+    }
+  }, [])
+
+  const handleActivitiesOpen = useCallback(() => {
+    cancelActivitiesClose()
+    setActivitiesOpen(true)
+    activitiesFetcher.load(`/api/deal-activities/${deal.id}`)
+  }, [deal.id, cancelActivitiesClose])
 
   const hasImages =
     (Array.isArray(deal.images) && deal.images.length > 0) || Boolean(deal.has_images)
@@ -97,6 +173,23 @@ export default function DealItem({
   useEffect(() => {
     setLocalDate(deal.due_date ?? null)
   }, [deal.due_date])
+
+  useEffect(() => {
+    setNoActiveActivitiesAfterLoad(false)
+  }, [deal.id])
+
+  const activeActivitiesCount =
+    activitiesFetcher.state === 'idle' && activitiesFetcher.data?.activities
+      ? (activitiesFetcher.data.activities as DealActivity[]).filter(
+          a => !a.is_completed,
+        ).length
+      : null
+  useEffect(() => {
+    if (activeActivitiesCount === 0) setNoActiveActivitiesAfterLoad(true)
+  }, [activeActivitiesCount])
+
+  const showActivitiesIcon =
+    Boolean(deal.has_activities) && !noActiveActivitiesAfterLoad
 
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: deal.id,
@@ -375,30 +468,98 @@ export default function DealItem({
           )}
         </div>
 
-        {(hasEmail || hasImages) && (
-          <div className='flex items-center gap-2'>
-            {hasEmail && (
-              <Link
-                to={mailUrl + location.search}
-                className='text-slate-500 hover:text-black'
+        <div className='flex items-center gap-2'>
+          {hasEmail && (
+            <Link
+              to={mailUrl + location.search}
+              className='text-slate-500 hover:text-black'
+              onPointerDown={e => e.stopPropagation()}
+              state={{ from: fromState }}
+            >
+              <Mail className='w-4 h-4' />
+            </Link>
+          )}
+          {hasImages && (
+            <Link
+              to={imagesUrl + location.search}
+              className='text-slate-500 hover:text-black'
+              onPointerDown={e => e.stopPropagation()}
+              state={{ from: fromState }}
+            >
+              <PaperclipIcon className='w-4 h-4' />
+            </Link>
+          )}
+          {showActivitiesIcon && (
+            <Popover open={activitiesOpen} onOpenChange={setActivitiesOpen}>
+              <PopoverTrigger asChild>
+                <Link
+                  to={projectUrl + location.search}
+                  state={{ from: fromState }}
+                  className='cursor-pointer hover:opacity-80'
+                  onPointerDown={e => e.stopPropagation()}
+                  onPointerEnter={handleActivitiesOpen}
+                  onPointerLeave={scheduleActivitiesClose}
+                >
+                  <ListTodo className='w-4 h-4 text-slate-500' />
+                </Link>
+              </PopoverTrigger>
+              <PopoverContent
+                className='w-72 max-h-64 overflow-y-auto p-2'
+                align='end'
+                side='bottom'
+                onPointerEnter={cancelActivitiesClose}
+                onPointerLeave={scheduleActivitiesClose}
+                onOpenAutoFocus={e => e.preventDefault()}
                 onPointerDown={e => e.stopPropagation()}
-                state={{ from: fromState }}
               >
-                <Mail className='w-4 h-4' />
-              </Link>
-            )}
-            {hasImages && (
-              <Link
-                to={imagesUrl + location.search}
-                className='text-slate-500 hover:text-black'
-                onPointerDown={e => e.stopPropagation()}
-                state={{ from: fromState }}
-              >
-                <PaperclipIcon className='w-4 h-4' />
-              </Link>
-            )}
-          </div>
-        )}
+                <p className='text-xs font-semibold text-slate-700 mb-2'>Activities</p>
+                {activitiesFetcher.state === 'loading' && (
+                  <p className='text-xs text-slate-500'>Loading…</p>
+                )}
+                {activitiesFetcher.state !== 'loading' &&
+                  (() => {
+                    const all = (activitiesFetcher.data?.activities ??
+                      []) as DealActivity[]
+                    const active = sortActivities(all.filter(a => !a.is_completed))
+                    return active.length ? (
+                      <ul className='space-y-2'>
+                        {active.map((a: DealActivity) => (
+                          <li
+                            key={a.id}
+                            className='text-xs border-b border-slate-100 last:border-0 pb-1.5 last:pb-0'
+                          >
+                            <p>{a.name}</p>
+                            <div className='flex items-center gap-1.5 mt-0.5 flex-wrap'>
+                              <span
+                                className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                                  a.priority === ActivityPriority.High
+                                    ? 'bg-red-100 text-red-700 border-red-200'
+                                    : a.priority === ActivityPriority.Medium
+                                      ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                      : 'bg-gray-100 text-gray-600 border-gray-200'
+                                }`}
+                              >
+                                {ACTIVITY_PRIORITY_LABEL[a.priority]}
+                              </span>
+                              {a.deadline && (
+                                <span
+                                  className={`text-[10px] ${getActivityDueDateColor(a.deadline)}`}
+                                >
+                                  {formatActivityTime(a.deadline)}
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className='text-xs text-slate-500'>No activities</p>
+                    )
+                  })()}
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
       </div>
     </div>
   )

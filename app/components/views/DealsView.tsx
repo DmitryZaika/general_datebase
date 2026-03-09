@@ -43,6 +43,8 @@ type Deal = FullDeal & {
   company_name?: string | null
   has_images?: boolean
   has_email?: boolean
+  has_activities?: boolean
+  activities_icon_color?: 'red' | 'yellow' | 'gray'
 }
 
 interface DealsViewProps {
@@ -51,6 +53,8 @@ interface DealsViewProps {
   lists: List[]
   imagesMap: Record<number, boolean>
   emailsMap: Record<number, boolean>
+  activitiesMap?: Record<number, boolean>
+  activitiesIconMap?: Record<number, 'red' | 'yellow' | 'gray'>
   groupListSelect?: React.ReactNode
   readonly?: boolean
   toolbarLeft?: React.ReactNode
@@ -63,6 +67,8 @@ export default function DealsView({
   lists,
   imagesMap,
   emailsMap,
+  activitiesMap = {},
+  activitiesIconMap = {},
   groupListSelect,
   readonly = false,
   toolbarLeft,
@@ -92,6 +98,8 @@ export default function DealsView({
         : null,
       has_images: imagesMap?.[d.id] || false,
       has_email: emailsMap?.[d.id] || false,
+      has_activities: activitiesMap?.[d.id] || false,
+      activities_icon_color: activitiesIconMap?.[d.id],
       is_won: d.is_won,
       sales_rep: d.sales_rep ?? undefined,
     }
@@ -415,6 +423,11 @@ export default function DealsView({
     <DndContext
       sensors={sensors}
       collisionDetection={args => {
+        const { pointerCoordinates } = args
+        const el = pointerCoordinates
+          ? document.elementFromPoint(pointerCoordinates.x, pointerCoordinates.y)
+          : null
+        if (el?.closest('[data-dnd-ignore]')) return []
         const pointerCollisions = pointerWithin(args)
         if (pointerCollisions.length > 0) return pointerCollisions
         return closestCorners(args)

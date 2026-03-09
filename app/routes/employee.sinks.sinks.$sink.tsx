@@ -103,16 +103,16 @@ export default function SinksModal() {
           <p className='text-center text-gray-500'>No sinks available</p>
         ) : (
           <div className='flex items-center gap-4 p-3 rounded-lg border border-gray-200'>
-            <img
-              src={sink.url ?? ''}
-              alt={sink.name}
-              className='w-20 h-20 object-cover cursor-pointer rounded'
-              onClick={() => {
-                if (sink.url) {
-                  setSelectedImage(sink.url)
-                }
-              }}
-            />
+            {sink.url ? (
+              <img
+                src={sink.url}
+                alt={sink.name}
+                className='w-20 h-20 object-cover cursor-pointer rounded'
+                onClick={() => setSelectedImage(sink.url)}
+              />
+            ) : (
+              <div className='w-20 h-20 bg-gray-200 rounded' />
+            )}
             <span className='flex-1 text-center font-semibold text-gray-800'>
               {sink.name}
             </span>

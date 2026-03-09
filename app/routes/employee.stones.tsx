@@ -106,13 +106,23 @@ function InteractiveCard({
         title={stone.name}
       >
         <div onClick={e => e.stopPropagation()}>
-          <img
-            src={stone.url ? withIconSuffix(stone.url) : ''}
-            alt={stone.name || 'Stone Image'}
-            className='object-cover w-full h-40 border-2 border-gray-300 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
-            loading='lazy'
-            onClick={handleImageClick}
-          />
+          {stone.url ? (
+            <img
+              src={withIconSuffix(stone.url)}
+              alt={stone.name || 'Stone Image'}
+              className='object-cover w-full h-40 border-2 border-gray-300 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
+              loading='lazy'
+              onClick={handleImageClick}
+            />
+          ) : (
+            <div
+              className='w-full h-40 border-2 border-gray-300 rounded cursor-pointer bg-gray-200'
+              onClick={handleImageClick}
+              role='button'
+              tabIndex={0}
+              onKeyDown={e => e.key === 'Enter' && setCurrentId(stone.id)}
+            />
+          )}
         </div>
       </ImageCard>
       {stone.available === 0 && !isRegularStock && (
@@ -222,11 +232,15 @@ export default function Stones() {
               setCurrentId(stone.id)
             }}
           >
-            <img
-              src={stone.url ? withIconSuffix(stone.url) : ''}
-              alt={stone.name}
-              className='object-cover w-full h-full'
-            />
+            {stone.url ? (
+              <img
+                src={withIconSuffix(stone.url)}
+                alt={stone.name}
+                className='object-cover w-full h-full'
+              />
+            ) : (
+              <div className='w-full h-full bg-gray-200' />
+            )}
             {isOutOfStock && !isRegularStock && (
               <div className='absolute inset-0 flex items-center justify-center bg-red-500/70'>
                 <span className='text-white text-[8px] font-bold rotate-0 text-center leading-tight px-0.5'>

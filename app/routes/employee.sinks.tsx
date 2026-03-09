@@ -70,13 +70,23 @@ function InteractiveCard({
         }}
         title={sink.name}
       >
-        <img
-          src={sink.url ?? ''}
-          alt={sink.name || 'Sink Image'}
-          className='object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
-          loading='lazy'
-          onClick={() => setCurrentId(sink.id, sinkType)}
-        />
+        {sink.url ? (
+          <img
+            src={sink.url}
+            alt={sink.name || 'Sink Image'}
+            className='object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
+            loading='lazy'
+            onClick={() => setCurrentId(sink.id, sinkType)}
+          />
+        ) : (
+          <div
+            className='w-full h-40 border-2 rounded cursor-pointer bg-gray-200'
+            onClick={() => setCurrentId(sink.id, sinkType)}
+            role='button'
+            tabIndex={0}
+            onKeyDown={e => e.key === 'Enter' && setCurrentId(sink.id, sinkType)}
+          />
+        )}
       </ImageCard>
       {displayedAmount === '—' && !isRegularStock && (
         <div className='absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center cursor-pointer whitespace-nowrap'>
