@@ -500,7 +500,15 @@ export default function DealItem({
                   onPointerEnter={handleActivitiesOpen}
                   onPointerLeave={scheduleActivitiesClose}
                 >
-                  <ListTodo className='w-4 h-4 text-slate-500' />
+                  <ListTodo
+                    className={`w-4 h-4 ${
+                      deal.activities_icon_color === 'red'
+                        ? 'text-red-600'
+                        : deal.activities_icon_color === 'yellow'
+                          ? 'text-yellow-600'
+                          : 'text-gray-500'
+                    }`}
+                  />
                 </Link>
               </PopoverTrigger>
               <PopoverContent
