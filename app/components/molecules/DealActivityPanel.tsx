@@ -947,21 +947,9 @@ function ActivityList({
       if (sortedNotes.length === 0) return <SectionEmptyState label='No notes yet' />
       return (
         <div className='space-y-1.5'>
-          <AnimatePresence initial={false}>
-            {sortedNotes.map(note => (
-              <motion.div
-                key={`note-${note.id}`}
-                layout
-                variants={ITEM_VARIANTS}
-                initial='initial'
-                animate='animate'
-                exit='exit'
-                transition={ITEM_TRANSITION}
-              >
-                <NoteItem note={note} handlers={noteHandlers} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          {sortedNotes.map(note => (
+            <NoteItem key={`note-${note.id}`} note={note} handlers={noteHandlers} />
+          ))}
         </div>
       )
     }
@@ -971,30 +959,23 @@ function ActivityList({
 
     return (
       <div className='space-y-1.5'>
-        <AnimatePresence initial={false}>
-          {allHistoryItems.map(item => (
-            <motion.div
-              key={`${item.type}-${item.data.id}`}
-              layout
-              variants={ITEM_VARIANTS}
-              initial='initial'
-              animate='animate'
-              exit='exit'
-              transition={ITEM_TRANSITION}
-            >
-              {item.type === 'activity' ? (
-                <ActivityItem
-                  activity={item.data}
-                  dealId={dealId}
-                  onEdit={onEdit}
-                  isBeingEdited={editingActivityId === item.data.id}
-                />
-              ) : (
-                <NoteItem note={item.data} handlers={noteHandlers} />
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        {allHistoryItems.map(item =>
+          item.type === 'activity' ? (
+            <ActivityItem
+              key={`activity-${item.data.id}`}
+              activity={item.data}
+              dealId={dealId}
+              onEdit={onEdit}
+              isBeingEdited={editingActivityId === item.data.id}
+            />
+          ) : (
+            <NoteItem
+              key={`note-${item.data.id}`}
+              note={item.data}
+              handlers={noteHandlers}
+            />
+          ),
+        )}
       </div>
     )
   }

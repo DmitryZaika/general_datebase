@@ -79,6 +79,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return handlePin(formData, dealId, user.company_id)
     }
 
+    if (intent === 'update') {
+      return handleUpdate(formData, dealId, user.company_id)
+    }
+
     if (intent === 'delete') {
       return handleDelete(formData, dealId, user.company_id, user)
     }
@@ -130,6 +134,34 @@ async function handleCreate(
      VALUES (?, ?, ?, ?)`,
     [dealId, companyId, content.trim(), createdBy],
   )
+
+  return success()
+}
+
+async function handleUpdate(formData: FormData, dealId: number, companyId: number) {
+  const noteId = formData.get('noteId')
+  const content = formData.get('content')
+
+  if (!noteId || Number.isNaN(Number(noteId))) {
+    return badRequest('Valid note ID is required')
+  }
+
+  if (!content || typeof content !== 'string' || !content.trim()) {
+    return badRequest('Note content is required')
+  }
+
+  if (content.trim().length > 5000) {
+    return badRequest('Note content must be 5000 characters or less')
+  }
+
+  const [result] = await db.execute<ResultSetHeader>(
+    'UPDATE deal_notes SET content = ? WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
+    [content.trim(), Number(noteId), dealId, companyId],
+  )
+
+  if (result.affectedRows === 0) {
+    return notFound('Note not found')
+  }
 
   return success()
 }

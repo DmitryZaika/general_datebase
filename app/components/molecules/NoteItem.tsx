@@ -1,6 +1,7 @@
 import { format } from 'date-fns'
-import { Pin, PinOff, Trash2 } from 'lucide-react'
+import { Pencil, Pin, PinOff, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useFetcher } from 'react-router'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,28 +14,49 @@ import {
 } from '~/components/ui/alert-dialog'
 import { Button, buttonVariants } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { Textarea } from '~/components/ui/textarea'
+import { buildNoteApiAction } from '~/lib/dealApiHelpers'
 import { cn } from '~/lib/utils'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
+import type { ApiResponse } from '~/utils/apiResponse.server'
 
 export interface NoteItemHandlers {
-  pin: (noteId: number) => void
+  dealId: number
+  token: string
   remove: (noteId: number) => void
   addComment: (noteId: number, content: string) => void
-  pinningData?: FormData
+  editNote: (noteId: number, content: string) => void
   deletingData?: FormData
 }
 
-export function NoteItem({ note, handlers }: { note: DealNote; handlers: NoteItemHandlers }) {
-  const { pin, remove, addComment, pinningData, deletingData } = handlers
+export function NoteItem({
+  note,
+  handlers,
+}: {
+  note: DealNote
+  handlers: NoteItemHandlers
+}) {
+  const { dealId, token, remove, addComment, editNote, deletingData } = handlers
+  const pinFetcher = useFetcher<ApiResponse>({ key: `pin-note-${note.id}` })
   const isDeleting = deletingData?.get('noteId') === String(note.id)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showCommentInput, setShowCommentInput] = useState(false)
   const [commentText, setCommentText] = useState('')
+  const [isEditingNote, setIsEditingNote] = useState(false)
+  const [editContent, setEditContent] = useState(note.content)
   const commentInputRef = useRef<HTMLInputElement>(null)
   const commentContainerRef = useRef<HTMLDivElement>(null)
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const isPinned =
-    pinningData?.get('noteId') === String(note.id) ? !note.is_pinned : !!note.is_pinned
+  const isPinning = pinFetcher.state !== 'idle'
+  const isPinned = isPinning ? !note.is_pinned : !!note.is_pinned
+
+  const pin = () => {
+    pinFetcher.submit(
+      { intent: 'pin', noteId: String(note.id), csrf: token },
+      { method: 'POST', action: buildNoteApiAction(dealId) },
+    )
+  }
 
   const handleAddComment = () => {
     if (!commentText.trim()) return
@@ -42,6 +64,39 @@ export function NoteItem({ note, handlers }: { note: DealNote; handlers: NoteIte
     setCommentText('')
     setShowCommentInput(false)
   }
+
+  const startEditing = () => {
+    setEditContent(note.content)
+    setIsEditingNote(true)
+  }
+
+  const cancelEditing = () => {
+    setIsEditingNote(false)
+    setEditContent(note.content)
+  }
+
+  const saveEdit = () => {
+    const trimmed = editContent.trim()
+    if (!trimmed || trimmed === note.content) {
+      cancelEditing()
+      return
+    }
+    editNote(note.id, trimmed)
+    setIsEditingNote(false)
+  }
+
+  useEffect(() => {
+    if (isEditingNote) {
+      requestAnimationFrame(() => {
+        const el = editTextareaRef.current
+        if (el) {
+          const end = el.value.length
+          el.focus()
+          el.setSelectionRange(end, end)
+        }
+      })
+    }
+  }, [isEditingNote])
 
   useEffect(() => {
     if (showCommentInput) {
@@ -67,8 +122,10 @@ export function NoteItem({ note, handlers }: { note: DealNote; handlers: NoteIte
   return (
     <div
       className={cn(
-        'rounded-md px-3 py-2.5 transition-all',
-        isPinned ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50 border border-gray-200',
+        'rounded-md px-3 py-2.5 transition-[opacity,transform,background-color,border-color]',
+        isPinned
+          ? 'bg-amber-50 border border-amber-200'
+          : 'bg-gray-50 border border-gray-200',
         isDeleting && 'opacity-0 scale-95 pointer-events-none',
       )}
     >
@@ -91,15 +148,27 @@ export function NoteItem({ note, handlers }: { note: DealNote; handlers: NoteIte
           <Button
             variant='ghost'
             size='icon'
+            className='h-6 w-6 text-gray-400 hover:text-blue-500'
+            onClick={startEditing}
+          >
+            <Pencil className='h-3 w-3' />
+          </Button>
+          <Button
+            variant='ghost'
+            size='icon'
             className={cn(
               'h-6 w-6',
               isPinned
                 ? 'text-amber-600 hover:text-amber-700'
                 : 'text-gray-400 hover:text-amber-500',
             )}
-            onClick={() => pin(note.id)}
+            onClick={pin}
           >
-            {isPinned ? <PinOff className='h-3.5 w-3.5' /> : <Pin className='h-3.5 w-3.5' />}
+            {isPinned ? (
+              <PinOff className='h-3.5 w-3.5' />
+            ) : (
+              <Pin className='h-3.5 w-3.5' />
+            )}
           </Button>
 
           <Button
@@ -113,20 +182,57 @@ export function NoteItem({ note, handlers }: { note: DealNote; handlers: NoteIte
         </div>
       </div>
 
-      <p className='text-sm text-gray-800 whitespace-pre-wrap mt-1 leading-relaxed'>
-        {note.content}
-      </p>
+      {isEditingNote ? (
+        <div className='mt-1 space-y-1.5'>
+          <Textarea
+            ref={editTextareaRef}
+            value={editContent}
+            onChange={e => setEditContent(e.target.value)}
+            className='text-sm min-h-[60px] resize-none'
+            onKeyDown={e => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                saveEdit()
+              }
+              if (e.key === 'Escape') {
+                cancelEditing()
+              }
+            }}
+          />
+          <div className='flex gap-1.5 justify-end'>
+            <Button
+              variant='ghost'
+              size='sm'
+              className='h-6 text-xs px-2'
+              onClick={cancelEditing}
+            >
+              Cancel
+            </Button>
+            <Button
+              size='sm'
+              className='h-6 text-xs px-2'
+              onClick={saveEdit}
+              disabled={!editContent.trim() || editContent.trim() === note.content}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className='text-sm text-gray-800 whitespace-pre-wrap mt-1 leading-relaxed'>
+          {note.content}
+        </p>
+      )}
 
       {note.comments.length > 0 && (
         <div className='mt-2.5 pl-3 border-l-2 border-gray-200 space-y-1.5'>
           {note.comments.map(comment => (
-            <div key={comment.id}>
-              <span className='text-[10px] text-gray-400'>
-                {format(new Date(comment.created_at), 'MMM d h:mm a')}
-                {comment.created_by && ` \u00b7 ${comment.created_by}`}
-              </span>
-              <p className='text-xs text-gray-600 leading-relaxed'>{comment.content}</p>
-            </div>
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              dealId={dealId}
+              token={token}
+            />
           ))}
         </div>
       )}
@@ -180,6 +286,56 @@ export function NoteItem({ note, handlers }: { note: DealNote; handlers: NoteIte
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  )
+}
+
+function CommentItem({
+  comment,
+  dealId,
+  token,
+}: {
+  comment: DealNote['comments'][number]
+  dealId: number
+  token: string
+}) {
+  const fetcher = useFetcher<ApiResponse>({
+    key: `delete-comment-${comment.id}`,
+  })
+  const isDeleting = fetcher.state !== 'idle'
+
+  const handleDelete = () => {
+    fetcher.submit(
+      {
+        intent: 'delete-comment',
+        commentId: String(comment.id),
+        csrf: token,
+      },
+      { method: 'POST', action: buildNoteApiAction(dealId) },
+    )
+  }
+
+  return (
+    <div
+      className={cn(
+        'group flex items-start justify-between gap-1',
+        isDeleting && 'hidden',
+      )}
+    >
+      <div className='min-w-0'>
+        <span className='text-[10px] text-gray-400'>
+          {format(new Date(comment.created_at), 'MMM d h:mm a')}
+          {comment.created_by && ` \u00b7 ${comment.created_by}`}
+        </span>
+        <p className='text-xs text-gray-600 leading-relaxed'>{comment.content}</p>
+      </div>
+      <button
+        type='button'
+        className='opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 text-gray-400 hover:text-red-500 transition-opacity'
+        onClick={handleDelete}
+      >
+        <X className='h-3 w-3' />
+      </button>
     </div>
   )
 }

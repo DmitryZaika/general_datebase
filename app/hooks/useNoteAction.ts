@@ -1,44 +1,35 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { useFetcher, useRevalidator } from 'react-router'
+import { useFetcher } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { buildNoteApiAction } from '~/lib/dealApiHelpers'
 import type { ApiResponse } from '~/utils/apiResponse.server'
 import { useToast } from './use-toast'
 
 export function useNoteAction(dealId: number) {
-  const pinFetcher = useFetcher<ApiResponse>()
   const deleteFetcher = useFetcher<ApiResponse>()
   const commentFetcher = useFetcher<ApiResponse>()
-  const revalidator = useRevalidator()
+  const editFetcher = useFetcher<ApiResponse>()
   const { toast } = useToast()
   const token = useAuthenticityToken()
 
-  const pinSubmitted = useRef(false)
   const deleteSubmitted = useRef(false)
   const commentSubmitted = useRef(false)
+  const editSubmitted = useRef(false)
 
   useEffect(() => {
     if (
-      (pinSubmitted.current && pinFetcher.state === 'idle' && pinFetcher.data) ||
-      (deleteSubmitted.current && deleteFetcher.state === 'idle' && deleteFetcher.data) ||
-      (commentSubmitted.current && commentFetcher.state === 'idle' && commentFetcher.data)
-    ) {
-      revalidator.revalidate()
-    }
-  }, [
-    pinFetcher.state,
-    pinFetcher.data,
-    deleteFetcher.state,
-    deleteFetcher.data,
-    commentFetcher.state,
-    commentFetcher.data,
-    revalidator,
-  ])
-
-  useEffect(() => {
-    if (!deleteSubmitted.current || deleteFetcher.state !== 'idle' || !deleteFetcher.data) return
+      !deleteSubmitted.current ||
+      deleteFetcher.state !== 'idle' ||
+      !deleteFetcher.data
+    )
+      return
+    deleteSubmitted.current = false
     if (deleteFetcher.data.success) {
-      toast({ title: 'Note deleted', description: 'Note has been removed', variant: 'success' })
+      toast({
+        title: 'Note deleted',
+        description: 'Note has been removed',
+        variant: 'success',
+      })
     } else {
       toast({
         title: 'Failed to delete note',
@@ -49,9 +40,19 @@ export function useNoteAction(dealId: number) {
   }, [deleteFetcher.state, deleteFetcher.data, toast])
 
   useEffect(() => {
-    if (!commentSubmitted.current || commentFetcher.state !== 'idle' || !commentFetcher.data) return
+    if (
+      !commentSubmitted.current ||
+      commentFetcher.state !== 'idle' ||
+      !commentFetcher.data
+    )
+      return
+    commentSubmitted.current = false
     if (commentFetcher.data.success) {
-      toast({ title: 'Comment added', description: 'Your comment has been added', variant: 'success' })
+      toast({
+        title: 'Comment added',
+        description: 'Your comment has been added',
+        variant: 'success',
+      })
     } else {
       toast({
         title: 'Failed to add comment',
@@ -61,16 +62,24 @@ export function useNoteAction(dealId: number) {
     }
   }, [commentFetcher.state, commentFetcher.data, toast])
 
-  const pin = useCallback(
-    (noteId: number) => {
-      pinSubmitted.current = true
-      pinFetcher.submit(
-        { intent: 'pin', noteId: String(noteId), csrf: token },
-        { method: 'POST', action: buildNoteApiAction(dealId) },
-      )
-    },
-    [pinFetcher.submit, dealId, token],
-  )
+  useEffect(() => {
+    if (!editSubmitted.current || editFetcher.state !== 'idle' || !editFetcher.data)
+      return
+    editSubmitted.current = false
+    if (editFetcher.data.success) {
+      toast({
+        title: 'Note updated',
+        description: 'Note has been updated',
+        variant: 'success',
+      })
+    } else {
+      toast({
+        title: 'Failed to update note',
+        description: editFetcher.data.error ?? 'Something went wrong',
+        variant: 'destructive',
+      })
+    }
+  }, [editFetcher.state, editFetcher.data, toast])
 
   const remove = useCallback(
     (noteId: number) => {
@@ -94,13 +103,25 @@ export function useNoteAction(dealId: number) {
     [commentFetcher.submit, dealId, token],
   )
 
+  const editNote = useCallback(
+    (noteId: number, content: string) => {
+      editSubmitted.current = true
+      editFetcher.submit(
+        { intent: 'update', noteId: String(noteId), content, csrf: token },
+        { method: 'POST', action: buildNoteApiAction(dealId) },
+      )
+    },
+    [editFetcher.submit, dealId, token],
+  )
+
   return {
-    pin,
+    dealId,
+    token,
     remove,
     addComment,
-    isPinning: pinFetcher.state !== 'idle',
+    editNote,
     isCommenting: commentFetcher.state !== 'idle',
-    pinningData: pinFetcher.formData,
+    isEditing: editFetcher.state !== 'idle',
     deletingData: deleteFetcher.formData,
   }
 }
