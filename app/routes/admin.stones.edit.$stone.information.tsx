@@ -54,7 +54,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (newFile) {
       await db.execute(
         `UPDATE stones
-           SET name = ?, type = ?, finishing = ?, url = ?, is_display = ?, regular_stock = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
+           SET name = ?, type = ?, finishing = ?, url = ?, is_display = ?, regular_stock = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?, bundle_number = ?
            WHERE id = ?`,
         [
           data.name,
@@ -70,13 +70,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.cost_per_sqft,
           data.level || null,
           data.retail_price,
+          data.bundle_number ?? null,
           stoneId,
         ],
       )
     } else {
       await db.execute(
         `UPDATE stones
-           SET name = ?, type = ?, finishing = ?, is_display = ?, regular_stock = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?
+           SET name = ?, type = ?, finishing = ?, is_display = ?, regular_stock = ?, supplier_id = ?, length = ?, width = ?, on_sale = ?, cost_per_sqft = ?, level = ?, retail_price = ?, bundle_number = ?
            WHERE id = ?`,
         [
           data.name,
@@ -91,6 +92,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           data.cost_per_sqft,
           data.level || null,
           data.retail_price,
+          data.bundle_number ?? null,
           stoneId,
         ],
       )
@@ -161,9 +163,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     retail_price: number
     level: number | null
     finishing: string | null
+    bundle_number: string | null
   }>(
     db,
-    'SELECT name, type, url, is_display, regular_stock, supplier_id, length, width, on_sale, cost_per_sqft, retail_price, level, finishing FROM stones WHERE id = ?',
+    'SELECT name, type, url, is_display, regular_stock, supplier_id, length, width, on_sale, cost_per_sqft, retail_price, level, finishing, bundle_number FROM stones WHERE id = ?',
     stoneId,
   )
   if (!stone) {
@@ -214,6 +217,7 @@ export default function Information() {
     retail_price,
     level,
     finishing,
+    bundle_number,
   } = stone
   const defaultValues = {
     name,
@@ -229,6 +233,7 @@ export default function Information() {
     retail_price,
     level,
     finishing,
+    bundle_number: bundle_number ?? '',
     colors: selectedColorIds,
   }
   const form = useCustomOptionalForm(stoneSchema, defaultValues)
@@ -336,6 +341,13 @@ export default function Information() {
           name='cost_per_sqft'
           render={({ field }) => (
             <InputItem name='Cost Per Sqft' placeholder='Cost Per Sqft' field={field} />
+          )}
+        />
+        <FormField
+          control={form.control}
+          name='bundle_number'
+          render={({ field }) => (
+            <InputItem name='Bundle Number' placeholder='Bundle Number' field={field} />
           )}
         />
       </div>

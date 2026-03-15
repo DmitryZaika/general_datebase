@@ -19,6 +19,7 @@ import {
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
+import { DIALOG_CONTENT_ADD_EDIT_CLASS } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { getAdminUser, type User } from '~/utils/session.server'
@@ -84,7 +85,7 @@ export default function ImagesAdd() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[425px]'>
+      <DialogContent className={DIALOG_CONTENT_ADD_EDIT_CLASS}>
         <DialogHeader>
           <DialogTitle>Add Image</DialogTitle>
         </DialogHeader>
