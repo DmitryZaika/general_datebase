@@ -25,6 +25,7 @@ export interface Stone {
   samples_amount: number
   samples_importance: number | null
   deleted_at: string | null
+  bundle_number: string | null
 }
 
 export const stoneQueryBuilder = async (
@@ -47,6 +48,7 @@ export const stoneQueryBuilder = async (
     stones.regular_stock,
     stones.retail_price,
     stones.cost_per_sqft,
+    stones.bundle_number,
     stones.level,
     stones.finishing,
     stones.samples_amount,
@@ -118,6 +120,9 @@ export const stoneQueryBuilder = async (
       stones.created_date,
       stones.on_sale,
       stones.regular_stock,
+      stones.retail_price,
+      stones.cost_per_sqft,
+      stones.bundle_number,
       stones.level,
       stones.finishing,
       stones.samples_amount,

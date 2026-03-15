@@ -25,7 +25,11 @@ import {
 import { db } from '~/db.server'
 import { stoneSchema } from '~/schemas/stones'
 import { commitSession, getSession } from '~/sessions.server'
-import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
+import {
+  DIALOG_CONTENT_ADD_EDIT_CLASS,
+  STONE_FINISHES,
+  STONE_TYPES,
+} from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectMany } from '~/utils/queryHelpers'
@@ -54,8 +58,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const user = await getAdminUser(request)
   const [result] = await db.execute<ResultSetHeader>(
     `INSERT INTO stones
-     (name, type, finishing, url, company_id, is_display, on_sale, regular_stock, supplier_id, width, length, cost_per_sqft, retail_price, level)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+     (name, type, finishing, url, company_id, is_display, on_sale, regular_stock, supplier_id, width, length, cost_per_sqft, retail_price, level, bundle_number)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
     [
       data.name,
       data.type,
@@ -71,6 +75,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data.cost_per_sqft || 0,
       data.retail_price || 0,
       data.level ?? null,
+      data.bundle_number ?? null,
     ],
   )
 
@@ -156,7 +161,7 @@ export default function StonesAdd() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[425px] overflow-y-auto max-h-[95vh]'>
+      <DialogContent className={DIALOG_CONTENT_ADD_EDIT_CLASS}>
         <DialogHeader>
           <DialogTitle>Add Stone</DialogTitle>
         </DialogHeader>
@@ -288,6 +293,17 @@ export default function StonesAdd() {
                 <InputItem
                   name={'Cost Per Sqft'}
                   placeholder={'Cost Per Sqft'}
+                  field={field}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='bundle_number'
+              render={({ field }) => (
+                <InputItem
+                  name={'Bundle Number'}
+                  placeholder={'Bundle Number'}
                   field={field}
                 />
               )}

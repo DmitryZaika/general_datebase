@@ -20,6 +20,7 @@ import {
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
+import { DIALOG_CONTENT_ADD_EDIT_CLASS } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectId } from '~/utils/queryHelpers'
@@ -123,7 +124,7 @@ export default function DocumentsEdit() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className=' overflow-auto sm:max-w-[425px]'>
+      <DialogContent className={DIALOG_CONTENT_ADD_EDIT_CLASS}>
         <DialogHeader>
           <DialogTitle>Save Changes</DialogTitle>
         </DialogHeader>

@@ -1,5 +1,8 @@
 export const DONE_KEY = '[DONE]035d8eba-9f8c-44c5-a1e0-290d1da033f7[/DONE]'
 
+export const DIALOG_CONTENT_ADD_EDIT_CLASS =
+  'sm:max-w-[480px] overflow-y-auto max-h-[95vh]'
+
 export const LOST_REASONS = {
   'Too expensive': 'Too expensive',
   'Out of area': 'Out of area',

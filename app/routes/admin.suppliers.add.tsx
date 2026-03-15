@@ -22,6 +22,7 @@ import {
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
+import { DIALOG_CONTENT_ADD_EDIT_CLASS } from '~/utils/constants'
 
 import { csrf } from '~/utils/csrf.server'
 import { getAdminUser, type User } from '~/utils/session.server'
@@ -108,7 +109,7 @@ export default function SuppliersAdd() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[425px]'>
+      <DialogContent className={DIALOG_CONTENT_ADD_EDIT_CLASS}>
         <DialogHeader>
           <DialogTitle>Add supplier</DialogTitle>
         </DialogHeader>

@@ -23,7 +23,7 @@ import {
 import { db } from '~/db.server'
 import { faucetSchema } from '~/schemas/faucets'
 import { commitSession, getSession } from '~/sessions.server'
-import { FAUCET_TYPES } from '~/utils/constants'
+import { DIALOG_CONTENT_ADD_EDIT_CLASS, FAUCET_TYPES } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { posthogClient } from '~/utils/posthog.server'
@@ -117,7 +117,7 @@ export default function FaucetsAdd() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-106.25 overflow-y-auto max-h-[95vh]'>
+      <DialogContent className={DIALOG_CONTENT_ADD_EDIT_CLASS}>
         <DialogHeader>
           <DialogTitle>Add Faucet</DialogTitle>
         </DialogHeader>

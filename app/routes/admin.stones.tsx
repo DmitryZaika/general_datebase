@@ -341,6 +341,11 @@ export default function AdminStones() {
                     <p className='text-center text-sm'>
                       Price: ${stone.retail_price}/${stone.cost_per_sqft}
                     </p>
+                    {stone.bundle_number != null && stone.bundle_number !== '' && (
+                      <p className='text-center text-sm'>
+                        Bundle: {stone.bundle_number}
+                      </p>
+                    )}
                   </div>
 
                   <div className='absolute inset-0 flex justify-between items-start p-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300'>

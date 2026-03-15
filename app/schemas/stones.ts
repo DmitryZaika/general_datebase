@@ -12,6 +12,7 @@ export const stoneSchema = z.object({
   width: coerceNumber,
   supplier_id: NullableId,
   bundle: z.string().optional(),
+  bundle_number: z.string().optional().nullable(),
   cost_per_sqft: coerceNumber,
   retail_price: coerceNumber,
   level: NullableId,
