@@ -343,7 +343,7 @@ export default function AdminStones() {
                     </p>
                     {stone.bundle_number != null && stone.bundle_number !== '' && (
                       <p className='text-center text-sm'>
-                        Bundle: {stone.bundle_number}
+                        Bundle: #{stone.bundle_number}
                       </p>
                     )}
                   </div>

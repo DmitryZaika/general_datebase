@@ -103,7 +103,7 @@ function InteractiveCard({
               ? ` By slab $${stone.cost_per_sqft} sqft`
               : `$${stone.retail_price}`,
           ...(stone.bundle_number != null && stone.bundle_number !== ''
-            ? { Bundle: stone.bundle_number }
+            ? { Bundle: `#${stone.bundle_number}` }
             : {}),
         }}
         title={stone.name}
