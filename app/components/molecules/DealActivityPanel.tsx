@@ -13,6 +13,9 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
+import ClipboardIcon from '~/components/icons/ClipboardIcon'
+import NoteIcon from '~/components/icons/NoteIcon'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +40,6 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { useToast } from '~/hooks/use-toast'
 import { useNoteAction } from '~/hooks/useNoteAction'
 import { buildActivityApiAction } from '~/lib/dealApiHelpers'
@@ -48,8 +50,8 @@ import {
 } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type {
-  DealActivityPanelProps,
   DeadlineUrgency,
+  DealActivityPanelProps,
   HistoryItem,
   HistoryTab,
 } from '~/types/dealActivityTypes'
@@ -419,6 +421,32 @@ function SectionHeader({
     <p className='text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2'>
       {content}
     </p>
+  )
+}
+
+// --- Timeline Wrapper ---
+
+function TimelineItem({
+  icon: Icon,
+  isLast = false,
+  children,
+}: {
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
+  isLast?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div className='flex gap-2.5'>
+      <div className='flex flex-col items-center shrink-0'>
+        <div className='flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 border border-gray-200'>
+          <Icon className='h-4 w-4 text-gray-500' />
+        </div>
+        {!isLast && (
+          <div className='flex-1 w-px border-l border-dashed border-gray-300 my-0.5' />
+        )}
+      </div>
+      <div className='flex-1 min-w-0 pb-3'>{children}</div>
+    </div>
   )
 }
 
@@ -918,9 +946,9 @@ function ActivityList({
     if (historyTab === 'activities') {
       if (done.length === 0) return <SectionEmptyState label='No completed activities' />
       return (
-        <div className='space-y-1.5'>
+        <div>
           <AnimatePresence initial={false}>
-            {done.map(activity => (
+            {done.map((activity, index) => (
               <motion.div
                 key={`activity-${activity.id}`}
                 layout
@@ -930,12 +958,17 @@ function ActivityList({
                 exit='exit'
                 transition={ITEM_TRANSITION}
               >
-                <ActivityItem
-                  activity={activity}
-                  dealId={dealId}
-                  onEdit={onEdit}
-                  isBeingEdited={editingActivityId === activity.id}
-                />
+                <TimelineItem
+                  icon={ClipboardIcon}
+                  isLast={index === done.length - 1}
+                >
+                  <ActivityItem
+                    activity={activity}
+                    dealId={dealId}
+                    onEdit={onEdit}
+                    isBeingEdited={editingActivityId === activity.id}
+                  />
+                </TimelineItem>
               </motion.div>
             ))}
           </AnimatePresence>
@@ -946,9 +979,15 @@ function ActivityList({
     if (historyTab === 'notes') {
       if (sortedNotes.length === 0) return <SectionEmptyState label='No notes yet' />
       return (
-        <div className='space-y-1.5'>
-          {sortedNotes.map(note => (
-            <NoteItem key={`note-${note.id}`} note={note} handlers={noteHandlers} />
+        <div>
+          {sortedNotes.map((note, index) => (
+            <TimelineItem
+              key={`note-${note.id}`}
+              icon={NoteIcon}
+              isLast={index === sortedNotes.length - 1}
+            >
+              <NoteItem note={note} handlers={noteHandlers} />
+            </TimelineItem>
           ))}
         </div>
       )
@@ -958,22 +997,32 @@ function ActivityList({
     if (allHistoryItems.length === 0) return <SectionEmptyState label='No history yet' />
 
     return (
-      <div className='space-y-1.5'>
-        {allHistoryItems.map(item =>
+      <div>
+        {allHistoryItems.map((item, index) =>
           item.type === 'activity' ? (
-            <ActivityItem
+            <TimelineItem
               key={`activity-${item.data.id}`}
-              activity={item.data}
-              dealId={dealId}
-              onEdit={onEdit}
-              isBeingEdited={editingActivityId === item.data.id}
-            />
+              icon={ClipboardIcon}
+              isLast={index === allHistoryItems.length - 1}
+            >
+              <ActivityItem
+                activity={item.data}
+                dealId={dealId}
+                onEdit={onEdit}
+                isBeingEdited={editingActivityId === item.data.id}
+              />
+            </TimelineItem>
           ) : (
-            <NoteItem
+            <TimelineItem
               key={`note-${item.data.id}`}
-              note={item.data}
-              handlers={noteHandlers}
-            />
+              icon={NoteIcon}
+              isLast={index === allHistoryItems.length - 1}
+            >
+              <NoteItem
+                note={item.data}
+                handlers={noteHandlers}
+              />
+            </TimelineItem>
           ),
         )}
       </div>
@@ -985,9 +1034,9 @@ function ActivityList({
       <div>
         <SectionHeader label='To Do' count={todo.length} />
         {todo.length > 0 ? (
-          <div className='space-y-1.5'>
+          <div>
             <AnimatePresence initial={false}>
-              {todo.map(activity => (
+              {todo.map((activity, index) => (
                 <motion.div
                   key={activity.id}
                   layout
@@ -998,12 +1047,17 @@ function ActivityList({
                   transition={ITEM_TRANSITION}
                   style={{ overflow: 'hidden' }}
                 >
-                  <ActivityItem
-                    activity={activity}
-                    dealId={dealId}
-                    onEdit={onEdit}
-                    isBeingEdited={editingActivityId === activity.id}
-                  />
+                  <TimelineItem
+                    icon={ClipboardIcon}
+                    isLast={index === todo.length - 1}
+                  >
+                    <ActivityItem
+                      activity={activity}
+                      dealId={dealId}
+                      onEdit={onEdit}
+                      isBeingEdited={editingActivityId === activity.id}
+                    />
+                  </TimelineItem>
                 </motion.div>
               ))}
             </AnimatePresence>
