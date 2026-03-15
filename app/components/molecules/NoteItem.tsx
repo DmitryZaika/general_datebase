@@ -334,7 +334,7 @@ function CommentItem({
       </div>
       <button
         type='button'
-        className='opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 text-gray-400 hover:text-red-500 transition-opacity'
+        className='opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0 mt-0.5 text-gray-400 hover:text-red-500 transition-opacity'
         onClick={() => setShowDeleteConfirm(true)}
       >
         <X className='h-3 w-3' />
