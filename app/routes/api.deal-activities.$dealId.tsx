@@ -2,8 +2,14 @@ import type { ResultSetHeader } from 'mysql2'
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router'
 import { data, redirect } from 'react-router'
 import { db } from '~/db.server'
+import { notifyDealAssignee } from '~/lib/dealNotification.server'
 import type { Nullable } from '~/types/utils'
-import { badRequest, handleAuthError, notFound, success } from '~/utils/apiResponse.server'
+import {
+  badRequest,
+  handleAuthError,
+  notFound,
+  success,
+} from '~/utils/apiResponse.server'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -34,9 +40,7 @@ function isValidPriority(value: string): value is ActivityPriority {
 }
 
 function toMySQLDatetime(dateString: string): Nullable<string> {
-  const match = dateString.match(
-    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/,
-  )
+  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/)
   if (!match) return null
   const [, y, mo, d, h, mi, s] = match
   return `${y}-${mo}-${d} ${h}:${mi}:${s}`
@@ -93,7 +97,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const intent = formData.get('intent')
 
     if (intent === 'create') {
-      const createdBy = (user.is_admin || user.is_superuser) ? user.name : null
+      const createdBy = user.is_admin || user.is_superuser ? user.name : null
       return handleCreate(formData, dealId, user.company_id, createdBy, user.id)
     }
 
@@ -102,11 +106,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (intent === 'update') {
-      return handleUpdate(formData, dealId, user.company_id)
+      const createdBy = user.is_admin || user.is_superuser ? user.name : null
+      return handleUpdate(formData, dealId, user.company_id, createdBy, user.id)
     }
 
     if (intent === 'delete') {
-      return handleDelete(formData, dealId, user.company_id)
+      const createdBy = user.is_admin || user.is_superuser ? user.name : null
+      return handleDelete(formData, dealId, user.company_id, createdBy, user.id)
     }
 
     return badRequest('Unknown action intent')
@@ -135,11 +141,16 @@ async function handleCreate(
   }
 
   if (!isValidPriority(priority)) {
-    return badRequest(`Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}`)
+    return badRequest(
+      `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}`,
+    )
   }
 
-  const rawDeadline = deadline && String(deadline).trim() ? String(deadline).trim() : null
-  const deadlineValue: Nullable<string> = rawDeadline ? toMySQLDatetime(rawDeadline) : null
+  const rawDeadline =
+    deadline && String(deadline).trim() ? String(deadline).trim() : null
+  const deadlineValue: Nullable<string> = rawDeadline
+    ? toMySQLDatetime(rawDeadline)
+    : null
 
   if (rawDeadline && !deadlineValue) {
     return badRequest('Invalid deadline date format')
@@ -152,28 +163,26 @@ async function handleCreate(
   )
 
   if (createdBy) {
-    try {
-      const dealRows = await selectMany<{ user_id: number | null }>(
-        db,
-        'SELECT user_id FROM deals WHERE id = ? AND deleted_at IS NULL LIMIT 1',
-        [dealId],
-      )
-      const assignedUserId = dealRows.length > 0 ? dealRows[0].user_id : null
-      if (assignedUserId && assignedUserId !== userId) {
-        const message = `${createdBy} added: ${name.trim()}`.slice(0, 255)
-        await db.execute(
-          `INSERT INTO notifications (user_id, deal_id, message, due_at)
-           VALUES (?, ?, ?, NOW())`,
-          [assignedUserId, dealId, message],
-        )
-      }
-    } catch {}
+    await notifyDealAssignee(
+      db,
+      dealId,
+      userId,
+      createdBy,
+      name.trim(),
+      'activity_added',
+    )
   }
 
   return success()
 }
 
-async function handleUpdate(formData: FormData, dealId: number, companyId: number) {
+async function handleUpdate(
+  formData: FormData,
+  dealId: number,
+  companyId: number,
+  createdBy: Nullable<string>,
+  userId: number,
+) {
   const activityId = formData.get('activityId')
 
   if (!activityId || isNaN(Number(activityId))) {
@@ -193,7 +202,9 @@ async function handleUpdate(formData: FormData, dealId: number, companyId: numbe
   }
 
   if (!isValidPriority(priority)) {
-    return badRequest(`Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}`)
+    return badRequest(
+      `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}`,
+    )
   }
 
   const rows = await selectMany<{ id: number }>(
@@ -206,8 +217,11 @@ async function handleUpdate(formData: FormData, dealId: number, companyId: numbe
     return notFound('Activity not found')
   }
 
-  const rawDeadline = deadline && String(deadline).trim() ? String(deadline).trim() : null
-  const deadlineValue: Nullable<string> = rawDeadline ? toMySQLDatetime(rawDeadline) : null
+  const rawDeadline =
+    deadline && String(deadline).trim() ? String(deadline).trim() : null
+  const deadlineValue: Nullable<string> = rawDeadline
+    ? toMySQLDatetime(rawDeadline)
+    : null
 
   if (rawDeadline && !deadlineValue) {
     return badRequest('Invalid deadline date format')
@@ -217,6 +231,17 @@ async function handleUpdate(formData: FormData, dealId: number, companyId: numbe
     `UPDATE deal_activities SET name = ?, deadline = ?, priority = ? WHERE id = ? AND deal_id = ? AND company_id = ?`,
     [name.trim(), deadlineValue, priority, Number(activityId), dealId, companyId],
   )
+
+  if (createdBy) {
+    await notifyDealAssignee(
+      db,
+      dealId,
+      userId,
+      createdBy,
+      name.trim(),
+      'activity_edited',
+    )
+  }
 
   return success()
 }
@@ -250,16 +275,22 @@ async function handleToggle(formData: FormData, dealId: number, companyId: numbe
   return success()
 }
 
-async function handleDelete(formData: FormData, dealId: number, companyId: number) {
+async function handleDelete(
+  formData: FormData,
+  dealId: number,
+  companyId: number,
+  createdBy: Nullable<string>,
+  userId: number,
+) {
   const activityId = formData.get('activityId')
 
   if (!activityId || isNaN(Number(activityId))) {
     return badRequest('Valid activity ID is required')
   }
 
-  const rows = await selectMany<{ id: number }>(
+  const rows = await selectMany<{ id: number; name: string }>(
     db,
-    'SELECT id FROM deal_activities WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
+    'SELECT id, name FROM deal_activities WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
     [Number(activityId), dealId, companyId],
   )
 
@@ -271,6 +302,17 @@ async function handleDelete(formData: FormData, dealId: number, companyId: numbe
     'UPDATE deal_activities SET deleted_at = NOW() WHERE id = ? AND deal_id = ? AND company_id = ?',
     [Number(activityId), dealId, companyId],
   )
+
+  if (createdBy) {
+    await notifyDealAssignee(
+      db,
+      dealId,
+      userId,
+      createdBy,
+      rows[0].name,
+      'activity_deleted',
+    )
+  }
 
   return success()
 }

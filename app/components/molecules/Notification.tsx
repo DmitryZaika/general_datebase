@@ -9,13 +9,18 @@ interface NotificationItem {
   title?: string
   message: string
   href?: string
+  type_title?: string
+  actor_name?: string
+  customer_name?: string
 }
 
 interface NotificationProps {
   className?: string
 }
 async function getNotifications(): Promise<NotificationItem[]> {
-  const response = await fetch('/api/notifications', { cache: 'no-store' })
+  const response = await fetch('/api/notifications', {
+    cache: 'no-store',
+  })
   if (!response.ok) {
     throw Error('Bad Request')
   }
@@ -36,16 +41,17 @@ export function Notification({ className }: NotificationProps) {
   const handleDismiss = useCallback(
     async (id: string | number) => {
       const numericId = Number(String(id).replace('notif-', ''))
-      queryClient.setQueryData<NotificationItem[]>(
-        ['notifications'],
-        old => (old ?? []).filter(n => n.id !== id),
+      queryClient.setQueryData<NotificationItem[]>(['notifications'], old =>
+        (old ?? []).filter(n => n.id !== id),
       )
       await fetch('/api/notifications/done', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: numericId }),
       })
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      queryClient.invalidateQueries({
+        queryKey: ['notifications'],
+      })
     },
     [queryClient],
   )
@@ -80,29 +86,65 @@ export function Notification({ className }: NotificationProps) {
           ) : (
             notifications.map(n => {
               const isDismissible = String(n.id).startsWith('notif-')
+              const hasRichLayout = n.type_title
+
               return (
                 <div
                   key={n.id}
-                  className='flex items-start justify-between gap-2 mb-1 border-b px-4 py-2 last:border-0 hover:bg-gray-50'
+                  className='flex items-start justify-between gap-2 border-b px-4 py-2 last:border-0 hover:bg-gray-50'
                 >
-                  <div>
-                    {n.title && (
-                      <p className='text-sm font-medium text-gray-800'>
-                        {n.title}
-                      </p>
-                    )}
-                    {n.href ? (
-                      <a
-                        className='text-sm text-gray-600 underline'
-                        href={n.href}
-                        onClick={isDismissible ? () => handleDismiss(n.id) : undefined}
-                      >
-                        {n.message}
-                      </a>
-                    ) : (
-                      <p className='text-sm text-gray-600'>{n.message}</p>
-                    )}
-                  </div>
+                  {hasRichLayout ? (
+                    <div className='flex min-w-0 flex-1 flex-col gap-1'>
+                      <h4 className='text-base font-semibold text-gray-900'>
+                        {n.type_title}
+                      </h4>
+                      <div className='flex flex-col gap-0.5'>
+                        {n.message && (
+                          <p className='truncate text-sm text-gray-600'>{n.message}</p>
+                        )}
+                        {n.href ? (
+                          <a
+                            className='text-sm text-gray-500 underline hover:text-gray-700'
+                            href={n.href}
+                            onClick={
+                              isDismissible ? () => handleDismiss(n.id) : undefined
+                            }
+                          >
+                            for {n.customer_name || n.title}
+                            &apos;s deal
+                          </a>
+                        ) : (
+                          <p className='text-sm text-gray-500'>
+                            {n.customer_name || n.title}
+                          </p>
+                        )}
+                      </div>
+                      {n.actor_name && (
+                        <span className='text-xs text-gray-400'>
+                          created by {n.actor_name}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className='min-w-0 flex-1'>
+                      {n.title && (
+                        <p className='text-sm font-medium text-gray-800'>{n.title}</p>
+                      )}
+                      {n.href ? (
+                        <a
+                          className='text-sm text-gray-600 underline'
+                          href={n.href}
+                          onClick={
+                            isDismissible ? () => handleDismiss(n.id) : undefined
+                          }
+                        >
+                          {n.message}
+                        </a>
+                      ) : (
+                        <p className='text-sm text-gray-600'>{n.message}</p>
+                      )}
+                    </div>
+                  )}
                   {isDismissible && (
                     <button
                       type='button'

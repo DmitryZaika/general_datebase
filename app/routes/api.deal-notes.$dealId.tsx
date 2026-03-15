@@ -2,6 +2,7 @@ import type { ResultSetHeader } from 'mysql2'
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router'
 import { data, redirect } from 'react-router'
 import { db } from '~/db.server'
+import { notifyDealAssignee } from '~/lib/dealNotification.server'
 import { fetchNotesWithComments } from '~/lib/noteHelpers.server'
 import type { Nullable } from '~/types/utils'
 import {
@@ -72,7 +73,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     if (intent === 'create') {
       const createdBy = user.is_admin || user.is_superuser ? user.name : null
-      return handleCreate(formData, dealId, user.company_id, createdBy)
+      return handleCreate(formData, dealId, user.company_id, createdBy, user.id)
     }
 
     if (intent === 'pin') {
@@ -80,7 +81,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (intent === 'update') {
-      return handleUpdate(formData, dealId, user.company_id)
+      const createdBy = user.is_admin || user.is_superuser ? user.name : null
+      return handleUpdate(formData, dealId, user.company_id, createdBy, user.id)
     }
 
     if (intent === 'delete') {
@@ -89,7 +91,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     if (intent === 'add-comment') {
       const createdBy = user.is_admin || user.is_superuser ? user.name : null
-      return handleAddComment(formData, dealId, user.company_id, createdBy)
+      return handleAddComment(formData, dealId, user.company_id, createdBy, user.id)
     }
 
     if (intent === 'delete-comment') {
@@ -107,6 +109,7 @@ async function handleCreate(
   dealId: number,
   companyId: number,
   createdBy: Nullable<string>,
+  userId: number,
 ) {
   const content = formData.get('content')
 
@@ -135,10 +138,27 @@ async function handleCreate(
     [dealId, companyId, content.trim(), createdBy],
   )
 
+  if (createdBy) {
+    await notifyDealAssignee(
+      db,
+      dealId,
+      userId,
+      createdBy,
+      content.trim(),
+      'note_added',
+    )
+  }
+
   return success()
 }
 
-async function handleUpdate(formData: FormData, dealId: number, companyId: number) {
+async function handleUpdate(
+  formData: FormData,
+  dealId: number,
+  companyId: number,
+  createdBy: Nullable<string>,
+  userId: number,
+) {
   const noteId = formData.get('noteId')
   const content = formData.get('content')
 
@@ -163,6 +183,17 @@ async function handleUpdate(formData: FormData, dealId: number, companyId: numbe
     return notFound('Note not found')
   }
 
+  if (createdBy) {
+    await notifyDealAssignee(
+      db,
+      dealId,
+      userId,
+      createdBy,
+      content.trim(),
+      'note_edited',
+    )
+  }
+
   return success()
 }
 
@@ -185,7 +216,12 @@ async function handlePin(formData: FormData, dealId: number, companyId: number) 
   return success()
 }
 
-type UserForDelete = { is_admin: boolean; is_superuser: boolean }
+type UserForDelete = {
+  id: number
+  name: string
+  is_admin: boolean
+  is_superuser: boolean
+}
 
 async function handleDelete(
   formData: FormData,
@@ -199,9 +235,13 @@ async function handleDelete(
     return badRequest('Valid note ID is required')
   }
 
-  const rows = await selectMany<{ id: number; created_by: Nullable<string> }>(
+  const rows = await selectMany<{
+    id: number
+    content: string
+    created_by: Nullable<string>
+  }>(
     db,
-    'SELECT id, created_by FROM deal_notes WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
+    'SELECT id, content, created_by FROM deal_notes WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
     [Number(noteId), dealId, companyId],
   )
 
@@ -218,6 +258,17 @@ async function handleDelete(
     [Number(noteId), dealId, companyId],
   )
 
+  if (user.is_admin || user.is_superuser) {
+    await notifyDealAssignee(
+      db,
+      dealId,
+      user.id,
+      user.name,
+      rows[0].content,
+      'note_deleted',
+    )
+  }
+
   return success()
 }
 
@@ -226,6 +277,7 @@ async function handleAddComment(
   dealId: number,
   companyId: number,
   createdBy: Nullable<string>,
+  userId: number,
 ) {
   const noteId = formData.get('noteId')
   const content = formData.get('content')
@@ -258,6 +310,17 @@ async function handleAddComment(
     [Number(noteId), companyId, content.trim(), createdBy],
   )
 
+  if (createdBy) {
+    await notifyDealAssignee(
+      db,
+      dealId,
+      userId,
+      createdBy,
+      content.trim(),
+      'comment_added',
+    )
+  }
+
   return success()
 }
 
@@ -277,9 +340,9 @@ async function handleDeleteComment(
     return badRequest('Valid comment ID is required')
   }
 
-  const rows = await selectMany<{ id: number }>(
+  const rows = await selectMany<{ id: number; content: string }>(
     db,
-    `SELECT dnc.id
+    `SELECT dnc.id, dnc.content
      FROM deal_note_comments dnc
      JOIN deal_notes dn ON dnc.note_id = dn.id
      WHERE dnc.id = ? AND dnc.company_id = ? AND dn.deal_id = ?
@@ -295,6 +358,17 @@ async function handleDeleteComment(
     'UPDATE deal_note_comments SET deleted_at = NOW() WHERE id = ? AND company_id = ?',
     [Number(commentId), companyId],
   )
+
+  if (user.is_admin || user.is_superuser) {
+    await notifyDealAssignee(
+      db,
+      dealId,
+      user.id,
+      user.name,
+      rows[0].content,
+      'comment_deleted',
+    )
+  }
 
   return success()
 }
