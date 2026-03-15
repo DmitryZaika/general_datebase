@@ -303,6 +303,7 @@ function CommentItem({
     key: `delete-comment-${comment.id}`,
   })
   const isDeleting = fetcher.state !== 'idle'
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const handleDelete = () => {
     fetcher.submit(
@@ -325,17 +326,42 @@ function CommentItem({
       <div className='min-w-0'>
         <span className='text-[10px] text-gray-400'>
           {format(new Date(comment.created_at), 'MMM d h:mm a')}
-          {comment.created_by && ` \u00b7 ${comment.created_by}`}
+          {comment.created_by && ` · ${comment.created_by}`}
         </span>
-        <p className='text-xs text-gray-600 leading-relaxed'>{comment.content}</p>
+        <p className='text-xs text-gray-600 leading-relaxed'>
+          {comment.content}
+        </p>
       </div>
       <button
         type='button'
         className='opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 text-gray-400 hover:text-red-500 transition-opacity'
-        onClick={handleDelete}
+        onClick={() => setShowDeleteConfirm(true)}
       >
         <X className='h-3 w-3' />
       </button>
+
+      <AlertDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Comment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this comment?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive' })}
+              onClick={handleDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
