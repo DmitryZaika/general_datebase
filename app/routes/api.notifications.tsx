@@ -31,7 +31,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         e.thread_id,
         COALESCE(e.deal_id, td.deal_id) AS deal_id,
         e.subject,
-        DATE_FORMAT(e.sent_at, '%Y-%m-%dT%H:%i:%s') AS sent_at,
+        DATE_FORMAT(e.sent_at, '%Y-%m-%dT%H:%i:%sZ') AS sent_at,
         c.name AS customer_name
       FROM emails e
       JOIN (
@@ -95,7 +95,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     `SELECT n.id, n.deal_id, n.message,
             c.name AS customer_name,
             n.notification_type, n.actor_name,
-            DATE_FORMAT(n.created_at, '%Y-%m-%dT%H:%i:%s') AS created_at
+            DATE_FORMAT(n.created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at
      FROM notifications n
      JOIN deals d ON d.id = n.deal_id AND d.deleted_at IS NULL
      JOIN customers c ON c.id = d.customer_id

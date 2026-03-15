@@ -21,8 +21,9 @@ import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
 export async function action({ request, params }: ActionFunctionArgs) {
+  let user: User
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -42,8 +43,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const prevRows = await selectMany<{ list_id: number }>(
     db,
-    'SELECT list_id FROM deals WHERE id = ? LIMIT 1',
-    [dealId],
+    'SELECT list_id FROM deals WHERE id = ? AND company_id = ? LIMIT 1',
+    [dealId, user.company_id],
   )
   const prevListId = prevRows[0]?.list_id
   const movedAcross = prevListId !== undefined && prevListId !== data.list_id
@@ -73,7 +74,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
              due_date = IF(? IN (?, ?), NULL, due_date),
              is_won = IF(? = 1, ?, is_won),
              lost_reason = IF(?, NULL, lost_reason)
-       WHERE id = ?`,
+       WHERE id = ? AND company_id = ?`,
     [
       data.customer_id,
       data.amount,
@@ -87,6 +88,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       isWonVal,
       clearLostReason ? 1 : 0,
       dealId,
+      user.company_id,
     ],
   )
 
@@ -119,8 +121,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     `SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.list_id, d.position, c.name
          FROM deals d
          JOIN customers c ON d.customer_id = c.id
-         WHERE d.id = ? AND d.deleted_at IS NULL`,
-    [dealId],
+         WHERE d.id = ? AND d.company_id = ? AND d.deleted_at IS NULL`,
+    [dealId, user.company_id],
   )
   if (!rows || rows.length === 0) {
     return redirect('/employee/deals')

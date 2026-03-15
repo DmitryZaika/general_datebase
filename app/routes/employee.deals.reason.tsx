@@ -22,6 +22,7 @@ import { closeDealStageHistory, transitionDealStage } from '~/crud/deals'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { CLOSED_LOST_LIST_ID, getSearchString, LOST_REASONS } from '~/utils/constants'
+import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -29,6 +30,7 @@ import { replaceUnderscoresWithSpaces } from '~/utils/words'
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const user = await getEmployeeUser(request)
+  const clonedRequest = request.clone()
   const formData = await request.formData()
   const intent = String(formData.get('intent') || '')
   const dealId = Number(formData.get('dealId') || 0)
@@ -43,8 +45,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (intent === 'cancel') {
     const currentRows = await selectMany<{ list_id: number }>(
       db,
-      'SELECT list_id FROM deals WHERE id = ? LIMIT 1',
-      [dealId],
+      'SELECT list_id FROM deals WHERE id = ? AND company_id = ? LIMIT 1',
+      [dealId, user.company_id],
     )
     const currentListId = currentRows[0]?.list_id
 
@@ -67,6 +69,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (intent === 'submit') {
+    try {
+      await csrf.validate(clonedRequest)
+    } catch {
+      return redirect(`/employee/deals${getSearchString(new URL(request.url))}`)
+    }
     if (!reason || reason === 'not_specified') {
       return redirect(
         `/employee/deals${getSearchString(new URL(request.url))}?dealId=${dealId}&fromListId=${fromListId}&fromPos=${fromPos}&error=Reason is required`,

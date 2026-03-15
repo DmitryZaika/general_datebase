@@ -249,10 +249,6 @@ async function handleDelete(
     return notFound('Note not found')
   }
 
-  if (!user.is_admin && !user.is_superuser) {
-    return data({ success: false, error: 'Forbidden' }, { status: 403 })
-  }
-
   await db.execute(
     'UPDATE deal_notes SET deleted_at = NOW() WHERE id = ? AND deal_id = ? AND company_id = ?',
     [Number(noteId), dealId, companyId],
@@ -330,10 +326,6 @@ async function handleDeleteComment(
   companyId: number,
   user: UserForDelete,
 ) {
-  if (!user.is_admin && !user.is_superuser) {
-    return data({ success: false, error: 'Forbidden' }, { status: 403 })
-  }
-
   const commentId = formData.get('commentId')
 
   if (!commentId || Number.isNaN(Number(commentId))) {

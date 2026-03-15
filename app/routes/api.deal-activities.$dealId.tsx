@@ -58,10 +58,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const activities = await selectMany<DealActivity>(
       db,
       `SELECT id, deal_id, company_id, name,
-              DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%s') AS deadline,
+              DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline,
               priority, is_completed,
-              DATE_FORMAT(completed_at, '%Y-%m-%dT%H:%i:%s') AS completed_at,
-              DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s') AS created_at,
+              DATE_FORMAT(completed_at, '%Y-%m-%dT%H:%i:%sZ') AS completed_at,
+              DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,
               created_by
        FROM deal_activities
        WHERE deal_id = ? AND company_id = ? AND deleted_at IS NULL
