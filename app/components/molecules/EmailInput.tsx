@@ -100,13 +100,13 @@ export const EmailInput = <T extends FieldValues, V extends Path<T>>({
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className='absolute z-10 w-full  max-h-32 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg'
+          className='top-full absolute z-10 w-full  max-h-32 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg'
         >
           <ul className='py-1 divide-y divide-gray-200'>
             {suggestions.map((suggestion, index) => (
               <li
                 key={index}
-                className='px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm'
+                className='px-3 py-1 hover:bg-gray-50 cursor-pointer text-sm'
                 onClick={() => handleSuggestionClick(suggestion)}
               >
                 {suggestion}

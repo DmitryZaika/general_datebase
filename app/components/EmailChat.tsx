@@ -214,6 +214,7 @@ export function EmailChat(props: EmailChatProps) {
 
   const [chatMessages, setChatMessages] = useState<EmailChatMessage[]>(messages)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const [currentImages, setCurrentImages] = useState<
     { id: number; url: string; name: string; type: string; available: null }[]
   >([])
@@ -241,9 +242,24 @@ export function EmailChat(props: EmailChatProps) {
     setChatMessages(messages)
   }, [messages])
 
+  const scrollToBottom = () => {
+    const el = scrollContainerRef.current
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
+  }
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    scrollToBottom()
   }, [chatMessages.length])
+
+  useEffect(() => {
+    if (chatMessages.length === 0) return
+    const t = setTimeout(scrollToBottom, 150)
+    return () => clearTimeout(t)
+  }, [messages])
 
   useEffect(() => {
     if (isEmployee && textareaRef.current) {
@@ -466,7 +482,7 @@ export function EmailChat(props: EmailChatProps) {
   const rowClass =
     variant === 'admin'
       ? 'flex items-center gap-2 px-1 py-2 relative'
-      : 'flex items-center gap-2 py-2 relative'
+      : 'flex items-center gap-2 py-3 relative'
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -502,7 +518,7 @@ export function EmailChat(props: EmailChatProps) {
           </div>
         </DialogHeader>
 
-        <div className='flex-1 overflow-y-auto'>
+        <div ref={scrollContainerRef} className='flex-1 overflow-y-auto'>
           {chatMessages.map((message, index) => (
             <div key={message.id}>
               {showDate(message, index) && (

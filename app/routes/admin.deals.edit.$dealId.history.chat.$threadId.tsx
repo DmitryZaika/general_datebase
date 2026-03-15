@@ -72,20 +72,18 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     parseEmailAddress(email).toLowerCase() || ''
   const customerEmail = normalizeEmail(customerRows?.email || '')
 
-  if (customerEmail) {
-    await db.execute(
-      `
-        UPDATE emails
-        SET employee_read_at = NOW()
-        WHERE deleted_at IS NULL
-          AND thread_id = ?
-          AND (deal_id = ? OR deal_id IS NULL)
-          AND (sender_email = ? OR sender_email LIKE ? OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(sender_email, '<', -1), '>', 1))) = ?)
-          AND employee_read_at IS NULL
-      `,
-      [threadId, dealId, customerEmail, `%<${customerEmail}>`, customerEmail],
-    )
-  }
+  await db.execute(
+    `
+      UPDATE emails
+      SET employee_read_at = NOW()
+      WHERE deleted_at IS NULL
+        AND thread_id = ?
+        AND (deal_id = ? OR deal_id IS NULL)
+        AND employee_read_at IS NULL
+        AND sender_user_id IS NULL
+    `,
+    [threadId, dealId],
+  )
 
   let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, u.email_signature as signature, MAX(er.read_at) AS read_at
        FROM emails e
