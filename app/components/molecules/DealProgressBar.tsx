@@ -1,3 +1,5 @@
+import type { Nullable } from '~/types/utils'
+
 interface StageInfo {
   id: number
   name: string
@@ -7,7 +9,7 @@ interface StageInfo {
 interface StageHistory {
   list_id: number
   entered_at: string
-  exited_at: string | null
+  exited_at: Nullable<string>
 }
 
 interface DealProgressBarProps {
@@ -15,8 +17,7 @@ interface DealProgressBarProps {
   history: StageHistory[]
   currentListId: number
   isClosed?: boolean
-  isWon?: number | null
-  closedAt?: string | null
+  closedAt?: Nullable<string>
 }
 
 function formatDuration(ms: number): string {
@@ -69,7 +70,6 @@ export function DealProgressBar({
   history,
   currentListId,
   isClosed,
-  isWon,
   closedAt,
 }: DealProgressBarProps) {
   const sorted = [...stages].sort((a, b) => a.position - b.position)
@@ -120,7 +120,6 @@ export function DealProgressBar({
           const isCompleted = index < effectiveIndex
           const isCurrent = index === effectiveIndex
           const isActive = isCompleted || isCurrent
-          const showBadge = isClosed && isCurrent && (isWon === 1 || isWon === 0)
 
           return (
             <div
@@ -139,17 +138,6 @@ export function DealProgressBar({
               >
                 {stage.name}
               </span>
-              {showBadge && (
-                <span
-                  className={`inline-block text-[9px] font-semibold px-1.5 rounded-sm mt-0.5 ${
-                    isWon === 1
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
-                  }`}
-                >
-                  {isWon === 1 ? 'Won' : 'Lost'}
-                </span>
-              )}
             </div>
           )
         })}

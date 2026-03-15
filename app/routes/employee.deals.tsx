@@ -94,33 +94,49 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ? 0
             : null
 
-    const lists =
-      isWon !== null
-        ? await selectMany<{ id: number; name: string }>(
-            db,
-            'SELECT id, name FROM deals_list WHERE id = ? ORDER BY position',
-            [isWon === 1 ? CLOSED_WON_LIST_ID : CLOSED_LOST_LIST_ID],
-          )
-        : await selectMany<{ id: number; name: string }>(
-            db,
-            'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
-            [activeGroupId],
-          )
+    const lists = await selectMany<{ id: number; name: string }>(
+      db,
+      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? AND id NOT IN (?, ?) ORDER BY position',
+      [activeGroupId, CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID],
+    )
 
-    let query = `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position,
-       DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at, is_won
-       FROM deals
-       WHERE deleted_at IS NULL AND user_id = ?`
-    const queryParams: number[] = [user.id]
+    let deals: FullDeal[]
 
     if (isWon === null) {
-      query += ' AND is_won IS NULL'
+      deals = await selectMany<FullDeal>(
+        db,
+        `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position,
+         DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at, is_won
+         FROM deals
+         WHERE deleted_at IS NULL AND user_id = ? AND is_won IS NULL`,
+        [user.id],
+      )
     } else {
-      query += ' AND is_won = ?'
-      queryParams.push(isWon)
+      deals = await selectMany<FullDeal>(
+        db,
+        `SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason,
+         COALESCE(last_stage.list_id, d.list_id) AS list_id,
+         d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') as due_date, d.deleted_at, d.is_won
+         FROM deals d
+         LEFT JOIN (
+           SELECT dsh.deal_id, dsh.list_id
+           FROM deal_stage_history dsh
+           INNER JOIN (
+             SELECT deal_id, MAX(entered_at) AS max_entered_at
+             FROM deal_stage_history
+             WHERE list_id NOT IN (?, ?)
+             GROUP BY deal_id
+           ) latest ON dsh.deal_id = latest.deal_id AND dsh.entered_at = latest.max_entered_at
+           WHERE dsh.list_id NOT IN (?, ?)
+         ) last_stage ON d.id = last_stage.deal_id
+         WHERE d.deleted_at IS NULL AND d.user_id = ? AND d.is_won = ?`,
+        [
+          CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID,
+          CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID,
+          user.id, isWon,
+        ],
+      )
     }
-
-    const deals = await selectMany<FullDeal>(db, query, queryParams)
     const imagesCounts = await selectMany<{ deal_id: number; count: number }>(
       db,
       'SELECT deal_id, COUNT(*) as count FROM deals_images GROUP BY deal_id',

@@ -10,15 +10,15 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
+import type { Nullable } from '~/types/utils'
 
 interface DealPageProps {
   dealId: number
   stages?: { id: number; name: string; position: number }[]
-  history?: { list_id: number; entered_at: string; exited_at: string | null }[]
+  history?: { list_id: number; entered_at: string; exited_at: Nullable<string> }[]
   currentListId?: number
   isClosed?: boolean
-  isWon?: number | null
-  closedAt?: string | null
+  closedAt?: Nullable<string>
   activities?: DealActivity[]
   notes?: DealNote[]
 }
@@ -29,7 +29,6 @@ export default function DealsEdit({
   history,
   currentListId,
   isClosed,
-  isWon,
   closedAt,
   activities,
   notes,
@@ -62,7 +61,6 @@ export default function DealsEdit({
               history={history}
               currentListId={currentListId}
               isClosed={isClosed}
-              isWon={isWon}
               closedAt={closedAt}
             />
           </div>

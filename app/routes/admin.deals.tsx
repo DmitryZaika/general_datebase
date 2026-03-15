@@ -72,40 +72,60 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const activeGroupId = viewParam ? parseInt(viewParam, 10) : groups[0]?.id
 
-    const lists =
-      isWon !== null
-        ? await selectMany<{ id: number; name: string }>(
-            db,
-            'SELECT id, name FROM deals_list WHERE id = ? ORDER BY position',
-            [isWon === 1 ? CLOSED_WON_LIST_ID : CLOSED_LOST_LIST_ID],
-          )
-        : await selectMany<{ id: number; name: string }>(
-            db,
-            'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
-            [activeGroupId],
-          )
+    const lists = await selectMany<{ id: number; name: string }>(
+      db,
+      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? AND id NOT IN (?, ?) ORDER BY position',
+      [activeGroupId, CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID],
+    )
 
-    const dealParams: (string | number)[] = [companyId]
-    let dealSql = `
-      SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason, d.list_id, d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') AS due_date, d.is_won, u.name AS sales_rep
-      FROM deals d
-      JOIN customers c ON d.customer_id = c.id
-      LEFT JOIN users u ON d.user_id = u.id
-      WHERE c.company_id = ? AND d.deleted_at IS NULL
-    `
-    if (salesRep && salesRep !== 'All') {
-      dealSql += ' AND u.name = ?'
-      dealParams.push(salesRep)
-    }
+    let deals: AdminDeal[]
 
     if (isWon === null) {
-      dealSql += ' AND d.is_won IS NULL'
+      const dealParams: (string | number)[] = [companyId]
+      let dealSql = `
+        SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason, d.list_id, d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') AS due_date, d.is_won, u.name AS sales_rep
+        FROM deals d
+        JOIN customers c ON d.customer_id = c.id
+        LEFT JOIN users u ON d.user_id = u.id
+        WHERE c.company_id = ? AND d.deleted_at IS NULL AND d.is_won IS NULL
+      `
+      if (salesRep && salesRep !== 'All') {
+        dealSql += ' AND u.name = ?'
+        dealParams.push(salesRep)
+      }
+      deals = await selectMany<AdminDeal>(db, dealSql, dealParams)
     } else {
-      dealSql += ' AND d.is_won = ?'
-      dealParams.push(isWon)
+      const dealParams: (string | number)[] = [
+        CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID,
+        CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID,
+        companyId, isWon,
+      ]
+      let dealSql = `
+        SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason,
+         COALESCE(last_stage.list_id, d.list_id) AS list_id,
+         d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') AS due_date, d.is_won, u.name AS sales_rep
+        FROM deals d
+        JOIN customers c ON d.customer_id = c.id
+        LEFT JOIN users u ON d.user_id = u.id
+        LEFT JOIN (
+          SELECT dsh.deal_id, dsh.list_id
+          FROM deal_stage_history dsh
+          INNER JOIN (
+            SELECT deal_id, MAX(entered_at) AS max_entered_at
+            FROM deal_stage_history
+            WHERE list_id NOT IN (?, ?)
+            GROUP BY deal_id
+          ) latest ON dsh.deal_id = latest.deal_id AND dsh.entered_at = latest.max_entered_at
+          WHERE dsh.list_id NOT IN (?, ?)
+        ) last_stage ON d.id = last_stage.deal_id
+        WHERE c.company_id = ? AND d.deleted_at IS NULL AND d.is_won = ?
+      `
+      if (salesRep && salesRep !== 'All') {
+        dealSql += ' AND u.name = ?'
+        dealParams.push(salesRep)
+      }
+      deals = await selectMany<AdminDeal>(db, dealSql, dealParams)
     }
-
-    const deals = await selectMany<AdminDeal>(db, dealSql, dealParams)
 
     const customers = await selectMany<{
       id: number

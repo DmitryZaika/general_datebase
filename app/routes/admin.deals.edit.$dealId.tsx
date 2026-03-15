@@ -15,7 +15,6 @@ export default function AdminDealEditLayout() {
     history,
     currentListId,
     isClosed,
-    isWon,
     closedAt,
     activities,
     notes,
@@ -27,7 +26,6 @@ export default function AdminDealEditLayout() {
       history={history}
       currentListId={currentListId}
       isClosed={isClosed}
-      isWon={isWon}
       closedAt={closedAt}
       activities={activities}
       notes={notes}

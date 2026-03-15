@@ -8,7 +8,7 @@ import { useToast } from '~/hooks/use-toast'
 import { buildNoteApiAction } from '~/lib/dealApiHelpers'
 import type { ApiResponse } from '~/utils/apiResponse.server'
 
-export function NoteForm({ dealId }: { dealId: number }) {
+export function NoteForm({ dealId, onNoteCreated }: { dealId: number; onNoteCreated?: () => void }) {
   const fetcher = useFetcher<ApiResponse>()
   const revalidator = useRevalidator()
   const token = useAuthenticityToken()
@@ -21,8 +21,10 @@ export function NoteForm({ dealId }: { dealId: number }) {
   useEffect(() => {
     if (!hasSubmitted.current || fetcher.state !== 'idle' || !fetcher.data) return
     if (fetcher.data.success) {
+      hasSubmitted.current = false
       setContent('')
       revalidator.revalidate()
+      onNoteCreated?.()
     } else {
       toast({
         title: 'Failed to add note',
@@ -30,7 +32,7 @@ export function NoteForm({ dealId }: { dealId: number }) {
         variant: 'destructive',
       })
     }
-  }, [fetcher.state, fetcher.data, revalidator, toast])
+  }, [fetcher.state, fetcher.data, revalidator, toast, onNoteCreated])
 
   const handleSubmit = () => {
     if (!isValid) return

@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { useToast } from '~/hooks/use-toast'
 import { useNoteAction } from '~/hooks/useNoteAction'
 import { buildActivityApiAction } from '~/lib/dealApiHelpers'
@@ -256,6 +257,7 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
 
 function useActivityForm(dealId: number, editingActivityId: number | null) {
   const fetcher = useFetcher()
+  const token = useAuthenticityToken()
   const [form, dispatch] = useReducer(formReducer, INITIAL_FORM_STATE)
 
   const isSubmitting = fetcher.state !== 'idle'
@@ -270,6 +272,7 @@ function useActivityForm(dealId: number, editingActivityId: number | null) {
       name: form.name.trim(),
       deadline: toDeadlinePayload(form.deadline ?? null),
       priority: form.priority,
+      csrf: token,
     }
 
     if (isEditing) {
@@ -282,7 +285,7 @@ function useActivityForm(dealId: number, editingActivityId: number | null) {
     })
 
     dispatch({ type: 'RESET' })
-  }, [fetcher.submit, form, dealId, isValid, isEditing, editingActivityId])
+  }, [fetcher.submit, form, dealId, isValid, isEditing, editingActivityId, token])
 
   return { form, dispatch, isSubmitting, isValid, isEditing, submit }
 }
@@ -290,12 +293,13 @@ function useActivityForm(dealId: number, editingActivityId: number | null) {
 function useActivityAction(dealId: number) {
   const toggleFetcher = useFetcher()
   const deleteFetcher = useFetcher()
+  const token = useAuthenticityToken()
   const { toast } = useToast()
 
   const toggle = useCallback(
     (activityId: number, activityName: string, isCurrentlyDone: boolean) => {
       toggleFetcher.submit(
-        { intent: 'toggle', activityId: String(activityId) },
+        { intent: 'toggle', activityId: String(activityId), csrf: token },
         { method: 'POST', action: buildActivityApiAction(dealId) },
       )
       if (!isCurrentlyDone) {
@@ -306,13 +310,13 @@ function useActivityAction(dealId: number) {
         })
       }
     },
-    [toggleFetcher.submit, dealId, toast],
+    [toggleFetcher.submit, dealId, toast, token],
   )
 
   const remove = useCallback(
     (activityId: number, activityName: string) => {
       deleteFetcher.submit(
-        { intent: 'delete', activityId: String(activityId) },
+        { intent: 'delete', activityId: String(activityId), csrf: token },
         { method: 'POST', action: buildActivityApiAction(dealId) },
       )
       toast({
@@ -321,7 +325,7 @@ function useActivityAction(dealId: number) {
         variant: 'success',
       })
     },
-    [deleteFetcher.submit, dealId, toast],
+    [deleteFetcher.submit, dealId, toast, token],
   )
 
   return {
@@ -852,12 +856,14 @@ function ActivityList({
   notes,
   onEdit,
   editingActivityId,
+  historyHeaderRef,
 }: {
   dealId: number
   activities: DealActivity[]
   notes: DealNote[]
   onEdit: (activity: DealActivity) => void
   editingActivityId: number | null
+  historyHeaderRef: React.RefObject<HTMLDivElement | null>
 }) {
   const [isHistoryOpen, setIsHistoryOpen] = useReducer((s: boolean) => !s, true)
   const [historyTab, setHistoryTab] = useState<HistoryTab>('all')
@@ -900,7 +906,7 @@ function ActivityList({
     items.sort((a, b) => {
       if (a.isPinned && !b.isPinned) return -1
       if (!a.isPinned && b.isPinned) return 1
-      return new Date(b.date).getTime() - new Date(a.date).getTime()
+      return new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime()
     })
 
     return items
@@ -1026,7 +1032,7 @@ function ActivityList({
         )}
       </div>
 
-      <div>
+      <div ref={historyHeaderRef}>
         <SectionHeader
           label='History'
           count={historyCount}
@@ -1058,10 +1064,29 @@ export function DealActivityPanel({
   notes = [],
 }: DealActivityPanelProps) {
   const [editingActivity, setEditingActivity] = useState<DealActivity | null>(null)
+  const [activeTab, setActiveTab] = useState<'activity' | 'notes'>('activity')
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const historyHeaderRef = useRef<HTMLDivElement>(null)
+
+  const handleEdit = (activity: DealActivity) => {
+    setEditingActivity(activity)
+    setActiveTab('activity')
+  }
+
+  const scrollToHistory = useCallback(() => {
+    requestAnimationFrame(() => {
+      const container = scrollRef.current
+      const header = historyHeaderRef.current
+      if (container && header) {
+        const top = header.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
+        container.scrollTo({ top, behavior: 'smooth' })
+      }
+    })
+  }, [])
 
   return (
     <div className='flex flex-col h-full'>
-      <Tabs defaultValue='activity' onValueChange={() => setEditingActivity(null)}>
+      <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value as 'activity' | 'notes'); setEditingActivity(null) }}>
         <TabsList className='mb-3 grid grid-cols-2'>
           <TabsTrigger value='activity'>Activity</TabsTrigger>
           <TabsTrigger value='notes'>Notes</TabsTrigger>
@@ -1074,16 +1099,17 @@ export function DealActivityPanel({
           />
         </TabsContent>
         <TabsContent value='notes'>
-          <NoteForm dealId={dealId} />
+          <NoteForm dealId={dealId} onNoteCreated={scrollToHistory} />
         </TabsContent>
       </Tabs>
-      <div className='flex-1 overflow-y-auto min-h-0'>
+      <div ref={scrollRef} className='flex-1 overflow-y-auto min-h-0'>
         <ActivityList
           dealId={dealId}
           activities={activities}
           notes={notes}
-          onEdit={setEditingActivity}
+          onEdit={handleEdit}
           editingActivityId={editingActivity?.id ?? null}
+          historyHeaderRef={historyHeaderRef}
         />
       </div>
     </div>

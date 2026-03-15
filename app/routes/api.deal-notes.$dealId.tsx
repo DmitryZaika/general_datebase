@@ -116,7 +116,9 @@ async function handleCreate(
 
   const dealRows = await selectMany<{ id: number }>(
     db,
-    'SELECT id FROM deals WHERE id = ? AND company_id = ? AND deleted_at IS NULL',
+    `SELECT d.id FROM deals d
+     JOIN customers c ON d.customer_id = c.id
+     WHERE d.id = ? AND c.company_id = ? AND d.deleted_at IS NULL`,
     [dealId, companyId],
   )
   if (!dealRows.length) {
