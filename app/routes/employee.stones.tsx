@@ -42,10 +42,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { stones, companyId: user.company_id }
 }
 
-function getStoneUrl(original: string | null) {
-  return original ? withIconSuffix(original) : '/placeholder.png'
-}
-
 function InteractiveCard({
   stone,
   setCurrentId,
@@ -110,13 +106,23 @@ function InteractiveCard({
         title={stone.name}
       >
         <div onClick={e => e.stopPropagation()}>
-          <img
-            src={getStoneUrl(stone.url)}
-            alt={stone.name || 'Stone Image'}
-            className='object-cover w-full h-40 border-2 border-gray-300 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
-            loading='lazy'
-            onClick={handleImageClick}
-          />
+          {stone.url ? (
+            <img
+              src={withIconSuffix(stone.url)}
+              alt={stone.name || 'Stone Image'}
+              className='object-cover w-full h-40 border-2 border-gray-300 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
+              loading='lazy'
+              onClick={handleImageClick}
+            />
+          ) : (
+            <div
+              className='w-full h-40 border-2 border-gray-300 rounded cursor-pointer bg-gray-200'
+              onClick={handleImageClick}
+              role='button'
+              tabIndex={0}
+              onKeyDown={e => e.key === 'Enter' && setCurrentId(stone.id)}
+            />
+          )}
         </div>
       </ImageCard>
       {stone.available === 0 && !isRegularStock && (
@@ -166,18 +172,21 @@ export default function Stones() {
   const location = useLocation()
 
   useEffect(() => {
-    const inStock = stones.filter(
+    const withImage = stones.filter(
+      stone => stone.url != null && String(stone.url).trim() !== '',
+    )
+    const inStock = withImage.filter(
       stone =>
         (Number(stone.available) > 0 || stone.regular_stock) &&
         Boolean(stone.is_display),
     )
-    const outOfStock = stones.filter(
+    const outOfStock = withImage.filter(
       stone =>
         Number(stone.available) <= 0 &&
         !stone.regular_stock &&
         Boolean(stone.is_display),
     )
-    const notDisplayed = stones.filter(stone => !stone.is_display)
+    const notDisplayed = withImage.filter(stone => !stone.is_display)
 
     const sortedInStock = [...inStock].sort((a, b) => a.name.localeCompare(b.name))
     const sortedOutOfStock = [...outOfStock].sort((a, b) =>
@@ -223,11 +232,15 @@ export default function Stones() {
               setCurrentId(stone.id)
             }}
           >
-            <img
-              src={getStoneUrl(stone.url)}
-              alt={stone.name}
-              className='object-cover w-full h-full'
-            />
+            {stone.url ? (
+              <img
+                src={withIconSuffix(stone.url)}
+                alt={stone.name}
+                className='object-cover w-full h-full'
+              />
+            ) : (
+              <div className='w-full h-full bg-gray-200' />
+            )}
             {isOutOfStock && !isRegularStock && (
               <div className='absolute inset-0 flex items-center justify-center bg-red-500/70'>
                 <span className='text-white text-[8px] font-bold rotate-0 text-center leading-tight px-0.5'>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { type LoaderFunctionArgs, Outlet, useLoaderData } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
@@ -27,16 +27,25 @@ interface Stone {
   created_date: string
 }
 
-function getStoneUrl(original: string | null) {
-  return original ? withIconSuffix(original) : '/placeholder.png'
-}
-
-function sortStones(a: Stone, b: Stone) {
-  const aAmount = a.amount ?? 0
-  const bAmount = b.amount ?? 0
-  if (aAmount === 0 && bAmount !== 0) return 1
-  if (aAmount !== 0 && bAmount === 0) return -1
-  return a.name.localeCompare(b.name)
+function sortStonesLikeAdminEmployee(stones: Stone[]): Stone[] {
+  const withImage = stones.filter(
+    stone => stone.url != null && String(stone.url).trim() !== '',
+  )
+  const inStock = withImage.filter(
+    stone =>
+      (Number(stone.available) > 0 || stone.regular_stock) && Boolean(stone.is_display),
+  )
+  const outOfStock = withImage.filter(
+    stone =>
+      Number(stone.available) <= 0 && !stone.regular_stock && Boolean(stone.is_display),
+  )
+  const notDisplayed = withImage.filter(stone => !stone.is_display)
+  const byName = (a: Stone, b: Stone) => a.name.localeCompare(b.name)
+  return [
+    ...inStock.sort(byName),
+    ...outOfStock.sort(byName),
+    ...notDisplayed.sort(byName),
+  ]
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -66,11 +75,6 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
   const displayedLength = stone.length && stone.length > 0 ? stone.length : '—'
   const isOnSale = !!stone.on_sale
   const isRegularStock = !!stone.regular_stock
-  const createdDate = new Date(stone.created_date)
-  const threeWeeksAgo = new Date()
-  threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 30)
-  const isNew = createdDate > threeWeeksAgo
-
   return (
     <div
       id={`stone-${stone.id}`}
@@ -102,13 +106,23 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
         disabled={true}
         title={stone.name}
       >
-        <img
-          src={getStoneUrl(stone.url)}
-          alt={stone.name || 'Stone Image'}
-          className='object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
-          loading='lazy'
-          onClick={() => setCurrentId(stone.id, stoneType)}
-        />
+        {stone.url ? (
+          <img
+            src={withIconSuffix(stone.url)}
+            alt={stone.name || 'Stone Image'}
+            className='object-cover w-full h-40 border-2 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
+            loading='lazy'
+            onClick={() => setCurrentId(stone.id, stoneType)}
+          />
+        ) : (
+          <div
+            className='w-full h-40 border-2 rounded cursor-pointer bg-gray-200'
+            onClick={() => setCurrentId(stone.id, stoneType)}
+            role='button'
+            tabIndex={0}
+            onKeyDown={e => e.key === 'Enter' && setCurrentId(stone.id, stoneType)}
+          />
+        )}
       </ImageCard>
       {stone.available === 0 && !isRegularStock && (
         <div className='absolute top-16 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
@@ -128,6 +142,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
 
 export default function Stones() {
   const { stones, companyId } = useLoaderData<typeof loader>()
+  const sortedStones = useMemo(() => sortStonesLikeAdminEmployee(stones), [stones])
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const [_, setActiveType] = useState<string | undefined>(undefined)
 
@@ -140,7 +155,7 @@ export default function Stones() {
     setCurrentId(id)
 
     if (id !== undefined) {
-      const stone = stones.find(s => s.id === id)
+      const stone = sortedStones.find(s => s.id === id)
       if (stone) {
         setActiveType(stone.type)
       }
@@ -161,11 +176,11 @@ export default function Stones() {
             type='stones'
             currentId={currentId}
             setCurrentId={handleCarouselChange}
-            images={stones}
+            images={sortedStones}
             userRole='customer'
           />
         </div>
-        {stones.sort(sortStones).map(stone => (
+        {sortedStones.map(stone => (
           <InteractiveCard
             key={stone.id}
             stone={stone}

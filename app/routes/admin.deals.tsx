@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
 import { Mail, Menu, SettingsIcon } from 'lucide-react'
+import { useEffect } from 'react'
 import {
   type LoaderFunctionArgs,
   Outlet,
@@ -174,6 +174,44 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     }
 
+    const activitiesCounts = await selectMany<{ deal_id: number; count: number }>(
+      db,
+      `SELECT deal_id, COUNT(*) as count FROM deal_activities WHERE company_id = ? AND deleted_at IS NULL AND is_completed = 0 GROUP BY deal_id`,
+      [companyId],
+    )
+    const activitiesMap: Record<number, boolean> = {}
+    for (const row of activitiesCounts)
+      activitiesMap[row.deal_id] = Number(row.count) > 0
+
+    const activitiesDeadlines = await selectMany<{
+      deal_id: number
+      deadline: string | null
+    }>(
+      db,
+      `SELECT deal_id, deadline FROM deal_activities WHERE company_id = ? AND deleted_at IS NULL AND is_completed = 0`,
+      [companyId],
+    )
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const activitiesIconMap: Record<number, 'red' | 'yellow' | 'gray'> = {}
+    for (const row of activitiesDeadlines) {
+      const current = activitiesIconMap[row.deal_id]
+      if (current === 'red') continue
+      const d = row.deadline ? new Date(row.deadline) : null
+      if (!d || Number.isNaN(d.getTime())) {
+        if (current === undefined) activitiesIconMap[row.deal_id] = 'gray'
+        continue
+      }
+      const deadlineDate = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+      if (deadlineDate.getTime() < today.getTime()) {
+        activitiesIconMap[row.deal_id] = 'red'
+      } else if (deadlineDate.getTime() === today.getTime()) {
+        activitiesIconMap[row.deal_id] = 'yellow'
+      } else if (current === undefined) {
+        activitiesIconMap[row.deal_id] = 'gray'
+      }
+    }
+
     return {
       deals,
       customers,
@@ -181,6 +219,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       emailsMap,
       imagesMap,
       nearestActivityMap,
+      activitiesMap,
+      activitiesIconMap,
       groups,
       activeGroupId,
       isWon,
@@ -198,6 +238,8 @@ export default function AdminDeals() {
     emailsMap,
     imagesMap,
     nearestActivityMap,
+    activitiesMap,
+    activitiesIconMap,
     groups,
     activeGroupId,
     isWon,
@@ -241,6 +283,8 @@ export default function AdminDeals() {
         imagesMap={imagesMap}
         emailsMap={emailsMap}
         nearestActivityMap={nearestActivityMap}
+        activitiesMap={activitiesMap}
+        activitiesIconMap={activitiesIconMap}
         readonly
         showAddDeal={false}
         toolbarLeft={

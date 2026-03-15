@@ -36,13 +36,23 @@ export function Image({
     <div className='flex gap-2 flex-col items-center'>
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
-          <img
-            src={src || '/path/to/placeholder.png'}
-            alt={alt || name || 'Image'}
-            className={`object-cover  w-full h-40 border-2  rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300 ${className}`}
-            loading='lazy'
-            onClick={() => setImage(id)}
-          />
+          {src ? (
+            <img
+              src={src}
+              alt={alt || name || 'Image'}
+              className={`object-cover  w-full h-40 border-2  rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none hover:border-blue-500 hover:bg-gray-300 ${className}`}
+              loading='lazy'
+              onClick={() => setImage(id)}
+            />
+          ) : (
+            <div
+              className={`object-cover w-full h-40 border-2 rounded cursor-pointer flex items-center justify-center bg-gray-200 ${className}`}
+              onClick={() => setImage(id)}
+              role='button'
+              tabIndex={0}
+              onKeyDown={e => e.key === 'Enter' && setImage(id)}
+            />
+          )}
         </DialogTrigger>
 
         <DialogContentImage className='flex justify-center items-center'>
@@ -54,12 +64,14 @@ export function Image({
             <X className='w-6 h-6' />
           </button>
 
-          <img
-            src={src || '/path/to/placeholder.png'}
-            alt={alt || name || 'Image'}
-            className='h-[90vh] w-auto max-h-[90vh] max-w-[90vw] object-contain'
-            onClick={e => e.stopPropagation()}
-          />
+          {src ? (
+            <img
+              src={src}
+              alt={alt || name || 'Image'}
+              className='h-[90vh] w-auto max-h-[90vh] max-w-[90vw] object-contain'
+              onClick={e => e.stopPropagation()}
+            />
+          ) : null}
         </DialogContentImage>
       </Dialog>
       {name && <p className='text-center font-bold font-sans'>{name}</p>}

@@ -8,6 +8,7 @@ import { useMutation } from '@tanstack/react-query'
 import {
   FileText,
   ImageIcon,
+  List,
   MoreVertical,
   Package,
   PaperclipIcon,
@@ -17,7 +18,7 @@ import {
   Upload,
 } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -39,6 +40,7 @@ import {
 } from '~/components/molecules/EmailTemplateSearch'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
+import { MultiEmailRecipientInput } from '~/components/molecules/MultiEmailRecipientInput'
 import { QuillInput } from '~/components/molecules/QuillInput'
 import { Button } from '~/components/ui/button'
 import {
@@ -55,6 +57,7 @@ import {
   FormMessage,
   FormProvider,
 } from '~/components/ui/form'
+import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -69,7 +72,6 @@ import { useToast } from '~/hooks/use-toast'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
 import {
   getUnfilledCustomVariables,
-  hasAnyVariables,
   replaceTemplateVariables,
   type TemplateVariableData,
 } from '~/utils/emailTemplateVariables'
@@ -130,7 +132,9 @@ interface AIEmailResponse {
 // ============================================================================
 
 const emailSchema = z.object({
-  to: z.email('Valid email address is required'),
+  to: z
+    .array(z.email('Valid email address is required'))
+    .min(1, 'Recipient is required'),
   subject: z.string().min(1, 'Subject is required'),
   text: z.string().min(1, 'Email body is required'),
   attachments: z.array(z.instanceof(File)),
@@ -328,6 +332,132 @@ async function generateAIEmail(
 // UI COMPONENTS
 // ============================================================================
 
+type DealList = { id: number; name: string; group_name: string }
+
+function FromListToField({
+  canEditTo,
+  companyId,
+  value,
+  onChange,
+  labels,
+  onLabelsChange,
+}: {
+  canEditTo: boolean
+  companyId: number
+  value: string[]
+  onChange: (value: string[]) => void
+  labels: Record<string, string>
+  onLabelsChange: (labels: Record<string, string>) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [lists, setLists] = useState<DealList[]>([])
+  const [listsLoading, setListsLoading] = useState(false)
+  const [recipientsLoading, setRecipientsLoading] = useState(false)
+
+  const fetchLists = useCallback(async () => {
+    setListsLoading(true)
+    try {
+      const res = await fetch('/api/employee/deal-lists')
+      if (!res.ok) return
+      const data = await res.json()
+      setLists(data.lists ?? [])
+    } finally {
+      setListsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (open) fetchLists()
+  }, [open, fetchLists])
+
+  const normalizedExisting = useCallback(
+    (emails: string[]) => emails.map(e => e.trim().toLowerCase()),
+    [],
+  )
+  const addFromList = useCallback(
+    async (listId: number) => {
+      setRecipientsLoading(true)
+      try {
+        const res = await fetch(`/api/employee/deal-lists/${listId}/recipients`)
+        if (!res.ok) return
+        const data = await res.json()
+        const recipients: { email: string; name: string | null }[] =
+          data.recipients ?? []
+        const existing = normalizedExisting(value)
+        const merged = [...existing]
+        const nextLabels = { ...labels }
+        for (const r of recipients) {
+          const normalized = r.email.trim().toLowerCase()
+          if (!normalized) continue
+          if (!merged.includes(normalized)) merged.push(normalized)
+          if (r.name) nextLabels[normalized] = r.name
+        }
+        onChange(merged)
+        onLabelsChange(nextLabels)
+        setOpen(false)
+      } finally {
+        setRecipientsLoading(false)
+      }
+    },
+    [value, onChange, labels, onLabelsChange, normalizedExisting],
+  )
+
+  return (
+    <div className='flex items-start gap-2'>
+      <div className='min-w-0 flex-1'>
+        <MultiEmailRecipientInput
+          value={value}
+          onChange={onChange}
+          disabled={!canEditTo}
+          companyId={companyId}
+          labels={labels}
+          onLabelsChange={onLabelsChange}
+        />
+      </div>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            disabled={!canEditTo}
+            className='shrink-0'
+          >
+            <List className='h-4 w-4 mr-1' />
+            From list
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className='w-56 p-0' align='end'>
+          {listsLoading ? (
+            <div className='p-3 text-sm text-zinc-500'>Loading lists...</div>
+          ) : lists.length === 0 ? (
+            <div className='p-3 text-sm text-zinc-500'>No lists</div>
+          ) : (
+            <ul className='max-h-64 overflow-y-auto py-1'>
+              {lists.map(list => (
+                <li key={list.id}>
+                  <button
+                    type='button'
+                    disabled={recipientsLoading}
+                    className='w-full px-3 py-2 text-left text-sm hover:bg-zinc-100 disabled:opacity-50'
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => addFromList(list.id)}
+                  >
+                    <span className='font-medium'>{list.name}</span>
+                    <span className='text-zinc-500 text-xs ml-1'>
+                      · {list.group_name}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </PopoverContent>
+      </Popover>
+    </div>
+  )
+}
+
 function EmailFormFields({
   form,
   companyId,
@@ -336,6 +466,8 @@ function EmailFormFields({
   templateVariableData,
   canEditTo = false,
   onFilesDrop,
+  toLabels,
+  onToLabelsChange,
 }: {
   form: ReturnType<typeof useForm<EmailFormData>>
   companyId: number
@@ -344,6 +476,8 @@ function EmailFormFields({
   templateVariableData: TemplateVariableData
   canEditTo?: boolean
   onFilesDrop?: (files: File[]) => void
+  toLabels: Record<string, string>
+  onToLabelsChange: (labels: Record<string, string>) => void
 }) {
   const bodyText = form.watch('text')
   const customVariables = getUnfilledCustomVariables(bodyText)
@@ -355,12 +489,20 @@ function EmailFormFields({
         control={form.control}
         name='to'
         render={({ field }) => (
-          <InputItem
-            name='To'
-            field={field}
-            placeholder='recipient@example.com'
-            disabled={!canEditTo}
-          />
+          <FormItem>
+            <FormLabel>To</FormLabel>
+            <FormControl>
+              <FromListToField
+                canEditTo={canEditTo}
+                companyId={companyId}
+                value={field.value ?? []}
+                onChange={field.onChange}
+                labels={toLabels}
+                onLabelsChange={onToLabelsChange}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
         )}
       />
       <FormField
@@ -400,8 +542,8 @@ function EmailFormFields({
       {showCustomVariablesInfo && (
         <div className='p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md'>
           <p>
-            <strong>Action required:</strong> Please replace the following placeholders
-            with actual values before sending:
+            <strong>Action required:</strong> Please replace the following custom
+            placeholders with actual values before sending:
           </p>
           <ul className='mt-1 list-disc list-inside'>
             {customVariables.map(variable => (
@@ -410,6 +552,10 @@ function EmailFormFields({
               </li>
             ))}
           </ul>
+          <p className='mt-2 text-xs text-amber-700'>
+            Note: Standard placeholders like customer names will be filled automatically
+            for each recipient.
+          </p>
         </div>
       )}
     </div>
@@ -561,14 +707,16 @@ function AIAssistantMenu({
 // MAIN COMPONENT
 // ====
 function sendEmail(
-  to: string,
+  to: string[],
   subject: string,
   body: string,
   dealId: number | undefined,
   attachments: File[],
 ) {
   const formData = new FormData()
-  formData.append('to', to)
+  for (const recipient of to) {
+    formData.append('to', recipient)
+  }
   formData.append('subject', subject)
   formData.append('body', body)
   if (dealId) {
@@ -601,7 +749,7 @@ function sendEmail(
 export default function DealEmailDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { email, dealId, companyId, templateVariableData } =
+  const { email, customerName, dealId, companyId, templateVariableData } =
     useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
   const [_isGenerating, setIsGenerating] = useState(false)
@@ -612,6 +760,13 @@ export default function DealEmailDialog() {
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [toLabels, setToLabels] = useState<Record<string, string>>(() => {
+    if (email && customerName) {
+      const normalized = email.trim().toLowerCase()
+      return { [normalized]: customerName }
+    }
+    return {}
+  })
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (values: EmailFormData) => {
@@ -645,7 +800,7 @@ export default function DealEmailDialog() {
   const form = useForm<EmailFormData>({
     resolver: emailResolver,
     defaultValues: {
-      to: email,
+      to: email ? [email] : [],
       subject: '',
       text: '',
       attachments: [],
@@ -665,10 +820,10 @@ export default function DealEmailDialog() {
   })
 
   const fullSubmit = (values: EmailFormData) => {
-    if (hasAnyVariables(values.text)) {
+    const customVariables = getUnfilledCustomVariables(values.text)
+    if (customVariables.length > 0) {
       form.setError('text', {
-        message:
-          'Please replace all {{placeholders}} with actual values before sending',
+        message: `Please replace custom placeholders before sending: ${customVariables.map(v => `{{${v}}}`).join(', ')}`,
       })
       return
     }
@@ -852,6 +1007,8 @@ export default function DealEmailDialog() {
               templateVariableData={templateVariableData}
               canEditTo={!dealId}
               onFilesDrop={files => addFiles(files)}
+              toLabels={toLabels}
+              onToLabelsChange={setToLabels}
             />
             {form.watch('attachments').length > 0 ? (
               <div className='flex flex-wrap gap-2'>

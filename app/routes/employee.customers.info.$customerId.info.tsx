@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import { useOutletContext } from 'react-router'
+import { CopyText } from '~/components/atoms/CopyText'
 
 type CustomerInfo = {
   id: number
@@ -95,14 +96,43 @@ export default function CustomerInfoTab() {
     <div className='space-y-4 mt-4'>
       <div className='border rounded p-4'>
         <div className='text-lg font-semibold'>
-          {customer.company_name ? 'Contact name: ' : ''} {customer.name}
+          {customer.company_name ? 'Contact name: ' : ''}
+          <CopyText value={customer.name} title={customer.name} />
         </div>
         <div className='text-sm text-slate-600 mt-2'>
           {customer.company_name && <div>Company: {customer.company_name}</div>}
-          <div>Email: {customer.email || '-'}</div>
-          <div>Phone 1: {customer.phone || '-'}</div>
-          <div>Phone 2: {customer.phone_2 || '-'}</div>
-          <div>Address: {customer.address || '-'}</div>
+          <div>
+            Email:{' '}
+            {customer.email ? (
+              <CopyText value={customer.email} title={customer.email} />
+            ) : (
+              '-'
+            )}
+          </div>
+          <div>
+            Phone 1:{' '}
+            {customer.phone ? (
+              <CopyText value={customer.phone} title={customer.phone} />
+            ) : (
+              '-'
+            )}
+          </div>
+          <div>
+            Phone 2:{' '}
+            {customer.phone_2 ? (
+              <CopyText value={customer.phone_2} title={customer.phone_2} />
+            ) : (
+              '-'
+            )}
+          </div>
+          <div>
+            Address:{' '}
+            {customer.address ? (
+              <CopyText value={customer.address} title={customer.address} />
+            ) : (
+              '-'
+            )}
+          </div>
           <div>Sales Rep: {customer.sales_rep_name || 'Not assigned'}</div>
           <div>Source: {customer.source || 'Not assigned'}</div>
           <div>

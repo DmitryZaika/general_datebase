@@ -31,7 +31,7 @@ interface Stone {
 }
 
 function getStoneUrl(original: string | null) {
-  return original ? withIconSuffix(original) : '/placeholder.png'
+  return original ? withIconSuffix(original) : ''
 }
 
 function sortStones(a: Stone, b: Stone) {
@@ -88,7 +88,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
   const createdDate = new Date(stone.created_date)
   const threeWeeksAgo = new Date()
   threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 30)
-  const isNew = createdDate > threeWeeksAgo
+  const _isNew = createdDate > threeWeeksAgo
 
   return (
     <div

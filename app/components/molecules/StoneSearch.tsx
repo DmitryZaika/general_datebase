@@ -64,6 +64,13 @@ export function StoneSearch({
     enabled: !!searchTerm,
   })
 
+  const displayStones =
+    mode === 'samples'
+      ? (data ?? []).filter(
+          (s: StoneImage) => s.url != null && String(s.url).trim() !== '',
+        )
+      : (data ?? [])
+
   useEffect(() => {
     if (userRole === 'admin') {
       const styleElement = document.createElement('style')
@@ -126,7 +133,7 @@ export function StoneSearch({
 
       {isInputFocused && (
         <div className='absolute z-50 w-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 max-h-72 overflow-y-auto'>
-          {data?.map(stone => (
+          {displayStones.map(stone => (
             <div
               key={stone.id}
               onClick={e => {
@@ -235,7 +242,7 @@ export function StoneSearch({
         type='stones'
         currentId={currentId}
         setCurrentId={setCurrentId}
-        images={data || []}
+        images={displayStones}
       />
     </div>
   )

@@ -143,13 +143,25 @@ export default function AdminFaucets() {
                   }`}
                 >
                   <div className='relative'>
-                    <img
-                      src={faucet.url || '/placeholder.png'}
-                      alt={faucet.name || 'Faucet Image'}
-                      className='object-cover w-full h-40 rounded select-none cursor-pointer'
-                      loading='lazy'
-                      onClick={() => handleSetCurrentId(faucet.id)}
-                    />
+                    {faucet.url ? (
+                      <img
+                        src={faucet.url}
+                        alt={faucet.name || 'Faucet Image'}
+                        className='object-cover w-full h-40 rounded select-none cursor-pointer'
+                        loading='lazy'
+                        onClick={() => handleSetCurrentId(faucet.id)}
+                      />
+                    ) : (
+                      <div
+                        className='w-full h-40 rounded bg-gray-200 cursor-pointer'
+                        onClick={() => handleSetCurrentId(faucet.id)}
+                        role='button'
+                        tabIndex={0}
+                        onKeyDown={e =>
+                          e.key === 'Enter' && handleSetCurrentId(faucet.id)
+                        }
+                      />
+                    )}
                     {displayedAmount === '—' && !isRegularStock && (
                       <div className='absolute top-15 left-1/2 transform -translate-x-1/2 flex items-center justify-center whitespace-nowrap'>
                         <div className='bg-red-500 text-white text-lg font-bold px-2 py-1 transform z-10 rotate-45 select-none'>

@@ -35,7 +35,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const [, searchParams] = request.url.split('?')
   const queryParams = new URLSearchParams(searchParams)
   const filters = stoneFilterSchema.parse(cleanParams(queryParams))
-  const stones = await stoneQueryBuilder(filters, user.company_id)
+  const allStones = await stoneQueryBuilder(filters, user.company_id)
+  const stones = allStones.filter(s => s.url != null && String(s.url).trim() !== '')
   return { stones, companyId: user.company_id }
 }
 
@@ -265,11 +266,15 @@ export default function Samples() {
               setCurrentId(stone.id)
             }}
           >
-            <img
-              src={stone.url || '/placeholder.png'}
-              alt={stone.name}
-              className='object-cover w-full h-full'
-            />
+            {stone.url ? (
+              <img
+                src={stone.url}
+                alt={stone.name}
+                className='object-cover w-full h-full'
+              />
+            ) : (
+              <div className='w-full h-full bg-gray-200' />
+            )}
             {isOutOfStock && (
               <div className='absolute inset-0 flex items-center justify-center bg-red-500/70'>
                 <span className='text-white text-[8px] font-bold rotate-0 text-center leading-tight px-0.5'>

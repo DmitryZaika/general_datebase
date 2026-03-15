@@ -3,7 +3,7 @@ AWS_ACCOUNT_ID := 741448943665
 REGION := us-east-2
 REPO_NAME := granite-manager-remix
 EC2_USER := ec2-user
-EC2_IP := ec2-3-147-83-220.us-east-2.compute.amazonaws.com
+EC2_IP := ec2-3-145-166-123.us-east-2.compute.amazonaws.com
 SSH_KEY = ~/colin.pem
 
 # Full Image URI

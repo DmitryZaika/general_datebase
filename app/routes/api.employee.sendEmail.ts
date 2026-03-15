@@ -1,9 +1,13 @@
-import type { ResultSetHeader } from 'mysql2'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { v4 as uuidv4 } from 'uuid'
 import { z } from 'zod'
 import { db } from '~/db.server'
 import { type MailReturn, sendEmail } from '~/lib/email.server'
+import {
+  replaceTemplateVariables,
+  type TemplateVariableData,
+} from '~/utils/emailTemplateVariables'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectId } from '~/utils/queryHelpers'
 import { uploadStreamToS3 } from '~/utils/s3.server'
@@ -11,7 +15,7 @@ import { getEmployeeUser, type User } from '~/utils/session.server'
 import { parseEmailAddress } from '~/utils/stringHelpers'
 
 export const emailSchema = z.object({
-  to: z.union([z.email(), z.array(z.email())]),
+  to: z.array(z.email()).min(1),
   subject: z.string().min(1).max(100),
   body: z.string().min(1).max(10000),
   dealId: z.coerce.number().min(1).int().optional(),
@@ -41,7 +45,48 @@ const appendEmailSignature = (body: string, signature: string | null | undefined
   return `${cleanBody}\n\n${sign}`
 }
 
-const emailToSend = async (user: User, cleaned: Email) => {
+async function fetchCustomerDataByEmail(
+  recipientEmail: string,
+  companyId: number,
+): Promise<TemplateVariableData['customer']> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT name, address FROM customers WHERE email = ? AND company_id = ? AND deleted_at IS NULL LIMIT 1`,
+    [recipientEmail, companyId],
+  )
+
+  if (rows?.[0]) {
+    return {
+      name: rows[0].name || undefined,
+      address: rows[0].address || undefined,
+    }
+  }
+
+  return undefined
+}
+
+async function fetchCompanyData(
+  companyId: number,
+): Promise<TemplateVariableData['company']> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    'SELECT name, address FROM company WHERE id = ?',
+    [companyId],
+  )
+
+  if (rows?.[0]) {
+    return {
+      name: rows[0].name || undefined,
+      address: rows[0].address || undefined,
+    }
+  }
+
+  return undefined
+}
+
+const emailToSend = async (
+  user: User,
+  cleaned: Omit<Email, 'to'>,
+  recipient: string,
+) => {
   const userCompany = await selectId<{ domain: string | null }>(
     db,
     'SELECT domain from company where id = ?',
@@ -83,7 +128,7 @@ const emailToSend = async (user: User, cleaned: Email) => {
     : emailAddress
 
   return {
-    to: cleaned.to,
+    to: recipient,
     from,
     subject: cleaned.subject,
     html: HTMLBody,
@@ -97,53 +142,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
 
   const formData = await request.formData()
+  const to = formData
+    .getAll('to')
+    .filter((value): value is string => typeof value === 'string')
+  const attachments = formData
+    .getAll('attachments')
+    .filter((value): value is File => value instanceof File)
 
   const raw = {
-    to: formData.get('to'),
+    to,
     subject: formData.get('subject'),
     body: formData.get('body'),
     dealId: formData.get('dealId') || undefined,
     threadId: formData.get('threadId') || undefined,
-    attachments: formData.getAll('attachments'),
+    attachments,
   }
   const cleaned = emailSchema.parse(raw)
-  const threadId = cleaned.threadId || uuidv4()
 
-  const emailInformation = await emailToSend(user, cleaned)
-  let info: MailReturn
-  try {
-    info = await sendEmail(emailInformation)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    if (message.includes('Email address is not verified.')) {
-      posthogClient.captureException(error, user.email)
-      return data({ error: 'Invalid email address' }, { status: 400 })
-    }
-    posthogClient.captureException(error, user.email)
-    return data({ error: 'Email failed to send' }, { status: 400 })
-  }
-
-  const messageId = cleanId(info.messageId)
-  const senderEmail = parseEmailAddress(emailInformation.from || '')
-
-  const [result] = await db.execute<ResultSetHeader>(
-    `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id, deal_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      user.id,
-      cleaned.subject,
-      cleaned.body,
-      messageId,
-      senderEmail,
-      Array.isArray(emailInformation.to)
-        ? (emailInformation.to as string[]).map(parseEmailAddress).join(', ')
-        : parseEmailAddress(emailInformation.to),
-      threadId,
-      cleaned.dealId || null,
-    ],
-  )
-
-  const emailId = result.insertId
+  const uploadedAttachments: {
+    contentType: string
+    contentSubtype: string
+    filename: string
+    url: string
+  }[] = []
 
   for (const file of cleaned.attachments) {
     const ab = await file.arrayBuffer()
@@ -159,11 +180,114 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const [type, subtype] = (file.type || 'application/octet-stream').split('/')
 
-    await db.execute(
-      `INSERT INTO email_attachments (email_id, content_type, content_subtype, filename, url)
-       VALUES (?, ?, ?, ?, ?)`,
-      [emailId, type, subtype, file.name, url],
+    uploadedAttachments.push({
+      contentType: type ?? 'application',
+      contentSubtype: subtype ?? '',
+      filename: file.name ?? '',
+      url: url ?? '',
+    })
+  }
+
+  const sendResults: {
+    messageId: string
+    senderEmail: string
+    receiverEmail: string
+    threadId: string
+    personalizedBody: string
+  }[] = []
+
+  const companyData = user.company_id
+    ? await fetchCompanyData(user.company_id)
+    : undefined
+
+  for (const recipient of cleaned.to) {
+    const threadId =
+      cleaned.to.length === 1 && cleaned.threadId ? cleaned.threadId : uuidv4()
+
+    const recipientCustomerData = user.company_id
+      ? await fetchCustomerDataByEmail(recipient, user.company_id)
+      : undefined
+
+    const templateVariableData: TemplateVariableData = {
+      user: {
+        name: user.name || undefined,
+        email: user.email,
+        phone_number: user.phone_number || undefined,
+      },
+      customer: recipientCustomerData,
+      company: companyData,
+    }
+
+    const personalizedBody = replaceTemplateVariables(
+      cleaned.body,
+      templateVariableData,
     )
+
+    const emailInformation = await emailToSend(
+      user,
+      {
+        subject: cleaned.subject,
+        body: personalizedBody,
+        dealId: cleaned.dealId,
+        threadId: cleaned.threadId,
+        attachments: cleaned.attachments,
+      },
+      recipient,
+    )
+
+    let info: MailReturn
+    try {
+      info = await sendEmail(emailInformation)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      if (message.includes('Email address is not verified.')) {
+        posthogClient.captureException(error, user.email)
+        return data({ error: 'Invalid email address' }, { status: 400 })
+      }
+      posthogClient.captureException(error, user.email)
+      return data({ error: 'Email failed to send' }, { status: 400 })
+    }
+
+    sendResults.push({
+      messageId: cleanId(info.messageId),
+      senderEmail: parseEmailAddress(emailInformation.from || ''),
+      receiverEmail: parseEmailAddress(recipient),
+      threadId,
+      personalizedBody,
+    })
+  }
+
+  for (const sendResult of sendResults) {
+    const [result] = await db.execute<ResultSetHeader>(
+      `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id, deal_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        user.id,
+        cleaned.subject,
+        sendResult.personalizedBody,
+        sendResult.messageId,
+        sendResult.senderEmail,
+        sendResult.receiverEmail,
+        sendResult.threadId,
+        cleaned.dealId || null,
+      ],
+    )
+
+    const emailId = result.insertId
+
+    for (const attachment of uploadedAttachments) {
+      await db.execute(
+        `INSERT INTO email_attachments (email_id, content_type, content_subtype, filename, url)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          emailId,
+          attachment.contentType,
+          attachment.contentSubtype,
+          attachment.filename,
+          attachment.url,
+        ],
+      )
+    }
   }
 
   return data({ ok: true })

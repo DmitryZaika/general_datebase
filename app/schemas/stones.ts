@@ -19,11 +19,15 @@ export const stoneSchema = z.object({
   finishing: z.enum(STONE_FINISHES),
 })
 
+const optionalNonNegativeNumber = z
+  .union([z.coerce.number().min(0), z.literal('')])
+  .transform(v => (v === '' ? 0 : v))
+
 const quickAddStoneBaseSchema = {
   name: z.string().min(1, 'Name is required'),
   retail_price: z.coerce.number().positive('Price is required'),
-  length: z.coerce.number().positive('Length is required'),
-  width: z.coerce.number().positive('Width is required'),
+  length: optionalNonNegativeNumber,
+  width: optionalNonNegativeNumber,
   type: z.enum(STONE_TYPES).optional(),
   company_id: z.number(),
 }

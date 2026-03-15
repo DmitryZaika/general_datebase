@@ -54,6 +54,8 @@ interface DealsViewProps {
   imagesMap: Record<number, boolean>
   emailsMap: Record<number, boolean>
   nearestActivityMap?: Record<number, { name: string; deadline: Nullable<string> }>
+  activitiesMap?: Record<number, boolean>
+  activitiesIconMap?: Record<number, 'red' | 'yellow' | 'gray'>
   groupListSelect?: React.ReactNode
   readonly?: boolean
   toolbarLeft?: React.ReactNode
@@ -67,6 +69,8 @@ export default function DealsView({
   imagesMap,
   emailsMap,
   nearestActivityMap,
+  activitiesMap = {},
+  activitiesIconMap = {},
   groupListSelect,
   readonly = false,
   toolbarLeft,
@@ -97,6 +101,8 @@ export default function DealsView({
         : null,
       has_images: imagesMap?.[d.id] || false,
       has_email: emailsMap?.[d.id] || false,
+      has_activities: activitiesMap?.[d.id] || false,
+      activities_icon_color: activitiesIconMap?.[d.id],
       is_won: d.is_won,
       nearest_activity_name: activity?.name ?? null,
       nearest_activity_deadline: activity?.deadline ?? null,
@@ -442,6 +448,11 @@ export default function DealsView({
     <DndContext
       sensors={sensors}
       collisionDetection={args => {
+        const { pointerCoordinates } = args
+        const el = pointerCoordinates
+          ? document.elementFromPoint(pointerCoordinates.x, pointerCoordinates.y)
+          : null
+        if (el?.closest('[data-dnd-ignore]')) return []
         const pointerCollisions = pointerWithin(args)
         if (pointerCollisions.length > 0) return pointerCollisions
         return closestCorners(args)
