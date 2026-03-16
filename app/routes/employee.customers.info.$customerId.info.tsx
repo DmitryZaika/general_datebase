@@ -1,6 +1,7 @@
 import { format } from 'date-fns'
 import { useOutletContext } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
+import { CustomerActivityTimeline } from '~/components/organisms/CustomerActivityTimeline'
 
 type CustomerInfo = {
   id: number
@@ -196,6 +197,8 @@ export default function CustomerInfoTab() {
           </ul>
         )}
       </div>
+
+      <CustomerActivityTimeline phone={customer.phone} phone2={customer.phone_2} />
     </div>
   )
 }
