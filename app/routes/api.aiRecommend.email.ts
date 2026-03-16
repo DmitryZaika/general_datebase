@@ -55,7 +55,7 @@ async function getUserInfo(user: {
   let companyName: string | undefined
   let positionName: string | undefined
 
-  if (user.company_id) {
+  if (user.company_id !== undefined) {
     try {
       const [rows] = await db.execute<RowDataPacket[]>(
         `SELECT name FROM company WHERE id = ? LIMIT 1`,

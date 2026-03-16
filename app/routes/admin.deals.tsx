@@ -42,7 +42,7 @@ type AdminDeal = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user: User = await getAdminUser(request)
-    if (!user || !user.company_id) {
+    if (!user) {
       return redirect('/login')
     }
 

@@ -76,6 +76,8 @@ export interface HeaderProps {
   isAdmin: boolean
   isSuperUser: boolean
   isEmployee?: boolean
+  superadminCompanies?: { id: number; name: string }[]
+  activeCompanyId?: number
 }
 
 export interface TokenSet {

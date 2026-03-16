@@ -24,7 +24,7 @@ import type { ISupplier } from '~/schemas/suppliers'
 import { queryClient } from '~/utils/api'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { getUserBySessionId } from '~/utils/session.server'
+import { getSuperAdminCompanies, getUserBySessionId } from '~/utils/session.server'
 import type { ToastMessage } from '~/utils/toastHelpers.server'
 import { getBase } from '~/utils/urlHelpers'
 import { Header } from './components/Header'
@@ -83,23 +83,46 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let companyName: string | null = null
   let companyId: number | undefined
 
+  let superadminCompanies: { id: number; name: string }[] = []
+  let activeCompanyId: number | undefined
+
   if (activeSession) {
     user = (await getUserBySessionId(activeSession)) || null
     if (user) {
+      let effectiveCompanyId = user.company_id
+
+      if (user.is_superuser) {
+        superadminCompanies = await getSuperAdminCompanies(user.id)
+        const sessionActiveCompany = session.get('activeCompanyId')
+        if (
+          sessionActiveCompany !== undefined &&
+          superadminCompanies.some(c => c.id === sessionActiveCompany)
+        ) {
+          effectiveCompanyId = sessionActiveCompany
+          activeCompanyId = sessionActiveCompany
+        } else if (
+          effectiveCompanyId == null &&
+          superadminCompanies.length > 0
+        ) {
+          effectiveCompanyId = superadminCompanies[0].id
+          activeCompanyId = superadminCompanies[0].id
+        }
+      }
+
       const company = await selectId<{ name: string }>(
         db,
         'SELECT name FROM company WHERE id = ?',
-        user.company_id,
+        effectiveCompanyId,
       )
       companyName = company?.name ?? null
-      companyId = user.company_id
+      companyId = effectiveCompanyId
     }
   }
 
   const url = new URL(request.url)
   const isContractors = url.pathname.startsWith('/contractors/')
 
-  if (!companyId && isContractors) {
+  if (companyId === undefined && isContractors) {
     const parts = url.pathname.split('/')
     if (parts[1] === 'contractors' && parts[2]) {
       const id = parseInt(parts[2], 10)
@@ -109,7 +132,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
-  if (companyId && isContractors && !companyName) {
+  if (companyId !== undefined && isContractors && !companyName) {
     const company = await selectId<{ name: string }>(
       db,
       'SELECT name FROM company WHERE id = ?',
@@ -131,7 +154,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     [],
   )
 
-  if (companyId) {
+  if (companyId !== undefined) {
     stoneSuppliers = await selectMany<ISupplier>(
       db,
       `SELECT s.id, s.supplier_name
@@ -188,14 +211,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
           : null
 
     // Installer users: always redirect to their checklist
-    if (hasInstaller) {
+    if (hasInstaller && !user.is_superuser) {
       const installerTarget = `/installers/${user.company_id}/checklist`
       if (!url.pathname.startsWith('/installers/')) {
         return redirect(installerTarget)
       }
     }
 
-    if (hasCheckIn) {
+    if (hasCheckIn && !user.is_superuser) {
       const target = `/customer/${user.company_id}/check-in`
       if (!url.pathname.startsWith(target)) {
         return redirect(target)
@@ -203,13 +226,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     // Auto-redirect Marketing users to their External Marketing page
-    if (hasExternalMarketing) {
+    if (hasExternalMarketing && !user.is_superuser) {
       const marketingTarget = `/external/marketing/${user.company_id}/leads`
       if (!url.pathname.startsWith('/external/marketing/')) {
         return redirect(marketingTarget)
       }
     }
-    if (hasShopWorker && !url.pathname.startsWith('/shop')) {
+    if (hasShopWorker && !user.is_superuser && !url.pathname.startsWith('/shop')) {
       return redirect('/shop/transactions')
     }
   }
@@ -225,6 +248,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       faucetSuppliers,
       colors,
       position,
+      superadminCompanies,
+      activeCompanyId,
     },
 
     {
@@ -247,6 +272,8 @@ export default function App() {
     faucetSuppliers,
     colors,
     position,
+    superadminCompanies,
+    activeCompanyId,
   } = useLoaderData<typeof loader>()
   const { pathname } = useLocation()
   const { toast } = useToast()
@@ -341,6 +368,8 @@ export default function App() {
                     user={user}
                     isAdmin={user?.is_admin ?? false}
                     isSuperUser={user?.is_superuser ?? false}
+                    superadminCompanies={superadminCompanies}
+                    activeCompanyId={activeCompanyId}
                   />
                 )}
                 <div className='relative'>

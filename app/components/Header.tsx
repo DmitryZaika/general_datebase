@@ -3,7 +3,14 @@ import HeaderCustomers from './organisms/HeaderCustomers'
 import { HeaderDesktop } from './organisms/HeaderDesktop'
 import { HeaderMobile } from './organisms/HeaderMobile'
 
-export function Header({ user, isEmployee, isAdmin, isSuperUser }: HeaderProps) {
+export function Header({
+  user,
+  isEmployee,
+  isAdmin,
+  isSuperUser,
+  superadminCompanies,
+  activeCompanyId,
+}: HeaderProps) {
   if (!isEmployee && !isAdmin && !isSuperUser) {
     return <HeaderCustomers />
   }
@@ -15,12 +22,16 @@ export function Header({ user, isEmployee, isAdmin, isSuperUser }: HeaderProps) 
         user={user}
         isAdmin={isAdmin}
         isSuperUser={isSuperUser}
+        superadminCompanies={superadminCompanies}
+        activeCompanyId={activeCompanyId}
       />
       <HeaderMobile
         className='block md:hidden'
         user={user}
         isAdmin={isAdmin}
         isSuperUser={isSuperUser}
+        superadminCompanies={superadminCompanies}
+        activeCompanyId={activeCompanyId}
       />
     </div>
   )

@@ -52,8 +52,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const users = await selectMany<User>(
     db,
-    `select id, name, email, phone_number from users WHERE is_deleted = 0${effectiveCompanyId ? ' AND company_id = ?' : ''}`,
-    effectiveCompanyId ? [effectiveCompanyId] : [],
+    `select id, name, email, phone_number from users WHERE is_deleted = 0${effectiveCompanyId != null ? ' AND company_id = ?' : ''}`,
+    effectiveCompanyId != null ? [effectiveCompanyId] : [],
   )
 
   const companies = await selectMany<Company>(db, 'SELECT id, name FROM company')

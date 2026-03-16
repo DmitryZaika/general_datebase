@@ -12,7 +12,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const companyId = Number(params.companyId)
 
-  if (Number.isNaN(companyId) || companyId <= 0) {
+  if (Number.isNaN(companyId) || companyId < 0) {
     return Response.json({ stones: [] })
   }
 

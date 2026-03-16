@@ -19,12 +19,19 @@ import {
   Users,
 } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useLoaderData, useLocation } from 'react-router'
+import { Link, useFetcher, useLoaderData, useLocation } from 'react-router'
 import { Collapsible } from '~/components/Collapsible'
 import { CorbelIcon } from '~/components/icons/CorbelIcon'
 import { SinkIcon } from '~/components/icons/SinkIcon'
 import { LinkButton } from '~/components/molecules/LinkButton'
 import { Button } from '~/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import {
   Sidebar,
   SidebarContent,
@@ -249,6 +256,9 @@ export function EmployeeSidebar({
   const isContractorsRoute = location.pathname.startsWith('/contractors/')
   const data = useLoaderData<{
     user: { company_id: number; is_admin: boolean; is_superuser: boolean } | null
+    superadminCompanies?: { id: number; name: string }[]
+    activeCompanyId?: number
+    token: string
   }>()
 
   let companyIdFromUrl: string | undefined
@@ -258,12 +268,31 @@ export function EmployeeSidebar({
     companyIdFromUrl = location.pathname.split('/').filter(Boolean)[1]
   }
 
-  const companyId = companyIdFromUrl || data?.user?.company_id
+  const companyId = companyIdFromUrl ?? data?.user?.company_id
 
   const { isMobile, setOpenMobile } = useSidebar()
   const isAdminPage = location.pathname.startsWith('/admin')
   const isCustomerPage = location.pathname.startsWith('/customer')
   const targetPath = getMirroredUrl(isAdminPage, location)
+
+  const fetcher = useFetcher()
+  const token = data?.token ?? ''
+  const superadminCompanies = data?.superadminCompanies ?? []
+  const activeCompanyId = data?.activeCompanyId
+
+  const handleCompanySwitch = (value: string) => {
+    fetcher.submit(
+      {
+        companyId: value,
+        csrf: token,
+        redirect: location.pathname + location.search,
+      },
+      {
+        method: 'POST',
+        action: '/api/superadmin/switchCompany',
+      },
+    )
+  }
 
   const buildCustomerUrl = () => {
     if (!isCustomerPage && location.pathname.startsWith('/admin/stones')) {
@@ -362,6 +391,28 @@ export function EmployeeSidebar({
               <Button className='w-full'>Users</Button>
             </Link>
           ) : null}
+          {data.user.is_superuser && superadminCompanies.length > 0 && (
+            <Select
+              value={
+                activeCompanyId?.toString() ??
+                (superadminCompanies.some(c => c.id === Number(companyId))
+                  ? String(companyId)
+                  : superadminCompanies[0].id.toString())
+              }
+              onValueChange={handleCompanySwitch}
+            >
+              <SelectTrigger className='w-full'>
+                <SelectValue placeholder='Switch Company' />
+              </SelectTrigger>
+              <SelectContent>
+                {superadminCompanies.map(company => (
+                  <SelectItem key={company.id} value={company.id.toString()}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </SidebarHeader>
       )}
       <SidebarContent>

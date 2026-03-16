@@ -1,6 +1,14 @@
 import clsx from 'clsx'
-import { Link, useLoaderData, useLocation } from 'react-router'
+import { Link, useFetcher, useLoaderData, useLocation } from 'react-router'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { Button } from '~/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import { defaultLogo, gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
 import type { HeaderProps } from '~/types'
 import { getCustomerUrl, getMirroredUrl } from '~/utils/headerNav'
@@ -17,6 +25,8 @@ export function HeaderDesktop({
   isAdmin,
   isSuperUser,
   className,
+  superadminCompanies = [],
+  activeCompanyId,
 }: HeaderDesktopProps) {
   const location = useLocation()
   const isAdminPage = location.pathname.startsWith('/admin')
@@ -33,6 +43,24 @@ export function HeaderDesktop({
     companyId === undefined
       ? '/employee/stones'
       : getCustomerUrl(isCustomerPage, location, companyId)
+
+  const fetcher = useFetcher()
+  const token = useAuthenticityToken()
+
+  const handleCompanySwitch = (value: string) => {
+    fetcher.submit(
+      {
+        companyId: value,
+        csrf: token,
+        redirect: location.pathname + location.search,
+      },
+      {
+        method: 'POST',
+        action: '/api/superadmin/switchCompany',
+      },
+    )
+  }
+
   return (
     <header
       className={
@@ -74,6 +102,28 @@ export function HeaderDesktop({
             {isCustomerPage ? 'Employee' : 'Customer'}
           </LinkButton>
         </Link>
+        {isSuperUser && superadminCompanies.length > 0 && (
+          <Select
+            value={
+              activeCompanyId?.toString() ??
+              (superadminCompanies.some(c => c.id === id)
+                ? id.toString()
+                : superadminCompanies[0].id.toString())
+            }
+            onValueChange={handleCompanySwitch}
+          >
+            <SelectTrigger className='w-48'>
+              <SelectValue placeholder='Switch Company' />
+            </SelectTrigger>
+            <SelectContent>
+              {superadminCompanies.map(company => (
+                <SelectItem key={company.id} value={company.id.toString()}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
       <nav className='text-center flex-1'>
         <ul className='flex-col md:flex-row flex flex-wrap justify-center ali md:justify-center gap-4'></ul>

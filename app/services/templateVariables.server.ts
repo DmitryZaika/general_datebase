@@ -82,7 +82,7 @@ async function fetchCustomerData(
 async function fetchCompanyData(
   companyId?: number,
 ): Promise<TemplateVariableData['company']> {
-  if (!companyId) {
+  if (companyId === undefined) {
     return undefined
   }
 

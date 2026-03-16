@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { db } from '~/db.server'
 import { getSession } from '~/sessions.server'
 import { Positions } from '~/types'
+import { selectMany } from '~/utils/queryHelpers'
 
 interface LoginUser {
   id: number
@@ -143,6 +144,20 @@ async function handlePermissions(
   if (!validUser(user)) {
     throw new TypeError('Invalid user permissions')
   }
+
+  if (user.is_superuser) {
+    const activeCompanyId = session.get('activeCompanyId')
+    if (activeCompanyId !== undefined) {
+      const [rows] = await db.query<RowDataPacket[]>(
+        'SELECT 1 FROM superadmin_companies WHERE user_id = ? AND company_id = ?',
+        [user.id, activeCompanyId],
+      )
+      if (Array.isArray(rows) && rows.length > 0) {
+        return { ...user, company_id: activeCompanyId }
+      }
+    }
+  }
+
   return user
 }
 
@@ -212,4 +227,18 @@ export async function getUserBySessionId(
   sessionId: string,
 ): Promise<SessionUser | undefined> {
   return await getUser(sessionId)
+}
+
+export async function getSuperAdminCompanies(
+  userId: number,
+): Promise<{ id: number; name: string }[]> {
+  return await selectMany<{ id: number; name: string }>(
+    db,
+    `SELECT c.id, c.name
+     FROM company c
+     JOIN superadmin_companies sc ON sc.company_id = c.id
+     WHERE sc.user_id = ?
+     ORDER BY c.name ASC`,
+    [userId],
+  )
 }
