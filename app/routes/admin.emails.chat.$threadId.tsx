@@ -124,23 +124,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
   }
 
-  let updateQuery = `
-      UPDATE emails
-      SET employee_read_at = NOW()
-      WHERE deleted_at IS NULL
-        AND thread_id = ?
-        AND employee_read_at IS NULL
-        AND sender_user_id IS NULL
-    `
-  const updateParams: (string | number)[] = [threadId]
-
-  if (dealId) {
-    updateQuery += ` AND (deal_id = ? OR deal_id IS NULL)`
-    updateParams.push(dealId)
-  }
-
-  await db.execute(updateQuery, updateParams)
-
   let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, e.sender_user_id, u.email_signature as signature, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
