@@ -149,7 +149,11 @@ const partitionActivities = (
 const DAY_MS = 86_400_000
 
 const calendarDayDiff = (target: Date): number => {
-  const deadlineDay = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+  const deadlineDay = new Date(
+    target.getFullYear(),
+    target.getMonth(),
+    target.getDate(),
+  )
   const today = new Date()
   const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   return Math.round((deadlineDay.getTime() - todayDay.getTime()) / DAY_MS)
@@ -347,7 +351,9 @@ function PriorityDot({ priority }: { priority: ActivityPriority }) {
 
 function PriorityBadge({ priority }: { priority: ActivityPriority }) {
   return (
-    <Badge className={cn('text-[10px] px-1.5 py-0 h-4 border', PRIORITY_STYLE[priority])}>
+    <Badge
+      className={cn('text-[10px] px-1.5 py-0 h-4 border', PRIORITY_STYLE[priority])}
+    >
       {PRIORITY_LABEL[priority]}
     </Badge>
   )
@@ -401,7 +407,11 @@ function SectionHeader({
     <>
       {label} ({count})
       {collapsible &&
-        (isOpen ? <ChevronUp className='h-3 w-3' /> : <ChevronDown className='h-3 w-3' />)}
+        (isOpen ? (
+          <ChevronUp className='h-3 w-3' />
+        ) : (
+          <ChevronDown className='h-3 w-3' />
+        ))}
     </>
   )
 
@@ -463,13 +473,16 @@ function ActivityItem({
   onEdit: (activity: DealActivity) => void
   isBeingEdited: boolean
 }) {
-  const { toggle, remove, isToggling, isDeleting, togglingData } = useActivityAction(dealId)
+  const { toggle, remove, isToggling, isDeleting, togglingData } =
+    useActivityAction(dealId)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const isDone = !!activity.is_completed
   const optimisticDone = togglingData?.get('intent') === 'toggle' ? !isDone : isDone
   const urgency =
-    !optimisticDone && activity.deadline ? getDeadlineUrgency(activity.deadline) : 'normal'
+    !optimisticDone && activity.deadline
+      ? getDeadlineUrgency(activity.deadline)
+      : 'normal'
 
   return (
     <div
@@ -492,7 +505,7 @@ function ActivityItem({
         <span
           className={cn(
             'text-sm leading-tight block',
-            optimisticDone && 'text-gray-400 line-through',
+            optimisticDone && 'text-gray-500',
           )}
         >
           {activity.name}
@@ -717,7 +730,11 @@ function ActivityForm({
   const handleSubmit = () => {
     submit()
     if (isEditing) {
-      toast({ title: 'Activity updated', description: 'Changes saved', variant: 'success' })
+      toast({
+        title: 'Activity updated',
+        description: 'Changes saved',
+        variant: 'success',
+      })
       onCancelEdit()
     }
   }
@@ -781,7 +798,10 @@ function ActivityForm({
                 dispatch({ type: 'SET_DEADLINE_TIME', payload: { hours, minutes } })
               }
               onClearTime={() =>
-                dispatch({ type: 'SET_DEADLINE_TIME', payload: { hours: 0, minutes: 0 } })
+                dispatch({
+                  type: 'SET_DEADLINE_TIME',
+                  payload: { hours: 0, minutes: 0 },
+                })
               }
               onClearDate={() => {
                 dispatch({ type: 'SET_DEADLINE_DATE', payload: undefined })
@@ -944,7 +964,8 @@ function ActivityList({
 
   const renderHistoryContent = () => {
     if (historyTab === 'activities') {
-      if (done.length === 0) return <SectionEmptyState label='No completed activities' />
+      if (done.length === 0)
+        return <SectionEmptyState label='No completed activities' />
       return (
         <div>
           <AnimatePresence initial={false}>
@@ -958,10 +979,7 @@ function ActivityList({
                 exit='exit'
                 transition={ITEM_TRANSITION}
               >
-                <TimelineItem
-                  icon={ClipboardIcon}
-                  isLast={index === done.length - 1}
-                >
+                <TimelineItem icon={ClipboardIcon} isLast={index === done.length - 1}>
                   <ActivityItem
                     activity={activity}
                     dealId={dealId}
@@ -994,7 +1012,8 @@ function ActivityList({
     }
 
     // All tab
-    if (allHistoryItems.length === 0) return <SectionEmptyState label='No history yet' />
+    if (allHistoryItems.length === 0)
+      return <SectionEmptyState label='No history yet' />
 
     return (
       <div>
@@ -1018,10 +1037,7 @@ function ActivityList({
               icon={NoteIcon}
               isLast={index === allHistoryItems.length - 1}
             >
-              <NoteItem
-                note={item.data}
-                handlers={noteHandlers}
-              />
+              <NoteItem note={item.data} handlers={noteHandlers} />
             </TimelineItem>
           ),
         )}
@@ -1047,10 +1063,7 @@ function ActivityList({
                   transition={ITEM_TRANSITION}
                   style={{ overflow: 'hidden' }}
                 >
-                  <TimelineItem
-                    icon={ClipboardIcon}
-                    isLast={index === todo.length - 1}
-                  >
+                  <TimelineItem icon={ClipboardIcon} isLast={index === todo.length - 1}>
                     <ActivityItem
                       activity={activity}
                       dealId={dealId}
@@ -1113,7 +1126,10 @@ export function DealActivityPanel({
       const container = scrollRef.current
       const header = historyHeaderRef.current
       if (container && header) {
-        const top = header.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
+        const top =
+          header.getBoundingClientRect().top -
+          container.getBoundingClientRect().top +
+          container.scrollTop
         container.scrollTo({ top, behavior: 'smooth' })
       }
     })
@@ -1121,7 +1137,13 @@ export function DealActivityPanel({
 
   return (
     <div className='flex flex-col h-full'>
-      <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value as 'activity' | 'notes'); setEditingActivity(null) }}>
+      <Tabs
+        value={activeTab}
+        onValueChange={value => {
+          setActiveTab(value as 'activity' | 'notes')
+          setEditingActivity(null)
+        }}
+      >
         <TabsList className='mb-3 grid grid-cols-2'>
           <TabsTrigger value='activity'>Activity</TabsTrigger>
           <TabsTrigger value='notes'>Notes</TabsTrigger>
