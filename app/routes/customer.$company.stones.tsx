@@ -104,7 +104,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
           Size: `${displayedLength} x ${displayedWidth}`,
           Type: capitalizeFirstLetter(stone.type),
           ...(stone.bundle_number != null && stone.bundle_number !== ''
-            ? { Bundle: stone.bundle_number }
+            ? { Bundle: `#${stone.bundle_number}` }
             : {}),
         }}
         disabled={true}
