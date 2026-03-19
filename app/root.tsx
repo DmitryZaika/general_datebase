@@ -364,10 +364,10 @@ export default function App() {
                   <MarketingHeader companyName={companyName ?? undefined} />
                 ) : (
                   <Header
-                    isEmployee={user?.is_employee ?? false}
+                    isEmployee={!!user?.is_employee}
                     user={user}
-                    isAdmin={user?.is_admin ?? false}
-                    isSuperUser={user?.is_superuser ?? false}
+                    isAdmin={!!user?.is_admin}
+                    isSuperUser={!!user?.is_superuser}
                     superadminCompanies={superadminCompanies}
                     activeCompanyId={activeCompanyId}
                   />

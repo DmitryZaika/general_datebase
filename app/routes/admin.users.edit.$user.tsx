@@ -1,6 +1,6 @@
 // app/routes/users.$user.tsx
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Info } from 'lucide-react'
+import { Info, TriangleAlert } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
@@ -37,6 +37,7 @@ import { POSITIONS } from '~/constants/positions'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
+import { Nullable } from '~/types/utils'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, getSuperUser } from '~/utils/session.server'
@@ -95,9 +96,11 @@ const resolver = zodResolver(userschema)
 
 export async function action({ request, params }: ActionFunctionArgs) {
   let loggedInIsSuperuser = false
+  let loggedInUserId: Nullable<number> = null
   try {
-    await getSuperUser(request)
+    const loggedInUser = await getSuperUser(request)
     loggedInIsSuperuser = true
+    loggedInUserId = loggedInUser.id
   } catch {
     try {
       await getAdminUser(request)
@@ -120,6 +123,34 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   const isSuperuser = loggedInIsSuperuser ? data.is_superuser : undefined
+
+  if (loggedInIsSuperuser && data.is_superuser === false) {
+    const isEditingSelf = loggedInUserId === userId
+    const targetUser = await selectId<{ is_employee: boolean }>(
+      db,
+      'SELECT is_employee FROM users WHERE id = ?',
+      userId,
+    )
+    const wouldLockOut = isEditingSelf
+      ? !data.is_admin
+      : !data.is_admin && targetUser && !targetUser.is_employee
+    if (wouldLockOut) {
+      const session = await getSession(request.headers.get('Cookie'))
+      session.flash(
+        'message',
+        toastData(
+          'Error',
+          isEditingSelf
+            ? 'Cannot remove your own Super Admin access without enabling Admin'
+            : 'Cannot remove Super Admin access without enabling Admin or having Employee access',
+          'destructive',
+        ),
+      )
+      return redirect(request.url, {
+        headers: { 'Set-Cookie': await commitSession(session) },
+      })
+    }
+  }
 
   await db.execute(
     `
@@ -220,13 +251,16 @@ interface User {
   company_id: number
   is_admin: null | number
   is_superuser: null | number
+  is_employee: null | number
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   let loggedInIsSuperuser = false
+  let loggedInUserId: Nullable<number> = null
   try {
-    await getSuperUser(request)
+    const loggedInUser = await getSuperUser(request)
     loggedInIsSuperuser = true
+    loggedInUserId = loggedInUser.id
   } catch {
     try {
       await getAdminUser(request)
@@ -243,7 +277,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const user = await selectId<User>(
     db,
-    'SELECT id, name, email, phone_number, company_id, is_admin, is_superuser FROM users WHERE id = ? AND is_deleted = 0',
+    'SELECT id, name, email, phone_number, company_id, is_admin, is_superuser, is_employee FROM users WHERE id = ? AND is_deleted = 0',
     userId,
   )
   if (!user) {
@@ -280,8 +314,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     companies: companies.map(c => ({ key: c.id, value: c.name })),
     positions: positions,
     marketingCompanyIds: marketingCompanies.map(mc => mc.company_id),
-    superadminCompanyIds: superadminCompanies.map(sc => sc.company_id),
+    superadminCompanyIds:
+      superadminCompanies.length > 0
+        ? superadminCompanies.map(sc => sc.company_id)
+        : user.is_superuser && user.company_id >= 0
+          ? [user.company_id]
+          : [],
     loggedInIsSuperuser,
+    loggedInUserId,
   }
 }
 
@@ -296,6 +336,7 @@ export default function User() {
     marketingCompanyIds,
     superadminCompanyIds,
     loggedInIsSuperuser,
+    loggedInUserId,
   } = useLoaderData<typeof loader>()
 
   const token = useAuthenticityToken()
@@ -324,6 +365,14 @@ export default function User() {
 
   const formPositions = form.watch('positions')
   const formIsSuperuser = form.watch('is_superuser')
+  const formIsAdmin = form.watch('is_admin')
+  const userIsEmployee = user.is_employee === 1
+  const isEditingSelf = loggedInUserId === user.id
+  const showNoRoleWarning =
+    loggedInIsSuperuser &&
+    user.is_superuser === 1 &&
+    !formIsSuperuser &&
+    (isEditingSelf ? !formIsAdmin : !formIsAdmin && !userIsEmployee)
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -511,6 +560,16 @@ export default function User() {
                   )}
                 />
               )}
+              {showNoRoleWarning && (
+                <div className='col-span-2 flex items-start gap-2 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800'>
+                  <TriangleAlert className='h-4 w-4 shrink-0 mt-0.5' />
+                  <span>
+                    {isEditingSelf
+                      ? 'Enable Admin before removing your own Super Admin access.'
+                      : 'Enable Admin or add Employee positions before removing Super Admin access, otherwise this user will be locked out.'}
+                  </span>
+                </div>
+              )}
               {loggedInIsSuperuser && formIsSuperuser && (
                 <div className='col-span-2 border-t pt-2 mt-2'>
                   <div className='text-sm font-medium mb-2'>Super Admin Companies</div>
@@ -552,7 +611,7 @@ export default function User() {
                 </div>
               )}
             </div>
-            <DialogFooter>
+            <DialogFooter className='mt-2'>
               <Button type='submit' disabled={isSubmitting}>
                 Save
               </Button>

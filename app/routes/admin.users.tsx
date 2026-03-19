@@ -106,7 +106,7 @@ export default function Adminusers() {
 
   return (
     <PageLayout title='Users'>
-      {isSuperUser && (
+      {isSuperUser ? (
         <div className='flex gap-2 items-end'>
           <Link to={`add`} relative='path' className='mb-3'>
             <Button>Add User</Button>
@@ -136,7 +136,7 @@ export default function Adminusers() {
             </Select>
           </div>
         </div>
-      )}
+      ) : null}
       <DataTable columns={columns} data={users} />
       <Outlet />
     </PageLayout>
