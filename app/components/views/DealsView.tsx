@@ -487,7 +487,7 @@ export default function DealsView({
                     Amount: $ {d.amount ?? 0}
                   </div>
                   {d.nearest_activity_name && (
-                    <div className='text-xs text-slate-600 mt-1 truncate'>
+                    <div className='text-xs text-slate-600 mt-1 line-clamp-2 whitespace-pre-wrap break-words'>
                       {d.nearest_activity_name}
                     </div>
                   )}

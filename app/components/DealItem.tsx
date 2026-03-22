@@ -239,8 +239,6 @@ export default function DealItem({
   useEffect(() => {
     const el = activityRef.current
     if (el) {
-      // Check if truncated in collapsed state (line-clamp-2)
-      // or if we are already expanded (in which case we should show "show less")
       const isOverflowing = el.scrollHeight > el.clientHeight
       setIsActivityTruncated(isOverflowing || activityExpanded)
     }
@@ -326,7 +324,9 @@ export default function DealItem({
               ref={activityRef}
               className={cn(
                 'text-sm leading-5 text-slate-600 w-full',
-                !activityExpanded ? 'line-clamp-2' : 'whitespace-pre-wrap',
+                !activityExpanded
+                  ? 'line-clamp-3 whitespace-pre-wrap break-words'
+                  : 'whitespace-pre-wrap break-words',
               )}
             >
               {deal.nearest_activity_name}

@@ -30,7 +30,6 @@ import { Badge } from '~/components/ui/badge'
 import { Button, buttonVariants } from '~/components/ui/button'
 import { Calendar } from '~/components/ui/calendar'
 import { Checkbox } from '~/components/ui/checkbox'
-import { Input } from '~/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import {
   Select,
@@ -40,6 +39,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
+import { Textarea } from '~/components/ui/textarea'
 import { useToast } from '~/hooks/use-toast'
 import { useNoteAction } from '~/hooks/useNoteAction'
 import { buildActivityApiAction } from '~/lib/dealApiHelpers'
@@ -514,7 +514,7 @@ function ActivityItem({
       <div className='flex-1 min-w-0'>
         <span
           className={cn(
-            'text-sm leading-tight block',
+            'text-sm leading-tight block whitespace-pre-wrap break-words',
             optimisticDone && 'text-gray-500',
           )}
         >
@@ -721,7 +721,7 @@ function ActivityForm({
     dealId,
     editingActivity?.id ?? null,
   )
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const [deadlineOpen, setDeadlineOpen] = useState(false)
   const { toast } = useToast()
 
@@ -749,34 +749,44 @@ function ActivityForm({
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
-      handleSubmit()
+      if (isValid && !isSubmitting) handleSubmit()
     }
     if (e.key === 'Escape' && isEditing) {
       handleCancel()
     }
   }
 
+  const activityNameRows = Math.max(1, form.name.split('\n').length)
+
   return (
     <div className='space-y-2 mb-4'>
       {isEditing && (
-        <div className='flex items-center justify-between rounded-md bg-blue-50 px-2.5 py-1.5 text-xs text-blue-700'>
-          <span>Editing: {editingActivity?.name}</span>
+        <div className='flex items-center justify-between rounded-md bg-blue-50 px-2.5 py-1.5 text-xs text-blue-700 gap-2'>
+          <span className='whitespace-pre-wrap break-words line-clamp-2 min-w-0'>
+            Editing: {editingActivity?.name}
+          </span>
           <button type='button' onClick={handleCancel} className='hover:text-blue-900'>
             <X className='h-3.5 w-3.5' />
           </button>
         </div>
       )}
-      <Input
+      <Textarea
         ref={inputRef}
         placeholder='Activity name'
         value={form.name}
         onChange={e => dispatch({ type: 'SET_NAME', payload: e.target.value })}
         onKeyDown={handleKeyDown}
         disabled={isSubmitting}
-        className='h-9 text-sm'
+        rows={activityNameRows}
+        className={cn(
+          'resize-none text-sm w-full py-1.5 leading-snug',
+          activityNameRows === 1
+            ? 'min-h-9 whitespace-nowrap overflow-x-auto overflow-y-hidden'
+            : 'min-h-0',
+        )}
       />
 
       <div className='flex gap-2'>
