@@ -40,10 +40,17 @@ function isValidPriority(value: string): value is ActivityPriority {
 }
 
 function toMySQLDatetime(dateString: string): Nullable<string> {
-  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/)
-  if (!match) return null
-  const [, y, mo, d, h, mi, s] = match
-  return `${y}-${mo}-${d} ${h}:${mi}:${s}`
+  const full = dateString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/)
+  if (full) {
+    const [, y, mo, d, h, mi, s] = full
+    return `${y}-${mo}-${d} ${h}:${mi}:${s}`
+  }
+  const date = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (date) {
+    const [, y, mo, d] = date
+    return `${y}-${mo}-${d} 00:00:00`
+  }
+  return null
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -185,7 +192,7 @@ async function handleUpdate(
 ) {
   const activityId = formData.get('activityId')
 
-  if (!activityId || isNaN(Number(activityId))) {
+  if (!activityId || Number.isNaN(Number(activityId))) {
     return badRequest('Valid activity ID is required')
   }
 
@@ -249,7 +256,7 @@ async function handleUpdate(
 async function handleToggle(formData: FormData, dealId: number, companyId: number) {
   const activityId = formData.get('activityId')
 
-  if (!activityId || isNaN(Number(activityId))) {
+  if (!activityId || Number.isNaN(Number(activityId))) {
     return badRequest('Valid activity ID is required')
   }
 
@@ -284,7 +291,7 @@ async function handleDelete(
 ) {
   const activityId = formData.get('activityId')
 
-  if (!activityId || isNaN(Number(activityId))) {
+  if (!activityId || Number.isNaN(Number(activityId))) {
     return badRequest('Valid activity ID is required')
   }
 

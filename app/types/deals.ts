@@ -1,6 +1,5 @@
 import type { Nullable } from '~/types/utils'
 
-
 type ActivitiesIconColor = 'red' | 'yellow' | 'gray'
 export interface DealCardData {
   id: number
@@ -20,6 +19,8 @@ export interface DealCardData {
   company_name?: Nullable<string>
   nearest_activity_name?: Nullable<string>
   nearest_activity_deadline?: Nullable<string>
+  nearest_activity_id?: Nullable<number>
+  nearest_activity_priority?: Nullable<string>
   has_activities?: boolean
   activities_icon_color?: ActivitiesIconColor
 }

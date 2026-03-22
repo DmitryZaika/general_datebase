@@ -5,19 +5,19 @@ import {
   AlertCircle,
   CalendarOff,
   Clock,
-  GripVertical,
   ListTodo,
   Mail,
   PaperclipIcon,
-  Pencil,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useFetcher, useLocation } from 'react-router'
+import { Link, useFetcher, useLocation, useRevalidator } from 'react-router'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { cn } from '~/lib/utils'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import { ActivityPriority } from '~/routes/api.deal-activities.$dealId'
 import type { DealCardData } from '~/types/deals'
 import { formatMoney, updateNumber } from './functions'
+import { Calendar } from './ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 interface DealItemProps {
@@ -43,18 +43,43 @@ function getActivityDeadlineInfo(deadline: string): ActivityDeadlineInfo {
   const timeSuffix = hasTime ? ` ${format(date, 'h:mm a')}` : ''
 
   if (diffDays < 0) {
-    return { color: 'text-red-600 bg-red-50', icon: 'alert', label: `${Math.abs(diffDays)}d overdue`, hasPill: true }
+    return {
+      color: 'text-red-600 bg-red-50',
+      icon: 'alert',
+      label: `${Math.abs(diffDays)}d overdue`,
+      hasPill: true,
+    }
   }
   if (diffDays === 0) {
-    return { color: 'text-orange-600 bg-orange-50', icon: 'clock', label: `Today${timeSuffix}`, hasPill: true }
+    return {
+      color: 'text-orange-600 bg-orange-50',
+      icon: 'clock',
+      label: `Today${timeSuffix}`,
+      hasPill: true,
+    }
   }
   if (diffDays === 1) {
-    return { color: 'text-amber-600', icon: 'clock', label: `Tomorrow${timeSuffix}`, hasPill: false }
+    return {
+      color: 'text-amber-600',
+      icon: 'clock',
+      label: `Tomorrow${timeSuffix}`,
+      hasPill: false,
+    }
   }
   if (diffDays <= 2) {
-    return { color: 'text-amber-600', icon: 'clock', label: format(date, 'MMM d') + timeSuffix, hasPill: false }
+    return {
+      color: 'text-amber-600',
+      icon: 'clock',
+      label: format(date, 'MMM d') + timeSuffix,
+      hasPill: false,
+    }
   }
-  return { color: 'text-gray-500', icon: 'clock', label: format(date, 'MMM d') + timeSuffix, hasPill: false }
+  return {
+    color: 'text-gray-500',
+    icon: 'clock',
+    label: format(date, 'MMM d') + timeSuffix,
+    hasPill: false,
+  }
 }
 
 const ACTIVITY_PRIORITY_LABEL: Record<ActivityPriority, string> = {
@@ -102,12 +127,18 @@ function getActivityDueDateColor(deadline: string | null): string {
   return 'text-gray-500'
 }
 
+function activityPriorityForApi(value: string | null | undefined): string {
+  if (value === 'high' || value === 'medium' || value === 'low') return value
+  return 'medium'
+}
+
 export default function DealItem({
   deal,
   readonly = false,
   highlighted = false,
 }: DealItemProps) {
   const [editAmount, setEditAmount] = useState(false)
+  const [editDueDate, setEditDueDate] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [activityExpanded, setActivityExpanded] = useState(false)
   const [activitiesOpen, setActivitiesOpen] = useState(false)
@@ -115,7 +146,10 @@ export default function DealItem({
   const activityRef = useRef<HTMLParagraphElement>(null)
   const activitiesCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isActivityTruncated, setIsActivityTruncated] = useState(false)
+  const pendingActivityDeadlineSyncRef = useRef(false)
   const fetcher = useFetcher()
+  const revalidator = useRevalidator()
+  const csrfToken = useAuthenticityToken()
   const activitiesFetcher = useFetcher<{
     activities?: DealActivity[]
     error?: string | null
@@ -166,13 +200,20 @@ export default function DealItem({
     setNoActiveActivitiesAfterLoad(false)
   }, [deal.id])
 
+  useEffect(() => {
+    if (fetcher.state !== 'idle' || !pendingActivityDeadlineSyncRef.current) return
+    pendingActivityDeadlineSyncRef.current = false
+    setIsSaving(false)
+    revalidator.revalidate()
+  }, [fetcher.state, revalidator])
+
   const activeActivitiesCount =
     activitiesFetcher.state === 'idle' && activitiesFetcher.data?.activities
       ? (activitiesFetcher.data.activities as DealActivity[]).filter(
           a => !a.is_completed,
         ).length
       : null
-      
+
   useEffect(() => {
     if (activeActivitiesCount === 0) setNoActiveActivitiesAfterLoad(true)
   }, [activeActivitiesCount])
@@ -193,8 +234,13 @@ export default function DealItem({
 
   useEffect(() => {
     const el = activityRef.current
-    if (el) setIsActivityTruncated(el.scrollWidth > el.clientWidth)
-  }, [deal.nearest_activity_name])
+    if (el) {
+      // Check if truncated in collapsed state (line-clamp-2)
+      // or if we are already expanded (in which case we should show "show less")
+      const isOverflowing = el.scrollHeight > el.clientHeight
+      setIsActivityTruncated(isOverflowing || activityExpanded)
+    }
+  }, [deal.nearest_activity_name, activityExpanded])
 
   const deadlineInfo = deal.nearest_activity_deadline
     ? getActivityDeadlineInfo(deal.nearest_activity_deadline)
@@ -205,49 +251,20 @@ export default function DealItem({
       ref={setNodeRef}
       style={style}
       id={`deal-${deal.id}`}
-      className={`relative flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3 ${isSaving ? 'opacity-60' : ''} ${highlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}
+      className={`relative flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3 ${isSaving ? 'opacity-60' : ''} ${highlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''} ${!readonly ? 'cursor-grab active:cursor-grabbing' : ''}`}
       {...(!readonly ? attributes : {})}
       {...(!readonly ? listeners : {})}
     >
       <div className='flex items-center w-full gap-2'>
-        <div
-          className={`flex items-center gap-1 flex-1 ${readonly ? '' : 'cursor-grab'}`}
-        >
-          {!readonly && (
-            <button
-              className='touch-none cursor-grab opacity-50 hover:opacity-100 p-1'
-              aria-label='Drag'
-              onPointerDown={e => e.stopPropagation()}
-            >
-              <GripVertical className='w-4 h-4' />
-            </button>
-          )}
-          {readonly ? (
-            <Link
-              to={projectUrl}
-              className='text-xl font-medium truncate whitespace-normal flex-1 select-none hover:underline'
-              onPointerDown={e => e.stopPropagation()}
-            >
-              {deal.company_name ? deal.company_name : deal.name}
-            </Link>
-          ) : (
-            <h3 className='text-xl font-medium truncate whitespace-normal flex-1 select-none'>
-              {deal.company_name ? deal.company_name : deal.name}
-            </h3>
-          )}
-        </div>
-        {!readonly && (
+        <div className='flex items-center gap-1 flex-1'>
           <Link
-            to={`edit/${deal.id}/project${location.search}`}
-            className='absolute top-1 right-1 z-20'
+            to={projectUrl}
+            className='text-xl font-medium truncate whitespace-normal flex-1 select-none hover:underline'
             onPointerDown={e => e.stopPropagation()}
           >
-            <Pencil
-              size={16}
-              className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black'
-            />
+            {deal.company_name ? deal.company_name : deal.name}
           </Link>
-        )}
+        </div>
       </div>
 
       <div className='flex items-center gap-2 w-full'>
@@ -305,7 +322,7 @@ export default function DealItem({
               ref={activityRef}
               className={cn(
                 'text-sm leading-5 text-slate-600 w-full',
-                !activityExpanded && 'truncate',
+                !activityExpanded ? 'line-clamp-2' : 'whitespace-pre-wrap',
               )}
             >
               {deal.nearest_activity_name}
@@ -338,28 +355,81 @@ export default function DealItem({
 
       <div className='flex items-center gap-2 w-full'>
         <div className='mr-auto flex items-center'>
-          {!isClosed &&
-            (deadlineInfo ? (
-              <span
-                className={cn(
-                  'flex items-center gap-1 text-xs font-medium',
-                  deadlineInfo.color,
-                  deadlineInfo.hasPill && 'rounded-full px-2 py-0.5',
-                )}
-              >
-                {deadlineInfo.icon === 'alert' ? (
-                  <AlertCircle className='w-3 h-3' />
+          {!isClosed && deal.nearest_activity_name && (
+            <Popover open={editDueDate} onOpenChange={setEditDueDate}>
+              <PopoverTrigger asChild>
+                {deadlineInfo ? (
+                  <span
+                    className={cn(
+                      'flex items-center gap-1 text-xs font-medium cursor-pointer hover:opacity-80',
+                      deadlineInfo.color,
+                      deadlineInfo.hasPill && 'rounded-full px-2 py-0.5',
+                    )}
+                    onClick={e => {
+                      if (!readonly) {
+                        e.stopPropagation()
+                        setEditDueDate(true)
+                      }
+                    }}
+                    onPointerDown={e => e.stopPropagation()}
+                  >
+                    {deadlineInfo.icon === 'alert' ? (
+                      <AlertCircle className='w-3 h-3' />
+                    ) : (
+                      <Clock className='w-3 h-3' />
+                    )}
+                    {deadlineInfo.label}
+                  </span>
                 ) : (
-                  <Clock className='w-3 h-3' />
+                  <span
+                    className='flex items-center gap-1 text-xs text-gray-400 italic cursor-pointer hover:text-gray-600'
+                    onClick={e => {
+                      if (!readonly) {
+                        e.stopPropagation()
+                        setEditDueDate(true)
+                      }
+                    }}
+                    onPointerDown={e => e.stopPropagation()}
+                  >
+                    <CalendarOff className='w-3 h-3' />
+                    No deadline
+                  </span>
                 )}
-                {deadlineInfo.label}
-              </span>
-            ) : deal.nearest_activity_name ? (
-              <span className='flex items-center gap-1 text-xs text-gray-400 italic'>
-                <CalendarOff className='w-3 h-3' />
-                No deadline
-              </span>
-            ) : null)}
+              </PopoverTrigger>
+              <PopoverContent className='w-auto p-0' align='start'>
+                <Calendar
+                  mode='single'
+                  selected={
+                    deal.nearest_activity_deadline
+                      ? new Date(deal.nearest_activity_deadline)
+                      : undefined
+                  }
+                  onSelect={(date: Date | undefined) => {
+                    if (!deal.nearest_activity_id || date === undefined) return
+                    const dateStr = format(date, 'yyyy-MM-dd')
+                    const fd = new FormData()
+                    fd.append('intent', 'update')
+                    fd.append('activityId', String(deal.nearest_activity_id))
+                    fd.append('name', deal.nearest_activity_name || '')
+                    fd.append('deadline', dateStr)
+                    fd.append(
+                      'priority',
+                      activityPriorityForApi(deal.nearest_activity_priority),
+                    )
+                    fd.append('csrf', csrfToken)
+                    pendingActivityDeadlineSyncRef.current = true
+                    setIsSaving(true)
+                    setEditDueDate(false)
+                    fetcher.submit(fd, {
+                      method: 'post',
+                      action: `/api/deal-activities/${deal.id}`,
+                    })
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         <div className='flex items-center gap-2'>
@@ -394,15 +464,7 @@ export default function DealItem({
                   onPointerEnter={handleActivitiesOpen}
                   onPointerLeave={scheduleActivitiesClose}
                 >
-                  <ListTodo
-                    className={`w-4 h-4 ${
-                      deal.activities_icon_color === 'red'
-                        ? 'text-red-600'
-                        : deal.activities_icon_color === 'yellow'
-                          ? 'text-yellow-600'
-                          : 'text-gray-500'
-                    }`}
-                  />
+                  <ListTodo className='w-4 h-4 text-slate-500' />
                 </Link>
               </PopoverTrigger>
               <PopoverContent

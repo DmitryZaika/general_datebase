@@ -96,9 +96,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       deals = await selectMany<AdminDeal>(db, dealSql, dealParams)
     } else {
       const dealParams: (string | number)[] = [
-        CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID,
-        CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID,
-        companyId, isWon,
+        CLOSED_WON_LIST_ID,
+        CLOSED_LOST_LIST_ID,
+        CLOSED_WON_LIST_ID,
+        CLOSED_LOST_LIST_ID,
+        companyId,
+        isWon,
       ]
       let dealSql = `
         SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason,
@@ -152,12 +155,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
 
     const nearestActivities = await selectMany<{
+      id: number
       deal_id: number
       name: string
       deadline: string | null
+      priority: string
     }>(
       db,
-      `SELECT deal_id, name, DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline
+      `SELECT id, deal_id, name, priority, DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline
        FROM deal_activities
        WHERE deleted_at IS NULL AND is_completed = 0 AND company_id = ?
        ORDER BY
@@ -167,10 +172,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          created_at ASC`,
       [companyId],
     )
-    const nearestActivityMap: Record<number, { name: string; deadline: string | null }> = {}
+    const nearestActivityMap: Record<
+      number,
+      { id: number; name: string; deadline: string | null; priority: string }
+    > = {}
     for (const a of nearestActivities) {
       if (!nearestActivityMap[a.deal_id]) {
-        nearestActivityMap[a.deal_id] = { name: a.name, deadline: a.deadline }
+        nearestActivityMap[a.deal_id] = {
+          id: a.id,
+          name: a.name,
+          deadline: a.deadline,
+          priority: a.priority,
+        }
       }
     }
 

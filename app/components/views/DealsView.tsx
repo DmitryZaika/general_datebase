@@ -53,7 +53,10 @@ interface DealsViewProps {
   lists: List[]
   imagesMap: Record<number, boolean>
   emailsMap: Record<number, boolean>
-  nearestActivityMap?: Record<number, { name: string; deadline: Nullable<string> }>
+  nearestActivityMap?: Record<
+    number,
+    { id: number; name: string; deadline: Nullable<string>; priority?: string }
+  >
   activitiesMap?: Record<number, boolean>
   activitiesIconMap?: Record<number, 'red' | 'yellow' | 'gray'>
   groupListSelect?: React.ReactNode
@@ -106,6 +109,8 @@ export default function DealsView({
       is_won: d.is_won,
       nearest_activity_name: activity?.name ?? null,
       nearest_activity_deadline: activity?.deadline ?? null,
+      nearest_activity_id: activity?.id ?? null,
+      nearest_activity_priority: activity?.priority ?? null,
       sales_rep: d.sales_rep ?? undefined,
     }
   }
@@ -140,7 +145,12 @@ export default function DealsView({
     }
     for (const l of lists) board[l.id] = sortDeals(board[l.id])
     return board
-  }, [JSON.stringify(deals), JSON.stringify(customers), JSON.stringify(lists), JSON.stringify(nearestActivityMap)])
+  }, [
+    JSON.stringify(deals),
+    JSON.stringify(customers),
+    JSON.stringify(lists),
+    JSON.stringify(nearestActivityMap),
+  ])
 
   const [board, setBoard] = useState<Record<number, Deal[]>>(initialBoard)
   const [activeId, setActiveId] = useState<number | null>(null)

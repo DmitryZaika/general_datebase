@@ -131,9 +131,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          ) last_stage ON d.id = last_stage.deal_id
          WHERE d.deleted_at IS NULL AND d.user_id = ? AND d.is_won = ?`,
         [
-          CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID,
-          CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID,
-          user.id, isWon,
+          CLOSED_WON_LIST_ID,
+          CLOSED_LOST_LIST_ID,
+          CLOSED_WON_LIST_ID,
+          CLOSED_LOST_LIST_ID,
+          user.id,
+          isWon,
         ],
       )
     }
@@ -151,12 +154,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     for (const row of emailCounts) emailsMap[row.deal_id] = Number(row.count) > 0
 
     const nearestActivities = await selectMany<{
+      id: number
       deal_id: number
       name: string
       deadline: string | null
+      priority: string
     }>(
       db,
-      `SELECT deal_id, name, DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline
+      `SELECT id, deal_id, name, priority, DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline
        FROM deal_activities
        WHERE deleted_at IS NULL AND is_completed = 0 AND company_id = ?
        ORDER BY
@@ -166,10 +171,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          created_at ASC`,
       [user.company_id],
     )
-    const nearestActivityMap: Record<number, { name: string; deadline: string | null }> = {}
+    const nearestActivityMap: Record<
+      number,
+      { id: number; name: string; deadline: string | null; priority: string }
+    > = {}
     for (const a of nearestActivities) {
       if (!nearestActivityMap[a.deal_id]) {
-        nearestActivityMap[a.deal_id] = { name: a.name, deadline: a.deadline }
+        nearestActivityMap[a.deal_id] = {
+          id: a.id,
+          name: a.name,
+          deadline: a.deadline,
+          priority: a.priority,
+        }
       }
     }
 
@@ -258,7 +271,10 @@ export default function EmployeeDeals() {
     lists: { id: number; name: string }[]
     imagesMap: Record<number, boolean>
     emailsMap: Record<number, boolean>
-    nearestActivityMap: Record<number, { name: string; deadline: string | null }>
+    nearestActivityMap: Record<
+      number,
+      { id: number; name: string; deadline: string | null; priority: string }
+    >
     activitiesMap: Record<number, boolean>
     activitiesIconMap: Record<number, 'red' | 'yellow' | 'gray'>
     groups: { id: number; name: string }[]
