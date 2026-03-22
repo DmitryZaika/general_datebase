@@ -496,14 +496,13 @@ export default function AdminCustomers() {
         tabParam === 'leads' ||
         tabParam === 'walkin' ||
         tabParam === 'call-in' ||
-        tabParam === 'other'
+        tabParam === 'other' ||
+        tabParam === 'all'
       ) {
         result.sort(
           (a, b) =>
             new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
         )
-      } else if (tabParam === 'all') {
-        result.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
       }
     }
     return result

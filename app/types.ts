@@ -40,6 +40,7 @@ export interface StoneImage {
   samples_amount: number
   regular_stock?: boolean | number
   is_display?: boolean | number
+  bundle_number?: string | null
 }
 
 export interface StoneSlim {
@@ -113,6 +114,7 @@ export interface StoneSearchResult {
   amount: number
   is_display: boolean
   regular_stock?: boolean | number
+  bundle_number?: string | null
 }
 export type Action =
   | { type: 'ADD_EVENT'; payload: Event }
