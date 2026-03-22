@@ -12,7 +12,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLocation, useRevalidator } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
-import { cn } from '~/lib/utils'
+import { cn, parseLocalDate } from '~/lib/utils'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import { ActivityPriority } from '~/routes/api.deal-activities.$dealId'
 import type { DealCardData } from '~/types/deals'
@@ -34,7 +34,7 @@ interface ActivityDeadlineInfo {
 }
 
 function getActivityDeadlineInfo(deadline: string): ActivityDeadlineInfo {
-  const date = new Date(deadline)
+  const date = parseLocalDate(deadline)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const deadlineDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -100,24 +100,28 @@ function sortActivities(activities: DealActivity[]): DealActivity[] {
       ACTIVITY_PRIORITY_WEIGHT[a.priority] - ACTIVITY_PRIORITY_WEIGHT[b.priority]
     if (pw !== 0) return pw
     if (a.deadline && b.deadline)
-      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+      return parseLocalDate(a.deadline).getTime() - parseLocalDate(b.deadline).getTime()
     return a.deadline ? -1 : b.deadline ? 1 : 0
   })
 }
 
 function formatActivityTime(deadline: string | null): string {
   if (!deadline) return '—'
-  const d = new Date(deadline)
+  const d = parseLocalDate(deadline)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString(undefined, {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  })
+  const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0
+  if (hasTime) {
+    return d.toLocaleString(undefined, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    })
+  }
+  return d.toLocaleDateString(undefined, { dateStyle: 'short' })
 }
 
 function getActivityDueDateColor(deadline: string | null): string {
   if (!deadline) return 'text-gray-500'
-  const d = new Date(deadline)
+  const d = parseLocalDate(deadline)
   if (Number.isNaN(d.getTime())) return 'text-gray-500'
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -401,7 +405,7 @@ export default function DealItem({
                   mode='single'
                   selected={
                     deal.nearest_activity_deadline
-                      ? new Date(deal.nearest_activity_deadline)
+                      ? parseLocalDate(deal.nearest_activity_deadline)
                       : undefined
                   }
                   onSelect={(date: Date | undefined) => {

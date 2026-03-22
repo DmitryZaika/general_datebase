@@ -43,7 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { useToast } from '~/hooks/use-toast'
 import { useNoteAction } from '~/hooks/useNoteAction'
 import { buildActivityApiAction } from '~/lib/dealApiHelpers'
-import { cn } from '~/lib/utils'
+import { cn, parseLocalDate } from '~/lib/utils'
 import {
   ActivityPriority,
   type DealActivity,
@@ -114,14 +114,17 @@ const comparePriority = (a: DealActivity, b: DealActivity): number =>
 
 const compareDeadlineAsc = (a: DealActivity, b: DealActivity): number => {
   if (a.deadline && b.deadline) {
-    return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+    return parseLocalDate(a.deadline).getTime() - parseLocalDate(b.deadline).getTime()
   }
   return a.deadline ? -1 : b.deadline ? 1 : 0
 }
 
 const compareCompletedDesc = (a: DealActivity, b: DealActivity): number => {
   if (a.completed_at && b.completed_at) {
-    return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
+    return (
+      parseLocalDate(b.completed_at).getTime() -
+      parseLocalDate(a.completed_at).getTime()
+    )
   }
   return a.completed_at ? -1 : b.completed_at ? 1 : 0
 }
@@ -160,7 +163,7 @@ const calendarDayDiff = (target: Date): number => {
 }
 
 const isOverdue = (deadline: string): boolean => {
-  const date = new Date(deadline)
+  const date = parseLocalDate(deadline)
   const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
   if (hasTime) return date.getTime() < Date.now()
   const endOfDay = new Date(date)
@@ -170,14 +173,14 @@ const isOverdue = (deadline: string): boolean => {
 
 const getDeadlineUrgency = (deadline: string): DeadlineUrgency => {
   if (isOverdue(deadline)) return 'overdue'
-  const diffDays = calendarDayDiff(new Date(deadline))
+  const diffDays = calendarDayDiff(parseLocalDate(deadline))
   if (diffDays === 0) return 'today'
   if (diffDays <= 2) return 'soon'
   return 'normal'
 }
 
 const formatDeadline = (deadline: string): string => {
-  const date = new Date(deadline)
+  const date = parseLocalDate(deadline)
   const diffDays = calendarDayDiff(date)
   const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
   const timeSuffix = hasTime ? ` ${format(date, 'h:mm a')}` : ''
@@ -193,8 +196,13 @@ const formatFormDeadline = (d: Date): string => {
   return hasTime ? format(d, 'MMM d, yyyy h:mm a') : format(d, 'MMM d, yyyy')
 }
 
-const toDeadlinePayload = (deadline: Nullable<Date>): string =>
-  deadline ? format(deadline, "yyyy-MM-dd'T'HH:mm:ss") : ''
+const toDeadlinePayload = (deadline: Nullable<Date>): string => {
+  if (!deadline) return ''
+  const hasTime = deadline.getHours() !== 0 || deadline.getMinutes() !== 0
+  return hasTime
+    ? format(deadline, "yyyy-MM-dd'T'HH:mm:ss")
+    : format(deadline, 'yyyy-MM-dd')
+}
 
 // --- Form Reducer ---
 
@@ -239,7 +247,9 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
     case 'SET_PRIORITY':
       return { ...state, priority: action.payload }
     case 'SET_EDIT': {
-      const d = action.payload.deadline ? new Date(action.payload.deadline) : undefined
+      const d = action.payload.deadline
+        ? parseLocalDate(action.payload.deadline)
+        : undefined
       if (d) {
         const snapped = Math.round(d.getMinutes() / 5) * 5
         if (snapped >= 60) {
@@ -381,7 +391,7 @@ function DeadlineLabel({ deadline }: { deadline: string }) {
 function CompletedLabel({ completedAt }: { completedAt: string }) {
   return (
     <span className='text-[10px] text-gray-600'>
-      Done {format(new Date(completedAt), 'MMM d')}
+      Done {format(parseLocalDate(completedAt), 'MMM d')}
     </span>
   )
 }
@@ -924,7 +934,10 @@ function ActivityList({
       [...notes].sort((a, b) => {
         if (a.is_pinned && !b.is_pinned) return -1
         if (!a.is_pinned && b.is_pinned) return 1
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        return (
+          parseLocalDate(b.created_at).getTime() -
+          parseLocalDate(a.created_at).getTime()
+        )
       }),
     [notes],
   )
@@ -954,7 +967,9 @@ function ActivityList({
     items.sort((a, b) => {
       if (a.isPinned && !b.isPinned) return -1
       if (!a.isPinned && b.isPinned) return 1
-      return new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime()
+      return (
+        parseLocalDate(b.date ?? '').getTime() - parseLocalDate(a.date ?? '').getTime()
+      )
     })
 
     return items

@@ -16,7 +16,7 @@ import { Button, buttonVariants } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Textarea } from '~/components/ui/textarea'
 import { buildNoteApiAction } from '~/lib/dealApiHelpers'
-import { cn } from '~/lib/utils'
+import { cn, parseLocalDate } from '~/lib/utils'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { ApiResponse } from '~/utils/apiResponse.server'
 
@@ -131,7 +131,7 @@ export function NoteItem({
     >
       <div className='flex items-start justify-between gap-2'>
         <span className='text-[11px] text-gray-500 leading-tight'>
-          {format(new Date(note.created_at), 'MMMM d h:mm a')}
+          {format(parseLocalDate(note.created_at), 'MMMM d h:mm a')}
           {note.created_by && <> &middot; {note.created_by}</>}
         </span>
 
@@ -325,12 +325,10 @@ function CommentItem({
     >
       <div className='min-w-0'>
         <span className='text-[10px] text-gray-400'>
-          {format(new Date(comment.created_at), 'MMM d h:mm a')}
+          {format(parseLocalDate(comment.created_at), 'MMM d h:mm a')}
           {comment.created_by && ` · ${comment.created_by}`}
         </span>
-        <p className='text-xs text-gray-600 leading-relaxed'>
-          {comment.content}
-        </p>
+        <p className='text-xs text-gray-600 leading-relaxed'>{comment.content}</p>
       </div>
       <button
         type='button'
@@ -340,10 +338,7 @@ function CommentItem({
         <X className='h-3 w-3' />
       </button>
 
-      <AlertDialog
-        open={showDeleteConfirm}
-        onOpenChange={setShowDeleteConfirm}
-      >
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Comment</AlertDialogTitle>
