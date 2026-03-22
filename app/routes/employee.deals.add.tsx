@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -17,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import type { ResultSetHeader } from 'mysql2'
 import { db } from '~/db.server'
 import { dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
@@ -96,10 +96,19 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  await db.execute(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
-    user.id,
-    data.customer_id,
-  ])
+  const [positionRows] = await db.execute<RowDataPacket[]>(
+    `SELECT 1 FROM users_positions up
+     JOIN positions p ON up.position_id = p.id
+     WHERE up.user_id = ? AND p.name = 'sales_rep'
+     LIMIT 1`,
+    [user.id],
+  )
+  if (positionRows.length > 0) {
+    await db.execute(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
+      user.id,
+      data.customer_id,
+    ])
+  }
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Deal added successfully'))

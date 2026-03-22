@@ -11,7 +11,7 @@ import {
   Send,
   Trash2,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   useLocation,
   useNavigate,
@@ -112,7 +112,40 @@ export default function DealsEmailsView({
   const { toast } = useToast()
   const location = useLocation()
   const navigation = useNavigation()
-  const isLoading = navigation.state === 'loading'
+  const isNavigatingToChat =
+    navigation.state === 'loading' && navigation.location?.pathname?.includes('/chat/')
+  const isNavigatingFromChat =
+    navigation.state === 'loading' && location.pathname.includes('/chat/')
+  const isLoading =
+    navigation.state === 'loading' && !isNavigatingToChat && !isNavigatingFromChat
+  const listScrollRef = useRef<HTMLDivElement>(null)
+  const savedScrollTopRef = useRef<number>(0)
+  const wasOnChatRef = useRef(false)
+
+  useEffect(() => {
+    const onChat = location.pathname.includes('/chat/')
+    if (wasOnChatRef.current && !onChat && savedScrollTopRef.current > 0) {
+      const el = listScrollRef.current
+      if (el) {
+        requestAnimationFrame(() => {
+          el.scrollTop = savedScrollTopRef.current
+          savedScrollTopRef.current = 0
+        })
+      }
+      wasOnChatRef.current = false
+    } else if (onChat) {
+      wasOnChatRef.current = true
+      if (savedScrollTopRef.current > 0) {
+        const el = listScrollRef.current
+        if (el) {
+          requestAnimationFrame(() => {
+            el.scrollTop = savedScrollTopRef.current
+          })
+        }
+      }
+    }
+  }, [location.pathname])
+
   const selectedSalesRepId = searchParams.get('sales_rep')
     ? Number(searchParams.get('sales_rep'))
     : null
@@ -567,7 +600,7 @@ export default function DealsEmailsView({
         </div>
 
         {/* Email List */}
-        <div className='flex-1 overflow-y-auto'>
+        <div ref={listScrollRef} className='flex-1 overflow-y-auto'>
           {isLoading ? (
             <div className='divide-y divide-gray-100'>
               {Array.from({ length: 10 }).map((_, i) => (
@@ -617,6 +650,8 @@ export default function DealsEmailsView({
                   <div
                     key={email.id}
                     onClick={() => {
+                      if (listScrollRef.current)
+                        savedScrollTopRef.current = listScrollRef.current.scrollTop
                       navigate(`chat/${email.thread_id}${location.search}`)
                     }}
                     className={cn(

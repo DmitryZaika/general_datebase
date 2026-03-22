@@ -25,7 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { faucetSchema } from '~/schemas/faucets'
 import { commitSession, getSession } from '~/sessions.server'
-import { FAUCET_TYPES } from '~/utils/constants'
+import { DIALOG_CONTENT_ADD_EDIT_CLASS, FAUCET_TYPES } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectId, selectMany } from '~/utils/queryHelpers'
@@ -370,7 +370,7 @@ export default function FaucetsEdit() {
   }
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[425px] overflow-auto max-h-[95vh]'>
+      <DialogContent className={DIALOG_CONTENT_ADD_EDIT_CLASS}>
         <DialogHeader>
           <DialogTitle>Edit Faucet</DialogTitle>
         </DialogHeader>

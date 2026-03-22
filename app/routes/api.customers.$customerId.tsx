@@ -73,6 +73,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     ],
   )
 
+  if (salesRep !== null) {
+    await db.execute(
+      'UPDATE deals SET user_id = ? WHERE customer_id = ? AND deleted_at IS NULL',
+      [salesRep, customerId],
+    )
+  }
+
   return data({
     success: true,
     message: 'Customer updated successfully',

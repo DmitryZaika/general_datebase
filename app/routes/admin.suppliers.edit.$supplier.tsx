@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
+import { DIALOG_CONTENT_ADD_EDIT_CLASS } from '~/utils/constants'
 
 export default function SuppliersEdit() {
   const navigate = useNavigate()
@@ -20,7 +21,7 @@ export default function SuppliersEdit() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[425px] overflow-auto flex flex-col justify-baseline min-h-[95vh] max-h-[95vh]'>
+      <DialogContent className={DIALOG_CONTENT_ADD_EDIT_CLASS}>
         <DialogHeader>
           <DialogTitle>Edit Supplier</DialogTitle>
         </DialogHeader>

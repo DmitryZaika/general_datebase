@@ -68,7 +68,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   let customerName = 'Customer'
   let customerEmail = ''
-  let customerId: number | null = null
 
   if (dealId) {
     const [customerRows] = await db.execute<RowDataPacket[]>(
@@ -80,7 +79,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     )
     customerName = customerRows?.[0]?.name || 'Customer'
     customerEmail = normalizeEmail(customerRows?.[0]?.email || '')
-    customerId = customerRows?.[0]?.customer_id
   } else {
     // Try to find customer from email thread participants
     const [threadEmails] = await db.execute<RowDataPacket[]>(
@@ -102,7 +100,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       if (custSender && custSender.length > 0) {
         customerName = custSender[0].name
         customerEmail = normalizeEmail(custSender[0].email)
-        customerId = custSender[0].id
       } else {
         // Try to find customer by receiver email
         const [custReceiver] = await db.execute<RowDataPacket[]>(
@@ -113,7 +110,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         if (custReceiver && custReceiver.length > 0) {
           customerName = custReceiver[0].name
           customerEmail = normalizeEmail(custReceiver[0].email)
-          customerId = custReceiver[0].id
         } else {
           // Fallback: assume the one that is NOT the current user's email is the customer
           if (sEmail === normalizeEmail(user.email)) {
@@ -126,38 +122,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         }
       }
     }
-  }
-
-  if (customerEmail) {
-    let updateQuery = `
-        UPDATE emails
-        SET employee_read_at = NOW()
-        WHERE deleted_at IS NULL
-          AND thread_id = ?
-          AND employee_read_at IS NULL
-      `
-    const updateParams: (string | number)[] = [threadId]
-
-    if (dealId) {
-      updateQuery += ` AND (deal_id = ? OR deal_id IS NULL)`
-      updateParams.push(dealId)
-    }
-
-    if (customerId) {
-      updateQuery += ` AND (sender_email = ? OR sender_email LIKE ? OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(sender_email, '<', -1), '>', 1))) = ? OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(sender_email, '<', -1), '>', 1))) IN (SELECT LOWER(email) FROM customers WHERE id = ? OR parent_id = ?))`
-      updateParams.push(
-        customerEmail,
-        `%<${customerEmail}>`,
-        customerEmail,
-        customerId,
-        customerId,
-      )
-    } else {
-      updateQuery += ` AND (sender_email = ? OR sender_email LIKE ? OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(sender_email, '<', -1), '>', 1))) = ?)`
-      updateParams.push(customerEmail, `%<${customerEmail}>`, customerEmail)
-    }
-
-    await db.execute(updateQuery, updateParams)
   }
 
   let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, e.sender_user_id, u.email_signature as signature, MAX(er.read_at) AS read_at
