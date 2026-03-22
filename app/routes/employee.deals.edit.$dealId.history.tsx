@@ -7,19 +7,13 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router'
-import { customerColumns } from '~/components/tables/DealEmails'
+import {
+  customerColumns,
+  type DealEmailThreadRow,
+} from '~/components/tables/DealEmails'
 import { DataTable } from '~/components/ui/data-table'
 import { getDealEmailsWithReads } from '~/crud/emails'
 import { getEmployeeUser } from '~/utils/session.server'
-
-interface EmailHistory {
-  id: number
-  thread_id: string
-  subject: string
-  body: string
-  sent_at: string
-  read_count: number
-}
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
@@ -43,20 +37,27 @@ export default function DealEmailHistory() {
   const location = useLocation()
 
   const uniqueThreads = useMemo(() => {
-    const threadMap = new Map<string, EmailHistory>()
-
-    emails.forEach(email => {
-      const existing = threadMap.get(email.thread_id)
-
-      if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
-        threadMap.set(email.thread_id, email)
+    const attachmentByThread = new Map<string, boolean>()
+    for (const email of emails) {
+      if (email.has_attachments) {
+        attachmentByThread.set(email.thread_id, true)
       }
-    })
-
+    }
+    const threadMap = new Map<string, DealEmailThreadRow>()
+    for (const email of emails) {
+      const existing = threadMap.get(email.thread_id)
+      const thread_has_attachments = attachmentByThread.get(email.thread_id) ?? false
+      if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
+        threadMap.set(email.thread_id, {
+          ...email,
+          thread_has_attachments,
+        })
+      }
+    }
     return Array.from(threadMap.values())
   }, [emails])
 
-  const handleRowClick = (email: EmailHistory) => {
+  const handleRowClick = (email: DealEmailThreadRow) => {
     navigate(`chat/${email.thread_id}${location.search}`)
   }
 
@@ -65,9 +66,9 @@ export default function DealEmailHistory() {
       <DataTable
         columns={customerColumns}
         data={uniqueThreads}
-        onRowClick={(email: EmailHistory) => handleRowClick(email)}
+        onRowClick={(email: DealEmailThreadRow) => handleRowClick(email)}
         rowClassName={() => 'cursor-pointer'}
-        getRowId={(email: EmailHistory) => email.thread_id}
+        getRowId={(email: DealEmailThreadRow) => email.thread_id}
       />
       <Outlet />
     </>

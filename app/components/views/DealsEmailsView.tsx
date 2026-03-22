@@ -46,6 +46,7 @@ export interface Email {
   receiver_email: string
   sender_user_id?: number | null
   has_attachments?: boolean | number
+  thread_has_attachments?: boolean | number
   sender_name?: string | null
   receiver_name?: string | null
   sales_rep?: string | null
@@ -170,7 +171,9 @@ export default function DealsEmailsView({
   const threadIdsWithAttachments = useMemo(() => {
     const ids = new Set<string>()
     for (const email of emails) {
-      if (email.has_attachments) ids.add(email.thread_id)
+      if (email.thread_has_attachments || email.has_attachments) {
+        ids.add(email.thread_id)
+      }
     }
     return ids
   }, [emails])
