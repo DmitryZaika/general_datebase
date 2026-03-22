@@ -8,6 +8,7 @@ export interface EmailHistory {
   body: string
   sent_at: string
   read_count: number
+  has_attachments?: boolean | number
 }
 
 export async function getDealEmailsWithReads(dealId: number): Promise<EmailHistory[]> {
@@ -19,7 +20,8 @@ export async function getDealEmailsWithReads(dealId: number): Promise<EmailHisto
       e.subject,
       e.body,
       e.sent_at,
-      COUNT(er.message_id) AS read_count
+      COUNT(er.message_id) AS read_count,
+      (SELECT COUNT(*) FROM email_attachments ea WHERE ea.email_id = e.id) > 0 AS has_attachments
     FROM emails e
     LEFT JOIN email_reads er
       ON e.message_id = er.message_id

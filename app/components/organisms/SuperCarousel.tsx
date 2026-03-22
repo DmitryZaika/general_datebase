@@ -52,7 +52,6 @@ function ChildrenImagesDialog({
   type,
   image,
   showInfo = false,
-  userRole,
 }: ImageProps) {
   const [data, setData] = useState<
     { images: { id: number; url: string }[] } | undefined
@@ -98,13 +97,13 @@ function ChildrenImagesDialog({
         : '—'
   return (
     <>
-      <div className='w-full relative select-none'>
+      <div className='w-full flex flex-col justify-center items-center relative select-none'>
         {showInfo && (
-          <div className='absolute top-7 sm:top-0 left-[50%] -translate-x-1/2 z-10 bg-black/80 p-3  rounded shadow-lg text-white border border-gray-900'>
+          <div className='absolute top-7 sm:flex-row justify-center items-center gap-y-2 sm:gap-y-0 z-10 bg-black/80 p-3  rounded shadow-lg text-white border border-gray-900'>
             <h3 className='text-lg font-bold mb-2 text-center'>
               {image?.name || name}
             </h3>
-            <div className='flex flex-col md:flex-row  gap-x-10 text-sm'>
+            <div className='flex flex-row justify-center items-center gap-x-10 text-sm'>
               <div className='flex flex-col  gap-y-1'>
                 <p>
                   <strong>Type:</strong> {displayedType}
@@ -113,17 +112,14 @@ function ChildrenImagesDialog({
                   <strong>Available:</strong> {displayedAvailable}
                 </p>
               </div>
-
-              {userRole === 'employee' && (
-                <div className='flex flex-col gap-y-1'>
-                  <p>
-                    <strong>Size:</strong> {displayedLength} x {displayedWidth}
-                  </p>
-                  <p>
-                    <strong>Price:</strong> {displayedPrice}
-                  </p>
-                </div>
-              )}
+              <div className='flex flex-col gap-y-1'>
+                <p>
+                  <strong>Size:</strong> {displayedLength} x {displayedWidth}
+                </p>
+                <p>
+                  <strong>Price:</strong> {displayedPrice}
+                </p>
+              </div>
             </div>
           </div>
         )}

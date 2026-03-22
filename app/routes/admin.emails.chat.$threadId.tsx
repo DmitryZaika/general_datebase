@@ -55,7 +55,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw new Error('Thread ID is missing')
   }
 
-  // Find deal_id from thread_id
+  const trashChat = new URL(request.url).searchParams.get('folder') === 'trash'
+  const deletedFilterRow = trashChat
+    ? 'e.deleted_at IS NOT NULL'
+    : 'e.deleted_at IS NULL'
+  const deletedFilterSub = trashChat ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL'
+
   const [dealRows] = await db.execute<RowDataPacket[]>(
     'SELECT deal_id FROM emails WHERE thread_id = ? AND deal_id IS NOT NULL LIMIT 1',
     [threadId],
@@ -128,7 +133,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
        LEFT JOIN users u ON u.id = e.sender_user_id
-      WHERE e.deleted_at IS NULL AND e.thread_id = ?`
+      WHERE ${deletedFilterRow} AND e.thread_id = ?`
   const emailParams: (number | string)[] = [threadId]
 
   if (dealId) {
@@ -141,7 +146,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
      WHERE email_id IN (
        SELECT id
        FROM emails
-       WHERE deleted_at IS NULL AND thread_id = ?`
+       WHERE ${deletedFilterSub} AND thread_id = ?`
   const attachParams: (number | string)[] = [threadId]
 
   if (dealId) {

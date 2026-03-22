@@ -46,6 +46,7 @@ export interface Email {
   receiver_email: string
   sender_user_id?: number | null
   has_attachments?: boolean | number
+  thread_has_attachments?: boolean | number
   sender_name?: string | null
   receiver_name?: string | null
   sales_rep?: string | null
@@ -164,6 +165,16 @@ export default function DealsEmailsView({
         ids.add(email.thread_id)
       }
     })
+    return ids
+  }, [emails])
+
+  const threadIdsWithAttachments = useMemo(() => {
+    const ids = new Set<string>()
+    for (const email of emails) {
+      if (email.thread_has_attachments || email.has_attachments) {
+        ids.add(email.thread_id)
+      }
+    }
     return ids
   }, [emails])
 
@@ -689,7 +700,7 @@ export default function DealsEmailsView({
                           {senderName}
                         </span>
                         <div className='flex items-center gap-2 flex-shrink-0'>
-                          {Boolean(email.has_attachments) && (
+                          {threadIdsWithAttachments.has(email.thread_id) && (
                             <Paperclip className='h-3.5 w-3.5 text-gray-500' />
                           )}
                           {activeTab === 'sent' && (
@@ -792,7 +803,7 @@ export default function DealsEmailsView({
 
                       {/* Attachments & Date */}
                       <div className='flex items-center gap-4 flex-shrink-0 text-xs text-gray-500 font-medium justify-end'>
-                        {Boolean(email.has_attachments) && (
+                        {threadIdsWithAttachments.has(email.thread_id) && (
                           <Paperclip className='h-3.5 w-3.5 text-gray-500' />
                         )}
                         {activeTab === 'sent' && (
