@@ -105,6 +105,7 @@ const emailToSend = async (
     user.id,
   )
 
+  // Break glass in case of emergency
   const emailData = await selectId<{ message_id: string }>(
     db,
     'SELECT message_id FROM emails WHERE thread_id = ? ORDER BY sent_at DESC LIMIT 1;',
@@ -142,6 +143,7 @@ const emailToSend = async (
     html: HTMLBody,
     text: textBody,
     attachments: cleaned.attachments,
+    // Break glass in case of emergency
     inReplyTo: emailData?.message_id,
   }
 }
