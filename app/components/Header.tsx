@@ -8,10 +8,11 @@ export function Header({
   isEmployee,
   isAdmin,
   isSuperUser,
+  isSuperAdmin,
   superadminCompanies,
   activeCompanyId,
 }: HeaderProps) {
-  if (!isEmployee && !isAdmin && !isSuperUser) {
+  if (!isEmployee && !isAdmin && !isSuperUser && !isSuperAdmin) {
     return <HeaderCustomers />
   }
   return (
@@ -22,6 +23,7 @@ export function Header({
         user={user}
         isAdmin={isAdmin}
         isSuperUser={isSuperUser}
+        isSuperAdmin={isSuperAdmin}
         superadminCompanies={superadminCompanies}
         activeCompanyId={activeCompanyId}
       />
@@ -30,6 +32,7 @@ export function Header({
         user={user}
         isAdmin={isAdmin}
         isSuperUser={isSuperUser}
+        isSuperAdmin={isSuperAdmin}
         superadminCompanies={superadminCompanies}
         activeCompanyId={activeCompanyId}
       />

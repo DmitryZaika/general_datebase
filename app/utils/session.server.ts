@@ -141,24 +141,34 @@ async function handlePermissions(
   if (user === undefined) {
     throw new TypeError('Could not find session')
   }
-  if (!validUser(user)) {
+
+  // Check SuperAdmin position — grants admin-level access + company switching
+  const activeCompanyId = session.get('activeCompanyId')
+  const [saRows] = await db.query<RowDataPacket[]>(
+    'SELECT company_id FROM users_positions WHERE user_id = ? AND position_id = ?',
+    [user.id, Positions.SuperAdmin],
+  )
+  const hasSuperAdmin = Array.isArray(saRows) && saRows.length > 0
+
+  let effectiveUser = hasSuperAdmin
+    ? { ...user, is_admin: true, is_employee: true }
+    : user
+
+  if (!validUser(effectiveUser)) {
     throw new TypeError('Invalid user permissions')
   }
 
-  if (user.is_superuser) {
-    const activeCompanyId = session.get('activeCompanyId')
-    if (activeCompanyId !== undefined) {
-      const [rows] = await db.query<RowDataPacket[]>(
-        'SELECT 1 FROM superadmin_companies WHERE user_id = ? AND company_id = ?',
-        [user.id, activeCompanyId],
-      )
-      if (Array.isArray(rows) && rows.length > 0) {
-        return { ...user, company_id: activeCompanyId }
-      }
+  // Company switching: check activeCompanyId is in SuperAdmin's assigned companies
+  if (hasSuperAdmin && activeCompanyId !== undefined) {
+    const hasCompany = saRows.some(
+      (r: RowDataPacket) => r.company_id === activeCompanyId,
+    )
+    if (hasCompany) {
+      effectiveUser = { ...effectiveUser, company_id: activeCompanyId }
     }
   }
 
-  return user
+  return effectiveUser
 }
 
 async function handlePermissionsNew(
@@ -236,9 +246,17 @@ export async function getSuperAdminCompanies(
     db,
     `SELECT c.id, c.name
      FROM company c
-     JOIN superadmin_companies sc ON sc.company_id = c.id
-     WHERE sc.user_id = ?
+     JOIN users_positions up ON up.company_id = c.id
+     WHERE up.user_id = ? AND up.position_id = ?
      ORDER BY c.name ASC`,
-    [userId],
+    [userId, Positions.SuperAdmin],
   )
+}
+
+export async function isSuperAdmin(userId: number): Promise<boolean> {
+  const [rows] = await db.query<RowDataPacket[]>(
+    'SELECT 1 FROM users_positions WHERE user_id = ? AND position_id = ? LIMIT 1',
+    [userId, Positions.SuperAdmin],
+  )
+  return Array.isArray(rows) && rows.length > 0
 }

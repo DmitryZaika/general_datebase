@@ -19,19 +19,13 @@ import {
   Users,
 } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useFetcher, useLoaderData, useLocation } from 'react-router'
+import { Link, useLoaderData, useLocation } from 'react-router'
 import { Collapsible } from '~/components/Collapsible'
 import { CorbelIcon } from '~/components/icons/CorbelIcon'
 import { SinkIcon } from '~/components/icons/SinkIcon'
 import { LinkButton } from '~/components/molecules/LinkButton'
+import { SuperAdminCompanySelect } from '~/components/molecules/SuperAdminCompanySelect'
 import { Button } from '~/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
 import {
   Sidebar,
   SidebarContent,
@@ -46,6 +40,7 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from '~/components/ui/sidebar'
+import { useSuperAdminCompanySwitch } from '~/hooks/useSuperAdminCompanySwitch'
 import type { ISupplier } from '~/schemas/suppliers'
 import { getMirroredUrl } from '~/utils/headerNav'
 import { getBase } from '~/utils/urlHelpers'
@@ -258,6 +253,7 @@ export function EmployeeSidebar({
     user: { company_id: number; is_admin: boolean; is_superuser: boolean } | null
     superadminCompanies?: { id: number; name: string }[]
     activeCompanyId?: number
+    userIsSuperAdmin?: boolean
     token: string
   }>()
 
@@ -275,24 +271,10 @@ export function EmployeeSidebar({
   const isCustomerPage = location.pathname.startsWith('/customer')
   const targetPath = getMirroredUrl(isAdminPage, location)
 
-  const fetcher = useFetcher()
-  const token = data?.token ?? ''
   const superadminCompanies = data?.superadminCompanies ?? []
   const activeCompanyId = data?.activeCompanyId
-
-  const handleCompanySwitch = (value: string) => {
-    fetcher.submit(
-      {
-        companyId: value,
-        csrf: token,
-        redirect: location.pathname + location.search,
-      },
-      {
-        method: 'POST',
-        action: '/api/superadmin/switchCompany',
-      },
-    )
-  }
+  const userIsSuperAdmin = data?.userIsSuperAdmin ?? false
+  const { handleCompanySwitch } = useSuperAdminCompanySwitch()
 
   const buildCustomerUrl = () => {
     if (!isCustomerPage && location.pathname.startsWith('/admin/stones')) {
@@ -373,7 +355,7 @@ export function EmployeeSidebar({
       {isMobile && data?.user && itemsBase !== 'shop' && (
         <SidebarHeader className='py-2 px-3'>
           <div className='flex gap-2 justify-center'>
-            {data.user.is_admin || data.user.is_superuser ? (
+            {data.user.is_admin || data.user.is_superuser || userIsSuperAdmin ? (
               <Link to={targetPath} className='w-full' onClick={handleLinkClick}>
                 <LinkButton className='select-none w-full'>
                   {isAdminPage ? 'Employee' : 'Admin'}
@@ -386,32 +368,19 @@ export function EmployeeSidebar({
               </LinkButton>
             </Link>
           </div>
-          {data.user.is_superuser && isAdminPage ? (
+          {(data.user.is_superuser || userIsSuperAdmin) && isAdminPage ? (
             <Link to='/admin/users' onClick={handleLinkClick}>
               <Button className='w-full'>Users</Button>
             </Link>
           ) : null}
-          {data.user.is_superuser && superadminCompanies.length > 0 && (
-            <Select
-              value={
-                activeCompanyId?.toString() ??
-                (superadminCompanies.some(c => c.id === Number(companyId))
-                  ? String(companyId)
-                  : superadminCompanies[0].id.toString())
-              }
-              onValueChange={handleCompanySwitch}
-            >
-              <SelectTrigger className='w-full'>
-                <SelectValue placeholder='Switch Company' />
-              </SelectTrigger>
-              <SelectContent>
-                {superadminCompanies.map(company => (
-                  <SelectItem key={company.id} value={company.id.toString()}>
-                    {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {userIsSuperAdmin && superadminCompanies.length > 0 && (
+            <SuperAdminCompanySelect
+              companies={superadminCompanies}
+              activeCompanyId={activeCompanyId}
+              currentCompanyId={companyId}
+              onCompanyChange={handleCompanySwitch}
+              className='w-full'
+            />
           )}
         </SidebarHeader>
       )}

@@ -98,16 +98,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [activeGroupId],
     )
 
-    let query = `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position,
-       DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at, is_won
-       FROM deals
-       WHERE deleted_at IS NULL AND user_id = ?`
-    const queryParams: number[] = [user.id]
+    let query = `SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason, d.list_id, d.position,
+       DATE_FORMAT(d.due_date, '%Y-%m-%d') as due_date, d.deleted_at, d.is_won
+       FROM deals d
+       JOIN customers c ON c.id = d.customer_id
+       WHERE d.deleted_at IS NULL AND d.user_id = ? AND c.company_id = ?`
+    const queryParams: number[] = [user.id, user.company_id]
 
     if (isWon === null) {
-      query += ' AND is_won IS NULL'
+      query += ' AND d.is_won IS NULL'
     } else {
-      query += ' AND is_won = ?'
+      query += ' AND d.is_won = ?'
       queryParams.push(isWon)
     }
 

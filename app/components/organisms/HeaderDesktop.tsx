@@ -1,19 +1,13 @@
 import clsx from 'clsx'
-import { Link, useFetcher, useLoaderData, useLocation } from 'react-router'
-import { useAuthenticityToken } from 'remix-utils/csrf/react'
+import { Link, useLoaderData, useLocation } from 'react-router'
 import { Button } from '~/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
 import { defaultLogo, gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
+import { useSuperAdminCompanySwitch } from '~/hooks/useSuperAdminCompanySwitch'
 import type { HeaderProps } from '~/types'
 import { getCustomerUrl, getMirroredUrl } from '~/utils/headerNav'
 import { LinkButton } from '../molecules/LinkButton'
 import { Notification } from '../molecules/Notification'
+import { SuperAdminCompanySelect } from '../molecules/SuperAdminCompanySelect'
 import { TodoList } from '../organisms/TodoList'
 
 interface HeaderDesktopProps extends HeaderProps {
@@ -24,6 +18,7 @@ export function HeaderDesktop({
   user,
   isAdmin,
   isSuperUser,
+  isSuperAdmin,
   className,
   superadminCompanies = [],
   activeCompanyId,
@@ -34,7 +29,7 @@ export function HeaderDesktop({
   const data = useLoaderData<{ user: { company_id: number } | null }>()
   const companyId = isCustomerPage
     ? location.pathname.split('/').filter(Boolean)[1]
-    : data?.user?.company_id
+    : (activeCompanyId ?? data?.user?.company_id)
   const id = Number(companyId)
   const companyLogo =
     id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
@@ -44,22 +39,7 @@ export function HeaderDesktop({
       ? '/employee/stones'
       : getCustomerUrl(isCustomerPage, location, companyId)
 
-  const fetcher = useFetcher()
-  const token = useAuthenticityToken()
-
-  const handleCompanySwitch = (value: string) => {
-    fetcher.submit(
-      {
-        companyId: value,
-        csrf: token,
-        redirect: location.pathname + location.search,
-      },
-      {
-        method: 'POST',
-        action: '/api/superadmin/switchCompany',
-      },
-    )
-  }
+  const { handleCompanySwitch } = useSuperAdminCompanySwitch()
 
   return (
     <header
@@ -84,7 +64,7 @@ export function HeaderDesktop({
       </div>
 
       <div className='flex gap-4'>
-        {isAdmin || isSuperUser ? (
+        {isAdmin || isSuperUser || isSuperAdmin ? (
           isAdminPage ? (
             <div className=' flex gap-4'>
               <Link to={getMirroredUrl(isAdminPage, location)}>
@@ -102,27 +82,13 @@ export function HeaderDesktop({
             {isCustomerPage ? 'Employee' : 'Customer'}
           </LinkButton>
         </Link>
-        {isSuperUser && superadminCompanies.length > 0 && (
-          <Select
-            value={
-              activeCompanyId?.toString() ??
-              (superadminCompanies.some(c => c.id === id)
-                ? id.toString()
-                : superadminCompanies[0].id.toString())
-            }
-            onValueChange={handleCompanySwitch}
-          >
-            <SelectTrigger className='w-48'>
-              <SelectValue placeholder='Switch Company' />
-            </SelectTrigger>
-            <SelectContent>
-              {superadminCompanies.map(company => (
-                <SelectItem key={company.id} value={company.id.toString()}>
-                  {company.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {isSuperAdmin && superadminCompanies.length > 0 && (
+          <SuperAdminCompanySelect
+            companies={superadminCompanies}
+            activeCompanyId={activeCompanyId}
+            currentCompanyId={id}
+            onCompanyChange={handleCompanySwitch}
+          />
         )}
       </div>
       <nav className='text-center flex-1'>

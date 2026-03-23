@@ -24,7 +24,11 @@ import type { ISupplier } from '~/schemas/suppliers'
 import { queryClient } from '~/utils/api'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { getSuperAdminCompanies, getUserBySessionId } from '~/utils/session.server'
+import {
+  getSuperAdminCompanies,
+  getUserBySessionId,
+  isSuperAdmin,
+} from '~/utils/session.server'
 import type { ToastMessage } from '~/utils/toastHelpers.server'
 import { getBase } from '~/utils/urlHelpers'
 import { Header } from './components/Header'
@@ -85,28 +89,34 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   let superadminCompanies: { id: number; name: string }[] = []
   let activeCompanyId: number | undefined
+  let userIsSuperAdmin = false
 
   if (activeSession) {
     user = (await getUserBySessionId(activeSession)) || null
     if (user) {
       let effectiveCompanyId = user.company_id
 
-      if (user.is_superuser) {
+      userIsSuperAdmin = await isSuperAdmin(user.id)
+      const sessionActiveCompany = session.get('activeCompanyId')
+      if (userIsSuperAdmin) {
         superadminCompanies = await getSuperAdminCompanies(user.id)
-        const sessionActiveCompany = session.get('activeCompanyId')
         if (
           sessionActiveCompany !== undefined &&
           superadminCompanies.some(c => c.id === sessionActiveCompany)
         ) {
           effectiveCompanyId = sessionActiveCompany
           activeCompanyId = sessionActiveCompany
-        } else if (
-          effectiveCompanyId == null &&
-          superadminCompanies.length > 0
-        ) {
-          effectiveCompanyId = superadminCompanies[0].id
-          activeCompanyId = superadminCompanies[0].id
+        } else {
+          if (sessionActiveCompany !== undefined) {
+            session.unset('activeCompanyId')
+          }
+          if (effectiveCompanyId == null && superadminCompanies.length > 0) {
+            effectiveCompanyId = superadminCompanies[0].id
+            activeCompanyId = superadminCompanies[0].id
+          }
         }
+      } else if (sessionActiveCompany !== undefined) {
+        session.unset('activeCompanyId')
       }
 
       const company = await selectId<{ name: string }>(
@@ -211,14 +221,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
           : null
 
     // Installer users: always redirect to their checklist
-    if (hasInstaller && !user.is_superuser) {
+    if (hasInstaller && !user.is_superuser && !userIsSuperAdmin) {
       const installerTarget = `/installers/${user.company_id}/checklist`
       if (!url.pathname.startsWith('/installers/')) {
         return redirect(installerTarget)
       }
     }
 
-    if (hasCheckIn && !user.is_superuser) {
+    if (hasCheckIn && !user.is_superuser && !userIsSuperAdmin) {
       const target = `/customer/${user.company_id}/check-in`
       if (!url.pathname.startsWith(target)) {
         return redirect(target)
@@ -226,13 +236,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     // Auto-redirect Marketing users to their External Marketing page
-    if (hasExternalMarketing && !user.is_superuser) {
+    if (hasExternalMarketing && !user.is_superuser && !userIsSuperAdmin) {
       const marketingTarget = `/external/marketing/${user.company_id}/leads`
       if (!url.pathname.startsWith('/external/marketing/')) {
         return redirect(marketingTarget)
       }
     }
-    if (hasShopWorker && !user.is_superuser && !url.pathname.startsWith('/shop')) {
+    if (
+      hasShopWorker &&
+      !user.is_superuser &&
+      !userIsSuperAdmin &&
+      !url.pathname.startsWith('/shop')
+    ) {
       return redirect('/shop/transactions')
     }
   }
@@ -250,6 +265,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       position,
       superadminCompanies,
       activeCompanyId,
+      userIsSuperAdmin,
     },
 
     {
@@ -274,6 +290,7 @@ export default function App() {
     position,
     superadminCompanies,
     activeCompanyId,
+    userIsSuperAdmin,
   } = useLoaderData<typeof loader>()
   const { pathname } = useLocation()
   const { toast } = useToast()
@@ -368,6 +385,7 @@ export default function App() {
                     user={user}
                     isAdmin={!!user?.is_admin}
                     isSuperUser={!!user?.is_superuser}
+                    isSuperAdmin={userIsSuperAdmin}
                     superadminCompanies={superadminCompanies}
                     activeCompanyId={activeCompanyId}
                   />

@@ -76,6 +76,7 @@ export interface HeaderProps {
   user: object | null
   isAdmin: boolean
   isSuperUser: boolean
+  isSuperAdmin?: boolean
   isEmployee?: boolean
   superadminCompanies?: { id: number; name: string }[]
   activeCompanyId?: number
@@ -224,4 +225,5 @@ export enum Positions {
   Installer = 6,
   ExternalMarketing = 7,
   CheckIn = 8,
+  SuperAdmin = 9,
 }

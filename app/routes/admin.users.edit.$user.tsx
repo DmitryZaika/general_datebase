@@ -1,6 +1,6 @@
 // app/routes/users.$user.tsx
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Info, TriangleAlert } from 'lucide-react'
+import { Info } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
@@ -37,7 +37,7 @@ import { POSITIONS } from '~/constants/positions'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
-import { Nullable } from '~/types/utils'
+import { Positions } from '~/types'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, getSuperUser } from '~/utils/session.server'
@@ -75,7 +75,6 @@ const userschema = z.object({
     .optional()
     .prefault([]),
   is_admin: z.boolean(),
-  is_superuser: z.boolean().optional().default(false),
   superadmin_company_ids: z
     .union([
       z.string().transform(val => {
@@ -96,11 +95,9 @@ const resolver = zodResolver(userschema)
 
 export async function action({ request, params }: ActionFunctionArgs) {
   let loggedInIsSuperuser = false
-  let loggedInUserId: Nullable<number> = null
   try {
-    const loggedInUser = await getSuperUser(request)
+    await getSuperUser(request)
     loggedInIsSuperuser = true
-    loggedInUserId = loggedInUser.id
   } catch {
     try {
       await getAdminUser(request)
@@ -122,34 +119,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { errors, receivedValues }
   }
 
-  const isSuperuser = loggedInIsSuperuser ? data.is_superuser : undefined
+  if (!loggedInIsSuperuser) {
+    data.positions = data.positions.filter(id => id !== Positions.SuperAdmin)
+    data.superadmin_company_ids = []
+  }
 
-  if (loggedInIsSuperuser && data.is_superuser === false) {
-    const isEditingSelf = loggedInUserId === userId
-    const targetUser = await selectId<{ is_employee: boolean }>(
-      db,
-      'SELECT is_employee FROM users WHERE id = ?',
-      userId,
-    )
-    const wouldLockOut = isEditingSelf
-      ? !data.is_admin
-      : !data.is_admin && targetUser && !targetUser.is_employee
-    if (wouldLockOut) {
-      const session = await getSession(request.headers.get('Cookie'))
-      session.flash(
-        'message',
-        toastData(
-          'Error',
-          isEditingSelf
-            ? 'Cannot remove your own Super Admin access without enabling Admin'
-            : 'Cannot remove Super Admin access without enabling Admin or having Employee access',
-          'destructive',
-        ),
-      )
-      return redirect(request.url, {
-        headers: { 'Set-Cookie': await commitSession(session) },
-      })
-    }
+  // SuperAdmin position grants admin access
+  if (data.positions.includes(Positions.SuperAdmin)) {
+    data.is_admin = true
   }
 
   await db.execute(
@@ -161,39 +138,33 @@ export async function action({ request, params }: ActionFunctionArgs) {
       phone_number = ?,
       company_id = ?,
       is_admin = ?
-      ${isSuperuser !== undefined ? ', is_superuser = ?' : ''}
     WHERE id = ?
     `,
-    isSuperuser !== undefined
-      ? [
-          data.name,
-          data.email,
-          data.phone_number,
-          data.company_id,
-          data.is_admin,
-          isSuperuser,
-          userId,
-        ]
-      : [
-          data.name,
-          data.email,
-          data.phone_number,
-          data.company_id,
-          data.is_admin,
-          userId,
-        ],
+    [data.name, data.email, data.phone_number, data.company_id, data.is_admin, userId],
   )
 
   await db.execute('DELETE FROM users_positions WHERE user_id = ?', [userId])
 
   const uniquePositions = [...new Set(data.positions)]
   const uniqueMarketingCompanies = [...new Set(data.marketing_company_ids ?? [])]
+  const uniqueSuperadminCompanies = [...new Set(data.superadmin_company_ids ?? [])]
 
   for (const positionId of uniquePositions) {
-    if (positionId === 7) {
+    if (positionId === Positions.ExternalMarketing) {
       const companies =
         uniqueMarketingCompanies.length > 0
           ? uniqueMarketingCompanies
+          : [data.company_id]
+      for (const companyId of companies) {
+        await db.execute(
+          'INSERT INTO users_positions (user_id, position_id, company_id) VALUES (?, ?, ?)',
+          [userId, positionId, companyId],
+        )
+      }
+    } else if (positionId === Positions.SuperAdmin) {
+      const companies =
+        uniqueSuperadminCompanies.length > 0
+          ? uniqueSuperadminCompanies
           : [data.company_id]
       for (const companyId of companies) {
         await db.execute(
@@ -206,24 +177,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         'INSERT INTO users_positions (user_id, position_id, company_id) VALUES (?, ?, ?)',
         [userId, positionId, data.company_id],
       )
-    }
-  }
-
-  if (loggedInIsSuperuser) {
-    if (data.is_superuser) {
-      await db.execute('DELETE FROM superadmin_companies WHERE user_id = ?', [userId])
-      let uniqueSuperadminCompanies = [...new Set(data.superadmin_company_ids ?? [])]
-      if (uniqueSuperadminCompanies.length === 0 && data.company_id >= 0) {
-        uniqueSuperadminCompanies = [data.company_id]
-      }
-      for (const companyId of uniqueSuperadminCompanies) {
-        await db.execute(
-          'INSERT INTO superadmin_companies (user_id, company_id) VALUES (?, ?)',
-          [userId, companyId],
-        )
-      }
-    } else {
-      await db.execute('DELETE FROM superadmin_companies WHERE user_id = ?', [userId])
     }
   }
 
@@ -256,11 +209,9 @@ interface User {
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   let loggedInIsSuperuser = false
-  let loggedInUserId: Nullable<number> = null
   try {
-    const loggedInUser = await getSuperUser(request)
+    await getSuperUser(request)
     loggedInIsSuperuser = true
-    loggedInUserId = loggedInUser.id
   } catch {
     try {
       await getAdminUser(request)
@@ -286,20 +237,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const userPositions = await selectMany<{ position_id: number }>(
     db,
-    'SELECT position_id FROM users_positions WHERE user_id = ?',
+    'SELECT DISTINCT position_id FROM users_positions WHERE user_id = ?',
     [userId],
   )
 
   const marketingCompanies = await selectMany<{ company_id: number }>(
     db,
-    'SELECT company_id FROM users_positions WHERE user_id = ? AND position_id = 7',
-    [userId],
+    'SELECT company_id FROM users_positions WHERE user_id = ? AND position_id = ?',
+    [userId, Positions.ExternalMarketing],
   )
 
   const superadminCompanies = await selectMany<{ company_id: number }>(
     db,
-    'SELECT company_id FROM superadmin_companies WHERE user_id = ?',
-    [userId],
+    'SELECT company_id FROM users_positions WHERE user_id = ? AND position_id = ?',
+    [userId, Positions.SuperAdmin],
   )
 
   const companies = await selectMany<Company>(db, 'SELECT id, name FROM company')
@@ -317,11 +268,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     superadminCompanyIds:
       superadminCompanies.length > 0
         ? superadminCompanies.map(sc => sc.company_id)
-        : user.is_superuser && user.company_id >= 0
-          ? [user.company_id]
-          : [],
+        : [],
     loggedInIsSuperuser,
-    loggedInUserId,
   }
 }
 
@@ -336,7 +284,6 @@ export default function User() {
     marketingCompanyIds,
     superadminCompanyIds,
     loggedInIsSuperuser,
-    loggedInUserId,
   } = useLoaderData<typeof loader>()
 
   const token = useAuthenticityToken()
@@ -350,7 +297,6 @@ export default function User() {
       positions: userPositions,
       marketing_company_ids: marketingCompanyIds,
       is_admin: user.is_admin === 1,
-      is_superuser: user.is_superuser === 1,
       superadmin_company_ids: superadminCompanyIds,
     },
   })
@@ -364,15 +310,9 @@ export default function User() {
   }
 
   const formPositions = form.watch('positions')
-  const formIsSuperuser = form.watch('is_superuser')
-  const formIsAdmin = form.watch('is_admin')
-  const userIsEmployee = user.is_employee === 1
-  const isEditingSelf = loggedInUserId === user.id
-  const showNoRoleWarning =
-    loggedInIsSuperuser &&
-    user.is_superuser === 1 &&
-    !formIsSuperuser &&
-    (isEditingSelf ? !formIsAdmin : !formIsAdmin && !userIsEmployee)
+  const visiblePositions = loggedInIsSuperuser
+    ? positions
+    : positions.filter(p => p.key !== Positions.SuperAdmin)
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -412,7 +352,7 @@ export default function User() {
               )}
             />
             <div className='grid grid-cols-2 gap-2'>
-              {positions.map(position => (
+              {visiblePositions.map(position => (
                 <FormField
                   key={position.key}
                   control={form.control}
@@ -481,135 +421,93 @@ export default function User() {
                   </div>
                 )}
               />
-              {Array.isArray(formPositions) && formPositions.includes(7) && (
-                <div className='col-span-2 border-t pt-2 mt-2'>
-                  <div className='text-sm font-medium mb-2'>
-                    External Marketing Companies
-                  </div>
-                  {companies.map(company => (
-                    <FormField
-                      key={company.key}
-                      control={form.control}
-                      name='marketing_company_ids'
-                      render={({ field }) => (
-                        <div className='flex items-center space-x-2'>
-                          <Switch
-                            id={`marketing-company-${company.key}`}
-                            checked={
-                              Array.isArray(field.value) &&
-                              field.value.includes(company.key)
-                            }
-                            onCheckedChange={checked => {
-                              if (checked && Array.isArray(field.value)) {
-                                field.onChange([...field.value, company.key])
-                              } else if (Array.isArray(field.value)) {
-                                field.onChange(
-                                  field.value.filter(
-                                    (id: number) => id !== company.key,
-                                  ),
-                                )
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={`marketing-company-${company.key}`}
-                            className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
-                          >
-                            {company.value}
-                          </label>
-                        </div>
-                      )}
-                    />
-                  ))}
-                </div>
-              )}
-              {loggedInIsSuperuser && (
-                <FormField
-                  control={form.control}
-                  name='is_superuser'
-                  render={({ field }) => (
-                    <div className='flex items-center space-x-2'>
-                      <Switch
-                        id='superadmin-switch'
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                      <label
-                        htmlFor='superadmin-switch'
-                        className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
-                      >
-                        Super Admin
-                      </label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className='w-4 h-4 text-gray-500 hover:text-gray-700 cursor-help' />
-                          </TooltipTrigger>
-                          <TooltipContent className='max-w-xs'>
-                            <div className='space-y-2'>
-                              <div className='font-semibold'>Super Admin</div>
-                              <p className='text-sm text-white-600'>
-                                Can switch between multiple companies and manage data
-                                across all assigned companies.
-                              </p>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+              {Array.isArray(formPositions) &&
+                formPositions.includes(Positions.ExternalMarketing) && (
+                  <div className='col-span-2 border-t pt-2 mt-2'>
+                    <div className='text-sm font-medium mb-2'>
+                      External Marketing Companies
                     </div>
-                  )}
-                />
-              )}
-              {showNoRoleWarning && (
-                <div className='col-span-2 flex items-start gap-2 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800'>
-                  <TriangleAlert className='h-4 w-4 shrink-0 mt-0.5' />
-                  <span>
-                    {isEditingSelf
-                      ? 'Enable Admin before removing your own Super Admin access.'
-                      : 'Enable Admin or add Employee positions before removing Super Admin access, otherwise this user will be locked out.'}
-                  </span>
-                </div>
-              )}
-              {loggedInIsSuperuser && formIsSuperuser && (
-                <div className='col-span-2 border-t pt-2 mt-2'>
-                  <div className='text-sm font-medium mb-2'>Super Admin Companies</div>
-                  {companies.map(company => (
-                    <FormField
-                      key={company.key}
-                      control={form.control}
-                      name='superadmin_company_ids'
-                      render={({ field }) => (
-                        <div className='flex items-center space-x-2'>
-                          <Switch
-                            id={`superadmin-company-${company.key}`}
-                            checked={
-                              Array.isArray(field.value) &&
-                              field.value.includes(company.key)
-                            }
-                            onCheckedChange={checked => {
-                              if (checked && Array.isArray(field.value)) {
-                                field.onChange([...field.value, company.key])
-                              } else if (Array.isArray(field.value)) {
-                                field.onChange(
-                                  field.value.filter(
-                                    (id: number) => id !== company.key,
-                                  ),
-                                )
+                    {companies.map(company => (
+                      <FormField
+                        key={company.key}
+                        control={form.control}
+                        name='marketing_company_ids'
+                        render={({ field }) => (
+                          <div className='flex items-center space-x-2'>
+                            <Switch
+                              id={`marketing-company-${company.key}`}
+                              checked={
+                                Array.isArray(field.value) &&
+                                field.value.includes(company.key)
                               }
-                            }}
-                          />
-                          <label
-                            htmlFor={`superadmin-company-${company.key}`}
-                            className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
-                          >
-                            {company.value}
-                          </label>
-                        </div>
-                      )}
-                    />
-                  ))}
-                </div>
-              )}
+                              onCheckedChange={checked => {
+                                if (checked && Array.isArray(field.value)) {
+                                  field.onChange([...field.value, company.key])
+                                } else if (Array.isArray(field.value)) {
+                                  field.onChange(
+                                    field.value.filter(
+                                      (id: number) => id !== company.key,
+                                    ),
+                                  )
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`marketing-company-${company.key}`}
+                              className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
+                            >
+                              {company.value}
+                            </label>
+                          </div>
+                        )}
+                      />
+                    ))}
+                  </div>
+                )}
+              {loggedInIsSuperuser &&
+                Array.isArray(formPositions) &&
+                formPositions.includes(Positions.SuperAdmin) && (
+                  <div className='col-span-2 border-t pt-2 mt-2'>
+                    <div className='text-sm font-medium mb-2'>
+                      Super Admin Companies
+                    </div>
+                    {companies.map(company => (
+                      <FormField
+                        key={company.key}
+                        control={form.control}
+                        name='superadmin_company_ids'
+                        render={({ field }) => (
+                          <div className='flex items-center space-x-2'>
+                            <Switch
+                              id={`superadmin-company-${company.key}`}
+                              checked={
+                                Array.isArray(field.value) &&
+                                field.value.includes(company.key)
+                              }
+                              onCheckedChange={checked => {
+                                if (checked && Array.isArray(field.value)) {
+                                  field.onChange([...field.value, company.key])
+                                } else if (Array.isArray(field.value)) {
+                                  field.onChange(
+                                    field.value.filter(
+                                      (id: number) => id !== company.key,
+                                    ),
+                                  )
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`superadmin-company-${company.key}`}
+                              className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
+                            >
+                              {company.value}
+                            </label>
+                          </div>
+                        )}
+                      />
+                    ))}
+                  </div>
+                )}
             </div>
             <DialogFooter className='mt-2'>
               <Button type='submit' disabled={isSubmitting}>

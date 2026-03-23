@@ -1,12 +1,13 @@
 import { type ActionFunctionArgs, data, redirect } from 'react-router'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
+import { Positions } from '~/types'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getSuperUser } from '~/utils/session.server'
+import { getAdminUser } from '~/utils/session.server'
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await getSuperUser(request)
+  const user = await getAdminUser(request)
   const formData = await request.formData()
   await csrf.validate(formData, request.headers)
 
@@ -22,8 +23,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const rows = await selectMany<{ id: number }>(
     db,
-    'SELECT id FROM superadmin_companies WHERE user_id = ? AND company_id = ?',
-    [user.id, companyId],
+    'SELECT up.user_id AS id FROM users_positions up WHERE up.user_id = ? AND up.position_id = ? AND up.company_id = ?',
+    [user.id, Positions.SuperAdmin, companyId],
   )
 
   if (rows.length === 0) {
