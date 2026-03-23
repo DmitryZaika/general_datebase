@@ -2,7 +2,10 @@ import type { ResultSetHeader } from 'mysql2'
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router'
 import { data, redirect } from 'react-router'
 import { db } from '~/db.server'
-import { notifyDealAssignee } from '~/lib/dealNotification.server'
+import {
+  notifyDealAssignee,
+  scheduleActivityDeadlineReminder,
+} from '~/lib/dealNotification.server'
 import type { Nullable } from '~/types/utils'
 import {
   badRequest,
@@ -180,6 +183,11 @@ async function handleCreate(
     )
   }
 
+  const deadlineUtc = String(formData.get('deadlineUtc') || '').trim()
+  if (deadlineUtc) {
+    await scheduleActivityDeadlineReminder(db, dealId, userId, name.trim(), deadlineUtc)
+  }
+
   return success()
 }
 
@@ -214,15 +222,17 @@ async function handleUpdate(
     )
   }
 
-  const rows = await selectMany<{ id: number }>(
+  const rows = await selectMany<{ id: number; name: string }>(
     db,
-    'SELECT id FROM deal_activities WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
+    'SELECT id, name FROM deal_activities WHERE id = ? AND deal_id = ? AND company_id = ? AND deleted_at IS NULL',
     [Number(activityId), dealId, companyId],
   )
 
   if (!rows.length) {
     return notFound('Activity not found')
   }
+
+  const oldName = rows[0].name
 
   const rawDeadline =
     deadline && String(deadline).trim() ? String(deadline).trim() : null
@@ -247,6 +257,18 @@ async function handleUpdate(
       createdBy,
       name.trim(),
       'activity_edited',
+    )
+  }
+
+  const deadlineUtc = String(formData.get('deadlineUtc') || '').trim()
+  if (deadlineUtc) {
+    await scheduleActivityDeadlineReminder(
+      db,
+      dealId,
+      userId,
+      name.trim(),
+      deadlineUtc,
+      oldName,
     )
   }
 

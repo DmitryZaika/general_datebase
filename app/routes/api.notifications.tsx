@@ -105,7 +105,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
      FROM notifications n
      JOIN deals d ON d.id = n.deal_id AND d.deleted_at IS NULL
      JOIN customers c ON c.id = d.customer_id
-     WHERE n.user_id = ? AND n.is_done = 0 AND n.due_at <= NOW()
+     WHERE n.user_id = ? AND n.is_done = 0
+       AND CASE
+         WHEN n.notification_type = 'activity_deadline_reminder' THEN n.due_at <= UTC_TIMESTAMP()
+         ELSE n.due_at <= NOW()
+       END
      ORDER BY n.created_at DESC
      LIMIT 50`,
     [user.id],

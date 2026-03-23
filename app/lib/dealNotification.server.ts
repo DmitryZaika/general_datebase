@@ -5,6 +5,7 @@ export type NotificationType =
   | 'activity_added'
   | 'activity_edited'
   | 'activity_deleted'
+  | 'activity_deadline_reminder'
   | 'note_added'
   | 'note_edited'
   | 'note_deleted'
@@ -15,6 +16,7 @@ export const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   activity_added: 'Added an Activity',
   activity_edited: 'Edited an Activity',
   activity_deleted: 'Deleted an Activity',
+  activity_deadline_reminder: 'Activity Reminder',
   note_added: 'Added a Note',
   note_edited: 'Edited a Note',
   note_deleted: 'Deleted a Note',
@@ -44,5 +46,43 @@ export async function notifyDealAssignee(
         [assignedUserId, dealId, message.slice(0, 255), notificationType, actorName],
       )
     }
-  } catch {}
+  } catch {
+    void 0
+  }
+}
+
+function isoToMysqlUtc(iso: string): string | null {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`
+}
+
+export async function scheduleActivityDeadlineReminder(
+  db: Pool,
+  dealId: number,
+  userId: number,
+  activityName: string,
+  deadlineUtcIso: string,
+  oldActivityName?: string,
+): Promise<void> {
+  try {
+    const dueAt = isoToMysqlUtc(deadlineUtcIso)
+    if (!dueAt) return
+
+    const nameToClean = oldActivityName ?? activityName
+    await db.execute(
+      `DELETE FROM notifications
+       WHERE user_id = ? AND deal_id = ? AND notification_type = 'activity_deadline_reminder'
+         AND message = ? AND is_done = 0`,
+      [userId, dealId, nameToClean.slice(0, 255)],
+    )
+    await db.execute(
+      `INSERT INTO notifications (user_id, deal_id, message, notification_type, actor_name, due_at)
+       VALUES (?, ?, ?, 'activity_deadline_reminder', NULL, ?)`,
+      [userId, dealId, activityName.slice(0, 255), dueAt],
+    )
+  } catch {
+    void 0
+  }
 }

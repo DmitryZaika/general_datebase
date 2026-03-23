@@ -283,10 +283,15 @@ function useActivityForm(dealId: number, editingActivityId: number | null) {
   const submit = useCallback(() => {
     if (!isValid) return
 
+    const deadlineLocal = toDeadlinePayload(form.deadline ?? null)
+    const hasTime = form.deadline
+      ? form.deadline.getHours() !== 0 || form.deadline.getMinutes() !== 0
+      : false
     const payload: Record<string, string> = {
       intent: isEditing ? 'update' : 'create',
       name: form.name.trim(),
-      deadline: toDeadlinePayload(form.deadline ?? null),
+      deadline: deadlineLocal,
+      deadlineUtc: hasTime && form.deadline ? form.deadline.toISOString() : '',
       priority: form.priority,
       csrf: token,
     }

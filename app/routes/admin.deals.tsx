@@ -194,7 +194,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     )
     const activitiesMap: Record<number, boolean> = {}
     for (const row of activitiesCounts)
-      activitiesMap[row.deal_id] = Number(row.count) > 0
+      activitiesMap[row.deal_id] = Number(row.count) > 1
 
     const activitiesDeadlines = await selectMany<{
       deal_id: number
