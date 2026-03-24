@@ -363,16 +363,19 @@ export default function App() {
             key={showSidebar ? 'show' : 'hide'}
             defaultOpen={showSidebar}
           >
-            {showSidebar && (
-              <EmployeeSidebar
-                suppliers={stoneSuppliers}
-                sinkSuppliers={sinkSuppliers}
-                faucetSuppliers={faucetSuppliers}
-                colors={colors}
-              />
-            )}
-            <main ref={mainRef} className='h-screen overflow-y-auto bg-gray-100 w-full'>
-              <AuthenticityTokenProvider token={token}>
+            <AuthenticityTokenProvider token={token}>
+              {showSidebar && (
+                <EmployeeSidebar
+                  suppliers={stoneSuppliers}
+                  sinkSuppliers={sinkSuppliers}
+                  faucetSuppliers={faucetSuppliers}
+                  colors={colors}
+                />
+              )}
+              <main
+                ref={mainRef}
+                className='h-screen overflow-y-auto bg-gray-100 w-full'
+              >
                 {isExternalMarketing ||
                 isCheckIn ||
                 isInstallerRoute ||
@@ -393,16 +396,16 @@ export default function App() {
                 <div className='relative'>
                   <Outlet />
                 </div>
-              </AuthenticityTokenProvider>
-              <Toaster />
-              <ScrollRestoration />
-              <Scripts />
-              <Posthog />
-              {!isInstallerRoute && !isCheckIn && user && (
-                <Chat isAtBottom={isAtBottom} />
-              )}
-              {/* <ScrollToTopButton /> */}
-            </main>
+                <Toaster />
+                <ScrollRestoration />
+                <Scripts />
+                <Posthog />
+                {!isInstallerRoute && !isCheckIn && user && (
+                  <Chat isAtBottom={isAtBottom} />
+                )}
+                {/* <ScrollToTopButton /> */}
+              </main>
+            </AuthenticityTokenProvider>
           </SidebarProvider>
         </QueryClientProvider>
       </body>
