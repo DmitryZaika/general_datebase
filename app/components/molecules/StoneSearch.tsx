@@ -252,6 +252,7 @@ export function StoneSearch({
         currentId={currentId}
         setCurrentId={setCurrentId}
         images={displayStones}
+        userRole={userRole}
       />
     </div>
   )
