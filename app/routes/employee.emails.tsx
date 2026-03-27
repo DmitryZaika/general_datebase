@@ -84,6 +84,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           `SELECT e.id, e.thread_id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.sender_user_id, e.employee_read_at,
          (SELECT MAX(er.read_at) FROM email_reads er WHERE er.message_id = e.message_id) AS client_read_at,
          (SELECT COUNT(*) FROM email_attachments ea WHERE ea.email_id = e.id) > 0 as has_attachments,
+         EXISTS (SELECT 1 FROM email_attachments ea2 INNER JOIN emails e3 ON ea2.email_id = e3.id WHERE e3.thread_id = e.thread_id) AS thread_has_attachments,
          COALESCE(s.name, (SELECT name FROM customers WHERE email = e.sender_email LIMIT 1)) as sender_name,
          COALESCE(r.name, (SELECT name FROM customers WHERE email = e.receiver_email LIMIT 1)) as receiver_name
          FROM emails e

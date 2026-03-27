@@ -82,6 +82,11 @@ async function fetchCompanyData(
   return undefined
 }
 
+interface UserData {
+  email_signature: string | null
+  email_name: string | null
+}
+
 const emailToSend = async (
   user: User,
   cleaned: Omit<Email, 'to'>,
@@ -94,12 +99,16 @@ const emailToSend = async (
   )
 
   // Изменено: получаем и подпись, и имя (email_name)
-  const userData = await selectId<{
-    email_signature: string | null
-    email_name: string | null
-  }>(
+  const userData = await selectId<UserData>(
     db,
     'SELECT email_signature, email_name FROM users WHERE id = ? AND is_deleted = 0',
+    user.id,
+  )
+
+  // Break glass in case of emergency
+  const emailData = await selectId<{ message_id: string }>(
+    db,
+    'SELECT message_id FROM emails WHERE thread_id = ? ORDER BY sent_at DESC LIMIT 1;',
     user.id,
   )
 
@@ -134,6 +143,8 @@ const emailToSend = async (
     html: HTMLBody,
     text: textBody,
     attachments: cleaned.attachments,
+    // Break glass in case of emergency
+    inReplyTo: emailData?.message_id,
   }
 }
 

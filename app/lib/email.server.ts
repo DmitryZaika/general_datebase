@@ -24,6 +24,7 @@ export interface SendEmail {
   html?: string
   text?: string
   replyTo?: string[]
+  inReplyTo?: string
   headers?: Record<string, string>
   attachments?: File[]
 }
@@ -52,11 +53,13 @@ export async function sendEmail({
   html,
   text,
   replyTo,
+  inReplyTo,
   attachments,
 }: SendEmail): Promise<MailReturn> {
   const toSend: MailOptions = {
     to: Array.isArray(to) ? to : [to],
     replyTo,
+    inReplyTo,
     from: from || 'noreply@granite-manager.com',
     subject,
     html: html,

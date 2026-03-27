@@ -205,7 +205,7 @@ export function QuillEditorWithVariables({
   return (
     <div className='quill-with-variables'>
       {renderInsertButton ? renderInsertButton(insertButton) : insertButton}
-      <div className='quill-container h-64 flex flex-col'>
+      <div className='quill-container h-64 flex flex-col [&_.ql-editor]:max-md:text-base'>
         <div ref={quillRef} className='flex-1 overflow-y-auto' />
       </div>
     </div>
