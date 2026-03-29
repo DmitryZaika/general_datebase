@@ -320,17 +320,42 @@ export default function DealItem({
       {!isClosed &&
         (deal.nearest_activity_name ? (
           <div className='w-full mt-1'>
-            <p
-              ref={activityRef}
-              className={cn(
-                'text-sm leading-5 text-slate-600 w-full',
-                !activityExpanded
-                  ? 'line-clamp-3 whitespace-pre-wrap break-words'
-                  : 'whitespace-pre-wrap break-words',
-              )}
-            >
-              {deal.nearest_activity_name}
-            </p>
+            {deal.nearest_activity_id && !readonly ? (
+              <Link
+                to={
+                  projectUrl.includes('?')
+                    ? `${projectUrl}&editActivity=${deal.nearest_activity_id}`
+                    : `${projectUrl}?editActivity=${deal.nearest_activity_id}`
+                }
+                state={{ from: fromState }}
+                className='block w-full text-left rounded-sm hover:bg-slate-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1'
+                onPointerDown={e => e.stopPropagation()}
+              >
+                <p
+                  ref={activityRef}
+                  className={cn(
+                    'text-sm leading-5 text-slate-600 w-full',
+                    !activityExpanded
+                      ? 'line-clamp-3 whitespace-pre-wrap break-words'
+                      : 'whitespace-pre-wrap break-words',
+                  )}
+                >
+                  {deal.nearest_activity_name}
+                </p>
+              </Link>
+            ) : (
+              <p
+                ref={activityRef}
+                className={cn(
+                  'text-sm leading-5 text-slate-600 w-full',
+                  !activityExpanded
+                    ? 'line-clamp-3 whitespace-pre-wrap break-words'
+                    : 'whitespace-pre-wrap break-words',
+                )}
+              >
+                {deal.nearest_activity_name}
+              </p>
+            )}
             {isActivityTruncated && (
               <button
                 type='button'

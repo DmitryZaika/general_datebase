@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { useFetcher } from 'react-router'
+import { useFetcher, useLocation, useNavigate } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import ClipboardIcon from '~/components/icons/ClipboardIcon'
 import NoteIcon from '~/components/icons/NoteIcon'
@@ -517,14 +517,27 @@ function ActivityItem({
       />
 
       <div className='flex-1 min-w-0'>
-        <span
-          className={cn(
-            'text-sm leading-tight block whitespace-pre-wrap break-words',
-            optimisticDone && 'text-gray-500',
-          )}
-        >
-          {activity.name}
-        </span>
+        {optimisticDone ? (
+          <span
+            className={cn(
+              'text-sm leading-tight block whitespace-pre-wrap break-words',
+              'text-gray-500',
+            )}
+          >
+            {activity.name}
+          </span>
+        ) : (
+          <button
+            type='button'
+            onClick={() => onEdit(activity)}
+            className={cn(
+              'text-sm leading-tight block whitespace-pre-wrap break-words text-left w-full',
+              'rounded px-0.5 -mx-0.5 hover:bg-gray-100/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 cursor-pointer',
+            )}
+          >
+            {activity.name}
+          </button>
+        )}
 
         <div className='flex items-center gap-1.5 mt-0.5 flex-wrap'>
           <PriorityBadge priority={activity.priority} />
@@ -1141,10 +1154,38 @@ export function DealActivityPanel({
   activities = [],
   notes = [],
 }: DealActivityPanelProps) {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [editingActivity, setEditingActivity] = useState<DealActivity | null>(null)
   const [activeTab, setActiveTab] = useState<'activity' | 'notes'>('activity')
   const scrollRef = useRef<HTMLDivElement>(null)
   const historyHeaderRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const raw = params.get('editActivity')
+    if (raw === null || raw === '') return
+    const id = Number.parseInt(raw, 10)
+    const pathOnly = location.pathname
+
+    const goReplace = () => {
+      params.delete('editActivity')
+      const qs = params.toString()
+      navigate(qs ? `${pathOnly}?${qs}` : pathOnly, { replace: true })
+    }
+
+    if (!Number.isFinite(id)) {
+      goReplace()
+      return
+    }
+
+    const found = activities.find(a => a.id === id)
+    if (found) {
+      setEditingActivity(found)
+      setActiveTab('activity')
+    }
+    goReplace()
+  }, [activities, location.search, location.pathname, navigate])
 
   const handleEdit = (activity: DealActivity) => {
     setEditingActivity(activity)
