@@ -23,10 +23,6 @@ export const emailSchema = z.object({
   attachments: z.array(z.instanceof(File)),
 })
 
-const cleanId = (value: string): string => {
-  return value.slice(1).split('@')[0]
-}
-
 type Email = z.infer<typeof emailSchema>
 const DEFAULT_EMAIL = 'sales@granite-manager.com'
 
@@ -246,6 +242,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       recipient,
     )
 
+    console.log('emailInformation', emailInformation)
+
     let info: MailReturn
     try {
       info = await sendEmail(emailInformation)
@@ -260,7 +258,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     sendResults.push({
-      messageId: cleanId(info.messageId),
+      messageId: info.messageId,
       senderEmail: parseEmailAddress(emailInformation.from || ''),
       receiverEmail: parseEmailAddress(recipient),
       threadId,
