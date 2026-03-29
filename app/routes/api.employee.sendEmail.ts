@@ -9,7 +9,7 @@ import {
   type TemplateVariableData,
 } from '~/utils/emailTemplateVariables'
 import { posthogClient } from '~/utils/posthog.server'
-import { selectId } from '~/utils/queryHelpers'
+import { selectId, selectMany } from '~/utils/queryHelpers'
 import { uploadStreamToS3 } from '~/utils/s3.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { parseEmailAddress } from '~/utils/stringHelpers'
@@ -102,11 +102,15 @@ const emailToSend = async (
   )
 
   // Break glass in case of emergency
-  const emailData = await selectId<{ message_id: string }>(
-    db,
-    'SELECT message_id FROM emails WHERE thread_id = ? ORDER BY sent_at DESC LIMIT 1;',
-    user.id,
-  )
+  let emailData: { message_id: string } | undefined
+  if (cleaned.threadId) {
+    const results = await selectMany<{ message_id: string }>(
+      db,
+      'SELECT message_id FROM emails WHERE thread_id = ? ORDER BY sent_at DESC LIMIT 1;',
+      [cleaned.threadId],
+    )
+    emailData = results[0]
+  }
 
   const bodyWithSignature = appendEmailSignature(
     cleaned.body,
@@ -241,8 +245,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       },
       recipient,
     )
-
-    console.log('emailInformation', emailInformation)
 
     let info: MailReturn
     try {
