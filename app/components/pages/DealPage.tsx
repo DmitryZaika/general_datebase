@@ -9,13 +9,18 @@ import {
 } from '~/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
+import type { DealNote } from '~/routes/api.deal-notes.$dealId'
+import type { Nullable } from '~/types/utils'
 
 interface DealPageProps {
   dealId: number
   stages?: { id: number; name: string; position: number }[]
-  history?: { list_id: number; entered_at: string; exited_at: string | null }[]
+  history?: { list_id: number; entered_at: string; exited_at: Nullable<string> }[]
   currentListId?: number
+  isClosed?: boolean
+  closedAt?: Nullable<string>
   activities?: DealActivity[]
+  notes?: DealNote[]
 }
 
 export default function DealsEdit({
@@ -23,13 +28,20 @@ export default function DealsEdit({
   stages,
   history,
   currentListId,
+  isClosed,
+  closedAt,
   activities,
+  notes,
 }: DealPageProps) {
   const navigate = useNavigate()
   const location = useLocation()
+
   const handleChange = (open: boolean) => {
     if (!open) {
-      navigate(`..${location.search}`)
+      const basePath = location.pathname.includes('/admin/')
+        ? '/admin/deals'
+        : '/employee/deals'
+      navigate(`${basePath}${location.search}`, { state: { shouldRevalidate: true } })
     }
   }
 
@@ -38,7 +50,7 @@ export default function DealsEdit({
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[1100px] overflow-auto md:overflow-hidden flex flex-col justify-baseline h-auto min-h-[600px] max-h-[95vh] md:h-[85vh] py-4 px-1 sm:px-2 sm:py-5  '>
+      <DialogContent className='sm:max-w-[1100px] xl:max-w-[1200px] overflow-auto md:overflow-hidden flex flex-col justify-baseline h-auto min-h-[600px] max-h-[95vh] md:h-[95vh] py-4 px-1 sm:px-2 sm:py-5'>
         <DialogHeader>
           <DialogTitle className='px-1 sm:px-2'>Edit Deal</DialogTitle>
         </DialogHeader>
@@ -48,6 +60,8 @@ export default function DealsEdit({
               stages={stages}
               history={history}
               currentListId={currentListId}
+              isClosed={isClosed}
+              closedAt={closedAt}
             />
           </div>
         )}
@@ -68,7 +82,7 @@ export default function DealsEdit({
             </Tabs>
           </div>
           <div className='border-t md:border-t-0 md:border-l pt-4 md:pt-0 px-1 sm:px-2 pr-2 md:overflow-auto md:min-h-0'>
-            <DealActivityPanel dealId={dealId} activities={activities} />
+            <DealActivityPanel dealId={dealId} activities={activities} notes={notes} />
           </div>
         </div>
       </DialogContent>

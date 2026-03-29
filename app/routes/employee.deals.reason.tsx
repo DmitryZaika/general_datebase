@@ -1,3 +1,4 @@
+import type { ResultSetHeader } from 'mysql2'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
@@ -17,15 +18,19 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
+import { closeDealStageHistory, transitionDealStage } from '~/crud/deals'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
-import { getSearchString, LOST_REASONS } from '~/utils/constants'
+import { CLOSED_LOST_LIST_ID, getSearchString, LOST_REASONS } from '~/utils/constants'
+import { csrf } from '~/utils/csrf.server'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 import { replaceUnderscoresWithSpaces } from '~/utils/words'
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const user = await getEmployeeUser(request)
+  const clonedRequest = request.clone()
   const formData = await request.formData()
   const intent = String(formData.get('intent') || '')
   const dealId = Number(formData.get('dealId') || 0)
@@ -38,19 +43,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (intent === 'cancel') {
-    await db.execute(
-      'UPDATE deals SET list_id = ?, position = ? WHERE id = ? AND user_id = ?',
-      [fromListId || null, fromPos || 0, dealId, user.id],
+    const currentRows = await selectMany<{ list_id: number }>(
+      db,
+      'SELECT list_id FROM deals WHERE id = ? AND company_id = ? LIMIT 1',
+      [dealId, user.company_id],
     )
-    await db.execute(
-      'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
-      [dealId],
-    )
-    if (fromListId) {
-      await db.execute(
-        'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
-        [dealId, fromListId],
+    const currentListId = currentRows[0]?.list_id
+
+    if (currentListId !== fromListId) {
+      const [cancelResult] = await db.execute<ResultSetHeader>(
+        'UPDATE deals SET list_id = ?, position = ? WHERE id = ? AND user_id = ?',
+        [fromListId || null, fromPos || 0, dealId, user.id],
       )
+      if (cancelResult.affectedRows > 0) {
+        if (fromListId) {
+          await transitionDealStage(dealId, fromListId)
+        } else {
+          await closeDealStageHistory(dealId)
+        }
+      }
     }
     return redirect(
       `/employee/deals${getSearchString(new URL(request.url))}?highlight=${dealId}`,
@@ -58,23 +69,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (intent === 'submit') {
+    try {
+      await csrf.validate(clonedRequest)
+    } catch {
+      return redirect(`/employee/deals${getSearchString(new URL(request.url))}`)
+    }
     if (!reason || reason === 'not_specified') {
       return redirect(
         `/employee/deals${getSearchString(new URL(request.url))}?dealId=${dealId}&fromListId=${fromListId}&fromPos=${fromPos}&error=Reason is required`,
       )
     }
-    await db.execute(
-      'UPDATE deals SET lost_reason = ?, is_won = 0 WHERE id = ? AND user_id = ?',
-      [reason, dealId, user.id],
+    const [submitResult] = await db.execute<ResultSetHeader>(
+      'UPDATE deals SET lost_reason = ?, is_won = 0, list_id = ?, due_date = NULL WHERE id = ? AND user_id = ?',
+      [reason, CLOSED_LOST_LIST_ID, dealId, user.id],
     )
-    await db.execute(
-      'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
-      [dealId],
-    )
-    await db.execute(
-      'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
-      [dealId, 5],
-    )
+    if (submitResult.affectedRows > 0) {
+      await transitionDealStage(dealId, CLOSED_LOST_LIST_ID)
+    }
 
     const session = await getSession(request.headers.get('Cookie'))
     session.flash(

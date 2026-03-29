@@ -1,28 +1,13 @@
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CardContent } from '@/components/ui/card'
+import type { DealCardData } from '~/types/deals'
 import DealItem from './DealItem'
 
 interface IProps {
-  customers: ExtendedCustomer[]
+  customers: DealCardData[]
   readonly?: boolean
   highlightedDealId?: number
 }
-
-interface ExtendedCustomer {
-  id: number
-  name: string
-  amount?: number | null
-  description?: string | null
-  status?: string | null
-  lost_reason?: string | null
-  list_id: number
-  position?: number | null
-  due_date?: string | null
-  has_images?: boolean
-  has_email?: boolean
-  sales_rep?: string | null
-}
-
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 
 export default function DealsCard({
   customers,
