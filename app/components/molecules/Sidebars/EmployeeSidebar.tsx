@@ -24,6 +24,7 @@ import { Collapsible } from '~/components/Collapsible'
 import { CorbelIcon } from '~/components/icons/CorbelIcon'
 import { SinkIcon } from '~/components/icons/SinkIcon'
 import { LinkButton } from '~/components/molecules/LinkButton'
+import { SuperAdminCompanySelect } from '~/components/molecules/SuperAdminCompanySelect'
 import { Button } from '~/components/ui/button'
 import {
   Sidebar,
@@ -39,6 +40,7 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from '~/components/ui/sidebar'
+import { useSuperAdminCompanySwitch } from '~/hooks/useSuperAdminCompanySwitch'
 import type { ISupplier } from '~/schemas/suppliers'
 import { getMirroredUrl } from '~/utils/headerNav'
 import { getBase } from '~/utils/urlHelpers'
@@ -249,6 +251,10 @@ export function EmployeeSidebar({
   const isContractorsRoute = location.pathname.startsWith('/contractors/')
   const data = useLoaderData<{
     user: { company_id: number; is_admin: boolean; is_superuser: boolean } | null
+    superadminCompanies?: { id: number; name: string }[]
+    activeCompanyId?: number
+    userIsSuperAdmin?: boolean
+    token: string
   }>()
 
   let companyIdFromUrl: string | undefined
@@ -258,12 +264,17 @@ export function EmployeeSidebar({
     companyIdFromUrl = location.pathname.split('/').filter(Boolean)[1]
   }
 
-  const companyId = companyIdFromUrl || data?.user?.company_id
+  const companyId = companyIdFromUrl ?? data?.user?.company_id
 
   const { isMobile, setOpenMobile } = useSidebar()
   const isAdminPage = location.pathname.startsWith('/admin')
   const isCustomerPage = location.pathname.startsWith('/customer')
   const targetPath = getMirroredUrl(isAdminPage, location)
+
+  const superadminCompanies = data?.superadminCompanies ?? []
+  const activeCompanyId = data?.activeCompanyId
+  const userIsSuperAdmin = data?.userIsSuperAdmin ?? false
+  const { handleCompanySwitch } = useSuperAdminCompanySwitch()
 
   const buildCustomerUrl = () => {
     if (!isCustomerPage && location.pathname.startsWith('/admin/stones')) {
@@ -344,7 +355,7 @@ export function EmployeeSidebar({
       {isMobile && data?.user && itemsBase !== 'shop' && (
         <SidebarHeader className='py-2 px-3'>
           <div className='flex gap-2 justify-center'>
-            {data.user.is_admin || data.user.is_superuser ? (
+            {data.user.is_admin || data.user.is_superuser || userIsSuperAdmin ? (
               <Link to={targetPath} className='w-full' onClick={handleLinkClick}>
                 <LinkButton className='select-none w-full'>
                   {isAdminPage ? 'Employee' : 'Admin'}
@@ -357,11 +368,20 @@ export function EmployeeSidebar({
               </LinkButton>
             </Link>
           </div>
-          {data.user.is_superuser && isAdminPage ? (
+          {(data.user.is_superuser || userIsSuperAdmin) && isAdminPage ? (
             <Link to='/admin/users' onClick={handleLinkClick}>
               <Button className='w-full'>Users</Button>
             </Link>
           ) : null}
+          {userIsSuperAdmin && superadminCompanies.length > 0 && (
+            <SuperAdminCompanySelect
+              companies={superadminCompanies}
+              activeCompanyId={activeCompanyId}
+              currentCompanyId={companyId}
+              onCompanyChange={handleCompanySwitch}
+              className='w-full'
+            />
+          )}
         </SidebarHeader>
       )}
       <SidebarContent>

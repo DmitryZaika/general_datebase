@@ -28,7 +28,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`]
       : []
 
-    const companyId = user.company_id || 0
+    const companyId = user.company_id ?? 0
     const baseWhere = `e.deleted_at IS NULL AND (s.company_id = ? OR r.company_id = ?)`
     const baseWhereTrash = `e.deleted_at IS NOT NULL AND (s.company_id = ? OR r.company_id = ?)`
     const baseParamsWhere: (string | number)[] = [companyId, companyId]

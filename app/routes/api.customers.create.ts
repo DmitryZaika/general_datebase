@@ -52,7 +52,18 @@ export async function action({ request }: ActionFunctionArgs) {
   const customerId = result.insertId
 
   if (salesRep) {
-    const listId = 1
+    const [defaultListRows] = await db.execute<RowDataPacket[]>(
+      `SELECT dl.id, dl.name
+       FROM groups_list g
+       JOIN deals_list dl ON dl.group_id = g.id AND dl.deleted_at IS NULL
+       WHERE g.deleted_at IS NULL AND g.is_default = 1
+         AND (g.company_id = ? OR g.id = 1)
+       ORDER BY dl.position ASC
+       LIMIT 1`,
+      [validatedData.company_id],
+    )
+    const listId = defaultListRows[0]?.id ?? 1
+    const status = defaultListRows[0]?.name ?? 'New Customer'
     const [posRows] = await db.query<RowDataPacket[]>(
       'SELECT COALESCE(MAX(position),0)+1 AS next FROM deals WHERE list_id = ? AND deleted_at IS NULL',
       [listId],
@@ -60,7 +71,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const nextPos = posRows[0]?.next ?? 1
     const [dealResult] = await db.execute<ResultSetHeader>(
       'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
-      [customerId, 'New Customer', listId, nextPos, salesRep],
+      [customerId, status, listId, nextPos, salesRep],
     )
     const dealId = dealResult.insertId
     await db.execute(

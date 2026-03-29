@@ -41,6 +41,8 @@ export interface StoneImage {
   regular_stock?: boolean | number
   is_display?: boolean | number
   bundle_number?: string | null
+  level?: number | null
+  finishing?: string | null
 }
 
 export interface StoneSlim {
@@ -76,7 +78,10 @@ export interface HeaderProps {
   user: object | null
   isAdmin: boolean
   isSuperUser: boolean
+  isSuperAdmin?: boolean
   isEmployee?: boolean
+  superadminCompanies?: { id: number; name: string }[]
+  activeCompanyId?: number
 }
 
 export interface TokenSet {
@@ -115,6 +120,8 @@ export interface StoneSearchResult {
   is_display: boolean
   regular_stock?: boolean | number
   bundle_number?: string | null
+  level?: number | null
+  finishing?: string | null
 }
 export type Action =
   | { type: 'ADD_EVENT'; payload: Event }
@@ -222,4 +229,5 @@ export enum Positions {
   Installer = 6,
   ExternalMarketing = 7,
   CheckIn = 8,
+  SuperAdmin = 9,
 }

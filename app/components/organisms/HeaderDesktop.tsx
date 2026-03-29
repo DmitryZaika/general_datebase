@@ -2,10 +2,12 @@ import clsx from 'clsx'
 import { Link, useLoaderData, useLocation } from 'react-router'
 import { Button } from '~/components/ui/button'
 import { defaultLogo, gbColumbus, gbIndianapolis, gmqTops } from '~/constants/logos'
+import { useSuperAdminCompanySwitch } from '~/hooks/useSuperAdminCompanySwitch'
 import type { HeaderProps } from '~/types'
 import { getCustomerUrl, getMirroredUrl } from '~/utils/headerNav'
 import { LinkButton } from '../molecules/LinkButton'
 import { Notification } from '../molecules/Notification'
+import { SuperAdminCompanySelect } from '../molecules/SuperAdminCompanySelect'
 import { TodoList } from '../organisms/TodoList'
 
 interface HeaderDesktopProps extends HeaderProps {
@@ -16,7 +18,10 @@ export function HeaderDesktop({
   user,
   isAdmin,
   isSuperUser,
+  isSuperAdmin,
   className,
+  superadminCompanies = [],
+  activeCompanyId,
 }: HeaderDesktopProps) {
   const location = useLocation()
   const isAdminPage = location.pathname.startsWith('/admin')
@@ -24,7 +29,7 @@ export function HeaderDesktop({
   const data = useLoaderData<{ user: { company_id: number } | null }>()
   const companyId = isCustomerPage
     ? location.pathname.split('/').filter(Boolean)[1]
-    : data?.user?.company_id
+    : (activeCompanyId ?? data?.user?.company_id)
   const id = Number(companyId)
   const companyLogo =
     id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo
@@ -33,6 +38,9 @@ export function HeaderDesktop({
     companyId === undefined
       ? '/employee/stones'
       : getCustomerUrl(isCustomerPage, location, companyId)
+
+  const { handleCompanySwitch } = useSuperAdminCompanySwitch()
+
   return (
     <header
       className={
@@ -56,7 +64,7 @@ export function HeaderDesktop({
       </div>
 
       <div className='flex gap-4'>
-        {isAdmin || isSuperUser ? (
+        {isAdmin || isSuperUser || isSuperAdmin ? (
           isAdminPage ? (
             <div className=' flex gap-4'>
               <Link to={getMirroredUrl(isAdminPage, location)}>
@@ -74,6 +82,14 @@ export function HeaderDesktop({
             {isCustomerPage ? 'Employee' : 'Customer'}
           </LinkButton>
         </Link>
+        {isSuperAdmin && superadminCompanies.length > 0 && (
+          <SuperAdminCompanySelect
+            companies={superadminCompanies}
+            activeCompanyId={activeCompanyId}
+            currentCompanyId={id}
+            onCompanyChange={handleCompanySwitch}
+          />
+        )}
       </div>
       <nav className='text-center flex-1'>
         <ul className='flex-col md:flex-row flex flex-wrap justify-center ali md:justify-center gap-4'></ul>

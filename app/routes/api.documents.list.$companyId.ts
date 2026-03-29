@@ -13,7 +13,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     const user = await getEmployeeUser(request)
     const companyId = Number(params.companyId)
-    if (Number.isNaN(companyId) || companyId <= 0 || user.company_id !== companyId) {
+    if (Number.isNaN(companyId) || companyId < 0 || user.company_id !== companyId) {
       return Response.json({ documents: [] })
     }
     const url = new URL(request.url)

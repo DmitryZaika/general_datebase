@@ -44,7 +44,7 @@ type ActionData = { errors?: Partial<Record<keyof PayrollRuleFormData, string>> 
 export async function action({ request }: ActionFunctionArgs) {
   try {
     const user = await getAdminUser(request)
-    if (!user || !user.company_id) {
+    if (!user) {
       return redirect('/login')
     }
 

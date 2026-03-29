@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -7,6 +8,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useRevalidator,
   useSearchParams,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
@@ -21,6 +23,7 @@ import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
+import { CLOSED_LOST_LIST_ID, CLOSED_WON_LIST_ID } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -91,27 +94,52 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ? 0
             : null
 
-    // Fetch lists for the active group
     const lists = await selectMany<{ id: number; name: string }>(
       db,
-      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
-      [activeGroupId],
+      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? AND id NOT IN (?, ?) ORDER BY position',
+      [activeGroupId, CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID],
     )
 
-    let query = `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position,
-       DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at, is_won
-       FROM deals
-       WHERE deleted_at IS NULL AND user_id = ?`
-    const queryParams: number[] = [user.id]
+    let deals: FullDeal[]
 
     if (isWon === null) {
-      query += ' AND is_won IS NULL'
+      deals = await selectMany<FullDeal>(
+        db,
+        `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position,
+         DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at, is_won
+         FROM deals
+         WHERE deleted_at IS NULL AND user_id = ? AND is_won IS NULL`,
+        [user.id],
+      )
     } else {
-      query += ' AND is_won = ?'
-      queryParams.push(isWon)
+      deals = await selectMany<FullDeal>(
+        db,
+        `SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason,
+         COALESCE(last_stage.list_id, d.list_id) AS list_id,
+         d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') as due_date, d.deleted_at, d.is_won
+         FROM deals d
+         LEFT JOIN (
+           SELECT dsh.deal_id, dsh.list_id
+           FROM deal_stage_history dsh
+           INNER JOIN (
+             SELECT deal_id, MAX(entered_at) AS max_entered_at
+             FROM deal_stage_history
+             WHERE list_id NOT IN (?, ?)
+             GROUP BY deal_id
+           ) latest ON dsh.deal_id = latest.deal_id AND dsh.entered_at = latest.max_entered_at
+           WHERE dsh.list_id NOT IN (?, ?)
+         ) last_stage ON d.id = last_stage.deal_id
+         WHERE d.deleted_at IS NULL AND d.user_id = ? AND d.is_won = ?`,
+        [
+          CLOSED_WON_LIST_ID,
+          CLOSED_LOST_LIST_ID,
+          CLOSED_WON_LIST_ID,
+          CLOSED_LOST_LIST_ID,
+          user.id,
+          isWon,
+        ],
+      )
     }
-
-    const deals = await selectMany<FullDeal>(db, query, queryParams)
     const imagesCounts = await selectMany<{ deal_id: number; count: number }>(
       db,
       'SELECT deal_id, COUNT(*) as count FROM deals_images GROUP BY deal_id',
@@ -125,6 +153,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const emailsMap: Record<number, boolean> = {}
     for (const row of emailCounts) emailsMap[row.deal_id] = Number(row.count) > 0
 
+    const nearestActivities = await selectMany<{
+      id: number
+      deal_id: number
+      name: string
+      deadline: string | null
+      priority: string
+    }>(
+      db,
+      `SELECT id, deal_id, name, priority, DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline
+       FROM deal_activities
+       WHERE deleted_at IS NULL AND is_completed = 0 AND company_id = ?
+       ORDER BY
+         CASE WHEN deadline IS NULL THEN 1 ELSE 0 END,
+         deadline ASC,
+         CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,
+         created_at ASC`,
+      [user.company_id],
+    )
+    const nearestActivityMap: Record<
+      number,
+      { id: number; name: string; deadline: string | null; priority: string }
+    > = {}
+    for (const a of nearestActivities) {
+      if (!nearestActivityMap[a.deal_id]) {
+        nearestActivityMap[a.deal_id] = {
+          id: a.id,
+          name: a.name,
+          deadline: a.deadline,
+          priority: a.priority,
+        }
+      }
+    }
+
     const activitiesCounts = await selectMany<{ deal_id: number; count: number }>(
       db,
       `SELECT deal_id, COUNT(*) as count FROM deal_activities WHERE company_id = ? AND deleted_at IS NULL AND is_completed = 0 GROUP BY deal_id`,
@@ -132,7 +193,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     )
     const activitiesMap: Record<number, boolean> = {}
     for (const row of activitiesCounts)
-      activitiesMap[row.deal_id] = Number(row.count) > 0
+      activitiesMap[row.deal_id] = Number(row.count) > 1
 
     const activitiesDeadlines = await selectMany<{
       deal_id: number
@@ -179,6 +240,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       lists,
       imagesMap,
       emailsMap,
+      nearestActivityMap,
       activitiesMap,
       activitiesIconMap,
       groups,
@@ -197,6 +259,7 @@ export default function EmployeeDeals() {
     lists,
     imagesMap,
     emailsMap,
+    nearestActivityMap,
     activitiesMap,
     activitiesIconMap,
     groups,
@@ -208,6 +271,10 @@ export default function EmployeeDeals() {
     lists: { id: number; name: string }[]
     imagesMap: Record<number, boolean>
     emailsMap: Record<number, boolean>
+    nearestActivityMap: Record<
+      number,
+      { id: number; name: string; deadline: string | null; priority: string }
+    >
     activitiesMap: Record<number, boolean>
     activitiesIconMap: Record<number, 'red' | 'yellow' | 'gray'>
     groups: { id: number; name: string }[]
@@ -217,6 +284,15 @@ export default function EmployeeDeals() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
+  const revalidator = useRevalidator()
+
+  useEffect(() => {
+    const state = location.state as { shouldRevalidate?: boolean } | null
+    if (state?.shouldRevalidate) {
+      revalidator.revalidate()
+      navigate(location.pathname + location.search, { replace: true, state: {} })
+    }
+  }, [location.state])
 
   const handleGroupChange = (newGroupId: string) => {
     const params = new URLSearchParams(searchParams)
@@ -272,6 +348,7 @@ export default function EmployeeDeals() {
         lists={lists}
         imagesMap={imagesMap}
         emailsMap={emailsMap}
+        nearestActivityMap={nearestActivityMap}
         activitiesMap={activitiesMap}
         activitiesIconMap={activitiesIconMap}
         groupListSelect={

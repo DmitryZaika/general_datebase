@@ -1,6 +1,11 @@
 import type { RowDataPacket } from 'mysql2'
 import { data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
+import {
+  NOTIFICATION_TITLES,
+  type NotificationType,
+} from '~/lib/dealNotification.server'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
 interface NotificationItem {
@@ -9,6 +14,10 @@ interface NotificationItem {
   message: string
   href: string
   sent_at: string
+  notification_type?: NotificationType
+  actor_name?: string
+  customer_name?: string
+  type_title?: string
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -24,8 +33,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         e.thread_id,
         COALESCE(e.deal_id, td.deal_id) AS deal_id,
         e.subject,
-        e.sent_at,
-        e.sender_email,
+        DATE_FORMAT(e.sent_at, '%Y-%m-%dT%H:%i:%sZ') AS sent_at,
         c.name AS customer_name
       FROM emails e
       JOIN (
@@ -59,7 +67,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     [user.id, user.id, userEmail, userEmail, userEmailLike],
   )
 
-  const notifications: NotificationItem[] = (rows || [])
+  const emailNotifications: NotificationItem[] = (rows || [])
     .map(row => {
       const threadId = typeof row.thread_id === 'string' ? row.thread_id : ''
       if (!threadId) return null
@@ -79,6 +87,53 @@ export async function loader({ request }: LoaderFunctionArgs) {
       return { id: threadId, title, message: subject, href, sent_at: sentAt }
     })
     .filter((n): n is NotificationItem => n !== null)
+
+  const dbRows = await selectMany<{
+    id: number
+    deal_id: number
+    message: string
+    customer_name: string
+    created_at: string
+    notification_type: string | null
+    actor_name: string | null
+  }>(
+    db,
+    `SELECT n.id, n.deal_id, n.message,
+            c.name AS customer_name,
+            n.notification_type, n.actor_name,
+            DATE_FORMAT(n.created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at
+     FROM notifications n
+     JOIN deals d ON d.id = n.deal_id AND d.deleted_at IS NULL
+     JOIN customers c ON c.id = d.customer_id
+     WHERE n.user_id = ? AND n.is_done = 0
+       AND CASE
+         WHEN n.notification_type = 'activity_deadline_reminder' THEN n.due_at <= UTC_TIMESTAMP()
+         ELSE n.due_at <= NOW()
+       END
+     ORDER BY n.created_at DESC
+     LIMIT 50`,
+    [user.id],
+  )
+
+  const activityNotifications: NotificationItem[] = dbRows.map(row => {
+    const nType = row.notification_type as NotificationType | null
+    const typeTitle = nType ? NOTIFICATION_TITLES[nType] : undefined
+    return {
+      id: `notif-${row.id}`,
+      title: row.customer_name,
+      message: row.message,
+      href: `/employee/deals/edit/${row.deal_id}/project`,
+      sent_at: row.created_at,
+      notification_type: nType ?? undefined,
+      actor_name: row.actor_name ?? undefined,
+      customer_name: row.customer_name,
+      type_title: typeTitle,
+    }
+  })
+
+  const notifications = [...emailNotifications, ...activityNotifications].sort(
+    (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime(),
+  )
 
   return data(
     { notifications },

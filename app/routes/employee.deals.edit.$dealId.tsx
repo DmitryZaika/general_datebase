@@ -9,15 +9,26 @@ import { getEmployeeUser } from '~/utils/session.server'
 export const loader = createDealEditLoader(getEmployeeUser, '/employee/deals')
 
 export default function DealEditLayout() {
-  const { dealId, stages, history, currentListId, activities } =
-    useLoaderData<DealEditLoaderData>()
+  const {
+    dealId,
+    stages,
+    history,
+    currentListId,
+    isClosed,
+    closedAt,
+    activities,
+    notes,
+  } = useLoaderData<DealEditLoaderData>()
   return (
     <DealPage
       dealId={dealId}
       stages={stages}
       history={history}
       currentListId={currentListId}
+      isClosed={isClosed}
+      closedAt={closedAt}
       activities={activities}
+      notes={notes}
     />
   )
 }

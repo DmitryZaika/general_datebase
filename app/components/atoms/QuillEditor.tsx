@@ -72,7 +72,7 @@ export function QuillEditor({ value, onChange, onFilesDrop }: IQuillEditorProps)
 
   return (
     <div
-      className='quill-container h-64 flex flex-col'
+      className='quill-container h-64 flex flex-col [&_.ql-editor]:max-md:text-base'
       onDropCapture={handleDropCapture}
     >
       <div ref={quillRef} className='flex-1 overflow-y-auto' />
