@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
+import { scheduleAutoEmail } from '~/services/autoEmail.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -53,7 +54,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (salesRep) {
     const [defaultListRows] = await db.execute<RowDataPacket[]>(
-      `SELECT dl.id, dl.name
+      `SELECT dl.id, dl.name, g.id AS group_id
        FROM groups_list g
        JOIN deals_list dl ON dl.group_id = g.id AND dl.deleted_at IS NULL
        WHERE g.deleted_at IS NULL AND g.is_default = 1
@@ -78,6 +79,19 @@ export async function action({ request }: ActionFunctionArgs) {
       'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
       [dealId, listId],
     )
+
+    const groupId = defaultListRows[0]?.group_id
+    if (groupId) {
+      await scheduleAutoEmail({
+        db,
+        groupId,
+        companyId: validatedData.company_id,
+        dealId,
+        customerId,
+        userId: salesRep,
+      })
+    }
+
     return data({
       success: true,
       message: 'Customer created successfully',

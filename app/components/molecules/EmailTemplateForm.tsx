@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { Form, useLocation, useNavigate, useNavigation } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
+import { Collapsible } from '~/components/Collapsible'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { QuillInputWithVariables } from '~/components/molecules/QuillInputWithVariables'
+import { SwitchItem } from '~/components/molecules/SwitchItem'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -12,18 +15,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { FormField, FormProvider } from '~/components/ui/form'
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  FormProvider,
+} from '~/components/ui/form'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
-
-interface EmailTemplateFormData {
-  template_name: string
-  template_subject: string
-  template_body: string
-}
+import type { EmailTemplateFormData, LeadGroup } from '~/schemas/emailTemplates'
 
 interface EmailTemplateFormProps {
   title: string
   form: UseFormReturn<EmailTemplateFormData>
+  groups: LeadGroup[]
   submitLabel?: string
   isEditMode?: boolean
 }
@@ -31,6 +44,7 @@ interface EmailTemplateFormProps {
 export function EmailTemplateForm({
   title,
   form,
+  groups,
   submitLabel = 'Save Template',
   isEditMode = false,
 }: EmailTemplateFormProps) {
@@ -41,6 +55,9 @@ export function EmailTemplateForm({
   const fullSubmit = useFullSubmit(form)
   const hasChanges = form.formState.isDirty
   const isSubmitDisabled = isSubmitting || (isEditMode && !hasChanges)
+
+  const defaultLeadGroupId = form.getValues('lead_group_id')
+  const [isAutoSendOpen, setIsAutoSendOpen] = useState(Boolean(defaultLeadGroupId))
 
   return (
     <Dialog open onOpenChange={open => !open && navigate(`..${location.search}`)}>
@@ -89,7 +106,70 @@ export function EmailTemplateForm({
               )}
             />
 
+            <Collapsible isOpen={isAutoSendOpen} className='' maxHeight='max-h-[600px]'>
+              <div className='space-y-4 p-4 border rounded-lg bg-muted/50 mb-4'>
+                <FormField
+                  control={form.control}
+                  name='lead_group_id'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lead Group</FormLabel>
+                      <Select
+                        onValueChange={val =>
+                          field.onChange(val === '__none__' ? '' : val)
+                        }
+                        value={field.value || '__none__'}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder='Select a group...' />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value='__none__'>None</SelectItem>
+                          {groups.map(group => (
+                            <SelectItem key={group.id} value={group.id.toString()}>
+                              {group.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='hour_delay'
+                  render={({ field }) => (
+                    <InputItem
+                      name='Delay (hours)'
+                      placeholder='Hours to wait before sending'
+                      type='number'
+                      field={field}
+                    />
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='show_template'
+                  render={({ field }) => (
+                    <SwitchItem name='Show in Template List' field={field} />
+                  )}
+                />
+              </div>
+            </Collapsible>
+
             <DialogFooter className='gap-2 mt-4'>
+              <Button
+                type='button'
+                variant='outline'
+                onClick={() => setIsAutoSendOpen(prev => !prev)}
+              >
+                {isAutoSendOpen ? 'Hide Auto Sending' : 'Set Auto Sending'}
+              </Button>
               <Button
                 type='button'
                 variant='outline'
