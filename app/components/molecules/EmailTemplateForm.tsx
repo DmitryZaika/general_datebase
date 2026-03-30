@@ -61,108 +61,118 @@ export function EmailTemplateForm({
 
   return (
     <Dialog open onOpenChange={open => !open && navigate(`..${location.search}`)}>
-      <DialogContent className='sm:max-w-[800px] max-h-[90vh] overflow-y-auto'>
-        <DialogHeader>
+      <DialogContent className='sm:max-w-[800px] max-h-[90vh] flex flex-col p-0'>
+        <DialogHeader className='px-6 pt-6 pb-4'>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
         <FormProvider {...form}>
-          <Form method='post' onSubmit={fullSubmit}>
+          <Form
+            method='post'
+            onSubmit={fullSubmit}
+            className='flex flex-col min-h-0 flex-1'
+          >
             <input type='hidden' name='csrf' value={token} />
 
-            <FormField
-              control={form.control}
-              name='template_name'
-              render={({ field }) => (
-                <InputItem
-                  name='Template Name'
-                  placeholder='Enter template name'
-                  field={field}
-                />
-              )}
-            />
+            <div className='flex-1 overflow-y-auto px-6'>
+              <FormField
+                control={form.control}
+                name='template_name'
+                render={({ field }) => (
+                  <InputItem
+                    name='Template Name'
+                    placeholder='Enter template name'
+                    field={field}
+                  />
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name='template_subject'
-              render={({ field }) => (
-                <InputItem
-                  name='Template Subject'
-                  placeholder='Enter email subject'
-                  field={field}
-                />
-              )}
-            />
+              <FormField
+                control={form.control}
+                name='template_subject'
+                render={({ field }) => (
+                  <InputItem
+                    name='Template Subject'
+                    placeholder='Enter email subject'
+                    field={field}
+                  />
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name='template_body'
-              render={({ field }) => (
-                <QuillInputWithVariables
-                  className='mb-4'
-                  name='Template Body'
-                  field={field}
-                />
-              )}
-            />
+              <FormField
+                control={form.control}
+                name='template_body'
+                render={({ field }) => (
+                  <QuillInputWithVariables
+                    className='mb-4'
+                    name='Template Body'
+                    field={field}
+                  />
+                )}
+              />
 
-            <Collapsible isOpen={isAutoSendOpen} className='' maxHeight='max-h-[600px]'>
-              <div className='space-y-4 p-4 border rounded-lg bg-muted/50 mb-4'>
-                <FormField
-                  control={form.control}
-                  name='lead_group_id'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Lead Group</FormLabel>
-                      <Select
-                        onValueChange={val =>
-                          field.onChange(val === '__none__' ? '' : val)
-                        }
-                        value={field.value || '__none__'}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder='Select a group...' />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value='__none__'>None</SelectItem>
-                          {groups.map(group => (
-                            <SelectItem key={group.id} value={group.id.toString()}>
-                              {group.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <Collapsible
+                isOpen={isAutoSendOpen}
+                className=''
+                maxHeight='max-h-[600px]'
+              >
+                <div className='space-y-4 p-4 border rounded-lg bg-muted/50 mb-4'>
+                  <FormField
+                    control={form.control}
+                    name='lead_group_id'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Lead Group</FormLabel>
+                        <Select
+                          onValueChange={val =>
+                            field.onChange(val === '__none__' ? '' : val)
+                          }
+                          value={field.value || '__none__'}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder='Select a group...' />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value='__none__'>None</SelectItem>
+                            {groups.map(group => (
+                              <SelectItem key={group.id} value={group.id.toString()}>
+                                {group.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name='hour_delay'
-                  render={({ field }) => (
-                    <InputItem
-                      name='Delay (hours)'
-                      placeholder='Hours to wait before sending'
-                      type='number'
-                      field={field}
-                    />
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name='hour_delay'
+                    render={({ field }) => (
+                      <InputItem
+                        name='Delay (hours)'
+                        placeholder='Hours to wait before sending'
+                        type='number'
+                        field={field}
+                      />
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name='show_template'
-                  render={({ field }) => (
-                    <SwitchItem name='Show in Template List' field={field} />
-                  )}
-                />
-              </div>
-            </Collapsible>
+                  <FormField
+                    control={form.control}
+                    name='show_template'
+                    render={({ field }) => (
+                      <SwitchItem name='Show in Template List' field={field} />
+                    )}
+                  />
+                </div>
+              </Collapsible>
+            </div>
 
-            <DialogFooter className='gap-2 mt-4'>
+            <DialogFooter className='gap-2 px-6 py-4 border-t'>
               <Button
                 type='button'
                 variant='outline'
