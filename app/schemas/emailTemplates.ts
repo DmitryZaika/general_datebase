@@ -24,8 +24,11 @@ export const emailTemplateSchema = z.object({
         message: 'Invalid template body format. Check for unclosed {{ or }}.',
       },
     ),
-  lead_group_id: z.string(),
-  hour_delay: z.string(),
+  lead_group_id: z.string().min(1, 'Lead Group is required'),
+  hour_delay: z
+    .string()
+    .min(1, 'Delay is required')
+    .refine(val => Number(val) > 0, { message: 'Delay must be greater than 0' }),
   show_template: z.union([z.boolean(), z.string().transform(val => val === 'true')]),
 })
 
