@@ -1,4 +1,4 @@
-import { Mail, Menu, SettingsIcon } from 'lucide-react'
+import { Clock, Mail, Menu, SettingsIcon } from 'lucide-react'
 import { useEffect } from 'react'
 import {
   type LoaderFunctionArgs,
@@ -365,6 +365,11 @@ export default function AdminDeals() {
                       label: 'Manage Lists',
                       icon: <SettingsIcon className='w-4 h-4' />,
                       onClick: () => navigate(`manage-lists${location.search}`),
+                    },
+                    {
+                      label: 'Scheduled Emails',
+                      icon: <Clock className='w-4 h-4' />,
+                      onClick: () => navigate(`scheduled-emails${location.search}`),
                     },
                   ],
                 },

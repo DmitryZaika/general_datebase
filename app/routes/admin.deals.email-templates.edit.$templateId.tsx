@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import type { UseFormReturn } from 'react-hook-form'
 import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
@@ -7,12 +8,19 @@ import {
   useLoaderData,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
-import { z } from 'zod'
 import { EmailTemplateForm } from '~/components/molecules/EmailTemplateForm'
+import { getLeadGroupsByCompany } from '~/crud/emailTemplates'
 import { db } from '~/db.server'
+import {
+  DUPLICATE_GROUP_ERROR,
+  type EmailTemplateFormData,
+  emailTemplateSchema,
+  isDuplicateGroupError,
+  parseAutoSendFields,
+  validateAutoSendFields,
+} from '~/schemas/emailTemplates'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
-import { validateTemplateBody } from '~/utils/emailTemplateVariables'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -22,29 +30,12 @@ interface EmailTemplate {
   template_name: string
   template_subject: string
   template_body: string
+  lead_group_id: number | null
+  hour_delay: number | null
+  show_template: number
 }
 
-const templateSchema = z.object({
-  template_name: z.string().min(1, 'Template name is required'),
-  template_subject: z.string().min(1, 'Template subject is required'),
-  template_body: z
-    .string()
-    .min(1, 'Template body is required')
-    .refine(
-      (val: string) => {
-        const text = val.replace(/<[^>]*>/g, '')
-        const validation = validateTemplateBody(text)
-        return validation.isValid
-      },
-      {
-        message: 'Invalid template body format. Check for unclosed {{ or }}.',
-      },
-    ),
-})
-
-type FormData = z.infer<typeof templateSchema>
-
-const resolver = zodResolver(templateSchema)
+const resolver = zodResolver(emailTemplateSchema)
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   let user: User
@@ -59,19 +50,23 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return redirect('..')
   }
 
-  const templates = await selectMany<EmailTemplate>(
-    db,
-    `SELECT id, template_name, template_subject, template_body
-     FROM email_templates
-     WHERE id = ? AND company_id = ? AND deleted_at IS NULL`,
-    [templateId, user.company_id],
-  )
+  const [templates, groups] = await Promise.all([
+    selectMany<EmailTemplate>(
+      db,
+      `SELECT id, template_name, template_subject, template_body,
+              lead_group_id, hour_delay, show_template
+       FROM email_templates
+       WHERE id = ? AND company_id = ? AND deleted_at IS NULL`,
+      [templateId, user.company_id],
+    ),
+    getLeadGroupsByCompany(db, user.company_id),
+  ])
 
   if (templates.length === 0) {
     return redirect('..')
   }
 
-  return { template: templates[0] }
+  return { template: templates[0], groups }
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -98,18 +93,32 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { errors }
   }
 
-  await db.execute(
-    `UPDATE email_templates
-     SET template_name = ?, template_subject = ?, template_body = ?
-     WHERE id = ? AND company_id = ?`,
-    [
-      data.template_name,
-      data.template_subject,
-      data.template_body,
-      templateId,
-      user.company_id,
-    ],
-  )
+  const validationError = validateAutoSendFields(data)
+  if (validationError) return validationError
+
+  const { leadGroupId, hourDelay, showTemplate } = parseAutoSendFields(data)
+
+  try {
+    await db.execute(
+      `UPDATE email_templates
+       SET template_name = ?, template_subject = ?, template_body = ?,
+           lead_group_id = ?, hour_delay = ?, show_template = ?
+       WHERE id = ? AND company_id = ?`,
+      [
+        data.template_name,
+        data.template_subject,
+        data.template_body,
+        leadGroupId,
+        hourDelay,
+        showTemplate ? 1 : 0,
+        templateId,
+        user.company_id,
+      ],
+    )
+  } catch (error) {
+    if (isDuplicateGroupError(error)) return DUPLICATE_GROUP_ERROR
+    throw error
+  }
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Email template updated'))
@@ -120,16 +129,28 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function EditEmailTemplate() {
-  const { template } = useLoaderData<typeof loader>()
+  const { template, groups } = useLoaderData<typeof loader>()
 
-  const form = useForm<FormData>({
+  // zodResolver input type is wider (string|boolean for show_template)
+  // but the form only produces boolean values from the Switch component
+  const form = useForm({
     resolver,
     defaultValues: {
       template_name: template.template_name,
       template_subject: template.template_subject,
       template_body: template.template_body,
+      lead_group_id: template.lead_group_id?.toString() ?? '',
+      hour_delay: template.hour_delay?.toString() ?? '',
+      show_template: Boolean(template.show_template),
     },
-  })
+  }) as UseFormReturn<EmailTemplateFormData>
 
-  return <EmailTemplateForm title='Edit Email Template' form={form} isEditMode />
+  return (
+    <EmailTemplateForm
+      title='Edit Email Template'
+      form={form}
+      groups={groups}
+      isEditMode
+    />
+  )
 }
