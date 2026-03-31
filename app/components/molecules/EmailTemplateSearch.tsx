@@ -84,7 +84,7 @@ export function EmailTemplateSearch({
     queryKey: ['emailTemplates', companyId],
     queryFn: () => fetchAllTemplates(companyId),
     enabled: isOpen,
-    staleTime: 60000,
+    staleTime: 5000,
   })
 
   const filteredTemplates = useMemo(() => {

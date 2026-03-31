@@ -30,7 +30,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     db,
     `SELECT id, template_name, template_subject, template_body
      FROM email_templates
-     WHERE company_id = ? AND deleted_at IS NULL AND show_template = 1
+     WHERE company_id = ? AND deleted_at IS NULL
+       AND (show_template = 1 OR lead_group_id IS NULL)
      ORDER BY created_at DESC`,
     [companyId],
   )

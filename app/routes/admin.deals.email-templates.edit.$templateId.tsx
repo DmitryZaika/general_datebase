@@ -17,7 +17,7 @@ import {
   emailTemplateSchema,
   isDuplicateGroupError,
   parseAutoSendFields,
-  validateAutoSendVariables,
+  validateAutoSendFields,
 } from '~/schemas/emailTemplates'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
@@ -93,7 +93,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return { errors }
   }
 
-  const validationError = validateAutoSendVariables(data)
+  const validationError = validateAutoSendFields(data)
   if (validationError) return validationError
 
   const { leadGroupId, hourDelay, showTemplate } = parseAutoSendFields(data)

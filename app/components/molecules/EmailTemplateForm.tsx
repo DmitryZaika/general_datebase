@@ -1,6 +1,12 @@
-import { useState } from 'react'
-import type { UseFormReturn } from 'react-hook-form'
-import { Form, useLocation, useNavigate, useNavigation } from 'react-router'
+import { useEffect, useState } from 'react'
+import type { Path, UseFormReturn } from 'react-hook-form'
+import {
+  Form,
+  useActionData,
+  useLocation,
+  useNavigate,
+  useNavigation,
+} from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import { Collapsible } from '~/components/Collapsible'
 import { InputItem } from '~/components/molecules/InputItem'
@@ -58,6 +64,14 @@ export function EmailTemplateForm({
 
   const defaultLeadGroupId = form.getValues('lead_group_id')
   const [isAutoSendOpen, setIsAutoSendOpen] = useState(Boolean(defaultLeadGroupId))
+
+  const actionData = useActionData<{ errors?: Record<string, { message: string }> }>()
+  useEffect(() => {
+    if (!actionData?.errors) return
+    for (const [key, value] of Object.entries(actionData.errors)) {
+      form.setError(key as Path<EmailTemplateFormData>, value)
+    }
+  }, [actionData, form])
 
   return (
     <Dialog open onOpenChange={open => !open && navigate(`..${location.search}`)}>
@@ -176,7 +190,15 @@ export function EmailTemplateForm({
               <Button
                 type='button'
                 variant='outline'
-                onClick={() => setIsAutoSendOpen(prev => !prev)}
+                onClick={() => {
+                  if (isAutoSendOpen) {
+                    form.setValue('lead_group_id', '', { shouldDirty: true })
+                    form.setValue('hour_delay', '', { shouldDirty: true })
+                    form.setValue('show_template', false, { shouldDirty: true })
+                    form.clearErrors(['lead_group_id', 'hour_delay', 'show_template'])
+                  }
+                  setIsAutoSendOpen(prev => !prev)
+                }}
               >
                 {isAutoSendOpen ? 'Hide Auto Sending' : 'Set Auto Sending'}
               </Button>

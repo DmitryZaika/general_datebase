@@ -24,11 +24,8 @@ export const emailTemplateSchema = z.object({
         message: 'Invalid template body format. Check for unclosed {{ or }}.',
       },
     ),
-  lead_group_id: z.string().min(1, 'Lead Group is required'),
-  hour_delay: z
-    .string()
-    .min(1, 'Delay is required')
-    .refine(val => Number(val) > 0, { message: 'Delay must be greater than 0' }),
+  lead_group_id: z.union([z.string(), z.number().transform(String)]),
+  hour_delay: z.union([z.string(), z.number().transform(String)]),
   show_template: z.union([z.boolean(), z.string().transform(val => val === 'true')]),
 })
 
@@ -59,28 +56,57 @@ export function parseAutoSendFields(data: EmailTemplateFormData) {
 }
 
 /**
- * Validate that auto-send templates don't contain custom variables.
+ * Validate auto-send fields: both must be set together, hour_delay > 0,
+ * and no custom template variables allowed.
  * Returns an errors object for remix-hook-form if invalid, or null if valid.
  */
-export function validateAutoSendVariables(data: EmailTemplateFormData) {
-  const { leadGroupId, hourDelay } = parseAutoSendFields(data)
+export function validateAutoSendFields(data: EmailTemplateFormData) {
+  const hasGroup = Boolean(data.lead_group_id)
+  const hasDelay = Boolean(data.hour_delay)
 
-  if (leadGroupId == null || hourDelay == null) return null
+  if (!hasGroup && !hasDelay) return null
+
+  if (hasGroup && !hasDelay) {
+    return {
+      errors: {
+        hour_delay: { message: 'Delay is required when Lead Group is set' },
+      },
+    }
+  }
+
+  if (!hasGroup && hasDelay) {
+    return {
+      errors: {
+        lead_group_id: { message: 'Lead Group is required when Delay is set' },
+      },
+    }
+  }
+
+  const hourDelay = Number(data.hour_delay)
+  if (hourDelay <= 0 || Number.isNaN(hourDelay)) {
+    return {
+      errors: {
+        hour_delay: { message: 'Delay must be greater than 0' },
+      },
+    }
+  }
 
   const bodyText = data.template_body.replace(/<[^>]*>/g, '')
   const bodyCustomVars = getUnfilledCustomVariables(bodyText)
   const subjectCustomVars = getUnfilledCustomVariables(data.template_subject)
   const allCustomVars = [...new Set([...bodyCustomVars, ...subjectCustomVars])]
 
-  if (allCustomVars.length === 0) return null
-
-  return {
-    errors: {
-      template_body: {
-        message: `Auto-send templates cannot use custom variables: ${allCustomVars.map(v => `{{${v}}}`).join(', ')}. Only system variables are allowed.`,
+  if (allCustomVars.length > 0) {
+    return {
+      errors: {
+        template_body: {
+          message: `Auto-send templates cannot use custom variables: ${allCustomVars.map(v => `{{${v}}}`).join(', ')}. Only system variables are allowed.`,
+        },
       },
-    },
+    }
   }
+
+  return null
 }
 
 /**
