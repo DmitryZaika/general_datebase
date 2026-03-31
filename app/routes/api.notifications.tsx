@@ -14,6 +14,7 @@ interface NotificationItem {
   message: string
   href: string
   sent_at: string
+  kind: 'email' | 'activity'
   notification_type?: NotificationType
   actor_name?: string
   customer_name?: string
@@ -84,7 +85,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
         ? `/employee/deals/edit/${dealId}/history/chat/${threadId}`
         : `/employee/emails/chat/${threadId}`
 
-      return { id: threadId, title, message: subject, href, sent_at: sentAt }
+      return {
+        id: threadId,
+        title,
+        message: subject,
+        href,
+        sent_at: sentAt,
+        kind: 'email',
+      }
     })
     .filter((n): n is NotificationItem => n !== null)
 
@@ -124,6 +132,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       message: row.message,
       href: `/employee/deals/edit/${row.deal_id}/project`,
       sent_at: row.created_at,
+      kind: 'activity',
       notification_type: nType ?? undefined,
       actor_name: row.actor_name ?? undefined,
       customer_name: row.customer_name,

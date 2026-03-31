@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover
 
 interface NotificationItem {
   id: string | number
+  kind: 'email' | 'activity'
   title?: string
   message: string
   href?: string
@@ -39,15 +40,17 @@ export function Notification({ className }: NotificationProps) {
   })
 
   const handleDismiss = useCallback(
-    async (id: string | number) => {
-      const numericId = Number(String(id).replace('notif-', ''))
+    async (notification: NotificationItem) => {
       queryClient.setQueryData<NotificationItem[]>(['notifications'], old =>
-        (old ?? []).filter(n => n.id !== id),
+        (old ?? []).filter(n => n.id !== notification.id),
       )
       await fetch('/api/notifications/done', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: numericId }),
+        body: JSON.stringify({
+          id: String(notification.id),
+          kind: notification.kind,
+        }),
       })
       queryClient.invalidateQueries({
         queryKey: ['notifications'],
@@ -55,6 +58,22 @@ export function Notification({ className }: NotificationProps) {
     },
     [queryClient],
   )
+
+  const handleDismissAll = useCallback(async () => {
+    if (notifications.length === 0) {
+      return
+    }
+
+    queryClient.setQueryData<NotificationItem[]>(['notifications'], [])
+    await fetch('/api/notifications/done', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clearAll: true }),
+    })
+    queryClient.invalidateQueries({
+      queryKey: ['notifications'],
+    })
+  }, [notifications.length, queryClient])
 
   return (
     <Popover>
@@ -76,6 +95,18 @@ export function Notification({ className }: NotificationProps) {
         </button>
       </PopoverTrigger>
       <PopoverContent className='w-80 p-0'>
+        {notifications.length > 0 && (
+          <div className='flex items-center justify-between border-b px-4 py-2'>
+            <p className='text-sm font-medium text-gray-700'>Notifications</p>
+            <button
+              type='button'
+              onClick={handleDismissAll}
+              className='text-xs text-gray-500 underline hover:text-gray-700'
+            >
+              Clear all
+            </button>
+          </div>
+        )}
         <div className='max-h-60 overflow-auto py-2'>
           {isLoading ? (
             <p className='py-4 text-center text-sm text-gray-500'>Loading...</p>
@@ -85,7 +116,6 @@ export function Notification({ className }: NotificationProps) {
             </p>
           ) : (
             notifications.map(n => {
-              const isDismissible = String(n.id).startsWith('notif-')
               const hasRichLayout = n.type_title
 
               return (
@@ -106,9 +136,7 @@ export function Notification({ className }: NotificationProps) {
                           <a
                             className='text-sm text-gray-500 underline hover:text-gray-700'
                             href={n.href}
-                            onClick={
-                              isDismissible ? () => handleDismiss(n.id) : undefined
-                            }
+                            onClick={() => handleDismiss(n)}
                           >
                             for {n.customer_name || n.title}
                             &apos;s deal
@@ -134,9 +162,7 @@ export function Notification({ className }: NotificationProps) {
                         <a
                           className='text-sm text-gray-600 underline'
                           href={n.href}
-                          onClick={
-                            isDismissible ? () => handleDismiss(n.id) : undefined
-                          }
+                          onClick={() => handleDismiss(n)}
                         >
                           {n.message}
                         </a>
@@ -145,16 +171,14 @@ export function Notification({ className }: NotificationProps) {
                       )}
                     </div>
                   )}
-                  {isDismissible && (
-                    <button
-                      type='button'
-                      onClick={() => handleDismiss(n.id)}
-                      className='shrink-0 rounded p-0.5 text-gray-400 hover:text-gray-600'
-                      aria-label='Dismiss'
-                    >
-                      <X className='h-3.5 w-3.5' />
-                    </button>
-                  )}
+                  <button
+                    type='button'
+                    onClick={() => handleDismiss(n)}
+                    className='shrink-0 rounded p-0.5 text-gray-400 hover:text-gray-600'
+                    aria-label='Dismiss'
+                  >
+                    <X className='h-3.5 w-3.5' />
+                  </button>
                 </div>
               )
             })
