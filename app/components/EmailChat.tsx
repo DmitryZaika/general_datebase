@@ -898,7 +898,7 @@ export function EmailChat(props: EmailChatProps) {
                   placeholder='Send a message'
                   rows={1}
                   autoFocus={!isMobile}
-                  className='flex-1 min-h-9.5 w-full max-h-30 rounded-sm border border-zinc-300 bg-transparent px-1 sm:px-4 py-2 text-base sm:text-sm outline-none resize-none overflow-y-auto border-none'
+                  className='flex-1 min-h-9.5 w-full max-h-30 rounded-sm border-none bg-transparent px-1 sm:px-4 py-2 text-base md:text-sm outline-none resize-none overflow-y-auto'
                 />
 
                 <div className='hidden'>
