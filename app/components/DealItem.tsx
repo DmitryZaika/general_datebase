@@ -60,7 +60,7 @@ function getActivityDeadlineInfo(deadline: string): ActivityDeadlineInfo {
   }
   if (diffDays === 1) {
     return {
-      color: 'text-amber-600',
+      color: 'text-gray-500',
       icon: 'clock',
       label: `Tomorrow${timeSuffix}`,
       hasPill: false,
@@ -68,7 +68,7 @@ function getActivityDeadlineInfo(deadline: string): ActivityDeadlineInfo {
   }
   if (diffDays <= 2) {
     return {
-      color: 'text-amber-600',
+      color: 'text-gray-500',
       icon: 'clock',
       label: format(date, 'MMM d') + timeSuffix,
       hasPill: false,

@@ -254,6 +254,7 @@ export function EmployeeSidebar({
     superadminCompanies?: { id: number; name: string }[]
     activeCompanyId?: number
     userIsSuperAdmin?: boolean
+    unreadEmailCount?: number
     token: string
   }>()
 
@@ -274,6 +275,7 @@ export function EmployeeSidebar({
   const superadminCompanies = data?.superadminCompanies ?? []
   const activeCompanyId = data?.activeCompanyId
   const userIsSuperAdmin = data?.userIsSuperAdmin ?? false
+  const unreadEmailCount = data?.unreadEmailCount ?? 0
   const { handleCompanySwitch } = useSuperAdminCompanySwitch()
 
   const buildCustomerUrl = () => {
@@ -416,9 +418,17 @@ export function EmployeeSidebar({
                         return (
                           <SidebarMenuSubItem key={sub.title}>
                             <SidebarMenuSubButton asChild isActive={isActive}>
-                              <a href={sub.url}>
+                              <a
+                                href={sub.url}
+                                className='flex w-full items-center gap-2'
+                              >
                                 <sub.icon />
                                 <span>{sub.title}</span>
+                                {sub.title === 'Emails' && unreadEmailCount > 0 ? (
+                                  <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white'>
+                                    {unreadEmailCount}
+                                  </span>
+                                ) : null}
                               </a>
                             </SidebarMenuSubButton>
                             {sub.component && isActive && <sub.component />}
@@ -458,9 +468,17 @@ export function EmployeeSidebar({
                         return (
                           <SidebarMenuSubItem key={sub.title}>
                             <SidebarMenuSubButton asChild isActive={isActive}>
-                              <a href={sub.url}>
+                              <a
+                                href={sub.url}
+                                className='flex w-full items-center gap-2'
+                              >
                                 <sub.icon />
                                 <span>{sub.title}</span>
+                                {sub.title === 'Emails' && unreadEmailCount > 0 ? (
+                                  <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white'>
+                                    {unreadEmailCount}
+                                  </span>
+                                ) : null}
                               </a>
                             </SidebarMenuSubButton>
                             {sub.component && isActive && <sub.component />}
@@ -565,9 +583,14 @@ export function EmployeeSidebar({
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>
-                      <a href={item.url}>
+                      <a href={item.url} className='flex w-full items-center gap-2'>
                         <item.icon />
                         <span>{item.title}</span>
+                        {item.title === 'Emails' && unreadEmailCount > 0 ? (
+                          <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white'>
+                            {unreadEmailCount}
+                          </span>
+                        ) : null}
                       </a>
                     </SidebarMenuButton>
                     {item.component && isActive && <item.component />}
