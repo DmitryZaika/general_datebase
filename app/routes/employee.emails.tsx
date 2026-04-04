@@ -48,9 +48,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         : [userEmailNorm, userEmailNorm, userEmailLike]
 
     const deletedClause = isTrash ? 'e.deleted_at IS NOT NULL' : 'e.deleted_at IS NULL'
-    const whereBase = `${deletedClause} AND ${folderCondition}${searchClause}`
-    const subqueryWhereBase = whereBase.replaceAll('e.', 'e2.')
-    const paramsWithSearch = [...folderParams, ...searchParams]
+    const folderWhere = `${deletedClause} AND ${folderCondition}`
+    const whereThreadMatch = `${folderWhere}${searchClause}`
+    const subqueryWhereBase = whereThreadMatch.replaceAll('e.', 'e2.')
+    const paramsThreadMatch = [...folderParams, ...searchParams]
+    const paramsListQuery = [...folderParams, ...paramsThreadMatch]
     const offset = (page - 1) * pageSize
 
     const [inboxCountRows, sentCountRows, trashCountRows, totalCountRows, userEmails] =
@@ -76,8 +78,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         selectMany<{ c: number }>(
           db,
           `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
-         WHERE ${whereBase}`,
-          paramsWithSearch,
+         WHERE ${whereThreadMatch}`,
+          paramsThreadMatch,
         ),
         selectMany<Email>(
           db,
@@ -90,7 +92,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          FROM emails e
          LEFT JOIN users s ON e.sender_user_id = s.id
          LEFT JOIN users r ON e.receiver_email = r.email
-         WHERE ${whereBase}
+         WHERE ${folderWhere}
          AND e.thread_id IN (
            SELECT thread_id FROM (
              SELECT e2.thread_id, MAX(e2.sent_at) AS mt
@@ -102,7 +104,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
            ) t
          )
          ORDER BY e.sent_at DESC`,
-          [...paramsWithSearch, ...paramsWithSearch],
+          paramsListQuery,
         ),
       ])
 

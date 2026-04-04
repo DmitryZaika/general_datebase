@@ -103,12 +103,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     customer_id: number
     list_id: number
     amount: number
-    description: string
     status: string
     lost_reason: string
   }>(
     db,
-    `SELECT d.id, d.customer_id, d.list_id, d.amount, d.description, d.status, d.lost_reason
+    `SELECT d.id, d.customer_id, d.list_id, d.amount, d.status, d.lost_reason
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
        WHERE ${whereSource} AND d.deleted_at IS NULL

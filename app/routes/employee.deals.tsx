@@ -105,7 +105,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (isWon === null) {
       deals = await selectMany<FullDeal>(
         db,
-        `SELECT id, customer_id, amount, description, status, lost_reason, list_id, position,
+        `SELECT id, customer_id, amount, title, status, lost_reason, list_id, position,
          DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at, is_won
          FROM deals
          WHERE deleted_at IS NULL AND user_id = ? AND is_won IS NULL`,
@@ -114,7 +114,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     } else {
       deals = await selectMany<FullDeal>(
         db,
-        `SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason,
+        `SELECT d.id, d.customer_id, d.amount, d.title, d.status, d.lost_reason,
          COALESCE(last_stage.list_id, d.list_id) AS list_id,
          d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') as due_date, d.deleted_at, d.is_won
          FROM deals d
@@ -224,6 +224,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     }
 
+    const notesCounts = await selectMany<{ deal_id: number; count: number }>(
+      db,
+      `SELECT deal_id, COUNT(*) as count FROM deal_notes WHERE company_id = ? AND deleted_at IS NULL GROUP BY deal_id`,
+      [user.company_id],
+    )
+    const notesMap: Record<number, boolean> = {}
+    for (const row of notesCounts) notesMap[row.deal_id] = Number(row.count) >= 1
+
     const customers = await selectMany<{
       id: number
       name: string
@@ -243,6 +251,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       nearestActivityMap,
       activitiesMap,
       activitiesIconMap,
+      notesMap,
       groups,
       activeGroupId,
       isWon,
@@ -262,6 +271,7 @@ export default function EmployeeDeals() {
     nearestActivityMap,
     activitiesMap,
     activitiesIconMap,
+    notesMap,
     groups,
     activeGroupId,
     isWon,
@@ -277,6 +287,7 @@ export default function EmployeeDeals() {
     >
     activitiesMap: Record<number, boolean>
     activitiesIconMap: Record<number, 'red' | 'yellow' | 'gray'>
+    notesMap: Record<number, boolean>
     groups: { id: number; name: string }[]
     activeGroupId: number | undefined
     isWon: number | null
@@ -351,6 +362,7 @@ export default function EmployeeDeals() {
         nearestActivityMap={nearestActivityMap}
         activitiesMap={activitiesMap}
         activitiesIconMap={activitiesIconMap}
+        notesMap={notesMap}
         groupListSelect={
           <div className='flex gap-2 '>
             {groupSelect}

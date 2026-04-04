@@ -35,7 +35,7 @@ type FullDeal = {
   id: number
   customer_id: number
   amount?: Nullable<number>
-  description?: Nullable<string>
+  title?: Nullable<string>
   status?: Nullable<string>
   lost_reason?: Nullable<string>
   position?: number
@@ -59,6 +59,7 @@ interface DealsViewProps {
   >
   activitiesMap?: Record<number, boolean>
   activitiesIconMap?: Record<number, 'red' | 'yellow' | 'gray'>
+  notesMap?: Record<number, boolean>
   groupListSelect?: React.ReactNode
   readonly?: boolean
   toolbarLeft?: React.ReactNode
@@ -74,6 +75,7 @@ export default function DealsView({
   nearestActivityMap,
   activitiesMap = {},
   activitiesIconMap = {},
+  notesMap = {},
   groupListSelect,
   readonly = false,
   toolbarLeft,
@@ -92,7 +94,7 @@ export default function DealsView({
       name: customer ? customer.name : `Customer #${d.customer_id}`,
       company_name: customer?.company_name,
       amount: d.amount,
-      description: d.description,
+      title: d.title ?? undefined,
       status: d.status ?? undefined,
       lost_reason: d.lost_reason ?? undefined,
       position: d.position ?? undefined,
@@ -105,6 +107,7 @@ export default function DealsView({
       has_images: imagesMap?.[d.id] || false,
       has_email: emailsMap?.[d.id] || false,
       has_activities: activitiesMap?.[d.id] || false,
+      has_notes: notesMap?.[d.id] || false,
       activities_icon_color: activitiesIconMap?.[d.id],
       is_won: d.is_won,
       nearest_activity_name: activity?.name ?? null,
@@ -150,6 +153,9 @@ export default function DealsView({
     JSON.stringify(customers),
     JSON.stringify(lists),
     JSON.stringify(nearestActivityMap),
+    JSON.stringify(activitiesMap),
+    JSON.stringify(activitiesIconMap),
+    JSON.stringify(notesMap),
   ])
 
   const [board, setBoard] = useState<Record<number, Deal[]>>(initialBoard)
@@ -483,6 +489,11 @@ export default function DealsView({
                   <div className='text-lg font-semibold truncate'>
                     {d.company_name ?? d.name}
                   </div>
+                  {typeof d.title === 'string' && d.title.trim() ? (
+                    <div className='mt-0.5 line-clamp-2 text-xs text-slate-500 break-words whitespace-pre-wrap'>
+                      {d.title.trim()}
+                    </div>
+                  ) : null}
                   <div className='text-xs text-slate-500 mt-1'>
                     Amount: $ {d.amount ?? 0}
                   </div>

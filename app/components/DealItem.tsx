@@ -12,9 +12,11 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLocation, useRevalidator } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
+import NoteIcon from '~/components/icons/NoteIcon'
 import { cn, parseLocalDate } from '~/lib/utils'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import { ActivityPriority } from '~/routes/api.deal-activities.$dealId'
+import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { DealCardData } from '~/types/deals'
 import { formatMoney, updateNumber } from './functions'
 import { Calendar } from './ui/calendar'
@@ -105,6 +107,13 @@ function sortActivities(activities: DealActivity[]): DealActivity[] {
   })
 }
 
+function sortNotesForPopover(notes: DealNote[]): DealNote[] {
+  return [...notes].sort((a, b) => {
+    if (a.is_pinned !== b.is_pinned) return b.is_pinned - a.is_pinned
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+}
+
 function formatActivityTime(deadline: string | null): string {
   if (!deadline) return '—'
   const d = parseLocalDate(deadline)
@@ -146,9 +155,11 @@ export default function DealItem({
   const [isSaving, setIsSaving] = useState(false)
   const [activityExpanded, setActivityExpanded] = useState(false)
   const [activitiesOpen, setActivitiesOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
   const [noActiveActivitiesAfterLoad, setNoActiveActivitiesAfterLoad] = useState(false)
   const activityRef = useRef<HTMLParagraphElement>(null)
   const activitiesCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const notesCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isActivityTruncated, setIsActivityTruncated] = useState(false)
   const pendingActivityDeadlineSyncRef = useRef(false)
   const fetcher = useFetcher()
@@ -156,6 +167,10 @@ export default function DealItem({
   const csrfToken = useAuthenticityToken()
   const activitiesFetcher = useFetcher<{
     activities?: DealActivity[]
+    error?: string | null
+  }>()
+  const notesFetcher = useFetcher<{
+    notes?: DealNote[]
     error?: string | null
   }>()
   const location = useLocation()
@@ -179,6 +194,24 @@ export default function DealItem({
     setActivitiesOpen(true)
     activitiesFetcher.load(`/api/deal-activities/${deal.id}`)
   }, [deal.id, cancelActivitiesClose])
+
+  const scheduleNotesClose = useCallback(() => {
+    if (notesCloseTimeoutRef.current) clearTimeout(notesCloseTimeoutRef.current)
+    notesCloseTimeoutRef.current = setTimeout(() => setNotesOpen(false), 200)
+  }, [])
+
+  const cancelNotesClose = useCallback(() => {
+    if (notesCloseTimeoutRef.current) {
+      clearTimeout(notesCloseTimeoutRef.current)
+      notesCloseTimeoutRef.current = null
+    }
+  }, [])
+
+  const handleNotesOpen = useCallback(() => {
+    cancelNotesClose()
+    setNotesOpen(true)
+    notesFetcher.load(`/api/deal-notes/${deal.id}`)
+  }, [deal.id, cancelNotesClose])
 
   const hasImages =
     (Array.isArray(deal.images) && deal.images.length > 0) || Boolean(deal.has_images)
@@ -225,6 +258,8 @@ export default function DealItem({
   const showActivitiesIcon =
     Boolean(deal.has_activities) && !noActiveActivitiesAfterLoad
 
+  const showNotesIcon = Boolean(deal.has_notes)
+
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: deal.id,
     data: { listId: deal.list_id, position: deal.position, type: 'deal' },
@@ -248,6 +283,9 @@ export default function DealItem({
     ? getActivityDeadlineInfo(deal.nearest_activity_deadline)
     : null
 
+  const titleLine =
+    typeof deal.title === 'string' && deal.title.trim() !== '' ? deal.title.trim() : ''
+
   return (
     <div
       ref={setNodeRef}
@@ -257,16 +295,21 @@ export default function DealItem({
       {...(!readonly ? attributes : {})}
       {...(!readonly ? listeners : {})}
     >
-      <div className='flex items-center w-full gap-2'>
-        <div className='flex items-center gap-1 flex-1'>
+      <div className='flex w-full flex-col gap-0.5'>
+        <div className='flex w-full items-center gap-2'>
           <Link
             to={projectUrl}
-            className='text-xl font-medium truncate whitespace-normal flex-1 select-none hover:underline'
+            className='flex-1 select-none text-xl font-medium whitespace-normal hover:underline'
             onPointerDown={e => e.stopPropagation()}
           >
             {deal.company_name ? deal.company_name : deal.name}
           </Link>
         </div>
+        {titleLine ? (
+          <p className='line-clamp-2 text-sm leading-snug text-gray-500 break-words whitespace-pre-wrap'>
+            {titleLine}
+          </p>
+        ) : null}
       </div>
 
       <div className='flex items-center gap-2 w-full'>
@@ -547,6 +590,73 @@ export default function DealItem({
                       </ul>
                     ) : (
                       <p className='text-xs text-slate-500'>No activities</p>
+                    )
+                  })()}
+              </PopoverContent>
+            </Popover>
+          )}
+          {showNotesIcon && (
+            <Popover open={notesOpen} onOpenChange={setNotesOpen}>
+              <PopoverTrigger asChild>
+                <Link
+                  to={projectUrl + location.search}
+                  state={{ from: fromState }}
+                  className='cursor-pointer hover:opacity-80'
+                  onPointerDown={e => e.stopPropagation()}
+                  onPointerEnter={handleNotesOpen}
+                  onPointerLeave={scheduleNotesClose}
+                >
+                  <NoteIcon className='h-4 w-4 text-slate-500' />
+                </Link>
+              </PopoverTrigger>
+              <PopoverContent
+                className='w-72 max-h-64 overflow-y-auto p-2'
+                align='end'
+                side='bottom'
+                onPointerEnter={cancelNotesClose}
+                onPointerLeave={scheduleNotesClose}
+                onOpenAutoFocus={e => e.preventDefault()}
+                onPointerDown={e => e.stopPropagation()}
+              >
+                <p className='text-xs font-semibold text-slate-700 mb-2'>Notes</p>
+                {notesFetcher.state === 'loading' && (
+                  <p className='text-xs text-slate-500'>Loading…</p>
+                )}
+                {notesFetcher.state !== 'loading' &&
+                  (() => {
+                    const raw = notesFetcher.data?.notes
+                    const list: DealNote[] = Array.isArray(raw) ? raw : []
+                    const sorted = sortNotesForPopover(list)
+                    return sorted.length ? (
+                      <ul className='space-y-2'>
+                        {sorted.map(note => (
+                          <li
+                            key={note.id}
+                            className='text-xs border-b border-slate-100 last:border-0 pb-1.5 last:pb-0'
+                          >
+                            {note.is_pinned === 1 ? (
+                              <span className='text-[10px] font-medium px-1.5 py-0.5 rounded border bg-amber-100 text-amber-800 border-amber-200 mb-1 inline-block'>
+                                Pinned
+                              </span>
+                            ) : null}
+                            <p className='whitespace-pre-wrap break-words'>
+                              {note.content}
+                            </p>
+                            <div className='flex items-center gap-1.5 mt-0.5 flex-wrap text-[10px] text-slate-500'>
+                              {note.created_by ? <span>{note.created_by}</span> : null}
+                              <span>{formatActivityTime(note.created_at)}</span>
+                              {note.comments.length > 0 ? (
+                                <span>
+                                  {note.comments.length}{' '}
+                                  {note.comments.length === 1 ? 'reply' : 'replies'}
+                                </span>
+                              ) : null}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className='text-xs text-slate-500'>No notes</p>
                     )
                   })()}
               </PopoverContent>

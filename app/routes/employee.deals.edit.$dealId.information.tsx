@@ -73,7 +73,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   await db.execute(
     `UPDATE deals
-       SET customer_id = ?, amount = ?, description = ?, list_id = ?, position = ?,
+       SET customer_id = ?, amount = ?, title = ?, list_id = ?, position = ?,
            due_date = IF(? IN (?, ?), NULL, due_date),
            is_won = IF(? = 1, ?, is_won),
            lost_reason = IF(?, NULL, lost_reason)
@@ -81,7 +81,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     [
       data.customer_id,
       data.amount,
-      data.description,
+      data.title ?? null,
       data.list_id,
       data.position,
       data.list_id,
@@ -121,7 +121,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const dealId = parseInt(params.dealId, 10)
 
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.list_id, d.position, c.name
+    `SELECT d.id, d.customer_id, d.amount, d.title, d.status, d.list_id, d.position, c.name
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
        WHERE d.id = ? AND d.deleted_at IS NULL`,
@@ -134,7 +134,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     company_id: user.company_id,
     customer_id: rows[0].customer_id,
     amount: rows[0].amount,
-    description: rows[0].description || '',
+    title: rows[0].title || '',
     status: rows[0].status,
     list_id: rows[0].list_id,
     position: rows[0].position,
