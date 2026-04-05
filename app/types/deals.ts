@@ -5,7 +5,7 @@ export interface DealCardData {
   id: number
   name: string
   amount?: Nullable<number>
-  description?: Nullable<string>
+  title?: Nullable<string>
   status?: Nullable<string>
   lost_reason?: Nullable<string>
   list_id: number
@@ -22,5 +22,6 @@ export interface DealCardData {
   nearest_activity_id?: Nullable<number>
   nearest_activity_priority?: Nullable<string>
   has_activities?: boolean
+  has_notes?: boolean
   activities_icon_color?: ActivitiesIconColor
 }

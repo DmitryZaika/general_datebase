@@ -576,7 +576,7 @@ export default function DealsEmailsView({
                 <Input
                   name='search'
                   type='text'
-                  placeholder='Search emails...'
+                  placeholder='Search subject, body, or addresses...'
                   defaultValue={searchFromUrl}
                   key={searchFromUrl}
                   className='pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
@@ -587,7 +587,7 @@ export default function DealsEmailsView({
                 <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-gray-500' />
                 <Input
                   type='text'
-                  placeholder='Search emails...'
+                  placeholder='Search subject, body, or addresses...'
                   value={searchTermLocal}
                   onChange={e => setSearchTermLocal(e.target.value)}
                   className='pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'

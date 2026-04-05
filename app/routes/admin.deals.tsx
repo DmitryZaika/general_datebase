@@ -31,7 +31,7 @@ type AdminDeal = {
   id: number
   customer_id: number
   amount: number | null
-  description: string | null
+  title: string | null
   status: string | null
   lost_reason: string | null
   list_id: number
@@ -83,7 +83,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (isWon === null) {
       const dealParams: (string | number)[] = [companyId]
       let dealSql = `
-        SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason, d.list_id, d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') AS due_date, d.is_won, u.name AS sales_rep
+        SELECT d.id, d.customer_id, d.amount, d.title, d.status, d.lost_reason, d.list_id, d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') AS due_date, d.is_won, u.name AS sales_rep
         FROM deals d
         JOIN customers c ON d.customer_id = c.id
         LEFT JOIN users u ON d.user_id = u.id
@@ -104,7 +104,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         isWon,
       ]
       let dealSql = `
-        SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason,
+        SELECT d.id, d.customer_id, d.amount, d.title, d.status, d.lost_reason,
          COALESCE(last_stage.list_id, d.list_id) AS list_id,
          d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') AS due_date, d.is_won, u.name AS sales_rep
         FROM deals d
@@ -225,6 +225,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     }
 
+    const notesCounts = await selectMany<{ deal_id: number; count: number }>(
+      db,
+      `SELECT deal_id, COUNT(*) as count FROM deal_notes WHERE company_id = ? AND deleted_at IS NULL GROUP BY deal_id`,
+      [companyId],
+    )
+    const notesMap: Record<number, boolean> = {}
+    for (const row of notesCounts) notesMap[row.deal_id] = Number(row.count) >= 1
+
     return {
       deals,
       customers,
@@ -234,6 +242,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       nearestActivityMap,
       activitiesMap,
       activitiesIconMap,
+      notesMap,
       groups,
       activeGroupId,
       isWon,
@@ -253,6 +262,7 @@ export default function AdminDeals() {
     nearestActivityMap,
     activitiesMap,
     activitiesIconMap,
+    notesMap,
     groups,
     activeGroupId,
     isWon,
@@ -298,6 +308,7 @@ export default function AdminDeals() {
         nearestActivityMap={nearestActivityMap}
         activitiesMap={activitiesMap}
         activitiesIconMap={activitiesIconMap}
+        notesMap={notesMap}
         readonly
         showAddDeal={false}
         toolbarLeft={

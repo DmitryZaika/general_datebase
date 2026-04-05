@@ -54,12 +54,12 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!data.deal_id) {
     const [result] = await db.execute<ResultSetHeader>(
       `INSERT INTO deals
-     (customer_id, amount, description, status, list_id, position, user_id, is_won)
+     (customer_id, amount, title, status, list_id, position, user_id, is_won)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.customer_id,
         data.amount,
-        data.description,
+        data.title ?? null,
         initialStatus,
         data.list_id,
         data.position,
@@ -80,8 +80,15 @@ export async function action({ request }: ActionFunctionArgs) {
     const prevListId = prevRows[0]?.list_id
 
     await db.execute(
-      `UPDATE deals SET amount = ?, description = ?, status = ?, list_id = ?, position = ? WHERE id = ?`,
-      [data.amount, data.description, initialStatus, data.list_id, data.position, data.deal_id],
+      `UPDATE deals SET amount = ?, title = ?, status = ?, list_id = ?, position = ? WHERE id = ?`,
+      [
+        data.amount,
+        data.title ?? null,
+        initialStatus,
+        data.list_id,
+        data.position,
+        data.deal_id,
+      ],
     )
 
     if (prevListId !== undefined && prevListId !== data.list_id) {
