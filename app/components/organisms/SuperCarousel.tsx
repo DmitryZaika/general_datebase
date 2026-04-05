@@ -22,6 +22,8 @@ interface ImageInput {
   name: string
   type: string
   available: number | null
+  whole_available?: number | null
+  whole_amount?: number | null
   regular_stock?: boolean | number
   width?: number | null
   length?: number | null
@@ -83,12 +85,19 @@ function ChildrenImagesDialog({
   }
 
   const isRegularStock = !!image?.regular_stock
+  const wholeAvail = image?.whole_available ?? image?.available ?? 0
+  const wholeAmt = image?.whole_amount ?? 0
+  const totalAvail = image?.available ?? 0
   const displayedAvailable =
-    image?.available === 0 && isRegularStock
+    isRegularStock && wholeAvail === 0
       ? 'Regular Stock'
-      : image?.available !== undefined
-        ? `${image.available}${isRegularStock ? ' (Regular stock)' : ''}`
-        : '—'
+      : wholeAvail > 0
+        ? `${wholeAvail} / ${wholeAmt > 0 ? wholeAmt : '—'}${isRegularStock ? ' (Regular stock)' : ''}`
+        : totalAvail > 0
+          ? 'Remnants Only'
+          : image?.available !== undefined
+            ? `${image.available}`
+            : '—'
   const displayedType = image?.type ? capitalizeFirstLetter(image.type) : '—'
   const displayedWidth = image?.width && image?.width > 0 ? image.width : '—'
   const displayedLength = image?.length && image?.length > 0 ? image.length : '—'

@@ -17,6 +17,7 @@ import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { Button } from '~/components/ui/button'
 import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
+import { parseLocalDate } from '~/lib/utils'
 import type { Customer } from '~/types'
 import type { DealCardData } from '~/types/deals'
 import type { Nullable } from '~/types/utils'
@@ -25,6 +26,24 @@ import {
   CLOSED_WON_LIST_ID,
   TERMINAL_LIST_IDS,
 } from '~/utils/constants'
+
+function activityDeadlineHasTime(deadline: string): boolean {
+  const d = parseLocalDate(deadline)
+  return d.getHours() !== 0 || d.getMinutes() !== 0
+}
+
+function compareNearestActivityDeadlines(aDate: string, bDate: string): number {
+  const da = parseLocalDate(aDate)
+  const db = parseLocalDate(bDate)
+  const dayA = new Date(da.getFullYear(), da.getMonth(), da.getDate()).getTime()
+  const dayB = new Date(db.getFullYear(), db.getMonth(), db.getDate()).getTime()
+  if (dayA !== dayB) return dayA - dayB
+  const aTimed = activityDeadlineHasTime(aDate)
+  const bTimed = activityDeadlineHasTime(bDate)
+  if (aTimed && !bTimed) return -1
+  if (!aTimed && bTimed) return 1
+  return da.getTime() - db.getTime()
+}
 
 type List = {
   id: number
@@ -133,7 +152,7 @@ export default function DealsView({
       if (!aDate && !bDate) return 0
       if (!aDate) return 1
       if (!bDate) return -1
-      return new Date(aDate).getTime() - new Date(bDate).getTime()
+      return compareNearestActivityDeadlines(aDate, bDate)
     })
     return copy
   }
