@@ -33,10 +33,11 @@ export function HeaderMobile({ className }: HeaderMobileProps) {
   const isCustomerPage = location.pathname.startsWith('/customer')
   const data = useLoaderData<{
     user: { company_id: number; is_admin: boolean; is_superuser: boolean } | null
+    activeCompanyId?: number
   }>()
   const companyId = isCustomerPage
     ? location.pathname.split('/').filter(Boolean)[1]
-    : data?.user?.company_id
+    : (data?.activeCompanyId ?? data?.user?.company_id)
   const id = Number(companyId)
   const companyLogo =
     id === 1 ? gbIndianapolis : id === 3 ? gbColumbus : id === 4 ? gmqTops : defaultLogo

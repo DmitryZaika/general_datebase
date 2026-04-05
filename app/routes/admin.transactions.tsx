@@ -53,7 +53,7 @@ function formatDate(dateString: string) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request)
-    if (!user || !user.company_id) {
+    if (!user) {
       return redirect('/login')
     }
 

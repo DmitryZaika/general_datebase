@@ -1,7 +1,7 @@
 import { EnvelopeClosedIcon } from '@radix-ui/react-icons'
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import { MapIcon, PhoneIcon } from 'lucide-react'
-import type { RowDataPacket } from 'mysql2'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { useEffect, useState } from 'react'
 import {
   type ActionFunctionArgs,
@@ -27,10 +27,16 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { VCard } from '~/components/VCard'
+import { reactivateDeal, transitionDealStage } from '~/crud/deals'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { commitSession, getSession } from '~/sessions.server'
+import {
+  CLOSED_LOST_LIST_ID,
+  CLOSED_WON_LIST_ID,
+  TERMINAL_LIST_IDS,
+} from '~/utils/constants'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -83,10 +89,32 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       const isWonRaw = formData.get('is_won')
       const isWon = isWonRaw === 'null' ? null : Number(isWonRaw)
 
-      await db.execute(
-        `UPDATE deals SET is_won = ?, lost_reason = NULL WHERE id = ? AND user_id = ?`,
-        [isWon, dealId, user.id],
-      )
+      if (isWon === 1) {
+        const [result] = await db.execute<ResultSetHeader>(
+          'UPDATE deals SET is_won = 1, lost_reason = NULL, list_id = ?, due_date = NULL WHERE id = ? AND user_id = ?',
+          [CLOSED_WON_LIST_ID, dealId, user.id],
+        )
+        if (result.affectedRows > 0) {
+          await transitionDealStage(dealId, CLOSED_WON_LIST_ID)
+        }
+      } else if (isWon === 0) {
+        const [result] = await db.execute<ResultSetHeader>(
+          'UPDATE deals SET is_won = 0, lost_reason = NULL, list_id = ?, due_date = NULL WHERE id = ? AND user_id = ?',
+          [CLOSED_LOST_LIST_ID, dealId, user.id],
+        )
+        if (result.affectedRows > 0) {
+          await transitionDealStage(dealId, CLOSED_LOST_LIST_ID)
+        }
+      } else if (isWon === null) {
+        const [result] = await db.execute<ResultSetHeader>(
+          'UPDATE deals SET is_won = NULL, lost_reason = NULL WHERE id = ? AND user_id = ?',
+          [dealId, user.id],
+        )
+        if (result.affectedRows > 0) {
+          await reactivateDeal(dealId)
+        }
+      }
+
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Deal status updated successfully'))
       return redirect(`/employee/deals${searchString}`, {
@@ -99,10 +127,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       const groupId = formData.get('group_id')
       if (!groupId) throw new Error('Group ID is missing')
 
-      // Find the list with the SMALLEST ID in this group
       const lists = await selectMany<{ id: number }>(
         db,
-        `SELECT id FROM deals_list WHERE group_id = ? ORDER BY id ASC LIMIT 1`,
+        `SELECT id FROM deals_list WHERE group_id = ? AND deleted_at IS NULL ORDER BY position ASC LIMIT 1`,
         [Number(groupId)],
       )
 
@@ -112,20 +139,45 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
       const targetListId = lists[0].id
 
-      // Update the deal to point to this list
-      await db.execute(`UPDATE deals SET list_id = ? WHERE id = ? AND user_id = ?`, [
-        targetListId,
-        dealId,
-        user.id,
-      ])
-      await db.execute(
-        'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
+      const prevRows = await selectMany<{ list_id: number }>(
+        db,
+        'SELECT list_id FROM deals WHERE id = ? LIMIT 1',
         [dealId],
       )
-      await db.execute(
-        'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
-        [dealId, targetListId],
+      const prevListId = prevRows[0]?.list_id
+
+      const [groupResult] = await db.execute<ResultSetHeader>(
+        `UPDATE deals SET list_id = ?, due_date = IF(? IN (?, ?), NULL, due_date) WHERE id = ? AND user_id = ?`,
+        [
+          targetListId,
+          targetListId,
+          CLOSED_WON_LIST_ID,
+          CLOSED_LOST_LIST_ID,
+          dealId,
+          user.id,
+        ],
       )
+
+      if (
+        groupResult.affectedRows > 0 &&
+        prevListId !== undefined &&
+        prevListId !== targetListId
+      ) {
+        if (targetListId === CLOSED_WON_LIST_ID) {
+          await db.execute(
+            'UPDATE deals SET is_won = 1, lost_reason = NULL WHERE id = ?',
+            [dealId],
+          )
+        } else if (targetListId === CLOSED_LOST_LIST_ID) {
+          await db.execute('UPDATE deals SET is_won = 0 WHERE id = ?', [dealId])
+        } else if (TERMINAL_LIST_IDS.includes(prevListId)) {
+          await db.execute(
+            'UPDATE deals SET is_won = NULL, lost_reason = NULL WHERE id = ?',
+            [dealId],
+          )
+        }
+        await transitionDealStage(dealId, targetListId)
+      }
       const session = await getSession(request.headers.get('Cookie'))
       session.flash('message', toastData('Success', 'Group updated successfully'))
       return redirect(`/employee/deals${searchString}`, {

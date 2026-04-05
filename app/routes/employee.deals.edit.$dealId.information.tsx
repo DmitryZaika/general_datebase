@@ -8,11 +8,17 @@ import {
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import DealsForm from '~/components/DealsForm'
+import { transitionDealStage } from '~/crud/deals'
 import { db } from '~/db.server'
-import { selectMany } from '~/utils/queryHelpers'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
+import {
+  CLOSED_LOST_LIST_ID,
+  CLOSED_WON_LIST_ID,
+  TERMINAL_LIST_IDS,
+} from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
+import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
@@ -44,32 +50,52 @@ export async function action({ request, params }: ActionFunctionArgs) {
     [dealId],
   )
   const prevListId = prevRows[0]?.list_id
+  const movedAcross = prevListId !== undefined && prevListId !== data.list_id
+  const fromTerminal =
+    prevListId !== undefined && TERMINAL_LIST_IDS.includes(prevListId)
+
+  let changeIsWon = 0
+  let isWonVal: number | null = null
+  if (movedAcross) {
+    if (data.list_id === CLOSED_WON_LIST_ID) {
+      changeIsWon = 1
+      isWonVal = 1
+    } else if (data.list_id === CLOSED_LOST_LIST_ID) {
+      changeIsWon = 1
+      isWonVal = 0
+    } else if (fromTerminal) {
+      changeIsWon = 1
+      isWonVal = null
+    }
+  }
+  const clearLostReason =
+    movedAcross && (data.list_id === CLOSED_WON_LIST_ID || fromTerminal)
 
   await db.execute(
     `UPDATE deals
-       SET customer_id = ?, amount = ?, description = ?, list_id = ?, position = ?,
-           due_date = IF(? IN (4,5), NULL, due_date)
+       SET customer_id = ?, amount = ?, title = ?, list_id = ?, position = ?,
+           due_date = IF(? IN (?, ?), NULL, due_date),
+           is_won = IF(? = 1, ?, is_won),
+           lost_reason = IF(?, NULL, lost_reason)
      WHERE id = ?`,
     [
       data.customer_id,
       data.amount,
-      data.description,
+      data.title ?? null,
       data.list_id,
       data.position,
       data.list_id,
+      CLOSED_WON_LIST_ID,
+      CLOSED_LOST_LIST_ID,
+      changeIsWon,
+      isWonVal,
+      clearLostReason ? 1 : 0,
       dealId,
     ],
   )
 
-  if (prevListId !== undefined && prevListId !== data.list_id) {
-    await db.execute(
-      'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
-      [dealId],
-    )
-    await db.execute(
-      'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
-      [dealId, data.list_id],
-    )
+  if (movedAcross) {
+    await transitionDealStage(dealId, data.list_id)
   }
 
   const session = await getSession(request.headers.get('Cookie'))
@@ -95,7 +121,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const dealId = parseInt(params.dealId, 10)
 
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.list_id, d.position, c.name
+    `SELECT d.id, d.customer_id, d.amount, d.title, d.status, d.list_id, d.position, c.name
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
        WHERE d.id = ? AND d.deleted_at IS NULL`,
@@ -108,7 +134,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     company_id: user.company_id,
     customer_id: rows[0].customer_id,
     amount: rows[0].amount,
-    description: rows[0].description || '',
+    title: rows[0].title || '',
     status: rows[0].status,
     list_id: rows[0].list_id,
     position: rows[0].position,

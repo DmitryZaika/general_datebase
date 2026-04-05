@@ -26,7 +26,7 @@ interface SupplierFile {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getEmployeeUser(request)
-    if (!user || !user.company_id) {
+    if (!user) {
       return redirect('/login')
     }
 

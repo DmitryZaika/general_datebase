@@ -1,68 +1,87 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { format } from 'date-fns'
 import {
-  Calendar as CalendarIcon,
-  GripVertical,
+  AlertCircle,
+  CalendarOff,
+  Clock,
   ListTodo,
   Mail,
   PaperclipIcon,
-  Pencil,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useFetcher, useLocation } from 'react-router'
+import { Link, useFetcher, useLocation, useRevalidator } from 'react-router'
+import { useAuthenticityToken } from 'remix-utils/csrf/react'
+import NoteIcon from '~/components/icons/NoteIcon'
+import { cn, parseLocalDate } from '~/lib/utils'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import { ActivityPriority } from '~/routes/api.deal-activities.$dealId'
+import type { DealNote } from '~/routes/api.deal-notes.$dealId'
+import type { DealCardData } from '~/types/deals'
 import { formatMoney, updateNumber } from './functions'
-import { Button } from './ui/button'
 import { Calendar } from './ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 interface DealItemProps {
-  deal: {
-    id: number
-    name: string
-    amount?: number | null
-    description?: string | null
-    status?: string | null
-    lost_reason?: string | null
-    list_id: number
-    position?: number | null
-    due_date?: string | null
-    images?: string[] | null
-    has_images?: boolean
-    has_email?: boolean
-    has_activities?: boolean
-    activities_icon_color?: 'red' | 'yellow' | 'gray'
-    sales_rep?: string | null
-    is_won?: number | null
-    company_name?: string | null
-  }
+  deal: DealCardData
   readonly?: boolean
   highlighted?: boolean
 }
 
-function parseLocal(dateInput: string | null | undefined): Date {
-  if (!dateInput) return new Date(NaN)
-  const dateStr = typeof dateInput === 'string' ? dateInput : ''
-  const parts = dateStr.split('-')
-  if (parts.length !== 3) return new Date(NaN)
-  const [y, m, d] = parts.map(Number)
-  return new Date(y, m - 1, d)
-}
-function getDateColor(dateStr: string | null | undefined, listId: number): string {
-  if ((!dateStr || dateStr === '0000-00-00') && listId !== 4 && listId !== 5)
-    return 'text-red-500'
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const selected = parseLocal(dateStr)
-  if (Number.isNaN(selected.getTime())) return 'text-gray-700'
-  if (selected.getTime() === today.getTime()) return 'text-yellow-500'
-  return selected < today ? 'text-red-500' : 'text-gray-500'
+interface ActivityDeadlineInfo {
+  color: string
+  icon: 'alert' | 'clock'
+  label: string
+  hasPill: boolean
 }
 
-function formatDate(date: string | null): Date | undefined {
-  if (!date) return undefined
-  return new Date(`${date}T00:00:00`)
+function getActivityDeadlineInfo(deadline: string): ActivityDeadlineInfo {
+  const date = parseLocalDate(deadline)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const deadlineDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const diffDays = Math.round((deadlineDay.getTime() - today.getTime()) / 86_400_000)
+  const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
+  const timeSuffix = hasTime ? ` ${format(date, 'h:mm a')}` : ''
+
+  if (diffDays < 0) {
+    return {
+      color: 'text-red-600 bg-red-50',
+      icon: 'alert',
+      label: `${Math.abs(diffDays)}d overdue`,
+      hasPill: true,
+    }
+  }
+  if (diffDays === 0) {
+    return {
+      color: 'text-orange-600 bg-orange-50',
+      icon: 'clock',
+      label: `Today${timeSuffix}`,
+      hasPill: true,
+    }
+  }
+  if (diffDays === 1) {
+    return {
+      color: 'text-gray-500',
+      icon: 'clock',
+      label: `Tomorrow${timeSuffix}`,
+      hasPill: false,
+    }
+  }
+  if (diffDays <= 2) {
+    return {
+      color: 'text-gray-500',
+      icon: 'clock',
+      label: format(date, 'MMM d') + timeSuffix,
+      hasPill: false,
+    }
+  }
+  return {
+    color: 'text-gray-500',
+    icon: 'clock',
+    label: format(date, 'MMM d') + timeSuffix,
+    hasPill: false,
+  }
 }
 
 const ACTIVITY_PRIORITY_LABEL: Record<ActivityPriority, string> = {
@@ -83,24 +102,35 @@ function sortActivities(activities: DealActivity[]): DealActivity[] {
       ACTIVITY_PRIORITY_WEIGHT[a.priority] - ACTIVITY_PRIORITY_WEIGHT[b.priority]
     if (pw !== 0) return pw
     if (a.deadline && b.deadline)
-      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+      return parseLocalDate(a.deadline).getTime() - parseLocalDate(b.deadline).getTime()
     return a.deadline ? -1 : b.deadline ? 1 : 0
+  })
+}
+
+function sortNotesForPopover(notes: DealNote[]): DealNote[] {
+  return [...notes].sort((a, b) => {
+    if (a.is_pinned !== b.is_pinned) return b.is_pinned - a.is_pinned
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 }
 
 function formatActivityTime(deadline: string | null): string {
   if (!deadline) return '—'
-  const d = new Date(deadline)
+  const d = parseLocalDate(deadline)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString(undefined, {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  })
+  const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0
+  if (hasTime) {
+    return d.toLocaleString(undefined, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    })
+  }
+  return d.toLocaleDateString(undefined, { dateStyle: 'short' })
 }
 
 function getActivityDueDateColor(deadline: string | null): string {
   if (!deadline) return 'text-gray-500'
-  const d = new Date(deadline)
+  const d = parseLocalDate(deadline)
   if (Number.isNaN(d.getTime())) return 'text-gray-500'
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -110,27 +140,37 @@ function getActivityDueDateColor(deadline: string | null): string {
   return 'text-gray-500'
 }
 
+function activityPriorityForApi(value: string | null | undefined): string {
+  if (value === 'high' || value === 'medium' || value === 'low') return value
+  return 'medium'
+}
+
 export default function DealItem({
   deal,
   readonly = false,
   highlighted = false,
 }: DealItemProps) {
-  const [localDate, setLocalDate] = useState<string | null>(deal.due_date ?? null)
   const [editAmount, setEditAmount] = useState(false)
-  const [editDesc, setEditDesc] = useState(false)
+  const [editDueDate, setEditDueDate] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [activityExpanded, setActivityExpanded] = useState(false)
   const [activitiesOpen, setActivitiesOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
   const [noActiveActivitiesAfterLoad, setNoActiveActivitiesAfterLoad] = useState(false)
+  const activityRef = useRef<HTMLParagraphElement>(null)
   const activitiesCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const descTextareaRef = useRef<HTMLTextAreaElement | null>(null)
-  const descDisplayRef = useRef<HTMLParagraphElement | null>(null)
-  const [descExpanded, setDescExpanded] = useState(false)
-  const [descOverflow, setDescOverflow] = useState(false)
-  const [lineHeightPx, setLineHeightPx] = useState<number>(20)
+  const notesCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [isActivityTruncated, setIsActivityTruncated] = useState(false)
+  const pendingActivityDeadlineSyncRef = useRef(false)
   const fetcher = useFetcher()
+  const revalidator = useRevalidator()
+  const csrfToken = useAuthenticityToken()
   const activitiesFetcher = useFetcher<{
     activities?: DealActivity[]
+    error?: string | null
+  }>()
+  const notesFetcher = useFetcher<{
+    notes?: DealNote[]
     error?: string | null
   }>()
   const location = useLocation()
@@ -155,8 +195,31 @@ export default function DealItem({
     activitiesFetcher.load(`/api/deal-activities/${deal.id}`)
   }, [deal.id, cancelActivitiesClose])
 
+  const scheduleNotesClose = useCallback(() => {
+    if (notesCloseTimeoutRef.current) clearTimeout(notesCloseTimeoutRef.current)
+    notesCloseTimeoutRef.current = setTimeout(() => setNotesOpen(false), 200)
+  }, [])
+
+  const cancelNotesClose = useCallback(() => {
+    if (notesCloseTimeoutRef.current) {
+      clearTimeout(notesCloseTimeoutRef.current)
+      notesCloseTimeoutRef.current = null
+    }
+  }, [])
+
+  const handleNotesOpen = useCallback(() => {
+    cancelNotesClose()
+    setNotesOpen(true)
+    notesFetcher.load(`/api/deal-notes/${deal.id}`)
+  }, [deal.id, cancelNotesClose])
+
   const hasImages =
     (Array.isArray(deal.images) && deal.images.length > 0) || Boolean(deal.has_images)
+
+  const isWon = deal.is_won === 1
+  const isLost = deal.is_won === 0
+  const isClosed = isWon || isLost
+  const hasLostReason = isLost && Boolean(deal.lost_reason)
 
   const editBase = location.pathname.startsWith('/admin')
     ? '/admin/deals'
@@ -171,12 +234,15 @@ export default function DealItem({
     : `edit/${deal.id}/images`
 
   useEffect(() => {
-    setLocalDate(deal.due_date ?? null)
-  }, [deal.due_date])
-
-  useEffect(() => {
     setNoActiveActivitiesAfterLoad(false)
   }, [deal.id])
+
+  useEffect(() => {
+    if (fetcher.state !== 'idle' || !pendingActivityDeadlineSyncRef.current) return
+    pendingActivityDeadlineSyncRef.current = false
+    setIsSaving(false)
+    revalidator.revalidate()
+  }, [fetcher.state, revalidator])
 
   const activeActivitiesCount =
     activitiesFetcher.state === 'idle' && activitiesFetcher.data?.activities
@@ -184,12 +250,15 @@ export default function DealItem({
           a => !a.is_completed,
         ).length
       : null
+
   useEffect(() => {
     if (activeActivitiesCount === 0) setNoActiveActivitiesAfterLoad(true)
   }, [activeActivitiesCount])
 
   const showActivitiesIcon =
     Boolean(deal.has_activities) && !noActiveActivitiesAfterLoad
+
+  const showNotesIcon = Boolean(deal.has_notes)
 
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: deal.id,
@@ -202,92 +271,45 @@ export default function DealItem({
     transition,
   }
 
-  function submitDate(dateStr: string) {
-    const fd = new FormData()
-    fd.append('id', String(deal.id))
-    fd.append('date', dateStr)
-    fetcher.submit(fd, { method: 'post', action: '/api/deals/update-date' })
-    setLocalDate(dateStr)
-  }
-
-  function resizeTextarea(el: HTMLTextAreaElement | null) {
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }
-
   useEffect(() => {
-    if (editDesc) {
-      resizeTextarea(descTextareaRef.current)
+    const el = activityRef.current
+    if (el) {
+      const isOverflowing = el.scrollHeight > el.clientHeight
+      setIsActivityTruncated(isOverflowing || activityExpanded)
     }
-  }, [editDesc])
+  }, [deal.nearest_activity_name, activityExpanded])
 
-  useEffect(() => {
-    if (editDesc) return
-    const el = descDisplayRef.current
-    if (!el) return
-    const styles = window.getComputedStyle(el)
-    const lh = parseFloat(styles.lineHeight)
-    const computedLineHeight = Number.isFinite(lh) ? lh : 20
-    setLineHeightPx(computedLineHeight)
-    const maxH = computedLineHeight * 4
-    setDescOverflow(el.scrollHeight > maxH + 1)
-  }, [deal.description, editDesc])
+  const deadlineInfo = deal.nearest_activity_deadline
+    ? getActivityDeadlineInfo(deal.nearest_activity_deadline)
+    : null
 
-  function formatDisplay(dateStr: string) {
-    if (dateStr === '0000-00-00') return ''
-    const d = parseLocal(dateStr)
-    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString()
-  }
+  const titleLine =
+    typeof deal.title === 'string' && deal.title.trim() !== '' ? deal.title.trim() : ''
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       id={`deal-${deal.id}`}
-      className={`relative flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3 ${isSaving ? 'opacity-60' : ''} ${highlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}
+      className={`relative flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3 ${isSaving ? 'opacity-60' : ''} ${highlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''} ${!readonly ? 'cursor-grab active:cursor-grabbing' : ''}`}
       {...(!readonly ? attributes : {})}
       {...(!readonly ? listeners : {})}
     >
-      <div className='flex items-center w-full gap-2'>
-        <div
-          className={`flex items-center gap-1 flex-1 ${readonly ? '' : 'cursor-grab'}`}
-        >
-          {!readonly && (
-            <button
-              className='touch-none cursor-grab opacity-50 hover:opacity-100 p-1'
-              aria-label='Drag'
-              onPointerDown={e => e.stopPropagation()}
-            >
-              <GripVertical className='w-4 h-4' />
-            </button>
-          )}
-          {readonly ? (
-            <Link
-              to={projectUrl}
-              className='text-xl font-medium truncate whitespace-normal flex-1 select-none hover:underline'
-              onPointerDown={e => e.stopPropagation()}
-            >
-              {deal.company_name ? deal.company_name : deal.name}
-            </Link>
-          ) : (
-            <h3 className='text-xl font-medium truncate whitespace-normal flex-1 select-none'>
-              {deal.company_name ? deal.company_name : deal.name}
-            </h3>
-          )}
-        </div>
-        {!readonly && (
+      <div className='flex w-full flex-col gap-0.5'>
+        <div className='flex w-full items-center gap-2'>
           <Link
-            to={`edit/${deal.id}/project${location.search}`}
-            className='absolute top-1 right-1 z-20'
+            to={projectUrl}
+            className='flex-1 select-none text-xl font-medium whitespace-normal hover:underline'
             onPointerDown={e => e.stopPropagation()}
           >
-            <Pencil
-              size={16}
-              className='w-5 h-5 flex-shrink-0 text-gray-500 hover:text-black'
-            />
+            {deal.company_name ? deal.company_name : deal.name}
           </Link>
-        )}
+        </div>
+        {titleLine ? (
+          <p className='line-clamp-2 text-sm leading-snug text-gray-500 break-words whitespace-pre-wrap'>
+            {titleLine}
+          </p>
+        ) : null}
       </div>
 
       <div className='flex items-center gap-2 w-full'>
@@ -338,83 +360,66 @@ export default function DealItem({
         </div>
       )}
 
-      {editDesc ? (
-        <textarea
-          className='border rounded p-1  w-full text-sm'
-          ref={descTextareaRef}
-          defaultValue={deal.description ?? ''}
-          autoFocus
-          onFocus={e => e.currentTarget.select()}
-          rows={1}
-          style={{
-            overflow: 'hidden',
-            resize: 'none',
-            position: 'relative',
-            zIndex: 20,
-          }}
-          onInput={e => resizeTextarea(e.currentTarget)}
-          onBlur={async e => {
-            const fd = new FormData()
-            fd.append('id', String(deal.id))
-            fd.append('description', e.currentTarget.value.trim())
-            setIsSaving(true)
-            await fetcher.submit(fd, {
-              method: 'post',
-              action: '/api/deals/update-desc',
-            })
-            setIsSaving(false)
-            setEditDesc(false)
-          }}
-          onPointerDown={e => e.stopPropagation()}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              e.currentTarget.blur()
-            }
-          }}
-        />
-      ) : deal.description ? (
-        <div className='w-full'>
-          <p
-            ref={descDisplayRef}
-            className={`text-sm leading-5 text-slate-500 mt-1 break-words whitespace-pre-wrap ${readonly ? '' : 'cursor-pointer'}`}
-            onClick={() => !readonly && setEditDesc(true)}
-            onPointerDown={e => e.stopPropagation()}
-            style={{
-              maxHeight: descExpanded ? 'none' : `${lineHeightPx * 4}px`,
-              overflow: descExpanded ? 'visible' : 'hidden',
-            }}
-          >
-            {deal.description}
-          </p>
-          {descOverflow && (
-            <div className='mt-1'>
-              <Button
-                variant='ghost'
-                size='sm'
-                className='h-6 px-2 text-xs'
-                onClick={() => setDescExpanded(v => !v)}
+      {!isClosed &&
+        (deal.nearest_activity_name ? (
+          <div className='w-full mt-1'>
+            {deal.nearest_activity_id && !readonly ? (
+              <Link
+                to={
+                  projectUrl.includes('?')
+                    ? `${projectUrl}&editActivity=${deal.nearest_activity_id}`
+                    : `${projectUrl}?editActivity=${deal.nearest_activity_id}`
+                }
+                state={{ from: fromState }}
+                className='block w-full text-left rounded-sm hover:bg-slate-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1'
                 onPointerDown={e => e.stopPropagation()}
-                style={{ position: 'relative', zIndex: 20 }}
               >
-                {descExpanded ? 'Show less' : 'Show more'}
-              </Button>
-            </div>
-          )}
-        </div>
-      ) : (
-        !readonly && (
-          <p
-            className='text-sm text-slate-500 mt-1 break-words whitespace-pre-wrap cursor-pointer'
-            onClick={() => setEditDesc(true)}
-            onPointerDown={e => e.stopPropagation()}
-          >
-            Add description
+                <p
+                  ref={activityRef}
+                  className={cn(
+                    'text-sm leading-5 text-slate-600 w-full',
+                    !activityExpanded
+                      ? 'line-clamp-3 whitespace-pre-wrap break-words'
+                      : 'whitespace-pre-wrap break-words',
+                  )}
+                >
+                  {deal.nearest_activity_name}
+                </p>
+              </Link>
+            ) : (
+              <p
+                ref={activityRef}
+                className={cn(
+                  'text-sm leading-5 text-slate-600 w-full',
+                  !activityExpanded
+                    ? 'line-clamp-3 whitespace-pre-wrap break-words'
+                    : 'whitespace-pre-wrap break-words',
+                )}
+              >
+                {deal.nearest_activity_name}
+              </p>
+            )}
+            {isActivityTruncated && (
+              <button
+                type='button'
+                className='text-xs text-slate-400 hover:text-slate-600 underline decoration-dotted mt-0.5'
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation()
+                  setActivityExpanded(prev => !prev)
+                }}
+              >
+                {activityExpanded ? 'show less' : 'show more'}
+              </button>
+            )}
+          </div>
+        ) : (
+          <p className='text-xs text-red-500 font-semibold mt-1 italic'>
+            No upcoming activities
           </p>
-        )
-      )}
+        ))}
 
-      {deal.status === 'Closed Lost' && deal.lost_reason && (
+      {hasLostReason && (
         <p className='text-xs text-slate-500 mt-1 break-words whitespace-pre-wrap'>
           {deal.lost_reason}
         </p>
@@ -422,49 +427,80 @@ export default function DealItem({
 
       <div className='flex items-center gap-2 w-full'>
         <div className='mr-auto flex items-center'>
-          {deal.list_id !== 5 &&
-            deal.list_id !== 4 &&
-            !readonly &&
-            deal.is_won === null && (
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    className={`text-sm font-medium cursor-pointer ${getDateColor(localDate, deal.list_id)}`}
-                    onClick={e => e.stopPropagation()}
-                    onPointerDown={e => e.stopPropagation()}
-                  >
-                    {localDate && localDate !== '0000-00-00' ? (
-                      formatDisplay(localDate)
-                    ) : (
-                      <CalendarIcon className='w-4 h-4' />
+          {!isClosed && deal.nearest_activity_name && (
+            <Popover open={editDueDate} onOpenChange={setEditDueDate}>
+              <PopoverTrigger asChild>
+                {deadlineInfo ? (
+                  <span
+                    className={cn(
+                      'flex items-center gap-1 text-xs font-medium cursor-pointer hover:opacity-80 select-none',
+                      deadlineInfo.color,
+                      deadlineInfo.hasPill && 'rounded-full px-2 py-0.5',
                     )}
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className='w-auto p-0' align='start' side='bottom'>
-                  <Calendar
-                    mode='single'
-                    selected={formatDate(localDate)}
-                    defaultMonth={formatDate(localDate)}
-                    onSelect={(date: Date | undefined) => {
-                      if (date) {
-                        const year = date.getFullYear()
-                        const month = String(date.getMonth() + 1).padStart(2, '0')
-                        const day = String(date.getDate()).padStart(2, '0')
-                        const dateStr = `${year}-${month}-${day}`
-                        submitDate(dateStr)
-                        setCalendarOpen(false)
+                    onClick={e => {
+                      if (!readonly) {
+                        e.stopPropagation()
+                        setEditDueDate(true)
                       }
                     }}
-                  />
-                </PopoverContent>
-              </Popover>
-            )}
-          {readonly && localDate && localDate !== '0000-00-00' && (
-            <p
-              className={`text-sm font-medium ${getDateColor(localDate, deal.list_id)}`}
-            >
-              {formatDisplay(localDate)}
-            </p>
+                    onPointerDown={e => e.stopPropagation()}
+                  >
+                    {deadlineInfo.icon === 'alert' ? (
+                      <AlertCircle className='w-3 h-3' />
+                    ) : (
+                      <Clock className='w-3 h-3' />
+                    )}
+                    {deadlineInfo.label}
+                  </span>
+                ) : (
+                  <span
+                    className='flex items-center gap-1 text-xs text-gray-400 italic cursor-pointer hover:text-gray-600'
+                    onClick={e => {
+                      if (!readonly) {
+                        e.stopPropagation()
+                        setEditDueDate(true)
+                      }
+                    }}
+                    onPointerDown={e => e.stopPropagation()}
+                  >
+                    <CalendarOff className='w-3 h-3' />
+                    No deadline
+                  </span>
+                )}
+              </PopoverTrigger>
+              <PopoverContent className='w-auto p-0' align='start'>
+                <Calendar
+                  mode='single'
+                  selected={
+                    deal.nearest_activity_deadline
+                      ? parseLocalDate(deal.nearest_activity_deadline)
+                      : undefined
+                  }
+                  onSelect={(date: Date | undefined) => {
+                    if (!deal.nearest_activity_id || date === undefined) return
+                    const dateStr = format(date, 'yyyy-MM-dd')
+                    const fd = new FormData()
+                    fd.append('intent', 'update')
+                    fd.append('activityId', String(deal.nearest_activity_id))
+                    fd.append('name', deal.nearest_activity_name || '')
+                    fd.append('deadline', dateStr)
+                    fd.append(
+                      'priority',
+                      activityPriorityForApi(deal.nearest_activity_priority),
+                    )
+                    fd.append('csrf', csrfToken)
+                    pendingActivityDeadlineSyncRef.current = true
+                    setIsSaving(true)
+                    setEditDueDate(false)
+                    fetcher.submit(fd, {
+                      method: 'post',
+                      action: `/api/deal-activities/${deal.id}`,
+                    })
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           )}
         </div>
 
@@ -500,15 +536,7 @@ export default function DealItem({
                   onPointerEnter={handleActivitiesOpen}
                   onPointerLeave={scheduleActivitiesClose}
                 >
-                  <ListTodo
-                    className={`w-4 h-4 ${
-                      deal.activities_icon_color === 'red'
-                        ? 'text-red-600'
-                        : deal.activities_icon_color === 'yellow'
-                          ? 'text-yellow-600'
-                          : 'text-gray-500'
-                    }`}
-                  />
+                  <ListTodo className='w-4 h-4 text-slate-500' />
                 </Link>
               </PopoverTrigger>
               <PopoverContent
@@ -562,6 +590,73 @@ export default function DealItem({
                       </ul>
                     ) : (
                       <p className='text-xs text-slate-500'>No activities</p>
+                    )
+                  })()}
+              </PopoverContent>
+            </Popover>
+          )}
+          {showNotesIcon && (
+            <Popover open={notesOpen} onOpenChange={setNotesOpen}>
+              <PopoverTrigger asChild>
+                <Link
+                  to={projectUrl + location.search}
+                  state={{ from: fromState }}
+                  className='cursor-pointer hover:opacity-80'
+                  onPointerDown={e => e.stopPropagation()}
+                  onPointerEnter={handleNotesOpen}
+                  onPointerLeave={scheduleNotesClose}
+                >
+                  <NoteIcon className='h-4 w-4 text-slate-500' />
+                </Link>
+              </PopoverTrigger>
+              <PopoverContent
+                className='w-72 max-h-64 overflow-y-auto p-2'
+                align='end'
+                side='bottom'
+                onPointerEnter={cancelNotesClose}
+                onPointerLeave={scheduleNotesClose}
+                onOpenAutoFocus={e => e.preventDefault()}
+                onPointerDown={e => e.stopPropagation()}
+              >
+                <p className='text-xs font-semibold text-slate-700 mb-2'>Notes</p>
+                {notesFetcher.state === 'loading' && (
+                  <p className='text-xs text-slate-500'>Loading…</p>
+                )}
+                {notesFetcher.state !== 'loading' &&
+                  (() => {
+                    const raw = notesFetcher.data?.notes
+                    const list: DealNote[] = Array.isArray(raw) ? raw : []
+                    const sorted = sortNotesForPopover(list)
+                    return sorted.length ? (
+                      <ul className='space-y-2'>
+                        {sorted.map(note => (
+                          <li
+                            key={note.id}
+                            className='text-xs border-b border-slate-100 last:border-0 pb-1.5 last:pb-0'
+                          >
+                            {note.is_pinned === 1 ? (
+                              <span className='text-[10px] font-medium px-1.5 py-0.5 rounded border bg-amber-100 text-amber-800 border-amber-200 mb-1 inline-block'>
+                                Pinned
+                              </span>
+                            ) : null}
+                            <p className='whitespace-pre-wrap break-words'>
+                              {note.content}
+                            </p>
+                            <div className='flex items-center gap-1.5 mt-0.5 flex-wrap text-[10px] text-slate-500'>
+                              {note.created_by ? <span>{note.created_by}</span> : null}
+                              <span>{formatActivityTime(note.created_at)}</span>
+                              {note.comments.length > 0 ? (
+                                <span>
+                                  {note.comments.length}{' '}
+                                  {note.comments.length === 1 ? 'reply' : 'replies'}
+                                </span>
+                              ) : null}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className='text-xs text-slate-500'>No notes</p>
                     )
                   })()}
               </PopoverContent>

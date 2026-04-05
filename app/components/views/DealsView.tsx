@@ -18,6 +18,13 @@ import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { Button } from '~/components/ui/button'
 import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import type { Customer } from '~/types'
+import type { DealCardData } from '~/types/deals'
+import type { Nullable } from '~/types/utils'
+import {
+  CLOSED_LOST_LIST_ID,
+  CLOSED_WON_LIST_ID,
+  TERMINAL_LIST_IDS,
+} from '~/utils/constants'
 
 type List = {
   id: number
@@ -27,25 +34,18 @@ type List = {
 type FullDeal = {
   id: number
   customer_id: number
-  amount?: number | null
-  description?: string | null
-  status?: string | null
-  lost_reason?: string | null
-  position?: number | null
+  amount?: Nullable<number>
+  title?: Nullable<string>
+  status?: Nullable<string>
+  lost_reason?: Nullable<string>
+  position?: number
   list_id: number
-  due_date?: string | null
-  is_won?: number | null
-  sales_rep?: string | null
+  due_date?: Nullable<string>
+  is_won?: Nullable<number>
+  sales_rep?: Nullable<string>
 }
 
-type Deal = FullDeal & {
-  name: string
-  company_name?: string | null
-  has_images?: boolean
-  has_email?: boolean
-  has_activities?: boolean
-  activities_icon_color?: 'red' | 'yellow' | 'gray'
-}
+type Deal = FullDeal & DealCardData
 
 interface DealsViewProps {
   deals: FullDeal[]
@@ -53,8 +53,13 @@ interface DealsViewProps {
   lists: List[]
   imagesMap: Record<number, boolean>
   emailsMap: Record<number, boolean>
+  nearestActivityMap?: Record<
+    number,
+    { id: number; name: string; deadline: Nullable<string>; priority?: string }
+  >
   activitiesMap?: Record<number, boolean>
   activitiesIconMap?: Record<number, 'red' | 'yellow' | 'gray'>
+  notesMap?: Record<number, boolean>
   groupListSelect?: React.ReactNode
   readonly?: boolean
   toolbarLeft?: React.ReactNode
@@ -67,8 +72,10 @@ export default function DealsView({
   lists,
   imagesMap,
   emailsMap,
+  nearestActivityMap,
   activitiesMap = {},
   activitiesIconMap = {},
+  notesMap = {},
   groupListSelect,
   readonly = false,
   toolbarLeft,
@@ -80,13 +87,14 @@ export default function DealsView({
 
   const toDeal = (d: FullDeal): Deal => {
     const customer = customers.find(c => c.id === d.customer_id)
+    const activity = nearestActivityMap?.[d.id]
     return {
       id: d.id,
       customer_id: d.customer_id,
       name: customer ? customer.name : `Customer #${d.customer_id}`,
       company_name: customer?.company_name,
       amount: d.amount,
-      description: d.description,
+      title: d.title ?? undefined,
       status: d.status ?? undefined,
       lost_reason: d.lost_reason ?? undefined,
       position: d.position ?? undefined,
@@ -99,8 +107,13 @@ export default function DealsView({
       has_images: imagesMap?.[d.id] || false,
       has_email: emailsMap?.[d.id] || false,
       has_activities: activitiesMap?.[d.id] || false,
+      has_notes: notesMap?.[d.id] || false,
       activities_icon_color: activitiesIconMap?.[d.id],
       is_won: d.is_won,
+      nearest_activity_name: activity?.name ?? null,
+      nearest_activity_deadline: activity?.deadline ?? null,
+      nearest_activity_id: activity?.id ?? null,
+      nearest_activity_priority: activity?.priority ?? null,
       sales_rep: d.sales_rep ?? undefined,
     }
   }
@@ -108,12 +121,19 @@ export default function DealsView({
   const sortDeals = (arr: Deal[]) => {
     const copy = [...arr]
     copy.sort((a, b) => {
-      const aHas = Boolean(a.due_date)
-      const bHas = Boolean(b.due_date)
-      if (!aHas && !bHas) return 0
-      if (!aHas) return -1
-      if (!bHas) return 1
-      return new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
+      const aHasActivity = Boolean(a.nearest_activity_name)
+      const bHasActivity = Boolean(b.nearest_activity_name)
+      if (!aHasActivity && bHasActivity) return -1
+      if (aHasActivity && !bHasActivity) return 1
+
+      if (!aHasActivity && !bHasActivity) return b.id - a.id
+
+      const aDate = a.nearest_activity_deadline
+      const bDate = b.nearest_activity_deadline
+      if (!aDate && !bDate) return 0
+      if (!aDate) return 1
+      if (!bDate) return -1
+      return new Date(aDate).getTime() - new Date(bDate).getTime()
     })
     return copy
   }
@@ -128,7 +148,15 @@ export default function DealsView({
     }
     for (const l of lists) board[l.id] = sortDeals(board[l.id])
     return board
-  }, [JSON.stringify(deals), JSON.stringify(customers), JSON.stringify(lists)])
+  }, [
+    JSON.stringify(deals),
+    JSON.stringify(customers),
+    JSON.stringify(lists),
+    JSON.stringify(nearestActivityMap),
+    JSON.stringify(activitiesMap),
+    JSON.stringify(activitiesIconMap),
+    JSON.stringify(notesMap),
+  ])
 
   const [board, setBoard] = useState<Record<number, Deal[]>>(initialBoard)
   const [activeId, setActiveId] = useState<number | null>(null)
@@ -250,11 +278,24 @@ export default function DealsView({
       const toArr = [...(copy[toListId] || [])]
       const idx = fromArr.findIndex(d => d.id === activeId)
       if (idx === -1) return prev
-      const shouldClearDate = toListId === 4 || toListId === 5
+      const shouldClearDate = TERMINAL_LIST_IDS.includes(toListId)
+      const fromTerminal = TERMINAL_LIST_IDS.includes(fromListId)
       const moved = {
         ...fromArr[idx],
         list_id: toListId,
         due_date: shouldClearDate ? null : fromArr[idx].due_date,
+        is_won:
+          toListId === CLOSED_WON_LIST_ID
+            ? 1
+            : toListId === CLOSED_LOST_LIST_ID
+              ? 0
+              : fromTerminal
+                ? null
+                : fromArr[idx].is_won,
+        lost_reason:
+          toListId === CLOSED_WON_LIST_ID || fromTerminal
+            ? null
+            : fromArr[idx].lost_reason,
       }
       fromArr.splice(idx, 1)
       toArr.push(moved)
@@ -445,17 +486,22 @@ export default function DealsView({
               if (!d) return null
               return (
                 <div className='w-72 border rounded-lg p-2 shadow-md bg-white'>
-                  <div className='text-lg font-semibold truncate'>{d.name}</div>
+                  <div className='text-lg font-semibold truncate'>
+                    {d.company_name ?? d.name}
+                  </div>
+                  {typeof d.title === 'string' && d.title.trim() ? (
+                    <div className='mt-0.5 line-clamp-2 text-xs text-slate-500 break-words whitespace-pre-wrap'>
+                      {d.title.trim()}
+                    </div>
+                  ) : null}
                   <div className='text-xs text-slate-500 mt-1'>
                     Amount: $ {d.amount ?? 0}
                   </div>
-                  {d.due_date &&
-                    d.due_date !== '0000-00-00' &&
-                    !Number.isNaN(new Date(d.due_date).getTime()) && (
-                      <div className='text-xs text-slate-500 mt-1'>
-                        {new Date(d.due_date).toLocaleDateString()}
-                      </div>
-                    )}
+                  {d.nearest_activity_name && (
+                    <div className='text-xs text-slate-600 mt-1 line-clamp-2 whitespace-pre-wrap break-words'>
+                      {d.nearest_activity_name}
+                    </div>
+                  )}
                 </div>
               )
             })()

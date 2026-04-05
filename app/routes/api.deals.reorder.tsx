@@ -1,5 +1,11 @@
 import type { ActionFunctionArgs } from 'react-router'
+import { transitionDealStage } from '~/crud/deals'
 import { db } from '~/db.server'
+import {
+  CLOSED_LOST_LIST_ID,
+  CLOSED_WON_LIST_ID,
+  TERMINAL_LIST_IDS,
+} from '~/utils/constants'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -59,20 +65,29 @@ export async function action({ request }: ActionFunctionArgs) {
       const movedAcrossLists =
         prevListId !== undefined && prevListId !== list_id ? 1 : 0
 
+      const fromTerminal = prevListId !== undefined && TERMINAL_LIST_IDS.includes(prevListId)
+
       await db.execute(
-        'UPDATE deals SET list_id = ?, status = ?, position = ?, due_date = CASE WHEN ? IN (4,5) THEN NULL ELSE due_date END, lost_reason = IF(? != 5, NULL, lost_reason), updated_at = CASE WHEN ? = 1 THEN NOW() ELSE updated_at END WHERE id = ?',
-        [list_id, statusToSet, position, list_id, list_id, movedAcrossLists, id],
+        `UPDATE deals SET list_id = ?, status = ?, position = ?,
+         due_date = CASE WHEN ? IN (?, ?) THEN NULL ELSE due_date END,
+         lost_reason = IF(? != ?, NULL, lost_reason),
+         is_won = CASE WHEN ? = 1 AND ? = ? THEN 1 WHEN ? = 1 AND ? = ? THEN 0 WHEN ? = 1 AND ? = 1 THEN NULL ELSE is_won END,
+         updated_at = CASE WHEN ? = 1 THEN NOW() ELSE updated_at END
+         WHERE id = ?`,
+        [
+          list_id, statusToSet, position,
+          list_id, CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID,
+          list_id, CLOSED_LOST_LIST_ID,
+          movedAcrossLists, list_id, CLOSED_WON_LIST_ID,
+          movedAcrossLists, list_id, CLOSED_LOST_LIST_ID,
+          movedAcrossLists, fromTerminal ? 1 : 0,
+          movedAcrossLists,
+          id,
+        ],
       )
 
       if (movedAcrossLists) {
-        await db.execute(
-          'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
-          [id],
-        )
-        await db.execute(
-          'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
-          [id, list_id],
-        )
+        await transitionDealStage(id, list_id)
       }
     }
     return Response.json({ success: true })

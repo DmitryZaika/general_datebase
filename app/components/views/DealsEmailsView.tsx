@@ -46,6 +46,7 @@ export interface Email {
   receiver_email: string
   sender_user_id?: number | null
   has_attachments?: boolean | number
+  thread_has_attachments?: boolean | number
   sender_name?: string | null
   receiver_name?: string | null
   sales_rep?: string | null
@@ -164,6 +165,16 @@ export default function DealsEmailsView({
         ids.add(email.thread_id)
       }
     })
+    return ids
+  }, [emails])
+
+  const threadIdsWithAttachments = useMemo(() => {
+    const ids = new Set<string>()
+    for (const email of emails) {
+      if (email.thread_has_attachments || email.has_attachments) {
+        ids.add(email.thread_id)
+      }
+    }
     return ids
   }, [emails])
 
@@ -565,7 +576,7 @@ export default function DealsEmailsView({
                 <Input
                   name='search'
                   type='text'
-                  placeholder='Search emails...'
+                  placeholder='Search subject, body, or addresses...'
                   defaultValue={searchFromUrl}
                   key={searchFromUrl}
                   className='pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
@@ -576,7 +587,7 @@ export default function DealsEmailsView({
                 <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-gray-500' />
                 <Input
                   type='text'
-                  placeholder='Search emails...'
+                  placeholder='Search subject, body, or addresses...'
                   value={searchTermLocal}
                   onChange={e => setSearchTermLocal(e.target.value)}
                   className='pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
@@ -689,7 +700,7 @@ export default function DealsEmailsView({
                           {senderName}
                         </span>
                         <div className='flex items-center gap-2 flex-shrink-0'>
-                          {Boolean(email.has_attachments) && (
+                          {threadIdsWithAttachments.has(email.thread_id) && (
                             <Paperclip className='h-3.5 w-3.5 text-gray-500' />
                           )}
                           {activeTab === 'sent' && (
@@ -792,7 +803,7 @@ export default function DealsEmailsView({
 
                       {/* Attachments & Date */}
                       <div className='flex items-center gap-4 flex-shrink-0 text-xs text-gray-500 font-medium justify-end'>
-                        {Boolean(email.has_attachments) && (
+                        {threadIdsWithAttachments.has(email.thread_id) && (
                           <Paperclip className='h-3.5 w-3.5 text-gray-500' />
                         )}
                         {activeTab === 'sent' && (

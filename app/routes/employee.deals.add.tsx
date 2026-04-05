@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -17,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import type { ResultSetHeader } from 'mysql2'
 import { db } from '~/db.server'
 import { dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
@@ -54,12 +54,12 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!data.deal_id) {
     const [result] = await db.execute<ResultSetHeader>(
       `INSERT INTO deals
-     (customer_id, amount, description, status, list_id, position, user_id, is_won)
+     (customer_id, amount, title, status, list_id, position, user_id, is_won)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.customer_id,
         data.amount,
-        data.description,
+        data.title ?? null,
         initialStatus,
         data.list_id,
         data.position,
@@ -72,17 +72,50 @@ export async function action({ request }: ActionFunctionArgs) {
       [result.insertId, data.list_id],
     )
   } else {
-    await db.execute(`UPDATE deals SET amount = ?, description = ? WHERE id = ?`, [
-      data.amount,
-      data.description,
-      data.deal_id,
-    ])
+    const prevRows = await selectMany<{ list_id: number }>(
+      db,
+      'SELECT list_id FROM deals WHERE id = ? LIMIT 1',
+      [data.deal_id],
+    )
+    const prevListId = prevRows[0]?.list_id
+
+    await db.execute(
+      `UPDATE deals SET amount = ?, title = ?, status = ?, list_id = ?, position = ? WHERE id = ?`,
+      [
+        data.amount,
+        data.title ?? null,
+        initialStatus,
+        data.list_id,
+        data.position,
+        data.deal_id,
+      ],
+    )
+
+    if (prevListId !== undefined && prevListId !== data.list_id) {
+      await db.execute(
+        'UPDATE deal_stage_history SET exited_at = NOW() WHERE deal_id = ? AND exited_at IS NULL',
+        [data.deal_id],
+      )
+      await db.execute(
+        'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+        [data.deal_id, data.list_id],
+      )
+    }
   }
 
-  await db.execute(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
-    user.id,
-    data.customer_id,
-  ])
+  const [positionRows] = await db.execute<RowDataPacket[]>(
+    `SELECT 1 FROM users_positions up
+     JOIN positions p ON up.position_id = p.id
+     WHERE up.user_id = ? AND p.name = 'sales_rep'
+     LIMIT 1`,
+    [user.id],
+  )
+  if (positionRows.length > 0) {
+    await db.execute(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
+      user.id,
+      data.customer_id,
+    ])
+  }
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Deal added successfully'))

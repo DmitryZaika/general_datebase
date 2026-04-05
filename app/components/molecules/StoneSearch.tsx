@@ -161,15 +161,24 @@ export function StoneSearch({
                 </div>
 
                 <div className='text-sm text-gray-500'>
-                  {userRole === 'admin'
-                    ? stone.retail_price === 0
-                      ? `Price per slab $${stone.cost_per_sqft}`
-                      : `Price: $${stone.retail_price} / $${stone.cost_per_sqft}`
-                    : userRole === 'employee'
-                      ? stone.retail_price === 0
-                        ? `Price per slab $${stone.cost_per_sqft}`
-                        : `Price: $${stone.retail_price}`
-                      : ''}
+                  {(() => {
+                    const bundleSuffix =
+                      stone.bundle_number != null &&
+                      String(stone.bundle_number).trim() !== ''
+                        ? ` · Bundle#${stone.bundle_number}`
+                        : ''
+                    if (userRole === 'admin') {
+                      return stone.retail_price === 0
+                        ? `Price per slab $${stone.cost_per_sqft}${bundleSuffix}`
+                        : `Price: $${stone.retail_price} / $${stone.cost_per_sqft}${bundleSuffix}`
+                    }
+                    if (userRole === 'employee') {
+                      return stone.retail_price === 0
+                        ? `Price per slab $${stone.cost_per_sqft}${bundleSuffix}`
+                        : `Price: $${stone.retail_price}${bundleSuffix}`
+                    }
+                    return ''
+                  })()}
                 </div>
               </div>
 
@@ -243,6 +252,7 @@ export function StoneSearch({
         currentId={currentId}
         setCurrentId={setCurrentId}
         images={displayStones}
+        userRole={userRole}
       />
     </div>
   )

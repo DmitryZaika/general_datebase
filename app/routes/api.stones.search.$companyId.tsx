@@ -12,7 +12,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const companyId = Number(params.companyId)
 
-  if (Number.isNaN(companyId) || companyId <= 0) {
+  if (Number.isNaN(companyId) || companyId < 0) {
     return Response.json({ stones: [] })
   }
 
@@ -20,7 +20,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return Response.json({ stones: [] })
   }
 
-  let query = `SELECT s.id, s.type, s.width, s.length, s.name, s.url, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount, s.regular_stock,
+  let query = `SELECT s.id, s.type, s.width, s.length, s.name, s.url, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount, s.regular_stock, s.bundle_number, s.level, s.finishing,
             CAST(SUM(CASE WHEN si.id IS NOT NULL AND si.sale_id IS NULL AND si.cut_date IS NULL AND si.deleted_at IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available,
             CAST(SUM(CASE WHEN si.id IS NOT NULL AND si.deleted_at IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS amount
     FROM stones s
@@ -36,7 +36,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     AND s.company_id = ?
     AND s.deleted_at IS NULL
     AND (s.is_display = 1 OR ? = 1)
-    GROUP BY s.id, s.type, s.name, s.url, s.width, s.length, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount, s.regular_stock`
+    GROUP BY s.id, s.type, s.name, s.url, s.width, s.length, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount, s.regular_stock, s.bundle_number, s.level, s.finishing`
 
   // Only filter by availability if explicitly requested (showSoldOut=false)
   // When unsold_only=true (from StoneSearch), show all stones including those without slabs

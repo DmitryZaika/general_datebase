@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const dealsSchema = z.object({
   company_id: z.coerce.number().optional(),
   amount: z.coerce.number().optional(),
-  description: z.string().nullish(),
+  title: z.string().nullish(),
   customer_id: z.coerce
     .number({
       error: issue =>

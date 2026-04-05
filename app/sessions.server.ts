@@ -3,6 +3,7 @@ import type { ToastMessage } from './utils/toastHelpers.server'
 
 type SessionData = {
   sessionId: string
+  activeCompanyId: number
   qboRealmId: string
   qboAccessToken: string
   qboRefreshToken: string

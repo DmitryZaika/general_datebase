@@ -1,3 +1,5 @@
+import type { Nullable } from '~/types/utils'
+
 interface StageInfo {
   id: number
   name: string
@@ -7,13 +9,15 @@ interface StageInfo {
 interface StageHistory {
   list_id: number
   entered_at: string
-  exited_at: string | null
+  exited_at: Nullable<string>
 }
 
 interface DealProgressBarProps {
   stages: StageInfo[]
   history: StageHistory[]
   currentListId: number
+  isClosed?: boolean
+  closedAt?: Nullable<string>
 }
 
 function formatDuration(ms: number): string {
@@ -29,16 +33,22 @@ function formatDuration(ms: number): string {
 function getStageDuration(
   stageId: number,
   history: StageHistory[],
+  isClosed?: boolean,
+  closedAt?: string | null,
 ): string | null {
   const entries = history.filter(h => h.list_id === stageId)
   if (entries.length === 0) return null
+
+  const closedTime = closedAt ? new Date(closedAt).getTime() : null
 
   let totalMs = 0
   for (const entry of entries) {
     const start = new Date(entry.entered_at).getTime()
     const end = entry.exited_at
       ? new Date(entry.exited_at).getTime()
-      : Date.now()
+      : isClosed
+        ? (closedTime ?? start)
+        : Date.now()
     totalMs += end - start
   }
 
@@ -59,6 +69,8 @@ export function DealProgressBar({
   stages,
   history,
   currentListId,
+  isClosed,
+  closedAt,
 }: DealProgressBarProps) {
   const sorted = [...stages].sort((a, b) => a.position - b.position)
   const currentIndex = sorted.findIndex(s => s.id === currentListId)
@@ -73,7 +85,7 @@ export function DealProgressBar({
           const isActive = isCompleted || isCurrent
 
           const duration = isActive
-            ? getStageDuration(stage.id, history)
+            ? getStageDuration(stage.id, history, isClosed, closedAt)
             : null
           const displayText = isActive ? (duration ?? '-') : '0 days'
 
