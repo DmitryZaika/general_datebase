@@ -8,14 +8,18 @@ import {
   CirclePlus,
   Clock,
   Pencil,
+  Phone,
   Trash2,
   X,
 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useFetcher, useLocation, useNavigate } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import ClipboardIcon from '~/components/icons/ClipboardIcon'
 import NoteIcon from '~/components/icons/NoteIcon'
+import type { CallEntry } from '~/components/molecules/CallHistory'
+import { CallItemContent } from '~/components/molecules/CallItemContent'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,10 +60,14 @@ import type {
   HistoryTab,
 } from '~/types/dealActivityTypes'
 import type { Nullable } from '~/types/utils'
+import { mapToCallEntry } from '~/utils/callDisplayHelpers'
+import { getMockActionsForDeal, MOCK_RECORDING_URL } from '~/utils/cloudtalk.mock'
 import { NoteForm } from './NoteForm'
 import { NoteItem } from './NoteItem'
 
 // --- Configuration ---
+
+const ACTION_CARD_CLASS = 'rounded-md px-3 py-2.5 bg-gray-50 border border-gray-200'
 
 const PRIORITY_WEIGHT: Readonly<Record<ActivityPriority, number>> = {
   [ActivityPriority.High]: 0,
@@ -901,16 +909,19 @@ function HistoryTabButtons({
   onTabChange,
   activitiesCount,
   notesCount,
+  actionsCount,
 }: {
   activeTab: HistoryTab
   onTabChange: (tab: HistoryTab) => void
   activitiesCount: number
   notesCount: number
+  actionsCount: number
 }) {
   const tabs: { key: HistoryTab; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'activities', label: `Activities (${activitiesCount})` },
     { key: 'notes', label: `Notes (${notesCount})` },
+    { key: 'actions', label: `Actions (${actionsCount})` },
   ]
 
   return (
@@ -940,6 +951,7 @@ function ActivityList({
   dealId,
   activities,
   notes,
+  actions,
   onEdit,
   editingActivityId,
   historyHeaderRef,
@@ -947,6 +959,7 @@ function ActivityList({
   dealId: number
   activities: DealActivity[]
   notes: DealNote[]
+  actions: CallEntry[]
   onEdit: (activity: DealActivity) => void
   editingActivityId: number | null
   historyHeaderRef: React.RefObject<HTMLDivElement | null>
@@ -990,6 +1003,15 @@ function ActivityList({
             isPinned: !!n.is_pinned,
           }) satisfies HistoryItem,
       ),
+      ...actions.map(
+        a =>
+          ({
+            type: 'action' as const,
+            data: a,
+            date: a.startedAt,
+            isPinned: false,
+          }) satisfies HistoryItem,
+      ),
     ]
 
     items.sort((a, b) => {
@@ -1001,71 +1023,19 @@ function ActivityList({
     })
 
     return items
-  }, [done, notes])
+  }, [done, notes, actions])
 
-  const historyCount = done.length + notes.length
+  const historyCount = done.length + notes.length + actions.length
 
-  const renderHistoryContent = () => {
-    if (historyTab === 'activities') {
-      if (done.length === 0)
-        return <SectionEmptyState label='No completed activities' />
-      return (
-        <div>
-          <AnimatePresence initial={false}>
-            {done.map((activity, index) => (
-              <motion.div
-                key={`activity-${activity.id}`}
-                layout
-                variants={ITEM_VARIANTS}
-                initial='initial'
-                animate='animate'
-                exit='exit'
-                transition={ITEM_TRANSITION}
-              >
-                <TimelineItem icon={ClipboardIcon} isLast={index === done.length - 1}>
-                  <ActivityItem
-                    activity={activity}
-                    dealId={dealId}
-                    onEdit={onEdit}
-                    isBeingEdited={editingActivityId === activity.id}
-                  />
-                </TimelineItem>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )
-    }
-
-    if (historyTab === 'notes') {
-      if (sortedNotes.length === 0) return <SectionEmptyState label='No notes yet' />
-      return (
-        <div>
-          {sortedNotes.map((note, index) => (
-            <TimelineItem
-              key={`note-${note.id}`}
-              icon={NoteIcon}
-              isLast={index === sortedNotes.length - 1}
-            >
-              <NoteItem note={note} handlers={noteHandlers} />
-            </TimelineItem>
-          ))}
-        </div>
-      )
-    }
-
-    // All tab
-    if (allHistoryItems.length === 0)
-      return <SectionEmptyState label='No history yet' />
-
-    return (
-      <div>
-        {allHistoryItems.map((item, index) =>
-          item.type === 'activity' ? (
+  const renderHistoryItem = useCallback(
+    (item: HistoryItem, isLast: boolean): ReactNode => {
+      switch (item.type) {
+        case 'activity':
+          return (
             <TimelineItem
               key={`activity-${item.data.id}`}
               icon={ClipboardIcon}
-              isLast={index === allHistoryItems.length - 1}
+              isLast={isLast}
             >
               <ActivityItem
                 activity={item.data}
@@ -1074,19 +1044,124 @@ function ActivityList({
                 isBeingEdited={editingActivityId === item.data.id}
               />
             </TimelineItem>
-          ) : (
+          )
+        case 'action':
+          return (
             <TimelineItem
-              key={`note-${item.data.id}`}
-              icon={NoteIcon}
-              isLast={index === allHistoryItems.length - 1}
+              key={`action-${item.data.callId}`}
+              icon={Phone}
+              isLast={isLast}
             >
+              <div className={ACTION_CARD_CLASS}>
+                <CallItemContent
+                  call={item.data}
+                  audioSrc={MOCK_RECORDING_URL}
+                  compact
+                />
+              </div>
+            </TimelineItem>
+          )
+        case 'note':
+          return (
+            <TimelineItem key={`note-${item.data.id}`} icon={NoteIcon} isLast={isLast}>
               <NoteItem note={item.data} handlers={noteHandlers} />
             </TimelineItem>
-          ),
-        )}
-      </div>
-    )
-  }
+          )
+      }
+    },
+    [dealId, onEdit, editingActivityId, noteHandlers],
+  )
+
+  const tabRenderers = useMemo<Record<HistoryTab, () => ReactNode>>(
+    () => ({
+      activities: () => {
+        if (done.length === 0)
+          return <SectionEmptyState label='No completed activities' />
+        return (
+          <div>
+            <AnimatePresence initial={false}>
+              {done.map((activity, index) => (
+                <motion.div
+                  key={`activity-${activity.id}`}
+                  layout
+                  variants={ITEM_VARIANTS}
+                  initial='initial'
+                  animate='animate'
+                  exit='exit'
+                  transition={ITEM_TRANSITION}
+                >
+                  <TimelineItem icon={ClipboardIcon} isLast={index === done.length - 1}>
+                    <ActivityItem
+                      activity={activity}
+                      dealId={dealId}
+                      onEdit={onEdit}
+                      isBeingEdited={editingActivityId === activity.id}
+                    />
+                  </TimelineItem>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )
+      },
+      notes: () => {
+        if (sortedNotes.length === 0) return <SectionEmptyState label='No notes yet' />
+        return (
+          <div>
+            {sortedNotes.map((note, index) => (
+              <TimelineItem
+                key={`note-${note.id}`}
+                icon={NoteIcon}
+                isLast={index === sortedNotes.length - 1}
+              >
+                <NoteItem note={note} handlers={noteHandlers} />
+              </TimelineItem>
+            ))}
+          </div>
+        )
+      },
+      actions: () => {
+        if (actions.length === 0) return <SectionEmptyState label='No actions yet' />
+        return (
+          <div>
+            {actions.map((call, index) => (
+              <TimelineItem
+                key={`action-${call.callId}`}
+                icon={Phone}
+                isLast={index === actions.length - 1}
+              >
+                <div className={ACTION_CARD_CLASS}>
+                  <CallItemContent call={call} audioSrc={MOCK_RECORDING_URL} compact />
+                </div>
+              </TimelineItem>
+            ))}
+          </div>
+        )
+      },
+      all: () => {
+        if (allHistoryItems.length === 0)
+          return <SectionEmptyState label='No history yet' />
+        return (
+          <div>
+            {allHistoryItems.map((item, index) =>
+              renderHistoryItem(item, index === allHistoryItems.length - 1),
+            )}
+          </div>
+        )
+      },
+    }),
+    [
+      done,
+      sortedNotes,
+      actions,
+      allHistoryItems,
+      dealId,
+      onEdit,
+      editingActivityId,
+      noteHandlers,
+      renderHistoryItem,
+    ],
+  )
 
   return (
     <div className='space-y-4'>
@@ -1138,8 +1213,9 @@ function ActivityList({
               onTabChange={setHistoryTab}
               activitiesCount={done.length}
               notesCount={notes.length}
+              actionsCount={actions.length}
             />
-            {renderHistoryContent()}
+            {tabRenderers[historyTab]()}
           </>
         )}
       </div>
@@ -1160,6 +1236,13 @@ export function DealActivityPanel({
   const [activeTab, setActiveTab] = useState<'activity' | 'notes'>('activity')
   const scrollRef = useRef<HTMLDivElement>(null)
   const historyHeaderRef = useRef<HTMLDivElement>(null)
+
+  const actions = useMemo(() => {
+    const raw = getMockActionsForDeal(dealId)
+    return raw
+      .map(mapToCallEntry)
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+  }, [dealId])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -1235,6 +1318,7 @@ export function DealActivityPanel({
           dealId={dealId}
           activities={activities}
           notes={notes}
+          actions={actions}
           onEdit={handleEdit}
           editingActivityId={editingActivity?.id ?? null}
           historyHeaderRef={historyHeaderRef}

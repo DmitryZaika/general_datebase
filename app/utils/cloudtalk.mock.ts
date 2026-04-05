@@ -500,3 +500,113 @@ export function getMockCallsForCustomer(
     ),
   ]
 }
+
+export function getMockActionsForDeal(dealId: number): Calls200Response[] {
+  const [sarah, mike, lisa] = MOCK_AGENTS
+  const phone = '+15559990001'
+
+  const offset = dealId % 5
+  const cdrBase = 100_000 + dealId * 10
+  const noteBase = dealId * 1000
+  const tagBase = dealId * 1000
+  const ratingBase = dealId * 1000
+
+  return [
+    makeCall(
+      makeCdr({
+        id: cdrBase,
+        type: 'incoming',
+        started_at: daysAgo(2 + offset, 14, 30),
+        talking_time: 312,
+        recorded: true,
+        recording_link: cdrBase,
+        public_external: phone,
+        user_id: sarah.id,
+      }),
+      sarah,
+      [{ id: noteBase + 1, name: 'Customer interested in quartz countertops' }],
+      [
+        { id: tagBase + 1, name: 'quote' },
+        { id: tagBase + 2, name: 'follow-up' },
+      ],
+      [{ id: ratingBase + 1, type: 'contact', rating: 5 }],
+    ),
+    makeCall(
+      makeCdr({
+        id: cdrBase + 1,
+        type: 'outgoing',
+        started_at: daysAgo(4 + offset, 10, 15),
+        talking_time: 185,
+        recorded: true,
+        recording_link: cdrBase + 1,
+        public_external: phone,
+        user_id: mike.id,
+      }),
+      mike,
+      [{ id: noteBase + 2, name: 'Discussed pricing and installation timeline' }],
+      [{ id: tagBase + 3, name: 'pricing' }],
+      [],
+    ),
+    makeCall(
+      makeCdr({
+        id: cdrBase + 2,
+        type: 'incoming',
+        started_at: daysAgo(6 + offset, 16, 45),
+        talking_time: 0,
+        public_external: phone,
+        user_id: sarah.id,
+      }),
+      sarah,
+      [],
+      [{ id: tagBase + 4, name: 'missed' }],
+      [],
+    ),
+    makeCall(
+      makeCdr({
+        id: cdrBase + 3,
+        type: 'incoming',
+        started_at: daysAgo(8 + offset, 9, 0),
+        talking_time: 28,
+        recorded: true,
+        recording_link: cdrBase + 3,
+        is_voicemail: true,
+        public_external: phone,
+        user_id: lisa.id,
+      }),
+      lisa,
+      [{ id: noteBase + 3, name: 'Left voicemail about scheduling measurement' }],
+      [{ id: tagBase + 5, name: 'voicemail' }],
+      [],
+    ),
+    makeCall(
+      makeCdr({
+        id: cdrBase + 4,
+        type: 'outgoing',
+        started_at: daysAgo(10 + offset, 11, 30),
+        talking_time: 0,
+        public_external: phone,
+        user_id: mike.id,
+      }),
+      mike,
+      [],
+      [],
+      [],
+    ),
+    makeCall(
+      makeCdr({
+        id: cdrBase + 5,
+        type: 'outgoing',
+        started_at: daysAgo(12 + offset, 15, 0),
+        talking_time: 95,
+        recorded: true,
+        recording_link: cdrBase + 5,
+        public_external: phone,
+        user_id: sarah.id,
+      }),
+      sarah,
+      [],
+      [{ id: tagBase + 6, name: 'confirmation' }],
+      [{ id: ratingBase + 2, type: 'agent', rating: 4 }],
+    ),
+  ]
+}

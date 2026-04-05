@@ -1,27 +1,20 @@
 import { format } from 'date-fns'
-import {
-  CalendarDays,
-  Info,
-  Phone,
-  PhoneIncoming,
-  PhoneOutgoing,
-  Star,
-  Voicemail,
-} from 'lucide-react'
+import { CalendarDays, Info, Phone } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
-import { AudioWaveformPlayer } from '~/components/molecules/AudioWaveformPlayer'
-import type { CallEntry } from '~/components/molecules/CallHistory'
+import { CallItemContent } from '~/components/molecules/CallItemContent'
 import { Button } from '~/components/ui/button'
 import { Calendar } from '~/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import type { Nullable } from '~/types/utils'
+import {
+  type CallFilterType,
+  mapToCallEntry,
+  matchesCallFilter,
+} from '~/utils/callDisplayHelpers'
 import { getMockCallsForCustomer, MOCK_RECORDING_URL } from '~/utils/cloudtalk.mock'
-import type { Calls200Response } from '~/utils/cloudtalk.server'
 
-type FilterType = 'all' | 'incoming' | 'outgoing' | 'missed' | 'voicemail'
-
-const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
+const FILTER_OPTIONS: { value: CallFilterType; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'incoming', label: 'Incoming' },
   { value: 'outgoing', label: 'Outgoing' },
@@ -30,61 +23,6 @@ const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
 ]
 
 const PAGE_SIZE = 10
-
-function mapToCallEntry(item: Calls200Response): CallEntry {
-  const { Cdr, Agent, Notes, Tags, Ratings } = item
-  return {
-    callId: Cdr.id,
-    type: Cdr.type,
-    startedAt: Cdr.started_at,
-    talkingTime: Cdr.talking_time,
-    recorded: Cdr.recorded,
-    recordingLink: Cdr.recording_link,
-    agentName: Agent ? `${Agent.firstname} ${Agent.lastname}`.trim() : 'Unknown',
-    publicExternal: Cdr.public_external,
-    isVoicemail: Cdr.is_voicemail,
-    notes: Notes,
-    tags: Tags,
-    ratings: Ratings,
-  }
-}
-
-function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
-}
-
-function getCallIcon(call: CallEntry) {
-  if (call.isVoicemail) return { Icon: Voicemail, color: 'text-amber-500' }
-  if (call.type === 'internal') return { Icon: Phone, color: 'text-slate-500' }
-  if (call.type === 'outgoing') {
-    const noAnswer = call.talkingTime === 0
-    return {
-      Icon: PhoneOutgoing,
-      color: noAnswer ? 'text-slate-400' : 'text-blue-600',
-    }
-  }
-  const isMissed = call.talkingTime === 0
-  return {
-    Icon: PhoneIncoming,
-    color: isMissed ? 'text-red-500' : 'text-green-600',
-  }
-}
-
-function getCallStatus(call: CallEntry): Nullable<string> {
-  if (call.isVoicemail) return 'Voicemail'
-  if (call.type === 'incoming' && call.talkingTime === 0) return 'Missed'
-  if (call.type === 'outgoing' && call.talkingTime === 0) return 'No answer'
-  return null
-}
-
-function matchesFilter(call: CallEntry, filter: FilterType): boolean {
-  if (filter === 'all') return true
-  if (filter === 'voicemail') return call.isVoicemail
-  if (filter === 'missed') return call.talkingTime === 0 && call.type === 'incoming'
-  return call.type === filter
-}
 
 // Sub-components
 
@@ -114,10 +52,7 @@ function todayDate(): Date {
   return d
 }
 
-function getActivePreset(
-  dateFrom?: Date,
-  dateTo?: Date,
-): Nullable<DatePreset> {
+function getActivePreset(dateFrom?: Date, dateTo?: Date): Nullable<DatePreset> {
   if (!dateFrom && !dateTo) return 'all'
   if (!dateFrom) return null
   if (isSameDay(dateFrom, daysAgoDate(7))) return '7d'
@@ -182,89 +117,6 @@ function DateRangePicker({
   )
 }
 
-function CallItem({ call }: { call: CallEntry }) {
-  const { Icon, color } = getCallIcon(call)
-  const status = getCallStatus(call)
-
-  return (
-    <li className='border rounded p-3 bg-white'>
-      <div className='flex items-start gap-3 text-sm'>
-        <span className={`mt-0.5 shrink-0 ${color}`}>
-          <Icon size={16} />
-        </span>
-
-        <div className='flex-1 min-w-0'>
-          <div className='flex items-baseline justify-between gap-2'>
-            <span className='text-slate-800'>
-              {format(new Date(call.startedAt), 'M/d/yyyy h:mm a')}
-            </span>
-            {status ? (
-              <span
-                className={`text-xs font-semibold ${
-                  status === 'Missed'
-                    ? 'text-red-500'
-                    : status === 'Voicemail'
-                      ? 'text-amber-500'
-                      : 'text-slate-400'
-                }`}
-              >
-                {status}
-              </span>
-            ) : (
-              <span className='text-xs text-slate-500'>
-                {formatDuration(call.talkingTime)}
-              </span>
-            )}
-          </div>
-
-          <div className='text-xs text-slate-500'>Agent: {call.agentName}</div>
-
-          {call.notes.length > 0 && (
-            <div className='mt-1 text-xs text-slate-600'>
-              {call.notes.map(n => (
-                <div key={n.id} className='italic'>
-                  {n.name}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {call.tags.length > 0 && (
-            <div className='mt-1 flex gap-1 flex-wrap'>
-              {call.tags.map(t => (
-                <span
-                  key={t.id}
-                  className='text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded'
-                >
-                  {t.name}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {call.ratings.length > 0 && (
-            <div className='mt-1 flex items-center gap-1'>
-              {call.ratings.map(r => (
-                <span
-                  key={r.id}
-                  className='flex items-center gap-0.5 text-[10px] text-amber-500'
-                >
-                  <Star size={10} fill='currentColor' />
-                  {r.rating}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {call.recorded && (
-            <AudioWaveformPlayer audioSrc={MOCK_RECORDING_URL} compact />
-          )}
-        </div>
-      </div>
-    </li>
-  )
-}
-
 function EmptyGlobal() {
   return (
     <div className='flex flex-col items-center justify-center py-8 text-center'>
@@ -286,9 +138,9 @@ function EmptyFiltered({
   onClearFilters,
   onClearDates,
 }: {
-  filter: FilterType
-  dateFrom?: Date 
-  dateTo?: Date 
+  filter: CallFilterType
+  dateFrom?: Date
+  dateTo?: Date
   onClearFilters: () => void
   onClearDates: () => void
 }) {
@@ -352,7 +204,7 @@ export function CustomerActivityTimeline({
   phone: Nullable<string>
   phone2: Nullable<string>
 }) {
-  const [filter, setFilter] = useState<FilterType>('all')
+  const [filter, setFilter] = useState<CallFilterType>('all')
   const [dateFrom, setDateFrom] = useState<Date | undefined>(daysAgoDate(7))
   const [dateTo, setDateTo] = useState<Date | undefined>(todayDate())
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
@@ -368,7 +220,7 @@ export function CustomerActivityTimeline({
   }, [hasPhones, phone, phone2])
 
   const filteredCalls = useMemo(() => {
-    let result = allCalls.filter(c => matchesFilter(c, filter))
+    let result = allCalls.filter(c => matchesCallFilter(c, filter))
 
     if (dateFrom) {
       const from = new Date(dateFrom)
@@ -481,7 +333,9 @@ export function CustomerActivityTimeline({
         <>
           <ul className='space-y-2'>
             {visibleCalls.map(call => (
-              <CallItem key={call.callId} call={call} />
+              <li key={call.callId} className='border rounded p-3 bg-white'>
+                <CallItemContent call={call} audioSrc={MOCK_RECORDING_URL} />
+              </li>
             ))}
           </ul>
 
