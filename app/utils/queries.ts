@@ -25,6 +25,8 @@ export interface Stone {
   samples_importance: number | null
   deleted_at: string | null
   bundle_number: string | null
+  whole_available: number
+  whole_amount: number
 }
 
 export const stoneQueryBuilder = async (
@@ -62,7 +64,20 @@ export const stoneQueryBuilder = async (
         AND slab_inventory.sale_id IS NULL 
         AND slab_inventory.cut_date IS NULL 
         AND slab_inventory.deleted_at IS NULL
-      THEN 1 ELSE 0 END) AS UNSIGNED) AS available
+      THEN 1 ELSE 0 END) AS UNSIGNED) AS available,
+    COUNT(DISTINCT CASE
+      WHEN slab_inventory.id IS NOT NULL
+        AND slab_inventory.parent_id IS NULL
+        AND slab_inventory.cut_date IS NULL
+        AND slab_inventory.deleted_at IS NULL
+      THEN slab_inventory.id ELSE NULL END) AS whole_amount,
+    CAST(SUM(CASE
+      WHEN slab_inventory.id IS NOT NULL
+        AND slab_inventory.parent_id IS NULL
+        AND slab_inventory.sale_id IS NULL
+        AND slab_inventory.cut_date IS NULL
+        AND slab_inventory.deleted_at IS NULL
+      THEN 1 ELSE 0 END) AS UNSIGNED) AS whole_available
   FROM stones
   LEFT JOIN slab_inventory ON (
     slab_inventory.stone_id = stones.id
