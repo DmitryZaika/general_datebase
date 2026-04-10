@@ -19,7 +19,6 @@ type CustomerInfo = {
 type DealRow = {
   id: number
   amount: number | null
-  title: string | null
   lost_reason: string | null
   list_name: string
   created_at: string | null
@@ -180,11 +179,6 @@ export default function CustomerInfoTab() {
                     </div>
                   )}
                 </div>
-                {d.title && (
-                  <div className='text-sm text-slate-600 mt-1 whitespace-pre-wrap'>
-                    <span className='font-semibold'>Title:</span> {d.title}
-                  </div>
-                )}
                 {d.lost_reason && (
                   <div className='text-sm text-slate-600 mt-1 whitespace-pre-wrap'>
                     <span className='font-semibold text-red-600'>Lost reason:</span>{' '}
