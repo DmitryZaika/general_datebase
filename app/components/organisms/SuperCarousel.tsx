@@ -22,6 +22,7 @@ interface ImageInput {
   name: string
   type: string
   available: number | null
+  amount?: number | null
   whole_available?: number | null
   whole_amount?: number | null
   regular_stock?: boolean | number
@@ -86,7 +87,7 @@ function ChildrenImagesDialog({
 
   const isRegularStock = !!image?.regular_stock
   const wholeAvail = image?.whole_available ?? image?.available ?? 0
-  const wholeAmt = image?.whole_amount ?? 0
+  const wholeAmt = image?.whole_amount ?? image?.amount ?? 0
   const totalAvail = image?.available ?? 0
   const displayedAvailable =
     isRegularStock && wholeAvail === 0

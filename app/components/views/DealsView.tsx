@@ -505,9 +505,12 @@ export default function DealsView({
               if (!d) return null
               return (
                 <div className='w-72 border rounded-lg p-2 shadow-md bg-white'>
-                  <div className='text-lg font-semibold truncate'>
-                    {d.company_name ?? d.name}
-                  </div>
+                  <div className='text-lg font-semibold truncate'>{d.name}</div>
+                  {d.company_name != null && String(d.company_name).trim() !== '' ? (
+                    <div className='text-xs text-slate-500 truncate'>
+                      {d.company_name}
+                    </div>
+                  ) : null}
                   {typeof d.title === 'string' && d.title.trim() ? (
                     <div className='mt-0.5 line-clamp-2 text-xs text-slate-500 break-words whitespace-pre-wrap'>
                       {d.title.trim()}
