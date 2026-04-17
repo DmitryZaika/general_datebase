@@ -370,6 +370,9 @@ export default function App() {
   }, [message?.nonce])
 
   const basePath = getBase(pathname)
+  const isEmployeeRoute = pathname.startsWith('/employee')
+  const isAdminRoute = pathname.startsWith('/admin')
+  const sidebarIconHoverShell = isEmployeeRoute || isAdminRoute
   const showSidebar =
     !!basePath &&
     !isLogin &&
@@ -392,8 +395,8 @@ export default function App() {
       <body>
         <QueryClientProvider client={queryClient}>
           <SidebarProvider
-            key={showSidebar ? 'show' : 'hide'}
-            defaultOpen={showSidebar}
+            key={showSidebar ? `show-${sidebarIconHoverShell}` : 'hide'}
+            defaultOpen={showSidebar && !sidebarIconHoverShell}
           >
             <AuthenticityTokenProvider token={token}>
               {showSidebar && (

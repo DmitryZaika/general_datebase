@@ -21,8 +21,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   let query = `SELECT s.id, s.type, s.width, s.length, s.name, s.url, s.retail_price, s.cost_per_sqft, s.is_display, s.samples_amount, s.regular_stock, s.bundle_number, s.level, s.finishing,
-            CAST(SUM(CASE WHEN si.id IS NOT NULL AND si.sale_id IS NULL AND si.cut_date IS NULL AND si.deleted_at IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS available,
-            CAST(SUM(CASE WHEN si.id IS NOT NULL AND si.deleted_at IS NULL THEN 1 ELSE 0 END) AS UNSIGNED) AS amount
+            COUNT(DISTINCT CASE
+              WHEN si.id IS NOT NULL AND si.cut_date IS NULL AND si.deleted_at IS NULL
+              THEN si.id ELSE NULL END) AS amount,
+            CAST(SUM(CASE
+              WHEN si.id IS NOT NULL AND si.sale_id IS NULL AND si.cut_date IS NULL AND si.deleted_at IS NULL
+              THEN 1 ELSE 0 END) AS UNSIGNED) AS available,
+            COUNT(DISTINCT CASE
+              WHEN si.id IS NOT NULL AND si.parent_id IS NULL AND si.cut_date IS NULL AND si.deleted_at IS NULL
+              THEN si.id ELSE NULL END) AS whole_amount,
+            CAST(SUM(CASE
+              WHEN si.id IS NOT NULL AND si.parent_id IS NULL AND si.sale_id IS NULL AND si.cut_date IS NULL AND si.deleted_at IS NULL
+              THEN 1 ELSE 0 END) AS UNSIGNED) AS whole_available
     FROM stones s
     LEFT JOIN slab_inventory AS si ON (
       si.stone_id = s.id
@@ -31,7 +41,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         FROM stone_slab_links
         WHERE stone_id = s.id
       )
-    )
+    ) AND si.cut_date IS NULL AND si.deleted_at IS NULL
     WHERE UPPER(s.name) LIKE UPPER(?)
     AND s.company_id = ?
     AND s.deleted_at IS NULL
