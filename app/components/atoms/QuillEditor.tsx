@@ -64,6 +64,7 @@ export function QuillEditor({ value, onChange, onFilesDrop }: IQuillEditorProps)
       const files = e.dataTransfer?.files
       if (files && files.length > 0 && onFilesDrop) {
         e.preventDefault()
+        e.stopPropagation()
         onFilesDrop(Array.from(files))
       }
     },

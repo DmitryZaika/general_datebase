@@ -70,6 +70,7 @@ interface EmailChatBaseProps {
   customerName: string
   messages: EmailChatMessage[]
   onClose: () => void
+  scrollToMessageId?: number | null
 }
 
 interface EmailChatEmployeeProps extends EmailChatBaseProps {
@@ -210,11 +211,15 @@ function getInitials(name: string): string {
 }
 
 export function EmailChat(props: EmailChatProps) {
-  const { variant, customerName, messages, onClose } = props
+  const { variant, customerName, messages, onClose, scrollToMessageId } = props
 
   const [chatMessages, setChatMessages] = useState<EmailChatMessage[]>(messages)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const messageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const targetMessageId = scrollToMessageId ?? null
+  const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null)
+  const initialScrollHandled = useRef(false)
   const [currentImages, setCurrentImages] = useState<
     { id: number; url: string; name: string; type: string; available: null }[]
   >([])
@@ -252,14 +257,37 @@ export function EmailChat(props: EmailChatProps) {
   }
 
   useEffect(() => {
+    if (targetMessageId !== null && !initialScrollHandled.current) return
     scrollToBottom()
   }, [chatMessages.length])
 
   useEffect(() => {
     if (chatMessages.length === 0) return
+    if (targetMessageId !== null && !initialScrollHandled.current) return
     const t = setTimeout(scrollToBottom, 150)
     return () => clearTimeout(t)
   }, [messages])
+
+  useEffect(() => {
+    if (targetMessageId === null) return
+    if (initialScrollHandled.current) return
+    if (chatMessages.length === 0) return
+
+    const t = setTimeout(() => {
+      const el = messageRefs.current.get(targetMessageId)
+      if (!el) {
+        initialScrollHandled.current = true
+        scrollToBottom()
+        return
+      }
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setHighlightedMessageId(targetMessageId)
+      initialScrollHandled.current = true
+      const clearT = setTimeout(() => setHighlightedMessageId(null), 2000)
+      return () => clearTimeout(clearT)
+    }, 250)
+    return () => clearTimeout(t)
+  }, [targetMessageId, chatMessages.length])
 
   useEffect(() => {
     if (isEmployee && textareaRef.current) {
@@ -530,11 +558,21 @@ export function EmailChat(props: EmailChatProps) {
                 className={`${rowClass} ${message.isFromCustomer ? 'flex-row-reverse justify-end pl-2' : 'flex-row-reverse justify-start pr-2'}`}
               >
                 <div
-                  className={
+                  ref={node => {
+                    if (node) {
+                      messageRefs.current.set(message.id, node)
+                    } else {
+                      messageRefs.current.delete(message.id)
+                    }
+                  }}
+                  className={cn(
                     message.isFromCustomer
                       ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%] break-words'
-                      : 'bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative pb-6 min-w-21.25 break-words'
-                  }
+                      : 'bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative pb-6 min-w-21.25 break-words',
+                    'transition-all duration-500 ease-out will-change-transform',
+                    highlightedMessageId === message.id &&
+                      'ring-1 ring-white/40 shadow-[0_22px_60px_-18px_rgba(15,23,42,0.55),0_8px_24px_-12px_rgba(15,23,42,0.4)] scale-[1.020] z-10',
+                  )}
                 >
                   <div
                     className={cn(
