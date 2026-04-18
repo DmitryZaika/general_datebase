@@ -5,6 +5,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from 'react-router'
 import { EmailChat } from '~/components/EmailChat'
 import { db } from '~/db.server'
@@ -133,6 +134,9 @@ export default function AdminDealsHistoryChatRoute() {
   const navigate = useNavigate()
   const location = useLocation()
   const data = useLoaderData<typeof loader>()
+  const [searchParams] = useSearchParams()
+  const messageIdRaw = searchParams.get('messageId')
+  const scrollToMessageId = messageIdRaw !== null ? Number(messageIdRaw) : null
 
   return (
     <EmailChat
@@ -141,6 +145,11 @@ export default function AdminDealsHistoryChatRoute() {
       messages={data.messages}
       onClose={() =>
         navigate(`/admin/deals/edit/${data.dealId}/history${location.search}`)
+      }
+      scrollToMessageId={
+        scrollToMessageId !== null && Number.isFinite(scrollToMessageId)
+          ? scrollToMessageId
+          : null
       }
     />
   )

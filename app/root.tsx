@@ -372,7 +372,8 @@ export default function App() {
   const basePath = getBase(pathname)
   const isEmployeeRoute = pathname.startsWith('/employee')
   const isAdminRoute = pathname.startsWith('/admin')
-  const sidebarIconHoverShell = isEmployeeRoute || isAdminRoute
+  const isSidebarPinned = Boolean(user?.pined_bar)
+  const sidebarIconHoverShell = (isEmployeeRoute || isAdminRoute) && !isSidebarPinned
   const showSidebar =
     !!basePath &&
     !isLogin &&

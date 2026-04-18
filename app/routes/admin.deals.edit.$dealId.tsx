@@ -18,6 +18,7 @@ export default function AdminDealEditLayout() {
     closedAt,
     activities,
     notes,
+    emails,
   } = useLoaderData<DealEditLoaderData>()
   return (
     <DealPage
@@ -29,6 +30,7 @@ export default function AdminDealEditLayout() {
       closedAt={closedAt}
       activities={activities}
       notes={notes}
+      emails={emails}
     />
   )
 }
