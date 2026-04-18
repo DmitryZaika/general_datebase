@@ -299,10 +299,15 @@ export default function DealItem({
         <div className='flex w-full items-center gap-2'>
           <Link
             to={projectUrl}
-            className='flex-1 select-none text-xl font-medium whitespace-normal hover:underline'
+            className='flex flex-1 flex-col gap-0.5 select-none text-xl font-medium whitespace-normal hover:underline'
             onPointerDown={e => e.stopPropagation()}
           >
-            {deal.company_name ? deal.company_name : deal.name}
+            <span>{deal.name}</span>
+            {deal.company_name != null && String(deal.company_name).trim() !== '' ? (
+              <span className='text-sm font-normal text-slate-500'>
+                {deal.company_name}
+              </span>
+            ) : null}
           </Link>
         </div>
         {titleLine ? (

@@ -37,6 +37,9 @@ export interface StoneImage {
   retail_price: number
   cost_per_sqft: number
   available: number
+  amount: number
+  whole_amount: number
+  whole_available: number
   samples_amount: number
   regular_stock?: boolean | number
   is_display?: boolean | number
@@ -117,6 +120,8 @@ export interface StoneSearchResult {
   cost_per_sqft: number
   available: number
   amount: number
+  whole_amount: number
+  whole_available: number
   is_display: boolean
   regular_stock?: boolean | number
   bundle_number?: string | null

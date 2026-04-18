@@ -146,6 +146,8 @@ function Sidebar({
   collapsible = 'offcanvas',
   className,
   children,
+  onMouseEnter,
+  onMouseLeave,
   ...props
 }: React.ComponentProps<'div'> & {
   side?: 'left' | 'right'
@@ -202,6 +204,8 @@ function Sidebar({
       data-variant={variant}
       data-side={side}
       data-slot='sidebar'
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <div
         data-slot='sidebar-gap'

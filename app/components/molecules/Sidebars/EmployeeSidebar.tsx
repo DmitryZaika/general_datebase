@@ -267,7 +267,7 @@ export function EmployeeSidebar({
 
   const companyId = companyIdFromUrl ?? data?.user?.company_id
 
-  const { isMobile, setOpenMobile } = useSidebar()
+  const { isMobile, setOpenMobile, setOpen } = useSidebar()
   const isAdminPage = location.pathname.startsWith('/admin')
   const isCustomerPage = location.pathname.startsWith('/customer')
   const targetPath = getMirroredUrl(isAdminPage, location)
@@ -352,8 +352,17 @@ export function EmployeeSidebar({
     operationsItems.some(i => location.pathname.startsWith(i.url)),
   )
 
+  const isIconHoverDesktopSidebar =
+    (location.pathname.startsWith('/employee') ||
+      location.pathname.startsWith('/admin')) &&
+    !isMobile
+
   return (
-    <Sidebar>
+    <Sidebar
+      collapsible={isIconHoverDesktopSidebar ? 'icon' : 'offcanvas'}
+      onMouseEnter={isIconHoverDesktopSidebar ? () => setOpen(true) : undefined}
+      onMouseLeave={isIconHoverDesktopSidebar ? () => setOpen(false) : undefined}
+    >
       {isMobile && data?.user && itemsBase !== 'shop' && (
         <SidebarHeader className='py-2 px-3'>
           <div className='flex gap-2 justify-center'>
@@ -400,9 +409,11 @@ export function EmployeeSidebar({
                       onClick={() => setInventoryOpen(o => !o)}
                     >
                       <Package />
-                      <span>Inventory</span>
+                      <span className='group-data-[collapsible=icon]:hidden'>
+                        Inventory
+                      </span>
                       <ChevronDown
-                        className={`ml-auto transition-transform ${inventoryOpen ? 'rotate-180' : ''}`}
+                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${inventoryOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
                   </SidebarMenuButton>
@@ -450,9 +461,9 @@ export function EmployeeSidebar({
                       onClick={() => setCrmOpen(o => !o)}
                     >
                       <Users />
-                      <span>CRM</span>
+                      <span className='group-data-[collapsible=icon]:hidden'>CRM</span>
                       <ChevronDown
-                        className={`ml-auto transition-transform ${crmOpen ? 'rotate-180' : ''}`}
+                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${crmOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
                   </SidebarMenuButton>
@@ -500,9 +511,11 @@ export function EmployeeSidebar({
                       onClick={() => setResourcesOpen(o => !o)}
                     >
                       <FileIcon />
-                      <span>Resources</span>
+                      <span className='group-data-[collapsible=icon]:hidden'>
+                        Resources
+                      </span>
                       <ChevronDown
-                        className={`ml-auto transition-transform ${resourcesOpen ? 'rotate-180' : ''}`}
+                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${resourcesOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
                   </SidebarMenuButton>
@@ -542,9 +555,11 @@ export function EmployeeSidebar({
                       onClick={() => setOperationsOpen(o => !o)}
                     >
                       <Calculator />
-                      <span>Operations</span>
+                      <span className='group-data-[collapsible=icon]:hidden'>
+                        Operations
+                      </span>
                       <ChevronDown
-                        className={`ml-auto transition-transform ${operationsOpen ? 'rotate-180' : ''}`}
+                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${operationsOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
                   </SidebarMenuButton>
@@ -585,9 +600,11 @@ export function EmployeeSidebar({
                     <SidebarMenuButton asChild isActive={isActive}>
                       <a href={item.url} className='flex w-full items-center gap-2'>
                         <item.icon />
-                        <span>{item.title}</span>
+                        <span className='group-data-[collapsible=icon]:hidden'>
+                          {item.title}
+                        </span>
                         {item.title === 'Emails' && unreadEmailCount > 0 ? (
-                          <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white'>
+                          <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white group-data-[collapsible=icon]:hidden'>
                             {unreadEmailCount}
                           </span>
                         ) : null}
