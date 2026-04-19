@@ -166,7 +166,6 @@ export function EmailTemplatePickerPopover({
             <Button
               type='button'
               size='icon'
-              variant='ghost'
               aria-label='Use template'
               onClick={() => (isOpen ? close() : setIsOpen(true))}
             >
