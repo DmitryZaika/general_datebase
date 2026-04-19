@@ -105,6 +105,22 @@ const getItems = (
       ),
     },
   ]
+  if (isCustomerRoute) {
+    finalList.push(
+      {
+        title: 'Sinks',
+        url: `/customer/${companyId}/sinks`,
+        icon: SinkIcon,
+        component: () => <SinksFilters base={base} suppliers={sinkSuppliers} />,
+      },
+      {
+        title: 'Faucets',
+        url: `/customer/${companyId}/faucets`,
+        icon: ShowerHead,
+        component: () => <FaucetsFilters base={base} suppliers={faucetSuppliers} />,
+      },
+    )
+  }
   if (base === 'employee') {
     finalList.push({
       title: 'Customers',

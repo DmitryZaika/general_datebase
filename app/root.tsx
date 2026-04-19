@@ -338,7 +338,11 @@ export default function App() {
   const isCustomersCompanies = pathname === '/customers/companies'
   const segments = pathname.split('/').filter(Boolean)
   const isCustomerViewPage =
-    segments[0] === 'customer' && segments[2] !== 'stones' && segments[2] !== undefined
+    segments[0] === 'customer' &&
+    segments[2] !== undefined &&
+    segments[2] !== 'stones' &&
+    segments[2] !== 'sinks' &&
+    segments[2] !== 'faucets'
   const mainRef = useRef<HTMLElement | null>(null)
   const [isAtBottom, setIsAtBottom] = useState(false)
   useEffect(() => {

@@ -783,8 +783,6 @@ function ActivityForm({
     }
   }
 
-  const activityNameRows = Math.max(1, form.name.split('\n').length)
-
   return (
     <div className='space-y-2 mb-4'>
       {isEditing && (
@@ -804,13 +802,8 @@ function ActivityForm({
         onChange={e => dispatch({ type: 'SET_NAME', payload: e.target.value })}
         onKeyDown={handleKeyDown}
         disabled={isSubmitting}
-        rows={activityNameRows}
-        className={cn(
-          'resize-none text-sm w-full py-1.5 leading-snug',
-          activityNameRows === 1
-            ? 'min-h-9 whitespace-nowrap overflow-x-auto overflow-y-hidden'
-            : 'min-h-0',
-        )}
+        rows={1}
+        className='resize-none text-sm w-full min-h-9 py-1.5 leading-snug break-words [field-sizing:content]'
       />
 
       <div className='flex gap-2'>
