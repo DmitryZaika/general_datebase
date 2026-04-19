@@ -58,7 +58,7 @@ export default function DeleteDeal() {
     if (!dealId) return
     deleteMutation.mutate(dealId, {
       onSuccess: () => {
-        navigate(`/employee/deals`, {
+        navigate(`/employee/deals${window.location.search}`, {
           replace: true,
         })
         toast({
