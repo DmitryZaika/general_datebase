@@ -38,6 +38,7 @@ export function QuillEditor({ value, onChange, onFilesDrop }: IQuillEditorProps)
       const currentContent = quill.root.innerHTML
       if (currentContent !== value && value !== undefined) {
         quill.clipboard.dangerouslyPasteHTML(value)
+        quill.setSelection(quill.getLength(), 0)
       }
     }
     isInternalChange.current = false
