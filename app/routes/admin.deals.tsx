@@ -20,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
 import { CLOSED_LOST_LIST_ID, CLOSED_WON_LIST_ID } from '~/utils/constants'
@@ -313,9 +312,6 @@ export default function AdminDeals() {
         showAddDeal={false}
         toolbarLeft={
           <>
-            <div className='hidden md:block'>
-              <OriginalSidebarTrigger />
-            </div>
             <SalesRepsFilter />
           </>
         }

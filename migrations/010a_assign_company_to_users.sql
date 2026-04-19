@@ -1,1 +1,0 @@
-UPDATE users SET company_id = (SELECT id FROM company WHERE name = 'Default Company' LIMIT 1) WHERE company_id IS NULL; 

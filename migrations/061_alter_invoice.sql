@@ -1,2 +1,0 @@
-ALTER TABLE sales
-ADD COLUMN qbo_id INT;

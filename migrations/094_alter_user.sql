@@ -1,1 +1,0 @@
-ALTER TABLE users ADD COLUMN temp_telegram_id bigint DEFAULT NULL;

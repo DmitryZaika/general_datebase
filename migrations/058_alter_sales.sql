@@ -1,2 +1,0 @@
-ALTER TABLE sales
-ADD COLUMN project_address VARCHAR(255) NOT NULL;
