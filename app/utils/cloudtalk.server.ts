@@ -20,12 +20,14 @@ export interface Agent {
   associated_numbers: string[]
 }
 
-interface CollectionsResponse<T> {
-  itemsCount: number
-  pageCount: number
-  pageNumber: number
-  limit: number
-  items: T[]
+interface CollectionsResponseEnvelope<T> {
+  responseData: {
+    itemsCount: number
+    pageCount: number
+    pageNumber: number
+    limit: number
+    data: T[]
+  }
 }
 
 type FavoriteAgent = {
@@ -76,8 +78,8 @@ type Contact = {
 }
 
 type Cdr = {
-  id: number
-  billsec: number
+  id: string
+  billsec: string
   type: 'incoming' | 'outgoing' | 'internal'
   public_external: string
   public_internal: string
@@ -88,14 +90,14 @@ type Cdr = {
   redirected_from: string
   transferred_from: string
   is_local: boolean
-  user_id: number
-  talking_time: number
+  user_id: string
+  talking_time: string
   started_at: string
   answered_at: string
   ended_at: string
-  waiting_time: number
-  wrapup_time: number
-  recording_link: number
+  waiting_time: string
+  wrapup_time: string
+  recording_link: string
 }
 
 type CallNumber = {
@@ -109,8 +111,8 @@ type CallNumber = {
   source_id: number
 }
 
-type BillingData = {
-  price: number
+type BillingCall = {
+  price: string
 }
 
 type AgentCall = {
@@ -170,7 +172,7 @@ export type Calls200Response = {
     country_code: CallNumber['country_code']
     area_code: CallNumber['area_code']
   }
-  BillingData: BillingData
+  BillingCall: BillingCall
   Agent: AgentCall
   Notes: CallNote
   Tags: CallTag
@@ -232,7 +234,37 @@ export async function fetchValue<T>(
   url: string,
   companyId: number,
   queryParams: Record<string, string | number>,
-): Promise<CollectionsResponse<T>> {
+): Promise<{ items: T[] }> {
   const response = await fetchValueRaw(url, companyId, queryParams)
-  return await response.json()
+  const json = (await response.json()) as CollectionsResponseEnvelope<T>
+  return { items: json.responseData?.data ?? [] }
+}
+
+export async function fetchCallsForPhones(
+  companyId: number,
+  phones: string[],
+  extraParams: Record<string, string | number> = {},
+): Promise<{ items: Calls200Response[] }> {
+  if (phones.length === 0) return { items: [] }
+
+  const results = await Promise.all(
+    phones.map(p =>
+      fetchValue<Calls200Response>('calls/index.json', companyId, {
+        limit: 200,
+        ...extraParams,
+        public_external: p,
+      }),
+    ),
+  )
+
+  const seen = new Set<string>()
+  const items: Calls200Response[] = []
+  for (const r of results) {
+    for (const item of r.items) {
+      if (seen.has(item.Cdr.id)) continue
+      seen.add(item.Cdr.id)
+      items.push(item)
+    }
+  }
+  return { items }
 }

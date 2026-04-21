@@ -1,18 +1,32 @@
 import type { LucideIcon } from 'lucide-react'
 import { Phone, PhoneIncoming, PhoneOutgoing, Voicemail } from 'lucide-react'
-import type { CallEntry } from '~/components/molecules/CallHistory'
 import type { Nullable } from '~/types/utils'
 import type { Calls200Response } from '~/utils/cloudtalk.server'
+
+export type CallEntry = {
+  callId: number
+  type: Calls200Response['Cdr']['type']
+  startedAt: string
+  talkingTime: number
+  recorded: boolean
+  recordingLink: string
+  agentName: string
+  publicExternal: string
+  isVoicemail: boolean
+  notes: Calls200Response['Notes']
+  tags: Calls200Response['Tags']
+  ratings: Calls200Response['Ratings']
+}
 
 export type CallIconInfo = { Icon: LucideIcon; color: string }
 
 export function mapToCallEntry(item: Calls200Response): CallEntry {
   const { Cdr, Agent, Notes, Tags, Ratings } = item
   return {
-    callId: Cdr.id,
+    callId: Number(Cdr.id),
     type: Cdr.type,
     startedAt: Cdr.started_at,
-    talkingTime: Cdr.talking_time,
+    talkingTime: Number(Cdr.talking_time),
     recorded: Cdr.recorded,
     recordingLink: Cdr.recording_link,
     agentName: Agent ? `${Agent.firstname} ${Agent.lastname}`.trim() : 'Unknown',

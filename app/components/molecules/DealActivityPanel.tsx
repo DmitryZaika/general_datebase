@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -18,7 +19,6 @@ import { useFetcher, useLocation, useNavigate } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import ClipboardIcon from '~/components/icons/ClipboardIcon'
 import NoteIcon from '~/components/icons/NoteIcon'
-import type { CallEntry } from '~/components/molecules/CallHistory'
 import { CallItemContent } from '~/components/molecules/CallItemContent'
 import {
   AlertDialog,
@@ -60,8 +60,8 @@ import type {
   HistoryTab,
 } from '~/types/dealActivityTypes'
 import type { Nullable } from '~/types/utils'
-import { mapToCallEntry } from '~/utils/callDisplayHelpers'
-import { getMockActionsForDeal, MOCK_RECORDING_URL } from '~/utils/cloudtalk.mock'
+import { type CallEntry, mapToCallEntry } from '~/utils/callDisplayHelpers'
+import type { Calls200Response } from '~/utils/cloudtalk.server'
 import { NoteForm } from './NoteForm'
 import { NoteItem } from './NoteItem'
 
@@ -1055,7 +1055,7 @@ function ActivityList({
               <div className={ACTION_CARD_CLASS}>
                 <CallItemContent
                   call={item.data}
-                  audioSrc={MOCK_RECORDING_URL}
+                  audioSrc={`/api/cloudtalk/userCallMedia/${item.data.callId}`}
                   compact
                 />
               </div>
@@ -1131,7 +1131,11 @@ function ActivityList({
                 isLast={index === actions.length - 1}
               >
                 <div className={ACTION_CARD_CLASS}>
-                  <CallItemContent call={call} audioSrc={MOCK_RECORDING_URL} compact />
+                  <CallItemContent
+                    call={call}
+                    audioSrc={`/api/cloudtalk/userCallMedia/${call.callId}`}
+                    compact
+                  />
                 </div>
               </TimelineItem>
             ))}
@@ -1237,12 +1241,23 @@ export function DealActivityPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const historyHeaderRef = useRef<HTMLDivElement>(null)
 
+  const { data: callsData } = useQuery({
+    queryKey: ['cloudtalk-deal-calls', dealId],
+    queryFn: async () => {
+      const r = await fetch(`/api/cloudtalk/dealCalls/${dealId}`)
+      if (!r.ok) throw new Error(`CloudTalk ${r.status}`)
+      return (await r.json()) as { items: Calls200Response[] }
+    },
+    enabled: !!dealId,
+    staleTime: 60_000,
+  })
+
   const actions = useMemo(() => {
-    const raw = getMockActionsForDeal(dealId)
+    const raw = callsData?.items ?? []
     return raw
       .map(mapToCallEntry)
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-  }, [dealId])
+  }, [callsData])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)

@@ -1,7 +1,9 @@
+import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { CalendarDays, Info, Phone } from 'lucide-react'
+import { AlertTriangle, CalendarDays, Info, Phone } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
+import { Spinner } from '~/components/atoms/Spinner'
 import { CallItemContent } from '~/components/molecules/CallItemContent'
 import { Button } from '~/components/ui/button'
 import { Calendar } from '~/components/ui/calendar'
@@ -12,7 +14,7 @@ import {
   mapToCallEntry,
   matchesCallFilter,
 } from '~/utils/callDisplayHelpers'
-import { getMockCallsForCustomer, MOCK_RECORDING_URL } from '~/utils/cloudtalk.mock'
+import type { Calls200Response } from '~/utils/cloudtalk.server'
 
 const FILTER_OPTIONS: { value: CallFilterType; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -195,6 +197,31 @@ function NoPhoneBanner() {
   )
 }
 
+function LoadingState() {
+  return (
+    <div className='flex items-center justify-center gap-2 py-8 text-sm text-slate-500'>
+      <Spinner size={16} />
+      Loading activity...
+    </div>
+  )
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className='flex flex-col items-center justify-center py-8 text-center'>
+      <AlertTriangle size={24} className='text-amber-500 mb-3' />
+      <div className='text-sm font-medium text-slate-600'>Unable to load activity</div>
+      <button
+        type='button'
+        onClick={onRetry}
+        className='text-xs text-blue-500 underline mt-2'
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+
 // Main component
 
 export function CustomerActivityTimeline({
@@ -205,19 +232,34 @@ export function CustomerActivityTimeline({
   phone2: Nullable<string>
 }) {
   const [filter, setFilter] = useState<CallFilterType>('all')
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(daysAgoDate(7))
-  const [dateTo, setDateTo] = useState<Date | undefined>(todayDate())
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   const hasPhones = !!phone || !!phone2
 
+  const queryKey = ['cloudtalk-customer-calls', phone, phone2] as const
+
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const qs = new URLSearchParams()
+      if (phone) qs.set('phone', phone)
+      if (phone2) qs.set('phone2', phone2)
+      const r = await fetch(`/api/cloudtalk/customerCalls?${qs}`)
+      if (!r.ok) throw new Error(`CloudTalk ${r.status}`)
+      return (await r.json()) as { items: Calls200Response[] }
+    },
+    enabled: hasPhones,
+    staleTime: 60_000,
+  })
+
   const allCalls = useMemo(() => {
-    if (!hasPhones) return []
-    const raw = getMockCallsForCustomer(phone, phone2)
-    return raw
+    const items = data?.items ?? []
+    return items
       .map(mapToCallEntry)
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-  }, [hasPhones, phone, phone2])
+  }, [data])
 
   const filteredCalls = useMemo(() => {
     let result = allCalls.filter(c => matchesCallFilter(c, filter))
@@ -243,8 +285,8 @@ export function CustomerActivityTimeline({
 
   const clearAllFilters = () => {
     setFilter('all')
-    setDateFrom(daysAgoDate(7))
-    setDateTo(todayDate())
+    setDateFrom(undefined)
+    setDateTo(undefined)
     setVisibleCount(PAGE_SIZE)
   }
 
@@ -260,8 +302,7 @@ export function CustomerActivityTimeline({
     setDateTo(todayDate())
   }
 
-  // No phone and empty mock data → global empty
-  if (!hasPhones && !allCalls.length) {
+  if (!hasPhones) {
     return (
       <div className='border rounded p-4'>
         <div className='text-md font-semibold mb-2'>Activity</div>
@@ -271,7 +312,24 @@ export function CustomerActivityTimeline({
     )
   }
 
-  // Has phones but no calls at all → global empty
+  if (isError) {
+    return (
+      <div className='border rounded p-4'>
+        <div className='text-md font-semibold mb-2'>Activity</div>
+        <ErrorState onRetry={() => refetch()} />
+      </div>
+    )
+  }
+
+  if (isLoading && !data) {
+    return (
+      <div className='border rounded p-4'>
+        <div className='text-md font-semibold mb-2'>Activity</div>
+        <LoadingState />
+      </div>
+    )
+  }
+
   if (!allCalls.length) {
     return (
       <div className='border rounded p-4'>
@@ -327,17 +385,26 @@ export function CustomerActivityTimeline({
           dateFrom={dateFrom}
           dateTo={dateTo}
           onClearFilters={clearAllFilters}
-          onClearDates={() => handlePreset('7d')}
+          onClearDates={() => handlePreset('all')}
         />
       ) : (
         <>
           <ul className='space-y-2'>
             {visibleCalls.map(call => (
               <li key={call.callId} className='border rounded p-3 bg-white'>
-                <CallItemContent call={call} audioSrc={MOCK_RECORDING_URL} />
+                <CallItemContent
+                  call={call}
+                  audioSrc={`/api/cloudtalk/userCallMedia/${call.callId}`}
+                />
               </li>
             ))}
           </ul>
+
+          {isFetching && (
+            <div className='mt-2 flex items-center justify-center'>
+              <Spinner size={14} />
+            </div>
+          )}
 
           {hasMore && (
             <div className='mt-3 text-center'>

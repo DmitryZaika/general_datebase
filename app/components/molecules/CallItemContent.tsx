@@ -1,9 +1,9 @@
 import { format } from 'date-fns'
 import { Star } from 'lucide-react'
 import { AudioWaveformPlayer } from '~/components/molecules/AudioWaveformPlayer'
-import type { CallEntry } from '~/components/molecules/CallHistory'
 import { cn } from '~/lib/utils'
 import {
+  type CallEntry,
   formatDuration,
   getCallIcon,
   getCallStatus,
@@ -106,7 +106,7 @@ export function CallItemContent({
 
         {call.recorded && (
           <div className={cn(compact ? 'mt-1.5' : 'mt-1')}>
-            <AudioWaveformPlayer audioSrc={audioSrc} compact />
+            <AudioWaveformPlayer audioSrc={audioSrc} compact={compact} />
           </div>
         )}
       </div>

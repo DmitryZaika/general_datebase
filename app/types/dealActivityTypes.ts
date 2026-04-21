@@ -1,6 +1,6 @@
-import type { CallEntry } from '~/components/molecules/CallHistory'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
+import type { CallEntry } from '~/utils/callDisplayHelpers'
 
 export type DeadlineUrgency = 'overdue' | 'today' | 'soon' | 'normal'
 
