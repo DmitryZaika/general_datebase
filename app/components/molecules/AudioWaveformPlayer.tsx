@@ -52,7 +52,7 @@ export function AudioWaveformPlayer({
   if (error) {
     return (
       <div className='flex items-center gap-2 w-full mt-1 text-xs text-slate-400'>
-        Recording unavailable
+        Recording no longer available
       </div>
     )
   }
