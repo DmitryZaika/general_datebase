@@ -83,7 +83,7 @@ function formatDate(dateString: string) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getEmployeeUser(request)
-    if (!user || !user.company_id) {
+    if (!user || user.company_id == null) {
       return redirect('/login')
     }
 
@@ -232,7 +232,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request)
-  if (!user || !user.company_id) {
+  if (!user || user.company_id == null) {
     const session = await getSession(request.headers.get('Cookie'))
     session.flash('message', toastData('Error', 'Unauthorized', 'destructive'))
     return redirect('/login', {

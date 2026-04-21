@@ -52,8 +52,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const users = await selectMany<User>(
     db,
-    `select id, name, email, phone_number from users WHERE is_deleted = 0${effectiveCompanyId ? ' AND company_id = ?' : ''}`,
-    effectiveCompanyId ? [effectiveCompanyId] : [],
+    `select id, name, email, phone_number from users WHERE is_deleted = 0${effectiveCompanyId != null ? ' AND company_id = ?' : ''}`,
+    effectiveCompanyId != null ? [effectiveCompanyId] : [],
   )
 
   const companies = await selectMany<Company>(db, 'SELECT id, name FROM company')
@@ -106,7 +106,7 @@ export default function Adminusers() {
 
   return (
     <PageLayout title='Users'>
-      {isSuperUser && (
+      {isSuperUser ? (
         <div className='flex gap-2 items-end'>
           <Link to={`add`} relative='path' className='mb-3'>
             <Button>Add User</Button>
@@ -136,7 +136,7 @@ export default function Adminusers() {
             </Select>
           </div>
         </div>
-      )}
+      ) : null}
       <DataTable columns={columns} data={users} />
       <Outlet />
     </PageLayout>

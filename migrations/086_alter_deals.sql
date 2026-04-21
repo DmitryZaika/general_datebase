@@ -1,1 +1,0 @@
-alter table deals add column due_date date;

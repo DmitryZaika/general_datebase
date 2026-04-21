@@ -1,4 +1,4 @@
-import type { ResultSetHeader } from 'mysql2'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { db } from '~/db.server'
 import { posthogClient } from '~/utils/posthog.server'
@@ -18,18 +18,31 @@ export async function action({ request }: ActionFunctionArgs) {
       [sales_rep, customer_id],
     )
 
-    // --- handle deals when assigning a sales rep ---
     if (sales_rep) {
-      // глобальный список "New Customers" имеет id = 1
-      const listId = 1
+      const [companyRows] = await db.execute<RowDataPacket[]>(
+        'SELECT company_id FROM customers WHERE id = ? LIMIT 1',
+        [customer_id],
+      )
+      const companyId = companyRows[0]?.company_id
 
-      // удалить активные сделки этого клиента у прошлого продавца
+      const [defaultListRows] = await db.execute<RowDataPacket[]>(
+        `SELECT dl.id, dl.name
+         FROM groups_list g
+         JOIN deals_list dl ON dl.group_id = g.id AND dl.deleted_at IS NULL
+         WHERE g.deleted_at IS NULL AND g.is_default = 1
+           AND (g.company_id = ? OR g.id = 1)
+         ORDER BY dl.position ASC
+         LIMIT 1`,
+        [companyId],
+      )
+      const listId = defaultListRows[0]?.id ?? 1
+      const status = defaultListRows[0]?.name ?? 'New Customer'
+
       await db.execute(
         'UPDATE deals SET user_id = ? WHERE customer_id = ? AND user_id <> ? AND deleted_at IS NULL',
         [sales_rep, customer_id, sales_rep],
       )
 
-      // проверить, есть ли уже активная сделка у нового продавца
       const [existingRows] = await db.query(
         'SELECT id FROM deals WHERE customer_id = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1',
         [customer_id, sales_rep],
@@ -37,7 +50,6 @@ export async function action({ request }: ActionFunctionArgs) {
       const hasExisting = (existingRows as Array<{ id: number }>).length > 0
 
       if (!hasExisting) {
-        // следующая позиция в списке
         const [posRows] = await db.query(
           'SELECT COALESCE(MAX(position),0)+1 AS next FROM deals WHERE list_id = ? AND deleted_at IS NULL',
           [listId],
@@ -46,7 +58,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
         const [dealResult] = await db.execute<ResultSetHeader>(
           'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
-          [customer_id, 'New Customer', listId, nextPos, sales_rep],
+          [customer_id, status, listId, nextPos, sales_rep],
         )
         await db.execute(
           'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',

@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { db } from '~/db.server'
 import { getSession } from '~/sessions.server'
 import { Positions } from '~/types'
+import { selectMany } from '~/utils/queryHelpers'
 
 interface LoginUser {
   id: number
@@ -33,6 +34,7 @@ export interface SessionUser {
   is_admin: boolean
   is_superuser: boolean
   company_id: number
+  pined_bar: number
 }
 
 export interface SessionUserNew extends Omit<SessionUser, 'company_id'> {
@@ -87,7 +89,7 @@ export async function login(
 
 async function getUser(sessionId: string): Promise<SessionUser | undefined> {
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
-    `SELECT users.id, users.email, users.name, users.phone_number, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
+    `SELECT users.id, users.email, users.name, users.phone_number, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.pined_bar, users.is_deleted FROM users
      JOIN sessions ON sessions.user_id = users.id
      WHERE sessions.id = ?
        AND sessions.expiration_date > CURRENT_TIMESTAMP
@@ -140,10 +142,34 @@ async function handlePermissions(
   if (user === undefined) {
     throw new TypeError('Could not find session')
   }
-  if (!validUser(user)) {
+
+  // Check SuperAdmin position — grants admin-level access + company switching
+  const activeCompanyId = session.get('activeCompanyId')
+  const [saRows] = await db.query<RowDataPacket[]>(
+    'SELECT company_id FROM users_positions WHERE user_id = ? AND position_id = ?',
+    [user.id, Positions.SuperAdmin],
+  )
+  const hasSuperAdmin = Array.isArray(saRows) && saRows.length > 0
+
+  let effectiveUser = hasSuperAdmin
+    ? { ...user, is_admin: true, is_employee: true }
+    : user
+
+  if (!validUser(effectiveUser)) {
     throw new TypeError('Invalid user permissions')
   }
-  return user
+
+  // Company switching: check activeCompanyId is in SuperAdmin's assigned companies
+  if (hasSuperAdmin && activeCompanyId !== undefined) {
+    const hasCompany = saRows.some(
+      (r: RowDataPacket) => r.company_id === activeCompanyId,
+    )
+    if (hasCompany) {
+      effectiveUser = { ...effectiveUser, company_id: activeCompanyId }
+    }
+  }
+
+  return effectiveUser
 }
 
 async function handlePermissionsNew(
@@ -212,4 +238,26 @@ export async function getUserBySessionId(
   sessionId: string,
 ): Promise<SessionUser | undefined> {
   return await getUser(sessionId)
+}
+
+export async function getSuperAdminCompanies(
+  userId: number,
+): Promise<{ id: number; name: string }[]> {
+  return await selectMany<{ id: number; name: string }>(
+    db,
+    `SELECT c.id, c.name
+     FROM company c
+     JOIN users_positions up ON up.company_id = c.id
+     WHERE up.user_id = ? AND up.position_id = ?
+     ORDER BY c.name ASC`,
+    [userId, Positions.SuperAdmin],
+  )
+}
+
+export async function isSuperAdmin(userId: number): Promise<boolean> {
+  const [rows] = await db.query<RowDataPacket[]>(
+    'SELECT 1 FROM users_positions WHERE user_id = ? AND position_id = ? LIMIT 1',
+    [userId, Positions.SuperAdmin],
+  )
+  return Array.isArray(rows) && rows.length > 0
 }

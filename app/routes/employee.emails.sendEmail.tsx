@@ -34,10 +34,7 @@ import { z } from 'zod'
 import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
-import {
-  type EmailTemplate,
-  EmailTemplateSearch,
-} from '~/components/molecules/EmailTemplateSearch'
+import { EmailTemplateSearch } from '~/components/molecules/EmailTemplateSearch'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { MultiEmailRecipientInput } from '~/components/molecules/MultiEmailRecipientInput'
@@ -70,6 +67,7 @@ import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
+import type { EmailTemplate } from '~/utils/emailTemplates'
 import {
   getUnfilledCustomVariables,
   replaceTemplateVariables,
@@ -201,7 +199,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     customerName,
     senderInfo,
     dealId,
-    companyId: user.company_id || 0,
+    companyId: user.company_id ?? 0,
     templateVariableData,
   }
 }
@@ -213,7 +211,7 @@ async function fetchSenderInfo(user: EmployeeUser): Promise<SenderInfo> {
   if (user.email) senderInfo.senderEmail = user.email
   if (user.phone_number) senderInfo.senderPhoneNumber = user.phone_number
 
-  if (user.company_id) {
+  if (user.company_id !== undefined) {
     const [companyRows] = await db.execute<RowDataPacket[]>(
       'SELECT name FROM company WHERE id = ?',
       [user.company_id],

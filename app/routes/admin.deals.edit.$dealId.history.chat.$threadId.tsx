@@ -5,6 +5,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from 'react-router'
 import { EmailChat } from '~/components/EmailChat'
 import { db } from '~/db.server'
@@ -72,19 +73,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     parseEmailAddress(email).toLowerCase() || ''
   const customerEmail = normalizeEmail(customerRows?.email || '')
 
-  await db.execute(
-    `
-      UPDATE emails
-      SET employee_read_at = NOW()
-      WHERE deleted_at IS NULL
-        AND thread_id = ?
-        AND (deal_id = ? OR deal_id IS NULL)
-        AND employee_read_at IS NULL
-        AND sender_user_id IS NULL
-    `,
-    [threadId, dealId],
-  )
-
   let emailQuery = `SELECT e.id, e.subject, e.body, e.sent_at, e.sender_email, e.receiver_email, e.employee_read_at, u.email_signature as signature, MAX(er.read_at) AS read_at
        FROM emails e
        LEFT JOIN email_reads er ON e.message_id = er.message_id
@@ -146,6 +134,9 @@ export default function AdminDealsHistoryChatRoute() {
   const navigate = useNavigate()
   const location = useLocation()
   const data = useLoaderData<typeof loader>()
+  const [searchParams] = useSearchParams()
+  const messageIdRaw = searchParams.get('messageId')
+  const scrollToMessageId = messageIdRaw !== null ? Number(messageIdRaw) : null
 
   return (
     <EmailChat
@@ -154,6 +145,11 @@ export default function AdminDealsHistoryChatRoute() {
       messages={data.messages}
       onClose={() =>
         navigate(`/admin/deals/edit/${data.dealId}/history${location.search}`)
+      }
+      scrollToMessageId={
+        scrollToMessageId !== null && Number.isFinite(scrollToMessageId)
+          ? scrollToMessageId
+          : null
       }
     />
   )

@@ -22,11 +22,16 @@ interface ImageInput {
   name: string
   type: string
   available: number | null
+  amount?: number | null
+  whole_available?: number | null
+  whole_amount?: number | null
   regular_stock?: boolean | number
   width?: number | null
   length?: number | null
   retail_price?: number | null
   cost_per_sqft?: number
+  level?: number | null
+  finishing?: string | null
 }
 
 interface ImageProps {
@@ -81,12 +86,19 @@ function ChildrenImagesDialog({
   }
 
   const isRegularStock = !!image?.regular_stock
+  const wholeAvail = image?.whole_available ?? image?.available ?? 0
+  const wholeAmt = image?.whole_amount ?? image?.amount ?? 0
+  const totalAvail = image?.available ?? 0
   const displayedAvailable =
-    image?.available === 0 && isRegularStock
+    isRegularStock && wholeAvail === 0
       ? 'Regular Stock'
-      : image?.available !== undefined
-        ? `${image.available}${isRegularStock ? ' (Regular stock)' : ''}`
-        : '—'
+      : wholeAvail > 0
+        ? `${wholeAvail} / ${wholeAmt > 0 ? wholeAmt : '—'}${isRegularStock ? ' (Regular stock)' : ''}`
+        : totalAvail > 0
+          ? 'Remnants Only'
+          : image?.available !== undefined
+            ? `${image.available}`
+            : '—'
   const displayedType = image?.type ? capitalizeFirstLetter(image.type) : '—'
   const displayedWidth = image?.width && image?.width > 0 ? image.width : '—'
   const displayedLength = image?.length && image?.length > 0 ? image.length : '—'
@@ -96,34 +108,54 @@ function ChildrenImagesDialog({
       : image?.cost_per_sqft
         ? `By slab $${image.cost_per_sqft} sqft`
         : '—'
+  const displayedLevel = image?.level != null ? String(image.level) : '—'
+  const displayedFinishing =
+    image?.finishing != null && String(image.finishing).trim() !== ''
+      ? capitalizeFirstLetter(String(image.finishing))
+      : '—'
+  const isStoneCarousel = type === 'stones'
+  const isCustomerStone = isStoneCarousel && userRole === 'customer'
+  const isEmployeeStone = isStoneCarousel && userRole === 'employee'
+  const isCustomerSinkOrFaucet =
+    userRole === 'customer' && (type === 'sinks' || type === 'faucets')
+
+  const infoPairs: { key: string; label: string; value: string }[] = [
+    { key: 'type', label: 'Type', value: displayedType },
+    { key: 'size', label: 'Size', value: `${displayedLength} x ${displayedWidth}` },
+    { key: 'available', label: 'Available', value: displayedAvailable },
+  ]
+  if (isStoneCarousel) {
+    if (isCustomerStone) {
+      infoPairs.push({ key: 'level', label: 'Level', value: displayedLevel })
+    } else {
+      infoPairs.push({ key: 'price', label: 'Price', value: displayedPrice })
+      if (isEmployeeStone) {
+        infoPairs.push({ key: 'level', label: 'Level', value: displayedLevel })
+        infoPairs.push({
+          key: 'finishing',
+          label: 'Finishing',
+          value: displayedFinishing,
+        })
+      }
+    }
+  } else if (!isCustomerSinkOrFaucet) {
+    infoPairs.push({ key: 'price', label: 'Price', value: displayedPrice })
+  }
+
   return (
     <>
-      <div className='w-full relative select-none'>
+      <div className='w-full flex flex-col justify-center items-center relative select-none'>
         {showInfo && (
-          <div className='absolute top-7 sm:top-0 left-[50%] -translate-x-1/2 z-10 bg-black/80 p-3  rounded shadow-lg text-white border border-gray-900'>
-            <h3 className='text-lg font-bold mb-2 text-center'>
+          <div className='absolute top-7 left-1/2 z-10 w-max max-w-[min(90vw,28rem)] -translate-x-1/2 bg-black/80 p-3 rounded shadow-lg text-white border border-gray-900 transition-opacity duration-200 hover:opacity-0'>
+            <h3 className='text-lg font-bold mb-3 text-center'>
               {image?.name || name}
             </h3>
-            <div className='flex flex-col md:flex-row  gap-x-10 text-sm'>
-              <div className='flex flex-col  gap-y-1'>
-                <p>
-                  <strong>Type:</strong> {displayedType}
+            <div className='grid grid-cols-2 gap-x-8 gap-y-2 text-sm justify-items-start'>
+              {infoPairs.map(({ key, label, value }) => (
+                <p key={key}>
+                  <strong>{label}:</strong> {value}
                 </p>
-                <p>
-                  <strong>Available:</strong> {displayedAvailable}
-                </p>
-              </div>
-
-              {userRole === 'employee' && (
-                <div className='flex flex-col gap-y-1'>
-                  <p>
-                    <strong>Size:</strong> {displayedLength} x {displayedWidth}
-                  </p>
-                  <p>
-                    <strong>Price:</strong> {displayedPrice}
-                  </p>
-                </div>
-              )}
+              ))}
             </div>
           </div>
         )}

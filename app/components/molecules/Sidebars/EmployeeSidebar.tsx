@@ -13,17 +13,20 @@ import {
   Mail,
   MailIcon,
   Package,
+  PanelLeftClose,
+  PanelLeftOpen,
   Receipt,
   ShowerHead,
   User,
   Users,
 } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useLoaderData, useLocation } from 'react-router'
+import { Link, useFetcher, useLoaderData, useLocation } from 'react-router'
 import { Collapsible } from '~/components/Collapsible'
 import { CorbelIcon } from '~/components/icons/CorbelIcon'
 import { SinkIcon } from '~/components/icons/SinkIcon'
 import { LinkButton } from '~/components/molecules/LinkButton'
+import { SuperAdminCompanySelect } from '~/components/molecules/SuperAdminCompanySelect'
 import { Button } from '~/components/ui/button'
 import {
   Sidebar,
@@ -39,6 +42,8 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from '~/components/ui/sidebar'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
+import { useSuperAdminCompanySwitch } from '~/hooks/useSuperAdminCompanySwitch'
 import type { ISupplier } from '~/schemas/suppliers'
 import { getMirroredUrl } from '~/utils/headerNav'
 import { getBase } from '~/utils/urlHelpers'
@@ -100,6 +105,22 @@ const getItems = (
       ),
     },
   ]
+  if (isCustomerRoute) {
+    finalList.push(
+      {
+        title: 'Sinks',
+        url: `/customer/${companyId}/sinks`,
+        icon: SinkIcon,
+        component: () => <SinksFilters base={base} suppliers={sinkSuppliers} />,
+      },
+      {
+        title: 'Faucets',
+        url: `/customer/${companyId}/faucets`,
+        icon: ShowerHead,
+        component: () => <FaucetsFilters base={base} suppliers={faucetSuppliers} />,
+      },
+    )
+  }
   if (base === 'employee') {
     finalList.push({
       title: 'Customers',
@@ -248,7 +269,17 @@ export function EmployeeSidebar({
   const isCustomerRoute = location.pathname.startsWith('/customer/')
   const isContractorsRoute = location.pathname.startsWith('/contractors/')
   const data = useLoaderData<{
-    user: { company_id: number; is_admin: boolean; is_superuser: boolean } | null
+    user: {
+      company_id: number
+      is_admin: boolean
+      is_superuser: boolean
+      pined_bar?: number
+    } | null
+    superadminCompanies?: { id: number; name: string }[]
+    activeCompanyId?: number
+    userIsSuperAdmin?: boolean
+    unreadEmailCount?: number
+    token: string
   }>()
 
   let companyIdFromUrl: string | undefined
@@ -258,12 +289,18 @@ export function EmployeeSidebar({
     companyIdFromUrl = location.pathname.split('/').filter(Boolean)[1]
   }
 
-  const companyId = companyIdFromUrl || data?.user?.company_id
+  const companyId = companyIdFromUrl ?? data?.user?.company_id
 
-  const { isMobile, setOpenMobile } = useSidebar()
+  const { isMobile, setOpenMobile, setOpen } = useSidebar()
   const isAdminPage = location.pathname.startsWith('/admin')
   const isCustomerPage = location.pathname.startsWith('/customer')
   const targetPath = getMirroredUrl(isAdminPage, location)
+
+  const superadminCompanies = data?.superadminCompanies ?? []
+  const activeCompanyId = data?.activeCompanyId
+  const userIsSuperAdmin = data?.userIsSuperAdmin ?? false
+  const unreadEmailCount = data?.unreadEmailCount ?? 0
+  const { handleCompanySwitch } = useSuperAdminCompanySwitch()
 
   const buildCustomerUrl = () => {
     if (!isCustomerPage && location.pathname.startsWith('/admin/stones')) {
@@ -339,12 +376,38 @@ export function EmployeeSidebar({
     operationsItems.some(i => location.pathname.startsWith(i.url)),
   )
 
+  const pinFetcher = useFetcher<{ pined_bar: number }>()
+  const pinnedFromServer = Boolean(data?.user?.pined_bar)
+  const isPinned =
+    pinFetcher.state !== 'idle'
+      ? !pinnedFromServer
+      : pinFetcher.data
+        ? Boolean(pinFetcher.data.pined_bar)
+        : pinnedFromServer
+
+  const handleTogglePin = () => {
+    pinFetcher.submit(null, {
+      method: 'post',
+      action: '/api/users/toggle-pin-bar',
+    })
+  }
+
+  const isIconHoverDesktopSidebar =
+    (location.pathname.startsWith('/employee') ||
+      location.pathname.startsWith('/admin')) &&
+    !isMobile &&
+    !isPinned
+
   return (
-    <Sidebar>
+    <Sidebar
+      collapsible={isIconHoverDesktopSidebar ? 'icon' : 'offcanvas'}
+      onMouseEnter={isIconHoverDesktopSidebar ? () => setOpen(true) : undefined}
+      onMouseLeave={isIconHoverDesktopSidebar ? () => setOpen(false) : undefined}
+    >
       {isMobile && data?.user && itemsBase !== 'shop' && (
         <SidebarHeader className='py-2 px-3'>
           <div className='flex gap-2 justify-center'>
-            {data.user.is_admin || data.user.is_superuser ? (
+            {data.user.is_admin || data.user.is_superuser || userIsSuperAdmin ? (
               <Link to={targetPath} className='w-full' onClick={handleLinkClick}>
                 <LinkButton className='select-none w-full'>
                   {isAdminPage ? 'Employee' : 'Admin'}
@@ -357,11 +420,20 @@ export function EmployeeSidebar({
               </LinkButton>
             </Link>
           </div>
-          {data.user.is_superuser && isAdminPage ? (
+          {(data.user.is_superuser || userIsSuperAdmin) && isAdminPage ? (
             <Link to='/admin/users' onClick={handleLinkClick}>
               <Button className='w-full'>Users</Button>
             </Link>
           ) : null}
+          {userIsSuperAdmin && superadminCompanies.length > 0 && (
+            <SuperAdminCompanySelect
+              companies={superadminCompanies}
+              activeCompanyId={activeCompanyId}
+              currentCompanyId={companyId}
+              onCompanyChange={handleCompanySwitch}
+              className='w-full'
+            />
+          )}
         </SidebarHeader>
       )}
       <SidebarContent>
@@ -378,9 +450,11 @@ export function EmployeeSidebar({
                       onClick={() => setInventoryOpen(o => !o)}
                     >
                       <Package />
-                      <span>Inventory</span>
+                      <span className='group-data-[collapsible=icon]:hidden'>
+                        Inventory
+                      </span>
                       <ChevronDown
-                        className={`ml-auto transition-transform ${inventoryOpen ? 'rotate-180' : ''}`}
+                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${inventoryOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
                   </SidebarMenuButton>
@@ -396,9 +470,17 @@ export function EmployeeSidebar({
                         return (
                           <SidebarMenuSubItem key={sub.title}>
                             <SidebarMenuSubButton asChild isActive={isActive}>
-                              <a href={sub.url}>
+                              <a
+                                href={sub.url}
+                                className='flex w-full items-center gap-2'
+                              >
                                 <sub.icon />
                                 <span>{sub.title}</span>
+                                {sub.title === 'Emails' && unreadEmailCount > 0 ? (
+                                  <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white'>
+                                    {unreadEmailCount}
+                                  </span>
+                                ) : null}
                               </a>
                             </SidebarMenuSubButton>
                             {sub.component && isActive && <sub.component />}
@@ -420,9 +502,9 @@ export function EmployeeSidebar({
                       onClick={() => setCrmOpen(o => !o)}
                     >
                       <Users />
-                      <span>CRM</span>
+                      <span className='group-data-[collapsible=icon]:hidden'>CRM</span>
                       <ChevronDown
-                        className={`ml-auto transition-transform ${crmOpen ? 'rotate-180' : ''}`}
+                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${crmOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
                   </SidebarMenuButton>
@@ -438,9 +520,17 @@ export function EmployeeSidebar({
                         return (
                           <SidebarMenuSubItem key={sub.title}>
                             <SidebarMenuSubButton asChild isActive={isActive}>
-                              <a href={sub.url}>
+                              <a
+                                href={sub.url}
+                                className='flex w-full items-center gap-2'
+                              >
                                 <sub.icon />
                                 <span>{sub.title}</span>
+                                {sub.title === 'Emails' && unreadEmailCount > 0 ? (
+                                  <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white'>
+                                    {unreadEmailCount}
+                                  </span>
+                                ) : null}
                               </a>
                             </SidebarMenuSubButton>
                             {sub.component && isActive && <sub.component />}
@@ -462,9 +552,11 @@ export function EmployeeSidebar({
                       onClick={() => setResourcesOpen(o => !o)}
                     >
                       <FileIcon />
-                      <span>Resources</span>
+                      <span className='group-data-[collapsible=icon]:hidden'>
+                        Resources
+                      </span>
                       <ChevronDown
-                        className={`ml-auto transition-transform ${resourcesOpen ? 'rotate-180' : ''}`}
+                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${resourcesOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
                   </SidebarMenuButton>
@@ -504,9 +596,11 @@ export function EmployeeSidebar({
                       onClick={() => setOperationsOpen(o => !o)}
                     >
                       <Calculator />
-                      <span>Operations</span>
+                      <span className='group-data-[collapsible=icon]:hidden'>
+                        Operations
+                      </span>
                       <ChevronDown
-                        className={`ml-auto transition-transform ${operationsOpen ? 'rotate-180' : ''}`}
+                        className={`ml-auto transition-transform group-data-[collapsible=icon]:hidden ${operationsOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
                   </SidebarMenuButton>
@@ -545,15 +639,68 @@ export function EmployeeSidebar({
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>
-                      <a href={item.url}>
+                      <a href={item.url} className='flex w-full items-center gap-2'>
                         <item.icon />
-                        <span>{item.title}</span>
+                        <span className='group-data-[collapsible=icon]:hidden'>
+                          {item.title}
+                        </span>
+                        {item.title === 'Emails' && unreadEmailCount > 0 ? (
+                          <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white group-data-[collapsible=icon]:hidden'>
+                            {unreadEmailCount}
+                          </span>
+                        ) : null}
                       </a>
                     </SidebarMenuButton>
                     {item.component && isActive && <item.component />}
                   </SidebarMenuItem>
                 )
               })}
+
+              {data?.user &&
+                !isMobile &&
+                (location.pathname.startsWith('/employee') ||
+                  location.pathname.startsWith('/admin')) && (
+                  <SidebarMenuItem className='mt-2 border-t border-sidebar-border pt-2 group-data-[collapsible=icon]:hidden'>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type='button'
+                          onClick={handleTogglePin}
+                          aria-label={isPinned ? 'Unpin sidebar' : 'Pin sidebar'}
+                          aria-pressed={isPinned}
+                          className={`group/pin flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200 cursor-pointer ${
+                            isPinned
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
+                              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                          }`}
+                        >
+                          <span className='transition-opacity duration-200'>
+                            {isPinned ? 'Pinned' : 'Pin'}
+                          </span>
+                          <span className='relative inline-flex size-5 items-center justify-center'>
+                            <PanelLeftClose
+                              className={`absolute size-5 transition-all duration-300 ${
+                                isPinned
+                                  ? 'opacity-100 rotate-0 scale-100'
+                                  : 'opacity-0 -rotate-90 scale-75'
+                              }`}
+                            />
+                            <PanelLeftOpen
+                              className={`absolute size-5 transition-all duration-300 ${
+                                isPinned
+                                  ? 'opacity-0 rotate-90 scale-75'
+                                  : 'opacity-100 rotate-0 scale-100'
+                              }`}
+                            />
+                          </span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side='right'>
+                        {isPinned ? 'Unpin sidebar' : 'Pin sidebar'}
+                      </TooltipContent>
+                    </Tooltip>
+                  </SidebarMenuItem>
+                )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

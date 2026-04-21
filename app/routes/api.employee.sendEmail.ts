@@ -9,7 +9,7 @@ import {
   type TemplateVariableData,
 } from '~/utils/emailTemplateVariables'
 import { posthogClient } from '~/utils/posthog.server'
-import { selectId } from '~/utils/queryHelpers'
+import { selectId, selectMany } from '~/utils/queryHelpers'
 import { uploadStreamToS3 } from '~/utils/s3.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { parseEmailAddress } from '~/utils/stringHelpers'
@@ -22,10 +22,6 @@ export const emailSchema = z.object({
   threadId: z.string().optional(),
   attachments: z.array(z.instanceof(File)),
 })
-
-const cleanId = (value: string): string => {
-  return value.slice(1).split('@')[0]
-}
 
 type Email = z.infer<typeof emailSchema>
 const DEFAULT_EMAIL = 'sales@granite-manager.com'
@@ -64,6 +60,13 @@ async function fetchCustomerDataByEmail(
   return undefined
 }
 
+function unwrapBrackets(input: string): string {
+  if (input.startsWith('<') && input.endsWith('>')) {
+    return input.slice(1, -1)
+  }
+  return input
+}
+
 async function fetchCompanyData(
   companyId: number,
 ): Promise<TemplateVariableData['company']> {
@@ -82,6 +85,11 @@ async function fetchCompanyData(
   return undefined
 }
 
+interface UserData {
+  email_signature: string | null
+  email_name: string | null
+}
+
 const emailToSend = async (
   user: User,
   cleaned: Omit<Email, 'to'>,
@@ -94,14 +102,22 @@ const emailToSend = async (
   )
 
   // Изменено: получаем и подпись, и имя (email_name)
-  const userData = await selectId<{
-    email_signature: string | null
-    email_name: string | null
-  }>(
+  const userData = await selectId<UserData>(
     db,
     'SELECT email_signature, email_name FROM users WHERE id = ? AND is_deleted = 0',
     user.id,
   )
+
+  // Break glass in case of emergency
+  let emailData: { message_id: string } | undefined
+  if (cleaned.threadId) {
+    const results = await selectMany<{ message_id: string }>(
+      db,
+      'SELECT message_id FROM emails WHERE thread_id = ? ORDER BY sent_at DESC LIMIT 1;',
+      [cleaned.threadId],
+    )
+    emailData = results[0]
+  }
 
   const bodyWithSignature = appendEmailSignature(
     cleaned.body,
@@ -134,6 +150,8 @@ const emailToSend = async (
     html: HTMLBody,
     text: textBody,
     attachments: cleaned.attachments,
+    // Break glass in case of emergency
+    inReplyTo: emailData?.message_id,
   }
 }
 
@@ -249,7 +267,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     sendResults.push({
-      messageId: cleanId(info.messageId),
+      messageId: unwrapBrackets(info.messageId),
       senderEmail: parseEmailAddress(emailInformation.from || ''),
       receiverEmail: parseEmailAddress(recipient),
       threadId,

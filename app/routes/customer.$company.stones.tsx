@@ -26,6 +26,10 @@ interface Stone {
   regular_stock: boolean | number
   created_date: string
   bundle_number: string | null
+  retail_price: number
+  cost_per_sqft: number
+  level: number | null
+  finishing: string | null
 }
 
 function sortStonesLikeAdminEmployee(stones: Stone[]): Stone[] {
@@ -104,7 +108,7 @@ function InteractiveCard({ stone, setCurrentId, stoneType }: InteractiveCardProp
           Size: `${displayedLength} x ${displayedWidth}`,
           Type: capitalizeFirstLetter(stone.type),
           ...(stone.bundle_number != null && stone.bundle_number !== ''
-            ? { Bundle: stone.bundle_number }
+            ? { Bundle: `#${stone.bundle_number}` }
             : {}),
         }}
         disabled={true}

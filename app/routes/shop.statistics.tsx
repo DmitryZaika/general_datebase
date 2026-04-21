@@ -34,7 +34,7 @@ type MaterialTotal = {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await getShopWorkerUser(request)
-  if (!user || !user.company_id) {
+  if (!user) {
     return data({ days: [], materials: [], totalSqft: 0, start: '', end: '' })
   }
 

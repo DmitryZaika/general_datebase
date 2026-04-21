@@ -1,4 +1,5 @@
 import { Mail, Menu, SettingsIcon } from 'lucide-react'
+import { useEffect } from 'react'
 import {
   type LoaderFunctionArgs,
   Outlet,
@@ -6,6 +7,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useRevalidator,
   useSearchParams,
 } from 'react-router'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
@@ -18,9 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
+import { CLOSED_LOST_LIST_ID, CLOSED_WON_LIST_ID } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, type User } from '~/utils/session.server'
 
@@ -28,7 +30,7 @@ type AdminDeal = {
   id: number
   customer_id: number
   amount: number | null
-  description: string | null
+  title: string | null
   status: string | null
   lost_reason: string | null
   list_id: number
@@ -42,7 +44,7 @@ type AdminDeal = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user: User = await getAdminUser(request)
-    if (!user || !user.company_id) {
+    if (!user) {
       return redirect('/login')
     }
 
@@ -71,31 +73,61 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const lists = await selectMany<{ id: number; name: string }>(
       db,
-      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
-      [activeGroupId],
+      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? AND id NOT IN (?, ?) ORDER BY position',
+      [activeGroupId, CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID],
     )
 
-    const dealParams: (string | number)[] = [companyId]
-    let dealSql = `
-      SELECT d.id, d.customer_id, d.amount, d.description, d.status, d.lost_reason, d.list_id, d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') AS due_date, u.name AS sales_rep, d.is_won
-      FROM deals d
-      JOIN customers c ON d.customer_id = c.id
-      JOIN users u ON d.user_id = u.id
-      WHERE c.company_id = ? AND d.deleted_at IS NULL
-    `
-    if (salesRep && salesRep !== 'All') {
-      dealSql += ' AND u.name = ?'
-      dealParams.push(salesRep)
-    }
+    let deals: AdminDeal[]
 
     if (isWon === null) {
-      dealSql += ' AND d.is_won IS NULL'
+      const dealParams: (string | number)[] = [companyId]
+      let dealSql = `
+        SELECT d.id, d.customer_id, d.amount, d.title, d.status, d.lost_reason, d.list_id, d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') AS due_date, d.is_won, u.name AS sales_rep
+        FROM deals d
+        JOIN customers c ON d.customer_id = c.id
+        LEFT JOIN users u ON d.user_id = u.id
+        WHERE c.company_id = ? AND d.deleted_at IS NULL AND d.is_won IS NULL
+      `
+      if (salesRep && salesRep !== 'All') {
+        dealSql += ' AND u.name = ?'
+        dealParams.push(salesRep)
+      }
+      deals = await selectMany<AdminDeal>(db, dealSql, dealParams)
     } else {
-      dealSql += ' AND d.is_won = ?'
-      dealParams.push(isWon)
+      const dealParams: (string | number)[] = [
+        CLOSED_WON_LIST_ID,
+        CLOSED_LOST_LIST_ID,
+        CLOSED_WON_LIST_ID,
+        CLOSED_LOST_LIST_ID,
+        companyId,
+        isWon,
+      ]
+      let dealSql = `
+        SELECT d.id, d.customer_id, d.amount, d.title, d.status, d.lost_reason,
+         COALESCE(last_stage.list_id, d.list_id) AS list_id,
+         d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') AS due_date, d.is_won, u.name AS sales_rep
+        FROM deals d
+        JOIN customers c ON d.customer_id = c.id
+        LEFT JOIN users u ON d.user_id = u.id
+        LEFT JOIN (
+          SELECT dsh.deal_id, dsh.list_id
+          FROM deal_stage_history dsh
+          INNER JOIN (
+            SELECT deal_id, MAX(entered_at) AS max_entered_at
+            FROM deal_stage_history
+            WHERE list_id NOT IN (?, ?)
+            GROUP BY deal_id
+          ) latest ON dsh.deal_id = latest.deal_id AND dsh.entered_at = latest.max_entered_at
+          WHERE dsh.list_id NOT IN (?, ?)
+        ) last_stage ON d.id = last_stage.deal_id
+        WHERE c.company_id = ? AND d.deleted_at IS NULL AND d.is_won = ?
+      `
+      if (salesRep && salesRep !== 'All') {
+        dealSql += ' AND u.name = ?'
+        dealParams.push(salesRep)
+      }
+      deals = await selectMany<AdminDeal>(db, dealSql, dealParams)
     }
-
-    const deals = await selectMany<AdminDeal>(db, dealSql, dealParams)
 
     const customers = await selectMany<{
       id: number
@@ -121,6 +153,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const imagesMap: Record<number, boolean> = {}
     for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
 
+    const nearestActivities = await selectMany<{
+      id: number
+      deal_id: number
+      name: string
+      deadline: string | null
+      priority: string
+    }>(
+      db,
+      `SELECT id, deal_id, name, priority, DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline
+       FROM deal_activities
+       WHERE deleted_at IS NULL AND is_completed = 0 AND company_id = ?
+       ORDER BY
+         CASE WHEN deadline IS NULL THEN 1 ELSE 0 END,
+         deadline ASC,
+         CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,
+         created_at ASC`,
+      [companyId],
+    )
+    const nearestActivityMap: Record<
+      number,
+      { id: number; name: string; deadline: string | null; priority: string }
+    > = {}
+    for (const a of nearestActivities) {
+      if (!nearestActivityMap[a.deal_id]) {
+        nearestActivityMap[a.deal_id] = {
+          id: a.id,
+          name: a.name,
+          deadline: a.deadline,
+          priority: a.priority,
+        }
+      }
+    }
+
     const activitiesCounts = await selectMany<{ deal_id: number; count: number }>(
       db,
       `SELECT deal_id, COUNT(*) as count FROM deal_activities WHERE company_id = ? AND deleted_at IS NULL AND is_completed = 0 GROUP BY deal_id`,
@@ -128,7 +193,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     )
     const activitiesMap: Record<number, boolean> = {}
     for (const row of activitiesCounts)
-      activitiesMap[row.deal_id] = Number(row.count) > 0
+      activitiesMap[row.deal_id] = Number(row.count) > 1
 
     const activitiesDeadlines = await selectMany<{
       deal_id: number
@@ -159,14 +224,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     }
 
+    const notesCounts = await selectMany<{ deal_id: number; count: number }>(
+      db,
+      `SELECT deal_id, COUNT(*) as count FROM deal_notes WHERE company_id = ? AND deleted_at IS NULL GROUP BY deal_id`,
+      [companyId],
+    )
+    const notesMap: Record<number, boolean> = {}
+    for (const row of notesCounts) notesMap[row.deal_id] = Number(row.count) >= 1
+
     return {
       deals,
       customers,
       lists,
       emailsMap,
       imagesMap,
+      nearestActivityMap,
       activitiesMap,
       activitiesIconMap,
+      notesMap,
       groups,
       activeGroupId,
       isWon,
@@ -183,8 +258,10 @@ export default function AdminDeals() {
     lists,
     emailsMap,
     imagesMap,
+    nearestActivityMap,
     activitiesMap,
     activitiesIconMap,
+    notesMap,
     groups,
     activeGroupId,
     isWon,
@@ -192,6 +269,15 @@ export default function AdminDeals() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
+  const revalidator = useRevalidator()
+
+  useEffect(() => {
+    const state = location.state as { shouldRevalidate?: boolean } | null
+    if (state?.shouldRevalidate) {
+      revalidator.revalidate()
+      navigate(location.pathname + location.search, { replace: true, state: {} })
+    }
+  }, [location.state])
 
   const handleGroupChange = (newGroupId: string) => {
     const params = new URLSearchParams(searchParams)
@@ -218,15 +304,14 @@ export default function AdminDeals() {
         lists={lists}
         imagesMap={imagesMap}
         emailsMap={emailsMap}
+        nearestActivityMap={nearestActivityMap}
         activitiesMap={activitiesMap}
         activitiesIconMap={activitiesIconMap}
+        notesMap={notesMap}
         readonly
         showAddDeal={false}
         toolbarLeft={
           <>
-            <div className='hidden md:block'>
-              <OriginalSidebarTrigger />
-            </div>
             <SalesRepsFilter />
           </>
         }

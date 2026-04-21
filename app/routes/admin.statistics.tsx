@@ -118,7 +118,7 @@ type SalesRepRating = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const user = await getAdminUser(request)
-    if (!user || !user.company_id) return redirect('/login')
+    if (!user) return redirect('/login')
 
     const url = new URL(request.url)
     const fromDate = url.searchParams.get('fromDate') || ''

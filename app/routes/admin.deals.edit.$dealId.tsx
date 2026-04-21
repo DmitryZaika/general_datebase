@@ -9,15 +9,28 @@ import { getAdminUser } from '~/utils/session.server'
 export const loader = createDealEditLoader(getAdminUser, '/admin/deals')
 
 export default function AdminDealEditLayout() {
-  const { dealId, stages, history, currentListId, activities } =
-    useLoaderData<DealEditLoaderData>()
+  const {
+    dealId,
+    stages,
+    history,
+    currentListId,
+    isClosed,
+    closedAt,
+    activities,
+    notes,
+    emails,
+  } = useLoaderData<DealEditLoaderData>()
   return (
     <DealPage
       dealId={dealId}
       stages={stages}
       history={history}
       currentListId={currentListId}
+      isClosed={isClosed}
+      closedAt={closedAt}
       activities={activities}
+      notes={notes}
+      emails={emails}
     />
   )
 }

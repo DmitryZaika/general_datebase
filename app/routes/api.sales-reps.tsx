@@ -12,7 +12,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let companyId: number
   try {
     const admin = await getAdminUser(request)
-    if (admin?.company_id) {
+    if (admin?.company_id !== undefined) {
       companyId = admin.company_id
     } else {
       const employee = await getEmployeeUser(request)

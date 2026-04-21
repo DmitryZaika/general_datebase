@@ -50,12 +50,12 @@ function MainComponent({
       />
       <FormField
         control={form.control}
-        name='description'
+        name='title'
         render={({ field }) => (
           <InputItem
             inputAutoFocus={!!dealId && dealId !== undefined}
-            name={'Description'}
-            placeholder={'Description of the deal'}
+            name={'Title'}
+            placeholder={'Title of the deal'}
             field={field}
           />
         )}

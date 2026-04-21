@@ -1,8 +1,23 @@
 import { useEffect } from 'react'
-import SignatureCanvas from 'react-signature-canvas'
+import SignatureCanvasModule from 'react-signature-canvas'
 import { ClientOnly } from 'remix-utils/client-only'
 import { Button } from '~/components/ui/button'
 import { FormItem, FormLabel, FormMessage } from '~/components/ui/form'
+
+function interopDefaultExport(mod: unknown) {
+  if (typeof mod === 'function') {
+    return mod
+  }
+  if (typeof mod === 'object' && mod !== null) {
+    const inner = Reflect.get(mod, 'default')
+    if (typeof inner === 'function') {
+      return inner
+    }
+  }
+  throw new Error('react-signature-canvas: could not resolve component export')
+}
+
+const SignatureCanvas = interopDefaultExport(SignatureCanvasModule)
 
 interface RHFField {
   onChange: (value: unknown) => void

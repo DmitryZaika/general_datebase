@@ -18,7 +18,6 @@ import { ImageCard } from '~/components/organisms/ImageCard'
 import { StoneTable } from '~/components/organisms/StoneTable'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
-import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
@@ -94,9 +93,13 @@ function InteractiveCard({
         itemId={stone.id}
         fieldList={{
           Available:
-            stone.available === 0 && isRegularStock
+            isRegularStock && stone.whole_available === 0
               ? 'Regular Stock'
-              : `${stone.available} / ${displayedAmount}${isRegularStock ? ' (Regular stock)' : ''}`,
+              : stone.whole_available > 0
+                ? `${stone.whole_available} / ${stone.whole_amount > 0 ? stone.whole_amount : '—'}${isRegularStock ? ' (Regular stock)' : ''}`
+                : stone.available > 0
+                  ? 'Remnants Only'
+                  : `${stone.available} / ${displayedAmount}`,
           Type: capitalizeFirstLetter(stone.type),
           Price:
             stone.retail_price === 0
@@ -295,8 +298,14 @@ export default function Stones() {
       cell: ({ row }) => {
         const stone = row.original
         const isRegularStock = !!stone.regular_stock
-        if (stone.available === 0 && isRegularStock) {
+        if (isRegularStock && stone.whole_available === 0) {
           return 'Regular Stock'
+        }
+        if (stone.whole_available > 0) {
+          return stone.whole_available
+        }
+        if (stone.available > 0) {
+          return 'Remnants Only'
         }
         return stone.available
       },
@@ -326,9 +335,6 @@ export default function Stones() {
     <>
       <div className='flex justify-between flex-wrap items-center items-end mb-2'>
         <div className='flex items-center gap-4'>
-          <div className='hidden md:block'>
-            <OriginalSidebarTrigger />
-          </div>
           <Button
             variant='outline'
             onClick={toggleViewMode}

@@ -20,7 +20,6 @@ import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
-import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import { cleanParams, useSafeSearchParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
@@ -122,8 +121,14 @@ function StoneTable({ stones }: { stones: Stone[] }) {
       cell: ({ row }) => {
         const stone = row.original
         const isRegularStock = !!stone.regular_stock
-        if (stone.available === 0 && isRegularStock) {
+        if (isRegularStock && stone.whole_available === 0) {
           return <div>Regular Stock</div>
+        }
+        if (stone.whole_available > 0) {
+          return <div>{stone.whole_available}</div>
+        }
+        if (stone.available > 0) {
+          return <div>Remnants Only</div>
         }
         return <div>{stone.available}</div>
       },
@@ -245,9 +250,6 @@ export default function AdminStones() {
     <>
       <div className='flex justify-between flex-wrap items-center items-end mb-2'>
         <div className='flex items-center gap-4'>
-          <div className='hidden md:block'>
-            <OriginalSidebarTrigger />
-          </div>
           <Button
             variant='outline'
             onClick={toggleViewMode}
@@ -298,9 +300,13 @@ export default function AdminStones() {
 
               const isRegularStock = !!stone.regular_stock
               const availableText =
-                stone.available === 0 && isRegularStock
+                isRegularStock && stone.whole_available === 0
                   ? 'Regular Stock'
-                  : `${displayedAvailable} / ${displayedAmount}${isRegularStock ? ' (Regular stock)' : ''}`
+                  : stone.whole_available > 0
+                    ? `${stone.whole_available} / ${stone.whole_amount > 0 ? stone.whole_amount : '—'}${isRegularStock ? ' (Regular stock)' : ''}`
+                    : stone.available > 0
+                      ? 'Remnants Only'
+                      : `${displayedAvailable} / ${displayedAmount}`
 
               return (
                 <div

@@ -37,9 +37,10 @@ import { POSITIONS } from '~/constants/positions'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
+import { Positions } from '~/types'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, getSuperUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 const userschema = z.object({
@@ -74,15 +75,35 @@ const userschema = z.object({
     .optional()
     .prefault([]),
   is_admin: z.boolean(),
+  superadmin_company_ids: z
+    .union([
+      z.string().transform(val => {
+        if (!val) return []
+        return val
+          .split(',')
+          .map(id => parseInt(id.trim(), 10))
+          .filter(id => !Number.isNaN(id))
+      }),
+      z.array(z.coerce.number()),
+      z.coerce.number().transform(val => [val]),
+    ])
+    .optional()
+    .prefault([]),
 })
 
 const resolver = zodResolver(userschema)
 
 export async function action({ request, params }: ActionFunctionArgs) {
+  let loggedInIsSuperuser = false
   try {
-    await getAdminUser(request)
-  } catch (error) {
-    return redirect(`/login?error=${error}`)
+    await getSuperUser(request)
+    loggedInIsSuperuser = true
+  } catch {
+    try {
+      await getAdminUser(request)
+    } catch (error) {
+      return redirect(`/login?error=${error}`)
+    }
   }
   try {
     await csrf.validate(request)
@@ -96,6 +117,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { errors, data, receivedValues } = await getValidatedFormData(request, resolver)
   if (errors) {
     return { errors, receivedValues }
+  }
+
+  if (!loggedInIsSuperuser) {
+    data.positions = data.positions.filter(id => id !== Positions.SuperAdmin)
+    data.superadmin_company_ids = []
+  }
+
+  // SuperAdmin position grants admin access
+  if (data.positions.includes(Positions.SuperAdmin)) {
+    data.is_admin = true
   }
 
   await db.execute(
@@ -116,12 +147,24 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const uniquePositions = [...new Set(data.positions)]
   const uniqueMarketingCompanies = [...new Set(data.marketing_company_ids ?? [])]
+  const uniqueSuperadminCompanies = [...new Set(data.superadmin_company_ids ?? [])]
 
   for (const positionId of uniquePositions) {
-    if (positionId === 7) {
+    if (positionId === Positions.ExternalMarketing) {
       const companies =
         uniqueMarketingCompanies.length > 0
           ? uniqueMarketingCompanies
+          : [data.company_id]
+      for (const companyId of companies) {
+        await db.execute(
+          'INSERT INTO users_positions (user_id, position_id, company_id) VALUES (?, ?, ?)',
+          [userId, positionId, companyId],
+        )
+      }
+    } else if (positionId === Positions.SuperAdmin) {
+      const companies =
+        uniqueSuperadminCompanies.length > 0
+          ? uniqueSuperadminCompanies
           : [data.company_id]
       for (const companyId of companies) {
         await db.execute(
@@ -136,6 +179,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       )
     }
   }
+
   const url = new URL(request.url)
   const searchParams = url.searchParams.toString()
   const searchString = searchParams ? `?${searchParams}` : ''
@@ -159,13 +203,21 @@ interface User {
   phone_number: null | string
   company_id: number
   is_admin: null | number
+  is_superuser: null | number
+  is_employee: null | number
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
+  let loggedInIsSuperuser = false
   try {
-    await getAdminUser(request)
-  } catch (error) {
-    return redirect(`/login?error=${error}`)
+    await getSuperUser(request)
+    loggedInIsSuperuser = true
+  } catch {
+    try {
+      await getAdminUser(request)
+    } catch (error) {
+      return redirect(`/login?error=${error}`)
+    }
   }
   if (!params.user) {
     return forceRedirectError(request.headers, 'No user id provided')
@@ -176,7 +228,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const user = await selectId<User>(
     db,
-    'SELECT id, name, email, phone_number, company_id, is_admin FROM users WHERE id = ? AND is_deleted = 0',
+    'SELECT id, name, email, phone_number, company_id, is_admin, is_superuser, is_employee FROM users WHERE id = ? AND is_deleted = 0',
     userId,
   )
   if (!user) {
@@ -185,14 +237,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const userPositions = await selectMany<{ position_id: number }>(
     db,
-    'SELECT position_id FROM users_positions WHERE user_id = ?',
+    'SELECT DISTINCT position_id FROM users_positions WHERE user_id = ?',
     [userId],
   )
 
   const marketingCompanies = await selectMany<{ company_id: number }>(
     db,
-    'SELECT company_id FROM users_positions WHERE user_id = ? AND position_id = 7',
-    [userId],
+    'SELECT company_id FROM users_positions WHERE user_id = ? AND position_id = ?',
+    [userId, Positions.ExternalMarketing],
+  )
+
+  const superadminCompanies = await selectMany<{ company_id: number }>(
+    db,
+    'SELECT company_id FROM users_positions WHERE user_id = ? AND position_id = ?',
+    [userId, Positions.SuperAdmin],
   )
 
   const companies = await selectMany<Company>(db, 'SELECT id, name FROM company')
@@ -207,14 +265,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     companies: companies.map(c => ({ key: c.id, value: c.name })),
     positions: positions,
     marketingCompanyIds: marketingCompanies.map(mc => mc.company_id),
+    superadminCompanyIds:
+      superadminCompanies.length > 0
+        ? superadminCompanies.map(sc => sc.company_id)
+        : [],
+    loggedInIsSuperuser,
   }
 }
 
 export default function User() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, userPositions, companies, positions, marketingCompanyIds } =
-    useLoaderData<typeof loader>()
+  const {
+    user,
+    userPositions,
+    companies,
+    positions,
+    marketingCompanyIds,
+    superadminCompanyIds,
+    loggedInIsSuperuser,
+  } = useLoaderData<typeof loader>()
 
   const token = useAuthenticityToken()
   const form = useForm({
@@ -227,6 +297,7 @@ export default function User() {
       positions: userPositions,
       marketing_company_ids: marketingCompanyIds,
       is_admin: user.is_admin === 1,
+      superadmin_company_ids: superadminCompanyIds,
     },
   })
 
@@ -239,6 +310,9 @@ export default function User() {
   }
 
   const formPositions = form.watch('positions')
+  const visiblePositions = loggedInIsSuperuser
+    ? positions
+    : positions.filter(p => p.key !== Positions.SuperAdmin)
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -278,7 +352,7 @@ export default function User() {
               )}
             />
             <div className='grid grid-cols-2 gap-2'>
-              {positions.map(position => (
+              {visiblePositions.map(position => (
                 <FormField
                   key={position.key}
                   control={form.control}
@@ -347,50 +421,95 @@ export default function User() {
                   </div>
                 )}
               />
-              {Array.isArray(formPositions) && formPositions.includes(7) && (
-                <div className='col-span-2 border-t pt-2 mt-2'>
-                  <div className='text-sm font-medium mb-2'>
-                    External Marketing Companies
-                  </div>
-                  {companies.map(company => (
-                    <FormField
-                      key={company.key}
-                      control={form.control}
-                      name='marketing_company_ids'
-                      render={({ field }) => (
-                        <div className='flex items-center space-x-2'>
-                          <Switch
-                            id={`marketing-company-${company.key}`}
-                            checked={
-                              Array.isArray(field.value) &&
-                              field.value.includes(company.key)
-                            }
-                            onCheckedChange={checked => {
-                              if (checked && Array.isArray(field.value)) {
-                                field.onChange([...field.value, company.key])
-                              } else if (Array.isArray(field.value)) {
-                                field.onChange(
-                                  field.value.filter(
-                                    (id: number) => id !== company.key,
-                                  ),
-                                )
+              {Array.isArray(formPositions) &&
+                formPositions.includes(Positions.ExternalMarketing) && (
+                  <div className='col-span-2 border-t pt-2 mt-2'>
+                    <div className='text-sm font-medium mb-2'>
+                      External Marketing Companies
+                    </div>
+                    {companies.map(company => (
+                      <FormField
+                        key={company.key}
+                        control={form.control}
+                        name='marketing_company_ids'
+                        render={({ field }) => (
+                          <div className='flex items-center space-x-2'>
+                            <Switch
+                              id={`marketing-company-${company.key}`}
+                              checked={
+                                Array.isArray(field.value) &&
+                                field.value.includes(company.key)
                               }
-                            }}
-                          />
-                          <label
-                            htmlFor={`marketing-company-${company.key}`}
-                            className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
-                          >
-                            {company.value}
-                          </label>
-                        </div>
-                      )}
-                    />
-                  ))}
-                </div>
-              )}
+                              onCheckedChange={checked => {
+                                if (checked && Array.isArray(field.value)) {
+                                  field.onChange([...field.value, company.key])
+                                } else if (Array.isArray(field.value)) {
+                                  field.onChange(
+                                    field.value.filter(
+                                      (id: number) => id !== company.key,
+                                    ),
+                                  )
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`marketing-company-${company.key}`}
+                              className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
+                            >
+                              {company.value}
+                            </label>
+                          </div>
+                        )}
+                      />
+                    ))}
+                  </div>
+                )}
+              {loggedInIsSuperuser &&
+                Array.isArray(formPositions) &&
+                formPositions.includes(Positions.SuperAdmin) && (
+                  <div className='col-span-2 border-t pt-2 mt-2'>
+                    <div className='text-sm font-medium mb-2'>
+                      Super Admin Companies
+                    </div>
+                    {companies.map(company => (
+                      <FormField
+                        key={company.key}
+                        control={form.control}
+                        name='superadmin_company_ids'
+                        render={({ field }) => (
+                          <div className='flex items-center space-x-2'>
+                            <Switch
+                              id={`superadmin-company-${company.key}`}
+                              checked={
+                                Array.isArray(field.value) &&
+                                field.value.includes(company.key)
+                              }
+                              onCheckedChange={checked => {
+                                if (checked && Array.isArray(field.value)) {
+                                  field.onChange([...field.value, company.key])
+                                } else if (Array.isArray(field.value)) {
+                                  field.onChange(
+                                    field.value.filter(
+                                      (id: number) => id !== company.key,
+                                    ),
+                                  )
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`superadmin-company-${company.key}`}
+                              className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
+                            >
+                              {company.value}
+                            </label>
+                          </div>
+                        )}
+                      />
+                    ))}
+                  </div>
+                )}
             </div>
-            <DialogFooter>
+            <DialogFooter className='mt-2'>
               <Button type='submit' disabled={isSubmitting}>
                 Save
               </Button>

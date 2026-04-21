@@ -1,10 +1,11 @@
 import type { RowDataPacket } from 'mysql2'
 import { db } from '~/db.server'
+import type { Nullable } from '~/types/utils'
 import type { TemplateVariableData } from '~/utils/emailTemplateVariables'
 
 interface UserData {
   id: number
-  name?: string | null
+  name?: Nullable<string>
   email?: string
   phone_number?: string
   company_id?: number
@@ -22,7 +23,7 @@ export async function fetchTemplateVariableData({
   customerId,
 }: FetchTemplateVariableDataParams): Promise<TemplateVariableData> {
   const [customerData, companyData] = await Promise.all([
-    fetchCustomerData(dealId, customerId),
+    fetchCustomerData(dealId, customerId, user.company_id),
     fetchCompanyData(user.company_id),
   ])
 
@@ -40,6 +41,7 @@ export async function fetchTemplateVariableData({
 async function fetchCustomerData(
   dealId?: number,
   customerId?: number,
+  companyId?: number,
 ): Promise<TemplateVariableData['customer']> {
   if (!dealId && !customerId) {
     return undefined
@@ -50,8 +52,8 @@ async function fetchCustomerData(
       `SELECT c.name, c.address
        FROM deals d
        JOIN customers c ON d.customer_id = c.id
-       WHERE d.id = ? AND d.deleted_at IS NULL`,
-      [dealId],
+       WHERE d.id = ? AND d.deleted_at IS NULL AND c.company_id = ?`,
+      [dealId, companyId],
     )
 
     if (rows?.[0]) {
@@ -64,8 +66,8 @@ async function fetchCustomerData(
 
   if (customerId) {
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT name, address FROM customers WHERE id = ? AND deleted_at IS NULL`,
-      [customerId],
+      `SELECT name, address FROM customers WHERE id = ? AND deleted_at IS NULL AND company_id = ?`,
+      [customerId, companyId],
     )
 
     if (rows?.[0]) {
@@ -82,7 +84,7 @@ async function fetchCustomerData(
 async function fetchCompanyData(
   companyId?: number,
 ): Promise<TemplateVariableData['company']> {
-  if (!companyId) {
+  if (companyId === undefined) {
     return undefined
   }
 

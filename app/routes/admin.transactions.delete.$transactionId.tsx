@@ -30,7 +30,7 @@ interface Transaction {
 export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     const user = await getAdminUser(request)
-    if (!user || !user.company_id) {
+    if (!user) {
       return redirect('/login')
     }
 
@@ -66,7 +66,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
     const user = await getAdminUser(request)
-    if (!user || !user.company_id) {
+    if (!user) {
       return redirect('/login')
     }
 

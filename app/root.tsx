@@ -24,7 +24,11 @@ import type { ISupplier } from '~/schemas/suppliers'
 import { queryClient } from '~/utils/api'
 import { csrf } from '~/utils/csrf.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { getUserBySessionId } from '~/utils/session.server'
+import {
+  getSuperAdminCompanies,
+  getUserBySessionId,
+  isSuperAdmin,
+} from '~/utils/session.server'
 import type { ToastMessage } from '~/utils/toastHelpers.server'
 import { getBase } from '~/utils/urlHelpers'
 import { Header } from './components/Header'
@@ -83,23 +87,52 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let companyName: string | null = null
   let companyId: number | undefined
 
+  let superadminCompanies: { id: number; name: string }[] = []
+  let activeCompanyId: number | undefined
+  let userIsSuperAdmin = false
+
   if (activeSession) {
     user = (await getUserBySessionId(activeSession)) || null
     if (user) {
+      let effectiveCompanyId = user.company_id
+
+      userIsSuperAdmin = await isSuperAdmin(user.id)
+      const sessionActiveCompany = session.get('activeCompanyId')
+      if (userIsSuperAdmin) {
+        superadminCompanies = await getSuperAdminCompanies(user.id)
+        if (
+          sessionActiveCompany !== undefined &&
+          superadminCompanies.some(c => c.id === sessionActiveCompany)
+        ) {
+          effectiveCompanyId = sessionActiveCompany
+          activeCompanyId = sessionActiveCompany
+        } else {
+          if (sessionActiveCompany !== undefined) {
+            session.unset('activeCompanyId')
+          }
+          if (effectiveCompanyId == null && superadminCompanies.length > 0) {
+            effectiveCompanyId = superadminCompanies[0].id
+            activeCompanyId = superadminCompanies[0].id
+          }
+        }
+      } else if (sessionActiveCompany !== undefined) {
+        session.unset('activeCompanyId')
+      }
+
       const company = await selectId<{ name: string }>(
         db,
         'SELECT name FROM company WHERE id = ?',
-        user.company_id,
+        effectiveCompanyId,
       )
       companyName = company?.name ?? null
-      companyId = user.company_id
+      companyId = effectiveCompanyId
     }
   }
 
   const url = new URL(request.url)
   const isContractors = url.pathname.startsWith('/contractors/')
 
-  if (!companyId && isContractors) {
+  if (companyId === undefined && isContractors) {
     const parts = url.pathname.split('/')
     if (parts[1] === 'contractors' && parts[2]) {
       const id = parseInt(parts[2], 10)
@@ -109,7 +142,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
-  if (companyId && isContractors && !companyName) {
+  if (companyId !== undefined && isContractors && !companyName) {
     const company = await selectId<{ name: string }>(
       db,
       'SELECT name FROM company WHERE id = ?',
@@ -122,6 +155,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let sinkSuppliers: ISupplier[] | undefined
   let faucetSuppliers: ISupplier[] | undefined
   let position: string | null = null
+  let unreadEmailCount = 0
 
   const colors = await selectMany<{ id: number; name: string; hex_code: string }>(
     db,
@@ -131,7 +165,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     [],
   )
 
-  if (companyId) {
+  if (companyId !== undefined) {
     stoneSuppliers = await selectMany<ISupplier>(
       db,
       `SELECT s.id, s.supplier_name
@@ -164,6 +198,36 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   if (user) {
+    const userEmail =
+      typeof user.email === 'string' ? user.email.trim().toLowerCase() : ''
+    const userEmailLike = `%<${userEmail}>`
+
+    const unreadEmailRows = await selectMany<{ c: number }>(
+      db,
+      `SELECT COUNT(DISTINCT e.thread_id) AS c
+       FROM emails e
+       LEFT JOIN (
+         SELECT thread_id, MAX(deal_id) AS deal_id
+         FROM emails
+         WHERE deleted_at IS NULL AND thread_id IS NOT NULL AND deal_id IS NOT NULL
+         GROUP BY thread_id
+       ) td ON td.thread_id = e.thread_id
+       LEFT JOIN deals d ON d.id = COALESCE(e.deal_id, td.deal_id) AND d.deleted_at IS NULL
+       WHERE e.deleted_at IS NULL
+         AND e.thread_id IS NOT NULL
+         AND e.sender_user_id IS NULL
+         AND e.employee_read_at IS NULL
+         AND (
+           e.receiver_user_id = ?
+           OR d.user_id = ?
+           OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.receiver_email, '<', -1), '>', 1))) = ?
+           OR (e.receiver_email NOT LIKE '%<%' AND LOWER(TRIM(e.receiver_email)) = ?)
+           OR e.receiver_email LIKE ?
+         )`,
+      [user.id, user.id, userEmail, userEmail, userEmailLike],
+    )
+    unreadEmailCount = unreadEmailRows[0]?.c ?? 0
+
     const [rows] = await db.query<(RowDataPacket & { position: string })[]>(
       `SELECT p.name AS position
        FROM users u
@@ -188,14 +252,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
           : null
 
     // Installer users: always redirect to their checklist
-    if (hasInstaller) {
+    if (hasInstaller && !user.is_superuser && !userIsSuperAdmin) {
       const installerTarget = `/installers/${user.company_id}/checklist`
       if (!url.pathname.startsWith('/installers/')) {
         return redirect(installerTarget)
       }
     }
 
-    if (hasCheckIn) {
+    if (hasCheckIn && !user.is_superuser && !userIsSuperAdmin) {
       const target = `/customer/${user.company_id}/check-in`
       if (!url.pathname.startsWith(target)) {
         return redirect(target)
@@ -203,13 +267,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     // Auto-redirect Marketing users to their External Marketing page
-    if (hasExternalMarketing) {
+    if (hasExternalMarketing && !user.is_superuser && !userIsSuperAdmin) {
       const marketingTarget = `/external/marketing/${user.company_id}/leads`
       if (!url.pathname.startsWith('/external/marketing/')) {
         return redirect(marketingTarget)
       }
     }
-    if (hasShopWorker && !url.pathname.startsWith('/shop')) {
+    if (
+      hasShopWorker &&
+      !user.is_superuser &&
+      !userIsSuperAdmin &&
+      !url.pathname.startsWith('/shop')
+    ) {
       return redirect('/shop/transactions')
     }
   }
@@ -225,6 +294,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
       faucetSuppliers,
       colors,
       position,
+      superadminCompanies,
+      activeCompanyId,
+      userIsSuperAdmin,
+      unreadEmailCount,
     },
 
     {
@@ -247,6 +320,9 @@ export default function App() {
     faucetSuppliers,
     colors,
     position,
+    superadminCompanies,
+    activeCompanyId,
+    userIsSuperAdmin,
   } = useLoaderData<typeof loader>()
   const { pathname } = useLocation()
   const { toast } = useToast()
@@ -262,7 +338,11 @@ export default function App() {
   const isCustomersCompanies = pathname === '/customers/companies'
   const segments = pathname.split('/').filter(Boolean)
   const isCustomerViewPage =
-    segments[0] === 'customer' && segments[2] !== 'stones' && segments[2] !== undefined
+    segments[0] === 'customer' &&
+    segments[2] !== undefined &&
+    segments[2] !== 'stones' &&
+    segments[2] !== 'sinks' &&
+    segments[2] !== 'faucets'
   const mainRef = useRef<HTMLElement | null>(null)
   const [isAtBottom, setIsAtBottom] = useState(false)
   useEffect(() => {
@@ -294,6 +374,10 @@ export default function App() {
   }, [message?.nonce])
 
   const basePath = getBase(pathname)
+  const isEmployeeRoute = pathname.startsWith('/employee')
+  const isAdminRoute = pathname.startsWith('/admin')
+  const isSidebarPinned = Boolean(user?.pined_bar)
+  const sidebarIconHoverShell = (isEmployeeRoute || isAdminRoute) && !isSidebarPinned
   const showSidebar =
     !!basePath &&
     !isLogin &&
@@ -316,19 +400,22 @@ export default function App() {
       <body>
         <QueryClientProvider client={queryClient}>
           <SidebarProvider
-            key={showSidebar ? 'show' : 'hide'}
-            defaultOpen={showSidebar}
+            key={showSidebar ? `show-${sidebarIconHoverShell}` : 'hide'}
+            defaultOpen={showSidebar && !sidebarIconHoverShell}
           >
-            {showSidebar && (
-              <EmployeeSidebar
-                suppliers={stoneSuppliers}
-                sinkSuppliers={sinkSuppliers}
-                faucetSuppliers={faucetSuppliers}
-                colors={colors}
-              />
-            )}
-            <main ref={mainRef} className='h-screen overflow-y-auto bg-gray-100 w-full'>
-              <AuthenticityTokenProvider token={token}>
+            <AuthenticityTokenProvider token={token}>
+              {showSidebar && (
+                <EmployeeSidebar
+                  suppliers={stoneSuppliers}
+                  sinkSuppliers={sinkSuppliers}
+                  faucetSuppliers={faucetSuppliers}
+                  colors={colors}
+                />
+              )}
+              <main
+                ref={mainRef}
+                className='h-screen overflow-y-auto bg-gray-100 w-full'
+              >
                 {isExternalMarketing ||
                 isCheckIn ||
                 isInstallerRoute ||
@@ -337,25 +424,28 @@ export default function App() {
                   <MarketingHeader companyName={companyName ?? undefined} />
                 ) : (
                   <Header
-                    isEmployee={user?.is_employee ?? false}
+                    isEmployee={!!user?.is_employee}
                     user={user}
-                    isAdmin={user?.is_admin ?? false}
-                    isSuperUser={user?.is_superuser ?? false}
+                    isAdmin={!!user?.is_admin}
+                    isSuperUser={!!user?.is_superuser}
+                    isSuperAdmin={userIsSuperAdmin}
+                    superadminCompanies={superadminCompanies}
+                    activeCompanyId={activeCompanyId}
                   />
                 )}
                 <div className='relative'>
                   <Outlet />
                 </div>
-              </AuthenticityTokenProvider>
-              <Toaster />
-              <ScrollRestoration />
-              <Scripts />
-              <Posthog />
-              {!isInstallerRoute && !isCheckIn && user && (
-                <Chat isAtBottom={isAtBottom} />
-              )}
-              {/* <ScrollToTopButton /> */}
-            </main>
+                <Toaster />
+                <ScrollRestoration />
+                <Scripts />
+                <Posthog />
+                {!isInstallerRoute && !isCheckIn && user && (
+                  <Chat isAtBottom={isAtBottom} />
+                )}
+                {/* <ScrollToTopButton /> */}
+              </main>
+            </AuthenticityTokenProvider>
           </SidebarProvider>
         </QueryClientProvider>
       </body>
