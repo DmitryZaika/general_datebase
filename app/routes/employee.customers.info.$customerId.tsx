@@ -34,7 +34,6 @@ type CustomerInfo = {
 type DealRow = {
   id: number
   amount: number | null
-  title: string | null
   lost_reason: string | null
   list_name: string
   created_at: string | null
@@ -111,7 +110,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const deals = await selectMany<DealRow>(
     db,
-    `SELECT d.id, d.amount, d.title, d.lost_reason, l.name AS list_name, d.created_at
+    `SELECT d.id, d.amount, d.lost_reason, l.name AS list_name, d.created_at
      FROM deals d
      JOIN deals_list l ON l.id = d.list_id
      WHERE d.customer_id = ? AND d.deleted_at IS NULL AND l.deleted_at IS NULL

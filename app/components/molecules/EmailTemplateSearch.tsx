@@ -1,15 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { EmailTemplate } from '~/utils/emailTemplates'
+import {
+  fetchAllTemplates,
+  filterTemplates,
+  getTemplatePreview,
+  TEMPLATE_STALE_TIME,
+  templateQueryKey,
+} from '~/utils/emailTemplates'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-
-export interface EmailTemplate {
-  id: number
-  template_name: string
-  template_subject: string
-  template_body: string
-}
 
 interface EmailTemplateSearchProps {
   companyId: number
@@ -26,7 +27,7 @@ const TemplateItem = memo(function TemplateItem({
   template,
   onSelect,
 }: TemplateItemProps) {
-  const previewText = template.template_body.replace(/<[^>]*>/g, '').slice(0, 50)
+  const previewText = getTemplatePreview(template.template_body, 50)
 
   return (
     <li
@@ -62,15 +63,6 @@ const DropdownList = memo(function DropdownList({
   )
 })
 
-const fetchAllTemplates = async (companyId: number) => {
-  const response = await fetch(`/api/email-templates/search/${companyId}`)
-  if (!response.ok) {
-    throw new Error('Failed to fetch templates')
-  }
-  const data = await response.json()
-  return data.templates as EmailTemplate[]
-}
-
 export function EmailTemplateSearch({
   companyId,
   value,
@@ -81,21 +73,16 @@ export function EmailTemplateSearch({
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { data: allTemplates = [], isLoading } = useQuery({
-    queryKey: ['emailTemplates', companyId],
+    queryKey: templateQueryKey(companyId),
     queryFn: () => fetchAllTemplates(companyId),
     enabled: isOpen,
-    staleTime: 60000,
+    staleTime: TEMPLATE_STALE_TIME,
   })
 
-  const filteredTemplates = useMemo(() => {
-    const query = inputValue.trim().toLowerCase()
-    if (!query) return allTemplates
-    return allTemplates.filter(
-      t =>
-        t.template_name.toLowerCase().includes(query) ||
-        t.template_body.toLowerCase().includes(query),
-    )
-  }, [allTemplates, inputValue])
+  const filteredTemplates = useMemo(
+    () => filterTemplates(allTemplates, inputValue),
+    [allTemplates, inputValue],
+  )
 
   useEffect(() => {
     return () => {

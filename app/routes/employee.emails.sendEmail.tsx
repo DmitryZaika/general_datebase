@@ -34,10 +34,7 @@ import { z } from 'zod'
 import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
-import {
-  type EmailTemplate,
-  EmailTemplateSearch,
-} from '~/components/molecules/EmailTemplateSearch'
+import { EmailTemplateSearch } from '~/components/molecules/EmailTemplateSearch'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { MultiEmailRecipientInput } from '~/components/molecules/MultiEmailRecipientInput'
@@ -70,6 +67,7 @@ import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
+import type { EmailTemplate } from '~/utils/emailTemplates'
 import {
   getUnfilledCustomVariables,
   replaceTemplateVariables,

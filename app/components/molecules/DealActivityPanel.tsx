@@ -8,6 +8,10 @@ import {
   ChevronUp,
   CirclePlus,
   Clock,
+  Eye,
+  EyeClosed,
+  Mail,
+  Paperclip,
   Pencil,
   Phone,
   Trash2,
@@ -15,7 +19,7 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { useFetcher, useLocation, useNavigate } from 'react-router'
+import { Link, useFetcher, useLocation, useNavigate, useParams } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import ClipboardIcon from '~/components/icons/ClipboardIcon'
 import NoteIcon from '~/components/icons/NoteIcon'
@@ -56,12 +60,14 @@ import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type {
   DeadlineUrgency,
   DealActivityPanelProps,
+  DealEmailHistoryItem,
   HistoryItem,
   HistoryTab,
 } from '~/types/dealActivityTypes'
 import type { Nullable } from '~/types/utils'
 import { type CallEntry, mapToCallEntry } from '~/utils/callDisplayHelpers'
 import type { Calls200Response } from '~/utils/cloudtalk.server'
+import { stripHtmlTags } from '~/utils/stringHelpers'
 import { NoteForm } from './NoteForm'
 import { NoteItem } from './NoteItem'
 
@@ -785,8 +791,6 @@ function ActivityForm({
     }
   }
 
-  const activityNameRows = Math.max(1, form.name.split('\n').length)
-
   return (
     <div className='space-y-2 mb-4'>
       {isEditing && (
@@ -806,13 +810,8 @@ function ActivityForm({
         onChange={e => dispatch({ type: 'SET_NAME', payload: e.target.value })}
         onKeyDown={handleKeyDown}
         disabled={isSubmitting}
-        rows={activityNameRows}
-        className={cn(
-          'resize-none text-sm w-full py-1.5 leading-snug',
-          activityNameRows === 1
-            ? 'min-h-9 whitespace-nowrap overflow-x-auto overflow-y-hidden'
-            : 'min-h-0',
-        )}
+        rows={1}
+        className='resize-none text-sm w-full min-h-9 py-1.5 leading-snug break-words [field-sizing:content]'
       />
 
       <div className='flex gap-2'>
@@ -902,6 +901,87 @@ function ActivityForm({
   )
 }
 
+// --- Email history row ---
+
+function makeEmailSnippet(body: string | null | undefined, max = 120): string {
+  if (!body) return ''
+  const text = stripHtmlTags(body)
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (text.length <= max) return text
+  return `${text.slice(0, max).trimEnd()}…`
+}
+
+function EmailHistoryRow({ email }: { email: DealEmailHistoryItem }) {
+  const location = useLocation()
+  const params = useParams()
+  const isAdmin = location.pathname.includes('/admin/')
+  const basePath = isAdmin ? '/admin/deals' : '/employee/deals'
+  const dealId = params.dealId ?? ''
+  const searchParams = new URLSearchParams(location.search)
+  searchParams.set('messageId', String(email.id))
+  const to = `${basePath}/edit/${dealId}/history/chat/${email.thread_id}?${searchParams.toString()}`
+
+  const sentAt = new Date(email.sent_at)
+  const sentLabel = Number.isNaN(sentAt.getTime())
+    ? ''
+    : format(sentAt, 'MMM d, h:mm a')
+
+  const isSent = !!email.sender_user_id
+  const isRead = isSent ? (email.read_count ?? 0) > 0 : !!email.employee_read_at
+  const hasAttachments = !!email.has_attachments
+  const snippet = makeEmailSnippet(email.body)
+
+  return (
+    <Link
+      to={to}
+      className='group flex flex-col gap-0.5 rounded-md px-2 py-1.5 hover:bg-gray-50 transition-colors'
+    >
+      <div className='flex items-center justify-between gap-2'>
+        <div className='flex items-center gap-2 min-w-0'>
+          <Badge
+            className={cn(
+              'text-[10px] px-1.5 py-0 h-4 border shrink-0',
+              isSent
+                ? 'bg-blue-100 text-blue-700 border-blue-200'
+                : 'bg-green-100 text-green-700 border-green-200',
+            )}
+          >
+            {isSent ? 'Sent' : 'Received'}
+          </Badge>
+          <span className='text-sm font-medium truncate'>
+            {email.subject || '(no subject)'}
+          </span>
+        </div>
+        <div className='flex items-center gap-1.5 shrink-0'>
+          <span className='w-3 flex items-center justify-center'>
+            {hasAttachments ? (
+              <Paperclip
+                className='h-3 w-3 text-gray-500'
+                aria-label='Has attachments'
+              />
+            ) : null}
+          </span>
+          <span className='w-3 flex items-center justify-center'>
+            {isRead ? (
+              <Eye className='h-3 w-3 text-blue-500' aria-label='Read' />
+            ) : (
+              <EyeClosed className='h-3 w-3 text-gray-400' aria-label='Unread' />
+            )}
+          </span>
+          <span className='text-[10px] text-gray-500 w-22 text-right tabular-nums'>
+            {sentLabel}
+          </span>
+        </div>
+      </div>
+      {snippet ? (
+        <p className='text-xs text-gray-500 line-clamp-1 break-words'>{snippet}</p>
+      ) : null}
+    </Link>
+  )
+}
+
 // --- History Sub-tabs ---
 
 function HistoryTabButtons({
@@ -910,18 +990,21 @@ function HistoryTabButtons({
   activitiesCount,
   notesCount,
   actionsCount,
+  emailsCount,
 }: {
   activeTab: HistoryTab
   onTabChange: (tab: HistoryTab) => void
   activitiesCount: number
   notesCount: number
   actionsCount: number
+  emailsCount: number
 }) {
   const tabs: { key: HistoryTab; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'activities', label: `Activities (${activitiesCount})` },
     { key: 'notes', label: `Notes (${notesCount})` },
     { key: 'actions', label: `Actions (${actionsCount})` },
+    { key: 'emails', label: `Emails (${emailsCount})` },
   ]
 
   return (
@@ -952,6 +1035,7 @@ function ActivityList({
   activities,
   notes,
   actions,
+  emails,
   onEdit,
   editingActivityId,
   historyHeaderRef,
@@ -960,6 +1044,7 @@ function ActivityList({
   activities: DealActivity[]
   notes: DealNote[]
   actions: CallEntry[]
+  emails: DealEmailHistoryItem[]
   onEdit: (activity: DealActivity) => void
   editingActivityId: number | null
   historyHeaderRef: React.RefObject<HTMLDivElement | null>
@@ -969,6 +1054,14 @@ function ActivityList({
   const noteHandlers = useNoteAction(dealId)
 
   const { todo, done } = useMemo(() => partitionActivities(activities), [activities])
+
+  const sortedEmails = useMemo(
+    () =>
+      [...emails].sort(
+        (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime(),
+      ),
+    [emails],
+  )
 
   const sortedNotes = useMemo(
     () =>
@@ -1012,20 +1105,35 @@ function ActivityList({
             isPinned: false,
           }) satisfies HistoryItem,
       ),
+      ...emails.map(
+        e =>
+          ({
+            type: 'email' as const,
+            data: e,
+            date: e.sent_at,
+            isPinned: false,
+          }) satisfies HistoryItem,
+      ),
     ]
 
     items.sort((a, b) => {
       if (a.isPinned && !b.isPinned) return -1
       if (!a.isPinned && b.isPinned) return 1
-      return (
-        parseLocalDate(b.date ?? '').getTime() - parseLocalDate(a.date ?? '').getTime()
-      )
+      const aTime =
+        a.type === 'email' || a.type === 'action'
+          ? new Date(a.date).getTime()
+          : parseLocalDate(a.date ?? '').getTime()
+      const bTime =
+        b.type === 'email' || b.type === 'action'
+          ? new Date(b.date).getTime()
+          : parseLocalDate(b.date ?? '').getTime()
+      return bTime - aTime
     })
 
     return items
-  }, [done, notes, actions])
+  }, [done, notes, actions, emails])
 
-  const historyCount = done.length + notes.length + actions.length
+  const historyCount = done.length + notes.length + actions.length + emails.length
 
   const renderHistoryItem = useCallback(
     (item: HistoryItem, isLast: boolean): ReactNode => {
@@ -1045,6 +1153,12 @@ function ActivityList({
               />
             </TimelineItem>
           )
+        case 'note':
+          return (
+            <TimelineItem key={`note-${item.data.id}`} icon={NoteIcon} isLast={isLast}>
+              <NoteItem note={item.data} handlers={noteHandlers} />
+            </TimelineItem>
+          )
         case 'action':
           return (
             <TimelineItem
@@ -1061,10 +1175,14 @@ function ActivityList({
               </div>
             </TimelineItem>
           )
-        case 'note':
+        case 'email':
           return (
-            <TimelineItem key={`note-${item.data.id}`} icon={NoteIcon} isLast={isLast}>
-              <NoteItem note={item.data} handlers={noteHandlers} />
+            <TimelineItem
+              key={`email-${item.data.thread_id}-${item.data.id}`}
+              icon={Mail}
+              isLast={isLast}
+            >
+              <EmailHistoryRow email={item.data} />
             </TimelineItem>
           )
       }
@@ -1142,6 +1260,23 @@ function ActivityList({
           </div>
         )
       },
+      emails: () => {
+        if (sortedEmails.length === 0)
+          return <SectionEmptyState label='No emails yet' />
+        return (
+          <div>
+            {sortedEmails.map((email, index) => (
+              <TimelineItem
+                key={`email-${email.thread_id}-${email.id}`}
+                icon={Mail}
+                isLast={index === sortedEmails.length - 1}
+              >
+                <EmailHistoryRow email={email} />
+              </TimelineItem>
+            ))}
+          </div>
+        )
+      },
       all: () => {
         if (allHistoryItems.length === 0)
           return <SectionEmptyState label='No history yet' />
@@ -1157,6 +1292,7 @@ function ActivityList({
     [
       done,
       sortedNotes,
+      sortedEmails,
       actions,
       allHistoryItems,
       dealId,
@@ -1218,6 +1354,7 @@ function ActivityList({
               activitiesCount={done.length}
               notesCount={notes.length}
               actionsCount={actions.length}
+              emailsCount={emails.length}
             />
             {tabRenderers[historyTab]()}
           </>
@@ -1233,6 +1370,7 @@ export function DealActivityPanel({
   dealId,
   activities = [],
   notes = [],
+  emails = [],
 }: DealActivityPanelProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -1334,6 +1472,7 @@ export function DealActivityPanel({
           activities={activities}
           notes={notes}
           actions={actions}
+          emails={emails}
           onEdit={handleEdit}
           editingActivityId={editingActivity?.id ?? null}
           historyHeaderRef={historyHeaderRef}

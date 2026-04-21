@@ -1,1 +1,0 @@
-ALTER TABLE customers ADD COLUMN assigned_date TIMESTAMP DEFAULT NULL;

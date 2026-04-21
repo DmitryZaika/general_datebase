@@ -116,6 +116,8 @@ function ChildrenImagesDialog({
   const isStoneCarousel = type === 'stones'
   const isCustomerStone = isStoneCarousel && userRole === 'customer'
   const isEmployeeStone = isStoneCarousel && userRole === 'employee'
+  const isCustomerSinkOrFaucet =
+    userRole === 'customer' && (type === 'sinks' || type === 'faucets')
 
   const infoPairs: { key: string; label: string; value: string }[] = [
     { key: 'type', label: 'Type', value: displayedType },
@@ -136,7 +138,7 @@ function ChildrenImagesDialog({
         })
       }
     }
-  } else {
+  } else if (!isCustomerSinkOrFaucet) {
     infoPairs.push({ key: 'price', label: 'Price', value: displayedPrice })
   }
 

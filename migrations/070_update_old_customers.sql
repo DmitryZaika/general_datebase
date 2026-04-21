@@ -1,1 +1,0 @@
-UPDATE customers SET view_id = UUID_TO_BIN(UUID(), 1);

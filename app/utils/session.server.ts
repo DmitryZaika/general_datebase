@@ -34,6 +34,7 @@ export interface SessionUser {
   is_admin: boolean
   is_superuser: boolean
   company_id: number
+  pined_bar: number
 }
 
 export interface SessionUserNew extends Omit<SessionUser, 'company_id'> {
@@ -88,7 +89,7 @@ export async function login(
 
 async function getUser(sessionId: string): Promise<SessionUser | undefined> {
   const [rows] = await db.query<SessionUser[] & RowDataPacket[]>(
-    `SELECT users.id, users.email, users.name, users.phone_number, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.is_deleted FROM users
+    `SELECT users.id, users.email, users.name, users.phone_number, users.is_employee, users.is_admin, users.is_superuser, users.company_id, users.pined_bar, users.is_deleted FROM users
      JOIN sessions ON sessions.user_id = users.id
      WHERE sessions.id = ?
        AND sessions.expiration_date > CURRENT_TIMESTAMP

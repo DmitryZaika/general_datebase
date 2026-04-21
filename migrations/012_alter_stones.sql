@@ -1,2 +1,0 @@
-ALTER TABLE stones
-ADD COLUMN is_display BOOLEAN;

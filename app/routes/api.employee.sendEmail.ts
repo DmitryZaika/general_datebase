@@ -60,6 +60,13 @@ async function fetchCustomerDataByEmail(
   return undefined
 }
 
+function unwrapBrackets(input: string): string {
+  if (input.startsWith('<') && input.endsWith('>')) {
+    return input.slice(1, -1)
+  }
+  return input
+}
+
 async function fetchCompanyData(
   companyId: number,
 ): Promise<TemplateVariableData['company']> {
@@ -260,7 +267,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     sendResults.push({
-      messageId: info.messageId,
+      messageId: unwrapBrackets(info.messageId),
       senderEmail: parseEmailAddress(emailInformation.from || ''),
       receiverEmail: parseEmailAddress(recipient),
       threadId,

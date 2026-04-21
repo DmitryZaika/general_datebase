@@ -1,8 +1,10 @@
 import { format } from 'date-fns'
 import {
+  ArchiveRestore,
   Eye,
   Inbox,
   Mail,
+  MailOpen,
   Menu,
   Paperclip,
   PenSquare,
@@ -71,6 +73,109 @@ export interface DealsEmailsViewProps {
 
 type Tab = 'inbox' | 'drafts' | 'outbox' | 'sent' | 'archive' | 'trash'
 
+function ThreadRowHoverActions({
+  threadId,
+  activeTab,
+  isUnread,
+  busy,
+  onDelete,
+  onMarkRead,
+  onMarkUnread,
+  onRestore,
+  layer = 'swap',
+}: {
+  threadId: string
+  activeTab: Tab
+  isUnread: boolean
+  busy: boolean
+  onDelete: (threadId: string) => void
+  onMarkRead: (threadId: string) => void
+  onMarkUnread: (threadId: string) => void
+  onRestore: (threadId: string) => void
+  layer?: 'swap' | 'overlay'
+}) {
+  const shellClass = cn(
+    'flex items-center gap-0.5 flex-shrink-0',
+    layer === 'overlay' ? 'flex' : 'max-md:flex md:hidden md:group-hover:flex',
+  )
+
+  if (activeTab === 'trash') {
+    return (
+      <div className={shellClass} onClick={e => e.stopPropagation()}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type='button'
+              disabled={busy}
+              onClick={() => onRestore(threadId)}
+              className='p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:opacity-50'
+            >
+              <ArchiveRestore className='h-4 w-4' />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side='top' sideOffset={6}>
+            Undelete
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    )
+  }
+
+  return (
+    <div className={shellClass} onClick={e => e.stopPropagation()}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type='button'
+            disabled={busy}
+            onClick={() => onDelete(threadId)}
+            className='p-1.5 hover:bg-red-50 rounded-full text-red-500 transition-colors disabled:opacity-50'
+          >
+            <Trash2 className='h-4 w-4' />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side='top' sideOffset={6}>
+          Delete
+        </TooltipContent>
+      </Tooltip>
+      {activeTab === 'inbox' &&
+        (isUnread ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type='button'
+                disabled={busy}
+                onClick={() => onMarkRead(threadId)}
+                className='p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:opacity-50'
+              >
+                <MailOpen className='h-4 w-4' />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side='top' sideOffset={6}>
+              Mark as read
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type='button'
+                disabled={busy}
+                onClick={() => onMarkUnread(threadId)}
+                className='p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:opacity-50'
+              >
+                <Mail className='h-4 w-4' />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side='top' sideOffset={6}>
+              Mark as unread
+            </TooltipContent>
+          </Tooltip>
+        ))}
+    </div>
+  )
+}
+
 export default function DealsEmailsView({
   emails,
   currentUserEmail,
@@ -110,6 +215,9 @@ export default function DealsEmailsView({
   const [selectedThreads, setSelectedThreads] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
   const [isMarkingUnread, setIsMarkingUnread] = useState(false)
+  const [rowActionBusyThreadId, setRowActionBusyThreadId] = useState<string | null>(
+    null,
+  )
   const { toast } = useToast()
   const location = useLocation()
   const navigation = useNavigation()
@@ -422,6 +530,139 @@ export default function DealsEmailsView({
     }
   }
 
+  const handleDeleteThread = async (threadId: string) => {
+    if (!confirm('Delete this conversation?')) return
+    setRowActionBusyThreadId(threadId)
+    try {
+      const res = await fetch('/api/emails/delete-threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadIds: [threadId] }),
+      })
+      if (res.ok) {
+        toast({
+          title: 'Success',
+          description: 'Conversation deleted',
+          variant: 'success',
+        })
+        revalidator.revalidate()
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to delete conversation',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete conversation',
+        variant: 'destructive',
+      })
+    } finally {
+      setRowActionBusyThreadId(null)
+    }
+  }
+
+  const handleMarkReadThread = async (threadId: string) => {
+    setRowActionBusyThreadId(threadId)
+    try {
+      const res = await fetch('/api/emails/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadIds: [threadId] }),
+      })
+      if (res.ok) {
+        toast({
+          title: 'Success',
+          description: 'Marked as read',
+          variant: 'success',
+        })
+        revalidator.revalidate()
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to mark as read',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to mark as read',
+        variant: 'destructive',
+      })
+    } finally {
+      setRowActionBusyThreadId(null)
+    }
+  }
+
+  const handleMarkUnreadThread = async (threadId: string) => {
+    setRowActionBusyThreadId(threadId)
+    try {
+      const res = await fetch('/api/emails/mark-unread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadIds: [threadId] }),
+      })
+      if (res.ok) {
+        toast({
+          title: 'Success',
+          description: 'Marked as unread',
+          variant: 'success',
+        })
+        revalidator.revalidate()
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to mark as unread',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to mark as unread',
+        variant: 'destructive',
+      })
+    } finally {
+      setRowActionBusyThreadId(null)
+    }
+  }
+
+  const handleRestoreThread = async (threadId: string) => {
+    setRowActionBusyThreadId(threadId)
+    try {
+      const res = await fetch('/api/emails/restore-threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadIds: [threadId] }),
+      })
+      if (res.ok) {
+        toast({
+          title: 'Success',
+          description: 'Conversation restored',
+          variant: 'success',
+        })
+        revalidator.revalidate()
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to restore conversation',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to restore conversation',
+        variant: 'destructive',
+      })
+    } finally {
+      setRowActionBusyThreadId(null)
+    }
+  }
+
   const salesRepParam = searchParams.get('sales_rep')
 
   const handleSalesRepChange = (val: string) => {
@@ -617,22 +858,33 @@ export default function DealsEmailsView({
               {Array.from({ length: 10 }).map((_, i) => (
                 <div
                   key={i}
-                  className='flex items-start md:items-center gap-3 px-3 py-3'
+                  className='group relative border-b border-transparent bg-white px-3 py-1.5'
                 >
-                  <Skeleton className='h-4.5 w-4.5 flex-shrink-0 rounded' />
-                  <div className='flex-1 min-w-0 flex flex-col gap-2 md:hidden'>
-                    <div className='flex justify-between gap-2'>
-                      <Skeleton className='h-4 w-28' />
-                      <Skeleton className='h-3 w-12' />
+                  <div className='relative z-[2] flex w-full min-w-0 items-stretch gap-3'>
+                    <div className='flex shrink-0 items-center self-stretch'>
+                      <Skeleton className='size-4.5 rounded' />
                     </div>
-                    <Skeleton className='h-4 w-full max-w-[200px]' />
-                    <Skeleton className='h-3 w-full max-w-[160px]' />
-                  </div>
-                  <div className='hidden md:flex flex-1 items-center gap-4 min-w-0'>
-                    <Skeleton className='h-4 w-32 flex-shrink-0' />
-                    <Skeleton className='h-4 w-48 flex-shrink-0' />
-                    <Skeleton className='h-4 flex-1 max-w-[200px]' />
-                    <Skeleton className='h-4 w-16 flex-shrink-0' />
+                    <div className='flex flex-1 min-w-0 flex-col gap-0.5 md:hidden'>
+                      <div className='flex items-center justify-between gap-2'>
+                        <Skeleton className='h-4 w-36 max-w-[65%]' />
+                        <div className='flex flex-shrink-0 items-center gap-2'>
+                          <Skeleton className='h-9 w-24' />
+                          <Skeleton className='h-3 w-10' />
+                        </div>
+                      </div>
+                      <Skeleton className='h-4 w-full max-w-[260px]' />
+                      <Skeleton className='h-4 w-full max-w-[220px]' />
+                    </div>
+                    <div className='hidden min-h-9 flex-1 items-center gap-4 md:flex'>
+                      {adminMode && <Skeleton className='h-4 w-32 flex-shrink-0' />}
+                      <Skeleton className='h-4 w-48 flex-shrink-0' />
+                      <div className='flex min-w-0 flex-1 items-center gap-2'>
+                        <Skeleton className='h-4 max-w-[200px] w-[40%] flex-shrink-0' />
+                        <Skeleton className='h-4 min-w-0 flex-1' />
+                      </div>
+                      <Skeleton className='h-9 w-24 flex-shrink-0' />
+                      <Skeleton className='h-3.5 w-16 flex-shrink-0' />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -666,171 +918,244 @@ export default function DealsEmailsView({
                       navigate(`chat/${email.thread_id}${location.search}`)
                     }}
                     className={cn(
-                      'group flex items-start md:items-center gap-3 px-3 py-3 hover:shadow-md hover:z-10 relative cursor-pointer transition-all border-b border-transparent hover:border-gray-200',
-                      // Стили для непрочитанного сообщения: синий фон, жирный шрифт
+                      'group relative z-0 cursor-pointer border-b border-transparent px-3 py-1.5 transition-[border-color] hover:z-20 hover:border-gray-200',
                       isUnread ? 'bg-blue-50 font-semibold' : 'bg-white',
-                      isSelected && 'bg-blue-100', // Приоритет выделения
+                      isSelected && 'bg-blue-100',
                     )}
                   >
-                    <div className='flex-shrink-0 mt-1 md:mt-0'>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={checked => {
-                          const next = new Set(selectedThreads)
-                          if (checked) next.add(email.thread_id)
-                          else next.delete(email.thread_id)
-                          setSelectedThreads(next)
-                        }}
-                        className='size-4.5'
+                    <span
+                      className='pointer-events-none absolute inset-0 z-[1] opacity-0 shadow-[0_2px_8px_rgba(15,23,42,0.12)] transition-opacity duration-150 group-hover:opacity-100'
+                      aria-hidden
+                    />
+                    <div className='relative z-[2] flex w-full min-w-0 items-stretch gap-3'>
+                      <label
+                        className='flex shrink-0 cursor-pointer items-center self-stretch'
                         onClick={e => e.stopPropagation()}
-                      />
-                    </div>
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={checked => {
+                            const next = new Set(selectedThreads)
+                            if (checked) next.add(email.thread_id)
+                            else next.delete(email.thread_id)
+                            setSelectedThreads(next)
+                          }}
+                          className='size-4.5'
+                          onClick={e => e.stopPropagation()}
+                        />
+                      </label>
 
-                    {/* Mobile Layout (Vertical Stack) */}
-                    <div className='flex-1 min-w-0 flex flex-col gap-0.5 md:hidden'>
-                      <div className='flex items-center justify-between gap-2'>
-                        <span
-                          className={cn(
-                            'truncate text-sm',
-                            isUnread
-                              ? 'font-bold text-gray-900'
-                              : 'font-semibold text-gray-900',
-                          )}
-                        >
-                          {senderName}
-                        </span>
-                        <div className='flex items-center gap-2 flex-shrink-0'>
-                          {threadIdsWithAttachments.has(email.thread_id) && (
-                            <Paperclip className='h-3.5 w-3.5 text-gray-500' />
-                          )}
-                          {activeTab === 'sent' && (
-                            <span
-                              title={email.client_read_at ? 'Read by client' : 'Unread'}
-                              aria-label={
-                                email.client_read_at ? 'Read by client' : 'Unread'
-                              }
-                            >
-                              <Eye
-                                className={cn(
-                                  'h-3.5 w-3.5 flex-shrink-0',
-                                  email.client_read_at
-                                    ? 'text-blue-500'
-                                    : 'text-gray-400',
-                                )}
-                              />
-                            </span>
-                          )}
+                      {/* Mobile Layout (Vertical Stack) */}
+                      <div className='flex-1 min-w-0 flex flex-col gap-0.5 md:hidden'>
+                        <div className='flex items-center justify-between gap-2'>
                           <span
                             className={cn(
-                              'text-xs whitespace-nowrap',
-                              isUnread ? 'text-blue-600 font-bold' : 'text-gray-500',
+                              'truncate text-sm',
+                              isUnread
+                                ? 'font-bold text-gray-900'
+                                : 'font-semibold text-gray-900',
                             )}
                           >
-                            {format(new Date(email.sent_at), 'MMM d')}
+                            {senderName}
                           </span>
+                          <div className='flex items-center gap-2 flex-shrink-0'>
+                            <div
+                              className={cn(
+                                'relative flex min-w-24 flex-shrink-0 items-center justify-end',
+                                'md:h-9 md:w-24',
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  'flex items-center justify-end gap-2',
+                                  'md:absolute md:inset-y-0 md:right-0 md:z-[3] md:gap-3 md:transition-opacity md:duration-150',
+                                  'md:opacity-100 md:group-hover:pointer-events-none md:group-hover:opacity-0',
+                                )}
+                              >
+                                {threadIdsWithAttachments.has(email.thread_id) && (
+                                  <Paperclip className='h-3.5 w-3.5 text-gray-500' />
+                                )}
+                                {activeTab === 'sent' && (
+                                  <span
+                                    title={
+                                      email.client_read_at ? 'Read by client' : 'Unread'
+                                    }
+                                    aria-label={
+                                      email.client_read_at ? 'Read by client' : 'Unread'
+                                    }
+                                  >
+                                    <Eye
+                                      className={cn(
+                                        'h-3.5 w-3.5 flex-shrink-0',
+                                        email.client_read_at
+                                          ? 'text-blue-500'
+                                          : 'text-gray-400',
+                                      )}
+                                    />
+                                  </span>
+                                )}
+                              </div>
+                              <div
+                                className={cn(
+                                  'flex items-center justify-end',
+                                  'md:absolute md:inset-y-0 md:right-0 md:z-[3] md:transition-opacity md:duration-150',
+                                  'md:pointer-events-none md:opacity-0 md:group-hover:pointer-events-auto md:group-hover:opacity-100',
+                                )}
+                              >
+                                <ThreadRowHoverActions
+                                  threadId={email.thread_id}
+                                  activeTab={activeTab}
+                                  isUnread={isUnread}
+                                  busy={rowActionBusyThreadId === email.thread_id}
+                                  onDelete={handleDeleteThread}
+                                  onMarkRead={handleMarkReadThread}
+                                  onMarkUnread={handleMarkUnreadThread}
+                                  onRestore={handleRestoreThread}
+                                  layer='overlay'
+                                />
+                              </div>
+                            </div>
+                            <span
+                              className={cn(
+                                'text-xs whitespace-nowrap',
+                                isUnread ? 'text-blue-600 font-bold' : 'text-gray-500',
+                              )}
+                            >
+                              {format(new Date(email.sent_at), 'MMM d')}
+                            </span>
+                          </div>
                         </div>
-                      </div>
 
-                      <div
-                        className={cn(
-                          'text-sm truncate',
-                          isUnread
-                            ? 'font-bold text-gray-900'
-                            : 'font-medium text-gray-900',
-                        )}
-                      >
-                        {email.subject || '(No Subject)'}
-                      </div>
-
-                      <div className='text-sm text-gray-500 truncate'>
-                        {email.body
-                          ? email.body.replace(/<[^>]*>?/gm, '').slice(0, 100)
-                          : ''}
-                      </div>
-
-                      {/* Admin Mode Extra Info */}
-                      {adminMode && (
-                        <div className='mt-1 text-xs text-gray-400 truncate'>
-                          {activeTab === 'inbox' || activeTab === 'trash'
-                            ? `To: ${email.receiver_name || email.receiver_email}`
-                            : `From: ${email.sender_name || email.sender_email}`}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Desktop Layout (Horizontal Row) */}
-                    <div className='hidden md:flex flex-1 items-center gap-4 min-w-0'>
-                      {/* Employee Name (Admin Mode) */}
-                      {adminMode && (
-                        <div className='w-32 flex-shrink-0 truncate text-sm text-gray-500 font-medium'>
-                          {activeTab === 'inbox' || activeTab === 'trash'
-                            ? email.receiver_name
-                            : email.sender_name}
-                        </div>
-                      )}
-
-                      {/* Sender/Receiver Name */}
-                      <div
-                        className={cn(
-                          'w-48 flex-shrink-0 truncate text-sm',
-                          isUnread
-                            ? 'font-bold text-gray-900'
-                            : 'font-medium text-gray-900',
-                        )}
-                      >
-                        {senderName}
-                      </div>
-
-                      {/* Subject + Body */}
-                      <div className='flex-1 min-w-0 flex items-center gap-2 text-sm'>
-                        <span
+                        <div
                           className={cn(
-                            'truncate max-w-[200px]',
+                            'text-sm truncate',
                             isUnread
                               ? 'font-bold text-gray-900'
                               : 'font-medium text-gray-900',
                           )}
                         >
                           {email.subject || '(No Subject)'}
-                        </span>
-                        <span className='text-gray-400'>-</span>
-                        <span className='text-gray-500 truncate'>
+                        </div>
+
+                        <div className='text-sm text-gray-500 truncate'>
                           {email.body
                             ? email.body.replace(/<[^>]*>?/gm, '').slice(0, 100)
                             : ''}
-                        </span>
+                        </div>
+
+                        {/* Admin Mode Extra Info */}
+                        {adminMode && (
+                          <div className='mt-1 text-xs text-gray-400 truncate'>
+                            {activeTab === 'inbox' || activeTab === 'trash'
+                              ? `To: ${email.receiver_name || email.receiver_email}`
+                              : `From: ${email.sender_name || email.sender_email}`}
+                          </div>
+                        )}
                       </div>
 
-                      {/* Attachments & Date */}
-                      <div className='flex items-center gap-4 flex-shrink-0 text-xs text-gray-500 font-medium justify-end'>
-                        {threadIdsWithAttachments.has(email.thread_id) && (
-                          <Paperclip className='h-3.5 w-3.5 text-gray-500' />
+                      {/* Desktop Layout (Horizontal Row) */}
+                      <div className='hidden md:flex flex-1 items-center gap-4 min-w-0'>
+                        {/* Employee Name (Admin Mode) */}
+                        {adminMode && (
+                          <div className='w-32 flex-shrink-0 truncate text-sm text-gray-500 font-medium'>
+                            {activeTab === 'inbox' || activeTab === 'trash'
+                              ? email.receiver_name
+                              : email.sender_name}
+                          </div>
                         )}
-                        {activeTab === 'sent' && (
-                          <span
-                            title={email.client_read_at ? 'Read by client' : 'Unread'}
-                            aria-label={
-                              email.client_read_at ? 'Read by client' : 'Unread'
-                            }
-                          >
-                            <Eye
-                              className={cn(
-                                'h-4 w-4 flex-shrink-0',
-                                email.client_read_at
-                                  ? 'text-blue-500'
-                                  : 'text-gray-400',
-                              )}
-                            />
-                          </span>
-                        )}
-                        <span
+
+                        {/* Sender/Receiver Name */}
+                        <div
                           className={cn(
-                            'w-16 text-right',
-                            isUnread ? 'font-bold text-blue-600' : '',
+                            'w-48 flex-shrink-0 truncate text-sm',
+                            isUnread
+                              ? 'font-bold text-gray-900'
+                              : 'font-medium text-gray-900',
                           )}
                         >
-                          {format(new Date(email.sent_at), 'MMM d')}
-                        </span>
+                          {senderName}
+                        </div>
+
+                        {/* Subject + Body */}
+                        <div className='flex-1 min-w-0 flex items-center gap-2 text-sm'>
+                          <span
+                            className={cn(
+                              'truncate max-w-[200px]',
+                              isUnread
+                                ? 'font-bold text-gray-900'
+                                : 'font-medium text-gray-900',
+                            )}
+                          >
+                            {email.subject || '(No Subject)'}
+                          </span>
+                          <span className='text-gray-400'>-</span>
+                          <span className='text-gray-500 truncate'>
+                            {email.body
+                              ? email.body.replace(/<[^>]*>?/gm, '').slice(0, 100)
+                              : ''}
+                          </span>
+                        </div>
+
+                        {/* Attachments & Date */}
+                        <div className='flex items-center gap-4 flex-shrink-0 text-xs text-gray-500 font-medium justify-end'>
+                          <div className='relative h-9 w-24 flex-shrink-0'>
+                            <div
+                              className={cn(
+                                'absolute inset-y-0 right-0 z-[3] flex items-center justify-end gap-3 transition-opacity duration-150',
+                                'opacity-100 group-hover:pointer-events-none group-hover:opacity-0',
+                              )}
+                            >
+                              {threadIdsWithAttachments.has(email.thread_id) && (
+                                <Paperclip className='h-3.5 w-3.5 text-gray-500' />
+                              )}
+                              {activeTab === 'sent' && (
+                                <span
+                                  title={
+                                    email.client_read_at ? 'Read by client' : 'Unread'
+                                  }
+                                  aria-label={
+                                    email.client_read_at ? 'Read by client' : 'Unread'
+                                  }
+                                >
+                                  <Eye
+                                    className={cn(
+                                      'h-4 w-4 flex-shrink-0',
+                                      email.client_read_at
+                                        ? 'text-blue-500'
+                                        : 'text-gray-400',
+                                    )}
+                                  />
+                                </span>
+                              )}
+                            </div>
+                            <div
+                              className={cn(
+                                'absolute inset-y-0 right-0 z-[3] flex items-center justify-end transition-opacity duration-150',
+                                'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100',
+                              )}
+                            >
+                              <ThreadRowHoverActions
+                                threadId={email.thread_id}
+                                activeTab={activeTab}
+                                isUnread={isUnread}
+                                busy={rowActionBusyThreadId === email.thread_id}
+                                onDelete={handleDeleteThread}
+                                onMarkRead={handleMarkReadThread}
+                                onMarkUnread={handleMarkUnreadThread}
+                                onRestore={handleRestoreThread}
+                                layer='overlay'
+                              />
+                            </div>
+                          </div>
+                          <span
+                            className={cn(
+                              'w-16 text-right',
+                              isUnread ? 'font-bold text-blue-600' : '',
+                            )}
+                          >
+                            {format(new Date(email.sent_at), 'MMM d')}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>

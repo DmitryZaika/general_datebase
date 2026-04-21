@@ -5,6 +5,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from 'react-router'
 import { EmailChat } from '~/components/EmailChat'
 import { db } from '~/db.server'
@@ -149,6 +150,9 @@ export default function EmployeeDealsHistoryChatRoute() {
   const navigate = useNavigate()
   const location = useLocation()
   const data = useLoaderData<typeof loader>()
+  const [searchParams] = useSearchParams()
+  const messageIdRaw = searchParams.get('messageId')
+  const scrollToMessageId = messageIdRaw !== null ? Number(messageIdRaw) : null
 
   return (
     <EmailChat
@@ -164,6 +168,11 @@ export default function EmployeeDealsHistoryChatRoute() {
       currentUserSignature={data.currentUserSignature}
       customerEmail={data.customerEmail}
       companyId={data.companyId}
+      scrollToMessageId={
+        scrollToMessageId !== null && Number.isFinite(scrollToMessageId)
+          ? scrollToMessageId
+          : null
+      }
     />
   )
 }

@@ -7,11 +7,11 @@ import {
 } from 'react-router'
 import { DeleteRow } from '~/components/pages/DeleteRow'
 import { useToast } from '~/hooks/use-toast'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getAdminUser } from '~/utils/session.server'
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
-    await getEmployeeUser(request)
+    await getAdminUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -58,13 +58,20 @@ export default function DeleteDeal() {
     if (!dealId) return
     deleteMutation.mutate(dealId, {
       onSuccess: () => {
-        navigate(`/employee/deals${window.location.search}`, {
+        navigate(`/admin/deals${window.location.search}`, {
           replace: true,
         })
         toast({
           title: 'Success',
           description: 'Deal deleted',
           variant: 'success',
+        })
+      },
+      onError: () => {
+        toast({
+          title: 'Failure',
+          description: 'Failed to delete deal',
+          variant: 'destructive',
         })
       },
     })

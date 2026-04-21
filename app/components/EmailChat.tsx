@@ -1,22 +1,36 @@
+import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import DOMPurify from 'isomorphic-dompurify'
 import {
+  Check,
   FileText,
   ImageIcon,
   MoreVertical,
   Package,
   PaperclipIcon,
   Pencil,
+  Search,
   SendIcon,
   Sparkles,
   Upload,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
+import { EmailTemplatePickerPopover } from '~/components/molecules/EmailTemplatePickerPopover'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '~/components/ui/alert-dialog'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import {
@@ -25,6 +39,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import { Input } from '~/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -41,7 +56,23 @@ import {
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { cn } from '~/lib/utils'
+import type { Nullable } from '~/types/utils'
 import { dateClass, fileSize } from '~/utils/constants'
+import {
+  type EmailTemplate,
+  fetchAllTemplates,
+  filterTemplates,
+  getTemplatePreview,
+  TEMPLATE_STALE_TIME,
+  templateQueryKey,
+} from '~/utils/emailTemplates'
+import {
+  getUnfilledCustomVariables,
+  hasAnyVariables,
+  replaceTemplateVariables,
+  type TemplateVariableData,
+} from '~/utils/emailTemplateVariables'
+import { htmlToPlainText } from '~/utils/stringHelpers'
 
 export interface EmailChatAttachment {
   id: number
@@ -70,6 +101,7 @@ interface EmailChatBaseProps {
   customerName: string
   messages: EmailChatMessage[]
   onClose: () => void
+  scrollToMessageId?: number | null
 }
 
 interface EmailChatEmployeeProps extends EmailChatBaseProps {
@@ -209,16 +241,97 @@ function getInitials(name: string): string {
   return trimmed.slice(0, 1).toUpperCase()
 }
 
+function MobileTemplatePicker({
+  open,
+  onOpenChange,
+  templates,
+  isLoading,
+  searchQuery,
+  onSearchChange,
+  onSelect,
+  activeTemplateId,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  templates: EmailTemplate[]
+  isLoading: boolean
+  searchQuery: string
+  onSearchChange: (query: string) => void
+  onSelect: (template: EmailTemplate) => void
+  activeTemplateId: Nullable<number>
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className='max-w-md rounded-xl'>
+        <DialogHeader>
+          <DialogTitle>Choose Template</DialogTitle>
+        </DialogHeader>
+        <div className='relative'>
+          <Search className='absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400' />
+          <Input
+            placeholder='Search templates...'
+            value={searchQuery}
+            onChange={e => onSearchChange(e.target.value)}
+            className='pl-8 text-sm'
+          />
+        </div>
+        <div className='max-h-64 overflow-y-auto -mx-2'>
+          {isLoading && (
+            <div className='flex items-center justify-center py-4'>
+              <div className='animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent' />
+            </div>
+          )}
+          {!isLoading && templates.length === 0 && (
+            <div className='px-3 py-4 text-sm text-gray-500 text-center'>
+              {searchQuery.length > 0 ? 'No templates found' : 'No templates available'}
+            </div>
+          )}
+          {!isLoading &&
+            templates.map(template => {
+              const isActive = template.id === activeTemplateId
+              return (
+                <button
+                  key={template.id}
+                  type='button'
+                  className={`w-full px-3 py-2 cursor-pointer text-left transition-colors ${
+                    isActive ? 'bg-blue-50' : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => onSelect(template)}
+                >
+                  <div className='flex items-center justify-between gap-2'>
+                    <div className='font-medium text-sm truncate'>
+                      {template.template_name}
+                    </div>
+                    {isActive && (
+                      <Check className='h-3.5 w-3.5 shrink-0 text-blue-600' />
+                    )}
+                  </div>
+                  <div className='text-xs text-gray-500 truncate'>
+                    {getTemplatePreview(template.template_body, 50)}...
+                  </div>
+                </button>
+              )
+            })}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function EmailChat(props: EmailChatProps) {
-  const { variant, customerName, messages, onClose } = props
+  const { variant, customerName, messages, onClose, scrollToMessageId } = props
 
   const [chatMessages, setChatMessages] = useState<EmailChatMessage[]>(messages)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const messageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const targetMessageId = scrollToMessageId ?? null
+  const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null)
+  const initialScrollHandled = useRef(false)
   const [currentImages, setCurrentImages] = useState<
     { id: number; url: string; name: string; type: string; available: null }[]
   >([])
-  const [currentImageId, setCurrentImageId] = useState<number | null>(null)
+  const [currentImageId, setCurrentImageId] = useState<Nullable<number>>(null)
 
   const isEmployee = variant === 'employee'
   const employeeProps = isEmployeeProps(props) ? props : null
@@ -235,8 +348,39 @@ export function EmailChat(props: EmailChatProps) {
   const [showStonesPicker, setShowStonesPicker] = useState(false)
   const [showImagesPicker, setShowImagesPicker] = useState(false)
   const [showDocumentsPicker, setShowDocumentsPicker] = useState(false)
+  const [showMobileTemplatePicker, setShowMobileTemplatePicker] = useState(false)
+  const [mobileTemplateSearch, setMobileTemplateSearch] = useState('')
+  const [pendingTemplate, setPendingTemplate] = useState<Nullable<EmailTemplate>>(null)
+  const [activeTemplateId, setActiveTemplateId] = useState<Nullable<number>>(null)
   const { toast } = useToast()
   const isMobile = useIsMobile()
+
+  const { data: mobileTemplates = [], isLoading: mobileTemplatesLoading } = useQuery({
+    queryKey: templateQueryKey(employeeProps?.companyId ?? 0),
+    queryFn: () => fetchAllTemplates(employeeProps?.companyId ?? 0),
+    enabled: showMobileTemplatePicker && !!employeeProps?.companyId,
+    staleTime: TEMPLATE_STALE_TIME,
+  })
+
+  const { data: templateVariableData } = useQuery({
+    queryKey: ['templateVariables', employeeProps?.dealId],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (employeeProps?.dealId) {
+        params.set('dealId', String(employeeProps.dealId))
+      }
+      const res = await fetch(`/api/template-variables?${params}`)
+      if (!res.ok) return {}
+      return res.json() as Promise<TemplateVariableData>
+    },
+    enabled: !!employeeProps,
+    staleTime: TEMPLATE_STALE_TIME,
+  })
+
+  const filteredMobileTemplates = useMemo(
+    () => filterTemplates(mobileTemplates, mobileTemplateSearch),
+    [mobileTemplates, mobileTemplateSearch],
+  )
 
   useEffect(() => {
     setChatMessages(messages)
@@ -252,14 +396,37 @@ export function EmailChat(props: EmailChatProps) {
   }
 
   useEffect(() => {
+    if (targetMessageId !== null && !initialScrollHandled.current) return
     scrollToBottom()
   }, [chatMessages.length])
 
   useEffect(() => {
     if (chatMessages.length === 0) return
+    if (targetMessageId !== null && !initialScrollHandled.current) return
     const t = setTimeout(scrollToBottom, 150)
     return () => clearTimeout(t)
   }, [messages])
+
+  useEffect(() => {
+    if (targetMessageId === null) return
+    if (initialScrollHandled.current) return
+    if (chatMessages.length === 0) return
+
+    const t = setTimeout(() => {
+      const el = messageRefs.current.get(targetMessageId)
+      if (!el) {
+        initialScrollHandled.current = true
+        scrollToBottom()
+        return
+      }
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setHighlightedMessageId(targetMessageId)
+      initialScrollHandled.current = true
+      const clearT = setTimeout(() => setHighlightedMessageId(null), 2000)
+      return () => clearTimeout(clearT)
+    }, 250)
+    return () => clearTimeout(t)
+  }, [targetMessageId, chatMessages.length])
 
   useEffect(() => {
     if (isEmployee && textareaRef.current) {
@@ -342,12 +509,49 @@ export function EmailChat(props: EmailChatProps) {
     handleGenerate(value)
   }
 
+  const applyEmailTemplate = (template: EmailTemplate) => {
+    if (!employeeProps) return
+
+    const variableData: TemplateVariableData = templateVariableData ?? {}
+    const replaced = replaceTemplateVariables(template.template_body, variableData)
+    const plainText = htmlToPlainText(replaced)
+    setMessageText(plainText)
+    setActiveTemplateId(template.id)
+
+    const customVars = getUnfilledCustomVariables(plainText)
+    if (customVars.length > 0) {
+      toast({
+        title: 'Custom variables detected',
+        description: `Please fill in: ${customVars.map(v => `{{${v}}}`).join(', ')}`,
+      })
+    }
+  }
+
+  const handleEmailTemplateSelect = (template: EmailTemplate): boolean => {
+    if (!employeeProps) return false
+    if (messageText.trim() !== '') {
+      setPendingTemplate(template)
+      return false
+    }
+    applyEmailTemplate(template)
+    return true
+  }
+
+  const handleConfirmTemplateReplace = () => {
+    if (!pendingTemplate) return
+    applyEmailTemplate(pendingTemplate)
+    setPendingTemplate(null)
+    setShowMobileTemplatePicker(false)
+    setMobileTemplateSearch('')
+  }
+
   const handleGenerate = async (templateOverride?: string) => {
     if (!employeeProps) return
     const template = templateOverride || selectedTemplate
     if (!template) return
     setIsGenerating(true)
     setMessageText('')
+    setActiveTemplateId(null)
     try {
       await generateAIEmailForChat(
         template,
@@ -367,10 +571,21 @@ export function EmailChat(props: EmailChatProps) {
     }
   }
 
+  const unfilled = useMemo(() => getUnfilledCustomVariables(messageText), [messageText])
+
   const handleSend = async () => {
     if (!employeeProps) return
     const body = messageText.trim()
     if (!body && attachments.length === 0) return
+    if (hasAnyVariables(body)) {
+      toast({
+        title: 'Placeholders detected',
+        description:
+          'Please replace all {{placeholders}} with actual values before sending',
+        variant: 'destructive',
+      })
+      return
+    }
     if (!employeeProps.customerEmail) {
       alert('Customer email is missing')
       return
@@ -439,6 +654,7 @@ export function EmailChat(props: EmailChatProps) {
       ])
       setMessageText('')
       setAttachments([])
+      setActiveTemplateId(null)
       toast({ title: 'Success', description: 'Email sent!', variant: 'success' })
     } catch (error) {
       if (error instanceof Error) {
@@ -530,11 +746,21 @@ export function EmailChat(props: EmailChatProps) {
                 className={`${rowClass} ${message.isFromCustomer ? 'flex-row-reverse justify-end pl-2' : 'flex-row-reverse justify-start pr-2'}`}
               >
                 <div
-                  className={
+                  ref={node => {
+                    if (node) {
+                      messageRefs.current.set(message.id, node)
+                    } else {
+                      messageRefs.current.delete(message.id)
+                    }
+                  }}
+                  className={cn(
                     message.isFromCustomer
                       ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%] break-words'
-                      : 'bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative pb-6 min-w-21.25 break-words'
-                  }
+                      : 'bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative pb-6 min-w-21.25 break-words',
+                    'transition-all duration-500 ease-out will-change-transform',
+                    highlightedMessageId === message.id &&
+                      'ring-1 ring-white/40 shadow-[0_22px_60px_-18px_rgba(15,23,42,0.55),0_8px_24px_-12px_rgba(15,23,42,0.4)] scale-[1.020] z-10',
+                  )}
                 >
                   <div
                     className={cn(
@@ -712,6 +938,21 @@ export function EmailChat(props: EmailChatProps) {
               })}
             </div>
           )}
+          {isEmployee && unfilled.length > 0 && (
+            <div className='mb-2 p-2.5 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md'>
+              <p>
+                <strong>Action required:</strong> Please replace the following
+                placeholders with actual values before sending:
+              </p>
+              <ul className='mt-1 list-disc list-inside'>
+                {unfilled.map(variable => (
+                  <li key={variable}>
+                    <code className='bg-amber-100 px-1 rounded'>{`{{${variable}}}`}</code>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {isEmployee && employeeProps ? (
             <div className='flex flex-col md:flex-row flex-1 gap-2'>
               <div className='hidden md:flex items-end gap-2'>
@@ -801,6 +1042,11 @@ export function EmailChat(props: EmailChatProps) {
                               ]
                             : []),
                           {
+                            label: 'Use Template',
+                            icon: <FileText className='w-4 h-4' />,
+                            onClick: () => setShowMobileTemplatePicker(true),
+                          },
+                          {
                             label: 'Generate with AI',
                             icon: <Sparkles className='w-4 h-4' />,
                             onClick: () => {
@@ -824,7 +1070,7 @@ export function EmailChat(props: EmailChatProps) {
                   />
                 </div>
 
-                <div className='hidden md:block'>
+                <div className='hidden md:flex items-end gap-1'>
                   {employeeProps.companyId > 0 ? (
                     <CustomDropdownMenu
                       side='top'
@@ -869,6 +1115,11 @@ export function EmailChat(props: EmailChatProps) {
                       <PaperclipIcon className='h-5 w-5' />
                     </Button>
                   )}
+                  <EmailTemplatePickerPopover
+                    companyId={employeeProps.companyId}
+                    onSelect={handleEmailTemplateSelect}
+                    activeTemplateId={activeTemplateId}
+                  />
                 </div>
 
                 <input
@@ -890,6 +1141,7 @@ export function EmailChat(props: EmailChatProps) {
                   value={messageText}
                   onChange={e => {
                     setMessageText(e.target.value)
+                    setActiveTemplateId(null)
                     if (textareaRef.current) {
                       textareaRef.current.style.height = 'auto'
                       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
@@ -967,6 +1219,48 @@ export function EmailChat(props: EmailChatProps) {
             />
           </>
         )}
+        {isEmployee && employeeProps && (
+          <MobileTemplatePicker
+            open={showMobileTemplatePicker}
+            onOpenChange={open => {
+              setShowMobileTemplatePicker(open)
+              if (!open) setMobileTemplateSearch('')
+            }}
+            templates={filteredMobileTemplates}
+            isLoading={mobileTemplatesLoading}
+            searchQuery={mobileTemplateSearch}
+            onSearchChange={setMobileTemplateSearch}
+            onSelect={template => {
+              const applied = handleEmailTemplateSelect(template)
+              if (applied) {
+                setShowMobileTemplatePicker(false)
+                setMobileTemplateSearch('')
+              }
+            }}
+            activeTemplateId={activeTemplateId}
+          />
+        )}
+        <AlertDialog
+          open={!!pendingTemplate}
+          onOpenChange={open => {
+            if (!open) setPendingTemplate(null)
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Replace message</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will replace your current message with the template. Continue?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmTemplateReplace}>
+                Replace
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
       <SuperCarousel
         type='email'

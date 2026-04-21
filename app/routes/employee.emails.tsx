@@ -17,39 +17,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
     const pageSize = 50
     const search = (url.searchParams.get('search') || '').trim()
-    const searchClause = search
-      ? ` AND (e.subject LIKE ? OR e.body LIKE ? OR e.sender_email LIKE ? OR e.receiver_email LIKE ? OR EXISTS (
-      SELECT 1 FROM customers c
-      WHERE c.company_id = ?
-      AND c.deleted_at IS NULL
-      AND c.name LIKE ?
-      AND (
-        c.email = e.sender_email
-        OR LOWER(TRIM(c.email)) = LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.sender_email, '<', -1), '>', 1)))
-        OR (e.sender_email NOT LIKE '%<%' AND LOWER(TRIM(c.email)) = LOWER(TRIM(e.sender_email)))
+
+    let customerEmailMatches: string[] = []
+    if (search) {
+      const rows = await selectMany<{ email: string }>(
+        db,
+        `SELECT DISTINCT LOWER(TRIM(email)) AS email
+         FROM customers
+         WHERE company_id = ?
+           AND deleted_at IS NULL
+           AND email IS NOT NULL
+           AND email <> ''
+           AND name LIKE ?
+         LIMIT 500`,
+        [user.company_id, `%${search}%`],
       )
-    ) OR EXISTS (
-      SELECT 1 FROM customers c2
-      WHERE c2.company_id = ?
-      AND c2.deleted_at IS NULL
-      AND c2.name LIKE ?
-      AND (
-        c2.email = e.receiver_email
-        OR LOWER(TRIM(c2.email)) = LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.receiver_email, '<', -1), '>', 1)))
-        OR (e.receiver_email NOT LIKE '%<%' AND LOWER(TRIM(c2.email)) = LOWER(TRIM(e.receiver_email)))
-      )
-    ))`
+      customerEmailMatches = rows.map(r => r.email).filter(Boolean)
+    }
+
+    const customerEmailClause = customerEmailMatches.length
+      ? ` OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.sender_email, '<', -1), '>', 1))) IN (${customerEmailMatches.map(() => '?').join(',')}) OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.receiver_email, '<', -1), '>', 1))) IN (${customerEmailMatches.map(() => '?').join(',')})`
       : ''
-    const searchParams = search
+
+    const searchClause = search
+      ? ` AND (e.subject LIKE ? OR e.body LIKE ? OR e.sender_email LIKE ? OR e.receiver_email LIKE ?${customerEmailClause})`
+      : ''
+    const searchParams: (string | number)[] = search
       ? [
           `%${search}%`,
           `%${search}%`,
           `%${search}%`,
           `%${search}%`,
-          user.company_id,
-          `%${search}%`,
-          user.company_id,
-          `%${search}%`,
+          ...customerEmailMatches,
+          ...customerEmailMatches,
         ]
       : []
 

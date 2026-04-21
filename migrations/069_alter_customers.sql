@@ -1,1 +1,0 @@
-ALTER TABLE customers ADD view_id binary(16);

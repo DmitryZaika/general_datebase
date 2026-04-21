@@ -13,13 +13,15 @@ import {
   Mail,
   MailIcon,
   Package,
+  PanelLeftClose,
+  PanelLeftOpen,
   Receipt,
   ShowerHead,
   User,
   Users,
 } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useLoaderData, useLocation } from 'react-router'
+import { Link, useFetcher, useLoaderData, useLocation } from 'react-router'
 import { Collapsible } from '~/components/Collapsible'
 import { CorbelIcon } from '~/components/icons/CorbelIcon'
 import { SinkIcon } from '~/components/icons/SinkIcon'
@@ -40,6 +42,7 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from '~/components/ui/sidebar'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { useSuperAdminCompanySwitch } from '~/hooks/useSuperAdminCompanySwitch'
 import type { ISupplier } from '~/schemas/suppliers'
 import { getMirroredUrl } from '~/utils/headerNav'
@@ -102,6 +105,22 @@ const getItems = (
       ),
     },
   ]
+  if (isCustomerRoute) {
+    finalList.push(
+      {
+        title: 'Sinks',
+        url: `/customer/${companyId}/sinks`,
+        icon: SinkIcon,
+        component: () => <SinksFilters base={base} suppliers={sinkSuppliers} />,
+      },
+      {
+        title: 'Faucets',
+        url: `/customer/${companyId}/faucets`,
+        icon: ShowerHead,
+        component: () => <FaucetsFilters base={base} suppliers={faucetSuppliers} />,
+      },
+    )
+  }
   if (base === 'employee') {
     finalList.push({
       title: 'Customers',
@@ -250,7 +269,12 @@ export function EmployeeSidebar({
   const isCustomerRoute = location.pathname.startsWith('/customer/')
   const isContractorsRoute = location.pathname.startsWith('/contractors/')
   const data = useLoaderData<{
-    user: { company_id: number; is_admin: boolean; is_superuser: boolean } | null
+    user: {
+      company_id: number
+      is_admin: boolean
+      is_superuser: boolean
+      pined_bar?: number
+    } | null
     superadminCompanies?: { id: number; name: string }[]
     activeCompanyId?: number
     userIsSuperAdmin?: boolean
@@ -352,10 +376,27 @@ export function EmployeeSidebar({
     operationsItems.some(i => location.pathname.startsWith(i.url)),
   )
 
+  const pinFetcher = useFetcher<{ pined_bar: number }>()
+  const pinnedFromServer = Boolean(data?.user?.pined_bar)
+  const isPinned =
+    pinFetcher.state !== 'idle'
+      ? !pinnedFromServer
+      : pinFetcher.data
+        ? Boolean(pinFetcher.data.pined_bar)
+        : pinnedFromServer
+
+  const handleTogglePin = () => {
+    pinFetcher.submit(null, {
+      method: 'post',
+      action: '/api/users/toggle-pin-bar',
+    })
+  }
+
   const isIconHoverDesktopSidebar =
     (location.pathname.startsWith('/employee') ||
       location.pathname.startsWith('/admin')) &&
-    !isMobile
+    !isMobile &&
+    !isPinned
 
   return (
     <Sidebar
@@ -614,6 +655,52 @@ export function EmployeeSidebar({
                   </SidebarMenuItem>
                 )
               })}
+
+              {data?.user &&
+                !isMobile &&
+                (location.pathname.startsWith('/employee') ||
+                  location.pathname.startsWith('/admin')) && (
+                  <SidebarMenuItem className='mt-2 border-t border-sidebar-border pt-2 group-data-[collapsible=icon]:hidden'>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type='button'
+                          onClick={handleTogglePin}
+                          aria-label={isPinned ? 'Unpin sidebar' : 'Pin sidebar'}
+                          aria-pressed={isPinned}
+                          className={`group/pin flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200 cursor-pointer ${
+                            isPinned
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
+                              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                          }`}
+                        >
+                          <span className='transition-opacity duration-200'>
+                            {isPinned ? 'Pinned' : 'Pin'}
+                          </span>
+                          <span className='relative inline-flex size-5 items-center justify-center'>
+                            <PanelLeftClose
+                              className={`absolute size-5 transition-all duration-300 ${
+                                isPinned
+                                  ? 'opacity-100 rotate-0 scale-100'
+                                  : 'opacity-0 -rotate-90 scale-75'
+                              }`}
+                            />
+                            <PanelLeftOpen
+                              className={`absolute size-5 transition-all duration-300 ${
+                                isPinned
+                                  ? 'opacity-0 rotate-90 scale-75'
+                                  : 'opacity-100 rotate-0 scale-100'
+                              }`}
+                            />
+                          </span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side='right'>
+                        {isPinned ? 'Unpin sidebar' : 'Pin sidebar'}
+                      </TooltipContent>
+                    </Tooltip>
+                  </SidebarMenuItem>
+                )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

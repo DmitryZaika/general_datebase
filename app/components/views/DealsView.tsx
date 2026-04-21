@@ -16,7 +16,6 @@ import DealsList from '~/components/DealsList'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { Button } from '~/components/ui/button'
-import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import { parseLocalDate } from '~/lib/utils'
 import type { Customer } from '~/types'
 import type { DealCardData } from '~/types/deals'
@@ -336,13 +335,7 @@ export default function DealsView({
   const toolbar = (
     <div className='w-full flex flex-col sm:flex-row justify-between items-center gap-2 py-1 px-1'>
       <div className='flex items-center gap-2 w-full sm:w-auto'>
-        {readonly ? (
-          toolbarLeft
-        ) : (
-          <div className='hidden md:block'>
-            <OriginalSidebarTrigger />
-          </div>
-        )}
+        {readonly ? toolbarLeft : null}
         {!readonly && toolbarLeft}
         {groupListSelect}
         {showAddDeal && (

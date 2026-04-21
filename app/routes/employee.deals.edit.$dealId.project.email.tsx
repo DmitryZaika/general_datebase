@@ -34,10 +34,7 @@ import { z } from 'zod'
 import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
-import {
-  type EmailTemplate,
-  EmailTemplateSearch,
-} from '~/components/molecules/EmailTemplateSearch'
+import { EmailTemplateSearch } from '~/components/molecules/EmailTemplateSearch'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { QuillInput } from '~/components/molecules/QuillInput'
@@ -66,6 +63,7 @@ import {
   FormMessage,
   FormProvider,
 } from '~/components/ui/form'
+import { Input } from '~/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -78,6 +76,7 @@ import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { useArrowCarousel } from '~/hooks/useArrowToggle'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
+import type { EmailTemplate } from '~/utils/emailTemplates'
 import {
   getUnfilledCustomVariables,
   hasAnyVariables,
@@ -343,6 +342,8 @@ function EmailFormFields({
   onTemplateChange,
   templateVariableData,
   onFilesDrop,
+  recipientEmail,
+  customerName,
 }: {
   form: ReturnType<typeof useForm<EmailFormData>>
   companyId: number
@@ -350,25 +351,24 @@ function EmailFormFields({
   onTemplateChange: (template: EmailTemplate | undefined) => void
   templateVariableData: TemplateVariableData
   onFilesDrop?: (files: File[]) => void
+  recipientEmail: string
+  customerName: string
 }) {
   const bodyText = form.watch('text')
   const customVariables = getUnfilledCustomVariables(bodyText)
   const showCustomVariablesInfo = selectedTemplate && customVariables.length > 0
+  const displayRecipient = customerName?.trim()
+    ? `${customerName} (${recipientEmail})`
+    : recipientEmail
 
   return (
     <div className='flex-1 space-y-2'>
-      <FormField
-        control={form.control}
-        name='to'
-        render={({ field }) => (
-          <InputItem
-            name='To'
-            field={field}
-            placeholder='recipient@example.com'
-            disabled={true}
-          />
-        )}
-      />
+      <FormItem>
+        <FormLabel>To</FormLabel>
+        <FormControl>
+          <Input value={displayRecipient} title={recipientEmail} disabled readOnly />
+        </FormControl>
+      </FormItem>
       <FormField
         control={form.control}
         name='subject'
@@ -605,7 +605,7 @@ function sendEmail(
 export default function DealEmailDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { email, dealId, companyId, templateVariableData } =
+  const { email, customerName, dealId, companyId, templateVariableData } =
     useLoaderData<typeof loader>()
   const [showAIMenu, setShowAIMenu] = useState(false)
   const [_isGenerating, setIsGenerating] = useState(false)
@@ -789,6 +789,7 @@ export default function DealEmailDialog() {
 
     if (pastedFiles.length > 0) {
       addFiles(pastedFiles)
+      setIsDragging(false)
     }
   }
 
@@ -879,7 +880,12 @@ export default function DealEmailDialog() {
               selectedTemplate={selectedTemplate}
               onTemplateChange={setSelectedTemplate}
               templateVariableData={templateVariableData}
-              onFilesDrop={files => addFiles(files)}
+              recipientEmail={email}
+              customerName={customerName}
+              onFilesDrop={files => {
+                addFiles(files)
+                setIsDragging(false)
+              }}
             />
             {form.watch('attachments').length > 0 ? (
               <div className='flex flex-wrap gap-2'>

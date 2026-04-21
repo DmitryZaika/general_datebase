@@ -38,6 +38,7 @@ export function QuillEditor({ value, onChange, onFilesDrop }: IQuillEditorProps)
       const currentContent = quill.root.innerHTML
       if (currentContent !== value && value !== undefined) {
         quill.clipboard.dangerouslyPasteHTML(value)
+        quill.setSelection(quill.getLength(), 0)
       }
     }
     isInternalChange.current = false
@@ -64,6 +65,7 @@ export function QuillEditor({ value, onChange, onFilesDrop }: IQuillEditorProps)
       const files = e.dataTransfer?.files
       if (files && files.length > 0 && onFilesDrop) {
         e.preventDefault()
+        e.stopPropagation()
         onFilesDrop(Array.from(files))
       }
     },

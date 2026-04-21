@@ -1,9 +1,11 @@
 import type { LoaderFunctionArgs } from 'react-router'
 import { redirect } from 'react-router'
+import { getDealEmailsWithReads } from '~/crud/emails'
 import { db } from '~/db.server'
 import { fetchNotesWithComments } from '~/lib/noteHelpers.server'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
+import type { DealEmailHistoryItem } from '~/types/dealActivityTypes'
 import type { Nullable } from '~/types/utils'
 import { TERMINAL_LIST_IDS } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
@@ -20,6 +22,7 @@ export interface DealEditLoaderData {
   closedAt: string | null
   activities: DealActivity[]
   notes: DealNote[]
+  emails: DealEmailHistoryItem[]
 }
 
 export function createDealEditLoader(
@@ -70,7 +73,7 @@ export function createDealEditLoader(
         }
       }
 
-      const [stages, history, activities, notes] = await Promise.all([
+      const [stages, history, activities, notes, rawEmails] = await Promise.all([
         selectMany<{ id: number; name: string; position: number }>(
           db,
           'SELECT id, name, position FROM deals_list WHERE group_id = ? AND deleted_at IS NULL ORDER BY position',
@@ -99,7 +102,19 @@ export function createDealEditLoader(
           [dealId, user.company_id],
         ),
         fetchNotesWithComments(db, dealId, user.company_id),
+        getDealEmailsWithReads(dealId),
       ])
+
+      const attachmentByThread = new Map<string, boolean>()
+      for (const email of rawEmails) {
+        if (email.has_attachments) {
+          attachmentByThread.set(email.thread_id, true)
+        }
+      }
+      const emails: DealEmailHistoryItem[] = rawEmails.map(email => ({
+        ...email,
+        thread_has_attachments: attachmentByThread.get(email.thread_id) ?? false,
+      }))
 
       const isClosed =
         is_won === 1 || is_won === 0 || TERMINAL_LIST_IDS.includes(list_id)
@@ -120,6 +135,7 @@ export function createDealEditLoader(
         closedAt,
         activities,
         notes,
+        emails,
       }
     } catch {
       return redirect('/login')

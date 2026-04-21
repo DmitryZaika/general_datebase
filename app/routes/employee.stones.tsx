@@ -18,7 +18,6 @@ import { ImageCard } from '~/components/organisms/ImageCard'
 import { StoneTable } from '~/components/organisms/StoneTable'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
-import { OriginalSidebarTrigger } from '~/components/ui/sidebar'
 import { cleanParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
@@ -336,9 +335,6 @@ export default function Stones() {
     <>
       <div className='flex justify-between flex-wrap items-center items-end mb-2'>
         <div className='flex items-center gap-4'>
-          <div className='hidden md:block'>
-            <OriginalSidebarTrigger />
-          </div>
           <Button
             variant='outline'
             onClick={toggleViewMode}
