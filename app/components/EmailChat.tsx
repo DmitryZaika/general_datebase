@@ -229,6 +229,147 @@ function getDisplayBody(body: string, signature: string | null | undefined): str
   return withoutDash.trimEnd()
 }
 
+const EMAIL_HTML_TAG_REGEX = /<\/?[a-z][\s\S]*>/i
+const EMAIL_MARKDOWN_LINK_REGEX = /\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^)]+)\)/gi
+const EMAIL_URL_REGEX = /\bhttps?:\/\/[^\s<>"')]+[^\s<>"').,;:]/gi
+const EMAIL_GREETING_REGEX = /\b(Hi|Hello|Dear|This|Thank|Location:)\b/i
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function escapeAttribute(value: string): string {
+  return escapeHtml(value).replace(/`/g, '&#96;')
+}
+
+function emailAnchor(url: string, label: string): string {
+  const href = escapeAttribute(url)
+  return `<a href="${href}" target="_blank" rel="noreferrer">${label}</a>`
+}
+
+function formatEmailInline(value: string): string {
+  const replacements: string[] = []
+  const withMarkdownLinks = value.replace(
+    EMAIL_MARKDOWN_LINK_REGEX,
+    (_match, label, url) => {
+      const index = replacements.length
+      replacements.push(emailAnchor(String(url), escapeHtml(String(label))))
+      return `__EMAIL_LINK_${index}__`
+    },
+  )
+  const linked = escapeHtml(withMarkdownLinks)
+    .replace(EMAIL_URL_REGEX, url => emailAnchor(url, escapeHtml(url)))
+    .replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>')
+
+  return replacements.reduce(
+    (html, replacement, index) => html.replace(`__EMAIL_LINK_${index}__`, replacement),
+    linked,
+  )
+}
+
+function stripEmailCssNoise(value: string): string {
+  const withoutStyleTags = value.replace(/<style[\s\S]*?<\/style>/gi, '')
+  const firstGreeting = withoutStyleTags.search(EMAIL_GREETING_REGEX)
+  if (firstGreeting <= 0) return withoutStyleTags
+
+  const prefix = withoutStyleTags.slice(0, firstGreeting)
+  if (!/(@media|!important|a:link|a:visited|\{|\})/i.test(prefix)) {
+    return withoutStyleTags
+  }
+
+  return withoutStyleTags.slice(firstGreeting).trimStart()
+}
+
+function plainEmailToHtml(value: string): string {
+  const lines = stripEmailCssNoise(value)
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+  const blocks: string[] = []
+  let paragraph: string[] = []
+  let list: string[] = []
+  let pendingListItem: string[] | null = null
+
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return
+    blocks.push(`<p>${paragraph.map(formatEmailInline).join('<br>')}</p>`)
+    paragraph = []
+  }
+
+  const flushList = () => {
+    if (list.length === 0) return
+    blocks.push(
+      `<ul>${list.map(item => `<li>${formatEmailInline(item)}</li>`).join('')}</ul>`,
+    )
+    list = []
+  }
+
+  const flushPendingListItem = () => {
+    if (pendingListItem === null) return
+    const item = pendingListItem.join(' ').replace(/\s+/g, ' ').trim()
+    if (item) list.push(item)
+    pendingListItem = null
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed === '-') {
+      flushParagraph()
+      flushPendingListItem()
+      pendingListItem = []
+      continue
+    }
+    if (!trimmed) {
+      flushParagraph()
+      flushPendingListItem()
+      flushList()
+      continue
+    }
+    const bullet = trimmed.match(/^[-*]\s+(.+)$/)
+    if (bullet) {
+      flushParagraph()
+      flushPendingListItem()
+      list.push(bullet[1])
+      continue
+    }
+    if (pendingListItem !== null) {
+      pendingListItem.push(trimmed)
+      continue
+    }
+    flushList()
+    paragraph.push(line)
+  }
+
+  flushParagraph()
+  flushPendingListItem()
+  flushList()
+  return blocks.join('')
+}
+
+function sanitizeEmailBody(html: string): string {
+  const sanitized = DOMPurify.sanitize(html, {
+    ADD_TAGS: ['ul', 'ol', 'li', 'a', 'strong', 'em', 'p', 'br'],
+    ADD_ATTR: ['href', 'target', 'rel'],
+  })
+  return sanitized.replace(
+    /<a\s+(?![^>]*\btarget=)/gi,
+    '<a target="_blank" rel="noreferrer" ',
+  )
+}
+
+function formatEmailBody(body: string, signature: string | null | undefined): string {
+  const displayBody = stripEmailCssNoise(getDisplayBody(body, signature))
+  const html = EMAIL_HTML_TAG_REGEX.test(displayBody)
+    ? displayBody
+    : plainEmailToHtml(displayBody)
+  return sanitizeEmailBody(html)
+}
+
 function getInitials(name: string): string {
   const trimmed = (name ?? '').trim()
   if (!trimmed) return ''
@@ -764,19 +905,16 @@ export function EmailChat(props: EmailChatProps) {
                 >
                   <div
                     className={cn(
-                      'email-message-body break-words',
+                      'email-message-body break-words text-base leading-[1.45] [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_p]:my-0 [&_strong]:font-semibold [&_ul]:space-y-0.5 [&_ol]:space-y-0.5',
                       message.isFromCustomer
-                        ? 'whitespace-pre-wrap [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5'
-                        : 'whitespace-pre-wrap text-white [&_*]:!text-white [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5',
+                        ? '[&_a]:text-blue-700 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5'
+                        : 'text-white [&_*]:!text-white [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5',
                     )}
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
                     dangerouslySetInnerHTML={{
-                      __html: DOMPurify.sanitize(
-                        getDisplayBody(
-                          message.body,
-                          message.isFromCustomer ? null : message.signature,
-                        ),
-                        { ADD_TAGS: ['ul', 'ol', 'li'] },
+                      __html: formatEmailBody(
+                        message.body,
+                        message.isFromCustomer ? null : message.signature,
                       ),
                     }}
                   />

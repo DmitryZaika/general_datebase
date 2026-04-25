@@ -6,7 +6,7 @@ import { cn } from '~/lib/utils'
 import type { CustomerDialogSchema, sourceEnum } from '~/schemas/customers'
 import type { Customer, Sources } from '~/types/customer'
 import { Button } from '../ui/button'
-import { Command, CommandGroup, CommandItem } from '../ui/command'
+import { Command, CommandGroup, CommandItem, CommandList } from '../ui/command'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
@@ -264,6 +264,8 @@ export function CustomerSearch({
   function handleDeselect() {
     onCustomerChange(undefined)
     setName(null)
+    setSearchTerm(null)
+    setIsListOpen(false)
   }
 
   return (
@@ -312,25 +314,27 @@ export function CustomerSearch({
         />
         {error && <CustomerSearchError error={error} className='text-red-500' />}
         {isListOpen && customerSuggestions.length > 0 && (
-          <Command className='z-60 top-full mt-1 w-full h-auto max-h-50 overflow-y-auto border rounded-md bg-white shadow-md absolute'>
-            <CommandGroup heading={isFetching ? 'Searching…' : 'Suggestions'}>
-              {customerSuggestions.map(c => (
-                <CommandItem
-                  key={c.id}
-                  onSelect={() => {
-                    setIsListOpen(false)
-                    handleFinal(c.id)
-                  }}
-                >
-                  <div className='flex flex-col'>
-                    <span>{c.name}</span>
-                    {c.address ? (
-                      <span className='text-xs text-gray-500'>{c.address}</span>
-                    ) : null}
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
+          <Command className='z-60 top-full mt-1 w-full h-auto border rounded-md bg-white shadow-md absolute'>
+            <CommandList className='max-h-80'>
+              <CommandGroup heading={isFetching ? 'Searching…' : 'Suggestions'}>
+                {customerSuggestions.map(c => (
+                  <CommandItem
+                    key={c.id}
+                    onSelect={() => {
+                      setIsListOpen(false)
+                      handleFinal(c.id)
+                    }}
+                  >
+                    <div className='flex flex-col'>
+                      <span>{c.name}</span>
+                      {c.address ? (
+                        <span className='text-xs text-gray-500'>{c.address}</span>
+                      ) : null}
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
           </Command>
         )}
         {selectedCustomer && (

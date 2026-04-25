@@ -21,11 +21,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
 
-  return { companyId: user.company_id }
+  return { companyId: user.company_id, currentUser: { id: user.id, name: user.name } }
 }
 
 export default function SellSlabWithoutStone() {
-  const { companyId } = useLoaderData<typeof loader>()
+  const { companyId, currentUser } = useLoaderData<typeof loader>()
 
   const starting = {
     same_address: true,
@@ -36,5 +36,11 @@ export default function SellSlabWithoutStone() {
     ],
   }
 
-  return <ContractForm startings={starting} companyId={companyId} />
+  return (
+    <ContractForm
+      startings={starting}
+      companyId={companyId}
+      currentUser={currentUser}
+    />
+  )
 }

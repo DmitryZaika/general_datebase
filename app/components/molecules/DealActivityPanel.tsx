@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { Skeleton } from '~/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { Textarea } from '~/components/ui/textarea'
 import { useToast } from '~/hooks/use-toast'
@@ -409,6 +410,34 @@ function CompletedLabel({ completedAt }: { completedAt: string }) {
 
 function SectionEmptyState({ label }: { label: string }) {
   return <p className='text-xs text-gray-400 py-3 text-center italic'>{label}</p>
+}
+
+function getFormDataNoteId(formData: FormData | undefined): number | null {
+  const value = formData?.get('noteId')
+  if (typeof value !== 'string') return null
+  const id = Number(value)
+  return Number.isFinite(id) ? id : null
+}
+
+function NoteHistorySkeletonItem({ isLast = false }: { isLast?: boolean }) {
+  return (
+    <TimelineItem icon={NoteIcon} isLast={isLast}>
+      <div className='rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5'>
+        <div className='mb-3 flex items-center justify-between gap-2'>
+          <Skeleton className='h-3 w-32' />
+          <div className='flex items-center gap-1'>
+            <Skeleton className='h-6 w-20 rounded-md' />
+            <Skeleton className='h-6 w-6 rounded-md' />
+            <Skeleton className='h-6 w-6 rounded-md' />
+          </div>
+        </div>
+        <div className='space-y-2'>
+          <Skeleton className='h-4 w-full' />
+          <Skeleton className='h-4 w-5/6' />
+        </div>
+      </div>
+    </TimelineItem>
+  )
 }
 
 function SectionHeader({
@@ -1039,6 +1068,10 @@ function ActivityList({
   const [isHistoryOpen, setIsHistoryOpen] = useReducer((s: boolean) => !s, true)
   const [historyTab, setHistoryTab] = useState<HistoryTab>('all')
   const noteHandlers = useNoteAction(dealId)
+  const updatingNoteId =
+    getFormDataNoteId(noteHandlers.editingData) ??
+    getFormDataNoteId(noteHandlers.commentingData) ??
+    getFormDataNoteId(noteHandlers.deletingData)
 
   const { todo, done } = useMemo(() => partitionActivities(activities), [activities])
 
@@ -1149,15 +1182,22 @@ function ActivityList({
       if (sortedNotes.length === 0) return <SectionEmptyState label='No notes yet' />
       return (
         <div>
-          {sortedNotes.map((note, index) => (
-            <TimelineItem
-              key={`note-${note.id}`}
-              icon={NoteIcon}
-              isLast={index === sortedNotes.length - 1}
-            >
-              <NoteItem note={note} handlers={noteHandlers} />
-            </TimelineItem>
-          ))}
+          {sortedNotes.map((note, index) => {
+            const isLast = index === sortedNotes.length - 1
+            if (updatingNoteId === note.id) {
+              return (
+                <NoteHistorySkeletonItem
+                  key={`note-skeleton-${note.id}`}
+                  isLast={isLast}
+                />
+              )
+            }
+            return (
+              <TimelineItem key={`note-${note.id}`} icon={NoteIcon} isLast={isLast}>
+                <NoteItem note={note} handlers={noteHandlers} />
+              </TimelineItem>
+            )
+          })}
         </div>
       )
     }
@@ -1203,6 +1243,14 @@ function ActivityList({
             )
           }
           if (item.type === 'note') {
+            if (updatingNoteId === item.data.id) {
+              return (
+                <NoteHistorySkeletonItem
+                  key={`note-skeleton-${item.data.id}`}
+                  isLast={isLast}
+                />
+              )
+            }
             return (
               <TimelineItem
                 key={`note-${item.data.id}`}

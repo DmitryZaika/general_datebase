@@ -29,6 +29,7 @@ import { Label } from '~/components/ui/label'
 import { useToast } from '~/hooks/use-toast'
 import { createCustomerMutation, sourceEnum } from '~/schemas/customers'
 import { getSession } from '~/sessions.server'
+import { zodEmail } from '~/utils/constants'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import {
   FormControl,
@@ -53,7 +54,7 @@ const customerCheckInSchema = z.object({
   company_id: z.number().min(1, 'Company ID is required'),
   name: z.string().min(1, 'Name is required'),
   phone: z.string().min(1, 'Phone number is required'),
-  email: z.email('Invalid email address'),
+  email: zodEmail.optional(),
   address: z.string().optional(),
   address_zip_code: z.string().optional(),
   source: z.enum(sourceEnum),

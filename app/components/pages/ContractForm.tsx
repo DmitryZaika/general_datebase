@@ -2,7 +2,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { type Resolver, type UseFormReturn, useForm } from 'react-hook-form'
+import {
+  type DefaultValues,
+  type Resolver,
+  type UseFormReturn,
+  useForm,
+} from 'react-hook-form'
 import {
   Form,
   Link,
@@ -29,6 +34,7 @@ import { Switch } from '~/components/ui/switch'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { customerSchema, roomSchema, type TCustomerSchema } from '~/schemas/sales'
 import type { Faucet, Sink } from '~/types'
+import type { Customer } from '~/types/customer'
 import { roomPrice } from '~/utils/contracts'
 import { CustomerSearch } from '../molecules/CustomerSearch'
 import { FullDynamicAdditions } from '../molecules/DynamicAdditions'
@@ -44,6 +50,7 @@ interface IContractFormProps {
   startings: Partial<TCustomerSchema>
   saleId?: number
   companyId: number
+  currentUser?: Seller
 }
 
 const fetchSinkType = async (): Promise<Sink[]> => {
@@ -74,7 +81,19 @@ const fetchSalesReps = async (): Promise<Seller[]> => {
   return json.users ?? []
 }
 
-export function ContractForm({ startings, saleId, companyId }: IContractFormProps) {
+async function fetchCustomerById(customerId: number): Promise<Customer | null> {
+  const res = await fetch(`/api/customers/${customerId}`)
+  if (!res.ok) return null
+  const json = await res.json()
+  return json.customer ?? null
+}
+
+export function ContractForm({
+  startings,
+  saleId,
+  companyId,
+  currentUser,
+}: IContractFormProps) {
   const navigate = useNavigate()
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
@@ -90,15 +109,31 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
   const { data: sellers = [] } = useQuery({
     queryKey: ['sales-reps', companyId],
     queryFn: fetchSalesReps,
-    enabled: Boolean(saleId),
   })
   const [sameAddress, setSameAddress] = useState(true)
 
   const resolver = zodResolver(customerSchema) as Resolver<TCustomerSchema>
+  const defaultValues: DefaultValues<TCustomerSchema> = {
+    ...startings,
+    seller_id: startings.seller_id ?? currentUser?.id,
+  }
 
-  const form: UseFormReturn<TCustomerSchema> = useForm({
+  const form: UseFormReturn<TCustomerSchema> = useForm<TCustomerSchema>({
     resolver,
-    defaultValues: startings as TCustomerSchema,
+    defaultValues,
+  })
+
+  const sellerOptions = useMemo(() => {
+    if (!currentUser || sellers.some(s => s.id === currentUser.id)) {
+      return sellers
+    }
+    return [currentUser, ...sellers]
+  }, [currentUser, sellers])
+  const selectedCustomerId = form.watch('customer_id')
+  const { data: selectedCustomer } = useQuery({
+    queryKey: ['customer-by-id', selectedCustomerId],
+    queryFn: () => fetchCustomerById(selectedCustomerId),
+    enabled: !saleId && Boolean(selectedCustomerId),
   })
 
   const fullSubmit = useFullSubmit(form, undefined, 'POST', value => {
@@ -133,6 +168,13 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
     }
   }, [sameAddress])
 
+  useEffect(() => {
+    if (saleId || !selectedCustomer?.company_name?.trim()) {
+      return
+    }
+    setSameAddress(false)
+  }, [saleId, selectedCustomer?.company_name])
+
   const roomValues = form.watch('rooms')
   const extrasValues = form.watch('extras') || []
 
@@ -166,15 +208,17 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
             <AuthenticityTokenInput />
             <div className=''>
               <CustomerSearch
-                onCustomerChange={value =>
-                  form.setValue(
-                    'customer_id',
-                    value ?? (undefined as unknown as number),
-                  )
-                }
+                onCustomerChange={value => {
+                  if (value === undefined || value === null) {
+                    form.unregister('customer_id')
+                    form.clearErrors('customer_id')
+                    return
+                  }
+                  form.setValue('customer_id', value)
+                }}
                 companyId={companyId}
                 source={'other'}
-                selectedCustomer={form.watch('customer_id') ?? undefined}
+                selectedCustomer={selectedCustomerId ?? undefined}
                 error={form.formState.errors.customer_id?.message}
                 setError={error =>
                   form.setError('customer_id', { message: error ?? undefined })
@@ -192,31 +236,29 @@ export function ContractForm({ startings, saleId, companyId }: IContractFormProp
               {!sameAddress && (
                 <AddressInput form={form} field='project_address' type='project' />
               )}
-              {saleId && (
-                <FormField
-                  control={form.control}
-                  name='seller_id'
-                  render={({ field }) => (
-                    <div className='mb-2 w-3/4'>
-                      <Select
-                        value={field.value ? String(field.value) : ''}
-                        onValueChange={val => field.onChange(Number(val))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder='Select a seller' />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {sellers.map(s => (
-                            <SelectItem key={s.id} value={String(s.id)}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                />
-              )}
+              <FormField
+                control={form.control}
+                name='seller_id'
+                render={({ field }) => (
+                  <div className='mb-2 w-1/3'>
+                    <Select
+                      value={field.value ? String(field.value) : ''}
+                      onValueChange={val => field.onChange(Number(val))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder='Select a seller' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sellerOptions.map(s => (
+                          <SelectItem key={s.id} value={String(s.id)}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              />
 
               {form.watch('rooms')?.map((room, index) => (
                 <RoomSubForm

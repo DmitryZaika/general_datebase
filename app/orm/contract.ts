@@ -31,13 +31,14 @@ export class Contract {
 
   protected async createSale(user: User) {
     const totalSquareFeet = await this.calculateTotalSquareFeet()
+    const sellerId = this.data.seller_id ?? user.id
     const [salesResult] = await db.execute<ResultSetHeader>(
       `INSERT INTO sales (customer_id, seller_id, company_id, sale_date, notes, status, square_feet, cancelled_date, installed_date, price, project_address, extras)
                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'pending', ?, NULL, NULL, ?, ?, ?)`,
 
       [
         this.data.customer_id,
-        user.id,
+        sellerId,
         user.company_id,
         this.data.notes_to_sale || null,
         totalSquareFeet,
@@ -51,7 +52,7 @@ export class Contract {
       `UPDATE customers
          SET sales_rep = COALESCE(sales_rep, ?)
        WHERE id = ? AND company_id = ?`,
-      [user.id, this.data.customer_id, user.company_id],
+      [sellerId, this.data.customer_id, user.company_id],
     )
 
     return salesResult.insertId

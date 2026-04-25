@@ -26,11 +26,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
   const slabId = parseInt(params.slab, 10)
 
-  return { slabId, companyId: user.company_id }
+  return {
+    slabId,
+    companyId: user.company_id,
+    currentUser: { id: user.id, name: user.name },
+  }
 }
 
 export default function SlabSell() {
-  const { slabId, companyId } = useLoaderData<typeof loader>()
+  const { slabId, companyId, currentUser } = useLoaderData<typeof loader>()
   const starting = {
     same_address: true,
     rooms: [
@@ -44,5 +48,11 @@ export default function SlabSell() {
       }),
     ],
   }
-  return <ContractForm startings={starting} companyId={companyId} />
+  return (
+    <ContractForm
+      startings={starting}
+      companyId={companyId}
+      currentUser={currentUser}
+    />
+  )
 }
