@@ -11,6 +11,7 @@ import {
   Eye,
   EyeClosed,
   Mail,
+  MessageSquare,
   Paperclip,
   Pencil,
   Phone,
@@ -24,6 +25,7 @@ import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import ClipboardIcon from '~/components/icons/ClipboardIcon'
 import NoteIcon from '~/components/icons/NoteIcon'
 import { CallItemContent } from '~/components/molecules/CallItemContent'
+import { SmsThreadCard } from '~/components/molecules/SmsThreadCard'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,6 +69,12 @@ import type {
 import type { Nullable } from '~/types/utils'
 import { type CallEntry, mapToCallEntry } from '~/utils/callDisplayHelpers'
 import type { Calls200Response } from '~/utils/cloudtalk.server'
+import {
+  groupSmsIntoThreads,
+  mapRowToSmsEntry,
+  type SmsRow,
+  type SmsThread,
+} from '~/utils/smsDisplayHelpers'
 import { stripHtmlTags } from '~/utils/stringHelpers'
 import { NoteForm } from './NoteForm'
 import { NoteItem } from './NoteItem'
@@ -990,6 +998,7 @@ function HistoryTabButtons({
   activitiesCount,
   notesCount,
   actionsCount,
+  smsThreadsCount,
   emailsCount,
 }: {
   activeTab: HistoryTab
@@ -997,6 +1006,7 @@ function HistoryTabButtons({
   activitiesCount: number
   notesCount: number
   actionsCount: number
+  smsThreadsCount: number
   emailsCount: number
 }) {
   const tabs: { key: HistoryTab; label: string }[] = [
@@ -1004,6 +1014,7 @@ function HistoryTabButtons({
     { key: 'activities', label: `Activities (${activitiesCount})` },
     { key: 'notes', label: `Notes (${notesCount})` },
     { key: 'actions', label: `Actions (${actionsCount})` },
+    { key: 'sms', label: `SMS (${smsThreadsCount})` },
     { key: 'emails', label: `Emails (${emailsCount})` },
   ]
 
@@ -1035,6 +1046,7 @@ function ActivityList({
   activities,
   notes,
   actions,
+  smsThreads,
   emails,
   onEdit,
   editingActivityId,
@@ -1044,6 +1056,7 @@ function ActivityList({
   activities: DealActivity[]
   notes: DealNote[]
   actions: CallEntry[]
+  smsThreads: SmsThread[]
   emails: DealEmailHistoryItem[]
   onEdit: (activity: DealActivity) => void
   editingActivityId: number | null
@@ -1105,6 +1118,15 @@ function ActivityList({
             isPinned: false,
           }) satisfies HistoryItem,
       ),
+      ...smsThreads.map(
+        t =>
+          ({
+            type: 'smsThread' as const,
+            data: t,
+            date: t.lastMessageAt,
+            isPinned: false,
+          }) satisfies HistoryItem,
+      ),
       ...emails.map(
         e =>
           ({
@@ -1120,20 +1142,21 @@ function ActivityList({
       if (a.isPinned && !b.isPinned) return -1
       if (!a.isPinned && b.isPinned) return 1
       const aTime =
-        a.type === 'email' || a.type === 'action'
+        a.type === 'email' || a.type === 'action' || a.type === 'smsThread'
           ? new Date(a.date).getTime()
           : parseLocalDate(a.date ?? '').getTime()
       const bTime =
-        b.type === 'email' || b.type === 'action'
+        b.type === 'email' || b.type === 'action' || b.type === 'smsThread'
           ? new Date(b.date).getTime()
           : parseLocalDate(b.date ?? '').getTime()
       return bTime - aTime
     })
 
     return items
-  }, [done, notes, actions, emails])
+  }, [done, notes, actions, smsThreads, emails])
 
-  const historyCount = done.length + notes.length + actions.length + emails.length
+  const historyCount =
+    done.length + notes.length + actions.length + smsThreads.length + emails.length
 
   const renderHistoryItem = useCallback(
     (item: HistoryItem, isLast: boolean): ReactNode => {
@@ -1172,6 +1195,18 @@ function ActivityList({
                   audioSrc={`/api/cloudtalk/userCallMedia/${item.data.callId}`}
                   compact
                 />
+              </div>
+            </TimelineItem>
+          )
+        case 'smsThread':
+          return (
+            <TimelineItem
+              key={`sms-${item.data.customerPhone}`}
+              icon={MessageSquare}
+              isLast={isLast}
+            >
+              <div className={ACTION_CARD_CLASS}>
+                <SmsThreadCard thread={item.data} compact />
               </div>
             </TimelineItem>
           )
@@ -1260,6 +1295,24 @@ function ActivityList({
           </div>
         )
       },
+      sms: () => {
+        if (smsThreads.length === 0) return <SectionEmptyState label='No SMS yet' />
+        return (
+          <div>
+            {smsThreads.map((thread, index) => (
+              <TimelineItem
+                key={`sms-${thread.customerPhone}`}
+                icon={MessageSquare}
+                isLast={index === smsThreads.length - 1}
+              >
+                <div className={ACTION_CARD_CLASS}>
+                  <SmsThreadCard thread={thread} compact />
+                </div>
+              </TimelineItem>
+            ))}
+          </div>
+        )
+      },
       emails: () => {
         if (sortedEmails.length === 0)
           return <SectionEmptyState label='No emails yet' />
@@ -1294,6 +1347,7 @@ function ActivityList({
       sortedNotes,
       sortedEmails,
       actions,
+      smsThreads,
       allHistoryItems,
       dealId,
       onEdit,
@@ -1354,6 +1408,7 @@ function ActivityList({
               activitiesCount={done.length}
               notesCount={notes.length}
               actionsCount={actions.length}
+              smsThreadsCount={smsThreads.length}
               emailsCount={emails.length}
             />
             {tabRenderers[historyTab]()}
@@ -1396,6 +1451,27 @@ export function DealActivityPanel({
       .map(mapToCallEntry)
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
   }, [callsData])
+
+  const { data: smsData } = useQuery({
+    queryKey: ['cloudtalk-deal-sms', dealId],
+    queryFn: async () => {
+      const r = await fetch(`/api/cloudtalk/dealSms/${dealId}`)
+      if (!r.ok) throw new Error(`SMS ${r.status}`)
+      return (await r.json()) as {
+        items: SmsRow[]
+        customerPhoneDigits: string[]
+      }
+    },
+    enabled: !!dealId,
+    staleTime: 60_000,
+  })
+
+  const smsThreads = useMemo(() => {
+    const rows = smsData?.items ?? []
+    const digits = smsData?.customerPhoneDigits ?? []
+    const entries = rows.map(r => mapRowToSmsEntry(r, digits))
+    return groupSmsIntoThreads(entries)
+  }, [smsData])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -1472,6 +1548,7 @@ export function DealActivityPanel({
           activities={activities}
           notes={notes}
           actions={actions}
+          smsThreads={smsThreads}
           emails={emails}
           onEdit={handleEdit}
           editingActivityId={editingActivity?.id ?? null}

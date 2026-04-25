@@ -5,26 +5,46 @@ import { useMemo, useState } from 'react'
 import type { DateRange } from 'react-day-picker'
 import { Spinner } from '~/components/atoms/Spinner'
 import { CallItemContent } from '~/components/molecules/CallItemContent'
+import { SmsThreadCard } from '~/components/molecules/SmsThreadCard'
 import { Button } from '~/components/ui/button'
 import { Calendar } from '~/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import type { Nullable } from '~/types/utils'
 import {
-  type CallFilterType,
+  type ActivityFilterType,
+  type CallEntry,
   mapToCallEntry,
   matchesCallFilter,
 } from '~/utils/callDisplayHelpers'
 import type { Calls200Response } from '~/utils/cloudtalk.server'
+import { phoneDigitsOnly } from '~/utils/phone'
+import {
+  groupSmsIntoThreads,
+  mapRowToSmsEntry,
+  type SmsRow,
+  type SmsThread,
+} from '~/utils/smsDisplayHelpers'
 
-const FILTER_OPTIONS: { value: CallFilterType; label: string }[] = [
+type TimelineItem =
+  | { type: 'call'; data: CallEntry; date: string }
+  | { type: 'smsThread'; data: SmsThread; date: string }
+
+const FILTER_OPTIONS: { value: ActivityFilterType; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'incoming', label: 'Incoming' },
   { value: 'outgoing', label: 'Outgoing' },
   { value: 'missed', label: 'Missed' },
   { value: 'voicemail', label: 'Voicemail' },
+  { value: 'sms', label: 'SMS' },
 ]
 
 const PAGE_SIZE = 10
+
+function matchesItemFilter(item: TimelineItem, filter: ActivityFilterType): boolean {
+  if (filter === 'all') return true
+  if (filter === 'sms') return item.type === 'smsThread'
+  return item.type === 'call' && matchesCallFilter(item.data, filter)
+}
 
 // Sub-components
 
@@ -125,7 +145,7 @@ function EmptyGlobal() {
       <Phone size={24} className='text-slate-300 mb-3' />
       <div className='text-sm font-medium text-slate-500'>No call activity yet</div>
       <div className='text-xs text-slate-400 mt-1'>
-        Calls with this customer will appear here
+        Calls and SMS with this customer will appear here
         <br />
         once interactions begin.
       </div>
@@ -140,7 +160,7 @@ function EmptyFiltered({
   onClearFilters,
   onClearDates,
 }: {
-  filter: CallFilterType
+  filter: ActivityFilterType
   dateFrom?: Date
   dateTo?: Date
   onClearFilters: () => void
@@ -169,11 +189,12 @@ function EmptyFiltered({
   }
 
   const filterLabel = FILTER_OPTIONS.find(o => o.value === filter)?.label.toLowerCase()
+  const noun = filter === 'sms' ? 'conversations' : 'calls'
 
   return (
     <div className='flex flex-col items-center py-6 text-center'>
       <div className='text-sm text-slate-500'>
-        No {filterLabel} calls found for this customer
+        No {filterLabel} {noun} found for this customer
       </div>
       <button
         type='button'
@@ -231,17 +252,24 @@ export function CustomerActivityTimeline({
   phone: Nullable<string>
   phone2: Nullable<string>
 }) {
-  const [filter, setFilter] = useState<CallFilterType>('all')
+  const [filter, setFilter] = useState<ActivityFilterType>('all')
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   const hasPhones = !!phone || !!phone2
 
-  const queryKey = ['cloudtalk-customer-calls', phone, phone2] as const
+  const customerPhoneDigits = useMemo(
+    () =>
+      [phone, phone2]
+        .filter((p): p is string => !!p)
+        .map(phoneDigitsOnly)
+        .filter(d => d.length >= 10),
+    [phone, phone2],
+  )
 
-  const { data, isLoading, isError, isFetching, refetch } = useQuery({
-    queryKey,
+  const callsQuery = useQuery({
+    queryKey: ['cloudtalk-customer-calls', phone, phone2] as const,
     queryFn: async () => {
       const qs = new URLSearchParams()
       if (phone) qs.set('phone', phone)
@@ -254,34 +282,75 @@ export function CustomerActivityTimeline({
     staleTime: 60_000,
   })
 
-  const allCalls = useMemo(() => {
-    const items = data?.items ?? []
-    return items
-      .map(mapToCallEntry)
-      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-  }, [data])
+  const smsQuery = useQuery({
+    queryKey: ['cloudtalk-customer-sms', phone, phone2] as const,
+    queryFn: async () => {
+      const qs = new URLSearchParams()
+      if (phone) qs.set('phone', phone)
+      if (phone2) qs.set('phone2', phone2)
+      const r = await fetch(`/api/cloudtalk/customerSms?${qs}`)
+      if (!r.ok) throw new Error(`SMS ${r.status}`)
+      return (await r.json()) as {
+        items: SmsRow[]
+        customerPhoneDigits: string[]
+      }
+    },
+    enabled: hasPhones,
+    staleTime: 60_000,
+  })
 
-  const filteredCalls = useMemo(() => {
-    let result = allCalls.filter(c => matchesCallFilter(c, filter))
+  const allCalls = useMemo(() => {
+    const items = callsQuery.data?.items ?? []
+    return items.map(mapToCallEntry)
+  }, [callsQuery.data])
+
+  const smsThreads = useMemo(() => {
+    const rows = smsQuery.data?.items ?? []
+    const digits = smsQuery.data?.customerPhoneDigits ?? customerPhoneDigits
+    const entries = rows.map(r => mapRowToSmsEntry(r, digits))
+    return groupSmsIntoThreads(entries)
+  }, [smsQuery.data, customerPhoneDigits])
+
+  const allItems = useMemo<TimelineItem[]>(() => {
+    const items: TimelineItem[] = []
+    for (const c of allCalls) items.push({ type: 'call', data: c, date: c.startedAt })
+    for (const t of smsThreads)
+      items.push({ type: 'smsThread', data: t, date: t.lastMessageAt })
+    items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return items
+  }, [allCalls, smsThreads])
+
+  const filteredItems = useMemo(() => {
+    let result = allItems.filter(item => matchesItemFilter(item, filter))
 
     if (dateFrom) {
       const from = new Date(dateFrom)
       from.setHours(0, 0, 0, 0)
-      result = result.filter(c => new Date(c.startedAt) >= from)
+      result = result.filter(i => new Date(i.date) >= from)
     }
     if (dateTo) {
       const to = new Date(dateTo)
       to.setHours(23, 59, 59, 999)
-      result = result.filter(c => new Date(c.startedAt) <= to)
+      result = result.filter(i => new Date(i.date) <= to)
     }
 
     return result
-  }, [allCalls, filter, dateFrom, dateTo])
+  }, [allItems, filter, dateFrom, dateTo])
 
-  const visibleCalls = filteredCalls.slice(0, visibleCount)
-  const hasMore = visibleCount < filteredCalls.length
+  const visibleItems = filteredItems.slice(0, visibleCount)
+  const hasMore = visibleCount < filteredItems.length
   const hasActiveFilters =
     filter !== 'all' || dateFrom !== undefined || dateTo !== undefined
+
+  const isFirstLoad =
+    (callsQuery.isLoading || smsQuery.isLoading) && !callsQuery.data && !smsQuery.data
+  const isBothErrored = callsQuery.isError && smsQuery.isError
+  const isFetching = callsQuery.isFetching || smsQuery.isFetching
+
+  const refetchAll = () => {
+    callsQuery.refetch()
+    smsQuery.refetch()
+  }
 
   const clearAllFilters = () => {
     setFilter('all')
@@ -312,16 +381,16 @@ export function CustomerActivityTimeline({
     )
   }
 
-  if (isError) {
+  if (isBothErrored) {
     return (
       <div className='border rounded p-4'>
         <div className='text-md font-semibold mb-2'>Activity</div>
-        <ErrorState onRetry={() => refetch()} />
+        <ErrorState onRetry={refetchAll} />
       </div>
     )
   }
 
-  if (isLoading && !data) {
+  if (isFirstLoad) {
     return (
       <div className='border rounded p-4'>
         <div className='text-md font-semibold mb-2'>Activity</div>
@@ -330,7 +399,7 @@ export function CustomerActivityTimeline({
     )
   }
 
-  if (!allCalls.length) {
+  if (allItems.length === 0) {
     return (
       <div className='border rounded p-4'>
         <div className='text-md font-semibold mb-2'>Activity</div>
@@ -343,8 +412,6 @@ export function CustomerActivityTimeline({
     <div className='border rounded p-4'>
       <div className='text-md font-semibold mb-3'>Activity</div>
 
-      {!hasPhones && <NoPhoneBanner />}
-
       <div className='space-y-3 mb-3'>
         <div className='flex gap-1 flex-wrap'>
           {FILTER_OPTIONS.map(opt => (
@@ -355,12 +422,11 @@ export function CustomerActivityTimeline({
                 setFilter(opt.value)
                 setVisibleCount(PAGE_SIZE)
               }}
-              disabled={!hasPhones && opt.value !== 'all'}
               className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                 filter === opt.value
                   ? 'bg-slate-800 text-white border-slate-800'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-              } disabled:opacity-40 disabled:cursor-not-allowed`}
+              }`}
             >
               {opt.label}
             </button>
@@ -379,7 +445,7 @@ export function CustomerActivityTimeline({
         />
       </div>
 
-      {!filteredCalls.length && hasActiveFilters ? (
+      {filteredItems.length === 0 && hasActiveFilters ? (
         <EmptyFiltered
           filter={filter}
           dateFrom={dateFrom}
@@ -390,14 +456,26 @@ export function CustomerActivityTimeline({
       ) : (
         <>
           <ul className='space-y-2'>
-            {visibleCalls.map(call => (
-              <li key={call.callId} className='border rounded p-3 bg-white'>
-                <CallItemContent
-                  call={call}
-                  audioSrc={`/api/cloudtalk/userCallMedia/${call.callId}`}
-                />
-              </li>
-            ))}
+            {visibleItems.map(item =>
+              item.type === 'call' ? (
+                <li
+                  key={`call-${item.data.callId}`}
+                  className='border rounded p-3 bg-white'
+                >
+                  <CallItemContent
+                    call={item.data}
+                    audioSrc={`/api/cloudtalk/userCallMedia/${item.data.callId}`}
+                  />
+                </li>
+              ) : (
+                <li
+                  key={`sms-${item.data.customerPhone}`}
+                  className='border rounded p-3 bg-white'
+                >
+                  <SmsThreadCard thread={item.data} />
+                </li>
+              ),
+            )}
           </ul>
 
           {isFetching && (
