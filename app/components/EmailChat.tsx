@@ -9,6 +9,7 @@ import {
   Package,
   PaperclipIcon,
   Pencil,
+  Plus,
   Search,
   SendIcon,
   Sparkles,
@@ -82,6 +83,26 @@ export interface EmailChatAttachment {
   filename: string
   url: string
   signed_url?: string
+}
+
+interface AttachmentDealOption {
+  id: number
+  title: string | null
+  status: string | null
+  amount: number | null
+  list_name: string | null
+  notes: {
+    id: number
+    content: string
+    created_at: string
+  }[]
+  activities: {
+    id: number
+    name: string
+    deadline: string | null
+    priority: string
+    is_completed: number
+  }[]
 }
 
 export interface EmailChatMessage {
@@ -459,6 +480,22 @@ function MobileTemplatePicker({
   )
 }
 
+function dealOptionName(deal: AttachmentDealOption): string {
+  const title = deal.title?.trim()
+  return title ? title : `Deal #${deal.id}`
+}
+
+function dealAmount(value: number | null): string | null {
+  if (value === null) return null
+  return `$${Number(value).toLocaleString()}`
+}
+
+function shortDealText(value: string): string {
+  const trimmed = value.trim()
+  if (trimmed.length <= 80) return trimmed
+  return `${trimmed.slice(0, 80)}...`
+}
+
 export function EmailChat(props: EmailChatProps) {
   const { variant, customerName, messages, onClose, scrollToMessageId } = props
 
@@ -493,6 +530,12 @@ export function EmailChat(props: EmailChatProps) {
   const [mobileTemplateSearch, setMobileTemplateSearch] = useState('')
   const [pendingTemplate, setPendingTemplate] = useState<Nullable<EmailTemplate>>(null)
   const [activeTemplateId, setActiveTemplateId] = useState<Nullable<number>>(null)
+  const [pendingDealAttachment, setPendingDealAttachment] =
+    useState<Nullable<EmailChatAttachment>>(null)
+  const [attachmentDealChoices, setAttachmentDealChoices] = useState<
+    AttachmentDealOption[]
+  >([])
+  const [isAddingAttachmentToDeal, setIsAddingAttachmentToDeal] = useState(false)
   const { toast } = useToast()
   const isMobile = useIsMobile()
 
@@ -684,6 +727,67 @@ export function EmailChat(props: EmailChatProps) {
     setPendingTemplate(null)
     setShowMobileTemplatePicker(false)
     setMobileTemplateSearch('')
+  }
+
+  const closeAttachmentDealDialog = () => {
+    setPendingDealAttachment(null)
+    setAttachmentDealChoices([])
+  }
+
+  const handleAddAttachmentToDeal = async (
+    attachment: EmailChatAttachment,
+    dealId?: number,
+  ) => {
+    if (!employeeProps) return
+
+    setIsAddingAttachmentToDeal(true)
+    try {
+      const response = await fetch('/api/email-attachments/add-to-deal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attachmentId: attachment.id,
+          customerEmail: employeeProps.customerEmail || undefined,
+          customerName,
+          dealId,
+        }),
+      })
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        const description =
+          payload && typeof payload.error === 'string'
+            ? payload.error
+            : 'Could not add attachment to deal'
+        toast({ title: 'Failure', description, variant: 'destructive' })
+        return
+      }
+
+      if (payload?.status === 'select' && Array.isArray(payload.deals)) {
+        setPendingDealAttachment(attachment)
+        setAttachmentDealChoices(payload.deals)
+        return
+      }
+
+      if (payload?.status === 'added') {
+        const dealName = payload.deal ? dealOptionName(payload.deal) : 'deal'
+        toast({
+          title: 'Success',
+          description: `Attachment added to ${dealName}`,
+          variant: 'success',
+        })
+        closeAttachmentDealDialog()
+      }
+    } catch (error) {
+      toast({
+        title: 'Failure',
+        description:
+          error instanceof Error ? error.message : 'Could not add attachment to deal',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsAddingAttachmentToDeal(false)
+    }
   }
 
   const handleGenerate = async (templateOverride?: string) => {
@@ -960,9 +1064,36 @@ export function EmailChat(props: EmailChatProps) {
                         const linkClass = message.isFromCustomer
                           ? 'text-blue-700 underline'
                           : 'text-white underline'
+                        const canAddToDeal =
+                          isEmployee && !!employeeProps && !!href && attachment.id > 0
 
                         return (
-                          <div key={attachment.id} className='space-y-2 max-w-[140px]'>
+                          <div
+                            key={attachment.id}
+                            className='group relative space-y-2 max-w-[140px]'
+                          >
+                            {canAddToDeal ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger
+                                    type='button'
+                                    className='absolute top-1 right-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-1 ring-black/10 opacity-100 transition-opacity hover:bg-emerald-50 hover:text-emerald-700 md:opacity-0 md:group-hover:opacity-100'
+                                    onClick={e => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      handleAddAttachmentToDeal(attachment)
+                                    }}
+                                    disabled={isAddingAttachmentToDeal}
+                                    aria-label='Add the file to the deal'
+                                  >
+                                    <Plus className='h-3.5 w-3.5' />
+                                  </TooltipTrigger>
+                                  <TooltipContent side='top'>
+                                    Add the file to the deal
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : null}
                             {isPdf && href ? (
                               <a
                                 href={href}
@@ -1377,6 +1508,83 @@ export function EmailChat(props: EmailChatProps) {
             }}
             activeTemplateId={activeTemplateId}
           />
+        )}
+        {isEmployee && employeeProps && (
+          <Dialog
+            open={!!pendingDealAttachment && attachmentDealChoices.length > 0}
+            onOpenChange={open => {
+              if (!open) closeAttachmentDealDialog()
+            }}
+          >
+            <DialogContent className='max-w-md rounded-xl'>
+              <DialogHeader>
+                <DialogTitle>Choose a deal</DialogTitle>
+              </DialogHeader>
+              <div className='max-h-[60vh] space-y-2 overflow-y-auto pr-1'>
+                {attachmentDealChoices.map(deal => (
+                  <button
+                    key={deal.id}
+                    type='button'
+                    className='w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+                    disabled={!pendingDealAttachment || isAddingAttachmentToDeal}
+                    onClick={() => {
+                      if (!pendingDealAttachment) return
+                      handleAddAttachmentToDeal(pendingDealAttachment, deal.id)
+                    }}
+                  >
+                    <div className='flex items-center justify-between gap-2'>
+                      <span className='text-sm font-medium text-slate-900'>
+                        {dealOptionName(deal)}
+                      </span>
+                      <span className='text-xs text-slate-500'>#{deal.id}</span>
+                    </div>
+                    <div className='mt-1 text-xs text-slate-500'>
+                      {[deal.list_name, deal.status, dealAmount(deal.amount)]
+                        .filter(Boolean)
+                        .join(' - ') || 'No stage'}
+                    </div>
+                    {deal.notes.length > 0 ? (
+                      <div className='mt-2 rounded-md bg-amber-50 px-2 py-1.5'>
+                        <div className='text-[11px] font-semibold text-amber-900'>
+                          Notes
+                        </div>
+                        <div className='mt-1 space-y-1'>
+                          {deal.notes.map(note => (
+                            <div
+                              key={note.id}
+                              className='text-xs leading-snug text-amber-950'
+                            >
+                              {shortDealText(note.content)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {deal.activities.length > 0 ? (
+                      <div className='mt-2 rounded-md bg-blue-50 px-2 py-1.5'>
+                        <div className='text-[11px] font-semibold text-blue-900'>
+                          Activities
+                        </div>
+                        <div className='mt-1 space-y-1'>
+                          {deal.activities.map(activity => (
+                            <div
+                              key={activity.id}
+                              className='flex items-center justify-between gap-2 text-xs leading-snug text-blue-950'
+                            >
+                              <span>{shortDealText(activity.name)}</span>
+                              <span className='shrink-0 text-[11px] capitalize text-blue-700'>
+                                {activity.is_completed ? 'Done' : activity.priority}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
         <AlertDialog
           open={!!pendingTemplate}

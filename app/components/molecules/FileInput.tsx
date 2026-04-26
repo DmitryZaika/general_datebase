@@ -11,11 +11,14 @@ type FileInput = {
   onChange: (event: File | undefined) => void
 }
 
-const acceptsMap = {
+type FileInputType = NonNullable<FileInput['type']>
+
+const acceptsMap: Record<FileInputType, string> = {
   image:
     'image/png, image/jpeg, image/jpg, image/gif, image/webp, image/svg+xml, image/tiff, image/bmp, image/x-icon, image/heif, image/x-canon-cr2, image/x-nikon-nef',
   pdf: 'application/pdf',
-
+  document:
+    'application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/plain, text/csv',
   all: '*/*',
 }
 
@@ -76,7 +79,7 @@ export function FileInput({
           className={className}
           onChange={event => handleChange(event.target.files?.[0])}
           type='file'
-          accept={acceptsMap[type as keyof typeof acceptsMap]}
+          accept={acceptsMap[type]}
           id={id}
         />
       </FormControl>
