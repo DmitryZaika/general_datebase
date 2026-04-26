@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
+import { getCustomerEmailsWithReads } from '~/crud/emails'
 import { db } from '~/db.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -117,11 +118,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
      ORDER BY d.id DESC`,
     [customerId],
   )
+  const emails = customer?.email ? await getCustomerEmailsWithReads(customer.email) : []
 
   return {
     customer,
     deals,
     project,
+    emails,
     hasTabs: !!customer?.company_name || hasChildren.length > 0,
   }
 }
@@ -129,12 +132,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function CustomerInfoDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { customer, deals, project, hasTabs } = useLoaderData<typeof loader>() as {
-    customer: CustomerInfo | null
-    deals: DealRow[]
-    project: ProjectInfo | null
-    hasTabs: boolean
-  }
+  const { customer, deals, project, emails, hasTabs } = useLoaderData<typeof loader>()
 
   const handleChange = (open: boolean) => {
     if (open === false) navigate(`..${location.search}`)
@@ -160,12 +158,12 @@ export default function CustomerInfoDialog() {
               <TabsTrigger value='projects'>Projects</TabsTrigger>
             </TabsList>
             <div className='mt-4'>
-              <Outlet context={{ customer, deals, project }} />
+              <Outlet context={{ customer, deals, project, emails }} />
             </div>
           </Tabs>
         ) : (
           <div className='mt-4'>
-            <Outlet context={{ customer, deals, project }} />
+            <Outlet context={{ customer, deals, project, emails }} />
           </div>
         )}
       </DialogContent>

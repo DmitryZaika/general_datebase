@@ -1,48 +1,71 @@
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { AlertTriangle, CalendarDays, Info, Phone } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import {
+  AlertTriangle,
+  CalendarDays,
+  Eye,
+  EyeClosed,
+  Info,
+  Mail,
+  MessageSquare,
+  Paperclip,
+  Phone,
+} from 'lucide-react'
+import {
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+  useMemo,
+  useState,
+} from 'react'
 import type { DateRange } from 'react-day-picker'
+import { Link } from 'react-router'
 import { Spinner } from '~/components/atoms/Spinner'
 import { CallItemContent } from '~/components/molecules/CallItemContent'
-import { SmsThreadCard } from '~/components/molecules/SmsThreadCard'
+import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Calendar } from '~/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
+import type { EmailHistory } from '~/crud/emails'
+import { cn } from '~/lib/utils'
 import type { Nullable } from '~/types/utils'
 import {
-  type ActivityFilterType,
   type CallEntry,
+  type CallFilterType,
   mapToCallEntry,
   matchesCallFilter,
 } from '~/utils/callDisplayHelpers'
 import type { Calls200Response } from '~/utils/cloudtalk.server'
 import { phoneDigitsOnly } from '~/utils/phone'
-import {
-  groupSmsIntoThreads,
-  mapRowToSmsEntry,
-  type SmsRow,
-  type SmsThread,
-} from '~/utils/smsDisplayHelpers'
+import { mapRowToSmsEntry, type SmsEntry, type SmsRow } from '~/utils/smsDisplayHelpers'
+import { stripHtmlTags } from '~/utils/stringHelpers'
 
 type TimelineItem =
   | { type: 'call'; data: CallEntry; date: string }
-  | { type: 'smsThread'; data: SmsThread; date: string }
+  | { type: 'sms'; data: SmsEntry; date: string }
+  | { type: 'email'; data: EmailHistory; date: string }
 
-const FILTER_OPTIONS: { value: ActivityFilterType; label: string }[] = [
+type CustomerActivityFilterType = CallFilterType | 'sms' | 'emails'
+
+const FILTER_OPTIONS: { value: CustomerActivityFilterType; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'incoming', label: 'Incoming' },
   { value: 'outgoing', label: 'Outgoing' },
   { value: 'missed', label: 'Missed' },
   { value: 'voicemail', label: 'Voicemail' },
   { value: 'sms', label: 'SMS' },
+  { value: 'emails', label: 'Emails' },
 ]
 
 const PAGE_SIZE = 10
 
-function matchesItemFilter(item: TimelineItem, filter: ActivityFilterType): boolean {
+function matchesItemFilter(
+  item: TimelineItem,
+  filter: CustomerActivityFilterType,
+): boolean {
   if (filter === 'all') return true
-  if (filter === 'sms') return item.type === 'smsThread'
+  if (filter === 'sms') return item.type === 'sms'
+  if (filter === 'emails') return item.type === 'email'
   return item.type === 'call' && matchesCallFilter(item.data, filter)
 }
 
@@ -153,6 +176,126 @@ function EmptyGlobal() {
   )
 }
 
+function makeEmailSnippet(body: string | null | undefined, max = 120): string {
+  if (!body) return ''
+  const text = stripHtmlTags(body)
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (text.length <= max) return text
+  return `${text.slice(0, max).trimEnd()}...`
+}
+
+function SmsActivityRow({ message }: { message: SmsEntry }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const isOutbound = message.direction === 'outbound'
+  const sentAt = new Date(message.createdDate)
+  const sentLabel = Number.isNaN(sentAt.getTime())
+    ? ''
+    : format(sentAt, 'MMM d, h:mm a')
+  const showToggle = message.text.length > 90
+
+  return (
+    <div className='flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
+      <div className='flex items-start justify-between gap-2'>
+        <div className='flex min-w-0 items-start gap-2'>
+          <Badge
+            className={cn(
+              'text-[10px] px-1.5 py-0 h-4 border shrink-0',
+              isOutbound
+                ? 'bg-blue-100 text-blue-700 border-blue-200'
+                : 'bg-green-100 text-green-700 border-green-200',
+            )}
+          >
+            {isOutbound ? 'Sent' : 'Received'}
+          </Badge>
+          <p
+            className={cn(
+              'min-w-0 text-xs leading-4 text-gray-500 break-words',
+              !isExpanded && 'line-clamp-1',
+            )}
+          >
+            {message.text}
+          </p>
+        </div>
+        <div className='flex shrink-0 items-center gap-2'>
+          {showToggle ? (
+            <button
+              type='button'
+              className='text-[10px] font-medium text-blue-600 hover:text-blue-700'
+              onClick={() => setIsExpanded(value => !value)}
+            >
+              {isExpanded ? 'Show less' : 'Show more'}
+            </button>
+          ) : null}
+          <span className='text-[10px] text-gray-500 w-22 text-right tabular-nums'>
+            {sentLabel}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EmailActivityRow({ email }: { email: EmailHistory }) {
+  const sentAt = new Date(email.sent_at)
+  const sentLabel = Number.isNaN(sentAt.getTime())
+    ? ''
+    : format(sentAt, 'MMM d, h:mm a')
+  const isSent = !!email.sender_user_id
+  const isRead = isSent ? (email.read_count ?? 0) > 0 : !!email.employee_read_at
+  const hasAttachments = !!email.has_attachments
+  const snippet = makeEmailSnippet(email.body)
+
+  return (
+    <Link
+      to={`/employee/emails/chat/${email.thread_id}`}
+      className='group flex flex-col gap-0.5 rounded-md px-2 py-1.5 hover:bg-gray-50 transition-colors'
+    >
+      <div className='flex items-center justify-between gap-2'>
+        <div className='flex items-center gap-2 min-w-0'>
+          <Badge
+            className={cn(
+              'text-[10px] px-1.5 py-0 h-4 border shrink-0',
+              isSent
+                ? 'bg-blue-100 text-blue-700 border-blue-200'
+                : 'bg-green-100 text-green-700 border-green-200',
+            )}
+          >
+            {isSent ? 'Sent' : 'Received'}
+          </Badge>
+          <span className='text-sm font-medium truncate'>
+            {email.subject || '(no subject)'}
+          </span>
+        </div>
+        <div className='flex items-center gap-1.5 shrink-0'>
+          <span className='w-3 flex items-center justify-center'>
+            {hasAttachments ? (
+              <Paperclip
+                className='h-3 w-3 text-gray-500'
+                aria-label='Has attachments'
+              />
+            ) : null}
+          </span>
+          <span className='w-3 flex items-center justify-center'>
+            {isRead ? (
+              <Eye className='h-3 w-3 text-blue-500' aria-label='Read' />
+            ) : (
+              <EyeClosed className='h-3 w-3 text-gray-400' aria-label='Unread' />
+            )}
+          </span>
+          <span className='text-[10px] text-gray-500 w-22 text-right tabular-nums'>
+            {sentLabel}
+          </span>
+        </div>
+      </div>
+      {snippet ? (
+        <p className='text-xs text-gray-500 line-clamp-1 break-words'>{snippet}</p>
+      ) : null}
+    </Link>
+  )
+}
+
 function EmptyFiltered({
   filter,
   dateFrom,
@@ -160,7 +303,7 @@ function EmptyFiltered({
   onClearFilters,
   onClearDates,
 }: {
-  filter: ActivityFilterType
+  filter: CustomerActivityFilterType
   dateFrom?: Date
   dateTo?: Date
   onClearFilters: () => void
@@ -189,7 +332,7 @@ function EmptyFiltered({
   }
 
   const filterLabel = FILTER_OPTIONS.find(o => o.value === filter)?.label.toLowerCase()
-  const noun = filter === 'sms' ? 'conversations' : 'calls'
+  const noun = filter === 'sms' ? 'messages' : filter === 'emails' ? 'emails' : 'calls'
 
   return (
     <div className='flex flex-col items-center py-6 text-center'>
@@ -243,21 +386,48 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   )
 }
 
+function TimelineItem({
+  icon: Icon,
+  isLast = false,
+  children,
+}: {
+  icon: ComponentType<SVGProps<SVGSVGElement>>
+  isLast?: boolean
+  children: ReactNode
+}) {
+  return (
+    <div className='flex gap-2.5'>
+      <div className='flex flex-col items-center shrink-0'>
+        <div className='flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 border border-gray-200'>
+          <Icon className='h-4 w-4 text-gray-500' />
+        </div>
+        {!isLast && (
+          <div className='flex-1 w-px border-l border-dashed border-gray-300 my-0.5' />
+        )}
+      </div>
+      <div className='flex-1 min-w-0 pb-3'>{children}</div>
+    </div>
+  )
+}
+
 // Main component
 
 export function CustomerActivityTimeline({
   phone,
   phone2,
+  emails,
 }: {
   phone: Nullable<string>
   phone2: Nullable<string>
+  emails: EmailHistory[]
 }) {
-  const [filter, setFilter] = useState<ActivityFilterType>('all')
+  const [filter, setFilter] = useState<CustomerActivityFilterType>('all')
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   const hasPhones = !!phone || !!phone2
+  const hasActivitySource = hasPhones || emails.length > 0
 
   const customerPhoneDigits = useMemo(
     () =>
@@ -268,32 +438,29 @@ export function CustomerActivityTimeline({
     [phone, phone2],
   )
 
-  const callsQuery = useQuery({
-    queryKey: ['cloudtalk-customer-calls', phone, phone2] as const,
+  const callsQuery = useQuery<{ items: Calls200Response[] }>({
+    queryKey: ['cloudtalk-customer-calls', phone, phone2],
     queryFn: async () => {
       const qs = new URLSearchParams()
       if (phone) qs.set('phone', phone)
       if (phone2) qs.set('phone2', phone2)
       const r = await fetch(`/api/cloudtalk/customerCalls?${qs}`)
       if (!r.ok) throw new Error(`CloudTalk ${r.status}`)
-      return (await r.json()) as { items: Calls200Response[] }
+      return await r.json()
     },
     enabled: hasPhones,
     staleTime: 60_000,
   })
 
-  const smsQuery = useQuery({
-    queryKey: ['cloudtalk-customer-sms', phone, phone2] as const,
+  const smsQuery = useQuery<{ items: SmsRow[]; customerPhoneDigits: string[] }>({
+    queryKey: ['cloudtalk-customer-sms', phone, phone2],
     queryFn: async () => {
       const qs = new URLSearchParams()
       if (phone) qs.set('phone', phone)
       if (phone2) qs.set('phone2', phone2)
       const r = await fetch(`/api/cloudtalk/customerSms?${qs}`)
       if (!r.ok) throw new Error(`SMS ${r.status}`)
-      return (await r.json()) as {
-        items: SmsRow[]
-        customerPhoneDigits: string[]
-      }
+      return await r.json()
     },
     enabled: hasPhones,
     staleTime: 60_000,
@@ -304,21 +471,28 @@ export function CustomerActivityTimeline({
     return items.map(mapToCallEntry)
   }, [callsQuery.data])
 
-  const smsThreads = useMemo(() => {
+  const smsMessages = useMemo(() => {
     const rows = smsQuery.data?.items ?? []
     const digits = smsQuery.data?.customerPhoneDigits ?? customerPhoneDigits
-    const entries = rows.map(r => mapRowToSmsEntry(r, digits))
-    return groupSmsIntoThreads(entries)
+    return rows
+      .map(r => mapRowToSmsEntry(r, digits))
+      .sort(
+        (a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime(),
+      )
   }, [smsQuery.data, customerPhoneDigits])
 
   const allItems = useMemo<TimelineItem[]>(() => {
     const items: TimelineItem[] = []
     for (const c of allCalls) items.push({ type: 'call', data: c, date: c.startedAt })
-    for (const t of smsThreads)
-      items.push({ type: 'smsThread', data: t, date: t.lastMessageAt })
+    for (const message of smsMessages) {
+      items.push({ type: 'sms', data: message, date: message.createdDate })
+    }
+    for (const email of emails) {
+      items.push({ type: 'email', data: email, date: email.sent_at })
+    }
     items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     return items
-  }, [allCalls, smsThreads])
+  }, [allCalls, smsMessages, emails])
 
   const filteredItems = useMemo(() => {
     let result = allItems.filter(item => matchesItemFilter(item, filter))
@@ -371,7 +545,7 @@ export function CustomerActivityTimeline({
     setDateTo(todayDate())
   }
 
-  if (!hasPhones) {
+  if (!hasActivitySource) {
     return (
       <div className='border rounded p-4'>
         <div className='text-md font-semibold mb-2'>Activity</div>
@@ -455,27 +629,40 @@ export function CustomerActivityTimeline({
         />
       ) : (
         <>
-          <ul className='space-y-2'>
-            {visibleItems.map(item =>
-              item.type === 'call' ? (
-                <li
-                  key={`call-${item.data.callId}`}
-                  className='border rounded p-3 bg-white'
-                >
-                  <CallItemContent
-                    call={item.data}
-                    audioSrc={`/api/cloudtalk/userCallMedia/${item.data.callId}`}
-                  />
+          <ul>
+            {visibleItems.map((item, index) => {
+              const isLast = index === visibleItems.length - 1
+              if (item.type === 'call') {
+                return (
+                  <li key={`call-${item.data.callId}`}>
+                    <TimelineItem icon={Phone} isLast={isLast}>
+                      <CallItemContent
+                        call={item.data}
+                        audioSrc={`/api/cloudtalk/userCallMedia/${item.data.callId}`}
+                        compact
+                        historyCompact
+                      />
+                    </TimelineItem>
+                  </li>
+                )
+              }
+              if (item.type === 'sms') {
+                return (
+                  <li key={`sms-${item.data.id}`}>
+                    <TimelineItem icon={MessageSquare} isLast={isLast}>
+                      <SmsActivityRow message={item.data} />
+                    </TimelineItem>
+                  </li>
+                )
+              }
+              return (
+                <li key={`email-${item.data.thread_id}-${item.data.id}`}>
+                  <TimelineItem icon={Mail} isLast={isLast}>
+                    <EmailActivityRow email={item.data} />
+                  </TimelineItem>
                 </li>
-              ) : (
-                <li
-                  key={`sms-${item.data.customerPhone}`}
-                  className='border rounded p-3 bg-white'
-                >
-                  <SmsThreadCard thread={item.data} />
-                </li>
-              ),
-            )}
+              )
+            })}
           </ul>
 
           {isFetching && (

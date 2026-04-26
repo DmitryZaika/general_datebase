@@ -2,6 +2,7 @@ import { format } from 'date-fns'
 import { useOutletContext } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
 import { CustomerActivityTimeline } from '~/components/organisms/CustomerActivityTimeline'
+import type { EmailHistory } from '~/crud/emails'
 
 type CustomerInfo = {
   id: number
@@ -54,10 +55,11 @@ export async function loader() {
 }
 
 export default function CustomerInfoTab() {
-  const { customer, deals, project } = useOutletContext<{
+  const { customer, deals, project, emails } = useOutletContext<{
     customer: CustomerInfo | null
     deals: DealRow[]
     project: ProjectInfo | null
+    emails: EmailHistory[]
   }>()
 
   if (!customer) {
@@ -192,7 +194,11 @@ export default function CustomerInfoTab() {
         )}
       </div>
 
-      <CustomerActivityTimeline phone={customer.phone} phone2={customer.phone_2} />
+      <CustomerActivityTimeline
+        phone={customer.phone}
+        phone2={customer.phone_2}
+        emails={emails}
+      />
     </div>
   )
 }

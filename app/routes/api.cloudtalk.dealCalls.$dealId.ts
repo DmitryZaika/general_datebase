@@ -41,10 +41,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .filter((p): p is string => !!p)
 
   const dateFrom = new Date(row.created_at).toISOString().slice(0, 10)
-  const today = new Date().toISOString().slice(0, 10)
 
   return await fetchCallsForPhones(companyId, phones, {
     date_from: dateFrom,
-    date_to: today,
   })
 }

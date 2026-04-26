@@ -49,6 +49,9 @@ export function CallItemContent({
               <Icon size={14} />
             </span>
             <span className='text-sm font-medium truncate'>{label}</span>
+            <span className='min-w-0 truncate text-xs text-gray-500'>
+              Agent: {call.agentName}
+            </span>
             <span
               className={cn(
                 'text-[10px] shrink-0',
