@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 import {
   type ActionFunctionArgs,
   data,
+  Form,
   type LoaderFunctionArgs,
-  Form as RemixForm,
   redirect,
   useLoaderData,
   useNavigation,
@@ -33,6 +33,7 @@ import { parseMutliForm } from '~/utils/parseMultiForm'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
+import { presignIfS3Uri } from '~/utils/s3Presign.server'
 import { getEmployeeUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 import { fileSchema, useCustomForm } from '~/utils/useCustomForm'
@@ -154,11 +155,37 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   const images = await selectMany<DealImage>(
     db,
-    'SELECT id, image_url, created_at FROM deals_images WHERE deal_id = ? ORDER BY created_at DESC',
+    `SELECT id, image_url, created_at
+       FROM deals_images
+      WHERE deal_id = ?
+        AND NOT (
+          LOWER(image_url) LIKE '%.pdf'
+          OR LOWER(image_url) LIKE '%.pdf?%'
+          OR LOWER(image_url) LIKE '%.doc'
+          OR LOWER(image_url) LIKE '%.doc?%'
+          OR LOWER(image_url) LIKE '%.docx'
+          OR LOWER(image_url) LIKE '%.docx?%'
+          OR LOWER(image_url) LIKE '%.xls'
+          OR LOWER(image_url) LIKE '%.xls?%'
+          OR LOWER(image_url) LIKE '%.xlsx'
+          OR LOWER(image_url) LIKE '%.xlsx?%'
+          OR LOWER(image_url) LIKE '%.csv'
+          OR LOWER(image_url) LIKE '%.csv?%'
+          OR LOWER(image_url) LIKE '%.txt'
+          OR LOWER(image_url) LIKE '%.txt?%'
+        )
+      ORDER BY created_at DESC`,
     [dealId],
   )
 
-  return { images, dealId }
+  const signedImages = await Promise.all(
+    images.map(async image => ({
+      ...image,
+      image_url: await presignIfS3Uri(image.image_url),
+    })),
+  )
+
+  return { images: signedImages, dealId }
 }
 
 function AddImageForm() {
@@ -269,13 +296,13 @@ export default function DealEditImages() {
             <Button variant='outline' onClick={() => setShowConfirmDialog(false)}>
               Cancel
             </Button>
-            <RemixForm method='delete' onSubmit={() => setShowConfirmDialog(false)}>
+            <Form method='delete' onSubmit={() => setShowConfirmDialog(false)}>
               <AuthenticityTokenInput />
               <input type='hidden' name='id' value={imageToDelete || ''} />
               <Button type='submit' variant='destructive'>
                 Delete
               </Button>
-            </RemixForm>
+            </Form>
           </DialogFooter>
         </DialogContent>
       </Dialog>
