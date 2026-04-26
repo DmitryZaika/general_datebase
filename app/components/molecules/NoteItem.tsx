@@ -85,18 +85,32 @@ export function NoteItem({
     setIsEditingNote(false)
   }
 
+  const resizeEditTextarea = () => {
+    const el = editTextareaRef.current
+    if (!el) return
+    el.style.height = '0px'
+    el.style.height = `${el.scrollHeight}px`
+  }
+
   useEffect(() => {
     if (isEditingNote) {
       requestAnimationFrame(() => {
         const el = editTextareaRef.current
         if (el) {
           const end = el.value.length
+          resizeEditTextarea()
           el.focus()
           el.setSelectionRange(end, end)
         }
       })
     }
   }, [isEditingNote])
+
+  useEffect(() => {
+    if (isEditingNote) {
+      resizeEditTextarea()
+    }
+  }, [editContent, isEditingNote])
 
   useEffect(() => {
     if (showCommentInput) {
@@ -188,7 +202,7 @@ export function NoteItem({
             ref={editTextareaRef}
             value={editContent}
             onChange={e => setEditContent(e.target.value)}
-            className='text-sm min-h-[60px] resize-none'
+            className='text-sm min-h-[60px] resize-none overflow-hidden'
             onKeyDown={e => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault()

@@ -129,7 +129,7 @@ function ThreadRowHoverActions({
             type='button'
             disabled={busy}
             onClick={() => onDelete(threadId)}
-            className='p-1.5 hover:bg-red-50 rounded-full text-red-500 transition-colors disabled:opacity-50'
+            className='cursor-pointer p-1.5 hover:bg-red-50 rounded-full text-red-500 transition-colors disabled:cursor-not-allowed disabled:opacity-50'
           >
             <Trash2 className='h-4 w-4' />
           </button>
@@ -146,7 +146,7 @@ function ThreadRowHoverActions({
                 type='button'
                 disabled={busy}
                 onClick={() => onMarkRead(threadId)}
-                className='p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:opacity-50'
+                className='cursor-pointer p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:cursor-not-allowed disabled:opacity-50'
               >
                 <MailOpen className='h-4 w-4' />
               </button>
@@ -162,7 +162,7 @@ function ThreadRowHoverActions({
                 type='button'
                 disabled={busy}
                 onClick={() => onMarkUnread(threadId)}
-                className='p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:opacity-50'
+                className='cursor-pointer p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:cursor-not-allowed disabled:opacity-50'
               >
                 <Mail className='h-4 w-4' />
               </button>
@@ -275,6 +275,15 @@ export default function DealsEmailsView({
     })
     return ids
   }, [emails])
+
+  const selectedHasUnreadThreads = useMemo(() => {
+    for (const threadId of selectedThreads) {
+      if (unreadThreadIds.has(threadId)) {
+        return true
+      }
+    }
+    return false
+  }, [selectedThreads, unreadThreadIds])
 
   const threadIdsWithAttachments = useMemo(() => {
     const ids = new Set<string>()
@@ -495,11 +504,21 @@ export default function DealsEmailsView({
     }
   }
 
-  const handleMarkUnread = async () => {
+  const handleToggleSelectedReadState = async () => {
     if (selectedThreads.size === 0) return
+    const endpoint = selectedHasUnreadThreads
+      ? '/api/emails/mark-read'
+      : '/api/emails/mark-unread'
+    const successDescription = selectedHasUnreadThreads
+      ? 'Marked as read'
+      : 'Marked as unread'
+    const errorDescription = selectedHasUnreadThreads
+      ? 'Failed to mark as read'
+      : 'Failed to mark as unread'
+
     setIsMarkingUnread(true)
     try {
-      const res = await fetch('/api/emails/mark-unread', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ threadIds: Array.from(selectedThreads) }),
@@ -507,7 +526,7 @@ export default function DealsEmailsView({
       if (res.ok) {
         toast({
           title: 'Success',
-          description: 'Marked as unread',
+          description: successDescription,
           variant: 'success',
         })
         setSelectedThreads(new Set())
@@ -515,14 +534,14 @@ export default function DealsEmailsView({
       } else {
         toast({
           title: 'Error',
-          description: 'Failed to mark as unread',
+          description: errorDescription,
           variant: 'destructive',
         })
       }
     } catch {
       toast({
         title: 'Error',
-        description: 'Failed to mark as unread',
+        description: errorDescription,
         variant: 'destructive',
       })
     } finally {
@@ -761,6 +780,7 @@ export default function DealsEmailsView({
                 selectedThreads.size === sortedEmails.length && sortedEmails.length > 0
               }
               onCheckedChange={toggleSelectAll}
+              className='cursor-pointer'
             />
             {selectedThreads.size > 0 && activeTab !== 'trash' && (
               <>
@@ -769,7 +789,7 @@ export default function DealsEmailsView({
                     <button
                       onClick={handleDelete}
                       disabled={isDeleting}
-                      className='p-1.5 hover:bg-red-50 rounded-full text-red-500 transition-colors'
+                      className='cursor-pointer p-1.5 hover:bg-red-50 rounded-full text-red-500 transition-colors disabled:cursor-not-allowed'
                     >
                       <Trash2 className='h-4 w-4' />
                     </button>
@@ -781,15 +801,19 @@ export default function DealsEmailsView({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      onClick={handleMarkUnread}
+                      onClick={handleToggleSelectedReadState}
                       disabled={isMarkingUnread}
-                      className='p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors'
+                      className='cursor-pointer p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:cursor-not-allowed'
                     >
-                      <Mail className='h-4 w-4' />
+                      {selectedHasUnreadThreads ? (
+                        <MailOpen className='h-4 w-4' />
+                      ) : (
+                        <Mail className='h-4 w-4' />
+                      )}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side='top' sideOffset={6}>
-                    Mark as unread
+                    {selectedHasUnreadThreads ? 'Mark as read' : 'Mark as unread'}
                   </TooltipContent>
                 </Tooltip>
               </>
@@ -929,20 +953,22 @@ export default function DealsEmailsView({
                     />
                     <div className='relative z-[2] flex w-full min-w-0 items-stretch gap-3'>
                       <label
-                        className='flex shrink-0 cursor-pointer items-center self-stretch'
+                        className='-my-1.5 flex w-8 shrink-0 cursor-pointer items-center justify-center self-stretch'
                         onClick={e => e.stopPropagation()}
                       >
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={checked => {
-                            const next = new Set(selectedThreads)
-                            if (checked) next.add(email.thread_id)
-                            else next.delete(email.thread_id)
-                            setSelectedThreads(next)
-                          }}
-                          className='size-4.5'
-                          onClick={e => e.stopPropagation()}
-                        />
+                        <span className='flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-gray-200'>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={checked => {
+                              const next = new Set(selectedThreads)
+                              if (checked) next.add(email.thread_id)
+                              else next.delete(email.thread_id)
+                              setSelectedThreads(next)
+                            }}
+                            className='h-4 w-4 cursor-pointer rounded-[2px] border-gray-400 bg-white shadow-none data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600'
+                            onClick={e => e.stopPropagation()}
+                          />
+                        </span>
                       </label>
 
                       {/* Mobile Layout (Vertical Stack) */}

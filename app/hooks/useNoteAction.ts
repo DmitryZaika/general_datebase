@@ -122,6 +122,8 @@ export function useNoteAction(dealId: number) {
     editNote,
     isCommenting: commentFetcher.state !== 'idle',
     isEditing: editFetcher.state !== 'idle',
+    commentingData: commentFetcher.formData,
+    editingData: editFetcher.formData,
     deletingData: deleteFetcher.formData,
   }
 }

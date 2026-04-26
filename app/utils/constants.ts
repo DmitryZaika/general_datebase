@@ -1,3 +1,5 @@
+import z from 'zod'
+
 export const DONE_KEY = '[DONE]035d8eba-9f8c-44c5-a1e0-290d1da033f7[/DONE]'
 
 export const CLOSED_WON_LIST_ID = 4
@@ -46,6 +48,10 @@ export const getSearchString = (url: URL) => {
   const searchParams = url.searchParams.toString()
   return searchParams ? `?${searchParams}` : ''
 }
+
+export const zodEmail = z
+  .email('Invalid email address')
+  .transform(val => val?.trim().toLowerCase())
 
 export const dateClass = 'text-center text-xs text-gray-500 my-1'
 

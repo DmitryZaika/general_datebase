@@ -67,6 +67,7 @@ import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
+import { zodEmail } from '~/utils/constants'
 import type { EmailTemplate } from '~/utils/emailTemplates'
 import {
   getUnfilledCustomVariables,
@@ -130,9 +131,7 @@ interface AIEmailResponse {
 // ============================================================================
 
 const emailSchema = z.object({
-  to: z
-    .array(z.email('Valid email address is required'))
-    .min(1, 'Recipient is required'),
+  to: z.array(zodEmail).min(1, 'Recipient is required'),
   subject: z.string().min(1, 'Subject is required'),
   text: z.string().min(1, 'Email body is required'),
   attachments: z.array(z.instanceof(File)),
