@@ -40,7 +40,12 @@ export async function action({ params, request }: ActionFunctionArgs) {
   await db.execute(`DELETE FROM instructions WHERE id = ?`, [instructionId])
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'instruction Deleted'))
-  return redirect('..', {
+
+  const url = new URL(request.url)
+  const type = url.searchParams.get('type')
+  const redirectUrl = type ? `..?type=${type}` : '..'
+
+  return redirect(redirectUrl, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }
@@ -69,10 +74,12 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 export default function InstructionsDelete() {
   const navigate = useNavigate()
   const { title } = useLoaderData<typeof loader>()
+  const url = new URL(typeof window !== 'undefined' ? window.location.href : '')
+  const type = url.searchParams.get('type')
 
   const handleChange = (open: boolean) => {
     if (open === false) {
-      navigate('..')
+      navigate(type ? `..?type=${type}` : '..')
     }
   }
   return (

@@ -75,7 +75,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Instruction updated'))
-  return redirect('..', {
+
+  const url = new URL(request.url)
+  const type = url.searchParams.get('type')
+  const redirectUrl = type ? `..?type=${type}` : '..'
+
+  return redirect(redirectUrl, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }
@@ -86,6 +91,8 @@ interface Instruction {
   parent_id: number
   after_id: number
   rich_text: string
+  company_id: number
+  public: number
 }
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
@@ -106,19 +113,24 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   const instruction = await selectId<Instruction>(
     db,
-    'SELECT title, parent_id, after_id, rich_text FROM instructions WHERE id = ?',
+    'SELECT title, parent_id, after_id, rich_text, company_id, public FROM instructions WHERE id = ?',
     instructionId,
   )
+
+  if (!instruction) {
+    return forceRedirectError(request.headers, 'Invalid instruction id')
+  }
 
   const instructions = await selectMany<{
     title: string
     id: number
     parent_id: number
-  }>(db, 'SELECT id, parent_id, title FROM instructions')
+  }>(
+    db,
+    'SELECT id, parent_id, title FROM instructions WHERE company_id = ? AND public = ?',
+    [instruction.company_id, instruction.public],
+  )
 
-  if (!instruction) {
-    return forceRedirectError(request.headers, 'Invalid supplier id')
-  }
   const { title, parent_id, after_id, rich_text } = instruction
   return {
     title,
@@ -131,8 +143,11 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 export default function InstructionsEdit() {
   const navigate = useNavigate()
-  const { title, parent_id, after_id, rich_text } = useLoaderData<typeof loader>()
-  const { instructions } = useLoaderData<typeof loader>()
+  const { title, parent_id, after_id, rich_text, instructions } =
+    useLoaderData<typeof loader>()
+  const url = new URL(typeof window !== 'undefined' ? window.location.href : '')
+  const type = url.searchParams.get('type')
+
   const form = useForm({
     resolver,
     defaultValues: {
@@ -149,7 +164,7 @@ export default function InstructionsEdit() {
 
   const handleChange = (open: boolean) => {
     if (open === false) {
-      navigate('..')
+      navigate(type ? `..?type=${type}` : '..')
     }
   }
 

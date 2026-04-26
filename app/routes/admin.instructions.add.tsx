@@ -43,6 +43,7 @@ const instructionschema = z.object({
   parent_id: z.coerce.number(),
   after_id: z.coerce.number(),
   rich_text: z.string(),
+  public: z.coerce.number(),
 })
 
 const resolver = zodResolver(instructionschema)
@@ -68,10 +69,14 @@ export async function action({ request }: ActionFunctionArgs) {
   const parentId = data.parent_id || null
   const afterId = data.after_id || null
   const user = await getAdminUser(request)
+  const isGeneral = data.public === 2
+  const companyId = isGeneral ? 0 : user.company_id
+  const publicVal = data.public === 1 ? 1 : 0
+
   const [result] = await db.execute<ResultSetHeader>(
-    `INSERT INTO instructions (title, parent_id, after_id, rich_text, company_id)
-       VALUES (?, ?, ?, ?, ?)`,
-    [data.title, parentId, afterId, data.rich_text, user.company_id],
+    `INSERT INTO instructions (title, parent_id, after_id, rich_text, company_id, public)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    [data.title, parentId, afterId, data.rich_text, companyId, publicVal],
   )
   insertId = result.insertId
 
@@ -81,7 +86,8 @@ export async function action({ request }: ActionFunctionArgs) {
         (after_id = ? OR (after_id IS NULL AND ? IS NULL))
         AND id != ?
         AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL))
-        AND company_id = ?;`
+        AND company_id = ?
+        AND public = ?;`
   await db.execute(query, [
     insertId,
     data.after_id,
@@ -89,13 +95,18 @@ export async function action({ request }: ActionFunctionArgs) {
     insertId,
     parentId,
     parentId,
-    user.company_id,
+    companyId,
+    publicVal,
   ])
 
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Instruction added'))
 
-  return redirect('..', {
+  const url = new URL(request.url)
+  const type = url.searchParams.get('type')
+  const redirectUrl = type ? `..?type=${type}` : '..'
+
+  return redirect(redirectUrl, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
 }
@@ -107,15 +118,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/login?error=${error}`)
   }
   const user = await getAdminUser(request)
+  const url = new URL(request.url)
+  const type = url.searchParams.get('type')
+  const isPublic = type === 'customer' ? 1 : 0
+  const companyId = type === 'general' ? 0 : user.company_id
+
   const instructions = await selectMany<InstructionsBasic>(
     db,
-    'SELECT id, parent_id, title FROM instructions WHERE company_id = ?',
-    [user.company_id],
+    'SELECT id, parent_id, title FROM instructions WHERE company_id = ? AND public = ?',
+    [companyId, isPublic],
   )
   if (!instructions) {
-    return { instructions: [] }
+    return { instructions: [], type }
   }
-  return { instructions }
+  return { instructions, type }
 }
 
 function cleanId(value: string | undefined): number | undefined {
@@ -129,7 +145,14 @@ export default function InstructionsAdd() {
   const navigate = useNavigate()
   const isSubmitting = useNavigation().state !== 'idle'
   const token = useAuthenticityToken()
-  const { instructions } = useLoaderData<typeof loader>()
+  const { instructions, type } = useLoaderData<typeof loader>()
+
+  let defaultPublic = 0
+  if (type === 'customer') {
+    defaultPublic = 1
+  } else if (type === 'general') {
+    defaultPublic = 2
+  }
 
   const form = useForm({
     resolver,
@@ -138,6 +161,7 @@ export default function InstructionsAdd() {
       rich_text: '',
       after_id: '0' as unknown as number,
       parent_id: '0' as unknown as number,
+      public: defaultPublic,
     },
   })
 
@@ -149,7 +173,7 @@ export default function InstructionsAdd() {
 
   const handleChange = (open: boolean) => {
     if (!open) {
-      navigate('..')
+      navigate(type ? `..?type=${type}` : '..')
     }
   }
 
@@ -170,6 +194,7 @@ export default function InstructionsAdd() {
         <FormProvider {...form}>
           <Form id='customerForm' method='post' onSubmit={fullSubmit}>
             <input type='hidden' name='csrf' value={token} />
+            <input type='hidden' name='public' value={form.watch('public')} />
             <FormField
               control={form.control}
               name='title'

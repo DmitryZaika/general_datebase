@@ -35,6 +35,7 @@ interface Instructions {
   parent_id: number | null
   after_id: number | null
   rich_text: string
+  public: number
 }
 
 interface InstructionNode {
@@ -43,47 +44,13 @@ interface InstructionNode {
   parent_id: number | null
   after_id: number | null
   rich_text: string
+  public: number
   children: InstructionNode[]
 }
 
 interface SearchResult extends InstructionNode {
   matchType: 'title' | 'content'
 }
-
-const CUSTOMER_INSTRUCTIONS: Instructions[] = [
-  {
-    id: 10001,
-    title: 'Advising Customers on Granite Selection',
-    parent_id: null,
-    after_id: null,
-    rich_text:
-      '<p>When advising customers, always emphasize that granite is a natural stone and every slab is unique. Encourage them to view the actual slabs that will be used for their project at the warehouse.</p>',
-  },
-  {
-    id: 10002,
-    title: 'Understanding Patterns and Movement',
-    parent_id: 10001,
-    after_id: null,
-    rich_text:
-      '<p>Help customers understand the difference between consistent patterns and "movement" (veining). Large-veined granites make a dramatic statement but may require more thoughtful seam placement.</p>',
-  },
-  {
-    id: 10003,
-    title: 'Finish Options: Polished vs. Leathered',
-    parent_id: 10001,
-    after_id: 10002,
-    rich_text:
-      '<p>Explain the tactile and visual differences between finishes. <strong>Polished</strong> is classic and reflective, while <strong>Leathered</strong> provides a textured, matte look that is excellent for hiding fingerprints and water spots.</p>',
-  },
-  {
-    id: 10004,
-    title: 'Durability and Maintenance Education',
-    parent_id: null,
-    after_id: 10001,
-    rich_text:
-      '<p>Educate customers on granite maintenance. While highly durable and heat-resistant, it is a porous material that should be professionally sealed. Advise them on using pH-neutral cleaners to preserve the sealer and stone surface.</p>',
-  },
-]
 
 interface InstructionItemProps {
   instruction: InstructionNode
@@ -110,15 +77,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     mode = 'general'
   }
 
-  if (mode === 'customer') {
-    return { instructions: CUSTOMER_INSTRUCTIONS, allowGeneral, mode }
-  }
-
   const companyId = mode === 'general' ? 0 : user.company_id
+  const isPublic = mode === 'customer' ? 1 : 0
+
   const instructions = await selectMany<Instructions>(
     db,
-    'SELECT id, title, parent_id, after_id, rich_text FROM instructions WHERE company_id = ?',
-    [companyId],
+    'SELECT id, title, parent_id, after_id, rich_text, public FROM instructions WHERE company_id = ? AND public = ?',
+    [companyId, isPublic],
   )
   return { instructions, allowGeneral, mode }
 }
@@ -178,7 +143,6 @@ const InstructionHeader: FC<InstructionHeaderProps> = ({
   onEdit,
   onDelete,
   textAlign,
-  readOnly,
 }) => (
   <div className='flex items-center justify-between flex-1 gap-6'>
     <h3
@@ -192,10 +156,8 @@ const InstructionHeader: FC<InstructionHeaderProps> = ({
     <div className='flex items-center gap-2 shrink-0'>
       <button
         type='button'
-        onClick={readOnly ? undefined : onEdit}
-        className={cn('p-2 rounded-md transition-colors', {
-          'cursor-default opacity-50': readOnly,
-        })}
+        onClick={onEdit}
+        className='p-2 rounded-md transition-colors'
         aria-label='Edit instruction'
         title='Edit instruction'
       >
@@ -203,10 +165,8 @@ const InstructionHeader: FC<InstructionHeaderProps> = ({
       </button>
       <button
         type='button'
-        onClick={readOnly ? undefined : onDelete}
-        className={cn('p-2 rounded-md transition-colors', {
-          'cursor-default opacity-50': readOnly,
-        })}
+        onClick={onDelete}
+        className='p-2 rounded-md transition-colors'
         aria-label='Delete instruction'
         title='Delete instruction'
       >
@@ -220,7 +180,6 @@ const InstructionItem: FC<InstructionItemProps> = ({
   instruction,
   onEdit,
   onDelete,
-  readOnly,
 }) => {
   const hasChildren = instruction.children.length > 0
   const hasContent = !isEmptyRichText(instruction.rich_text)
@@ -228,13 +187,11 @@ const InstructionItem: FC<InstructionItemProps> = ({
 
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (readOnly) return
     onEdit(instruction.id)
   }
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (readOnly) return
     onDelete(instruction.id)
   }
 
@@ -246,7 +203,6 @@ const InstructionItem: FC<InstructionItemProps> = ({
             title={instruction.title}
             onEdit={handleEdit}
             onDelete={handleDelete}
-            readOnly={readOnly}
           />
         </div>
       )
@@ -263,7 +219,6 @@ const InstructionItem: FC<InstructionItemProps> = ({
             onEdit={handleEdit}
             onDelete={handleDelete}
             textAlign='left'
-            readOnly={readOnly}
           />
         </AccordionTrigger>
         <AccordionContent>
@@ -291,7 +246,6 @@ const InstructionItem: FC<InstructionItemProps> = ({
                       instruction={child}
                       onEdit={onEdit}
                       onDelete={onDelete}
-                      readOnly={readOnly}
                     />
                   ))}
                 </Accordion>
@@ -318,9 +272,7 @@ const InstructionItem: FC<InstructionItemProps> = ({
             <button
               type='button'
               onClick={handleEdit}
-              className={cn('p-2 rounded-md transition-colors', {
-                'cursor-default opacity-50': readOnly,
-              })}
+              className='p-2 rounded-md transition-colors'
               aria-label='Edit instruction'
               title='Edit instruction'
             >
@@ -332,9 +284,7 @@ const InstructionItem: FC<InstructionItemProps> = ({
             <button
               type='button'
               onClick={handleDelete}
-              className={cn('p-2 rounded-md transition-colors', {
-                'cursor-default opacity-50': readOnly,
-              })}
+              className='p-2 rounded-md transition-colors'
               aria-label='Delete instruction'
               title='Delete instruction'
             >
@@ -353,7 +303,6 @@ const InstructionItem: FC<InstructionItemProps> = ({
                 instruction={child}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                readOnly={readOnly}
               />
             ))}
           </section>
@@ -566,7 +515,6 @@ export default function AdminInstructions() {
                 instruction={instruction}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                readOnly={mode === 'customer'}
               />
             ))}
           </Accordion>
