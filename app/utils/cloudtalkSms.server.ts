@@ -9,17 +9,33 @@ export interface FetchSmsParams {
   limit?: number
 }
 
+export function cloudTalkSmsPhoneVariants(phoneDigits: string[]): string[] {
+  return [
+    ...new Set(
+      phoneDigits.flatMap(digits => {
+        if (digits.length === 11 && digits.startsWith('1')) {
+          return [digits, digits.slice(1)]
+        }
+        if (digits.length === 10) {
+          return [digits, `1${digits}`]
+        }
+        return [digits]
+      }),
+    ),
+  ]
+}
+
 export async function fetchSmsForCompanyAndPhones({
-  companyId,
   phoneDigits,
   createdAfter,
   limit = 200,
 }: FetchSmsParams): Promise<{ items: SmsRow[] }> {
-  if (phoneDigits.length === 0) return { items: [] }
+  const phoneVariants = cloudTalkSmsPhoneVariants(phoneDigits)
+  if (phoneVariants.length === 0) return { items: [] }
 
-  const placeholders = phoneDigits.map(() => '?').join(',')
+  const placeholders = phoneVariants.map(() => '?').join(',')
   const dateFilter = createdAfter ? 'AND created_date >= ?' : ''
-  const params: (string | number)[] = [companyId, ...phoneDigits, ...phoneDigits]
+  const params: (string | number)[] = [...phoneVariants, ...phoneVariants]
   if (createdAfter) {
     params.push(createdAfter.toISOString().slice(0, 19).replace('T', ' '))
   }
@@ -30,10 +46,9 @@ export async function fetchSmsForCompanyAndPhones({
     `SELECT id, cloudtalk_id,
             CAST(sender AS CHAR) AS sender,
             CAST(recipient AS CHAR) AS recipient,
-            text, agent, created_date, company_id
+            text, agent, created_date, NULL AS company_id
        FROM cloudtalk_sms
-      WHERE company_id = ?
-        AND (sender IN (${placeholders}) OR recipient IN (${placeholders}))
+      WHERE (sender IN (${placeholders}) OR recipient IN (${placeholders}))
         ${dateFilter}
       ORDER BY created_date DESC
       LIMIT ?`,

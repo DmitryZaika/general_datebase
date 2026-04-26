@@ -25,7 +25,6 @@ import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import ClipboardIcon from '~/components/icons/ClipboardIcon'
 import NoteIcon from '~/components/icons/NoteIcon'
 import { CallItemContent } from '~/components/molecules/CallItemContent'
-import { SmsThreadCard } from '~/components/molecules/SmsThreadCard'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,19 +69,12 @@ import type {
 import type { Nullable } from '~/types/utils'
 import { type CallEntry, mapToCallEntry } from '~/utils/callDisplayHelpers'
 import type { Calls200Response } from '~/utils/cloudtalk.server'
-import {
-  groupSmsIntoThreads,
-  mapRowToSmsEntry,
-  type SmsRow,
-  type SmsThread,
-} from '~/utils/smsDisplayHelpers'
+import { mapRowToSmsEntry, type SmsEntry, type SmsRow } from '~/utils/smsDisplayHelpers'
 import { stripHtmlTags } from '~/utils/stringHelpers'
 import { NoteForm } from './NoteForm'
 import { NoteItem } from './NoteItem'
 
 // --- Configuration ---
-
-const ACTION_CARD_CLASS = 'rounded-md px-3 py-2.5 bg-gray-50 border border-gray-200'
 
 const PRIORITY_WEIGHT: Readonly<Record<ActivityPriority, number>> = {
   [ActivityPriority.High]: 0,
@@ -950,6 +942,57 @@ function makeEmailSnippet(body: string | null | undefined, max = 120): string {
   return `${text.slice(0, max).trimEnd()}…`
 }
 
+function SmsHistoryRow({ message }: { message: SmsEntry }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const isOutbound = message.direction === 'outbound'
+  const sentAt = new Date(message.createdDate)
+  const sentLabel = Number.isNaN(sentAt.getTime())
+    ? ''
+    : format(sentAt, 'MMM d, h:mm a')
+  const showToggle = message.text.length > 90
+
+  return (
+    <div className='flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
+      <div className='flex items-start justify-between gap-2'>
+        <div className='flex min-w-0 items-start gap-2'>
+          <Badge
+            className={cn(
+              'text-[10px] px-1.5 py-0 h-4 border shrink-0',
+              isOutbound
+                ? 'bg-blue-100 text-blue-700 border-blue-200'
+                : 'bg-green-100 text-green-700 border-green-200',
+            )}
+          >
+            {isOutbound ? 'Sent' : 'Received'}
+          </Badge>
+          <p
+            className={cn(
+              'min-w-0 text-xs leading-4 text-gray-500 break-words',
+              !isExpanded && 'line-clamp-1',
+            )}
+          >
+            {message.text}
+          </p>
+        </div>
+        <div className='flex shrink-0 items-center gap-2'>
+          {showToggle ? (
+            <button
+              type='button'
+              className='text-[10px] font-medium text-blue-600 hover:text-blue-700'
+              onClick={() => setIsExpanded(value => !value)}
+            >
+              {isExpanded ? 'Show less' : 'Show more'}
+            </button>
+          ) : null}
+          <span className='text-[10px] text-gray-500 w-22 text-right tabular-nums'>
+            {sentLabel}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function EmailHistoryRow({ email }: { email: DealEmailHistoryItem }) {
   const location = useLocation()
   const params = useParams()
@@ -1027,7 +1070,7 @@ function HistoryTabButtons({
   activitiesCount,
   notesCount,
   actionsCount,
-  smsThreadsCount,
+  smsCount,
   emailsCount,
 }: {
   activeTab: HistoryTab
@@ -1035,7 +1078,7 @@ function HistoryTabButtons({
   activitiesCount: number
   notesCount: number
   actionsCount: number
-  smsThreadsCount: number
+  smsCount: number
   emailsCount: number
 }) {
   const tabs: { key: HistoryTab; label: string }[] = [
@@ -1043,7 +1086,7 @@ function HistoryTabButtons({
     { key: 'activities', label: `Activities (${activitiesCount})` },
     { key: 'notes', label: `Notes (${notesCount})` },
     { key: 'actions', label: `Actions (${actionsCount})` },
-    { key: 'sms', label: `SMS (${smsThreadsCount})` },
+    { key: 'sms', label: `SMS (${smsCount})` },
     { key: 'emails', label: `Emails (${emailsCount})` },
   ]
 
@@ -1075,7 +1118,7 @@ function ActivityList({
   activities,
   notes,
   actions,
-  smsThreads,
+  smsMessages,
   emails,
   onEdit,
   editingActivityId,
@@ -1085,7 +1128,7 @@ function ActivityList({
   activities: DealActivity[]
   notes: DealNote[]
   actions: CallEntry[]
-  smsThreads: SmsThread[]
+  smsMessages: SmsEntry[]
   emails: DealEmailHistoryItem[]
   onEdit: (activity: DealActivity) => void
   editingActivityId: number | null
@@ -1127,7 +1170,7 @@ function ActivityList({
       ...done.map(
         a =>
           ({
-            type: 'activity' as const,
+            type: 'activity',
             data: a,
             date: a.completed_at || a.created_at,
             isPinned: false,
@@ -1136,7 +1179,7 @@ function ActivityList({
       ...notes.map(
         n =>
           ({
-            type: 'note' as const,
+            type: 'note',
             data: n,
             date: n.created_at,
             isPinned: !!n.is_pinned,
@@ -1145,25 +1188,25 @@ function ActivityList({
       ...actions.map(
         a =>
           ({
-            type: 'action' as const,
+            type: 'action',
             data: a,
             date: a.startedAt,
             isPinned: false,
           }) satisfies HistoryItem,
       ),
-      ...smsThreads.map(
-        t =>
+      ...smsMessages.map(
+        message =>
           ({
-            type: 'smsThread' as const,
-            data: t,
-            date: t.lastMessageAt,
+            type: 'sms',
+            data: message,
+            date: message.createdDate,
             isPinned: false,
           }) satisfies HistoryItem,
       ),
       ...emails.map(
         e =>
           ({
-            type: 'email' as const,
+            type: 'email',
             data: e,
             date: e.sent_at,
             isPinned: false,
@@ -1175,21 +1218,21 @@ function ActivityList({
       if (a.isPinned && !b.isPinned) return -1
       if (!a.isPinned && b.isPinned) return 1
       const aTime =
-        a.type === 'email' || a.type === 'action' || a.type === 'smsThread'
+        a.type === 'email' || a.type === 'action' || a.type === 'sms'
           ? new Date(a.date).getTime()
           : parseLocalDate(a.date ?? '').getTime()
       const bTime =
-        b.type === 'email' || b.type === 'action' || b.type === 'smsThread'
+        b.type === 'email' || b.type === 'action' || b.type === 'sms'
           ? new Date(b.date).getTime()
           : parseLocalDate(b.date ?? '').getTime()
       return bTime - aTime
     })
 
     return items
-  }, [done, notes, actions, smsThreads, emails])
+  }, [done, notes, actions, smsMessages, emails])
 
   const historyCount =
-    done.length + notes.length + actions.length + smsThreads.length + emails.length
+    done.length + notes.length + actions.length + smsMessages.length + emails.length
 
   const renderHistoryItem = useCallback(
     (item: HistoryItem, isLast: boolean): ReactNode => {
@@ -1230,25 +1273,22 @@ function ActivityList({
               icon={Phone}
               isLast={isLast}
             >
-              <div className={ACTION_CARD_CLASS}>
-                <CallItemContent
-                  call={item.data}
-                  audioSrc={`/api/cloudtalk/userCallMedia/${item.data.callId}`}
-                  compact
-                />
-              </div>
+              <CallItemContent
+                call={item.data}
+                audioSrc={`/api/cloudtalk/userCallMedia/${item.data.callId}`}
+                compact
+                historyCompact
+              />
             </TimelineItem>
           )
-        case 'smsThread':
+        case 'sms':
           return (
             <TimelineItem
-              key={`sms-${item.data.customerPhone}`}
+              key={`sms-${item.data.id}`}
               icon={MessageSquare}
               isLast={isLast}
             >
-              <div className={ACTION_CARD_CLASS}>
-                <SmsThreadCard thread={item.data} compact />
-              </div>
+              <SmsHistoryRow message={item.data} />
             </TimelineItem>
           )
         case 'email':
@@ -1331,31 +1371,28 @@ function ActivityList({
                 icon={Phone}
                 isLast={index === actions.length - 1}
               >
-                <div className={ACTION_CARD_CLASS}>
-                  <CallItemContent
-                    call={call}
-                    audioSrc={`/api/cloudtalk/userCallMedia/${call.callId}`}
-                    compact
-                  />
-                </div>
+                <CallItemContent
+                  call={call}
+                  audioSrc={`/api/cloudtalk/userCallMedia/${call.callId}`}
+                  compact
+                  historyCompact
+                />
               </TimelineItem>
             ))}
           </div>
         )
       },
       sms: () => {
-        if (smsThreads.length === 0) return <SectionEmptyState label='No SMS yet' />
+        if (smsMessages.length === 0) return <SectionEmptyState label='No SMS yet' />
         return (
           <div>
-            {smsThreads.map((thread, index) => (
+            {smsMessages.map((message, index) => (
               <TimelineItem
-                key={`sms-${thread.customerPhone}`}
+                key={`sms-${message.id}`}
                 icon={MessageSquare}
-                isLast={index === smsThreads.length - 1}
+                isLast={index === smsMessages.length - 1}
               >
-                <div className={ACTION_CARD_CLASS}>
-                  <SmsThreadCard thread={thread} compact />
-                </div>
+                <SmsHistoryRow message={message} />
               </TimelineItem>
             ))}
           </div>
@@ -1395,7 +1432,7 @@ function ActivityList({
       sortedNotes,
       sortedEmails,
       actions,
-      smsThreads,
+      smsMessages,
       allHistoryItems,
       dealId,
       onEdit,
@@ -1457,7 +1494,7 @@ function ActivityList({
               activitiesCount={done.length}
               notesCount={notes.length}
               actionsCount={actions.length}
-              smsThreadsCount={smsThreads.length}
+              smsCount={smsMessages.length}
               emailsCount={emails.length}
             />
             {tabRenderers[historyTab]()}
@@ -1515,11 +1552,14 @@ export function DealActivityPanel({
     staleTime: 60_000,
   })
 
-  const smsThreads = useMemo(() => {
+  const smsMessages = useMemo(() => {
     const rows = smsData?.items ?? []
     const digits = smsData?.customerPhoneDigits ?? []
-    const entries = rows.map(r => mapRowToSmsEntry(r, digits))
-    return groupSmsIntoThreads(entries)
+    return rows
+      .map(r => mapRowToSmsEntry(r, digits))
+      .sort(
+        (a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime(),
+      )
   }, [smsData])
 
   useEffect(() => {
@@ -1597,7 +1637,7 @@ export function DealActivityPanel({
           activities={activities}
           notes={notes}
           actions={actions}
-          smsThreads={smsThreads}
+          smsMessages={smsMessages}
           emails={emails}
           onEdit={handleEdit}
           editingActivityId={editingActivity?.id ?? null}

@@ -2,7 +2,7 @@ import type { EmailHistory } from '~/crud/emails'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { CallEntry } from '~/utils/callDisplayHelpers'
-import type { SmsThread } from '~/utils/smsDisplayHelpers'
+import type { SmsEntry } from '~/utils/smsDisplayHelpers'
 
 export type DeadlineUrgency = 'overdue' | 'today' | 'soon' | 'normal'
 
@@ -16,7 +16,7 @@ export type HistoryItem =
   | { type: 'activity'; data: DealActivity; date: string; isPinned: false }
   | { type: 'note'; data: DealNote; date: string; isPinned: boolean }
   | { type: 'action'; data: CallEntry; date: string; isPinned: false }
-  | { type: 'smsThread'; data: SmsThread; date: string; isPinned: false }
+  | { type: 'sms'; data: SmsEntry; date: string; isPinned: false }
   | { type: 'email'; data: DealEmailHistoryItem; date: string; isPinned: false }
 
 export interface DealActivityPanelProps {

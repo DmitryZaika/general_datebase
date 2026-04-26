@@ -1,7 +1,10 @@
 import { type LoaderFunctionArgs, redirect } from 'react-router'
 import { db } from '~/db.server'
 import type { Nullable } from '~/types/utils'
-import { fetchSmsForCompanyAndPhones } from '~/utils/cloudtalkSms.server'
+import {
+  cloudTalkSmsPhoneVariants,
+  fetchSmsForCompanyAndPhones,
+} from '~/utils/cloudtalkSms.server'
 import { phoneDigitsOnly } from '~/utils/phone'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -41,11 +44,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .filter((p): p is string => !!p)
     .map(phoneDigitsOnly)
     .filter(d => d.length >= 10)
+  const customerPhoneDigits = cloudTalkSmsPhoneVariants(phoneDigits)
 
   const result = await fetchSmsForCompanyAndPhones({
     companyId,
     phoneDigits,
     createdAfter: new Date(row.created_at),
   })
-  return { ...result, customerPhoneDigits: phoneDigits }
+  return { ...result, customerPhoneDigits }
 }
