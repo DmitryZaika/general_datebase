@@ -17,6 +17,7 @@
     "prod-kill": "kill -9 $(lsof -t -i:3000)",
     "prod-restart": "bun run prod-kill && npm run prod-deploy",
     "load-data": "node scripts/load-stones-csv.js",
+    "seed:customer-instructions": "bun scripts/seed-customer-instructions.ts",
     "test": "vitest",
     "shrink-images": "tsx scripts/images.ts",
     "send-email": "tsx scripts/send-email.ts"
