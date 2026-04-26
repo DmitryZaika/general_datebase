@@ -193,6 +193,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     subject: emailRows?.[0]?.subject || null,
     threadId,
     currentUserSignature,
+    companyId: user.company_id ?? 0,
   }
 }
 
@@ -207,6 +208,12 @@ export default function AdminEmailsChatRoute() {
       customerName={data.customerName}
       messages={data.messages}
       onClose={() => navigate(`/admin/emails${location.search}`)}
+      dealNav={{
+        companyId: data.companyId,
+        customerEmail: data.customerEmail,
+        pathPrefix: 'admin',
+        threadDealId: data.dealId,
+      }}
     />
   )
 }

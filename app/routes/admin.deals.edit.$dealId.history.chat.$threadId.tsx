@@ -122,11 +122,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   return {
     customerName: customerRows?.name || 'Customer',
+    customerEmail,
     messages,
     dealId,
     subject: emailRows?.[0]?.subject || null,
     threadId,
     currentUserSignature,
+    companyId: user.company_id ?? 0,
   }
 }
 
@@ -146,6 +148,12 @@ export default function AdminDealsHistoryChatRoute() {
       onClose={() =>
         navigate(`/admin/deals/edit/${data.dealId}/history${location.search}`)
       }
+      dealNav={{
+        companyId: data.companyId,
+        customerEmail: data.customerEmail,
+        pathPrefix: 'admin',
+        threadDealId: data.dealId,
+      }}
       scrollToMessageId={
         scrollToMessageId !== null && Number.isFinite(scrollToMessageId)
           ? scrollToMessageId

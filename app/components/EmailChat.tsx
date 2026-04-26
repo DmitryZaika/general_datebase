@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import DOMPurify from 'isomorphic-dompurify'
 import {
   Check,
+  ExternalLink,
   FileText,
   ImageIcon,
   MoreVertical,
@@ -16,6 +17,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
@@ -117,12 +119,20 @@ export interface EmailChatMessage {
   attachments?: EmailChatAttachment[]
 }
 
+interface EmailChatDealNav {
+  companyId: number
+  customerEmail: string
+  pathPrefix: 'employee' | 'admin'
+  threadDealId: number | null
+}
+
 interface EmailChatBaseProps {
   variant: 'admin' | 'employee'
   customerName: string
   messages: EmailChatMessage[]
   onClose: () => void
   scrollToMessageId?: number | null
+  dealNav?: EmailChatDealNav
 }
 
 interface EmailChatEmployeeProps extends EmailChatBaseProps {
@@ -496,8 +506,101 @@ function shortDealText(value: string): string {
   return `${trimmed.slice(0, 80)}...`
 }
 
+function readPayloadError(payload: unknown): string | undefined {
+  if (payload === null || typeof payload !== 'object') return undefined
+  if (!Object.hasOwn(payload, 'error')) return undefined
+  const err = Reflect.get(payload, 'error')
+  return typeof err === 'string' ? err : undefined
+}
+
+function isAttachmentDealOption(item: unknown): item is AttachmentDealOption {
+  if (item === null || typeof item !== 'object') return false
+  const id = Reflect.get(item, 'id')
+  if (typeof id !== 'number') return false
+  const notes = Reflect.get(item, 'notes')
+  if (!Array.isArray(notes)) return false
+  const activities = Reflect.get(item, 'activities')
+  if (!Array.isArray(activities)) return false
+  return true
+}
+
+function parseDealOptionsFromPayload(payload: unknown): AttachmentDealOption[] {
+  if (payload === null || typeof payload !== 'object') return []
+  if (!Object.hasOwn(payload, 'deals')) return []
+  const raw = Reflect.get(payload, 'deals')
+  if (!Array.isArray(raw)) return []
+  return raw.filter(isAttachmentDealOption)
+}
+
+function DealChoiceList({
+  deals,
+  onSelectDeal,
+  disabled,
+}: {
+  deals: AttachmentDealOption[]
+  onSelectDeal: (dealId: number) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className='max-h-[60vh] space-y-2 overflow-y-auto pr-1'>
+      {deals.map(deal => (
+        <button
+          key={deal.id}
+          type='button'
+          className='w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+          disabled={disabled}
+          onClick={() => onSelectDeal(deal.id)}
+        >
+          <div className='flex items-center justify-between gap-2'>
+            <span className='text-sm font-medium text-slate-900'>
+              {dealOptionName(deal)}
+            </span>
+            <span className='text-xs text-slate-500'>#{deal.id}</span>
+          </div>
+          <div className='mt-1 text-xs text-slate-500'>
+            {[deal.list_name, deal.status, dealAmount(deal.amount)]
+              .filter(Boolean)
+              .join(' - ') || 'No stage'}
+          </div>
+          {deal.notes.length > 0 ? (
+            <div className='mt-2 rounded-md bg-amber-50 px-2 py-1.5'>
+              <div className='text-[11px] font-semibold text-amber-900'>Notes</div>
+              <div className='mt-1 space-y-1'>
+                {deal.notes.map(note => (
+                  <div key={note.id} className='text-xs leading-snug text-amber-950'>
+                    {shortDealText(note.content)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {deal.activities.length > 0 ? (
+            <div className='mt-2 rounded-md bg-blue-50 px-2 py-1.5'>
+              <div className='text-[11px] font-semibold text-blue-900'>Activities</div>
+              <div className='mt-1 space-y-1'>
+                {deal.activities.map(activity => (
+                  <div
+                    key={activity.id}
+                    className='flex items-center justify-between gap-2 text-xs leading-snug text-blue-950'
+                  >
+                    <span>{shortDealText(activity.name)}</span>
+                    <span className='shrink-0 text-[11px] capitalize text-blue-700'>
+                      {activity.is_completed ? 'Done' : activity.priority}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function EmailChat(props: EmailChatProps) {
-  const { variant, customerName, messages, onClose, scrollToMessageId } = props
+  const { variant, customerName, messages, onClose, scrollToMessageId, dealNav } = props
+  const navigate = useNavigate()
 
   const [chatMessages, setChatMessages] = useState<EmailChatMessage[]>(messages)
   const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -536,6 +639,9 @@ export function EmailChat(props: EmailChatProps) {
     AttachmentDealOption[]
   >([])
   const [isAddingAttachmentToDeal, setIsAddingAttachmentToDeal] = useState(false)
+  const [dealNavPickerOpen, setDealNavPickerOpen] = useState(false)
+  const [dealNavChoices, setDealNavChoices] = useState<AttachmentDealOption[]>([])
+  const [dealNavLoading, setDealNavLoading] = useState(false)
   const { toast } = useToast()
   const isMobile = useIsMobile()
 
@@ -732,6 +838,84 @@ export function EmailChat(props: EmailChatProps) {
   const closeAttachmentDealDialog = () => {
     setPendingDealAttachment(null)
     setAttachmentDealChoices([])
+  }
+
+  const closeDealNavPicker = () => {
+    setDealNavPickerOpen(false)
+    setDealNavChoices([])
+  }
+
+  const goToDeal = (dealId: number) => {
+    if (!dealNav) return
+    navigate(`/${dealNav.pathPrefix}/deals/edit/${dealId}`)
+  }
+
+  const handleDealNavClick = async () => {
+    if (!dealNav) return
+
+    const canLookupCustomer =
+      dealNav.customerEmail.trim().length > 0 || customerName.trim().length > 0
+
+    if (!canLookupCustomer) {
+      if (dealNav.threadDealId !== null) {
+        goToDeal(dealNav.threadDealId)
+        return
+      }
+      toast({
+        title: 'Cannot open deal',
+        description: 'No customer email or name to look up deals.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setDealNavLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (dealNav.customerEmail.trim()) {
+        params.set('customerEmail', dealNav.customerEmail.trim())
+      }
+      if (customerName.trim()) {
+        params.set('customerName', customerName.trim())
+      }
+      const response = await fetch(`/api/customer-deals?${params}`)
+      const payload: unknown = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        const description = readPayloadError(payload) ?? 'Could not load deals'
+        toast({ title: 'Failure', description, variant: 'destructive' })
+        return
+      }
+
+      const deals = parseDealOptionsFromPayload(payload)
+
+      if (deals.length === 0) {
+        if (dealNav.threadDealId !== null) {
+          goToDeal(dealNav.threadDealId)
+          return
+        }
+        toast({
+          title: 'No deal found',
+          description: 'There is no open deal for this customer.',
+          variant: 'destructive',
+        })
+        return
+      }
+      if (deals.length === 1) {
+        goToDeal(deals[0].id)
+        return
+      }
+      setDealNavChoices(deals)
+      setDealNavPickerOpen(true)
+    } catch {
+      toast({
+        title: 'Failure',
+        description: 'Could not load deals',
+        variant: 'destructive',
+      })
+    } finally {
+      setDealNavLoading(false)
+    }
   }
 
   const handleAddAttachmentToDeal = async (
@@ -963,17 +1147,40 @@ export function EmailChat(props: EmailChatProps) {
             : undefined
         }
       >
-        <DialogHeader className='p-2 border-b'>
-          <div className='flex items-center gap-3'>
-            <div className='w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white font-bold'>
+        <DialogHeader className='border-b p-2'>
+          <div className='flex w-full items-start gap-3'>
+            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-500 font-bold text-white'>
               {getInitials(customerName)}
             </div>
-            <div>
-              <DialogTitle className='text-lg font-semibold'>
-                {customerName}
-              </DialogTitle>
-              {isEmployee && employeeProps?.customerEmail && (
-                <p className='text-sm text-gray-500'>{employeeProps.customerEmail}</p>
+            <div className='min-w-0 flex-1'>
+              <div className='flex flex-wrap items-center gap-2'>
+                <DialogTitle className='text-lg font-semibold'>
+                  {customerName}
+                </DialogTitle>
+                {dealNav ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <LoadingButton
+                          type='button'
+                          size='sm'
+                          className='shrink-0 gap-1.5'
+                          loading={dealNavLoading}
+                          onClick={() => void handleDealNavClick()}
+                        >
+                          <ExternalLink className='h-4 w-4' />
+                          <span className='hidden sm:inline'>Deal</span>
+                        </LoadingButton>
+                      </TooltipTrigger>
+                      <TooltipContent>Open customer deal</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : null}
+              </div>
+              {(employeeProps?.customerEmail || dealNav?.customerEmail) && (
+                <p className='text-sm text-gray-500'>
+                  {employeeProps?.customerEmail || dealNav?.customerEmail}
+                </p>
               )}
             </div>
           </div>
@@ -1520,72 +1727,38 @@ export function EmailChat(props: EmailChatProps) {
               <DialogHeader>
                 <DialogTitle>Choose a deal</DialogTitle>
               </DialogHeader>
-              <div className='max-h-[60vh] space-y-2 overflow-y-auto pr-1'>
-                {attachmentDealChoices.map(deal => (
-                  <button
-                    key={deal.id}
-                    type='button'
-                    className='w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
-                    disabled={!pendingDealAttachment || isAddingAttachmentToDeal}
-                    onClick={() => {
-                      if (!pendingDealAttachment) return
-                      handleAddAttachmentToDeal(pendingDealAttachment, deal.id)
-                    }}
-                  >
-                    <div className='flex items-center justify-between gap-2'>
-                      <span className='text-sm font-medium text-slate-900'>
-                        {dealOptionName(deal)}
-                      </span>
-                      <span className='text-xs text-slate-500'>#{deal.id}</span>
-                    </div>
-                    <div className='mt-1 text-xs text-slate-500'>
-                      {[deal.list_name, deal.status, dealAmount(deal.amount)]
-                        .filter(Boolean)
-                        .join(' - ') || 'No stage'}
-                    </div>
-                    {deal.notes.length > 0 ? (
-                      <div className='mt-2 rounded-md bg-amber-50 px-2 py-1.5'>
-                        <div className='text-[11px] font-semibold text-amber-900'>
-                          Notes
-                        </div>
-                        <div className='mt-1 space-y-1'>
-                          {deal.notes.map(note => (
-                            <div
-                              key={note.id}
-                              className='text-xs leading-snug text-amber-950'
-                            >
-                              {shortDealText(note.content)}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                    {deal.activities.length > 0 ? (
-                      <div className='mt-2 rounded-md bg-blue-50 px-2 py-1.5'>
-                        <div className='text-[11px] font-semibold text-blue-900'>
-                          Activities
-                        </div>
-                        <div className='mt-1 space-y-1'>
-                          {deal.activities.map(activity => (
-                            <div
-                              key={activity.id}
-                              className='flex items-center justify-between gap-2 text-xs leading-snug text-blue-950'
-                            >
-                              <span>{shortDealText(activity.name)}</span>
-                              <span className='shrink-0 text-[11px] capitalize text-blue-700'>
-                                {activity.is_completed ? 'Done' : activity.priority}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
+              <DealChoiceList
+                deals={attachmentDealChoices}
+                disabled={!pendingDealAttachment || isAddingAttachmentToDeal}
+                onSelectDeal={dealId => {
+                  if (!pendingDealAttachment) return
+                  void handleAddAttachmentToDeal(pendingDealAttachment, dealId)
+                }}
+              />
             </DialogContent>
           </Dialog>
         )}
+        {dealNav ? (
+          <Dialog
+            open={dealNavPickerOpen}
+            onOpenChange={open => {
+              if (!open) closeDealNavPicker()
+            }}
+          >
+            <DialogContent className='max-w-md rounded-xl'>
+              <DialogHeader>
+                <DialogTitle>Choose a deal</DialogTitle>
+              </DialogHeader>
+              <DealChoiceList
+                deals={dealNavChoices}
+                onSelectDeal={dealId => {
+                  goToDeal(dealId)
+                  closeDealNavPicker()
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        ) : null}
         <AlertDialog
           open={!!pendingTemplate}
           onOpenChange={open => {

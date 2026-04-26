@@ -226,6 +226,12 @@ export default function EmployeeEmailsChatRoute() {
       currentUserSignature={data.currentUserSignature}
       customerEmail={data.customerEmail}
       companyId={data.companyId}
+      dealNav={{
+        companyId: data.companyId,
+        customerEmail: data.customerEmail,
+        pathPrefix: 'employee',
+        threadDealId: data.dealId,
+      }}
     />
   )
 }

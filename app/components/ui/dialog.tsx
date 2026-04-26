@@ -1,9 +1,8 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Cross2Icon } from '@radix-ui/react-icons'
 import { cva, type VariantProps } from 'class-variance-authority'
-import clsx from 'clsx'
 import * as React from 'react'
-import { cn } from '~/lib/utils' // Ensure this path is correct
+import { cn } from '~/lib/utils'
 
 const Dialog = DialogPrimitive.Root
 
@@ -66,12 +65,12 @@ const DialogContent = React.forwardRef<
       >
         {!hideClose && (
           <DialogPrimitive.Close
-            className={clsx(
-              `absolute cursor-pointer  top-5 right-5 w-7 h-7 flex items-center justify-center rounded-full text-white bg-black opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none`,
+            className={cn(
+              'absolute right-5 top-5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-black text-white opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none',
               closeClassName,
             )}
           >
-            <Cross2Icon className='w-5 h-5 ' />
+            <Cross2Icon className='h-5 w-5' />
             <span className='sr-only'>Close</span>
           </DialogPrimitive.Close>
         )}

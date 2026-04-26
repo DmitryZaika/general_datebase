@@ -168,6 +168,12 @@ export default function EmployeeDealsHistoryChatRoute() {
       currentUserSignature={data.currentUserSignature}
       customerEmail={data.customerEmail}
       companyId={data.companyId}
+      dealNav={{
+        companyId: data.companyId,
+        customerEmail: data.customerEmail,
+        pathPrefix: 'employee',
+        threadDealId: data.dealId,
+      }}
       scrollToMessageId={
         scrollToMessageId !== null && Number.isFinite(scrollToMessageId)
           ? scrollToMessageId
