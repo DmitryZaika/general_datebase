@@ -189,28 +189,30 @@ const InstructionHeader: FC<InstructionHeaderProps> = ({
     >
       {title}
     </h3>
-    {!readOnly && (
-      <div className='flex items-center gap-2 shrink-0'>
-        <button
-          type='button'
-          onClick={onEdit}
-          className='p-2 rounded-md transition-colors'
-          aria-label='Edit instruction'
-          title='Edit instruction'
-        >
-          <Pencil className='w-4 h-4 text-gray-600 hover:text-blue-600 transition-colors' />
-        </button>
-        <button
-          type='button'
-          onClick={onDelete}
-          className='p-2 rounded-md transition-colors'
-          aria-label='Delete instruction'
-          title='Delete instruction'
-        >
-          <Trash2 className='w-4 h-4 text-gray-600 hover:text-red-600 transition-colors' />
-        </button>
-      </div>
-    )}
+    <div className='flex items-center gap-2 shrink-0'>
+      <button
+        type='button'
+        onClick={readOnly ? undefined : onEdit}
+        className={cn('p-2 rounded-md transition-colors', {
+          'cursor-default opacity-50': readOnly,
+        })}
+        aria-label='Edit instruction'
+        title='Edit instruction'
+      >
+        <Pencil className='w-4 h-4 text-gray-600 hover:text-blue-600 transition-colors' />
+      </button>
+      <button
+        type='button'
+        onClick={readOnly ? undefined : onDelete}
+        className={cn('p-2 rounded-md transition-colors', {
+          'cursor-default opacity-50': readOnly,
+        })}
+        aria-label='Delete instruction'
+        title='Delete instruction'
+      >
+        <Trash2 className='w-4 h-4 text-gray-600 hover:text-red-600 transition-colors' />
+      </button>
+    </div>
   </div>
 )
 
@@ -226,11 +228,13 @@ const InstructionItem: FC<InstructionItemProps> = ({
 
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (readOnly) return
     onEdit(instruction.id)
   }
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (readOnly) return
     onDelete(instruction.id)
   }
 
@@ -310,34 +314,36 @@ const InstructionItem: FC<InstructionItemProps> = ({
               __html: DOMPurify.sanitize(instruction.rich_text),
             }}
           />
-          {!readOnly && (
-            <div className='flex items-center gap-3 shrink-0'>
-              <button
-                type='button'
-                onClick={handleEdit}
-                className='p-2 rounded-md transition-colors'
-                aria-label='Edit instruction'
-                title='Edit instruction'
-              >
-                <Pencil
-                  size={16}
-                  className='w-5 h-5 text-gray-600 hover:text-blue-600 transition-colors'
-                />
-              </button>
-              <button
-                type='button'
-                onClick={handleDelete}
-                className='p-2 rounded-md transition-colors'
-                aria-label='Delete instruction'
-                title='Delete instruction'
-              >
-                <Trash2
-                  size={16}
-                  className='w-5 h-5 text-gray-600 hover:text-red-600 transition-colors'
-                />
-              </button>
-            </div>
-          )}
+          <div className='flex items-center gap-3 shrink-0'>
+            <button
+              type='button'
+              onClick={handleEdit}
+              className={cn('p-2 rounded-md transition-colors', {
+                'cursor-default opacity-50': readOnly,
+              })}
+              aria-label='Edit instruction'
+              title='Edit instruction'
+            >
+              <Pencil
+                size={16}
+                className='w-5 h-5 text-gray-600 hover:text-blue-600 transition-colors'
+              />
+            </button>
+            <button
+              type='button'
+              onClick={handleDelete}
+              className={cn('p-2 rounded-md transition-colors', {
+                'cursor-default opacity-50': readOnly,
+              })}
+              aria-label='Delete instruction'
+              title='Delete instruction'
+            >
+              <Trash2
+                size={16}
+                className='w-5 h-5 text-gray-600 hover:text-red-600 transition-colors'
+              />
+            </button>
+          </div>
         </div>
         {hasChildren && (
           <section className='mt-6 space-y-3'>
