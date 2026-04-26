@@ -50,10 +50,46 @@ interface SearchResult extends InstructionNode {
   matchType: 'title' | 'content'
 }
 
+const CUSTOMER_INSTRUCTIONS: Instructions[] = [
+  {
+    id: 10001,
+    title: 'Advising Customers on Granite Selection',
+    parent_id: null,
+    after_id: null,
+    rich_text:
+      '<p>When advising customers, always emphasize that granite is a natural stone and every slab is unique. Encourage them to view the actual slabs that will be used for their project at the warehouse.</p>',
+  },
+  {
+    id: 10002,
+    title: 'Understanding Patterns and Movement',
+    parent_id: 10001,
+    after_id: null,
+    rich_text:
+      '<p>Help customers understand the difference between consistent patterns and "movement" (veining). Large-veined granites make a dramatic statement but may require more thoughtful seam placement.</p>',
+  },
+  {
+    id: 10003,
+    title: 'Finish Options: Polished vs. Leathered',
+    parent_id: 10001,
+    after_id: 10002,
+    rich_text:
+      '<p>Explain the tactile and visual differences between finishes. <strong>Polished</strong> is classic and reflective, while <strong>Leathered</strong> provides a textured, matte look that is excellent for hiding fingerprints and water spots.</p>',
+  },
+  {
+    id: 10004,
+    title: 'Durability and Maintenance Education',
+    parent_id: null,
+    after_id: 10001,
+    rich_text:
+      '<p>Educate customers on granite maintenance. While highly durable and heat-resistant, it is a porous material that should be professionally sealed. Advise them on using pH-neutral cleaners to preserve the sealer and stone surface.</p>',
+  },
+]
+
 interface InstructionItemProps {
   instruction: InstructionNode
   onEdit: (id: number) => void
   onDelete: (id: number) => void
+  readOnly?: boolean
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -65,9 +101,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request)
   const url = new URL(request.url)
   const allowGeneral = !!user.is_superuser
-  const requestedMode =
-    url.searchParams.get('type') === 'general' ? 'general' : 'company'
-  const mode = allowGeneral && requestedMode === 'general' ? 'general' : 'company'
+  const requestedType = url.searchParams.get('type')
+
+  let mode: 'company' | 'general' | 'customer' = 'company'
+  if (requestedType === 'customer') {
+    mode = 'customer'
+  } else if (allowGeneral && requestedType === 'general') {
+    mode = 'general'
+  }
+
+  if (mode === 'customer') {
+    return { instructions: CUSTOMER_INSTRUCTIONS, allowGeneral, mode }
+  }
+
   const companyId = mode === 'general' ? 0 : user.company_id
   const instructions = await selectMany<Instructions>(
     db,
@@ -124,6 +170,7 @@ interface InstructionHeaderProps {
   onEdit: (e: React.MouseEvent) => void
   onDelete: (e: React.MouseEvent) => void
   textAlign?: 'left' | 'center'
+  readOnly?: boolean
 }
 
 const InstructionHeader: FC<InstructionHeaderProps> = ({
@@ -131,6 +178,7 @@ const InstructionHeader: FC<InstructionHeaderProps> = ({
   onEdit,
   onDelete,
   textAlign,
+  readOnly,
 }) => (
   <div className='flex items-center justify-between flex-1 gap-6'>
     <h3
@@ -141,26 +189,28 @@ const InstructionHeader: FC<InstructionHeaderProps> = ({
     >
       {title}
     </h3>
-    <div className='flex items-center gap-2 shrink-0'>
-      <button
-        type='button'
-        onClick={onEdit}
-        className='p-2 rounded-md transition-colors'
-        aria-label='Edit instruction'
-        title='Edit instruction'
-      >
-        <Pencil className='w-4 h-4 text-gray-600 hover:text-blue-600 transition-colors' />
-      </button>
-      <button
-        type='button'
-        onClick={onDelete}
-        className='p-2 rounded-md transition-colors'
-        aria-label='Delete instruction'
-        title='Delete instruction'
-      >
-        <Trash2 className='w-4 h-4 text-gray-600 hover:text-red-600 transition-colors' />
-      </button>
-    </div>
+    {!readOnly && (
+      <div className='flex items-center gap-2 shrink-0'>
+        <button
+          type='button'
+          onClick={onEdit}
+          className='p-2 rounded-md transition-colors'
+          aria-label='Edit instruction'
+          title='Edit instruction'
+        >
+          <Pencil className='w-4 h-4 text-gray-600 hover:text-blue-600 transition-colors' />
+        </button>
+        <button
+          type='button'
+          onClick={onDelete}
+          className='p-2 rounded-md transition-colors'
+          aria-label='Delete instruction'
+          title='Delete instruction'
+        >
+          <Trash2 className='w-4 h-4 text-gray-600 hover:text-red-600 transition-colors' />
+        </button>
+      </div>
+    )}
   </div>
 )
 
@@ -168,6 +218,7 @@ const InstructionItem: FC<InstructionItemProps> = ({
   instruction,
   onEdit,
   onDelete,
+  readOnly,
 }) => {
   const hasChildren = instruction.children.length > 0
   const hasContent = !isEmptyRichText(instruction.rich_text)
@@ -191,6 +242,7 @@ const InstructionItem: FC<InstructionItemProps> = ({
             title={instruction.title}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            readOnly={readOnly}
           />
         </div>
       )
@@ -207,6 +259,7 @@ const InstructionItem: FC<InstructionItemProps> = ({
             onEdit={handleEdit}
             onDelete={handleDelete}
             textAlign='left'
+            readOnly={readOnly}
           />
         </AccordionTrigger>
         <AccordionContent>
@@ -234,6 +287,7 @@ const InstructionItem: FC<InstructionItemProps> = ({
                       instruction={child}
                       onEdit={onEdit}
                       onDelete={onDelete}
+                      readOnly={readOnly}
                     />
                   ))}
                 </Accordion>
@@ -256,32 +310,34 @@ const InstructionItem: FC<InstructionItemProps> = ({
               __html: DOMPurify.sanitize(instruction.rich_text),
             }}
           />
-          <div className='flex items-center gap-3 shrink-0'>
-            <button
-              type='button'
-              onClick={handleEdit}
-              className='p-2 rounded-md transition-colors'
-              aria-label='Edit instruction'
-              title='Edit instruction'
-            >
-              <Pencil
-                size={16}
-                className='w-5 h-5 text-gray-600 hover:text-blue-600 transition-colors'
-              />
-            </button>
-            <button
-              type='button'
-              onClick={handleDelete}
-              className='p-2 rounded-md transition-colors'
-              aria-label='Delete instruction'
-              title='Delete instruction'
-            >
-              <Trash2
-                size={16}
-                className='w-5 h-5 text-gray-600 hover:text-red-600 transition-colors'
-              />
-            </button>
-          </div>
+          {!readOnly && (
+            <div className='flex items-center gap-3 shrink-0'>
+              <button
+                type='button'
+                onClick={handleEdit}
+                className='p-2 rounded-md transition-colors'
+                aria-label='Edit instruction'
+                title='Edit instruction'
+              >
+                <Pencil
+                  size={16}
+                  className='w-5 h-5 text-gray-600 hover:text-blue-600 transition-colors'
+                />
+              </button>
+              <button
+                type='button'
+                onClick={handleDelete}
+                className='p-2 rounded-md transition-colors'
+                aria-label='Delete instruction'
+                title='Delete instruction'
+              >
+                <Trash2
+                  size={16}
+                  className='w-5 h-5 text-gray-600 hover:text-red-600 transition-colors'
+                />
+              </button>
+            </div>
+          )}
         </div>
         {hasChildren && (
           <section className='mt-6 space-y-3'>
@@ -291,6 +347,7 @@ const InstructionItem: FC<InstructionItemProps> = ({
                 instruction={child}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                readOnly={readOnly}
               />
             ))}
           </section>
@@ -401,26 +458,23 @@ export default function AdminInstructions() {
   }
 
   const handleTabChange = (value: string) => {
-    if (!allowGeneral) return
-    if (value === 'general') {
-      setSearchParams({ type: 'general' })
-    } else {
-      setSearchParams({ type: 'company' })
-    }
+    if (value === 'general' && !allowGeneral) return
+    setSearchParams({ type: value })
   }
 
   return (
     <PageLayout title='Instructions'>
-      {allowGeneral && (
-        <div className='mb-4'>
-          <Tabs value={mode} onValueChange={handleTabChange}>
-            <TabsList>
-              <TabsTrigger value='company'>Company instructions</TabsTrigger>
+      <div className='mb-4'>
+        <Tabs value={mode} onValueChange={handleTabChange}>
+          <TabsList>
+            <TabsTrigger value='company'>Company instructions</TabsTrigger>
+            {allowGeneral && (
               <TabsTrigger value='general'>General instructions</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      )}
+            )}
+            <TabsTrigger value='customer'>Customer instructions</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
       <header className='flex gap-4 justify-between mb-6'>
         <Link to={`add${location.search || ''}`} relative='path'>
           <Button
@@ -506,6 +560,7 @@ export default function AdminInstructions() {
                 instruction={instruction}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                readOnly={mode === 'customer'}
               />
             ))}
           </Accordion>
