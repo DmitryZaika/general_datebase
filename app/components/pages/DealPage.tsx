@@ -39,6 +39,11 @@ export default function DealsEdit({
   const navigate = useNavigate()
   const location = useLocation()
 
+  const dealEditTabMatch = location.pathname.match(
+    /\/edit\/[^/]+\/(project|information|images|documents)(?:\/|$)/,
+  )
+  const activeDealTab = dealEditTabMatch?.[1] ?? 'project'
+
   const handleChange = (open: boolean) => {
     if (!open) {
       const basePath = location.pathname.includes('/admin/')
@@ -71,15 +76,14 @@ export default function DealsEdit({
         <div className='grid grid-cols-1 md:grid-cols-[2fr_2fr] flex-1 min-h-0 overflow-auto md:overflow-hidden'>
           <div className='px-1 sm:px-1 md:overflow-auto md:min-h-0'>
             <Tabs
-              value={location.pathname.split('/').pop()}
+              value={activeDealTab}
               onValueChange={value => navigate(`${value}${location.search}`)}
             >
-              <TabsList className='mb-5 grid grid-cols-5'>
+              <TabsList className='mb-5 grid grid-cols-4'>
                 <TabsTrigger value='project'>Project</TabsTrigger>
                 <TabsTrigger value='information'>General</TabsTrigger>
                 <TabsTrigger value='images'>Images</TabsTrigger>
                 <TabsTrigger value='documents'>Documents</TabsTrigger>
-                <TabsTrigger value='history'>Email</TabsTrigger>
               </TabsList>
               <Outlet />
             </Tabs>

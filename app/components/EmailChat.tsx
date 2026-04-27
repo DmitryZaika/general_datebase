@@ -702,6 +702,7 @@ export function EmailChat(props: EmailChatProps) {
     if (initialScrollHandled.current) return
     if (chatMessages.length === 0) return
 
+    let highlightClearTimeout: ReturnType<typeof setTimeout> | undefined
     const t = setTimeout(() => {
       const el = messageRefs.current.get(targetMessageId)
       if (!el) {
@@ -712,10 +713,12 @@ export function EmailChat(props: EmailChatProps) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       setHighlightedMessageId(targetMessageId)
       initialScrollHandled.current = true
-      const clearT = setTimeout(() => setHighlightedMessageId(null), 2000)
-      return () => clearTimeout(clearT)
+      highlightClearTimeout = setTimeout(() => setHighlightedMessageId(null), 1500)
     }, 250)
-    return () => clearTimeout(t)
+    return () => {
+      clearTimeout(t)
+      if (highlightClearTimeout !== undefined) clearTimeout(highlightClearTimeout)
+    }
   }, [targetMessageId, chatMessages.length])
 
   useEffect(() => {
@@ -847,7 +850,7 @@ export function EmailChat(props: EmailChatProps) {
 
   const goToDeal = (dealId: number) => {
     if (!dealNav) return
-    navigate(`/${dealNav.pathPrefix}/deals/edit/${dealId}`)
+    navigate(`/${dealNav.pathPrefix}/deals/edit/${dealId}/project`)
   }
 
   const handleDealNavClick = async () => {
@@ -1209,7 +1212,7 @@ export function EmailChat(props: EmailChatProps) {
                     message.isFromCustomer
                       ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%] break-words'
                       : 'bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative pb-6 min-w-21.25 break-words',
-                    'transition-all duration-500 ease-out will-change-transform',
+                    'transition-all duration-300 ease-out will-change-transform',
                     highlightedMessageId === message.id &&
                       'ring-1 ring-white/40 shadow-[0_22px_60px_-18px_rgba(15,23,42,0.55),0_8px_24px_-12px_rgba(15,23,42,0.4)] scale-[1.020] z-10',
                   )}

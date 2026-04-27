@@ -466,6 +466,7 @@ export default function DealsEmailsView({
   const handleDelete = async () => {
     if (selectedThreads.size === 0) return
     if (
+      adminMode &&
       !confirm(`Are you sure you want to delete ${selectedThreads.size} conversations?`)
     )
       return
@@ -550,7 +551,7 @@ export default function DealsEmailsView({
   }
 
   const handleDeleteThread = async (threadId: string) => {
-    if (!confirm('Delete this conversation?')) return
+    if (adminMode && !confirm('Delete this conversation?')) return
     setRowActionBusyThreadId(threadId)
     try {
       const res = await fetch('/api/emails/delete-threads', {

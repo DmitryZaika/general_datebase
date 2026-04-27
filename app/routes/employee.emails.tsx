@@ -83,6 +83,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const paramsThreadMatch = [...folderParams, ...searchParams]
     const paramsListQuery = [...folderParams, ...paramsThreadMatch]
     const offset = (page - 1) * pageSize
+    const threadOrderAgg = isTrash ? 'MAX(e2.deleted_at)' : 'MAX(e2.sent_at)'
+    const listOrderBy = isTrash ? 'e.deleted_at DESC, e.sent_at DESC' : 'e.sent_at DESC'
 
     const [inboxCountRows, sentCountRows, trashCountRows, totalCountRows, userEmails] =
       await Promise.all([
@@ -124,7 +126,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
          WHERE ${folderWhere}
          AND e.thread_id IN (
            SELECT thread_id FROM (
-             SELECT e2.thread_id, MAX(e2.sent_at) AS mt
+             SELECT e2.thread_id, ${threadOrderAgg} AS mt
              FROM emails e2
              WHERE ${subqueryWhereBase}
              GROUP BY e2.thread_id
@@ -132,7 +134,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
              LIMIT ${pageSize} OFFSET ${offset}
            ) t
          )
-         ORDER BY e.sent_at DESC`,
+         ORDER BY ${listOrderBy}`,
           paramsListQuery,
         ),
       ])

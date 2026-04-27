@@ -912,6 +912,7 @@ export default function DealEmailDialog() {
 
     if (pastedFiles.length > 0) {
       addFiles(pastedFiles)
+      setIsDragging(false)
     }
   }
 
@@ -1003,7 +1004,10 @@ export default function DealEmailDialog() {
               onTemplateChange={setSelectedTemplate}
               templateVariableData={templateVariableData}
               canEditTo={!dealId}
-              onFilesDrop={files => addFiles(files)}
+              onFilesDrop={files => {
+                addFiles(files)
+                setIsDragging(false)
+              }}
               toLabels={toLabels}
               onToLabelsChange={setToLabels}
             />

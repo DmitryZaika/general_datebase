@@ -4,8 +4,9 @@ import {
   Outlet,
   redirect,
   useLoaderData,
-  useLocation, // Добавляем useLocation, так как он использовался в navigate
+  useLocation,
   useNavigate,
+  useParams,
 } from 'react-router'
 import {
   customerColumns,
@@ -35,6 +36,7 @@ export default function DealEmailHistory() {
   const { emails } = useLoaderData<typeof loader>()
   const navigate = useNavigate()
   const location = useLocation()
+  const params = useParams()
 
   const uniqueThreads = useMemo(() => {
     const attachmentByThread = new Map<string, boolean>()
@@ -58,7 +60,11 @@ export default function DealEmailHistory() {
   }, [emails])
 
   const handleRowClick = (email: DealEmailThreadRow) => {
-    navigate(`chat/${email.thread_id}${location.search}`)
+    const dealId = params.dealId
+    if (!dealId) return
+    navigate(
+      `/admin/deals/edit/${dealId}/project/chat/${email.thread_id}${location.search}`,
+    )
   }
 
   return (

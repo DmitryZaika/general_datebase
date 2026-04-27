@@ -152,6 +152,7 @@ export default function DealItem({
 }: DealItemProps) {
   const [editAmount, setEditAmount] = useState(false)
   const [editDueDate, setEditDueDate] = useState(false)
+  const [dueDateCalendarKey, setDueDateCalendarKey] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
   const [activityExpanded, setActivityExpanded] = useState(false)
   const [activitiesOpen, setActivitiesOpen] = useState(false)
@@ -227,8 +228,8 @@ export default function DealItem({
   const fromState = `${location.pathname}${location.search}`
   const projectUrl = `${editBase}/edit/${deal.id}/project${location.search}`
   const mailUrl = readonly
-    ? `${editBase}/edit/${deal.id}/history`
-    : `edit/${deal.id}/history`
+    ? `${editBase}/edit/${deal.id}/project`
+    : `edit/${deal.id}/project`
   const imagesUrl = readonly
     ? `${editBase}/edit/${deal.id}/images`
     : `edit/${deal.id}/images`
@@ -433,7 +434,13 @@ export default function DealItem({
       <div className='flex items-center gap-2 w-full'>
         <div className='mr-auto flex items-center'>
           {!isClosed && deal.nearest_activity_name && (
-            <Popover open={editDueDate} onOpenChange={setEditDueDate}>
+            <Popover
+              open={editDueDate}
+              onOpenChange={open => {
+                setEditDueDate(open)
+                if (open) setDueDateCalendarKey(k => k + 1)
+              }}
+            >
               <PopoverTrigger asChild>
                 {deadlineInfo ? (
                   <span
@@ -475,7 +482,13 @@ export default function DealItem({
               </PopoverTrigger>
               <PopoverContent className='w-auto p-0' align='start'>
                 <Calendar
+                  key={dueDateCalendarKey}
                   mode='single'
+                  defaultMonth={
+                    deal.nearest_activity_deadline
+                      ? parseLocalDate(deal.nearest_activity_deadline)
+                      : new Date()
+                  }
                   selected={
                     deal.nearest_activity_deadline
                       ? parseLocalDate(deal.nearest_activity_deadline)

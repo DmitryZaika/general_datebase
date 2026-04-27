@@ -82,7 +82,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
       const title = customerName || senderEmail || 'New email'
       const href = dealId
-        ? `/employee/deals/edit/${dealId}/history/chat/${threadId}`
+        ? `/employee/deals/edit/${dealId}/project/chat/${threadId}`
         : `/employee/emails/chat/${threadId}`
 
       return {

@@ -784,6 +784,7 @@ function ActivityForm({
   )
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [deadlineOpen, setDeadlineOpen] = useState(false)
+  const [deadlineCalendarKey, setDeadlineCalendarKey] = useState(0)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -844,7 +845,13 @@ function ActivityForm({
       />
 
       <div className='flex gap-2'>
-        <Popover open={deadlineOpen} onOpenChange={setDeadlineOpen}>
+        <Popover
+          open={deadlineOpen}
+          onOpenChange={open => {
+            setDeadlineOpen(open)
+            if (open) setDeadlineCalendarKey(k => k + 1)
+          }}
+        >
           <PopoverTrigger asChild>
             <Button
               variant='outline'
@@ -862,7 +869,9 @@ function ActivityForm({
           </PopoverTrigger>
           <PopoverContent className='w-auto p-0' align='start'>
             <Calendar
+              key={deadlineCalendarKey}
               mode='single'
+              defaultMonth={form.deadline ?? new Date()}
               selected={form.deadline}
               onSelect={d => dispatch({ type: 'SET_DEADLINE_DATE', payload: d })}
             />
@@ -1001,7 +1010,7 @@ function EmailHistoryRow({ email }: { email: DealEmailHistoryItem }) {
   const dealId = params.dealId ?? ''
   const searchParams = new URLSearchParams(location.search)
   searchParams.set('messageId', String(email.id))
-  const to = `${basePath}/edit/${dealId}/history/chat/${email.thread_id}?${searchParams.toString()}`
+  const to = `${basePath}/edit/${dealId}/project/chat/${email.thread_id}?${searchParams.toString()}`
 
   const sentAt = new Date(email.sent_at)
   const sentLabel = Number.isNaN(sentAt.getTime())
