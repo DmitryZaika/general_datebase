@@ -36,6 +36,22 @@ const userSchema = z.object({
   password: z.union([z.string(), z.null(), z.undefined()]).optional(),
   email_signature: z.string().optional(),
   email_name: z.string().optional(),
+  cloudtalk_agent_id: z
+    .string()
+    .optional()
+    .superRefine((val, ctx) => {
+      const t = (val ?? '').trim()
+      if (t.length > 36) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'CloudTalk agent ID must be at most 36 characters',
+        })
+      }
+    })
+    .transform((val): string | null => {
+      const t = (val ?? '').trim()
+      return t === '' ? null : t
+    }),
 })
 
 const resolver = zodResolver(userSchema)
@@ -46,6 +62,7 @@ interface UserData extends RowDataPacket {
   phone_number: string | null
   email_signature: string | null
   email_name: string | null
+  cloudtalk_agent_id: string | null
   telegram_id: boolean
 }
 
@@ -74,6 +91,7 @@ export async function action({ request }: ActionFunctionArgs) {
       'phone_number = ?',
       'email_name = ?',
       'email_signature = ?',
+      'cloudtalk_agent_id = ?',
     ]
     const params = [
       data.name,
@@ -81,6 +99,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data.phone_number ?? null,
       data.email_name ?? null,
       data.email_signature ?? null,
+      data.cloudtalk_agent_id,
     ]
 
     // Only hash and update password if provided
@@ -118,7 +137,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     user = await getEmployeeUser(request)
 
     ;[rows] = await db.query<UserData[]>(
-      `SELECT name, email, phone_number, email_signature, email_name, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ? AND is_deleted = 0`,
+      `SELECT name, email, phone_number, email_signature, email_name, cloudtalk_agent_id, CASE WHEN telegram_id IS NULL THEN false ELSE true END as telegram_id FROM users WHERE id = ? AND is_deleted = 0`,
       [user.id],
     )
 
@@ -180,6 +199,7 @@ export default function UserProfile() {
       password: '',
       email_signature: userData.email_signature || '',
       email_name: userData.email_name || '',
+      cloudtalk_agent_id: userData.cloudtalk_agent_id ?? '',
     },
   })
 
@@ -266,6 +286,17 @@ export default function UserProfile() {
                   <InputItem
                     name='Email Name'
                     placeholder='Your email name'
+                    field={field}
+                  />
+                )}
+              />
+              <FormField
+                control={form.control}
+                name='cloudtalk_agent_id'
+                render={({ field }) => (
+                  <InputItem
+                    name='CloudTalk agent ID'
+                    placeholder='From CloudTalk (optional)'
                     field={field}
                   />
                 )}

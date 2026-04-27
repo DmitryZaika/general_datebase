@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArchiveRestore,
   Eye,
@@ -12,6 +13,7 @@ import {
   Search,
   Send,
   Trash2,
+  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -72,6 +74,13 @@ export interface DealsEmailsViewProps {
 }
 
 type Tab = 'inbox' | 'drafts' | 'outbox' | 'sent' | 'archive' | 'trash'
+
+const EMPLOYEE_GMAIL_TRASH_BAR_MS = 5000
+const EMPLOYEE_GMAIL_ACK_BAR_MS = 4000
+
+type EmployeeGmailBarState =
+  | { mode: 'trash'; threadIds: string[]; message: string }
+  | { mode: 'ack'; message: string; instanceId: number }
 
 function ThreadRowHoverActions({
   threadId,
@@ -218,6 +227,11 @@ export default function DealsEmailsView({
   const [rowActionBusyThreadId, setRowActionBusyThreadId] = useState<string | null>(
     null,
   )
+  const [employeeGmailBar, setEmployeeGmailBar] =
+    useState<EmployeeGmailBarState | null>(null)
+  const [undoRestoreSubmitting, setUndoRestoreSubmitting] = useState(false)
+  const employeeGmailBarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const gmailBarAckInstanceRef = useRef(0)
   const { toast } = useToast()
   const location = useLocation()
   const navigation = useNavigation()
@@ -230,6 +244,83 @@ export default function DealsEmailsView({
   const listScrollRef = useRef<HTMLDivElement>(null)
   const savedScrollTopRef = useRef<number>(0)
   const wasOnChatRef = useRef(false)
+
+  const clearEmployeeGmailBarTimer = () => {
+    if (employeeGmailBarTimerRef.current) {
+      clearTimeout(employeeGmailBarTimerRef.current)
+      employeeGmailBarTimerRef.current = null
+    }
+  }
+
+  const dismissEmployeeGmailBar = () => {
+    clearEmployeeGmailBarTimer()
+    setEmployeeGmailBar(null)
+  }
+
+  const scheduleEmployeeGmailBarDismiss = (ms: number) => {
+    clearEmployeeGmailBarTimer()
+    employeeGmailBarTimerRef.current = setTimeout(() => {
+      setEmployeeGmailBar(null)
+      employeeGmailBarTimerRef.current = null
+    }, ms)
+  }
+
+  const showEmployeeTrashUndo = (threadIds: string[]) => {
+    clearEmployeeGmailBarTimer()
+    const message =
+      threadIds.length > 1
+        ? `${threadIds.length} conversations moved to Trash.`
+        : 'Conversation moved to Trash.'
+    setEmployeeGmailBar({ mode: 'trash', threadIds, message })
+    scheduleEmployeeGmailBarDismiss(EMPLOYEE_GMAIL_TRASH_BAR_MS)
+  }
+
+  const showActionUndoneGmailBar = () => {
+    clearEmployeeGmailBarTimer()
+    gmailBarAckInstanceRef.current += 1
+    setEmployeeGmailBar({
+      mode: 'ack',
+      message: 'Action undone.',
+      instanceId: gmailBarAckInstanceRef.current,
+    })
+    scheduleEmployeeGmailBarDismiss(EMPLOYEE_GMAIL_ACK_BAR_MS)
+  }
+
+  const restoreEmployeeTrashUndo = async () => {
+    if (!employeeGmailBar || employeeGmailBar.mode !== 'trash') return
+    setUndoRestoreSubmitting(true)
+    try {
+      const res = await fetch('/api/emails/restore-threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadIds: employeeGmailBar.threadIds }),
+      })
+      dismissEmployeeGmailBar()
+      if (res.ok) {
+        revalidator.revalidate()
+        showActionUndoneGmailBar()
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Could not undo.',
+          variant: 'destructive',
+        })
+      }
+    } catch {
+      dismissEmployeeGmailBar()
+      toast({
+        title: 'Error',
+        description: 'Could not undo.',
+        variant: 'destructive',
+      })
+    } finally {
+      setUndoRestoreSubmitting(false)
+    }
+  }
+
+  useEffect(() => {
+    return () => clearEmployeeGmailBarTimer()
+  }, [])
 
   useEffect(() => {
     const onChat = location.pathname.includes('/chat/')
@@ -480,11 +571,16 @@ export default function DealsEmailsView({
       })
 
       if (res.ok) {
-        toast({
-          title: 'Success',
-          description: 'Conversations deleted',
-          variant: 'success',
-        })
+        const deletedIds = Array.from(selectedThreads)
+        if (!adminMode) {
+          showEmployeeTrashUndo(deletedIds)
+        } else {
+          toast({
+            title: 'Success',
+            description: 'Conversations deleted',
+            variant: 'success',
+          })
+        }
         setSelectedThreads(new Set())
         revalidator.revalidate()
       } else {
@@ -560,11 +656,15 @@ export default function DealsEmailsView({
         body: JSON.stringify({ threadIds: [threadId] }),
       })
       if (res.ok) {
-        toast({
-          title: 'Success',
-          description: 'Conversation deleted',
-          variant: 'success',
-        })
+        if (!adminMode) {
+          showEmployeeTrashUndo([threadId])
+        } else {
+          toast({
+            title: 'Success',
+            description: 'Conversation deleted',
+            variant: 'success',
+          })
+        }
         revalidator.revalidate()
       } else {
         toast({
@@ -1240,6 +1340,75 @@ export default function DealsEmailsView({
           <PenSquare className='h-6 w-6' />
         </Button>
       )}
+
+      {!adminMode ? (
+        <AnimatePresence>
+          {employeeGmailBar ? (
+            <motion.div
+              key={
+                employeeGmailBar.mode === 'trash'
+                  ? employeeGmailBar.threadIds.join('\0')
+                  : `ack-${employeeGmailBar.instanceId}`
+              }
+              role='status'
+              initial={{ x: '-100vw', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '-100vw', opacity: 0 }}
+              transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+              className='fixed bottom-4 left-4 z-[60] flex max-w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 text-sm text-white shadow-lg'
+            >
+              <div className='flex items-center gap-3 px-4 py-3'>
+                <span className='min-w-0 flex-1 leading-snug'>
+                  {employeeGmailBar.message}
+                </span>
+                {employeeGmailBar.mode === 'trash' ? (
+                  <>
+                    <button
+                      type='button'
+                      className='shrink-0 font-medium text-[#8ab4f8] hover:text-[#aac7ff] disabled:pointer-events-none disabled:opacity-50'
+                      onClick={() => void restoreEmployeeTrashUndo()}
+                      disabled={undoRestoreSubmitting}
+                    >
+                      Undo
+                    </button>
+                    <button
+                      type='button'
+                      className='shrink-0 rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white'
+                      onClick={dismissEmployeeGmailBar}
+                      aria-label='Dismiss'
+                    >
+                      <X className='h-4 w-4' />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type='button'
+                    className='shrink-0 rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white'
+                    onClick={dismissEmployeeGmailBar}
+                    aria-label='Dismiss'
+                  >
+                    <X className='h-4 w-4' />
+                  </button>
+                )}
+              </div>
+              {employeeGmailBar.mode === 'trash' ? (
+                <div className='h-1 w-full shrink-0 bg-zinc-800'>
+                  <motion.div
+                    className='h-full w-full bg-[#8ab4f8]'
+                    style={{ transformOrigin: '0% 50%' }}
+                    initial={{ scaleX: 1 }}
+                    animate={{ scaleX: 0 }}
+                    transition={{
+                      duration: EMPLOYEE_GMAIL_TRASH_BAR_MS / 1000,
+                      ease: 'linear',
+                    }}
+                  />
+                </div>
+              ) : null}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      ) : null}
     </div>
   )
 }
