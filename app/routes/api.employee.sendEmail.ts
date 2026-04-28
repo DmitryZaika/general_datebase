@@ -16,7 +16,7 @@ import { parseEmailAddress } from '~/utils/stringHelpers'
 
 export const emailSchema = z.object({
   to: z.array(z.email()).min(1),
-  subject: z.string().min(1).max(100),
+  subject: z.string().min(1).max(300),
   body: z.string().min(1).max(10000),
   dealId: z.coerce.number().min(1).int().optional(),
   threadId: z.string().optional(),
@@ -156,157 +156,166 @@ const emailToSend = async (
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const user: User | null = await getEmployeeUser(request).catch(() => null)
-  if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const user: User | null = await getEmployeeUser(request).catch(() => null)
+    if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
 
-  const formData = await request.formData()
-  const to = formData
-    .getAll('to')
-    .filter((value): value is string => typeof value === 'string')
-  const attachments = formData
-    .getAll('attachments')
-    .filter((value): value is File => value instanceof File)
+    const formData = await request.formData()
+    const to = formData
+      .getAll('to')
+      .filter((value): value is string => typeof value === 'string')
+    const attachments = formData
+      .getAll('attachments')
+      .filter((value): value is File => value instanceof File)
 
-  const raw = {
-    to,
-    subject: formData.get('subject'),
-    body: formData.get('body'),
-    dealId: formData.get('dealId') || undefined,
-    threadId: formData.get('threadId') || undefined,
-    attachments,
-  }
-  const cleaned = emailSchema.parse(raw)
+    const raw = {
+      to,
+      subject: formData.get('subject'),
+      body: formData.get('body'),
+      dealId: formData.get('dealId') || undefined,
+      threadId: formData.get('threadId') || undefined,
+      attachments,
+    }
+    const cleaned = emailSchema.parse(raw)
 
-  const uploadedAttachments: {
-    contentType: string
-    contentSubtype: string
-    filename: string
-    url: string
-  }[] = []
+    const uploadedAttachments: {
+      contentType: string
+      contentSubtype: string
+      filename: string
+      url: string
+    }[] = []
 
-  for (const file of cleaned.attachments) {
-    const ab = await file.arrayBuffer()
-    const buffer = Buffer.from(ab)
-    const filename = `${uuidv4()}-${file.name}`
-    const url = await uploadStreamToS3(
-      (async function* () {
-        yield new Uint8Array(buffer)
-      })(),
-      filename,
-      'emails',
-    )
+    for (const file of cleaned.attachments) {
+      const ab = await file.arrayBuffer()
+      const buffer = Buffer.from(ab)
+      const filename = `${uuidv4()}-${file.name}`
+      const url = await uploadStreamToS3(
+        (async function* () {
+          yield new Uint8Array(buffer)
+        })(),
+        filename,
+        'emails',
+      )
 
-    const [type, subtype] = (file.type || 'application/octet-stream').split('/')
+      const [type, subtype] = (file.type || 'application/octet-stream').split('/')
 
-    uploadedAttachments.push({
-      contentType: type ?? 'application',
-      contentSubtype: subtype ?? '',
-      filename: file.name ?? '',
-      url: url ?? '',
-    })
-  }
+      uploadedAttachments.push({
+        contentType: type ?? 'application',
+        contentSubtype: subtype ?? '',
+        filename: file.name ?? '',
+        url: url ?? '',
+      })
+    }
 
-  const sendResults: {
-    messageId: string
-    senderEmail: string
-    receiverEmail: string
-    threadId: string
-    personalizedBody: string
-  }[] = []
+    const sendResults: {
+      messageId: string
+      senderEmail: string
+      receiverEmail: string
+      threadId: string
+      personalizedBody: string
+    }[] = []
 
-  const companyData = user.company_id
-    ? await fetchCompanyData(user.company_id)
-    : undefined
-
-  for (const recipient of cleaned.to) {
-    const threadId =
-      cleaned.to.length === 1 && cleaned.threadId ? cleaned.threadId : uuidv4()
-
-    const recipientCustomerData = user.company_id
-      ? await fetchCustomerDataByEmail(recipient, user.company_id)
+    const companyData = user.company_id
+      ? await fetchCompanyData(user.company_id)
       : undefined
 
-    const templateVariableData: TemplateVariableData = {
-      user: {
-        name: user.name || undefined,
-        email: user.email,
-        phone_number: user.phone_number || undefined,
-      },
-      customer: recipientCustomerData,
-      company: companyData,
-    }
+    for (const recipient of cleaned.to) {
+      const threadId =
+        cleaned.to.length === 1 && cleaned.threadId ? cleaned.threadId : uuidv4()
 
-    const personalizedBody = replaceTemplateVariables(
-      cleaned.body,
-      templateVariableData,
-    )
+      const recipientCustomerData = user.company_id
+        ? await fetchCustomerDataByEmail(recipient, user.company_id)
+        : undefined
 
-    const emailInformation = await emailToSend(
-      user,
-      {
-        subject: cleaned.subject,
-        body: personalizedBody,
-        dealId: cleaned.dealId,
-        threadId: cleaned.threadId,
-        attachments: cleaned.attachments,
-      },
-      recipient,
-    )
-
-    let info: MailReturn
-    try {
-      info = await sendEmail(emailInformation)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      if (message.includes('Email address is not verified.')) {
-        posthogClient.captureException(error, user.email)
-        return data({ error: 'Invalid email address' }, { status: 400 })
+      const templateVariableData: TemplateVariableData = {
+        user: {
+          name: user.name || undefined,
+          email: user.email,
+          phone_number: user.phone_number || undefined,
+        },
+        customer: recipientCustomerData,
+        company: companyData,
       }
-      posthogClient.captureException(error, user.email)
-      return data({ error: 'Email failed to send' }, { status: 400 })
+
+      const personalizedBody = replaceTemplateVariables(
+        cleaned.body,
+        templateVariableData,
+      )
+
+      const emailInformation = await emailToSend(
+        user,
+        {
+          subject: cleaned.subject,
+          body: personalizedBody,
+          dealId: cleaned.dealId,
+          threadId: cleaned.threadId,
+          attachments: cleaned.attachments,
+        },
+        recipient,
+      )
+
+      let info: MailReturn
+      try {
+        info = await sendEmail(emailInformation)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        if (message.includes('Email address is not verified.')) {
+          posthogClient.captureException(error, user.email)
+          return data({ error: 'Invalid email address' }, { status: 400 })
+        }
+        posthogClient.captureException(error, user.email)
+        return data({ error: 'Email failed to send' }, { status: 400 })
+      }
+
+      sendResults.push({
+        messageId: unwrapBrackets(info.messageId),
+        senderEmail: parseEmailAddress(emailInformation.from || ''),
+        receiverEmail: parseEmailAddress(recipient),
+        threadId,
+        personalizedBody,
+      })
     }
 
-    sendResults.push({
-      messageId: unwrapBrackets(info.messageId),
-      senderEmail: parseEmailAddress(emailInformation.from || ''),
-      receiverEmail: parseEmailAddress(recipient),
-      threadId,
-      personalizedBody,
-    })
-  }
-
-  for (const sendResult of sendResults) {
-    const [result] = await db.execute<ResultSetHeader>(
-      `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id, deal_id)
+    for (const sendResult of sendResults) {
+      const [result] = await db.execute<ResultSetHeader>(
+        `INSERT INTO emails (sender_user_id, subject, body, message_id, sender_email, receiver_email, thread_id, deal_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        user.id,
-        cleaned.subject,
-        sendResult.personalizedBody,
-        sendResult.messageId,
-        sendResult.senderEmail,
-        sendResult.receiverEmail,
-        sendResult.threadId,
-        cleaned.dealId || null,
-      ],
-    )
-
-    const emailId = result.insertId
-
-    for (const attachment of uploadedAttachments) {
-      await db.execute(
-        `INSERT INTO email_attachments (email_id, content_type, content_subtype, filename, url)
-         VALUES (?, ?, ?, ?, ?)`,
         [
-          emailId,
-          attachment.contentType,
-          attachment.contentSubtype,
-          attachment.filename,
-          attachment.url,
+          user.id,
+          cleaned.subject,
+          sendResult.personalizedBody,
+          sendResult.messageId,
+          sendResult.senderEmail,
+          sendResult.receiverEmail,
+          sendResult.threadId,
+          cleaned.dealId || null,
         ],
       )
-    }
-  }
 
-  return data({ ok: true })
+      const emailId = result.insertId
+
+      for (const attachment of uploadedAttachments) {
+        await db.execute(
+          `INSERT INTO email_attachments (email_id, content_type, content_subtype, filename, url)
+         VALUES (?, ?, ?, ?, ?)`,
+          [
+            emailId,
+            attachment.contentType,
+            attachment.contentSubtype,
+            attachment.filename,
+            attachment.url,
+          ],
+        )
+      }
+    }
+
+    return data({ ok: true })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const issue = error.issues[0]
+      const msg = issue?.message || 'Invalid email payload'
+      return data({ error: msg }, { status: 400 })
+    }
+    return data({ error: 'Email failed to send' }, { status: 500 })
+  }
 }
