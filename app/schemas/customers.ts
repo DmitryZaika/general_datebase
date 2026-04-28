@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { ToastProps } from '~/components/ui/toast'
-import { zodEmail } from '~/utils/constants'
+import { optionalEmailSchema } from '~/utils/constants'
 
 type ToastFunction = (props: ToastProps & { description: string }) => void
 
@@ -68,7 +68,7 @@ export const updateCustomer = async (id: number, data: CustomerSignupSchema) => 
 
 export const customerDialogSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  email: zodEmail.optional(),
+  email: optionalEmailSchema.optional(),
   phone: z.string().optional(),
   phone_2: z.string().optional(),
   address: z.string().optional(),

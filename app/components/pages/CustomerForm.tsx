@@ -139,8 +139,12 @@ export function CustomerForm({
   const emailValue = form.watch('email')
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
-    if (phoneValue && phoneValue.trim() !== '') params.set('phone', phoneValue.trim())
-    if (emailValue && emailValue.trim() !== '') params.set('email', emailValue.trim())
+    if (typeof phoneValue === 'string' && phoneValue.trim() !== '') {
+      params.set('phone', phoneValue.trim())
+    }
+    if (typeof emailValue === 'string' && emailValue.trim() !== '') {
+      params.set('email', emailValue.trim())
+    }
     return params.toString()
   }, [phoneValue, emailValue])
 
