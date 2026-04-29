@@ -31,6 +31,7 @@ type CustomerInfo = {
   created_by: string | null
   parent_id: number | null
   company_name: string | null
+  first_rep_deal_created_at: string | null
 }
 
 type DealRow = {
@@ -88,7 +89,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return redirect(`${url.pathname}/info${url.search}`)
   }
 
-  const customer = await selectId<CustomerInfo>(
+  const customer = await selectId<Omit<CustomerInfo, 'first_rep_deal_created_at'>>(
     db,
     `SELECT c.id, c.name, c.email, c.phone, c.phone_2, c.address, u.name AS sales_rep_name, c.source, c.parent_id, c.company_name, c.created_date, c.created_by
      FROM customers c
@@ -131,15 +132,35 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
      FROM customers_history WHERE customer_id = ? ORDER BY updated_at ASC, id ASC`,
     [customerId],
   )
-  const emails = customer?.email ? await getCustomerEmailsWithReads(customer.email) : []
+  // Temporary: assignment time for the sales-manager lead line is inferred from the first deal
+  // for this customer where deal.user_id matches customer.sales_rep. Replace when history stores it.
+  const firstRepDealRows = await selectMany<{ t: string }>(
+    db,
+    `SELECT DATE_FORMAT(d.created_at, '%Y-%m-%dT%H:%i:%sZ') AS t
+     FROM deals d
+     INNER JOIN customers c ON c.id = d.customer_id AND c.sales_rep = d.user_id
+     WHERE d.customer_id = ? AND d.deleted_at IS NULL
+     ORDER BY d.created_at ASC, d.id ASC
+     LIMIT 1`,
+    [customerId],
+  )
+  const firstRepDealAt = firstRepDealRows[0]?.t ?? null
+  const customerOut: CustomerInfo | undefined =
+    customer === undefined
+      ? undefined
+      : { ...customer, first_rep_deal_created_at: firstRepDealAt }
+
+  const emails = customerOut?.email
+    ? await getCustomerEmailsWithReads(customerOut.email)
+    : []
 
   return {
-    customer,
+    customer: customerOut,
     deals,
     project,
     emails,
     reassignments,
-    hasTabs: !!customer?.company_name || hasChildren.length > 0,
+    hasTabs: !!(customerOut?.company_name || hasChildren.length > 0),
   }
 }
 

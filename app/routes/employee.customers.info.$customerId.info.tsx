@@ -18,6 +18,7 @@ type CustomerInfo = {
   created_date: string | null
   created_by: string | null
   parent_id: number | null
+  first_rep_deal_created_at: string | null
 }
 
 type DealRow = {
@@ -206,6 +207,9 @@ export default function CustomerInfoTab() {
       <CustomerHistorySection
         created_by={customer.created_by}
         created_date={customer.created_date}
+        source={customer.source}
+        sales_rep_name={customer.sales_rep_name}
+        first_rep_deal_created_at={customer.first_rep_deal_created_at}
         reassignments={reassignments}
       />
 

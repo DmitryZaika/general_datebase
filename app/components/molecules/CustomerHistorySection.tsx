@@ -11,31 +11,71 @@ type ReassignmentRow = {
 type CustomerHistoryProps = {
   created_by: string | null
   created_date: string | null
+  source?: string | null
+  sales_rep_name?: string | null
+  first_rep_deal_created_at?: string | null
   reassignments?: ReassignmentRow[]
 }
 
 export function CustomerHistorySection({
   created_by,
   created_date,
+  source = null,
+  sales_rep_name = null,
+  first_rep_deal_created_at = null,
   reassignments = [],
 }: CustomerHistoryProps) {
   const [expanded, setExpanded] = useState(false)
   type Item = { sortKey: number; text: string }
   const items: Item[] = []
 
-  const creator = created_by?.trim()
-  if (creator) {
+  const sourceNorm = source?.trim().toLowerCase() ?? ''
+  const noCreatedBy = !created_by?.trim()
+  const isLeadWithoutCreator = sourceNorm === 'leads' && noCreatedBy
+
+  // Temporary: lead + sales-manager copy and deal-based timestamp until customers_history covers lead capture.
+  if (isLeadWithoutCreator) {
     const createdAt = created_date ? new Date(created_date) : null
+    const t0 = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.getTime() : 0
     if (createdAt && !Number.isNaN(createdAt.getTime())) {
       items.push({
-        sortKey: createdAt.getTime(),
-        text: `Customer created by ${creator} on ${format(createdAt, 'M/d/yyyy h:mm a')}`,
+        sortKey: t0,
+        text: `Customer added as a lead on ${format(createdAt, 'M/d/yyyy h:mm a')}`,
       })
     } else {
       items.push({
         sortKey: 0,
-        text: `Customer created by ${creator}`,
+        text: 'Customer added as a lead',
       })
+    }
+    const rep = sales_rep_name?.trim()
+    if (rep) {
+      const dealAt = first_rep_deal_created_at
+        ? new Date(first_rep_deal_created_at)
+        : null
+      const dealValid = dealAt && !Number.isNaN(dealAt.getTime())
+      items.push({
+        sortKey: dealValid ? dealAt.getTime() : t0 + 1,
+        text: dealValid
+          ? `Assigned by sales manager to ${rep} on ${format(dealAt, 'M/d/yyyy h:mm a')}`
+          : `Assigned by sales manager to ${rep}`,
+      })
+    }
+  } else {
+    const creator = created_by?.trim()
+    if (creator) {
+      const createdAt = created_date ? new Date(created_date) : null
+      if (createdAt && !Number.isNaN(createdAt.getTime())) {
+        items.push({
+          sortKey: createdAt.getTime(),
+          text: `Customer created by ${creator} on ${format(createdAt, 'M/d/yyyy h:mm a')}`,
+        })
+      } else {
+        items.push({
+          sortKey: 0,
+          text: `Customer created by ${creator}`,
+        })
+      }
     }
   }
 
