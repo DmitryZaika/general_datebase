@@ -17,7 +17,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useNavigation } from 'react-router'
 import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
@@ -601,6 +601,7 @@ function DealChoiceList({
 export function EmailChat(props: EmailChatProps) {
   const { variant, customerName, messages, onClose, scrollToMessageId, dealNav } = props
   const navigate = useNavigate()
+  const navigation = useNavigation()
 
   const [chatMessages, setChatMessages] = useState<EmailChatMessage[]>(messages)
   const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -642,6 +643,7 @@ export function EmailChat(props: EmailChatProps) {
   const [dealNavPickerOpen, setDealNavPickerOpen] = useState(false)
   const [dealNavChoices, setDealNavChoices] = useState<AttachmentDealOption[]>([])
   const [dealNavLoading, setDealNavLoading] = useState(false)
+  const [dealNavRouteActive, setDealNavRouteActive] = useState(false)
   const { toast } = useToast()
   const isMobile = useIsMobile()
 
@@ -675,6 +677,12 @@ export function EmailChat(props: EmailChatProps) {
   useEffect(() => {
     setChatMessages(messages)
   }, [messages])
+
+  useEffect(() => {
+    if (navigation.state === 'idle') {
+      setDealNavRouteActive(false)
+    }
+  }, [navigation.state])
 
   const scrollToBottom = () => {
     const el = scrollContainerRef.current
@@ -850,8 +858,12 @@ export function EmailChat(props: EmailChatProps) {
 
   const goToDeal = (dealId: number) => {
     if (!dealNav) return
+    setDealNavRouteActive(true)
     navigate(`/${dealNav.pathPrefix}/deals/edit/${dealId}/project`)
   }
+
+  const dealNavButtonLoading =
+    dealNavLoading || (navigation.state !== 'idle' && dealNavRouteActive)
 
   const handleDealNavClick = async () => {
     if (!dealNav) return
@@ -1168,11 +1180,11 @@ export function EmailChat(props: EmailChatProps) {
                           type='button'
                           size='sm'
                           className='shrink-0 gap-1.5'
-                          loading={dealNavLoading}
+                          loading={dealNavButtonLoading}
                           onClick={() => void handleDealNavClick()}
                         >
                           <ExternalLink className='h-4 w-4' />
-                          <span className='hidden sm:inline'>Deal</span>
+                          <span className='hidden sm:inline'>Go to Deal</span>
                         </LoadingButton>
                       </TooltipTrigger>
                       <TooltipContent>Open customer deal</TooltipContent>

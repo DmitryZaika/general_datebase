@@ -12,10 +12,10 @@ import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getAdminUser } from '~/utils/session.server'
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  await getEmployeeUser(request)
+  await getAdminUser(request)
   const customerId = params.customerId ? Number(params.customerId) : 0
 
   if (!customerId) return { customers: [], effectiveParentId: 0 }
@@ -100,7 +100,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await getEmployeeUser(request)
+  const user = await getAdminUser(request)
   const formData = await request.formData()
   const intent = formData.get('intent')
 

@@ -223,6 +223,11 @@ const getItems = (
   if (base === 'admin') {
     finalList.push(
       {
+        title: 'Customers',
+        url: `/admin/customers`,
+        icon: Users,
+      },
+      {
         title: 'Statistic',
         url: `/admin/statistics`,
         icon: DollarSign,

@@ -25,7 +25,7 @@ import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
+import { getAdminUser, type SessionUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 
 async function assertCanDeleteCustomer(user: SessionUser, companyId: number) {
@@ -45,7 +45,7 @@ async function assertCanDeleteCustomer(user: SessionUser, companyId: number) {
 export async function action({ params, request }: ActionFunctionArgs) {
   let user: SessionUser
   try {
-    user = await getEmployeeUser(request)
+    user = await getAdminUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -118,7 +118,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   let user: SessionUser
   try {
-    user = await getEmployeeUser(request)
+    user = await getAdminUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }

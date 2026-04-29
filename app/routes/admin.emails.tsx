@@ -103,49 +103,37 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
        LEFT JOIN users s ON e.sender_user_id = s.id
        LEFT JOIN users r ON e.receiver_email = r.email`
 
-    const [
-      inboxCountRows,
-      sentCountRows,
-      trashCountRows,
-      totalCountRows,
-      userEmails,
-      salesReps,
-    ] = await Promise.all([
-      selectMany<{ c: number }>(
-        db,
-        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+    const [inboxUnreadRows, trashCountRows, totalCountRows, userEmails, salesReps] =
+      await Promise.all([
+        selectMany<{ c: number }>(
+          db,
+          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
          LEFT JOIN users s ON e.sender_user_id = s.id
          LEFT JOIN users r ON e.receiver_email = r.email
-         WHERE ${whereInbox}`,
-        paramsInboxWhere,
-      ),
-      selectMany<{ c: number }>(
-        db,
-        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
-         LEFT JOIN users s ON e.sender_user_id = s.id
-         LEFT JOIN users r ON e.receiver_email = r.email
-         WHERE ${whereSent}`,
-        paramsSentWhere,
-      ),
-      selectMany<{ c: number }>(
-        db,
-        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+         WHERE ${whereInbox}
+         AND e.thread_id IS NOT NULL
+         AND e.employee_read_at IS NULL`,
+          paramsInboxWhere,
+        ),
+        selectMany<{ c: number }>(
+          db,
+          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
          LEFT JOIN users s ON e.sender_user_id = s.id
          LEFT JOIN users r ON e.receiver_email = r.email
          WHERE ${whereTrash}`,
-        paramsTrashWhere,
-      ),
-      selectMany<{ c: number }>(
-        db,
-        `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
+          paramsTrashWhere,
+        ),
+        selectMany<{ c: number }>(
+          db,
+          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
          LEFT JOIN users s ON e.sender_user_id = s.id
          LEFT JOIN users r ON e.receiver_email = r.email
          WHERE ${isTrash ? whereTrash : isSent ? whereSent : whereInbox}`,
-        isTrash ? paramsTrashWhere : isSent ? paramsSentWhere : paramsInboxWhere,
-      ),
-      selectMany<Email>(
-        db,
-        `${selectList}
+          isTrash ? paramsTrashWhere : isSent ? paramsSentWhere : paramsInboxWhere,
+        ),
+        selectMany<Email>(
+          db,
+          `${selectList}
          WHERE ${isTrash ? whereTrash : isSent ? whereSent : whereInbox}
          AND e.thread_id IN (
            SELECT thread_id FROM (
@@ -160,27 +148,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
            ) t
          )
          ORDER BY e.sent_at DESC`,
-        [
-          ...(isTrash
-            ? paramsTrashSelect
-            : isSent
-              ? paramsSentSelect
-              : paramsInboxSelect),
-          ...(isTrash ? paramsTrashWhere : isSent ? paramsSentWhere : paramsInboxWhere),
-        ],
-      ),
-      selectMany<{ id: number; name: string }>(
-        db,
-        `SELECT u.id, u.name
+          [
+            ...(isTrash
+              ? paramsTrashSelect
+              : isSent
+                ? paramsSentSelect
+                : paramsInboxSelect),
+            ...(isTrash
+              ? paramsTrashWhere
+              : isSent
+                ? paramsSentWhere
+                : paramsInboxWhere),
+          ],
+        ),
+        selectMany<{ id: number; name: string }>(
+          db,
+          `SELECT u.id, u.name
          FROM users u
          JOIN users_positions up ON up.user_id = u.id
          JOIN positions p ON p.id = up.position_id
          WHERE LOWER(p.name) = 'sales_rep'
            AND u.is_deleted = 0
            AND u.company_id = ?`,
-        [companyId],
-      ),
-    ])
+          [companyId],
+        ),
+      ])
 
     const totalCount = totalCountRows[0]?.c ?? 0
 
@@ -189,8 +181,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       userEmail: user.email,
       salesReps,
       folder: isTrash ? 'trash' : isSent ? 'sent' : 'inbox',
-      inboxCount: inboxCountRows[0]?.c ?? 0,
-      sentCount: sentCountRows[0]?.c ?? 0,
+      inboxUnreadCount: inboxUnreadRows[0]?.c ?? 0,
       trashCount: trashCountRows[0]?.c ?? 0,
       totalCount,
       currentPage: page,
@@ -208,8 +199,7 @@ export default function AdminEmails() {
     userEmail,
     salesReps,
     folder,
-    inboxCount,
-    sentCount,
+    inboxUnreadCount,
     trashCount,
     totalCount,
     currentPage,
@@ -219,8 +209,7 @@ export default function AdminEmails() {
     userEmail: string
     salesReps: { id: number; name: string }[]
     folder: 'inbox' | 'sent' | 'trash'
-    inboxCount: number
-    sentCount: number
+    inboxUnreadCount: number
     trashCount: number
     totalCount: number
     currentPage: number
@@ -237,8 +226,7 @@ export default function AdminEmails() {
           adminMode={true}
           salesReps={salesReps}
           initialFolder={folder}
-          inboxCount={inboxCount}
-          sentCount={sentCount}
+          inboxUnreadCount={inboxUnreadCount}
           trashCount={trashCount}
           totalCount={totalCount}
           currentPage={currentPage}

@@ -17,6 +17,7 @@ interface IProps {
   intent?: string
   id?: number
   onSubmit?: (event: React.MouseEvent<HTMLButtonElement>) => void
+  hiddenFields?: Record<string, string>
 }
 
 export const DeleteRow = ({
@@ -26,6 +27,7 @@ export const DeleteRow = ({
   intent,
   id,
   onSubmit,
+  hiddenFields,
 }: IProps) => {
   return (
     <Dialog open={true} onOpenChange={handleChange}>
@@ -39,6 +41,10 @@ export const DeleteRow = ({
             <AuthenticityTokenInput />
             {intent && <input type='hidden' name='intent' value={intent} />}
             {id && <input type='hidden' name='id' value={id} />}
+            {hiddenFields &&
+              Object.entries(hiddenFields).map(([name, value]) => (
+                <input key={name} type='hidden' name={name} value={value} />
+              ))}
             <Button autoFocus type='submit' variant='destructive' onClick={onSubmit}>
               Confirm
             </Button>

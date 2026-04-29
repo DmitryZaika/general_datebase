@@ -65,8 +65,7 @@ export interface DealsEmailsViewProps {
   salesReps?: { id: number; name: string }[]
   currentUserId?: number | null
   initialFolder?: 'inbox' | 'sent' | 'trash'
-  inboxCount?: number
-  sentCount?: number
+  inboxUnreadCount?: number
   trashCount?: number
   totalCount?: number
   currentPage?: number
@@ -104,7 +103,7 @@ function ThreadRowHoverActions({
   layer?: 'swap' | 'overlay'
 }) {
   const shellClass = cn(
-    'flex items-center gap-0.5 flex-shrink-0',
+    'flex items-stretch gap-0.5 flex-shrink-0',
     layer === 'overlay' ? 'flex' : 'max-md:flex md:hidden md:group-hover:flex',
   )
 
@@ -117,7 +116,7 @@ function ThreadRowHoverActions({
               type='button'
               disabled={busy}
               onClick={() => onRestore(threadId)}
-              className='p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:opacity-50'
+              className='flex h-full min-h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50'
             >
               <ArchiveRestore className='h-4 w-4' />
             </button>
@@ -138,7 +137,7 @@ function ThreadRowHoverActions({
             type='button'
             disabled={busy}
             onClick={() => onDelete(threadId)}
-            className='cursor-pointer p-1.5 hover:bg-red-50 rounded-full text-red-500 transition-colors disabled:cursor-not-allowed disabled:opacity-50'
+            className='flex h-full min-h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50'
           >
             <Trash2 className='h-4 w-4' />
           </button>
@@ -155,7 +154,7 @@ function ThreadRowHoverActions({
                 type='button'
                 disabled={busy}
                 onClick={() => onMarkRead(threadId)}
-                className='cursor-pointer p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:cursor-not-allowed disabled:opacity-50'
+                className='flex h-full min-h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
               >
                 <MailOpen className='h-4 w-4' />
               </button>
@@ -171,7 +170,7 @@ function ThreadRowHoverActions({
                 type='button'
                 disabled={busy}
                 onClick={() => onMarkUnread(threadId)}
-                className='cursor-pointer p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:cursor-not-allowed disabled:opacity-50'
+                className='flex h-full min-h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
               >
                 <Mail className='h-4 w-4' />
               </button>
@@ -192,8 +191,7 @@ export default function DealsEmailsView({
   salesReps = [],
   currentUserId = null,
   initialFolder,
-  inboxCount: inboxCountProp,
-  sentCount: sentCountProp,
+  inboxUnreadCount: inboxUnreadCountProp,
   trashCount: trashCountProp,
   totalCount: totalCountProp,
   currentPage: currentPageProp = 1,
@@ -493,56 +491,18 @@ export default function DealsEmailsView({
     )
   }, [searchedEmails])
 
-  // Calculate counts for nav items (same logic as filtered lists)
-  const counts = useMemo(() => {
-    const isFromCustomer = (e: Email) => e.sender_user_id == null
-    const latestByThread = new Map<string, Email>()
-    emails.forEach(email => {
-      const existing = latestByThread.get(email.thread_id)
-      if (!existing || new Date(email.sent_at) > new Date(existing.sent_at)) {
-        latestByThread.set(email.thread_id, email)
-      }
-    })
-    const latestIncomingByThread = new Set<string>()
-    emails.forEach(email => {
-      if (!isFromCustomer(email)) return
-      latestIncomingByThread.add(email.thread_id)
-    })
-    const inboxThreads = new Set<string>()
-    latestByThread.forEach((latest, threadId) => {
-      if (isFromCustomer(latest)) inboxThreads.add(threadId)
-      else if (latestIncomingByThread.has(threadId)) inboxThreads.add(threadId)
-    })
-
-    const sentThreads = new Set<string>()
-    emails.forEach(email => {
-      const isSender = adminMode
-        ? selectedSalesRepId != null
-          ? email.sender_user_id === selectedSalesRepId
-          : email.sender_user_id != null
-        : (currentUserId != null && email.sender_user_id === currentUserId) ||
-          parseEmailAddress(email.sender_email).toLowerCase() ===
-            parseEmailAddress(currentUserEmail).toLowerCase()
-      if (isSender) {
-        sentThreads.add(email.thread_id)
-      }
-    })
-
-    return { inbox: inboxThreads.size, sent: sentThreads.size }
-  }, [emails, currentUserEmail, currentUserId, adminMode, selectedSalesRepId])
-
-  const inboxCount = inboxCountProp !== undefined ? inboxCountProp : counts.inbox
-  const sentCount = sentCountProp !== undefined ? sentCountProp : counts.sent
   const trashCount = trashCountProp !== undefined ? trashCountProp : 0
+  const inboxNavUnread =
+    inboxUnreadCountProp !== undefined ? inboxUnreadCountProp : unreadThreadIds.size
 
-  const navItems = [
-    {
-      id: 'inbox',
-      label: 'Inbox',
-      icon: Inbox,
-      count: inboxCount,
-    },
-    { id: 'sent', label: 'Sent', icon: Send, count: sentCount },
+  const navItems: {
+    id: Tab
+    label: string
+    icon: typeof Inbox
+    count?: number
+  }[] = [
+    { id: 'inbox', label: 'Inbox', icon: Inbox, count: inboxNavUnread },
+    { id: 'sent', label: 'Sent', icon: Send },
     { id: 'trash', label: 'Trash', icon: Trash2, count: trashCount },
   ]
 
@@ -842,7 +802,7 @@ export default function DealsEmailsView({
               )}
             />
             <span className='flex-1 text-left'>{item.label}</span>
-            {item.count > 0 && (
+            {item.count !== undefined && item.count > 0 && (
               <span className='text-xs font-semibold'>{item.count}</span>
             )}
           </button>
@@ -861,9 +821,9 @@ export default function DealsEmailsView({
       {/* Main Content */}
       <div className='flex-1 flex flex-col bg-white md:rounded-tl-2xl shadow-sm border border-gray-200 overflow-hidden md:mr-4 md:mb-4 h-full'>
         {/* Toolbar / Header of list */}
-        <div className='flex items-center gap-2 md:gap-4 p-2 md:p-3 border-b border-gray-200 bg-white'>
+        <div className='flex items-stretch gap-2 md:gap-4 px-2 py-2 md:px-3 md:py-3 border-b border-gray-200 bg-white'>
           {/* Mobile Menu Trigger */}
-          <div className='md:hidden'>
+          <div className='self-center md:hidden'>
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant='ghost' size='icon'>
@@ -875,22 +835,26 @@ export default function DealsEmailsView({
               </SheetContent>
             </Sheet>
           </div>
-          <div className='pl-2 flex items-center gap-2'>
-            <Checkbox
-              checked={
-                selectedThreads.size === sortedEmails.length && sortedEmails.length > 0
-              }
-              onCheckedChange={toggleSelectAll}
-              className='cursor-pointer'
-            />
+          <div className='pl-2 flex items-stretch gap-2'>
+            <label className='flex shrink-0 cursor-pointer items-center self-stretch'>
+              <Checkbox
+                checked={
+                  selectedThreads.size === sortedEmails.length &&
+                  sortedEmails.length > 0
+                }
+                onCheckedChange={toggleSelectAll}
+                className='cursor-pointer'
+              />
+            </label>
             {selectedThreads.size > 0 && activeTab !== 'trash' && (
               <>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
+                      type='button'
                       onClick={handleDelete}
                       disabled={isDeleting}
-                      className='cursor-pointer p-1.5 hover:bg-red-50 rounded-full text-red-500 transition-colors disabled:cursor-not-allowed'
+                      className='flex min-h-9 w-9 shrink-0 cursor-pointer items-center justify-center self-stretch rounded-full text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50'
                     >
                       <Trash2 className='h-4 w-4' />
                     </button>
@@ -902,9 +866,10 @@ export default function DealsEmailsView({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
+                      type='button'
                       onClick={handleToggleSelectedReadState}
                       disabled={isMarkingUnread}
-                      className='cursor-pointer p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors disabled:cursor-not-allowed'
+                      className='flex min-h-9 w-9 shrink-0 cursor-pointer items-center justify-center self-stretch rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
                     >
                       {selectedHasUnreadThreads ? (
                         <MailOpen className='h-4 w-4' />
@@ -920,7 +885,7 @@ export default function DealsEmailsView({
               </>
             )}
           </div>
-          <div className='relative flex-1 max-w-md ml-2'>
+          <div className='relative flex-1 max-w-md ml-2 self-center'>
             {isServerPagination ? (
               <form
                 onSubmit={e => {
@@ -961,11 +926,11 @@ export default function DealsEmailsView({
               </>
             )}
           </div>
-          <div className='flex-1 md:hidden' /> {/* Spacer for mobile */}
+          <div className='flex-1 self-center md:hidden' /> {/* Spacer for mobile */}
           <button
             type='button'
             onClick={() => revalidator.revalidate()}
-            className='p-1 hover:bg-gray-100 rounded-full text-gray-500'
+            className='flex min-h-9 w-9 shrink-0 items-center justify-center self-stretch rounded-full text-gray-500 hover:bg-gray-100'
           >
             <RotateCw
               className={cn(

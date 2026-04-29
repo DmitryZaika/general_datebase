@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Edit, Search, Trash } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { useToast } from '~/hooks/use-toast'
 import type { Customer } from '~/types'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -50,7 +49,6 @@ export function FindCustomer({
   const searchRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
-  const { toast } = useToast()
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ['customers', 'search', searchTerm, location.pathname],
@@ -172,43 +170,34 @@ export function FindCustomer({
                       >
                         <Edit style={{ minWidth: '20px', minHeight: '20px' }} />
                       </Button>
-                      <Button
-                        variant='ghost'
-                        size='icon'
-                        onClick={e => {
-                          e.stopPropagation()
-                          if (onDelete) {
+                      {onDelete ? (
+                        <Button
+                          variant='ghost'
+                          size='icon'
+                          onClick={e => {
+                            e.stopPropagation()
                             onDelete(customer.id, customer)
-                            return
-                          }
-                          ;(async () => {
-                            const res = await fetch(
-                              `/api/deals/count-by-customer/${customer.id}`,
-                            )
-                            if (res.ok) {
-                              const json = await res.json()
-                              if ((json.count ?? 0) > 0) {
-                                toast({
-                                  title: 'Action required',
-                                  description:
-                                    'Delete all related deals with this customer.',
-                                  duration: 7000,
-                                  variant: 'destructive',
-                                })
-                                return
-                              }
-                            }
-
+                          }}
+                          className='h-9 w-9 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                        >
+                          <Trash style={{ minWidth: '20px', minHeight: '20px' }} />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant='ghost'
+                          size='icon'
+                          onClick={e => {
+                            e.stopPropagation()
                             const link = buildDeleteLink
                               ? buildDeleteLink(customer.id, location.search)
                               : `${deleteBasePath}/delete/${customer.id}${location.search}`
                             navigate(link)
-                          })()
-                        }}
-                        className='h-9 w-9 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
-                      >
-                        <Trash style={{ minWidth: '20px', minHeight: '20px' }} />
-                      </Button>
+                          }}
+                          className='h-9 w-9 text-blue-500 hover:text-blue-700 hover:bg-blue-100'
+                        >
+                          <Trash style={{ minWidth: '20px', minHeight: '20px' }} />
+                        </Button>
+                      )}
                     </>
                   )}
                 </div>

@@ -86,19 +86,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const threadOrderAgg = isTrash ? 'MAX(e2.deleted_at)' : 'MAX(e2.sent_at)'
     const listOrderBy = isTrash ? 'e.deleted_at DESC, e.sent_at DESC' : 'e.sent_at DESC'
 
-    const [inboxCountRows, sentCountRows, trashCountRows, totalCountRows, userEmails] =
+    const [inboxUnreadRows, trashCountRows, totalCountRows, userEmails] =
       await Promise.all([
         selectMany<{ c: number }>(
           db,
-          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
-         WHERE e.deleted_at IS NULL AND ${receiverCondition}`,
-          [userEmailNorm, userEmailNorm, userEmailLike],
-        ),
-        selectMany<{ c: number }>(
-          db,
-          `SELECT COUNT(DISTINCT e.thread_id) AS c FROM emails e
-         WHERE e.deleted_at IS NULL AND ${senderCondition}`,
-          [user.id, userEmailNorm, userEmailNorm, userEmailLike],
+          `SELECT COUNT(DISTINCT e.thread_id) AS c
+           FROM emails e
+           LEFT JOIN (
+             SELECT thread_id, MAX(deal_id) AS deal_id
+             FROM emails
+             WHERE deleted_at IS NULL AND thread_id IS NOT NULL AND deal_id IS NOT NULL
+             GROUP BY thread_id
+           ) td ON td.thread_id = e.thread_id
+           LEFT JOIN deals d ON d.id = COALESCE(e.deal_id, td.deal_id) AND d.deleted_at IS NULL
+           WHERE e.deleted_at IS NULL
+             AND e.thread_id IS NOT NULL
+             AND e.sender_user_id IS NULL
+             AND e.employee_read_at IS NULL
+             AND (
+               e.receiver_user_id = ?
+               OR d.user_id = ?
+               OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.receiver_email, '<', -1), '>', 1))) = ?
+               OR (e.receiver_email NOT LIKE '%<%' AND LOWER(TRIM(e.receiver_email)) = ?)
+               OR e.receiver_email LIKE ?
+             )`,
+          [user.id, user.id, userEmailNorm, userEmailNorm, userEmailLike],
         ),
         selectMany<{ c: number }>(
           db,
@@ -146,8 +158,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       userEmail: user.email,
       userId: user.id,
       folder: isTrash ? 'trash' : isSent ? 'sent' : 'inbox',
-      inboxCount: inboxCountRows[0]?.c ?? 0,
-      sentCount: sentCountRows[0]?.c ?? 0,
+      inboxUnreadCount: inboxUnreadRows[0]?.c ?? 0,
       trashCount: trashCountRows[0]?.c ?? 0,
       totalCount,
       currentPage: page,
@@ -164,8 +175,7 @@ export default function EmployeeEmails() {
     userEmail,
     userId,
     folder,
-    inboxCount,
-    sentCount,
+    inboxUnreadCount,
     trashCount,
     totalCount,
     currentPage,
@@ -175,8 +185,7 @@ export default function EmployeeEmails() {
     userEmail: string
     userId: number
     folder: 'inbox' | 'sent' | 'trash'
-    inboxCount: number
-    sentCount: number
+    inboxUnreadCount: number
     trashCount: number
     totalCount: number
     currentPage: number
@@ -190,8 +199,7 @@ export default function EmployeeEmails() {
         currentUserEmail={userEmail}
         currentUserId={userId}
         initialFolder={folder}
-        inboxCount={inboxCount}
-        sentCount={sentCount}
+        inboxUnreadCount={inboxUnreadCount}
         trashCount={trashCount}
         totalCount={totalCount}
         currentPage={currentPage}
