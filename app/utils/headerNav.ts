@@ -19,6 +19,7 @@ export const getMirroredUrl = (isAdminPage: boolean, location: Location) => {
   const currentSection = segments[1]
 
   const supportedSections = [
+    'customers',
     'stones',
     'instructions',
     'sinks',
