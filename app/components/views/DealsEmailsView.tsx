@@ -503,7 +503,12 @@ export default function DealsEmailsView({
   }[] = [
     { id: 'inbox', label: 'Inbox', icon: Inbox, count: inboxNavUnread },
     { id: 'sent', label: 'Sent', icon: Send },
-    { id: 'trash', label: 'Trash', icon: Trash2, count: trashCount },
+    {
+      id: 'trash',
+      label: 'Trash',
+      icon: Trash2,
+      count: adminMode ? trashCount : undefined,
+    },
   ]
 
   const toggleSelectAll = () => {
