@@ -28,6 +28,7 @@ type CustomerInfo = {
   sales_rep_name: string | null
   source: string | null
   created_date: string | null
+  created_by: string | null
   parent_id: number | null
   company_name: string | null
 }
@@ -38,6 +39,12 @@ type DealRow = {
   lost_reason: string | null
   list_name: string
   created_at: string | null
+}
+
+type ReassignmentRow = {
+  reassigned_by: string | null
+  reassigned_to: string | null
+  updated_at: string
 }
 
 type ProjectInfo = {
@@ -83,7 +90,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const customer = await selectId<CustomerInfo>(
     db,
-    `SELECT c.id, c.name, c.email, c.phone, c.phone_2, c.address, u.name AS sales_rep_name, c.source, c.parent_id, c.company_name, c.created_date
+    `SELECT c.id, c.name, c.email, c.phone, c.phone_2, c.address, u.name AS sales_rep_name, c.source, c.parent_id, c.company_name, c.created_date, c.created_by
      FROM customers c
      LEFT JOIN deals d ON d.customer_id = c.id AND d.created_at IS NULL
      LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
@@ -118,6 +125,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
      ORDER BY d.id DESC`,
     [customerId],
   )
+  const reassignments = await selectMany<ReassignmentRow>(
+    db,
+    `SELECT reassigned_by, reassigned_to, DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%sZ') AS updated_at
+     FROM customers_history WHERE customer_id = ? ORDER BY updated_at ASC, id ASC`,
+    [customerId],
+  )
   const emails = customer?.email ? await getCustomerEmailsWithReads(customer.email) : []
 
   return {
@@ -125,6 +138,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     deals,
     project,
     emails,
+    reassignments,
     hasTabs: !!customer?.company_name || hasChildren.length > 0,
   }
 }
@@ -132,7 +146,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function CustomerInfoDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { customer, deals, project, emails, hasTabs } = useLoaderData<typeof loader>()
+  const { customer, deals, project, emails, reassignments, hasTabs } =
+    useLoaderData<typeof loader>()
 
   const handleChange = (open: boolean) => {
     if (open === false) navigate(`..${location.search}`)
@@ -158,12 +173,12 @@ export default function CustomerInfoDialog() {
               <TabsTrigger value='projects'>Projects</TabsTrigger>
             </TabsList>
             <div className='mt-4'>
-              <Outlet context={{ customer, deals, project, emails }} />
+              <Outlet context={{ customer, deals, project, emails, reassignments }} />
             </div>
           </Tabs>
         ) : (
           <div className='mt-4'>
-            <Outlet context={{ customer, deals, project, emails }} />
+            <Outlet context={{ customer, deals, project, emails, reassignments }} />
           </div>
         )}
       </DialogContent>

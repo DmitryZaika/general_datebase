@@ -1,6 +1,7 @@
 import { format } from 'date-fns'
 import { useOutletContext } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
+import { CustomerHistorySection } from '~/components/molecules/CustomerHistorySection'
 import { CustomerActivityTimeline } from '~/components/organisms/CustomerActivityTimeline'
 import type { EmailHistory } from '~/crud/emails'
 
@@ -15,6 +16,7 @@ type CustomerInfo = {
   sales_rep_name: string | null
   source: string | null
   created_date: string | null
+  created_by: string | null
   parent_id: number | null
 }
 
@@ -54,12 +56,19 @@ export async function loader() {
   return null
 }
 
+type ReassignmentRow = {
+  reassigned_by: string | null
+  reassigned_to: string | null
+  updated_at: string
+}
+
 export default function CustomerInfoTab() {
-  const { customer, deals, project, emails } = useOutletContext<{
+  const { customer, deals, project, emails, reassignments } = useOutletContext<{
     customer: CustomerInfo | null
     deals: DealRow[]
     project: ProjectInfo | null
     emails: EmailHistory[]
+    reassignments: ReassignmentRow[]
   }>()
 
   if (!customer) {
@@ -193,6 +202,12 @@ export default function CustomerInfoTab() {
           </ul>
         )}
       </div>
+
+      <CustomerHistorySection
+        created_by={customer.created_by}
+        created_date={customer.created_date}
+        reassignments={reassignments}
+      />
 
       <CustomerActivityTimeline
         phone={customer.phone}

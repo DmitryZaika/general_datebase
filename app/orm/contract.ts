@@ -2,6 +2,11 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { db } from '~/db.server'
 import type { TCustomerSchema, TRoomSchema } from '~/schemas/sales'
 import { getCustomerSchemaFromSaleId } from '~/utils/contractsBackend.server'
+import {
+  auditDisplayName,
+  fetchUserDisplayNameById,
+  recordCustomerReassignment,
+} from '~/utils/customerAudit.server'
 import type { User } from '~/utils/session.server'
 
 export class Contract {
@@ -48,12 +53,22 @@ export class Contract {
       ],
     )
 
+    const assignedBy = auditDisplayName(user)
+    const [repRows] = await db.query<RowDataPacket[]>(
+      `SELECT sales_rep FROM customers WHERE id = ? AND company_id = ? AND deleted_at IS NULL LIMIT 1`,
+      [this.data.customer_id, user.company_id],
+    )
+    const hadRep = repRows[0]?.sales_rep != null
+
     await db.execute(
-      `UPDATE customers
-         SET sales_rep = COALESCE(sales_rep, ?)
-       WHERE id = ? AND company_id = ?`,
+      `UPDATE customers SET sales_rep = COALESCE(sales_rep, ?) WHERE id = ? AND company_id = ?`,
       [sellerId, this.data.customer_id, user.company_id],
     )
+
+    if (!hadRep && assignedBy) {
+      const toName = await fetchUserDisplayNameById(db, sellerId)
+      await recordCustomerReassignment(db, this.data.customer_id, assignedBy, toName)
+    }
 
     return salesResult.insertId
   }

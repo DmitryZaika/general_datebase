@@ -1,9 +1,24 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { db } from '~/db.server'
+import {
+  auditDisplayName,
+  fetchUserDisplayNameById,
+  normalizeSalesRepId,
+  recordCustomerReassignment,
+} from '~/utils/customerAudit.server'
 import { posthogClient } from '~/utils/posthog.server'
+import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
 
 export async function action({ request }: ActionFunctionArgs) {
+  let actor: SessionUser
+  try {
+    actor = await getEmployeeUser(request)
+  } catch {
+    return data({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const actorName = auditDisplayName(actor)
+
   const body = await request.json()
   const { customer_id, sales_rep } = body as {
     customer_id: number
@@ -13,10 +28,21 @@ export async function action({ request }: ActionFunctionArgs) {
     return data({ error: 'customer_id required' }, { status: 400 })
   }
   try {
-    await db.query(
-      `UPDATE customers SET sales_rep = ?, assigned_date = NOW() WHERE id = ? AND deleted_at IS NULL`,
-      [sales_rep, customer_id],
+    const [prevRows] = await db.execute<RowDataPacket[]>(
+      'SELECT sales_rep FROM customers WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      [customer_id],
     )
+    const prevRep = normalizeSalesRepId(prevRows[0]?.sales_rep)
+    const nextRep = normalizeSalesRepId(sales_rep)
+    const repChanged = prevRep !== nextRep
+    if (repChanged) {
+      await db.query(
+        `UPDATE customers SET sales_rep = ? WHERE id = ? AND deleted_at IS NULL`,
+        [sales_rep, customer_id],
+      )
+      const toName = await fetchUserDisplayNameById(db, nextRep)
+      await recordCustomerReassignment(db, customer_id, actorName, toName)
+    }
 
     if (sales_rep) {
       const [companyRows] = await db.execute<RowDataPacket[]>(

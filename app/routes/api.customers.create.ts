@@ -2,6 +2,11 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
+import {
+  auditDisplayName,
+  fetchUserDisplayNameById,
+  recordCustomerReassignment,
+} from '~/utils/customerAudit.server'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -32,8 +37,10 @@ export async function action({ request }: ActionFunctionArgs) {
     salesRep = positionRows.length > 0 ? user.id : null
   }
 
+  const createdBy = auditDisplayName(user)
+
   const [result] = await db.execute<ResultSetHeader>(
-    `INSERT INTO customers (name, phone, phone_2, email, address, your_message, referral_source, source, company_id, company_name, sales_rep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO customers (name, phone, phone_2, email, address, your_message, referral_source, source, company_id, company_name, sales_rep, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       validatedData.name,
       validatedData.phone || null,
@@ -46,10 +53,16 @@ export async function action({ request }: ActionFunctionArgs) {
       validatedData.company_id,
       validatedData.company_name || null,
       salesRep,
+      createdBy,
     ],
   )
 
   const customerId = result.insertId
+
+  if (salesRep !== null && createdBy) {
+    const toName = await fetchUserDisplayNameById(db, salesRep)
+    await recordCustomerReassignment(db, customerId, createdBy, toName)
+  }
 
   if (salesRep) {
     const [defaultListRows] = await db.execute<RowDataPacket[]>(

@@ -71,7 +71,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   ).toString()
 
   await db.execute(
-    'UPDATE customers SET invalid_lead = ?, sales_rep = NULL, assigned_date = NULL WHERE id = ?',
+    'UPDATE customers SET invalid_lead = ?, sales_rep = NULL WHERE id = ?',
     [mapped, customerId],
   )
   await db.execute('UPDATE deals SET deleted_at = NOW() WHERE customer_id = ?', [

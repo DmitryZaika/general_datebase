@@ -3,6 +3,12 @@ import { type ActionFunctionArgs, data, type LoaderFunctionArgs } from 'react-ro
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
 import type { Customer } from '~/types/customer'
+import {
+  auditDisplayName,
+  fetchUserDisplayNameById,
+  normalizeSalesRepId,
+  recordCustomerReassignment,
+} from '~/utils/customerAudit.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 
@@ -45,6 +51,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     )
   }
 
+  const actor = await getEmployeeUser(request)
+
   const customerId = parseInt(params.customerId || '0')
 
   const userData = await request.json()
@@ -54,8 +62,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
     validatedData.sales_rep !== undefined && validatedData.sales_rep !== null
       ? validatedData.sales_rep
       : null
+  const assignedBy = auditDisplayName(actor)
+
+  const [prevRows] = await db.execute<RowDataPacket[]>(
+    'SELECT sales_rep FROM customers WHERE id = ? AND company_id = ? AND deleted_at IS NULL LIMIT 1',
+    [customerId, actor.company_id],
+  )
+  const prevRep = normalizeSalesRepId(prevRows[0]?.sales_rep)
+  const nextRep = normalizeSalesRepId(salesRep)
+  const repChanged = prevRep !== nextRep
+
   await db.execute<ResultSetHeader>(
-    `UPDATE customers SET name = ?, phone = ?, phone_2 = ?, email = ?, address = ?, your_message = ?, referral_source = ?, source = ?, company_id = ?, company_name = ?, sales_rep = ?, assigned_date = CASE WHEN ? IS NOT NULL THEN NOW() ELSE assigned_date END WHERE id = ?`,
+    `UPDATE customers SET name = ?, phone = ?, phone_2 = ?, email = ?, address = ?, your_message = ?, referral_source = ?, source = ?, company_id = ?, company_name = ?, sales_rep = ? WHERE id = ?`,
     [
       validatedData.name,
       validatedData.phone || null,
@@ -68,10 +86,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
       validatedData.company_id,
       validatedData.company_name || null,
       salesRep,
-      salesRep,
       customerId,
     ],
   )
+
+  if (repChanged) {
+    const toName = await fetchUserDisplayNameById(db, salesRep)
+    await recordCustomerReassignment(db, customerId, assignedBy, toName)
+  }
 
   if (salesRep !== null) {
     await db.execute(

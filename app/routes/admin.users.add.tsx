@@ -37,7 +37,7 @@ import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
-import { getSuperUser } from '~/utils/session.server'
+import { getSuperUser, type SessionUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 import { FormField, FormProvider } from '../components/ui/form'
 
@@ -69,8 +69,9 @@ const userschema = z.object({
 const resolver = zodResolver(userschema)
 
 export async function action({ request }: ActionFunctionArgs) {
+  let creator: SessionUser
   try {
-    await getSuperUser(request)
+    creator = await getSuperUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -86,9 +87,11 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   const password = await bcrypt.hash(data.password, 10)
 
+  const createdByName = creator.name.trim().length > 0 ? creator.name.trim() : null
+
   const [result] = await db.execute<ResultSetHeader>(
-    `INSERT INTO users (name, phone_number, email, password, company_id, is_employee, is_admin)
-       VALUES (?, ?, ?, ?, ?, 1, ?)`,
+    `INSERT INTO users (name, phone_number, email, password, company_id, is_employee, is_admin, created_by)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
     [
       data.name,
       data.phone_number,
@@ -96,6 +99,7 @@ export async function action({ request }: ActionFunctionArgs) {
       password,
       data.company_id,
       data.is_admin,
+      createdByName,
     ],
   )
 

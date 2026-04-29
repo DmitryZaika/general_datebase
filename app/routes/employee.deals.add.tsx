@@ -22,6 +22,11 @@ import { db } from '~/db.server'
 import { dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import {
+  auditDisplayName,
+  normalizeSalesRepId,
+  recordCustomerReassignment,
+} from '~/utils/customerAudit.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -111,10 +116,21 @@ export async function action({ request }: ActionFunctionArgs) {
     [user.id],
   )
   if (positionRows.length > 0) {
-    await db.execute(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
-      user.id,
-      data.customer_id,
-    ])
+    const assignedBy = auditDisplayName(user)
+    const [custRows] = await db.execute<RowDataPacket[]>(
+      'SELECT sales_rep FROM customers WHERE id = ? LIMIT 1',
+      [data.customer_id],
+    )
+    const prevRep = normalizeSalesRepId(custRows[0]?.sales_rep)
+    const nextRep = user.id
+    if (prevRep !== nextRep) {
+      await db.execute(`UPDATE customers SET sales_rep = ? WHERE id = ?`, [
+        user.id,
+        data.customer_id,
+      ])
+      const toName = auditDisplayName(user)
+      await recordCustomerReassignment(db, data.customer_id, assignedBy, toName)
+    }
   }
 
   const session = await getSession(request.headers.get('Cookie'))
