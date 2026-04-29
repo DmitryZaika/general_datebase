@@ -51,6 +51,10 @@ import { FaucetsFilters } from './FaucetsFilters'
 import { SinksFilters } from './SinksFilters'
 import { StonesFilters } from './StonesFilters'
 
+function navItemPathActive(pathname: string, baseUrl: string): boolean {
+  return pathname === baseUrl || pathname.startsWith(`${baseUrl}/`)
+}
+
 interface ISidebarItem {
   title: string
   url: string
@@ -251,6 +255,11 @@ const getItems = (
         title: 'Survey',
         url: `/admin/surveys`,
         icon: Receipt,
+      },
+      {
+        title: 'Users Activity',
+        url: `/admin/users-activity`,
+        icon: Users,
       },
       {
         title: 'User Panel',
@@ -521,7 +530,7 @@ export function EmployeeSidebar({
                   >
                     <SidebarMenuSub>
                       {crmItems.map(sub => {
-                        const isActive = location.pathname.startsWith(sub.url)
+                        const isActive = navItemPathActive(location.pathname, sub.url)
                         return (
                           <SidebarMenuSubItem key={sub.title}>
                             <SidebarMenuSubButton asChild isActive={isActive}>
@@ -639,7 +648,7 @@ export function EmployeeSidebar({
                 const isActive =
                   (isCustomerRoute || isContractorsRoute) && item.title === 'Stones'
                     ? location.pathname.includes('/stones')
-                    : location.pathname.startsWith(item.url)
+                    : navItemPathActive(location.pathname, item.url)
 
                 return (
                   <SidebarMenuItem key={item.title}>

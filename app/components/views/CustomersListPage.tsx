@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
   Link,
@@ -227,14 +227,6 @@ export function CustomersListPage() {
     },
   })
 
-  const [highlightCustomerId, setHighlightCustomerId] = useState<number | null>(null)
-  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  useEffect(() => {
-    return () => {
-      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
-    }
-  }, [])
-
   const tabParam = searchParams.get('tab') ?? 'walkin'
   const salesRepParam = searchParams.get('sales_rep')
   const showInvalid = searchParams.get('show_invalid') === '1'
@@ -383,36 +375,7 @@ export function CustomersListPage() {
   const startIndex = (currentPage - 1) * pageSize
   const endIndex = startIndex + pageSize
   const displayed = fullDisplayed.slice(startIndex, endIndex)
-  const rows = displayed.map((c: CustomersListCustomer) => ({
-    ...c,
-    className: `${c.className ?? ''} customer-row-${c.id} ${
-      highlightCustomerId === c.id ? 'ring-2 ring-blue-400 bg-blue-50' : ''
-    }`.trim(),
-  }))
-
-  useEffect(() => {
-    const highlightParam = searchParams.get('highlight')
-    const id = highlightParam ? Number(highlightParam) : 0
-    if (!id) return
-    setTimeout(() => {
-      const el = document.querySelector<HTMLElement>(`.customer-row-${id}`)
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        setHighlightCustomerId(id)
-        if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
-        highlightTimeoutRef.current = setTimeout(() => {
-          setHighlightCustomerId(null)
-          highlightTimeoutRef.current = null
-        }, 2000)
-      }
-      const params = new URLSearchParams(searchParams)
-      params.delete('highlight')
-      navigate(
-        { pathname: location.pathname, search: params.toString() },
-        { replace: true },
-      )
-    }, 50)
-  }, [searchParams, navigate, location.pathname])
+  const rows = displayed
 
   const getRowClassName = (customer: CustomersListCustomer) =>
     `${customer.className ?? ''} cursor-pointer`.trim()
@@ -480,12 +443,7 @@ export function CustomersListPage() {
             editBasePath={customersBasePath}
             deleteBasePath={customersBasePath}
             onSelect={customerId => {
-              const index = fullDisplayed.findIndex(c => c.id === customerId)
-              const targetPage = index >= 0 ? Math.floor(index / pageSize) + 1 : 1
-              const params = new URLSearchParams(searchParams)
-              params.set('page', String(targetPage))
-              params.set('highlight', String(customerId))
-              navigate({ pathname: location.pathname, search: params.toString() })
+              navigate(`info/${customerId}${location.search}`)
             }}
           />
         </div>
