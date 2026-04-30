@@ -83,8 +83,8 @@ export async function action({ request }: ActionFunctionArgs) {
         const nextPos = (posRows as Array<{ next: number }>)[0]?.next ?? 1
 
         const [dealResult] = await db.execute<ResultSetHeader>(
-          'INSERT INTO deals (customer_id, status, list_id, position, user_id) VALUES (?,?,?,?,?)',
-          [customer_id, status, listId, nextPos, sales_rep],
+          'INSERT INTO deals (customer_id, status, list_id, position, user_id, created_by) VALUES (?,?,?,?,?,?)',
+          [customer_id, status, listId, nextPos, sales_rep, actorName],
         )
         await db.execute(
           'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',

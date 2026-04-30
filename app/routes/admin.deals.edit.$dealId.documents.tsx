@@ -26,12 +26,13 @@ import { FormField } from '~/components/ui/form'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import { auditDisplayName } from '~/utils/customerAudit.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
-import { getAdminUser } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 import { fileSchema, useCustomForm } from '~/utils/useCustomForm'
 
@@ -43,12 +44,14 @@ interface DealDocument {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
+  let sessionUser: User
   try {
-    await getAdminUser(request)
+    sessionUser = await getAdminUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
   await csrf.validate(request)
+  const dealDocumentCreatedBy = auditDisplayName(sessionUser)
 
   if (!params.dealId) {
     return forceRedirectError(request.headers, 'No deal ID provided')
@@ -112,8 +115,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     try {
       await db.execute(
-        `INSERT INTO deals_documents (deal_id, image_url) VALUES (?, ?)`,
-        [dealId, parsedData.file],
+        `INSERT INTO deals_documents (deal_id, image_url, created_by) VALUES (?, ?, ?)`,
+        [dealId, parsedData.file, dealDocumentCreatedBy],
       )
 
       const session = await getSession(request.headers.get('Cookie'))

@@ -32,12 +32,13 @@ import { FormField } from '~/components/ui/form'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import { auditDisplayName } from '~/utils/customerAudit.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
 import { multiFileSchema } from '~/utils/useCustomForm'
 
@@ -48,12 +49,14 @@ interface DealImage {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
+  let sessionUser: User
   try {
-    await getEmployeeUser(request)
+    sessionUser = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
   await csrf.validate(request)
+  const dealImageCreatedBy = auditDisplayName(sessionUser)
 
   if (!params.dealId) {
     return forceRedirectError(request.headers, 'No deal ID provided')
@@ -118,8 +121,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
         for (const url of urls) {
           await db.execute(
-            `INSERT INTO deals_images (deal_id, image_url) VALUES (?, ?)`,
-            [dealId, url],
+            `INSERT INTO deals_images (deal_id, image_url, created_by) VALUES (?, ?, ?)`,
+            [dealId, url, dealImageCreatedBy],
           )
         }
 

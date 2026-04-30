@@ -256,11 +256,11 @@ const getItems = (
         url: `/admin/surveys`,
         icon: Receipt,
       },
-      // {
-      //   title: 'Users Activity',
-      //   url: `/admin/users-activity`,
-      //   icon: Users,
-      // },
+      {
+        title: 'Users Activity',
+        url: `/admin/users-activity`,
+        icon: Users,
+      },
       {
         title: 'User Panel',
         url: `/admin/users`,

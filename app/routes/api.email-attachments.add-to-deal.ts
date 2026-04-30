@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from 'react-router'
 import { data } from 'react-router'
 import { z } from 'zod'
 import { db } from '~/db.server'
+import { auditDisplayName } from '~/utils/customerAudit.server'
 import { findCustomerDealsForUser } from '~/utils/customerDeals.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -20,7 +21,11 @@ interface EmailAttachmentRow {
   content_subtype: string
 }
 
-async function addAttachmentToDeal(attachmentId: number, dealId: number) {
+async function addAttachmentToDeal(
+  attachmentId: number,
+  dealId: number,
+  createdBy: string | null,
+) {
   const attachments = await selectMany<EmailAttachmentRow>(
     db,
     'SELECT id, url, content_type, content_subtype FROM email_attachments WHERE id = ? LIMIT 1',
@@ -40,23 +45,23 @@ async function addAttachmentToDeal(attachmentId: number, dealId: number) {
 
   if (tableName === 'deals_images') {
     await db.execute(
-      `INSERT INTO deals_images (deal_id, image_url)
-       SELECT ?, ?
+      `INSERT INTO deals_images (deal_id, image_url, created_by)
+       SELECT ?, ?, ?
          FROM DUAL
         WHERE NOT EXISTS (
           SELECT 1 FROM deals_images WHERE deal_id = ? AND image_url = ?
         )`,
-      [dealId, attachment.url, dealId, attachment.url],
+      [dealId, attachment.url, createdBy, dealId, attachment.url],
     )
   } else {
     await db.execute(
-      `INSERT INTO deals_documents (deal_id, image_url)
-       SELECT ?, ?
+      `INSERT INTO deals_documents (deal_id, image_url, created_by)
+       SELECT ?, ?, ?
          FROM DUAL
         WHERE NOT EXISTS (
           SELECT 1 FROM deals_documents WHERE deal_id = ? AND image_url = ?
         )`,
-      [dealId, attachment.url, dealId, attachment.url],
+      [dealId, attachment.url, createdBy, dealId, attachment.url],
     )
   }
 
@@ -66,6 +71,7 @@ async function addAttachmentToDeal(attachmentId: number, dealId: number) {
 export async function action({ request }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request).catch(() => null)
   if (!user) return data({ error: 'Unauthorized' }, { status: 401 })
+  const attachmentCreatedBy = auditDisplayName(user)
 
   const parsed = requestSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
@@ -88,6 +94,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const addError = await addAttachmentToDeal(
       parsed.data.attachmentId,
       parsed.data.dealId,
+      attachmentCreatedBy,
     )
     if (addError) return addError
 
@@ -103,7 +110,11 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const deal = deals[0]
-  const addError = await addAttachmentToDeal(parsed.data.attachmentId, deal.id)
+  const addError = await addAttachmentToDeal(
+    parsed.data.attachmentId,
+    deal.id,
+    attachmentCreatedBy,
+  )
   if (addError) return addError
 
   return data({ status: 'added', deal })

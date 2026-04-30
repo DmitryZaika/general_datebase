@@ -21,6 +21,7 @@ import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { DIALOG_CONTENT_ADD_EDIT_CLASS } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
+import { auditDisplayName } from '~/utils/customerAudit.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { getAdminUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -32,8 +33,9 @@ const imageSchema = z.object({
 })
 
 export async function action({ request }: ActionFunctionArgs) {
+  let user: User
   try {
-    await getAdminUser(request)
+    user = await getAdminUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -47,12 +49,11 @@ export async function action({ request }: ActionFunctionArgs) {
     return { errors }
   }
 
-  const user: User = await getAdminUser(request)
-  await db.execute(`INSERT INTO images (name, url, company_id) VALUES (?,  ?, ?);`, [
-    data.name,
-    data.file,
-    user.company_id,
-  ])
+  const createdBy = auditDisplayName(user)
+  await db.execute(
+    `INSERT INTO images (name, url, company_id, created_by) VALUES (?, ?, ?, ?);`,
+    [data.name, data.file, user.company_id, createdBy],
+  )
   const session = await getSession(request.headers.get('Cookie'))
   session.flash('message', toastData('Success', 'Image added'))
 

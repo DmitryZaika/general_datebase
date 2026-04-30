@@ -56,7 +56,8 @@ interface CustomerPhoneRow {
   phone_2: string | null
 }
 
-function lastPhoneDigits10(value: string): string | null {
+function lastPhoneDigits10(value: string | null | undefined): string | null {
+  if (!value) return null
   const d = phoneDigitsOnly(value)
   if (d.length < 10) return null
   return d.slice(-10)
@@ -293,10 +294,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const [
     dealActivityCreated,
+    dealActivityDeleted,
+    customerCreatedActivities,
     dealActivityCompleted,
     dealNotesList,
+    dealNotesDeletedList,
+    dealImagesActivities,
+    dealDocumentsActivities,
     smsRows,
     emailActivities,
+    userCreatedActivities,
+    dealCreatedActivities,
     customerPhones,
   ] = await Promise.all([
     selectMany<UserActivity>(
@@ -320,6 +328,49 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           AND LOWER(TRIM(u_creator.name)) = LOWER(TRIM(da.created_by))
         LEFT JOIN users u_deal ON u_deal.id = d.user_id AND u_deal.company_id = da.company_id AND u_deal.is_deleted = 0
         WHERE da.company_id = ? AND da.deleted_at IS NULL`,
+      [companyId],
+    ),
+    selectMany<UserActivity>(
+      db,
+      `SELECT
+          da.id AS id,
+          'deal_activity_deleted' AS source,
+          u_deal.id AS user_id,
+          u_deal.name AS user_name,
+          'Delete Activity' AS action,
+          DATE_FORMAT(da.deleted_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,
+          cust.name AS customer_name
+        FROM deal_activities da
+        LEFT JOIN deals d ON d.id = da.deal_id AND d.deleted_at IS NULL
+        LEFT JOIN customers cust ON cust.id = d.customer_id AND cust.deleted_at IS NULL
+        LEFT JOIN users u_deal ON u_deal.id = d.user_id
+          AND u_deal.company_id = da.company_id
+          AND u_deal.is_deleted = 0
+        WHERE da.company_id = ? AND da.deleted_at IS NOT NULL`,
+      [companyId],
+    ),
+    selectMany<UserActivity>(
+      db,
+      `SELECT
+          c.id AS id,
+          'customer_created' AS source,
+          u_creator.id AS user_id,
+          COALESCE(
+            u_creator.name,
+            NULLIF(TRIM(c.created_by), '')
+          ) AS user_name,
+          'Created customer' AS action,
+          DATE_FORMAT(c.created_date, '%Y-%m-%dT%H:%i:%sZ') AS created_at,
+          c.name AS customer_name
+        FROM customers c
+        LEFT JOIN users u_creator ON u_creator.company_id = c.company_id AND u_creator.is_deleted = 0
+          AND c.created_by IS NOT NULL AND TRIM(c.created_by) != ''
+          AND LOWER(TRIM(u_creator.name)) = LOWER(TRIM(c.created_by))
+        WHERE c.company_id = ? AND c.deleted_at IS NULL
+          AND NOT (
+            (c.created_by IS NULL OR TRIM(c.created_by) = '')
+            AND LOWER(TRIM(IFNULL(c.source, ''))) = 'leads'
+          )`,
       [companyId],
     ),
     selectMany<UserActivity>(
@@ -350,20 +401,100 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       `SELECT
           dn.id AS id,
           'deal_note' AS source,
-          COALESCE(u_creator.id, u_deal.id) AS user_id,
-          COALESCE(u_creator.name, u_deal.name) AS user_name,
+          u_deal.id AS user_id,
+          u_deal.name AS user_name,
           'Add Note' AS action,
           DATE_FORMAT(dn.created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,
           cust.name AS customer_name
         FROM deal_notes dn
         LEFT JOIN deals d ON d.id = dn.deal_id AND d.deleted_at IS NULL
         LEFT JOIN customers cust ON cust.id = d.customer_id AND cust.deleted_at IS NULL
-        LEFT JOIN users u_creator ON u_creator.company_id = dn.company_id AND u_creator.is_deleted = 0
-          AND dn.created_by IS NOT NULL AND dn.created_by != ''
-          AND LOWER(TRIM(u_creator.name)) = LOWER(TRIM(dn.created_by))
         LEFT JOIN users u_deal ON u_deal.id = d.user_id AND u_deal.company_id = dn.company_id AND u_deal.is_deleted = 0
         WHERE dn.company_id = ? AND dn.deleted_at IS NULL`,
       [companyId],
+    ),
+    selectMany<UserActivity>(
+      db,
+      `SELECT
+          dn.id AS id,
+          'deal_note_deleted' AS source,
+          u_deal.id AS user_id,
+          u_deal.name AS user_name,
+          'Delete Note' AS action,
+          DATE_FORMAT(dn.deleted_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,
+          cust.name AS customer_name
+        FROM deal_notes dn
+        LEFT JOIN deals d ON d.id = dn.deal_id AND d.deleted_at IS NULL
+        LEFT JOIN customers cust ON cust.id = d.customer_id AND cust.deleted_at IS NULL
+        LEFT JOIN users u_deal ON u_deal.id = d.user_id AND u_deal.company_id = dn.company_id AND u_deal.is_deleted = 0
+        WHERE dn.company_id = ? AND dn.deleted_at IS NOT NULL`,
+      [companyId],
+    ),
+    selectMany<UserActivity>(
+      db,
+      `SELECT
+          di.id AS id,
+          'deal_image' AS source,
+          u_creator.id AS user_id,
+          COALESCE(
+            u_creator.name,
+            NULLIF(TRIM(di.created_by), '')
+          ) AS user_name,
+          'Added image' AS action,
+          DATE_FORMAT(di.created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,
+          COALESCE(
+            (
+              SELECT NULLIF(TRIM(c2.name), '')
+              FROM customers c2
+              WHERE c2.id = d.customer_id AND c2.company_id = ?
+              LIMIT 1
+            ),
+            CONCAT('Deal #', CAST(d.id AS CHAR))
+          ) AS customer_name
+        FROM deals_images di
+        JOIN deals d ON d.id = di.deal_id AND d.deleted_at IS NULL
+        LEFT JOIN users u_creator ON u_creator.company_id = ? AND u_creator.is_deleted = 0
+          AND di.created_by IS NOT NULL AND TRIM(di.created_by) != ''
+          AND LOWER(TRIM(u_creator.name)) = LOWER(TRIM(di.created_by))
+        WHERE EXISTS (
+          SELECT 1
+          FROM customers c_scope
+          WHERE c_scope.id = d.customer_id AND c_scope.company_id = ?
+        )`,
+      [companyId, companyId, companyId],
+    ),
+    selectMany<UserActivity>(
+      db,
+      `SELECT
+          dd.id AS id,
+          'deal_document' AS source,
+          u_creator.id AS user_id,
+          COALESCE(
+            u_creator.name,
+            NULLIF(TRIM(dd.created_by), '')
+          ) AS user_name,
+          'Added document' AS action,
+          DATE_FORMAT(dd.created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,
+          COALESCE(
+            (
+              SELECT NULLIF(TRIM(c2.name), '')
+              FROM customers c2
+              WHERE c2.id = d.customer_id AND c2.company_id = ?
+              LIMIT 1
+            ),
+            CONCAT('Deal #', CAST(d.id AS CHAR))
+          ) AS customer_name
+        FROM deals_documents dd
+        JOIN deals d ON d.id = dd.deal_id AND d.deleted_at IS NULL
+        LEFT JOIN users u_creator ON u_creator.company_id = ? AND u_creator.is_deleted = 0
+          AND dd.created_by IS NOT NULL AND TRIM(dd.created_by) != ''
+          AND LOWER(TRIM(u_creator.name)) = LOWER(TRIM(dd.created_by))
+        WHERE EXISTS (
+          SELECT 1
+          FROM customers c_scope
+          WHERE c_scope.id = d.customer_id AND c_scope.company_id = ?
+        )`,
+      [companyId, companyId, companyId],
     ),
     selectMany<SmsActivityRow>(
       db,
@@ -402,7 +533,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                   OR LOWER(TRIM(IFNULL(c2.email, ''))) = LOWER(TRIM(IFNULL(e.sender_email, '')))
                 )
               LIMIT 1
-            )
+            ),
+            NULLIF(TRIM(IFNULL(e.receiver_email, '')), ''),
+            NULLIF(TRIM(IFNULL(e.sender_email, '')), '')
           ) AS customer_name
         FROM emails e
         JOIN users u ON u.id = e.sender_user_id
@@ -410,6 +543,45 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         LEFT JOIN customers c_deal ON c_deal.id = d.customer_id AND c_deal.deleted_at IS NULL
         WHERE u.company_id = ? AND u.is_deleted = 0 AND e.deleted_at IS NULL
         ORDER BY e.sent_at DESC, e.id DESC`,
+      [companyId],
+    ),
+    selectMany<UserActivity>(
+      db,
+      `SELECT
+          u_new.id AS id,
+          'user_created' AS source,
+          u_creator.id AS user_id,
+          u_creator.name AS user_name,
+          'Created user' AS action,
+          DATE_FORMAT(u_new.created_date, '%Y-%m-%dT%H:%i:%sZ') AS created_at,
+          u_new.name AS customer_name
+        FROM users u_new
+        LEFT JOIN users u_creator ON u_creator.company_id = u_new.company_id AND u_creator.is_deleted = 0
+          AND u_new.created_by IS NOT NULL AND TRIM(u_new.created_by) != ''
+          AND LOWER(TRIM(u_creator.name)) = LOWER(TRIM(u_new.created_by))
+        WHERE u_new.company_id = ? AND u_new.is_deleted = 0
+          AND u_new.created_by IS NOT NULL AND TRIM(u_new.created_by) != ''`,
+      [companyId],
+    ),
+    selectMany<UserActivity>(
+      db,
+      `SELECT
+          d.id AS id,
+          'deal_created' AS source,
+          u_creator.id AS user_id,
+          COALESCE(
+            u_creator.name,
+            NULLIF(TRIM(d.created_by), '')
+          ) AS user_name,
+          'Created deal' AS action,
+          DATE_FORMAT(d.created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at,
+          cust.name AS customer_name
+        FROM deals d
+        JOIN customers cust ON cust.id = d.customer_id AND cust.deleted_at IS NULL
+        LEFT JOIN users u_creator ON u_creator.company_id = cust.company_id AND u_creator.is_deleted = 0
+          AND d.created_by IS NOT NULL AND TRIM(d.created_by) != ''
+          AND LOWER(TRIM(u_creator.name)) = LOWER(TRIM(d.created_by))
+        WHERE cust.company_id = ? AND d.deleted_at IS NULL`,
       [companyId],
     ),
     selectMany<CustomerPhoneRow>(
@@ -438,13 +610,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const dealActivities = [
     ...dealActivityCreated,
+    ...dealActivityDeleted,
     ...dealActivityCompleted,
     ...dealNotesList,
+    ...dealNotesDeletedList,
+    ...dealImagesActivities,
+    ...dealDocumentsActivities,
+    ...dealCreatedActivities,
   ]
 
-  const activities = [...dealActivities, ...smsActivities, ...emailActivities].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  )
+  const activities = [
+    ...dealActivities,
+    ...userCreatedActivities,
+    ...customerCreatedActivities,
+    ...smsActivities,
+    ...emailActivities,
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   let callActivities: UserActivity[] = []
   try {
@@ -638,8 +819,14 @@ export default function AdminUsersActivity() {
 
   const selectedUserActivities = useMemo(() => {
     if (!selectedUser) return []
+    const sid = selectedUser.id
+    const sname = selectedUser.name.trim().toLowerCase()
     return activities
-      .filter(item => item.user_id === selectedUser.id)
+      .filter(item => {
+        if (item.user_id === sid) return true
+        const un = item.user_name?.trim().toLowerCase()
+        return un !== undefined && un.length > 0 && un === sname
+      })
       .filter(item => {
         const activityDate = new Date(item.created_at)
         if (dateFrom && activityDate < dateFrom) return false

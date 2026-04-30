@@ -57,10 +57,11 @@ export async function action({ request }: ActionFunctionArgs) {
   )
   const initialStatus = listRows[0]?.name || 'New Customer'
   if (!data.deal_id) {
+    const dealCreatedBy = auditDisplayName(user)
     const [result] = await db.execute<ResultSetHeader>(
       `INSERT INTO deals
-     (customer_id, amount, title, status, list_id, position, user_id, is_won)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+     (customer_id, amount, title, status, list_id, position, user_id, is_won, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.customer_id,
         data.amount,
@@ -70,6 +71,7 @@ export async function action({ request }: ActionFunctionArgs) {
         data.position,
         user.id,
         data.is_won ?? null,
+        dealCreatedBy,
       ],
     )
     await db.execute(
