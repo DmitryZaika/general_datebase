@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from 'lucide-react'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import {
   Link,
@@ -47,6 +47,12 @@ function SalesRepCell({ customer }: { customer: CustomersListCustomer }) {
       rep: customer.sales_rep ? String(customer.sales_rep) : '',
     },
   })
+
+  useEffect(() => {
+    form.reset({
+      rep: customer.sales_rep ? String(customer.sales_rep) : '',
+    })
+  }, [customer.id, customer.sales_rep, form])
 
   const mutation = useMutation({
     mutationFn: async (newRep: string) => {
@@ -480,9 +486,10 @@ export function CustomersListPage() {
         }}
       />
       <DataTable
-        key={`${tabParam}-${currentPage}-${viewParam}-${pageSize}`}
+        key={`${tabParam}-${currentPage}-${viewParam}-${pageSize}-${salesRepParam ?? 'all'}`}
         columns={columns}
         data={rows}
+        getRowId={row => String(row.id)}
         rowClassName={getRowClassName}
         onRowClick={customer => navigate(`info/${customer.id}${location.search}`)}
       />
