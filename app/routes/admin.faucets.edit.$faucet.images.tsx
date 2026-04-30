@@ -1,18 +1,15 @@
 import { X } from 'lucide-react'
-import { useEffect, useState } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   Form as RemixForm,
   redirect,
   useLoaderData,
-  useNavigation,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
-import { FileInput } from '~/components/molecules/FileInput'
-import { MultiPartForm } from '~/components/molecules/MultiPartForm'
+import { z } from 'zod'
+import { AdminMultiImageUploadForm } from '~/components/molecules/AdminMultiImageUploadForm'
 import { Button } from '~/components/ui/button'
-import { FormField } from '~/components/ui/form'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
@@ -21,7 +18,6 @@ import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
-import { fileSchema, useCustomForm } from '~/utils/useCustomForm'
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
@@ -62,18 +58,23 @@ export async function action({ request, params }: ActionFunctionArgs) {
     })
   }
 
-  const { errors, data } = await parseMutliForm(request, fileSchema, 'faucets')
+  const { errors, data } = await parseMutliForm(request, z.object({}), 'faucets')
   if (errors || !data) {
     return { errors }
   }
 
-  await db.execute(`INSERT INTO installed_faucets (url, faucet_id) VALUES (?, ?)`, [
-    data.file,
-    faucetId,
-  ])
+  const urls = typeof data.file === 'string' ? [data.file] : data.file
+
+  for (const url of urls) {
+    await db.execute(`INSERT INTO installed_faucets (url, faucet_id) VALUES (?, ?)`, [
+      url,
+      faucetId,
+    ])
+  }
 
   const session = await getSession(request.headers.get('Cookie'))
-  session.flash('message', toastData('Success', 'Image Added'))
+  const msg = urls.length === 1 ? 'Image added' : `${urls.length} images added`
+  session.flash('message', toastData('Success', msg))
   return redirect(request.url, {
     headers: { 'Set-Cookie': await commitSession(session) },
   })
@@ -97,48 +98,11 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   return { faucets }
 }
 
-function AddImage() {
-  const navigation = useNavigation()
-  const form = useCustomForm(fileSchema)
-
-  const [inputKey, setInputKey] = useState(0)
-
-  useEffect(() => {
-    if (navigation.state === 'idle') {
-      form.reset()
-      setInputKey(k => k + 1)
-    }
-  }, [navigation.state, form])
-
-  return (
-    <MultiPartForm form={form}>
-      <div className='flex items-center space-x-4'>
-        <FormField
-          control={form.control}
-          name='file'
-          render={({ field }) => (
-            <FileInput
-              key={inputKey}
-              inputName='images'
-              id='image'
-              type='image'
-              onChange={field.onChange}
-            />
-          )}
-        />
-        <Button type='submit' variant='blue'>
-          Add image
-        </Button>
-      </div>
-    </MultiPartForm>
-  )
-}
-
 export default function SelectImages() {
   const { faucets } = useLoaderData<typeof loader>()
   return (
     <>
-      <AddImage />
+      <AdminMultiImageUploadForm fileInputId='faucet-image' />
       <div className='grid grid-cols-2  md:grid-cols-3 gap-4 mt-4'>
         {faucets.map(faucet => (
           <div key={faucet.id} className='relative group'>

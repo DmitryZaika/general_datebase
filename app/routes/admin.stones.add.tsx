@@ -25,11 +25,7 @@ import {
 import { db } from '~/db.server'
 import { stoneSchema } from '~/schemas/stones'
 import { commitSession, getSession } from '~/sessions.server'
-import {
-  DIALOG_CONTENT_ADD_EDIT_CLASS,
-  STONE_FINISHES,
-  STONE_TYPES,
-} from '~/utils/constants'
+import { STONE_FINISHES, STONE_TYPES } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectMany } from '~/utils/queryHelpers'
@@ -161,7 +157,7 @@ export default function StonesAdd() {
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className={DIALOG_CONTENT_ADD_EDIT_CLASS}>
+      <DialogContent className='sm:max-w-[480px] overflow-y-auto max-h-[95vh]'>
         <DialogHeader>
           <DialogTitle>Add Stone</DialogTitle>
         </DialogHeader>

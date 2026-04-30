@@ -1,5 +1,7 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import {
   type ActionFunctionArgs,
   data,
@@ -10,6 +12,7 @@ import {
   useNavigation,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
+import { z } from 'zod'
 
 import { FileInput } from '~/components/molecules/FileInput'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -36,7 +39,7 @@ import { deleteFile } from '~/utils/s3.server'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
 import { getEmployeeUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
-import { fileSchema, useCustomForm } from '~/utils/useCustomForm'
+import { multiFileSchema } from '~/utils/useCustomForm'
 
 interface DealImage {
   id: number
@@ -96,7 +99,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (contentType.includes('multipart/form-data')) {
       const { errors, data: parsedData } = await parseMutliForm(
         requestClone,
-        fileSchema,
+        z.object({}),
         'deals',
       )
 
@@ -110,13 +113,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       // Insert into database
       try {
-        await db.execute(
-          `INSERT INTO deals_images (deal_id, image_url) VALUES (?, ?)`,
-          [dealId, parsedData.file],
-        )
+        const urls =
+          typeof parsedData.file === 'string' ? [parsedData.file] : parsedData.file
+
+        for (const url of urls) {
+          await db.execute(
+            `INSERT INTO deals_images (deal_id, image_url) VALUES (?, ?)`,
+            [dealId, url],
+          )
+        }
 
         const session = await getSession(request.headers.get('Cookie'))
-        session.flash('message', toastData('Success', 'Image added successfully'))
+        const msg =
+          urls.length === 1
+            ? 'Image added successfully'
+            : `${urls.length} images added successfully`
+        session.flash('message', toastData('Success', msg))
         return data(
           { success: true },
           {
@@ -190,7 +202,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
 function AddImageForm() {
   const navigation = useNavigation()
-  const form = useCustomForm(fileSchema)
+  const form = useForm<z.infer<typeof multiFileSchema>>({
+    resolver: zodResolver(multiFileSchema),
+  })
   const isSubmitting = useNavigation().state !== 'idle'
   const [inputKey, setInputKey] = useState(0)
 
@@ -213,12 +227,13 @@ function AddImageForm() {
               inputName='deals'
               id='deal-image'
               type='image'
+              multiple
               onChange={field.onChange}
             />
           )}
         />
         <LoadingButton type='submit' className='mt-2' loading={isSubmitting}>
-          Add image
+          Add images
         </LoadingButton>
       </div>
     </MultiPartForm>

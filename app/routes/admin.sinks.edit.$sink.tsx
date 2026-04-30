@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { sinkSchema } from '~/schemas/sinks'
 import { commitSession, getSession } from '~/sessions.server'
+import { DIALOG_CONTENT_ADD_EDIT_CLASS } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { parseMutliForm } from '~/utils/parseMultiForm'
 import { selectId, selectMany } from '~/utils/queryHelpers'
@@ -401,7 +402,7 @@ export default function SinksEdit() {
   }
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[425px] overflow-auto max-h-[95vh]'>
+      <DialogContent className={DIALOG_CONTENT_ADD_EDIT_CLASS}>
         <DialogHeader>
           <DialogTitle>Edit Sink</DialogTitle>
         </DialogHeader>

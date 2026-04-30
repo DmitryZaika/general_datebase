@@ -6,7 +6,7 @@ export const CLOSED_WON_LIST_ID = 4
 export const CLOSED_LOST_LIST_ID = 5
 export const TERMINAL_LIST_IDS = [CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID]
 export const DIALOG_CONTENT_ADD_EDIT_CLASS =
-  'sm:max-w-[480px] overflow-y-auto max-h-[95vh]'
+  'sm:max-w-[480px] overflow-y-auto h-[95vh] flex flex-col'
 
 export const LOST_REASONS = {
   'Too expensive': 'Too expensive',

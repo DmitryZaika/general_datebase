@@ -13,9 +13,8 @@ import {
   useParams,
 } from 'react-router'
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
-import { FileInput } from '~/components/molecules/FileInput'
-import { LoadingButton } from '~/components/molecules/LoadingButton'
-import { MultiPartForm } from '~/components/molecules/MultiPartForm'
+import { z } from 'zod'
+import { AdminMultiImageUploadForm } from '~/components/molecules/AdminMultiImageUploadForm'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -25,7 +24,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { FormField } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
@@ -36,7 +34,6 @@ import { selectId, selectMany } from '~/utils/queryHelpers'
 import { deleteFile } from '~/utils/s3.server'
 import { getAdminUser } from '~/utils/session.server'
 import { forceRedirectError, toastData } from '~/utils/toastHelpers.server'
-import { fileSchema, useCustomForm } from '~/utils/useCustomForm'
 
 function LinkedImagesCarousel({ images }: { images: { url: string }[] }) {
   return (
@@ -126,20 +123,26 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (contentType.includes('multipart/form-data')) {
       const { errors, data: parsedData } = await parseMutliForm(
         requestClone,
-        fileSchema,
+        z.object({}),
         'stones',
       )
       if (errors || !parsedData) {
         return { errors }
       }
 
-      await db.execute(`INSERT INTO installed_stones (url, stone_id) VALUES (?, ?)`, [
-        parsedData.file,
-        stoneId,
-      ])
+      const urls =
+        typeof parsedData.file === 'string' ? [parsedData.file] : parsedData.file
+
+      for (const url of urls) {
+        await db.execute(`INSERT INTO installed_stones (url, stone_id) VALUES (?, ?)`, [
+          url,
+          stoneId,
+        ])
+      }
 
       const session = await getSession(request.headers.get('Cookie'))
-      session.flash('message', toastData('Success', 'Image Added'))
+      const msg = urls.length === 1 ? 'Image added' : `${urls.length} images added`
+      session.flash('message', toastData('Success', msg))
       return data(
         { success: true },
         {
@@ -230,42 +233,6 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   })
 
   return { stones, allStones, linkedImages }
-}
-
-function AddImage() {
-  const navigation = useNavigation()
-  const isSubmitting = useNavigation().state === 'submitting'
-  const form = useCustomForm(fileSchema)
-
-  const [inputKey, setInputKey] = useState(0)
-
-  useEffect(() => {
-    if (navigation.state === 'idle') {
-      form.reset()
-      setInputKey(k => k + 1)
-    }
-  }, [navigation.state, form])
-
-  return (
-    <MultiPartForm form={form}>
-      <div className='flex items-center space-x-4'>
-        <FormField
-          control={form.control}
-          name='file'
-          render={({ field }) => (
-            <FileInput
-              key={inputKey}
-              inputName='images'
-              id='image'
-              type='image'
-              onChange={field.onChange}
-            />
-          )}
-        />
-        <LoadingButton loading={isSubmitting}>Add Stone</LoadingButton>
-      </div>
-    </MultiPartForm>
-  )
 }
 
 interface LinkImagesDialogProps {
@@ -411,7 +378,7 @@ export default function SelectImages() {
         </Button>
       </div>
 
-      <AddImage />
+      <AdminMultiImageUploadForm fileInputId='image' />
 
       <div className='grid grid-cols-2 md:grid-cols-3 gap-4 mt-4'>
         {stones.map(stone => (

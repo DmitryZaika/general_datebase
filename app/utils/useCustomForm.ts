@@ -6,6 +6,12 @@ export const fileSchema = z.object({
   file: z.instanceof(File),
 })
 
+export const multiFileSchema = z.object({
+  file: z.array(z.instanceof(File)).min(1),
+})
+
+export type MultiImageFormValues = z.infer<typeof multiFileSchema>
+
 const optionalFileSchema = z.object({
   file: z.instanceof(File).optional(),
 })

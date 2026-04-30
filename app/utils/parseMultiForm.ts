@@ -1,12 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { type FileUpload, parseFormData } from '@mjackson/form-data-parser'
-import { validateFormData } from 'remix-hook-form'
+import { generateFormData, validateFormData } from 'remix-hook-form'
 import { z } from 'zod'
 import { csrf } from '~/utils/csrf.server'
 import { s3UploadHandler } from '~/utils/s3.server'
 
 const fileSchema = z.object({
-  file: z.string(),
+  file: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
 })
 
 export async function parseMutliForm<Shape extends z.ZodRawShape>(
@@ -26,5 +26,6 @@ export async function parseMutliForm<Shape extends z.ZodRawShape>(
 
   csrf.validate(formData, request.headers)
 
-  return await validateFormData(formData, resolver)
+  const receivedValues = generateFormData(formData)
+  return await validateFormData(receivedValues, resolver)
 }

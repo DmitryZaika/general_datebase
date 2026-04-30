@@ -2,16 +2,27 @@ import Compressor from 'compressorjs'
 import { Input } from '~/components/ui/input'
 import { FormControl, FormItem, FormLabel, FormMessage } from '../ui/form'
 
-type FileInput = {
+type BaseFileInputProps = {
   inputName?: string
   id: string
   label?: string
   type?: 'image' | 'pdf' | 'document' | 'all'
   className?: string
-  onChange: (event: File | undefined) => void
 }
 
-type FileInputType = NonNullable<FileInput['type']>
+type SingleFileInputProps = BaseFileInputProps & {
+  multiple?: false
+  onChange: (file: File | undefined) => void
+}
+
+type MultiFileInputProps = BaseFileInputProps & {
+  multiple: true
+  onChange: (files: File[]) => void
+}
+
+type FileInputProps = SingleFileInputProps | MultiFileInputProps
+
+type FileInputType = NonNullable<BaseFileInputProps['type']>
 
 const acceptsMap: Record<FileInputType, string> = {
   image:
@@ -41,35 +52,64 @@ function getQuality(size: number): number {
   }
 }
 
-export function FileInput({
-  onChange,
-  id,
-  label = 'File',
-  type = 'all',
-  className,
-}: FileInput) {
-  function compressImage(file: File) {
+function compressToFile(file: File): Promise<File> {
+  return new Promise((resolve, reject) => {
     new Compressor(file, {
       quality: getQuality(file.size),
       success(result) {
         if (result instanceof File) {
-          onChange(result)
+          resolve(result)
         } else {
-          const tempFile = new File([result], 'temp.jpg')
-          onChange(tempFile)
+          resolve(new File([result], file.name, { type: file.type || 'image/jpeg' }))
         }
       },
+      error: reject,
     })
+  })
+}
+
+export function FileInput(props: FileInputProps) {
+  const { id, label = 'File', type = 'all', className } = props
+
+  async function runMultiFromList(files: FileList | null) {
+    if (props.multiple !== true) return
+    if (!files?.length) {
+      props.onChange([])
+      return
+    }
+    const list = Array.from(files)
+    const out: File[] = []
+    for (const file of list) {
+      if (type === 'image' || (type === 'all' && file.type.startsWith('image/'))) {
+        out.push(await compressToFile(file))
+      } else {
+        out.push(file)
+      }
+    }
+    props.onChange(out)
   }
 
-  function handleChange(file: File | undefined) {
+  function runSingleFromFile(file: File | undefined) {
+    if (props.multiple === true) return
     if (!file) return
     if (type === 'image' || (type === 'all' && file.type.startsWith('image/'))) {
-      compressImage(file)
+      new Compressor(file, {
+        quality: getQuality(file.size),
+        success(result) {
+          if (result instanceof File) {
+            props.onChange(result)
+          } else {
+            const tempFile = new File([result], 'temp.jpg')
+            props.onChange(tempFile)
+          }
+        },
+      })
     } else {
-      onChange(file)
+      props.onChange(file)
     }
   }
+
+  const isMulti = props.multiple === true
 
   return (
     <FormItem>
@@ -77,10 +117,17 @@ export function FileInput({
       <FormControl>
         <Input
           className={className}
-          onChange={event => handleChange(event.target.files?.[0])}
+          onChange={event => {
+            if (isMulti) {
+              void runMultiFromList(event.target.files)
+            } else {
+              runSingleFromFile(event.target.files?.[0])
+            }
+          }}
           type='file'
           accept={acceptsMap[type]}
           id={id}
+          multiple={isMulti}
         />
       </FormControl>
       <FormMessage />
