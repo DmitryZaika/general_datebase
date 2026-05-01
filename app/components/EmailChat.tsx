@@ -15,6 +15,7 @@ import {
   SendIcon,
   Sparkles,
   Upload,
+  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useNavigation } from 'react-router'
@@ -34,7 +35,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '~/components/ui/alert-dialog'
-import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -264,6 +264,9 @@ const EMAIL_HTML_TAG_REGEX = /<\/?[a-z][\s\S]*>/i
 const EMAIL_MARKDOWN_LINK_REGEX = /\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^)]+)\)/gi
 const EMAIL_URL_REGEX = /\bhttps?:\/\/[^\s<>"')]+[^\s<>"').,;:]/gi
 const EMAIL_GREETING_REGEX = /\b(Hi|Hello|Dear|This|Thank|Location:)\b/i
+const EMAIL_EXISTING_ANCHOR_REGEX = /<a\b[\s\S]*?<\/a>/gi
+const EMAIL_INLINE_URL_BOUNDARY_REGEX =
+  /(^|[\s>(])((?:https?:\/\/)[^\s<>"']+[^\s<>"').,;:])/gim
 
 function escapeHtml(value: string): string {
   return value
@@ -283,18 +286,26 @@ function emailAnchor(url: string, label: string): string {
   return `<a href="${href}" target="_blank" rel="noreferrer">${label}</a>`
 }
 
+function normalizeEmailUrl(url: string): string {
+  return url.replace(/&amp;/gi, '&').replace(/&#38;/gi, '&')
+}
+
 function formatEmailInline(value: string): string {
   const replacements: string[] = []
   const withMarkdownLinks = value.replace(
     EMAIL_MARKDOWN_LINK_REGEX,
     (_match, label, url) => {
       const index = replacements.length
-      replacements.push(emailAnchor(String(url), escapeHtml(String(label))))
+      const normalizedUrl = normalizeEmailUrl(String(url))
+      replacements.push(emailAnchor(normalizedUrl, escapeHtml(String(label))))
       return `__EMAIL_LINK_${index}__`
     },
   )
   const linked = escapeHtml(withMarkdownLinks)
-    .replace(EMAIL_URL_REGEX, url => emailAnchor(url, escapeHtml(url)))
+    .replace(EMAIL_URL_REGEX, url => {
+      const normalizedUrl = normalizeEmailUrl(url)
+      return emailAnchor(normalizedUrl, escapeHtml(normalizedUrl))
+    })
     .replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>')
 
   return replacements.reduce(
@@ -387,9 +398,27 @@ function sanitizeEmailBody(html: string): string {
     ADD_TAGS: ['ul', 'ol', 'li', 'a', 'strong', 'em', 'p', 'br'],
     ADD_ATTR: ['href', 'target', 'rel'],
   })
-  return sanitized.replace(
+  const withTargets = sanitized.replace(
     /<a\s+(?![^>]*\btarget=)/gi,
     '<a target="_blank" rel="noreferrer" ',
+  )
+  const anchors: string[] = []
+  const withoutAnchors = withTargets.replace(EMAIL_EXISTING_ANCHOR_REGEX, match => {
+    const marker = `__EMAIL_ANCHOR_${anchors.length}__`
+    anchors.push(match)
+    return marker
+  })
+  const linkified = withoutAnchors.replace(
+    EMAIL_INLINE_URL_BOUNDARY_REGEX,
+    (_match, prefix: string, url: string) => {
+      const normalizedUrl = url.replace(/&amp;/gi, '&')
+      return `${prefix}<a href="${escapeAttribute(normalizedUrl)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>`
+    },
+  )
+  return anchors.reduce(
+    (htmlOutput, anchor, index) =>
+      htmlOutput.replace(`__EMAIL_ANCHOR_${index}__`, anchor),
+    linkified,
   )
 }
 
@@ -624,6 +653,9 @@ export function EmailChat(props: EmailChatProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [attachments, setAttachments] = useState<File[]>([])
+  const [attachmentPreviews, setAttachmentPreviews] = useState<Record<string, string>>(
+    {},
+  )
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -751,7 +783,7 @@ export function EmailChat(props: EmailChatProps) {
       }
       if (files.length > 0) {
         e.preventDefault()
-        setAttachments(prev => [...prev, ...files])
+        appendAttachments(files)
       }
     }
     document.addEventListener('paste', handlePaste, true)
@@ -769,11 +801,17 @@ export function EmailChat(props: EmailChatProps) {
     )
   }
 
-  const addFiles = (newFiles: File[]) => {
-    setAttachments(prev => [...prev, ...newFiles])
-  }
-
   const removeAttachment = (file: File) => {
+    const previewKey = `${file.name}-${file.size}-${file.lastModified}`
+    const previewUrl = attachmentPreviews[previewKey]
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
+      setAttachmentPreviews(prev => {
+        const next = { ...prev }
+        delete next[previewKey]
+        return next
+      })
+    }
     setAttachments(prev => prev.filter(f => f !== file))
   }
 
@@ -800,7 +838,42 @@ export function EmailChat(props: EmailChatProps) {
     const parts = fileName.split('.')
     const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : ''
     if (ext && imageExt.has(ext)) return <ImageIcon className='h-4 w-4' />
-    return <FileText className='h-4 w-4' />
+    return <FileText className='h-8 w-8' />
+  }
+
+  function appendAttachments(newFiles: File[]) {
+    setAttachments(prev => [...prev, ...newFiles])
+    setAttachmentPreviews(prev => {
+      const next = { ...prev }
+      for (const file of newFiles) {
+        const key = `${file.name}-${file.size}-${file.lastModified}`
+        const isImageFile = file.type.toLowerCase().startsWith('image/')
+        if (isImageFile && !next[key]) {
+          next[key] = URL.createObjectURL(file)
+        }
+      }
+      return next
+    })
+  }
+
+  function clearAttachmentPreviews() {
+    const urls = Object.values(attachmentPreviews)
+    for (const url of urls) {
+      URL.revokeObjectURL(url)
+    }
+    setAttachmentPreviews({})
+  }
+
+  function openAttachment(file: File) {
+    const fileUrl = URL.createObjectURL(file)
+    const link = document.createElement('a')
+    link.href = fileUrl
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(fileUrl), 30_000)
   }
 
   const handleTemplateSelect = (value: string) => {
@@ -1097,6 +1170,7 @@ export function EmailChat(props: EmailChatProps) {
         },
       ])
       setMessageText('')
+      clearAttachmentPreviews()
       setAttachments([])
       setActiveTemplateId(null)
       toast({ title: 'Success', description: 'Email sent!', variant: 'success' })
@@ -1133,7 +1207,7 @@ export function EmailChat(props: EmailChatProps) {
     if (!isEmployee) return
     const files = e.dataTransfer?.files
     if (files && files.length > 0) {
-      setAttachments(prev => [...prev, ...Array.from(files)])
+      appendAttachments(Array.from(files))
     }
   }
 
@@ -1322,7 +1396,6 @@ export function EmailChat(props: EmailChatProps) {
                                 target='_blank'
                                 rel='noreferrer'
                                 className='block'
-                                download
                               >
                                 <div
                                   className={`${fileSize} bg-zinc-600 rounded-md border border-zinc-800 flex flex-col items-center justify-center text-zinc-900 hover:bg-zinc-800 transition-colors p-2 shadow-md`}
@@ -1339,7 +1412,6 @@ export function EmailChat(props: EmailChatProps) {
                                 target='_blank'
                                 rel='noreferrer'
                                 className={linkClass}
-                                download
                               >
                                 <span className='inline-flex items-center gap-1'>
                                   <FileText className='h-4 w-4' />
@@ -1400,31 +1472,78 @@ export function EmailChat(props: EmailChatProps) {
           {isEmployee && attachments.length > 0 && (
             <div className='mb-2 flex flex-wrap gap-2'>
               {attachments.map(file => {
-                const isTruncated = file.name.length > 15
-                const displayName = formatFileName(file.name)
-                const badge = (
-                  <Badge
-                    key={`${file.name}-${file.size}`}
-                    className='cursor-pointer select-none'
-                    onClick={() => removeAttachment(file)}
-                  >
-                    <span className='flex items-center gap-1'>
-                      {attachmentIcon(file.name)}
-                      <span>{displayName}</span>
-                      <span className='ml-1'>×</span>
-                    </span>
-                  </Badge>
-                )
-
-                if (!isTruncated) return badge
-
+                const previewKey = `${file.name}-${file.size}-${file.lastModified}`
+                const previewUrl = attachmentPreviews[previewKey]
+                const isImageFile = file.type.toLowerCase().startsWith('image/')
                 return (
-                  <TooltipProvider key={`${file.name}-${file.size}`}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>{badge}</TooltipTrigger>
-                      <TooltipContent side='top'>{file.name}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <div
+                    key={previewKey}
+                    className={`group relative size-15 shrink-0 rounded border border-border overflow-hidden ${!isImageFile ? 'cursor-pointer' : ''}`}
+                    onClick={
+                      isImageFile
+                        ? undefined
+                        : () => {
+                            openAttachment(file)
+                          }
+                    }
+                  >
+                    <button
+                      type='button'
+                      className='absolute top-0 right-0 z-10 p-0.5 rounded-bl bg-black/60 text-white transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-black/80'
+                      onClick={e => {
+                        e.stopPropagation()
+                        removeAttachment(file)
+                      }}
+                      aria-label='Remove attachment'
+                    >
+                      <X className='h-3 w-3' />
+                    </button>
+                    {isImageFile && previewUrl ? (
+                      <button
+                        type='button'
+                        className='size-full cursor-pointer block focus:outline-none'
+                        onClick={e => {
+                          e.stopPropagation()
+                          const imgs = attachments
+                            .map((attachment, imageIndex) => {
+                              const key = `${attachment.name}-${attachment.size}-${attachment.lastModified}`
+                              const url = attachmentPreviews[key]
+                              if (!url) return null
+                              return {
+                                id: imageIndex,
+                                url,
+                                name: attachment.name,
+                                type: 'email',
+                                available: null,
+                              }
+                            })
+                            .filter(item => item !== null)
+                          setCurrentImages(imgs)
+                          const clickedImageIndex = attachments.findIndex(
+                            attachment =>
+                              `${attachment.name}-${attachment.size}-${attachment.lastModified}` ===
+                              previewKey,
+                          )
+                          setCurrentImageId(clickedImageIndex)
+                        }}
+                      >
+                        <img
+                          src={previewUrl}
+                          alt={file.name}
+                          className='size-full object-cover transition-all group-hover:grayscale group-hover:brightness-75'
+                        />
+                      </button>
+                    ) : (
+                      <div className='size-full flex items-center justify-center bg-muted text-muted-foreground group-hover:bg-muted/80 transition-colors cursor-pointer'>
+                        {attachmentIcon(file.name)}
+                      </div>
+                    )}
+                    <div className='absolute inset-0 pointer-events-none bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
+                      <span className='text-white text-[10px] text-center line-clamp-2 break-all select-none px-1'>
+                        {formatFileName(file.name)}
+                      </span>
+                    </div>
+                  </div>
                 )
               })}
             </div>
@@ -1621,7 +1740,7 @@ export function EmailChat(props: EmailChatProps) {
                   onChange={e => {
                     const files = e.currentTarget.files
                     if (files && files.length > 0) {
-                      setAttachments(prev => [...prev, ...Array.from(files)])
+                      appendAttachments(Array.from(files))
                     }
                     e.currentTarget.value = ''
                   }}
@@ -1683,10 +1802,10 @@ export function EmailChat(props: EmailChatProps) {
               open={showStonesPicker}
               onClose={() => setShowStonesPicker(false)}
               onSelect={files => {
-                addFiles(files)
+                appendAttachments(files)
                 setShowStonesPicker(false)
               }}
-              onAddFiles={addFiles}
+              onAddFiles={appendAttachments}
             />
             <AttachmentImagePicker
               type='images'
@@ -1694,7 +1813,7 @@ export function EmailChat(props: EmailChatProps) {
               open={showImagesPicker}
               onClose={() => setShowImagesPicker(false)}
               onSelect={files => {
-                addFiles(files)
+                appendAttachments(files)
                 setShowImagesPicker(false)
               }}
             />
@@ -1704,7 +1823,7 @@ export function EmailChat(props: EmailChatProps) {
               open={showDocumentsPicker}
               onClose={() => setShowDocumentsPicker(false)}
               onSelect={files => {
-                addFiles(files)
+                appendAttachments(files)
                 setShowDocumentsPicker(false)
               }}
             />

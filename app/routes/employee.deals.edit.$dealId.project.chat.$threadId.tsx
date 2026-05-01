@@ -106,7 +106,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   )
   const attachments = await Promise.all(
     attachmentsRaw.map(async attachment => {
-      const signed = await presignIfS3Uri(attachment.url)
+      const type = attachment.content_type.trim().toLowerCase()
+      const subtype = attachment.content_subtype.trim().toLowerCase()
+      const mime = type && subtype ? `${type}/${subtype}` : null
+      const signed = await presignIfS3Uri(attachment.url, 3600, 'inline', mime)
       if (signed === attachment.url) return attachment
       return { ...attachment, signed_url: signed }
     }),

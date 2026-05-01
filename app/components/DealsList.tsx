@@ -27,7 +27,7 @@ export default function DealsList({
   return (
     <Card
       ref={setNodeRef}
-      className={`min-w-[18rem] max-w-[22rem] flex-1 w-full max-h-[calc(100vh-10rem)] flex flex-col h-full shadow-sm `}
+      className='min-w-[18rem] max-w-[22rem] flex-1 w-full min-h-0 flex flex-col h-full shadow-sm'
     >
       <CardHeader className='bg-black rounded-t-xl py-2 px-3'>
         <div className='flex justify-between items-center'>

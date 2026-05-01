@@ -30,10 +30,20 @@ function parseS3Uri(input: string) {
   return { bucket, key }
 }
 
-export async function presignIfS3Uri(url: string, expiresInSeconds: number = 3600) {
+export async function presignIfS3Uri(
+  url: string,
+  expiresInSeconds: number = 3600,
+  contentDisposition: 'inline' | 'attachment' | null = null,
+  contentType: string | null = null,
+) {
   const parsed = parseS3Uri(url)
   if (!parsed) return url
   const client = getClient()
-  const command = new GetObjectCommand({ Bucket: parsed.bucket, Key: parsed.key })
+  const command = new GetObjectCommand({
+    Bucket: parsed.bucket,
+    Key: parsed.key,
+    ResponseContentDisposition: contentDisposition,
+    ResponseContentType: contentType,
+  })
   return getSignedUrl(client, command, { expiresIn: expiresInSeconds })
 }

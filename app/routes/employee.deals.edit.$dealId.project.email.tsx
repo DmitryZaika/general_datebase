@@ -788,6 +788,9 @@ export default function DealEmailDialog() {
     }
 
     if (pastedFiles.length > 0) {
+      e.preventDefault()
+      e.stopPropagation()
+      e.nativeEvent.stopImmediatePropagation()
       addFiles(pastedFiles)
       setIsDragging(false)
     }
@@ -856,11 +859,17 @@ export default function DealEmailDialog() {
     return <FileText className='h-8 sm:h-15 w-8 sm:w-15' />
   }
 
+  const openAttachment = (file: File) => {
+    const fileUrl = URL.createObjectURL(file)
+    window.open(fileUrl, '_blank', 'noopener,noreferrer')
+    setTimeout(() => URL.revokeObjectURL(fileUrl), 30_000)
+  }
+
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
       <DialogContent
         className={`sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5 transition-colors ${isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`}
-        onPaste={handlePaste}
+        onPasteCapture={handlePaste}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -925,20 +934,22 @@ export default function DealEmailDialog() {
                           />
                         </button>
                       ) : (
-                        <div
+                        <button
+                          type='button'
                           className='size-full flex items-center justify-center bg-muted text-muted-foreground cursor-pointer group-hover:bg-muted/80 transition-colors'
-                          onClick={() => removeAttachment(index)}
+                          onClick={e => {
+                            e.stopPropagation()
+                            openAttachment(file)
+                          }}
                         >
                           {attachmentIcon(file.name)}
-                        </div>
+                        </button>
                       )}
-                      {previewUrl ? (
-                        <div className='absolute inset-0 pointer-events-none bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
-                          <span className='text-white text-[10px] text-center line-clamp-2 break-all select-none'>
-                            {file.name}
-                          </span>
-                        </div>
-                      ) : null}
+                      <div className='absolute inset-0 pointer-events-none bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
+                        <span className='text-white text-[10px] text-center line-clamp-2 break-all select-none px-1'>
+                          {file.name}
+                        </span>
+                      </div>
                     </div>
                   )
                 })}

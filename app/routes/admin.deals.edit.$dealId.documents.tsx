@@ -43,6 +43,20 @@ interface DealDocument {
   source: string
 }
 
+function documentMimeType(url: string): string | null {
+  const cleanUrl = url.split('?')[0].toLowerCase()
+  if (cleanUrl.endsWith('.pdf')) return 'application/pdf'
+  if (cleanUrl.endsWith('.txt')) return 'text/plain'
+  if (cleanUrl.endsWith('.csv')) return 'text/csv'
+  if (cleanUrl.endsWith('.doc')) return 'application/msword'
+  if (cleanUrl.endsWith('.docx'))
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  if (cleanUrl.endsWith('.xls')) return 'application/vnd.ms-excel'
+  if (cleanUrl.endsWith('.xlsx'))
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  return null
+}
+
 export async function action({ request, params }: ActionFunctionArgs) {
   let sessionUser: User
   try {
@@ -180,7 +194,12 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const signedDocuments = await Promise.all(
     documents.map(async document => ({
       ...document,
-      image_url: await presignIfS3Uri(document.image_url),
+      image_url: await presignIfS3Uri(
+        document.image_url,
+        3600,
+        'inline',
+        documentMimeType(document.image_url),
+      ),
     })),
   )
 
