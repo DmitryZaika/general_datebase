@@ -1,11 +1,6 @@
 import { type ActionFunctionArgs, data } from 'react-router'
 import { transitionDealStage } from '~/crud/deals'
 import { db } from '~/db.server'
-import {
-  CLOSED_LOST_LIST_ID,
-  CLOSED_WON_LIST_ID,
-  TERMINAL_LIST_IDS,
-} from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -18,51 +13,33 @@ export async function action({ request }: ActionFunctionArgs) {
   const toList = Number(form.get('toList'))
   if (!id || !toList) return data({ error: 'bad payload' }, { status: 400 })
 
-  const prevRows = await selectMany<{ list_id: number }>(
+  const prevRows = await selectMany<{ list_id: number; is_won: number | null }>(
     db,
-    'SELECT list_id FROM deals WHERE id = ? LIMIT 1',
+    'SELECT list_id, is_won FROM deals WHERE id = ? LIMIT 1',
     [id],
   )
   const prevListId = prevRows[0]?.list_id
+  const prevIsWon = prevRows[0]?.is_won
+  const fromClosed = prevIsWon === 1 || prevIsWon === 0
 
   const movedAcross = prevListId !== undefined && prevListId !== toList
-  const fromTerminal =
-    prevListId !== undefined && TERMINAL_LIST_IDS.includes(prevListId)
 
   let changeIsWon = 0
   let isWonVal: number | null = null
-  if (movedAcross) {
-    if (toList === CLOSED_WON_LIST_ID) {
-      changeIsWon = 1
-      isWonVal = 1
-    } else if (toList === CLOSED_LOST_LIST_ID) {
-      changeIsWon = 1
-      isWonVal = 0
-    } else if (fromTerminal) {
-      changeIsWon = 1
-      isWonVal = null
-    }
+  if (movedAcross && fromClosed) {
+    changeIsWon = 1
+    isWonVal = null
   }
-  const clearLostReason = movedAcross && (toList === CLOSED_WON_LIST_ID || fromTerminal)
+  const clearLostReason = movedAcross && fromClosed
 
   await db.execute(
     `UPDATE deals
      SET list_id = ?,
-         due_date = IF(? IN (?, ?), NULL, due_date),
          is_won = IF(? = 1, ?, is_won),
          lost_reason = IF(?, NULL, lost_reason),
          updated_at = NOW()
      WHERE id = ?`,
-    [
-      toList,
-      toList,
-      CLOSED_WON_LIST_ID,
-      CLOSED_LOST_LIST_ID,
-      changeIsWon,
-      isWonVal,
-      clearLostReason ? 1 : 0,
-      id,
-    ],
+    [toList, changeIsWon, isWonVal, clearLostReason ? 1 : 0, id],
   )
 
   if (movedAcross) {

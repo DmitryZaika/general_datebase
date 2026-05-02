@@ -20,11 +20,6 @@ import { parseLocalDate } from '~/lib/utils'
 import type { Customer } from '~/types'
 import type { DealCardData } from '~/types/deals'
 import type { Nullable } from '~/types/utils'
-import {
-  CLOSED_LOST_LIST_ID,
-  CLOSED_WON_LIST_ID,
-  TERMINAL_LIST_IDS,
-} from '~/utils/constants'
 
 function activityDeadlineHasTime(deadline: string): boolean {
   const d = parseLocalDate(deadline)
@@ -296,24 +291,13 @@ export default function DealsView({
       const toArr = [...(copy[toListId] || [])]
       const idx = fromArr.findIndex(d => d.id === activeId)
       if (idx === -1) return prev
-      const shouldClearDate = TERMINAL_LIST_IDS.includes(toListId)
-      const fromTerminal = TERMINAL_LIST_IDS.includes(fromListId)
+      const fromClosed = fromArr[idx].is_won === 1 || fromArr[idx].is_won === 0
       const moved = {
         ...fromArr[idx],
         list_id: toListId,
-        due_date: shouldClearDate ? null : fromArr[idx].due_date,
-        is_won:
-          toListId === CLOSED_WON_LIST_ID
-            ? 1
-            : toListId === CLOSED_LOST_LIST_ID
-              ? 0
-              : fromTerminal
-                ? null
-                : fromArr[idx].is_won,
-        lost_reason:
-          toListId === CLOSED_WON_LIST_ID || fromTerminal
-            ? null
-            : fromArr[idx].lost_reason,
+        due_date: fromArr[idx].due_date,
+        is_won: fromClosed ? null : fromArr[idx].is_won,
+        lost_reason: fromClosed ? null : fromArr[idx].lost_reason,
       }
       fromArr.splice(idx, 1)
       toArr.push(moved)
@@ -449,7 +433,7 @@ export default function DealsView({
   })
 
   const listsContent = (
-    <div className='flex gap-1 min-w-max h-full'>
+    <div className='flex min-h-0 flex-1 max-w-full min-w-0 items-stretch gap-1 md:min-w-0 max-md:gap-0 max-md:overflow-x-auto max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory'>
       {lists.map(list => (
         <DealsList
           key={list.id}
@@ -465,9 +449,11 @@ export default function DealsView({
 
   if (readonly) {
     return (
-      <div className='w-full h-[calc(100dvh-8rem)] min-h-0 flex flex-col overflow-hidden'>
+      <div className='w-full h-[calc(100dvh-4.75rem)] min-h-0 flex flex-col overflow-hidden'>
         <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
-        <div className='min-h-0 flex-1 overflow-auto'>{listsContent}</div>
+        <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
+          {listsContent}
+        </div>
       </div>
     )
   }
@@ -489,9 +475,11 @@ export default function DealsView({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full h-[calc(100dvh-8rem)] min-h-0 flex flex-col overflow-hidden'>
+      <div className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.50rem)] flex flex-col overflow-hidden'>
         <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
-        <div className='min-h-0 flex-1 overflow-auto'>{listsContent}</div>
+        <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
+          {listsContent}
+        </div>
       </div>
       <DragOverlay>
         {activeId !== null

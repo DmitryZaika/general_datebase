@@ -7,7 +7,6 @@ import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { DealEmailHistoryItem } from '~/types/dealActivityTypes'
 import type { Nullable } from '~/types/utils'
-import { TERMINAL_LIST_IDS } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 
 type UserWithCompany = { company_id: number }
@@ -53,31 +52,11 @@ export function createDealEditLoader(
 
       const { list_id, group_id, is_won } = dealRows[0]
 
-      let effectiveGroupId = group_id
-      let progressListId = list_id
-      if (TERMINAL_LIST_IDS.includes(list_id)) {
-        const histGroup = await selectMany<{
-          group_id: number
-          list_id: number
-        }>(
-          db,
-          `SELECT l.group_id, dsh.list_id FROM deal_stage_history dsh
-           JOIN deals_list l ON dsh.list_id = l.id
-           WHERE dsh.deal_id = ? AND dsh.list_id NOT IN (?, ?)
-           ORDER BY dsh.entered_at DESC LIMIT 1`,
-          [dealId, ...TERMINAL_LIST_IDS],
-        )
-        if (histGroup.length > 0) {
-          effectiveGroupId = histGroup[0].group_id
-          progressListId = histGroup[0].list_id
-        }
-      }
-
       const [stages, history, activities, notes, rawEmails] = await Promise.all([
         selectMany<{ id: number; name: string; position: number }>(
           db,
           'SELECT id, name, position FROM deals_list WHERE group_id = ? AND deleted_at IS NULL ORDER BY position',
-          [effectiveGroupId],
+          [group_id],
         ),
         selectMany<{
           list_id: number
@@ -116,8 +95,7 @@ export function createDealEditLoader(
         thread_has_attachments: attachmentByThread.get(email.thread_id) ?? false,
       }))
 
-      const isClosed =
-        is_won === 1 || is_won === 0 || TERMINAL_LIST_IDS.includes(list_id)
+      const isClosed = is_won === 1 || is_won === 0
 
       let closedAt: string | null = null
       if (isClosed && history.length > 0) {
@@ -129,7 +107,7 @@ export function createDealEditLoader(
         dealId,
         stages,
         history,
-        currentListId: progressListId,
+        currentListId: list_id,
         isClosed,
         isWon: is_won,
         closedAt,

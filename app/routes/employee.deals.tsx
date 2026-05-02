@@ -23,7 +23,6 @@ import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
-import { CLOSED_LOST_LIST_ID, CLOSED_WON_LIST_ID } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -96,8 +95,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const lists = await selectMany<{ id: number; name: string }>(
       db,
-      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? AND id NOT IN (?, ?) ORDER BY position',
-      [activeGroupId, CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID],
+      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
+      [activeGroupId],
     )
 
     let deals: FullDeal[]
@@ -124,20 +123,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
            INNER JOIN (
              SELECT deal_id, MAX(entered_at) AS max_entered_at
              FROM deal_stage_history
-             WHERE list_id NOT IN (?, ?)
              GROUP BY deal_id
            ) latest ON dsh.deal_id = latest.deal_id AND dsh.entered_at = latest.max_entered_at
-           WHERE dsh.list_id NOT IN (?, ?)
          ) last_stage ON d.id = last_stage.deal_id
          WHERE d.deleted_at IS NULL AND d.user_id = ? AND d.is_won = ?`,
-        [
-          CLOSED_WON_LIST_ID,
-          CLOSED_LOST_LIST_ID,
-          CLOSED_WON_LIST_ID,
-          CLOSED_LOST_LIST_ID,
-          user.id,
-          isWon,
-        ],
+        [user.id, isWon],
       )
     }
     const imagesCounts = await selectMany<{ deal_id: number; count: number }>(

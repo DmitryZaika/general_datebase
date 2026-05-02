@@ -21,7 +21,7 @@ import { FormField } from '~/components/ui/form'
 import { closeDealStageHistory, transitionDealStage } from '~/crud/deals'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
-import { CLOSED_LOST_LIST_ID, getSearchString, LOST_REASONS } from '~/utils/constants'
+import { getSearchString, LOST_REASONS } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -79,13 +79,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         `/employee/deals${getSearchString(new URL(request.url))}?dealId=${dealId}&fromListId=${fromListId}&fromPos=${fromPos}&error=Reason is required`,
       )
     }
-    const [submitResult] = await db.execute<ResultSetHeader>(
-      'UPDATE deals SET lost_reason = ?, is_won = 0, list_id = ?, due_date = NULL WHERE id = ? AND user_id = ?',
-      [reason, CLOSED_LOST_LIST_ID, dealId, user.id],
+    await db.execute<ResultSetHeader>(
+      'UPDATE deals SET lost_reason = ?, is_won = 0, due_date = NULL WHERE id = ? AND user_id = ?',
+      [reason, dealId, user.id],
     )
-    if (submitResult.affectedRows > 0) {
-      await transitionDealStage(dealId, CLOSED_LOST_LIST_ID)
-    }
 
     const session = await getSession(request.headers.get('Cookie'))
     session.flash(

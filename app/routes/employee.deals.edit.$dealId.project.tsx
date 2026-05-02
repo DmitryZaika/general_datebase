@@ -32,11 +32,6 @@ import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { commitSession, getSession } from '~/sessions.server'
-import {
-  CLOSED_LOST_LIST_ID,
-  CLOSED_WON_LIST_ID,
-  TERMINAL_LIST_IDS,
-} from '~/utils/constants'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -90,21 +85,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       const isWon = isWonRaw === 'null' ? null : Number(isWonRaw)
 
       if (isWon === 1) {
-        const [result] = await db.execute<ResultSetHeader>(
-          'UPDATE deals SET is_won = 1, lost_reason = NULL, list_id = ?, due_date = NULL WHERE id = ? AND user_id = ?',
-          [CLOSED_WON_LIST_ID, dealId, user.id],
+        await db.execute<ResultSetHeader>(
+          'UPDATE deals SET is_won = 1, lost_reason = NULL, due_date = NULL WHERE id = ? AND user_id = ?',
+          [dealId, user.id],
         )
-        if (result.affectedRows > 0) {
-          await transitionDealStage(dealId, CLOSED_WON_LIST_ID)
-        }
       } else if (isWon === 0) {
-        const [result] = await db.execute<ResultSetHeader>(
-          'UPDATE deals SET is_won = 0, lost_reason = NULL, list_id = ?, due_date = NULL WHERE id = ? AND user_id = ?',
-          [CLOSED_LOST_LIST_ID, dealId, user.id],
+        await db.execute<ResultSetHeader>(
+          'UPDATE deals SET is_won = 0, lost_reason = NULL, due_date = NULL WHERE id = ? AND user_id = ?',
+          [dealId, user.id],
         )
-        if (result.affectedRows > 0) {
-          await transitionDealStage(dealId, CLOSED_LOST_LIST_ID)
-        }
       } else if (isWon === null) {
         const [result] = await db.execute<ResultSetHeader>(
           'UPDATE deals SET is_won = NULL, lost_reason = NULL WHERE id = ? AND user_id = ?',
@@ -139,23 +128,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
       const targetListId = lists[0].id
 
-      const prevRows = await selectMany<{ list_id: number }>(
+      const prevRows = await selectMany<{ list_id: number; is_won: number | null }>(
         db,
-        'SELECT list_id FROM deals WHERE id = ? LIMIT 1',
+        'SELECT list_id, is_won FROM deals WHERE id = ? LIMIT 1',
         [dealId],
       )
       const prevListId = prevRows[0]?.list_id
+      const fromClosed = prevRows[0]?.is_won === 1 || prevRows[0]?.is_won === 0
 
       const [groupResult] = await db.execute<ResultSetHeader>(
-        `UPDATE deals SET list_id = ?, due_date = IF(? IN (?, ?), NULL, due_date) WHERE id = ? AND user_id = ?`,
-        [
-          targetListId,
-          targetListId,
-          CLOSED_WON_LIST_ID,
-          CLOSED_LOST_LIST_ID,
-          dealId,
-          user.id,
-        ],
+        'UPDATE deals SET list_id = ? WHERE id = ? AND user_id = ?',
+        [targetListId, dealId, user.id],
       )
 
       if (
@@ -163,14 +146,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         prevListId !== undefined &&
         prevListId !== targetListId
       ) {
-        if (targetListId === CLOSED_WON_LIST_ID) {
-          await db.execute(
-            'UPDATE deals SET is_won = 1, lost_reason = NULL WHERE id = ?',
-            [dealId],
-          )
-        } else if (targetListId === CLOSED_LOST_LIST_ID) {
-          await db.execute('UPDATE deals SET is_won = 0 WHERE id = ?', [dealId])
-        } else if (TERMINAL_LIST_IDS.includes(prevListId)) {
+        if (fromClosed) {
           await db.execute(
             'UPDATE deals SET is_won = NULL, lost_reason = NULL WHERE id = ?',
             [dealId],

@@ -1,6 +1,5 @@
 import type { PoolConnection } from 'mysql2/promise'
 import { db } from '~/db.server'
-import { TERMINAL_LIST_IDS } from '~/utils/constants'
 
 export async function closeDealStageHistory(
   dealId: number,
@@ -17,17 +16,10 @@ export async function transitionDealStage(dealId: number, toListId: number) {
   try {
     await conn.beginTransaction()
     await closeDealStageHistory(dealId, conn)
-    if (TERMINAL_LIST_IDS.includes(toListId)) {
-      await conn.execute(
-        'INSERT INTO deal_stage_history (deal_id, list_id, exited_at) VALUES (?, ?, NOW())',
-        [dealId, toListId],
-      )
-    } else {
-      await conn.execute(
-        'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
-        [dealId, toListId],
-      )
-    }
+    await conn.execute(
+      'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+      [dealId, toListId],
+    )
     await conn.commit()
   } catch (err) {
     await conn.rollback()
@@ -47,7 +39,7 @@ export async function reopenDealStageHistory(dealId: number) {
       [dealId],
     )
     const rows = rawRows as { list_id: number }[]
-    if (rows.length > 0 && !TERMINAL_LIST_IDS.includes(rows[0].list_id)) {
+    if (rows.length > 0) {
       await conn.execute(
         'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
         [dealId, rows[0].list_id],
@@ -70,36 +62,28 @@ export async function reactivateDeal(dealId: number) {
     const [dealRaw] = await conn.execute(
       `SELECT d.list_id, l.group_id
        FROM deals d
-       JOIN deals_list l ON d.list_id = l.id
+       INNER JOIN deals_list l ON d.list_id = l.id AND l.deleted_at IS NULL
        WHERE d.id = ? LIMIT 1 FOR UPDATE`,
       [dealId],
     )
     const dealRows = dealRaw as { list_id: number; group_id: number }[]
-    if (dealRows.length === 0) {
-      await conn.commit()
-      return
-    }
-
-    const { list_id, group_id } = dealRows[0]
-
-    if (!TERMINAL_LIST_IDS.includes(list_id)) {
+    if (dealRows.length > 0) {
+      const { list_id } = dealRows[0]
       await closeDealStageHistory(dealId, conn)
-      if (!TERMINAL_LIST_IDS.includes(list_id)) {
-        await conn.execute(
-          'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
-          [dealId, list_id],
-        )
-      }
+      await conn.execute(
+        'INSERT INTO deal_stage_history (deal_id, list_id) VALUES (?, ?)',
+        [dealId, list_id],
+      )
       await conn.commit()
       return
     }
 
     const [histRaw] = await conn.execute(
       `SELECT dsh.list_id FROM deal_stage_history dsh
-       JOIN deals_list l ON dsh.list_id = l.id AND l.deleted_at IS NULL
-       WHERE dsh.deal_id = ? AND dsh.list_id NOT IN (?, ?)
+       INNER JOIN deals_list l ON dsh.list_id = l.id AND l.deleted_at IS NULL
+       WHERE dsh.deal_id = ?
        ORDER BY dsh.entered_at DESC LIMIT 1`,
-      [dealId, ...TERMINAL_LIST_IDS],
+      [dealId],
     )
     const historyRows = histRaw as { list_id: number }[]
 
@@ -109,8 +93,13 @@ export async function reactivateDeal(dealId: number) {
       targetListId = historyRows[0].list_id
     } else {
       const [groupRaw] = await conn.execute(
-        'SELECT id FROM deals_list WHERE group_id = ? AND deleted_at IS NULL ORDER BY position ASC LIMIT 1',
-        [group_id],
+        `SELECT dl.id FROM deals_list dl
+         INNER JOIN groups_list gl ON dl.group_id = gl.id AND gl.deleted_at IS NULL AND gl.is_displayed = 1
+         INNER JOIN deals d ON d.id = ?
+         INNER JOIN customers c ON d.customer_id = c.id AND (gl.company_id = c.company_id OR gl.id = 1)
+         WHERE dl.deleted_at IS NULL
+         ORDER BY gl.id ASC, dl.position ASC LIMIT 1`,
+        [dealId],
       )
       const groupRows = groupRaw as { id: number }[]
       if (groupRows.length === 0) {

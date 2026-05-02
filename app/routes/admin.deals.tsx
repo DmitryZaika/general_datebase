@@ -22,7 +22,6 @@ import {
 } from '~/components/ui/select'
 import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
-import { CLOSED_LOST_LIST_ID, CLOSED_WON_LIST_ID } from '~/utils/constants'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, type User } from '~/utils/session.server'
 
@@ -73,8 +72,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const lists = await selectMany<{ id: number; name: string }>(
       db,
-      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? AND id NOT IN (?, ?) ORDER BY position',
-      [activeGroupId, CLOSED_WON_LIST_ID, CLOSED_LOST_LIST_ID],
+      'SELECT id, name FROM deals_list WHERE deleted_at IS NULL AND group_id = ? ORDER BY position',
+      [activeGroupId],
     )
 
     let deals: AdminDeal[]
@@ -94,14 +93,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
       deals = await selectMany<AdminDeal>(db, dealSql, dealParams)
     } else {
-      const dealParams: (string | number)[] = [
-        CLOSED_WON_LIST_ID,
-        CLOSED_LOST_LIST_ID,
-        CLOSED_WON_LIST_ID,
-        CLOSED_LOST_LIST_ID,
-        companyId,
-        isWon,
-      ]
+      const dealParams: (string | number)[] = [companyId, isWon]
       let dealSql = `
         SELECT d.id, d.customer_id, d.amount, d.title, d.status, d.lost_reason,
          COALESCE(last_stage.list_id, d.list_id) AS list_id,
@@ -115,10 +107,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           INNER JOIN (
             SELECT deal_id, MAX(entered_at) AS max_entered_at
             FROM deal_stage_history
-            WHERE list_id NOT IN (?, ?)
             GROUP BY deal_id
           ) latest ON dsh.deal_id = latest.deal_id AND dsh.entered_at = latest.max_entered_at
-          WHERE dsh.list_id NOT IN (?, ?)
         ) last_stage ON d.id = last_stage.deal_id
         WHERE c.company_id = ? AND d.deleted_at IS NULL AND d.is_won = ?
       `
@@ -310,11 +300,7 @@ export default function AdminDeals() {
         notesMap={notesMap}
         readonly
         showAddDeal={false}
-        toolbarLeft={
-          <>
-            <SalesRepsFilter />
-          </>
-        }
+        toolbarLeft={<SalesRepsFilter />}
         groupListSelect={
           <>
             <Select value={String(activeGroupId)} onValueChange={handleGroupChange}>
