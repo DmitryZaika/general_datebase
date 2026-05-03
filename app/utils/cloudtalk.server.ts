@@ -1,4 +1,5 @@
 import { db } from '~/db.server'
+import type { Nullable } from '~/types/utils'
 import { selectId } from '~/utils/queryHelpers'
 
 export const BASE_URL = 'https://my.cloudtalk.io/api'
@@ -238,6 +239,192 @@ export async function fetchValue<T>(
   const response = await fetchValueRaw(url, companyId, queryParams)
   const json = (await response.json()) as CollectionsResponseEnvelope<T>
   return { items: json.responseData?.data ?? [] }
+}
+
+export interface ContactPayload {
+  name: string
+  ContactNumber: { public_number: string }[]
+  ContactEmail: { email: string }[]
+  ExternalUrl?: { name: string; url: string }[]
+  address?: string
+}
+
+interface AddContactResponse {
+  responseData?: { data?: { id?: number } }
+  data?: { id?: number }
+}
+
+const MAX_5XX_RETRIES = 3
+const MAX_429_RETRIES = 5
+const SERVER_BACKOFF_MS = [2000, 4000, 8000]
+
+export class CloudTalkApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'CloudTalkApiError'
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function cloudtalkRequest(
+  path: string,
+  companyId: number,
+  init: { method: 'PUT' | 'POST' | 'DELETE' | 'GET'; body?: unknown },
+): Promise<Response> {
+  const auth = await getAuthString(companyId)
+  const url = `${BASE_URL}/${path}`
+  const requestInit: RequestInit = {
+    method: init.method,
+    headers: {
+      Authorization: `Basic ${auth}`,
+      Accept: 'application/json',
+      ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+  }
+
+  let serverAttempt = 0
+  let rateLimitAttempt = 0
+  while (true) {
+    const response = await fetch(url, requestInit)
+
+    if (response.ok) return response
+
+    if (response.status === 429) {
+      if (rateLimitAttempt >= MAX_429_RETRIES) {
+        throw new CloudTalkApiError(
+          429,
+          `CloudTalk rate limit: max retries (${MAX_429_RETRIES}) exceeded`,
+        )
+      }
+      const reset = Number(response.headers.get('X-CloudTalkAPI-ResetTime'))
+      const waitMs =
+        Number.isFinite(reset) && reset > 0
+          ? Math.max(reset * 1000 - Date.now(), 0) + 1000
+          : 5000
+      // Add a little jitter so concurrent callers don't all wake at the same instant.
+      await sleep(waitMs + Math.floor(Math.random() * 500))
+      rateLimitAttempt += 1
+      continue
+    }
+
+    if (response.status >= 500 && serverAttempt < MAX_5XX_RETRIES) {
+      await sleep(SERVER_BACKOFF_MS[serverAttempt] + Math.floor(Math.random() * 500))
+      serverAttempt += 1
+      continue
+    }
+
+    const text = await response.text().catch(() => '')
+    throw new CloudTalkApiError(
+      response.status,
+      `CloudTalk API error: ${response.status} ${response.statusText} ${text}`,
+    )
+  }
+}
+
+export async function createCloudTalkContact(
+  companyId: number,
+  payload: ContactPayload,
+): Promise<number> {
+  const response = await cloudtalkRequest('contacts/add.json', companyId, {
+    method: 'PUT',
+    body: payload,
+  })
+  const json = (await response.json()) as AddContactResponse
+  const id = json?.responseData?.data?.id ?? json?.data?.id
+  if (!id || typeof id !== 'number') {
+    throw new Error('CloudTalk add.json did not return a contact id')
+  }
+  return id
+}
+
+export async function updateCloudTalkContact(
+  companyId: number,
+  cloudtalkId: number,
+  payload: ContactPayload,
+): Promise<void> {
+  await cloudtalkRequest(`contacts/edit/${cloudtalkId}.json`, companyId, {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+export async function deleteCloudTalkContact(
+  companyId: number,
+  cloudtalkId: number,
+): Promise<void> {
+  await cloudtalkRequest(`contacts/delete/${cloudtalkId}.json`, companyId, {
+    method: 'DELETE',
+  })
+}
+
+interface ContactSearchHit {
+  Contact?: {
+    id?: number
+    contact_numbers?: string[]
+    ContactNumber?: { public_number?: string }[]
+  }
+  id?: number
+  contact_numbers?: string[]
+  ContactNumber?: { public_number?: string }[]
+}
+
+interface ContactSearchEnvelope {
+  responseData?: { data?: ContactSearchHit[] }
+}
+
+function extractPhones(hit: ContactSearchHit): string[] {
+  const node = hit.Contact ?? hit
+  const phones: string[] = []
+  for (const p of node.contact_numbers ?? []) {
+    if (typeof p === 'string') phones.push(p)
+  }
+  for (const p of node.ContactNumber ?? []) {
+    if (p?.public_number) phones.push(p.public_number)
+  }
+  return phones
+}
+
+function extractId(hit: ContactSearchHit): number | undefined {
+  return hit.Contact?.id ?? hit.id
+}
+
+async function findContactByOnePhone(
+  companyId: number,
+  e164Phone: string,
+): Promise<Nullable<number>> {
+  const response = await cloudtalkRequest(
+    `contacts/index.json?keyword=${encodeURIComponent(e164Phone)}&limit=10`,
+    companyId,
+    { method: 'GET' },
+  )
+  const json = (await response.json()) as ContactSearchEnvelope
+  const hits = json.responseData?.data ?? []
+  for (const hit of hits) {
+    const phones = extractPhones(hit)
+    if (phones.some(p => p === e164Phone)) {
+      const id = extractId(hit)
+      if (typeof id === 'number') return id
+    }
+  }
+  return null
+}
+
+export async function findCloudTalkContactByPhone(
+  companyId: number,
+  e164Phones: string[],
+): Promise<Nullable<number>> {
+  for (const phone of e164Phones) {
+    const id = await findContactByOnePhone(companyId, phone)
+    if (id) return id
+  }
+  return null
 }
 
 export async function fetchCallsForPhones(
