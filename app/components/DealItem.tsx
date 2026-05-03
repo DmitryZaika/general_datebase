@@ -13,11 +13,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLocation, useRevalidator } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import NoteIcon from '~/components/icons/NoteIcon'
-import { cn, parseLocalDate } from '~/lib/utils'
+import {
+  formatDeadlineLabel,
+  isDateOnlyDeadline,
+  localCalendarDate,
+} from '~/lib/dateHelpers'
+import { cn } from '~/lib/utils'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import { ActivityPriority } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { DealCardData } from '~/types/deals'
+import type { Nullable } from '~/types/utils'
 import { formatMoney, updateNumber } from './functions'
 import { Calendar } from './ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
@@ -35,53 +41,19 @@ interface ActivityDeadlineInfo {
   hasPill: boolean
 }
 
-function getActivityDeadlineInfo(deadline: string): ActivityDeadlineInfo {
-  const date = parseLocalDate(deadline)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const deadlineDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const diffDays = Math.round((deadlineDay.getTime() - today.getTime()) / 86_400_000)
-  const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
-  const timeSuffix = hasTime ? ` ${format(date, 'h:mm a')}` : ''
+const URGENCY_TO_DEADLINE_INFO: Record<
+  'overdue' | 'today' | 'soon' | 'normal',
+  Omit<ActivityDeadlineInfo, 'label'>
+> = {
+  overdue: { color: 'text-red-600 bg-red-50', icon: 'alert', hasPill: true },
+  today: { color: 'text-orange-600 bg-orange-50', icon: 'clock', hasPill: true },
+  soon: { color: 'text-gray-500', icon: 'clock', hasPill: false },
+  normal: { color: 'text-gray-500', icon: 'clock', hasPill: false },
+}
 
-  if (diffDays < 0) {
-    return {
-      color: 'text-red-600 bg-red-50',
-      icon: 'alert',
-      label: `${Math.abs(diffDays)}d overdue`,
-      hasPill: true,
-    }
-  }
-  if (diffDays === 0) {
-    return {
-      color: 'text-orange-600 bg-orange-50',
-      icon: 'clock',
-      label: `Today${timeSuffix}`,
-      hasPill: true,
-    }
-  }
-  if (diffDays === 1) {
-    return {
-      color: 'text-gray-500',
-      icon: 'clock',
-      label: `Tomorrow${timeSuffix}`,
-      hasPill: false,
-    }
-  }
-  if (diffDays <= 2) {
-    return {
-      color: 'text-gray-500',
-      icon: 'clock',
-      label: format(date, 'MMM d') + timeSuffix,
-      hasPill: false,
-    }
-  }
-  return {
-    color: 'text-gray-500',
-    icon: 'clock',
-    label: format(date, 'MMM d') + timeSuffix,
-    hasPill: false,
-  }
+function getActivityDeadlineInfo(deadline: string): ActivityDeadlineInfo {
+  const { label, urgency } = formatDeadlineLabel(deadline)
+  return { ...URGENCY_TO_DEADLINE_INFO[urgency], label }
 }
 
 const ACTIVITY_PRIORITY_LABEL: Record<ActivityPriority, string> = {
@@ -102,7 +74,7 @@ function sortActivities(activities: DealActivity[]): DealActivity[] {
       ACTIVITY_PRIORITY_WEIGHT[a.priority] - ACTIVITY_PRIORITY_WEIGHT[b.priority]
     if (pw !== 0) return pw
     if (a.deadline && b.deadline)
-      return parseLocalDate(a.deadline).getTime() - parseLocalDate(b.deadline).getTime()
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
     return a.deadline ? -1 : b.deadline ? 1 : 0
   })
 }
@@ -114,33 +86,31 @@ function sortNotesForPopover(notes: DealNote[]): DealNote[] {
   })
 }
 
-function formatActivityTime(deadline: string | null): string {
+function formatActivityTime(deadline: Nullable<string>): string {
   if (!deadline) return '—'
-  const d = parseLocalDate(deadline)
+  const d = new Date(deadline)
   if (Number.isNaN(d.getTime())) return '—'
-  const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0
-  if (hasTime) {
-    return d.toLocaleString(undefined, {
+  if (isDateOnlyDeadline(deadline)) {
+    return localCalendarDate(deadline).toLocaleDateString(undefined, {
       dateStyle: 'short',
-      timeStyle: 'short',
     })
   }
-  return d.toLocaleDateString(undefined, { dateStyle: 'short' })
+  return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function getActivityDueDateColor(deadline: string | null): string {
+function getActivityDueDateColor(deadline: Nullable<string>): string {
   if (!deadline) return 'text-gray-500'
-  const d = parseLocalDate(deadline)
-  if (Number.isNaN(d.getTime())) return 'text-gray-500'
+  const local = localCalendarDate(deadline)
+  if (Number.isNaN(local.getTime())) return 'text-gray-500'
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const deadlineDate = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const deadlineDate = new Date(local.getFullYear(), local.getMonth(), local.getDate())
   if (deadlineDate.getTime() < today.getTime()) return 'text-red-600'
   if (deadlineDate.getTime() === today.getTime()) return 'text-yellow-600'
   return 'text-gray-500'
 }
 
-function activityPriorityForApi(value: string | null | undefined): string {
+function activityPriorityForApi(value: Nullable<string> | undefined): string {
   if (value === 'high' || value === 'medium' || value === 'low') return value
   return 'medium'
 }
@@ -159,8 +129,9 @@ export default function DealItem({
   const [notesOpen, setNotesOpen] = useState(false)
   const [noActiveActivitiesAfterLoad, setNoActiveActivitiesAfterLoad] = useState(false)
   const activityRef = useRef<HTMLParagraphElement>(null)
-  const activitiesCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const notesCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const activitiesCloseTimeoutRef =
+    useRef<Nullable<ReturnType<typeof setTimeout>>>(null)
+  const notesCloseTimeoutRef = useRef<Nullable<ReturnType<typeof setTimeout>>>(null)
   const [isActivityTruncated, setIsActivityTruncated] = useState(false)
   const pendingActivityDeadlineSyncRef = useRef(false)
   const fetcher = useFetcher()
@@ -168,11 +139,11 @@ export default function DealItem({
   const csrfToken = useAuthenticityToken()
   const activitiesFetcher = useFetcher<{
     activities?: DealActivity[]
-    error?: string | null
+    error?: Nullable<string>
   }>()
   const notesFetcher = useFetcher<{
     notes?: DealNote[]
-    error?: string | null
+    error?: Nullable<string>
   }>()
   const location = useLocation()
   const hasEmail = Boolean(deal.has_email)
@@ -486,12 +457,12 @@ export default function DealItem({
                   mode='single'
                   defaultMonth={
                     deal.nearest_activity_deadline
-                      ? parseLocalDate(deal.nearest_activity_deadline)
+                      ? localCalendarDate(deal.nearest_activity_deadline)
                       : new Date()
                   }
                   selected={
                     deal.nearest_activity_deadline
-                      ? parseLocalDate(deal.nearest_activity_deadline)
+                      ? localCalendarDate(deal.nearest_activity_deadline)
                       : undefined
                   }
                   onSelect={(date: Date | undefined) => {
