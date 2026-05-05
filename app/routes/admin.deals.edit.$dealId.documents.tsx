@@ -1,4 +1,5 @@
-import { FileText, X } from 'lucide-react'
+import { FileText, Pencil, X } from 'lucide-react'
+import type { ResultSetHeader } from 'mysql2'
 import { useEffect, useState } from 'react'
 import {
   type ActionFunctionArgs,
@@ -6,6 +7,7 @@ import {
   Form,
   type LoaderFunctionArgs,
   redirect,
+  useFetcher,
   useLoaderData,
   useNavigation,
 } from 'react-router'
@@ -23,6 +25,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
+import { Input } from '~/components/ui/input'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
@@ -108,6 +111,34 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   if (request.method === 'POST') {
     if (!contentType.includes('multipart/form-data')) {
+      const renameForm = await request.formData()
+      const intent = renameForm.get('intent')
+      if (intent === 'rename_document') {
+        const idRaw = renameForm.get('id')
+        const source = renameForm.get('source')?.toString()
+        const nameRaw = renameForm.get('name')
+        const docId = idRaw != null ? parseInt(String(idRaw), 10) : 0
+        const nameStr = typeof nameRaw === 'string' ? nameRaw.trim() : ''
+        if (!docId || source !== 'documents') {
+          return data({ error: 'Invalid document' }, { status: 400 })
+        }
+        if (!nameStr || nameStr.length > 255) {
+          return data({ error: 'Invalid name' }, { status: 400 })
+        }
+        const [result] = await db.execute<ResultSetHeader>(
+          'UPDATE deals_documents SET name = ? WHERE id = ? AND deal_id = ?',
+          [nameStr, docId, dealId],
+        )
+        if (result.affectedRows === 0) {
+          return data({ error: 'Document not found' }, { status: 404 })
+        }
+        const session = await getSession(request.headers.get('Cookie'))
+        session.flash('message', toastData('Success', 'Document name updated'))
+        return data(
+          { success: true },
+          { headers: { 'Set-Cookie': await commitSession(session) } },
+        )
+      }
       posthogClient.captureException(
         new Error('Invalid content type. Expected multipart/form-data'),
       )
@@ -277,15 +308,28 @@ function documentName(url: string, id: number) {
 
 export default function DealEditDocuments() {
   const { documents } = useLoaderData<typeof loader>()
+  const renameFetcher = useFetcher<{ success?: boolean; error?: string }>()
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [documentToDelete, setDocumentToDelete] = useState<DocumentToDelete | null>(
     null,
   )
+  const [editingKey, setEditingKey] = useState<string | null>(null)
 
   const handleDeleteClick = (document: DealDocument) => {
     setDocumentToDelete({ id: document.id, source: document.source })
     setShowConfirmDialog(true)
   }
+
+  useEffect(() => {
+    if (
+      renameFetcher.state === 'idle' &&
+      renameFetcher.data &&
+      'success' in renameFetcher.data &&
+      renameFetcher.data.success
+    ) {
+      setEditingKey(null)
+    }
+  }, [renameFetcher.state, renameFetcher.data])
 
   return (
     <>
@@ -297,26 +341,87 @@ export default function DealEditDocuments() {
               key={`${document.source}-${document.id}`}
               className='group relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md'
             >
-              <a
-                href={document.image_url}
-                target='_blank'
-                rel='noreferrer'
-                className='flex flex-col items-start gap-3 pr-9 text-slate-900 hover:text-blue-700'
-              >
-                <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700'>
-                  <FileText className='h-5 w-5' />
-                </span>
-                <span
-                  className='w-full break-words text-sm font-medium leading-5 text-slate-800'
-                  title={
-                    document.name?.trim() ||
-                    documentName(document.image_url, document.id)
-                  }
+              <div className='flex w-full min-w-0 flex-col items-start gap-3'>
+                <a
+                  href={document.image_url}
+                  target='_blank'
+                  rel='noreferrer'
+                  className='text-slate-900 hover:text-blue-700'
                 >
-                  {document.name?.trim() ||
-                    documentName(document.image_url, document.id)}
-                </span>
-              </a>
+                  <span className='flex h-10 w-10 items-center justify-center rounded-md bg-blue-50 text-blue-700'>
+                    <FileText className='h-5 w-5' />
+                  </span>
+                </a>
+                {editingKey === `${document.source}-${document.id}` &&
+                document.source === 'documents' ? (
+                  <renameFetcher.Form
+                    method='post'
+                    className='flex w-full min-w-0 self-stretch flex-col gap-2'
+                  >
+                    <AuthenticityTokenInput />
+                    <input type='hidden' name='intent' value='rename_document' />
+                    <input type='hidden' name='id' value={document.id} />
+                    <input type='hidden' name='source' value={document.source} />
+                    <Input
+                      name='name'
+                      defaultValue={
+                        document.name?.trim() ||
+                        documentName(document.image_url, document.id)
+                      }
+                      className='w-full text-sm'
+                      required
+                      maxLength={255}
+                      autoFocus
+                    />
+                    <div className='flex flex-wrap gap-2'>
+                      <Button
+                        type='submit'
+                        size='sm'
+                        disabled={renameFetcher.state !== 'idle'}
+                      >
+                        {renameFetcher.state !== 'idle' ? 'Saving…' : 'Save'}
+                      </Button>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='sm'
+                        onClick={() => setEditingKey(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                    {renameFetcher.data?.error ? (
+                      <p className='text-xs text-red-600'>{renameFetcher.data.error}</p>
+                    ) : null}
+                  </renameFetcher.Form>
+                ) : (
+                  <a
+                    href={document.image_url}
+                    target='_blank'
+                    rel='noreferrer'
+                    className='w-full min-w-0 break-words text-sm font-medium leading-5 text-slate-800 hover:text-blue-700'
+                    title={
+                      document.name?.trim() ||
+                      documentName(document.image_url, document.id)
+                    }
+                  >
+                    {document.name?.trim() ||
+                      documentName(document.image_url, document.id)}
+                  </a>
+                )}
+              </div>
+              {document.source === 'documents' ? (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='absolute right-11 top-2.5 size-7 rounded-full bg-white/90 p-0 text-slate-600 opacity-0 transition-opacity hover:text-slate-900 group-hover:opacity-100'
+                  title='Edit name'
+                  onClick={() => setEditingKey(`${document.source}-${document.id}`)}
+                >
+                  <Pencil className='h-4 w-4' />
+                </Button>
+              ) : null}
               <Button
                 type='button'
                 onClick={() => handleDeleteClick(document)}
