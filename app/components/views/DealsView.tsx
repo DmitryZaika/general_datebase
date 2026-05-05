@@ -482,11 +482,9 @@ export default function DealsView({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col h-full'>
+      <div className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col'>
         <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
-        <div className='flex min-h-0 min-w-0 h-full flex-1 flex-col'>
-          {listsContent}
-        </div>
+        <div className='flex min-h-0 min-w-0 flex-1 flex-col'>{listsContent}</div>
       </div>
       <DragOverlay>
         {activeId !== null
