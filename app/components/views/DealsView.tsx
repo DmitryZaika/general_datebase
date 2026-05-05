@@ -4,8 +4,9 @@ import {
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
-  PointerSensor,
+  MouseSensor,
   pointerWithin,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -220,9 +221,15 @@ export default function DealsView({
   }, [searchParams, board])
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 4,
+        distance: 6,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 220,
+        tolerance: 10,
       },
     }),
   )
@@ -433,7 +440,7 @@ export default function DealsView({
   })
 
   const listsContent = (
-    <div className='flex min-h-0 flex-1 max-w-full min-w-0 items-stretch gap-1 md:min-w-0 max-md:gap-0 max-md:overflow-x-auto max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory'>
+    <div className='flex min-h-0 flex-1 max-w-full min-w-0 items-stretch gap-1 md:min-w-0 max-md:h-full max-md:gap-0 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory'>
       {lists.map(list => (
         <DealsList
           key={list.id}
@@ -449,7 +456,7 @@ export default function DealsView({
 
   if (readonly) {
     return (
-      <div className='w-full h-[calc(100dvh-4.75rem)] min-h-0 flex flex-col overflow-hidden'>
+      <div className='w-full h-[calc(100dvh-6.25rem)] min-h-0 flex flex-col overflow-hidden'>
         <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
         <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
           {listsContent}
@@ -475,7 +482,7 @@ export default function DealsView({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.50rem)] flex flex-col overflow-hidden'>
+      <div className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col overflow-hidden'>
         <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
         <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
           {listsContent}
