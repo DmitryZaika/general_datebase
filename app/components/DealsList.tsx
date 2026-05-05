@@ -25,7 +25,7 @@ export default function DealsList({
   })
 
   return (
-    <div className='box-border flex min-w-93 flex-1 items-start justify-start px-2 max-md:h-full  max-md:w-full max-md:flex-[0_0_100%] max-md:shrink-0 max-md:snap-start max-md:snap-always md:min-w-65 md:flex-1 md:flex-col md:px-0 xl:max-w-120'>
+    <div className='box-border flex min-w-93 flex-1 items-start justify-start px-2 max-md:w-full max-md:flex-[0_0_100%] max-md:shrink-0 max-md:snap-start max-md:snap-always md:min-w-65 md:flex-1 md:flex-col md:px-0 xl:max-w-120'>
       <Card ref={setNodeRef} className='flex w-full flex-col sm:min-w-50 md:max-w-none'>
         <CardHeader className='bg-black rounded-t-xl py-2 px-3'>
           <div className='flex justify-between items-center'>
