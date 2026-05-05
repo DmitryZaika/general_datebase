@@ -1,5 +1,5 @@
 import type { ColumnDef, Row } from '@tanstack/react-table'
-import { MapIcon, PhoneIcon } from 'lucide-react'
+import { FileText, MapIcon, PhoneIcon } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useState } from 'react'
 import {
@@ -39,6 +39,24 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return redirect('/employee/deals')
   }
   return { customer: rows[0] }
+}
+
+function attachedFileName(url: string) {
+  const cleanUrl = url.split('?')[0]
+  const parts = cleanUrl.split('/')
+  const name = parts[parts.length - 1]
+  if (!name) return 'Attached file'
+  try {
+    return decodeURIComponent(name).replace(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i,
+      '',
+    )
+  } catch {
+    return name.replace(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i,
+      '',
+    )
+  }
 }
 
 function AddressLinkCell({
@@ -146,19 +164,29 @@ export default function DealProjectInfo() {
 
   // Extract attached_file separately to render as image
   const attachedFile = customer.attached_file
+  const attachedFileUrl = attachedFile ? String(attachedFile).toLowerCase() : ''
+  const isImageFile =
+    attachedFileUrl.includes('.jpg') ||
+    attachedFileUrl.includes('.jpeg') ||
+    attachedFileUrl.includes('.png') ||
+    attachedFileUrl.includes('.gif') ||
+    attachedFileUrl.includes('.webp') ||
+    attachedFileUrl.includes('.bmp') ||
+    attachedFileUrl.includes('.svg')
 
   // Create images array for SuperCarousel
-  const images = attachedFile
-    ? [
-        {
-          id: 1,
-          url: String(attachedFile),
-          name: 'Attached Project File',
-          type: 'project',
-          available: null,
-        },
-      ]
-    : []
+  const images =
+    attachedFile && isImageFile
+      ? [
+          {
+            id: 1,
+            url: String(attachedFile),
+            name: 'Attached Project File',
+            type: 'project',
+            available: null,
+          },
+        ]
+      : []
 
   const otherFields = Object.entries(customer)
     .filter(([k, v]) => v != null && k !== 'attached_file')
@@ -182,12 +210,30 @@ export default function DealProjectInfo() {
       {attachedFile && (
         <div className='mt-6'>
           <p className='font-bold mb-2'>Attached File:</p>
-          <img
-            src={String(attachedFile)}
-            alt='Attached project file'
-            className='max-w-full h-auto rounded-lg shadow-lg border cursor-pointer'
-            onClick={() => setCurrentId(1)}
-          />
+          {isImageFile ? (
+            <img
+              src={String(attachedFile)}
+              alt='Attached project file'
+              className='max-w-full h-auto rounded-lg shadow-lg border cursor-pointer'
+              onClick={() => setCurrentId(1)}
+            />
+          ) : (
+            <div className='max-w-xl'>
+              <a
+                href={String(attachedFile)}
+                target='_blank'
+                rel='noreferrer'
+                className='flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-slate-900 shadow-sm hover:text-blue-700'
+              >
+                <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700'>
+                  <FileText className='h-5 w-5' />
+                </span>
+                <span className='min-w-0 break-words text-sm font-medium'>
+                  {attachedFileName(String(attachedFile))}
+                </span>
+              </a>
+            </div>
+          )}
         </div>
       )}
 

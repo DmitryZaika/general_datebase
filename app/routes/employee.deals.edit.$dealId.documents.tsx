@@ -41,6 +41,7 @@ interface DealDocument {
   image_url: string
   created_at: string
   source: string
+  name: string | null
 }
 
 function documentMimeType(url: string): string | null {
@@ -113,6 +114,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return data({ error: 'Invalid content type. Expected multipart/form-data' })
     }
 
+    const requestForName = request.clone()
+    const rawForm = await requestForName.formData()
+    const uploadedFile = rawForm.get('file')
+    const documentNameValue =
+      uploadedFile instanceof File ? uploadedFile.name.trim() : ''
+
     const { errors, data: parsedData } = await parseMutliForm(
       requestClone,
       fileSchema,
@@ -129,8 +136,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     try {
       await db.execute(
-        `INSERT INTO deals_documents (deal_id, image_url, created_by) VALUES (?, ?, ?)`,
-        [dealId, parsedData.file, dealDocumentCreatedBy],
+        `INSERT INTO deals_documents (deal_id, image_url, created_by, name) VALUES (?, ?, ?, ?)`,
+        [dealId, parsedData.file, dealDocumentCreatedBy, documentNameValue || null],
       )
 
       const session = await getSession(request.headers.get('Cookie'))
@@ -166,11 +173,11 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const dealId = parseInt(params.dealId)
   const documents = await selectMany<DealDocument>(
     db,
-    `SELECT id, image_url, created_at, 'documents' source
+    `SELECT id, image_url, created_at, 'documents' source, name
        FROM deals_documents
       WHERE deal_id = ?
       UNION ALL
-     SELECT id, image_url, created_at, 'images' source
+     SELECT id, image_url, created_at, 'images' source, NULL as name
        FROM deals_images
       WHERE deal_id = ?
         AND (
@@ -286,32 +293,39 @@ export default function DealEditDocuments() {
     <>
       <div className='space-y-4'>
         <AddDocumentForm />
-        <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'>
+        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3'>
           {documents.map(document => (
             <div
               key={`${document.source}-${document.id}`}
-              className='group relative rounded-lg border border-slate-200 bg-white p-3 shadow-sm'
+              className='group relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md'
             >
               <a
                 href={document.image_url}
                 target='_blank'
                 rel='noreferrer'
-                className='flex items-center gap-3 pr-8 text-slate-900 hover:text-blue-700'
+                className='flex flex-col items-start gap-3 pr-9 text-slate-900 hover:text-blue-700'
               >
                 <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700'>
                   <FileText className='h-5 w-5' />
                 </span>
-                <span className='min-w-0 break-words text-sm font-medium'>
-                  {documentName(document.image_url, document.id)}
+                <span
+                  className='w-full break-words text-sm font-medium leading-5 text-slate-800'
+                  title={
+                    document.name?.trim() ||
+                    documentName(document.image_url, document.id)
+                  }
+                >
+                  {document.name?.trim() ||
+                    documentName(document.image_url, document.id)}
                 </span>
               </a>
               <Button
                 type='button'
                 onClick={() => handleDeleteClick(document)}
-                className='absolute right-2 top-2 size-6 rounded-full bg-red-600 p-0 text-white opacity-0 hover:bg-red-700 group-hover:opacity-100'
+                className='absolute right-2.5 top-2.5 size-7 rounded-full bg-red-600 p-0 text-white opacity-0 transition-opacity hover:bg-red-700 group-hover:opacity-100'
                 title='Delete document'
               >
-                <X size={10} />
+                <X size={12} />
               </Button>
             </div>
           ))}
