@@ -56,6 +56,52 @@ function toMySQLDatetime(dateString: string): Nullable<string> {
   return null
 }
 
+function deadlineForReminder(rawDeadline: Nullable<string>): Nullable<string> {
+  if (!rawDeadline) return null
+  return rawDeadline.includes('T') ? rawDeadline : null
+}
+
+interface ActivityInput {
+  name: string
+  rawDeadline: Nullable<string>
+  deadlineValue: Nullable<string>
+  priority: ActivityPriority
+}
+
+type ParseResult<T> = { ok: true; value: T } | { ok: false; error: string }
+
+function parseActivityInput(formData: FormData): ParseResult<ActivityInput> {
+  const name = formData.get('name')
+  const deadline = formData.get('deadline')
+  const priority = String(formData.get('priority') || ActivityPriority.Medium)
+
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return { ok: false, error: 'Activity name is required' }
+  }
+  if (name.trim().length > 255) {
+    return { ok: false, error: 'Activity name must be 255 characters or less' }
+  }
+  if (!isValidPriority(priority)) {
+    return {
+      ok: false,
+      error: `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}`,
+    }
+  }
+
+  const rawDeadline =
+    deadline && String(deadline).trim() ? String(deadline).trim() : null
+  const deadlineValue = rawDeadline ? toMySQLDatetime(rawDeadline) : null
+
+  if (rawDeadline && !deadlineValue) {
+    return { ok: false, error: 'Invalid deadline date format' }
+  }
+
+  return {
+    ok: true,
+    value: { name: name.trim(), rawDeadline, deadlineValue, priority },
+  }
+}
+
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
     const user = await getEmployeeUser(request)
@@ -138,53 +184,27 @@ async function handleCreate(
   createdBy: Nullable<string>,
   userId: number,
 ) {
-  const name = formData.get('name')
-  const deadline = formData.get('deadline')
-  const priority = String(formData.get('priority') || ActivityPriority.Medium)
-
-  if (!name || typeof name !== 'string' || !name.trim()) {
-    return badRequest('Activity name is required')
-  }
-
-  if (name.trim().length > 255) {
-    return badRequest('Activity name must be 255 characters or less')
-  }
-
-  if (!isValidPriority(priority)) {
-    return badRequest(
-      `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}`,
-    )
-  }
-
-  const rawDeadline =
-    deadline && String(deadline).trim() ? String(deadline).trim() : null
-  const deadlineValue: Nullable<string> = rawDeadline
-    ? toMySQLDatetime(rawDeadline)
-    : null
-
-  if (rawDeadline && !deadlineValue) {
-    return badRequest('Invalid deadline date format')
-  }
+  const parsed = parseActivityInput(formData)
+  if (!parsed.ok) return badRequest(parsed.error)
+  const { name, rawDeadline, deadlineValue, priority } = parsed.value
 
   await db.execute<ResultSetHeader>(
     `INSERT INTO deal_activities (deal_id, company_id, name, deadline, priority, created_by)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [dealId, companyId, name.trim(), deadlineValue, priority, createdBy],
+    [dealId, companyId, name, deadlineValue, priority, createdBy],
   )
 
   if (createdBy) {
-    await notifyDealAssignee(
-      db,
-      dealId,
-      userId,
-      createdBy,
-      name.trim(),
-      'activity_added',
-    )
+    await notifyDealAssignee(db, dealId, userId, createdBy, name, 'activity_added')
   }
 
-  const deadlineUtc = String(formData.get('deadlineUtc') || '').trim() || null
-  await scheduleActivityDeadlineReminder(db, dealId, userId, name.trim(), deadlineUtc)
+  await scheduleActivityDeadlineReminder(
+    db,
+    dealId,
+    userId,
+    name,
+    deadlineForReminder(rawDeadline),
+  )
 
   return success()
 }
@@ -202,23 +222,9 @@ async function handleUpdate(
     return badRequest('Valid activity ID is required')
   }
 
-  const name = formData.get('name')
-  const deadline = formData.get('deadline')
-  const priority = String(formData.get('priority') || ActivityPriority.Medium)
-
-  if (!name || typeof name !== 'string' || !name.trim()) {
-    return badRequest('Activity name is required')
-  }
-
-  if (name.trim().length > 255) {
-    return badRequest('Activity name must be 255 characters or less')
-  }
-
-  if (!isValidPriority(priority)) {
-    return badRequest(
-      `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(', ')}`,
-    )
-  }
+  const parsed = parseActivityInput(formData)
+  if (!parsed.ok) return badRequest(parsed.error)
+  const { name, rawDeadline, deadlineValue, priority } = parsed.value
 
   const rows = await selectMany<{ id: number; name: string }>(
     db,
@@ -232,39 +238,21 @@ async function handleUpdate(
 
   const oldName = rows[0].name
 
-  const rawDeadline =
-    deadline && String(deadline).trim() ? String(deadline).trim() : null
-  const deadlineValue: Nullable<string> = rawDeadline
-    ? toMySQLDatetime(rawDeadline)
-    : null
-
-  if (rawDeadline && !deadlineValue) {
-    return badRequest('Invalid deadline date format')
-  }
-
   await db.execute(
     `UPDATE deal_activities SET name = ?, deadline = ?, priority = ? WHERE id = ? AND deal_id = ? AND company_id = ?`,
-    [name.trim(), deadlineValue, priority, Number(activityId), dealId, companyId],
+    [name, deadlineValue, priority, Number(activityId), dealId, companyId],
   )
 
   if (createdBy) {
-    await notifyDealAssignee(
-      db,
-      dealId,
-      userId,
-      createdBy,
-      name.trim(),
-      'activity_edited',
-    )
+    await notifyDealAssignee(db, dealId, userId, createdBy, name, 'activity_edited')
   }
 
-  const deadlineUtc = String(formData.get('deadlineUtc') || '').trim() || null
   await scheduleActivityDeadlineReminder(
     db,
     dealId,
     userId,
-    name.trim(),
-    deadlineUtc,
+    name,
+    deadlineForReminder(rawDeadline),
     oldName,
   )
 
@@ -275,7 +263,7 @@ async function handleToggle(
   formData: FormData,
   dealId: number,
   companyId: number,
-  userId: number,
+  _userId: number,
 ) {
   const activityId = formData.get('activityId')
 

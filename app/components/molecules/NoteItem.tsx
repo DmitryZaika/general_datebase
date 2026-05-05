@@ -1,4 +1,3 @@
-import { format } from 'date-fns'
 import { Pencil, Pin, PinOff, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
@@ -15,8 +14,9 @@ import {
 import { Button, buttonVariants } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Textarea } from '~/components/ui/textarea'
+import { formatTimestamp } from '~/lib/dateHelpers'
 import { buildNoteApiAction } from '~/lib/dealApiHelpers'
-import { cn, parseLocalDate } from '~/lib/utils'
+import { cn } from '~/lib/utils'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { ApiResponse } from '~/utils/apiResponse.server'
 
@@ -145,7 +145,7 @@ export function NoteItem({
     >
       <div className='flex items-start justify-between gap-2'>
         <span className='text-[11px] text-gray-500 leading-tight'>
-          {format(parseLocalDate(note.created_at), 'MMMM d h:mm a')}
+          {formatTimestamp(note.created_at)}
           {note.created_by && <> &middot; {note.created_by}</>}
         </span>
 
@@ -339,7 +339,7 @@ function CommentItem({
     >
       <div className='min-w-0'>
         <span className='text-[10px] text-gray-400'>
-          {format(parseLocalDate(comment.created_at), 'MMM d h:mm a')}
+          {formatTimestamp(comment.created_at)}
           {comment.created_by && ` · ${comment.created_by}`}
         </span>
         <p className='text-xs text-gray-600 leading-relaxed'>{comment.content}</p>

@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query'
-import { format } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertCircle,
@@ -52,8 +51,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { Textarea } from '~/components/ui/textarea'
 import { useToast } from '~/hooks/use-toast'
 import { useNoteAction } from '~/hooks/useNoteAction'
+import {
+  buildDeadlinePayload,
+  formatDeadlineLabel,
+  formatPickerDeadline,
+  formatTimestamp,
+} from '~/lib/dateHelpers'
 import { buildActivityApiAction } from '~/lib/dealApiHelpers'
-import { cn, parseLocalDate } from '~/lib/utils'
+import { cn } from '~/lib/utils'
 import {
   ActivityPriority,
   type DealActivity,
@@ -73,8 +78,6 @@ import { mapRowToSmsEntry, type SmsEntry, type SmsRow } from '~/utils/smsDisplay
 import { stripHtmlTags } from '~/utils/stringHelpers'
 import { NoteForm } from './NoteForm'
 import { NoteItem } from './NoteItem'
-
-// --- Configuration ---
 
 const PRIORITY_WEIGHT: Readonly<Record<ActivityPriority, number>> = {
   [ActivityPriority.High]: 0,
@@ -122,24 +125,19 @@ const URGENCY_BORDER_STYLE: Readonly<Record<DeadlineUrgency, string>> = {
   normal: '',
 }
 
-// --- Pure Functions ---
-
 const comparePriority = (a: DealActivity, b: DealActivity): number =>
   PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority]
 
 const compareDeadlineAsc = (a: DealActivity, b: DealActivity): number => {
   if (a.deadline && b.deadline) {
-    return parseLocalDate(a.deadline).getTime() - parseLocalDate(b.deadline).getTime()
+    return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
   }
   return a.deadline ? -1 : b.deadline ? 1 : 0
 }
 
 const compareCompletedDesc = (a: DealActivity, b: DealActivity): number => {
   if (a.completed_at && b.completed_at) {
-    return (
-      parseLocalDate(b.completed_at).getTime() -
-      parseLocalDate(a.completed_at).getTime()
-    )
+    return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
   }
   return a.completed_at ? -1 : b.completed_at ? 1 : 0
 }
@@ -163,63 +161,6 @@ const partitionActivities = (
 
   return { todo, done }
 }
-
-const DAY_MS = 86_400_000
-
-const calendarDayDiff = (target: Date): number => {
-  const deadlineDay = new Date(
-    target.getFullYear(),
-    target.getMonth(),
-    target.getDate(),
-  )
-  const today = new Date()
-  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  return Math.round((deadlineDay.getTime() - todayDay.getTime()) / DAY_MS)
-}
-
-const isOverdue = (deadline: string): boolean => {
-  const date = parseLocalDate(deadline)
-  const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
-  if (hasTime) return date.getTime() < Date.now()
-  const endOfDay = new Date(date)
-  endOfDay.setHours(23, 59, 59, 999)
-  return endOfDay.getTime() < Date.now()
-}
-
-const getDeadlineUrgency = (deadline: string): DeadlineUrgency => {
-  if (isOverdue(deadline)) return 'overdue'
-  const diffDays = calendarDayDiff(parseLocalDate(deadline))
-  if (diffDays === 0) return 'today'
-  if (diffDays <= 2) return 'soon'
-  return 'normal'
-}
-
-const formatDeadline = (deadline: string): string => {
-  const date = parseLocalDate(deadline)
-  const diffDays = calendarDayDiff(date)
-  const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
-  const timeSuffix = hasTime ? ` ${format(date, 'h:mm a')}` : ''
-
-  if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`
-  if (diffDays === 0) return `Today${timeSuffix}`
-  if (diffDays === 1) return `Tomorrow${timeSuffix}`
-  return format(date, 'MMM d') + timeSuffix
-}
-
-const formatFormDeadline = (d: Date): string => {
-  const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0
-  return hasTime ? format(d, 'MMM d, yyyy h:mm a') : format(d, 'MMM d, yyyy')
-}
-
-const toDeadlinePayload = (deadline: Nullable<Date>): string => {
-  if (!deadline) return ''
-  const hasTime = deadline.getHours() !== 0 || deadline.getMinutes() !== 0
-  return hasTime
-    ? format(deadline, "yyyy-MM-dd'T'HH:mm:ss")
-    : format(deadline, 'yyyy-MM-dd')
-}
-
-// --- Form Reducer ---
 
 interface FormState {
   name: string
@@ -262,17 +203,7 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
     case 'SET_PRIORITY':
       return { ...state, priority: action.payload }
     case 'SET_EDIT': {
-      const d = action.payload.deadline
-        ? parseLocalDate(action.payload.deadline)
-        : undefined
-      if (d) {
-        const snapped = Math.round(d.getMinutes() / 5) * 5
-        if (snapped >= 60) {
-          d.setHours(d.getHours() + 1, 0, 0, 0)
-        } else {
-          d.setMinutes(snapped, 0, 0)
-        }
-      }
+      const d = action.payload.deadline ? new Date(action.payload.deadline) : undefined
       return {
         name: action.payload.name,
         deadline: d,
@@ -284,9 +215,7 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
   }
 }
 
-// --- Hooks ---
-
-function useActivityForm(dealId: number, editingActivityId: number | null) {
+function useActivityForm(dealId: number, editingActivityId: Nullable<number>) {
   const fetcher = useFetcher()
   const token = useAuthenticityToken()
   const [form, dispatch] = useReducer(formReducer, INITIAL_FORM_STATE)
@@ -298,15 +227,10 @@ function useActivityForm(dealId: number, editingActivityId: number | null) {
   const submit = useCallback(() => {
     if (!isValid) return
 
-    const deadlineLocal = toDeadlinePayload(form.deadline ?? null)
-    const hasTime = form.deadline
-      ? form.deadline.getHours() !== 0 || form.deadline.getMinutes() !== 0
-      : false
     const payload: Record<string, string> = {
       intent: isEditing ? 'update' : 'create',
       name: form.name.trim(),
-      deadline: deadlineLocal,
-      deadlineUtc: hasTime && form.deadline ? form.deadline.toISOString() : '',
+      deadline: buildDeadlinePayload(form.deadline),
       priority: form.priority,
       csrf: token,
     }
@@ -373,8 +297,6 @@ function useActivityAction(dealId: number) {
   }
 }
 
-// --- Shared Sub-Components ---
-
 function PriorityDot({ priority }: { priority: ActivityPriority }) {
   return <span className={cn('h-2 w-2 rounded-full', PRIORITY_DOT_COLOR[priority])} />
 }
@@ -390,7 +312,7 @@ function PriorityBadge({ priority }: { priority: ActivityPriority }) {
 }
 
 function DeadlineLabel({ deadline }: { deadline: string }) {
-  const urgency = getDeadlineUrgency(deadline)
+  const { label, urgency } = formatDeadlineLabel(deadline)
   const hasPill = urgency === 'overdue' || urgency === 'today'
   const Icon = urgency === 'overdue' ? AlertCircle : Clock
 
@@ -403,7 +325,7 @@ function DeadlineLabel({ deadline }: { deadline: string }) {
       )}
     >
       <Icon className='h-2.5 w-2.5' />
-      {formatDeadline(deadline)}
+      {label}
     </span>
   )
 }
@@ -411,7 +333,7 @@ function DeadlineLabel({ deadline }: { deadline: string }) {
 function CompletedLabel({ completedAt }: { completedAt: string }) {
   return (
     <span className='text-[10px] text-gray-600'>
-      Done {format(parseLocalDate(completedAt), 'MMM d')}
+      Done {formatTimestamp(completedAt)}
     </span>
   )
 }
@@ -420,7 +342,7 @@ function SectionEmptyState({ label }: { label: string }) {
   return <p className='text-xs text-gray-400 py-3 text-center italic'>{label}</p>
 }
 
-function getFormDataNoteId(formData: FormData | undefined): number | null {
+function getFormDataNoteId(formData: FormData | undefined): Nullable<number> {
   const value = formData?.get('noteId')
   if (typeof value !== 'string') return null
   const id = Number(value)
@@ -492,8 +414,6 @@ function SectionHeader({
   )
 }
 
-// --- Timeline Wrapper ---
-
 function TimelineItem({
   icon: Icon,
   isLast = false,
@@ -518,8 +438,6 @@ function TimelineItem({
   )
 }
 
-// --- Activity Components ---
-
 function ActivityItem({
   activity,
   dealId,
@@ -537,9 +455,9 @@ function ActivityItem({
 
   const isDone = !!activity.is_completed
   const optimisticDone = togglingData?.get('intent') === 'toggle' ? !isDone : isDone
-  const urgency =
+  const urgency: DeadlineUrgency =
     !optimisticDone && activity.deadline
-      ? getDeadlineUrgency(activity.deadline)
+      ? formatDeadlineLabel(activity.deadline).urgency
       : 'normal'
 
   return (
@@ -642,8 +560,6 @@ function ActivityItem({
   )
 }
 
-// --- Deadline & Time Controls ---
-
 const HOURS_12 = Array.from({ length: 12 }, (_, i) => (i === 0 ? 12 : i))
 const MINUTES_5 = Array.from({ length: 12 }, (_, i) => i * 5)
 
@@ -656,10 +572,6 @@ function to12Hour(h24: number): { hour: number; period: 'AM' | 'PM' } {
 function to24Hour(hour: number, period: 'AM' | 'PM'): number {
   if (period === 'AM') return hour === 12 ? 0 : hour
   return hour === 12 ? 12 : hour + 12
-}
-
-function roundTo5(min: number): number {
-  return Math.min(Math.round(min / 5) * 5, 55)
 }
 
 function DeadlineControls({
@@ -677,7 +589,12 @@ function DeadlineControls({
 
   const hasTime = deadline.getHours() !== 0 || deadline.getMinutes() !== 0
   const current = to12Hour(deadline.getHours())
-  const currentMin = roundTo5(deadline.getMinutes())
+  const currentMin = deadline.getMinutes()
+  // Preserve any non-5-min value from the saved deadline as an extra option
+  // so it shows as the selected item without silently rounding.
+  const minuteOptions = MINUTES_5.includes(currentMin)
+    ? MINUTES_5
+    : [...MINUTES_5, currentMin].sort((a, b) => a - b)
 
   const handleHour = (val: string) => {
     const h24 = to24Hour(Number(val), current.period)
@@ -717,7 +634,7 @@ function DeadlineControls({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {MINUTES_5.map(m => (
+              {minuteOptions.map(m => (
                 <SelectItem key={m} value={String(m)}>
                   {String(m).padStart(2, '0')}
                 </SelectItem>
@@ -767,15 +684,13 @@ function DeadlineControls({
   )
 }
 
-// --- Activity Form ---
-
 function ActivityForm({
   dealId,
   editingActivity,
   onCancelEdit,
 }: {
   dealId: number
-  editingActivity: DealActivity | null
+  editingActivity: Nullable<DealActivity>
   onCancelEdit: () => void
 }) {
   const { form, dispatch, isSubmitting, isValid, isEditing, submit } = useActivityForm(
@@ -863,7 +778,7 @@ function ActivityForm({
             >
               <CalendarIcon className='mr-1.5 h-3.5 w-3.5 shrink-0' />
               <span className='truncate'>
-                {form.deadline ? formatFormDeadline(form.deadline) : 'Deadline'}
+                {form.deadline ? formatPickerDeadline(form.deadline) : 'Deadline'}
               </span>
             </Button>
           </PopoverTrigger>
@@ -939,9 +854,7 @@ function ActivityForm({
   )
 }
 
-// --- Email history row ---
-
-function makeEmailSnippet(body: string | null | undefined, max = 120): string {
+function makeEmailSnippet(body: Nullable<string> | undefined, max = 120): string {
   if (!body) return ''
   const text = stripHtmlTags(body)
     .replace(/&nbsp;/g, ' ')
@@ -954,11 +867,9 @@ function makeEmailSnippet(body: string | null | undefined, max = 120): string {
 function SmsHistoryRow({ message }: { message: SmsEntry }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const isOutbound = message.direction === 'outbound'
-  const sentAt = new Date(message.createdDate)
-  const sentLabel = Number.isNaN(sentAt.getTime())
-    ? ''
-    : format(sentAt, 'MMM d, h:mm a')
+  const sentLabel = formatTimestamp(message.createdDate)
   const showToggle = message.text.length > 90
+  const outboundAgent = isOutbound && message.agent ? message.agent : null
 
   return (
     <div className='flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
@@ -993,7 +904,12 @@ function SmsHistoryRow({ message }: { message: SmsEntry }) {
               {isExpanded ? 'Show less' : 'Show more'}
             </button>
           ) : null}
-          <span className='text-[10px] text-gray-500 w-22 text-right tabular-nums'>
+          {outboundAgent ? (
+            <span className='text-[10px] text-gray-500 truncate max-w-[120px]'>
+              by {outboundAgent}
+            </span>
+          ) : null}
+          <span className='text-[10px] text-gray-500 text-right tabular-nums whitespace-nowrap'>
             {sentLabel}
           </span>
         </div>
@@ -1012,15 +928,12 @@ function EmailHistoryRow({ email }: { email: DealEmailHistoryItem }) {
   searchParams.set('messageId', String(email.id))
   const to = `${basePath}/edit/${dealId}/project/chat/${email.thread_id}?${searchParams.toString()}`
 
-  const sentAt = new Date(email.sent_at)
-  const sentLabel = Number.isNaN(sentAt.getTime())
-    ? ''
-    : format(sentAt, 'MMM d, h:mm a')
-
+  const sentLabel = formatTimestamp(email.sent_at)
   const isSent = !!email.sender_user_id
   const isRead = isSent ? (email.read_count ?? 0) > 0 : !!email.employee_read_at
   const hasAttachments = !!email.has_attachments
   const snippet = makeEmailSnippet(email.body)
+  const outboundSender = isSent && email.sender_name ? email.sender_name : null
 
   return (
     <Link
@@ -1059,7 +972,12 @@ function EmailHistoryRow({ email }: { email: DealEmailHistoryItem }) {
               <EyeClosed className='h-3 w-3 text-gray-400' aria-label='Unread' />
             )}
           </span>
-          <span className='text-[10px] text-gray-500 w-22 text-right tabular-nums'>
+          {outboundSender ? (
+            <span className='text-[10px] text-gray-500 truncate max-w-[120px]'>
+              by {outboundSender}
+            </span>
+          ) : null}
+          <span className='text-[10px] text-gray-500 text-right tabular-nums whitespace-nowrap'>
             {sentLabel}
           </span>
         </div>
@@ -1070,8 +988,6 @@ function EmailHistoryRow({ email }: { email: DealEmailHistoryItem }) {
     </Link>
   )
 }
-
-// --- History Sub-tabs ---
 
 function HistoryTabButtons({
   activeTab,
@@ -1120,8 +1036,6 @@ function HistoryTabButtons({
   )
 }
 
-// --- Activity List ---
-
 function ActivityList({
   dealId,
   activities,
@@ -1140,10 +1054,11 @@ function ActivityList({
   smsMessages: SmsEntry[]
   emails: DealEmailHistoryItem[]
   onEdit: (activity: DealActivity) => void
-  editingActivityId: number | null
-  historyHeaderRef: React.RefObject<HTMLDivElement | null>
+  editingActivityId: Nullable<number>
+  historyHeaderRef: React.RefObject<Nullable<HTMLDivElement>>
 }) {
-  const [isHistoryOpen, setIsHistoryOpen] = useReducer((s: boolean) => !s, true)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true)
+  const toggleHistoryOpen = useCallback(() => setIsHistoryOpen(prev => !prev), [])
   const [historyTab, setHistoryTab] = useState<HistoryTab>('all')
   const noteHandlers = useNoteAction(dealId)
   const updatingNoteId =
@@ -1166,10 +1081,7 @@ function ActivityList({
       [...notes].sort((a, b) => {
         if (a.is_pinned && !b.is_pinned) return -1
         if (!a.is_pinned && b.is_pinned) return 1
-        return (
-          parseLocalDate(b.created_at).getTime() -
-          parseLocalDate(a.created_at).getTime()
-        )
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       }),
     [notes],
   )
@@ -1226,15 +1138,7 @@ function ActivityList({
     items.sort((a, b) => {
       if (a.isPinned && !b.isPinned) return -1
       if (!a.isPinned && b.isPinned) return 1
-      const aTime =
-        a.type === 'email' || a.type === 'action' || a.type === 'sms'
-          ? new Date(a.date).getTime()
-          : parseLocalDate(a.date ?? '').getTime()
-      const bTime =
-        b.type === 'email' || b.type === 'action' || b.type === 'sms'
-          ? new Date(b.date).getTime()
-          : parseLocalDate(b.date ?? '').getTime()
-      return bTime - aTime
+      return new Date(b.date ?? '').getTime() - new Date(a.date ?? '').getTime()
     })
 
     return items
@@ -1493,7 +1397,7 @@ function ActivityList({
           count={historyCount}
           collapsible
           isOpen={isHistoryOpen}
-          onToggle={setIsHistoryOpen}
+          onToggle={toggleHistoryOpen}
         />
         {isHistoryOpen && (
           <>
@@ -1514,8 +1418,6 @@ function ActivityList({
   )
 }
 
-// --- Main Component ---
-
 export function DealActivityPanel({
   dealId,
   activities = [],
@@ -1524,7 +1426,7 @@ export function DealActivityPanel({
 }: DealActivityPanelProps) {
   const location = useLocation()
   const navigate = useNavigate()
-  const [editingActivity, setEditingActivity] = useState<DealActivity | null>(null)
+  const [editingActivity, setEditingActivity] = useState<Nullable<DealActivity>>(null)
   const [activeTab, setActiveTab] = useState<'activity' | 'notes'>('activity')
   const scrollRef = useRef<HTMLDivElement>(null)
   const historyHeaderRef = useRef<HTMLDivElement>(null)
