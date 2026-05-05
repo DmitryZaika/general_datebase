@@ -4,8 +4,9 @@ import {
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
-  PointerSensor,
+  MouseSensor,
   pointerWithin,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -16,27 +17,30 @@ import DealsList from '~/components/DealsList'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { Button } from '~/components/ui/button'
-import { parseLocalDate } from '~/lib/utils'
+import { isDateOnlyDeadline, localCalendarDate } from '~/lib/dateHelpers'
 import type { Customer } from '~/types'
 import type { DealCardData } from '~/types/deals'
 import type { Nullable } from '~/types/utils'
 
-function activityDeadlineHasTime(deadline: string): boolean {
-  const d = parseLocalDate(deadline)
-  return d.getHours() !== 0 || d.getMinutes() !== 0
-}
-
 function compareNearestActivityDeadlines(aDate: string, bDate: string): number {
-  const da = parseLocalDate(aDate)
-  const db = parseLocalDate(bDate)
-  const dayA = new Date(da.getFullYear(), da.getMonth(), da.getDate()).getTime()
-  const dayB = new Date(db.getFullYear(), db.getMonth(), db.getDate()).getTime()
+  const localA = localCalendarDate(aDate)
+  const localB = localCalendarDate(bDate)
+  const dayA = new Date(
+    localA.getFullYear(),
+    localA.getMonth(),
+    localA.getDate(),
+  ).getTime()
+  const dayB = new Date(
+    localB.getFullYear(),
+    localB.getMonth(),
+    localB.getDate(),
+  ).getTime()
   if (dayA !== dayB) return dayA - dayB
-  const aTimed = activityDeadlineHasTime(aDate)
-  const bTimed = activityDeadlineHasTime(bDate)
+  const aTimed = !isDateOnlyDeadline(aDate)
+  const bTimed = !isDateOnlyDeadline(bDate)
   if (aTimed && !bTimed) return -1
   if (!aTimed && bTimed) return 1
-  return da.getTime() - db.getTime()
+  return new Date(aDate).getTime() - new Date(bDate).getTime()
 }
 
 type List = {
@@ -172,9 +176,9 @@ export default function DealsView({
   ])
 
   const [board, setBoard] = useState<Record<number, Deal[]>>(initialBoard)
-  const [activeId, setActiveId] = useState<number | null>(null)
-  const [highlightDealId, setHighlightDealId] = useState<number | null>(null)
-  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [activeId, setActiveId] = useState<Nullable<number>>(null)
+  const [highlightDealId, setHighlightDealId] = useState<Nullable<number>>(null)
+  const highlightTimeoutRef = useRef<Nullable<NodeJS.Timeout>>(null)
 
   useEffect(() => setBoard(initialBoard), [JSON.stringify(initialBoard)])
 
@@ -220,9 +224,15 @@ export default function DealsView({
   }, [searchParams, board])
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 4,
+        distance: 6,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 220,
+        tolerance: 10,
       },
     }),
   )
@@ -433,7 +443,7 @@ export default function DealsView({
   })
 
   const listsContent = (
-    <div className='flex min-h-0 flex-1 max-w-full min-w-0 items-stretch gap-1 md:min-w-0 max-md:gap-0 max-md:overflow-x-auto max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory'>
+    <div className='flex min-h-0 flex-1 max-w-full min-w-0 items-stretch gap-1 md:min-w-0 max-md:h-full max-md:gap-0 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory'>
       {lists.map(list => (
         <DealsList
           key={list.id}
@@ -449,9 +459,9 @@ export default function DealsView({
 
   if (readonly) {
     return (
-      <div className='w-full h-[calc(100dvh-4.75rem)] min-h-0 flex flex-col overflow-hidden'>
+      <div className='w-full h-[calc(100dvh-6.25rem)] min-h-0 flex flex-col h-full'>
         <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
-        <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
+        <div className='flex min-h-0 min-w-0 h-full flex-1 flex-col'>
           {listsContent}
         </div>
       </div>
@@ -475,11 +485,9 @@ export default function DealsView({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.50rem)] flex flex-col overflow-hidden'>
+      <div className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col'>
         <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
-        <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
-          {listsContent}
-        </div>
+        <div className='flex min-h-0 min-w-0 flex-1 flex-col'>{listsContent}</div>
       </div>
       <DragOverlay>
         {activeId !== null

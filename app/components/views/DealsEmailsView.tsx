@@ -204,6 +204,7 @@ export default function DealsEmailsView({
   const folderFromUrl =
     folderParam === 'sent' ? 'sent' : folderParam === 'trash' ? 'trash' : 'inbox'
   const searchFromUrl = searchParams.get('search') ?? ''
+  const [serverSearchTerm, setServerSearchTerm] = useState(searchFromUrl)
   const [activeTabLocal, setActiveTabLocal] = useState<Tab>('inbox')
   const activeTab = initialFolder != null ? (folderFromUrl as Tab) : activeTabLocal
   const setActiveTab = (t: Tab) => {
@@ -750,6 +751,10 @@ export default function DealsEmailsView({
 
   const salesRepParam = searchParams.get('sales_rep')
 
+  useEffect(() => {
+    setServerSearchTerm(searchFromUrl)
+  }, [searchFromUrl])
+
   const handleSalesRepChange = (val: string) => {
     const params = new URLSearchParams(searchParams)
     if (val === 'all') {
@@ -895,11 +900,7 @@ export default function DealsEmailsView({
               <form
                 onSubmit={e => {
                   e.preventDefault()
-                  const form = e.currentTarget
-                  const q =
-                    (
-                      form.elements.namedItem('search') as HTMLInputElement
-                    )?.value?.trim() ?? ''
+                  const q = serverSearchTerm.trim()
                   const next = new URLSearchParams(searchParams)
                   if (q) next.set('search', q)
                   else next.delete('search')
@@ -913,10 +914,26 @@ export default function DealsEmailsView({
                   name='search'
                   type='text'
                   placeholder='Search subject, body, or addresses...'
-                  defaultValue={searchFromUrl}
-                  key={searchFromUrl}
-                  className='pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
+                  value={serverSearchTerm}
+                  onChange={e => setServerSearchTerm(e.target.value)}
+                  className='pl-9 pr-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
                 />
+                {serverSearchTerm.length > 0 && (
+                  <button
+                    type='button'
+                    aria-label='Clear search'
+                    onClick={() => {
+                      setServerSearchTerm('')
+                      const next = new URLSearchParams(searchParams)
+                      next.delete('search')
+                      next.set('page', '1')
+                      navigate({ search: next.toString() })
+                    }}
+                    className='absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700'
+                  >
+                    <X className='h-4 w-4' />
+                  </button>
+                )}
               </form>
             ) : (
               <>
@@ -926,8 +943,18 @@ export default function DealsEmailsView({
                   placeholder='Search subject, body, or addresses...'
                   value={searchTermLocal}
                   onChange={e => setSearchTermLocal(e.target.value)}
-                  className='pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
+                  className='pl-9 pr-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
                 />
+                {searchTermLocal.length > 0 && (
+                  <button
+                    type='button'
+                    aria-label='Clear search'
+                    onClick={() => setSearchTermLocal('')}
+                    className='absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700'
+                  >
+                    <X className='h-4 w-4' />
+                  </button>
+                )}
               </>
             )}
           </div>

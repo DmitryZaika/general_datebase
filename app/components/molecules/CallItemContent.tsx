@@ -2,6 +2,7 @@ import { format } from 'date-fns'
 import { Star } from 'lucide-react'
 import { useState } from 'react'
 import { AudioWaveformPlayer } from '~/components/molecules/AudioWaveformPlayer'
+import { formatTimestamp } from '~/lib/dateHelpers'
 import { cn } from '~/lib/utils'
 import {
   type CallEntry,
@@ -29,10 +30,7 @@ export function CallItemContent({
   const status = getCallStatus(call)
 
   if (historyCompact) {
-    const startedAt = new Date(call.startedAt)
-    const startedLabel = Number.isNaN(startedAt.getTime())
-      ? ''
-      : format(startedAt, 'MMM d, h:mm a')
+    const startedLabel = formatTimestamp(call.startedAt)
     const label =
       call.type === 'outgoing'
         ? 'Outgoing'
@@ -71,7 +69,7 @@ export function CallItemContent({
                 {showRecording ? 'Hide voice call' : 'Voice call'}
               </button>
             ) : null}
-            <span className='text-[10px] text-gray-500 w-22 text-right tabular-nums'>
+            <span className='text-[10px] text-gray-500 text-right tabular-nums whitespace-nowrap'>
               {startedLabel}
             </span>
           </div>

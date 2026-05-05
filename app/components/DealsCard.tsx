@@ -19,7 +19,7 @@ export default function DealsCard({
       items={customers.map(c => c.id)}
       strategy={verticalListSortingStrategy}
     >
-      <CardContent className='flex flex-col space-y-2 overflow-y-auto p-2 '>
+      <CardContent className='flex flex-col space-y-2 overflow-y-auto p-2 max-h-[calc(100dvh-13rem)] md:max-h-[calc(100dvh-12rem)]'>
         {customers.map(c => (
           <DealItem
             key={c.id}
