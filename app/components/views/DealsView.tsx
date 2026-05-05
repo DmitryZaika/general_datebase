@@ -456,9 +456,9 @@ export default function DealsView({
 
   if (readonly) {
     return (
-      <div className='w-full h-[calc(100dvh-6.25rem)] min-h-0 flex flex-col overflow-hidden'>
+      <div className='w-full h-[calc(100dvh-6.25rem)] min-h-0 flex flex-col h-full'>
         <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
-        <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
+        <div className='flex min-h-0 min-w-0 h-full flex-1 flex-col'>
           {listsContent}
         </div>
       </div>
@@ -482,9 +482,9 @@ export default function DealsView({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col overflow-hidden'>
+      <div className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col h-full'>
         <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
-        <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
+        <div className='flex min-h-0 min-w-0 h-full flex-1 flex-col'>
           {listsContent}
         </div>
       </div>
