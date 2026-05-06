@@ -821,6 +821,68 @@ export default function DealsEmailsView({
     </div>
   )
 
+  const emailSearchControl = isServerPagination ? (
+    <form
+      onSubmit={e => {
+        e.preventDefault()
+        const q = serverSearchTerm.trim()
+        const next = new URLSearchParams(searchParams)
+        if (q) next.set('search', q)
+        else next.delete('search')
+        next.set('page', '1')
+        navigate({ search: next.toString() })
+      }}
+      className='relative'
+    >
+      <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-gray-500' />
+      <Input
+        name='search'
+        type='text'
+        placeholder='Search subject, body, or addresses...'
+        value={serverSearchTerm}
+        onChange={e => setServerSearchTerm(e.target.value)}
+        className='pl-9 pr-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
+      />
+      {serverSearchTerm.length > 0 && (
+        <button
+          type='button'
+          aria-label='Clear search'
+          onClick={() => {
+            setServerSearchTerm('')
+            const next = new URLSearchParams(searchParams)
+            next.delete('search')
+            next.set('page', '1')
+            navigate({ search: next.toString() })
+          }}
+          className='absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700'
+        >
+          <X className='h-4 w-4' />
+        </button>
+      )}
+    </form>
+  ) : (
+    <>
+      <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-gray-500' />
+      <Input
+        type='text'
+        placeholder='Search subject, body, or addresses...'
+        value={searchTermLocal}
+        onChange={e => setSearchTermLocal(e.target.value)}
+        className='pl-9 pr-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
+      />
+      {searchTermLocal.length > 0 && (
+        <button
+          type='button'
+          aria-label='Clear search'
+          onClick={() => setSearchTermLocal('')}
+          className='absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700'
+        >
+          <X className='h-4 w-4' />
+        </button>
+      )}
+    </>
+  )
+
   return (
     <div className='flex h-[calc(100vh-100px)] w-full bg-background font-sans relative'>
       {/* Desktop Sidebar */}
@@ -831,146 +893,87 @@ export default function DealsEmailsView({
       {/* Main Content */}
       <div className='flex-1 flex flex-col bg-white md:rounded-tl-2xl shadow-sm border border-gray-200 overflow-hidden md:mr-4 md:mb-4 h-full'>
         {/* Toolbar / Header of list */}
-        <div className='flex items-stretch gap-2 md:gap-4 px-2 py-2 md:px-3 md:py-3 border-b border-gray-200 bg-white'>
-          {/* Mobile Menu Trigger */}
-          <div className='self-center md:hidden'>
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant='ghost' size='icon'>
-                  <Menu className='h-5 w-5' />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side='left' className='w-64 p-0 bg-white'>
-                <SidebarContent />
-              </SheetContent>
-            </Sheet>
-          </div>
-          <div className='pl-2 flex items-stretch gap-2'>
-            <label className='flex shrink-0 cursor-pointer items-center self-stretch'>
-              <Checkbox
-                checked={
-                  selectedThreads.size === sortedEmails.length &&
-                  sortedEmails.length > 0
-                }
-                onCheckedChange={toggleSelectAll}
-                className='cursor-pointer'
-              />
-            </label>
-            {selectedThreads.size > 0 && activeTab !== 'trash' && (
-              <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type='button'
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                      className='flex min-h-9 w-9 shrink-0 cursor-pointer items-center justify-center self-stretch rounded-full text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50'
-                    >
-                      <Trash2 className='h-4 w-4' />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side='top' sideOffset={6}>
-                    Delete selected
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type='button'
-                      onClick={handleToggleSelectedReadState}
-                      disabled={isMarkingUnread}
-                      className='flex min-h-9 w-9 shrink-0 cursor-pointer items-center justify-center self-stretch rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
-                    >
-                      {selectedHasUnreadThreads ? (
-                        <MailOpen className='h-4 w-4' />
-                      ) : (
-                        <Mail className='h-4 w-4' />
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side='top' sideOffset={6}>
-                    {selectedHasUnreadThreads ? 'Mark as read' : 'Mark as unread'}
-                  </TooltipContent>
-                </Tooltip>
-              </>
-            )}
-          </div>
-          <div className='relative flex-1 max-w-md ml-2 self-center'>
-            {isServerPagination ? (
-              <form
-                onSubmit={e => {
-                  e.preventDefault()
-                  const q = serverSearchTerm.trim()
-                  const next = new URLSearchParams(searchParams)
-                  if (q) next.set('search', q)
-                  else next.delete('search')
-                  next.set('page', '1')
-                  navigate({ search: next.toString() })
-                }}
-                className='relative'
-              >
-                <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-gray-500' />
-                <Input
-                  name='search'
-                  type='text'
-                  placeholder='Search subject, body, or addresses...'
-                  value={serverSearchTerm}
-                  onChange={e => setServerSearchTerm(e.target.value)}
-                  className='pl-9 pr-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
+        <div className='flex flex-col gap-2 md:flex-row md:items-stretch md:gap-4 px-2 py-2 md:px-3 md:py-3 border-b border-gray-200 bg-white'>
+          <div className='flex w-full min-w-0 items-stretch gap-2 md:min-h-0 md:flex-1'>
+            <div className='shrink-0 self-center md:hidden'>
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant='ghost' size='icon'>
+                    <Menu className='h-5 w-5' />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side='left' className='w-64 p-0 bg-white'>
+                  <SidebarContent />
+                </SheetContent>
+              </Sheet>
+            </div>
+            <div className='flex min-w-0 flex-1 items-stretch gap-2 pl-2 md:flex-initial md:min-w-0'>
+              <label className='flex shrink-0 cursor-pointer items-center self-stretch'>
+                <Checkbox
+                  checked={
+                    selectedThreads.size === sortedEmails.length &&
+                    sortedEmails.length > 0
+                  }
+                  onCheckedChange={toggleSelectAll}
+                  className='cursor-pointer'
                 />
-                {serverSearchTerm.length > 0 && (
-                  <button
-                    type='button'
-                    aria-label='Clear search'
-                    onClick={() => {
-                      setServerSearchTerm('')
-                      const next = new URLSearchParams(searchParams)
-                      next.delete('search')
-                      next.set('page', '1')
-                      navigate({ search: next.toString() })
-                    }}
-                    className='absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700'
-                  >
-                    <X className='h-4 w-4' />
-                  </button>
-                )}
-              </form>
-            ) : (
-              <>
-                <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-gray-500' />
-                <Input
-                  type='text'
-                  placeholder='Search subject, body, or addresses...'
-                  value={searchTermLocal}
-                  onChange={e => setSearchTermLocal(e.target.value)}
-                  className='pl-9 pr-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors'
-                />
-                {searchTermLocal.length > 0 && (
-                  <button
-                    type='button'
-                    aria-label='Clear search'
-                    onClick={() => setSearchTermLocal('')}
-                    className='absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700'
-                  >
-                    <X className='h-4 w-4' />
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-          <div className='flex-1 self-center md:hidden' /> {/* Spacer for mobile */}
-          <button
-            type='button'
-            onClick={() => revalidator.revalidate()}
-            className='flex min-h-9 w-9 shrink-0 items-center justify-center self-stretch rounded-full text-gray-500 hover:bg-gray-100'
-          >
-            <RotateCw
-              className={cn(
-                'h-4 w-4',
-                revalidator.state === 'loading' && 'animate-spin',
+              </label>
+              {selectedThreads.size > 0 && activeTab !== 'trash' && (
+                <>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type='button'
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className='flex min-h-9 w-9 shrink-0 cursor-pointer items-center justify-center self-stretch rounded-full text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50'
+                      >
+                        <Trash2 className='h-4 w-4' />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side='top' sideOffset={6}>
+                      Delete selected
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type='button'
+                        onClick={handleToggleSelectedReadState}
+                        disabled={isMarkingUnread}
+                        className='flex min-h-9 w-9 shrink-0 cursor-pointer items-center justify-center self-stretch rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+                      >
+                        {selectedHasUnreadThreads ? (
+                          <MailOpen className='h-4 w-4' />
+                        ) : (
+                          <Mail className='h-4 w-4' />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side='top' sideOffset={6}>
+                      {selectedHasUnreadThreads ? 'Mark as read' : 'Mark as unread'}
+                    </TooltipContent>
+                  </Tooltip>
+                </>
               )}
-            />
-          </button>
+            </div>
+            <div className='relative ml-2 hidden min-w-0 flex-1 max-w-md self-center md:block'>
+              {emailSearchControl}
+            </div>
+            <button
+              type='button'
+              onClick={() => revalidator.revalidate()}
+              className='ml-auto flex min-h-9 w-9 shrink-0 items-center justify-center self-center rounded-full text-gray-500 hover:bg-gray-100 md:ml-0 md:self-stretch'
+            >
+              <RotateCw
+                className={cn(
+                  'h-4 w-4',
+                  revalidator.state === 'loading' && 'animate-spin',
+                )}
+              />
+            </button>
+          </div>
+          <div className='relative w-full min-w-0 md:hidden'>{emailSearchControl}</div>
         </div>
 
         {/* Email List */}

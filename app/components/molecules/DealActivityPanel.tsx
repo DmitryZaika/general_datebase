@@ -330,14 +330,6 @@ function DeadlineLabel({ deadline }: { deadline: string }) {
   )
 }
 
-function CompletedLabel({ completedAt }: { completedAt: string }) {
-  return (
-    <span className='text-[10px] text-gray-600'>
-      Done {formatTimestamp(completedAt)}
-    </span>
-  )
-}
-
 function SectionEmptyState({ label }: { label: string }) {
   return <p className='text-xs text-gray-400 py-3 text-center italic'>{label}</p>
 }
@@ -352,7 +344,7 @@ function getFormDataNoteId(formData: FormData | undefined): Nullable<number> {
 function NoteHistorySkeletonItem({ isLast = false }: { isLast?: boolean }) {
   return (
     <TimelineItem icon={NoteIcon} isLast={isLast}>
-      <div className='rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5'>
+      <div className='flex flex-col gap-0.5 rounded-md border border-gray-200 px-2 py-1.5'>
         <div className='mb-3 flex items-center justify-between gap-2'>
           <Skeleton className='h-3 w-32' />
           <div className='flex items-center gap-1'>
@@ -460,12 +452,84 @@ function ActivityItem({
       ? formatDeadlineLabel(activity.deadline).urgency
       : 'normal'
 
+  const deleteControl = (
+    <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <Button
+        variant='ghost'
+        size='icon'
+        className='h-6 w-6 shrink-0 text-gray-600 hover:text-red-500'
+        onClick={() => setShowDeleteConfirm(true)}
+      >
+        <Trash2 className='h-3 w-3' />
+      </Button>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Activity</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete &quot;{activity.name}&quot;?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className={buttonVariants({ variant: 'destructive' })}
+            onClick={() => remove(activity.id, activity.name)}
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+
+  if (optimisticDone) {
+    return (
+      <div
+        className={cn(
+          'group flex flex-col gap-0.5 rounded-md px-2 py-1.5 transition-colors hover:bg-gray-50',
+          isDeleting && 'pointer-events-none scale-95 opacity-0',
+          isBeingEdited && 'bg-blue-50 ring-1 ring-blue-200',
+        )}
+      >
+        <div className='flex items-center justify-between gap-2'>
+          <div className='flex min-w-0 flex-1 items-center gap-2'>
+            <Checkbox
+              checked={optimisticDone}
+              onCheckedChange={() => toggle(activity.id, activity.name, isDone)}
+              disabled={isToggling}
+              className='mt-0.5 h-4 w-4 shrink-0'
+            />
+            <Badge className='h-4 shrink-0 border border-gray-200 bg-gray-100 px-1.5 py-0 text-[10px] text-gray-700'>
+              Done
+            </Badge>
+            <PriorityBadge priority={activity.priority} />
+            {activity.created_by ? (
+              <span className='min-w-0 truncate text-xs text-gray-500'>
+                Created by {activity.created_by}
+              </span>
+            ) : null}
+          </div>
+          <div className='flex shrink-0 items-center gap-1'>
+            {deleteControl}
+            {activity.completed_at ? (
+              <span className='whitespace-nowrap text-right text-[10px] tabular-nums text-gray-500'>
+                {formatTimestamp(activity.completed_at)}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <p className='mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800'>
+          {activity.name}
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn(
-        'group flex items-start gap-2 rounded-md px-2 py-1.5 transition-all',
-        optimisticDone ? 'bg-gray-50' : 'hover:bg-gray-50',
-        isDeleting && 'opacity-0 scale-95 pointer-events-none',
+        'group flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-gray-50',
+        isDeleting && 'pointer-events-none scale-95 opacity-0',
         isBeingEdited && 'bg-blue-50 ring-1 ring-blue-200',
         URGENCY_BORDER_STYLE[urgency],
       )}
@@ -477,84 +541,39 @@ function ActivityItem({
         className='mt-0.5 h-4 w-4 shrink-0'
       />
 
-      <div className='flex-1 min-w-0'>
-        {optimisticDone ? (
-          <span
-            className={cn(
-              'text-sm leading-tight block whitespace-pre-wrap break-words',
-              'text-gray-500',
-            )}
-          >
-            {activity.name}
-          </span>
-        ) : (
-          <button
-            type='button'
-            onClick={() => onEdit(activity)}
-            className={cn(
-              'text-sm leading-tight block whitespace-pre-wrap break-words text-left w-full',
-              'rounded px-0.5 -mx-0.5 hover:bg-gray-100/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 cursor-pointer',
-            )}
-          >
-            {activity.name}
-          </button>
-        )}
+      <div className='min-w-0 flex-1'>
+        <button
+          type='button'
+          onClick={() => onEdit(activity)}
+          className={cn(
+            'block w-full whitespace-pre-wrap break-words rounded px-0.5 -mx-0.5 text-left text-sm leading-tight',
+            'hover:bg-gray-100/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 cursor-pointer',
+          )}
+        >
+          {activity.name}
+        </button>
 
-        <div className='flex items-center gap-1.5 mt-0.5 flex-wrap'>
+        <div className='mt-0.5 flex flex-wrap items-center gap-1.5'>
           <PriorityBadge priority={activity.priority} />
-          {activity.deadline && !optimisticDone && (
-            <DeadlineLabel deadline={activity.deadline} />
-          )}
-          {optimisticDone && activity.completed_at && (
-            <CompletedLabel completedAt={activity.completed_at} />
-          )}
-          {activity.created_by && (
-            <span className='text-[10px] text-gray-900 px-1.5 py-0.5'>
-              Created By {activity.created_by}
+          {activity.deadline ? <DeadlineLabel deadline={activity.deadline} /> : null}
+          {activity.created_by ? (
+            <span className='px-1.5 py-0.5 text-[10px] text-gray-900'>
+              Created by {activity.created_by}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 
-      <div className='flex items-center gap-0.5 shrink-0'>
-        {!optimisticDone && (
-          <Button
-            variant='ghost'
-            size='icon'
-            className='h-6 w-6 shrink-0 text-gray-600 hover:text-blue-500'
-            onClick={() => onEdit(activity)}
-          >
-            <Pencil className='h-3 w-3' />
-          </Button>
-        )}
-
-        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-          <Button
-            variant='ghost'
-            size='icon'
-            className='h-6 w-6 shrink-0 text-gray-600 hover:text-red-500'
-            onClick={() => setShowDeleteConfirm(true)}
-          >
-            <Trash2 className='h-3 w-3' />
-          </Button>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Activity</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete &quot;{activity.name}&quot;?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                className={buttonVariants({ variant: 'destructive' })}
-                onClick={() => remove(activity.id, activity.name)}
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+      <div className='flex shrink-0 items-center gap-0.5'>
+        <Button
+          variant='ghost'
+          size='icon'
+          className='h-6 w-6 shrink-0 text-gray-600 hover:text-blue-500'
+          onClick={() => onEdit(activity)}
+        >
+          <Pencil className='h-3 w-3' />
+        </Button>
+        {deleteControl}
       </div>
     </div>
   )
