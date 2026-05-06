@@ -11,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '~/components/ui/alert-dialog'
+import { Badge } from '~/components/ui/badge'
 import { Button, buttonVariants } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Textarea } from '~/components/ui/textarea'
@@ -136,20 +137,31 @@ export function NoteItem({
   return (
     <div
       className={cn(
-        'rounded-md px-3 py-2.5 transition-[opacity,transform,background-color,border-color]',
-        isPinned
-          ? 'bg-amber-50 border border-amber-200'
-          : 'bg-gray-50 border border-gray-200',
-        isDeleting && 'opacity-0 scale-95 pointer-events-none',
+        'flex flex-col gap-0.5 rounded-md px-2 py-1.5 transition-colors',
+        isPinned ? 'bg-amber-50 ring-1 ring-amber-200' : 'hover:bg-gray-50',
+        isDeleting && 'pointer-events-none scale-95 opacity-0',
       )}
     >
-      <div className='flex items-start justify-between gap-2'>
-        <span className='text-[11px] text-gray-500 leading-tight'>
-          {formatTimestamp(note.created_at)}
-          {note.created_by && <> &middot; {note.created_by}</>}
-        </span>
+      <div className='flex items-center justify-between gap-2'>
+        <div className='flex min-w-0 flex-1 items-center gap-2'>
+          <Badge
+            className={cn(
+              'h-4 shrink-0 border px-1.5 py-0 text-[10px]',
+              isPinned
+                ? 'border-amber-200 bg-amber-100 text-amber-800'
+                : 'border-gray-200 bg-gray-100 text-gray-700',
+            )}
+          >
+            {isPinned ? 'Pinned' : 'Note'}
+          </Badge>
+          {note.created_by ? (
+            <span className='truncate text-xs text-gray-500'>
+              Created by {note.created_by}
+            </span>
+          ) : null}
+        </div>
 
-        <div className='flex items-center gap-1 shrink-0'>
+        <div className='flex shrink-0 items-center gap-1'>
           {!showCommentInput && (
             <button
               type='button'
@@ -193,6 +205,9 @@ export function NoteItem({
           >
             <Trash2 className='h-3 w-3' />
           </Button>
+          <span className='whitespace-nowrap text-right text-[10px] tabular-nums text-gray-500'>
+            {formatTimestamp(note.created_at)}
+          </span>
         </div>
       </div>
 
@@ -233,7 +248,7 @@ export function NoteItem({
           </div>
         </div>
       ) : (
-        <p className='text-sm text-gray-800 whitespace-pre-wrap mt-1 leading-relaxed'>
+        <p className='mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800'>
           {note.content}
         </p>
       )}

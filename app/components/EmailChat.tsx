@@ -20,6 +20,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useNavigation } from 'react-router'
 import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
+import { CopyText } from '~/components/atoms/CopyText'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { EmailTemplatePickerPopover } from '~/components/molecules/EmailTemplatePickerPopover'
@@ -1218,6 +1219,12 @@ export function EmailChat(props: EmailChatProps) {
       ? 'flex items-center gap-2 px-1 py-2 relative'
       : 'flex items-center gap-2 py-3 relative'
 
+  const headerCustomerEmail = (
+    employeeProps?.customerEmail ||
+    dealNav?.customerEmail ||
+    ''
+  ).trim()
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent
@@ -1244,7 +1251,15 @@ export function EmailChat(props: EmailChatProps) {
             <div className='min-w-0 flex-1'>
               <div className='flex flex-wrap items-center gap-2'>
                 <DialogTitle className='text-lg font-semibold'>
-                  {customerName}
+                  {customerName.trim() ? (
+                    <CopyText
+                      value={customerName.trim()}
+                      display={customerName.trim()}
+                      className='text-lg font-semibold'
+                    />
+                  ) : (
+                    customerName
+                  )}
                 </DialogTitle>
                 {dealNav ? (
                   <TooltipProvider>
@@ -1266,11 +1281,14 @@ export function EmailChat(props: EmailChatProps) {
                   </TooltipProvider>
                 ) : null}
               </div>
-              {(employeeProps?.customerEmail || dealNav?.customerEmail) && (
-                <p className='text-sm text-gray-500'>
-                  {employeeProps?.customerEmail || dealNav?.customerEmail}
-                </p>
-              )}
+              {headerCustomerEmail ? (
+                <div className='flex min-w-0 flex-wrap items-center gap-2'>
+                  <CopyText
+                    value={headerCustomerEmail}
+                    className='text-sm font-medium text-gray-600 break-words text-left'
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
         </DialogHeader>
