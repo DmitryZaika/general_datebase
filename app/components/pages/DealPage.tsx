@@ -23,6 +23,9 @@ interface DealPageProps {
   activities?: DealActivity[]
   notes?: DealNote[]
   emails?: DealEmailHistoryItem[]
+  customerEmails?: DealEmailHistoryItem[]
+  imagesCount?: number
+  documentsCount?: number
 }
 
 export default function DealsEdit({
@@ -35,6 +38,9 @@ export default function DealsEdit({
   activities,
   notes,
   emails,
+  customerEmails,
+  imagesCount = 0,
+  documentsCount = 0,
 }: DealPageProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -82,8 +88,22 @@ export default function DealsEdit({
               <TabsList className='mb-5 grid grid-cols-4'>
                 <TabsTrigger value='project'>Project</TabsTrigger>
                 <TabsTrigger value='information'>General</TabsTrigger>
-                <TabsTrigger value='images'>Images</TabsTrigger>
-                <TabsTrigger value='documents'>Documents</TabsTrigger>
+                <TabsTrigger value='images'>
+                  Images
+                  {imagesCount > 0 ? (
+                    <span className='ml-1 rounded-full bg-zinc-200 px-1.5 py-0 text-[10px] font-semibold leading-4 text-zinc-700'>
+                      {imagesCount}
+                    </span>
+                  ) : null}
+                </TabsTrigger>
+                <TabsTrigger value='documents'>
+                  Documents
+                  {documentsCount > 0 ? (
+                    <span className='ml-1 rounded-full bg-zinc-200 px-1.5 py-0 text-[10px] font-semibold leading-4 text-zinc-700'>
+                      {documentsCount}
+                    </span>
+                  ) : null}
+                </TabsTrigger>
               </TabsList>
               <Outlet />
             </Tabs>
@@ -94,6 +114,7 @@ export default function DealsEdit({
               activities={activities}
               notes={notes}
               emails={emails}
+              customerEmails={customerEmails}
             />
           </div>
         </div>

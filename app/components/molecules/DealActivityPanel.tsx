@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, type Variants } from 'framer-motion'
 import {
   AlertCircle,
   CalendarIcon,
@@ -110,6 +110,32 @@ const ITEM_VARIANTS = {
 }
 
 const ITEM_TRANSITION = { duration: 0.25, ease: 'easeInOut' as const }
+
+const EMAIL_LIST_VARIANTS: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.085,
+      delayChildren: 0.05,
+    },
+  },
+}
+
+const EMAIL_ROW_VARIANTS: Variants = {
+  hidden: { opacity: 0, y: -22 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: 'spring',
+      stiffness: 400,
+      damping: 30,
+      mass: 0.72,
+    },
+  },
+}
+
+const EMAIL_ROW_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
 const URGENCY_LABEL_STYLE: Readonly<Record<DeadlineUrgency, string>> = {
   overdue: 'text-red-600 bg-red-50 border-red-200',
@@ -955,10 +981,11 @@ function EmailHistoryRow({ email }: { email: DealEmailHistoryItem }) {
   const params = useParams()
   const isAdmin = location.pathname.includes('/admin/')
   const basePath = isAdmin ? '/admin/deals' : '/employee/deals'
-  const dealId = params.dealId ?? ''
+  const currentDealId = params.dealId ?? ''
+  const emailDealId = email.deal_id ? String(email.deal_id) : currentDealId
   const searchParams = new URLSearchParams(location.search)
   searchParams.set('messageId', String(email.id))
-  const to = `${basePath}/edit/${dealId}/project/chat/${email.thread_id}?${searchParams.toString()}`
+  const to = `${basePath}/edit/${emailDealId}/project/chat/${email.thread_id}?${searchParams.toString()}`
 
   const sentLabel = formatTimestamp(email.sent_at)
   const isSent = !!email.sender_user_id
@@ -1075,6 +1102,7 @@ function ActivityList({
   actions,
   smsMessages,
   emails,
+  customerEmails,
   onEdit,
   editingActivityId,
   historyHeaderRef,
@@ -1085,6 +1113,7 @@ function ActivityList({
   actions: CallEntry[]
   smsMessages: SmsEntry[]
   emails: DealEmailHistoryItem[]
+  customerEmails: DealEmailHistoryItem[]
   onEdit: (activity: DealActivity) => void
   editingActivityId: Nullable<number>
   historyHeaderRef: React.RefObject<Nullable<HTMLDivElement>>
@@ -1092,6 +1121,7 @@ function ActivityList({
   const [isHistoryOpen, setIsHistoryOpen] = useState(true)
   const toggleHistoryOpen = useCallback(() => setIsHistoryOpen(prev => !prev), [])
   const [historyTab, setHistoryTab] = useState<HistoryTab>('all')
+  const [showCustomerEmails, setShowCustomerEmails] = useState(false)
   const noteHandlers = useNoteAction(dealId)
   const updatingNoteId =
     getFormDataNoteId(noteHandlers.editingData) ??
@@ -1100,12 +1130,15 @@ function ActivityList({
 
   const { todo, done } = useMemo(() => partitionActivities(activities), [activities])
 
+  const displayedEmails =
+    showCustomerEmails && customerEmails.length > 0 ? customerEmails : emails
+
   const sortedEmails = useMemo(
     () =>
-      [...emails].sort(
+      [...displayedEmails].sort(
         (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime(),
       ),
-    [emails],
+    [displayedEmails],
   )
 
   const sortedNotes = useMemo(
@@ -1156,7 +1189,7 @@ function ActivityList({
             isPinned: false,
           }) satisfies HistoryItem,
       ),
-      ...emails.map(
+      ...displayedEmails.map(
         e =>
           ({
             type: 'email',
@@ -1174,10 +1207,26 @@ function ActivityList({
     })
 
     return items
-  }, [done, notes, actions, smsMessages, emails])
+  }, [done, notes, actions, smsMessages, displayedEmails])
 
   const historyCount =
-    done.length + notes.length + actions.length + smsMessages.length + emails.length
+    done.length +
+    notes.length +
+    actions.length +
+    smsMessages.length +
+    displayedEmails.length
+
+  const emailStaggerIndexById = useMemo(() => {
+    let n = 0
+    const m = new Map<number, number>()
+    for (const item of allHistoryItems) {
+      if (item.type === 'email') {
+        m.set(item.data.id, n)
+        n += 1
+      }
+    }
+    return m
+  }, [allHistoryItems])
 
   const renderHistoryItem = useCallback(
     (item: HistoryItem, isLast: boolean): ReactNode => {
@@ -1236,19 +1285,35 @@ function ActivityList({
               <SmsHistoryRow message={item.data} />
             </TimelineItem>
           )
-        case 'email':
+        case 'email': {
+          const stagger = emailStaggerIndexById.get(item.data.id) ?? 0
           return (
-            <TimelineItem
+            <motion.div
               key={`email-${item.data.thread_id}-${item.data.id}`}
-              icon={Mail}
-              isLast={isLast}
+              initial={{ opacity: 0, y: -22 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                delay: stagger * 0.078,
+                duration: 0.42,
+                ease: EMAIL_ROW_EASE,
+              }}
             >
-              <EmailHistoryRow email={item.data} />
-            </TimelineItem>
+              <TimelineItem icon={Mail} isLast={isLast}>
+                <EmailHistoryRow email={item.data} />
+              </TimelineItem>
+            </motion.div>
           )
+        }
       }
     },
-    [dealId, onEdit, editingActivityId, noteHandlers, updatingNoteId],
+    [
+      dealId,
+      onEdit,
+      editingActivityId,
+      noteHandlers,
+      updatingNoteId,
+      emailStaggerIndexById,
+    ],
   )
 
   const tabRenderers = useMemo<Record<HistoryTab, () => ReactNode>>(
@@ -1344,21 +1409,30 @@ function ActivityList({
         )
       },
       emails: () => {
-        if (sortedEmails.length === 0)
-          return <SectionEmptyState label='No emails yet' />
-        return (
-          <div>
-            {sortedEmails.map((email, index) => (
-              <TimelineItem
-                key={`email-${email.thread_id}-${email.id}`}
-                icon={Mail}
-                isLast={index === sortedEmails.length - 1}
-              >
-                <EmailHistoryRow email={email} />
-              </TimelineItem>
-            ))}
-          </div>
-        )
+        const content =
+          sortedEmails.length === 0 ? (
+            <SectionEmptyState label='No emails yet' />
+          ) : (
+            <motion.div
+              key={`email-tab-${showCustomerEmails ? 'all' : 'deal'}-${sortedEmails.map(e => e.id).join('-')}`}
+              variants={EMAIL_LIST_VARIANTS}
+              initial='hidden'
+              animate='visible'
+            >
+              {sortedEmails.map((email, index) => (
+                <motion.div
+                  key={`email-${email.thread_id}-${email.id}`}
+                  variants={EMAIL_ROW_VARIANTS}
+                >
+                  <TimelineItem icon={Mail} isLast={index === sortedEmails.length - 1}>
+                    <EmailHistoryRow email={email} />
+                  </TimelineItem>
+                </motion.div>
+              ))}
+            </motion.div>
+          )
+
+        return <div className='space-y-2'>{content}</div>
       },
       all: () => {
         if (allHistoryItems.length === 0)
@@ -1376,6 +1450,8 @@ function ActivityList({
       done,
       sortedNotes,
       sortedEmails,
+      customerEmails.length,
+      showCustomerEmails,
       actions,
       smsMessages,
       allHistoryItems,
@@ -1440,8 +1516,23 @@ function ActivityList({
               notesCount={notes.length}
               actionsCount={actions.length}
               smsCount={smsMessages.length}
-              emailsCount={emails.length}
+              emailsCount={displayedEmails.length}
             />
+            {customerEmails.length > 0 ? (
+              <div className='flex justify-center mb-2'>
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  className='h-7 rounded-full px-3 text-[11px]'
+                  onClick={() => setShowCustomerEmails(prev => !prev)}
+                >
+                  {showCustomerEmails
+                    ? 'Show only this deal'
+                    : 'Show all emails with this customer'}
+                </Button>
+              </div>
+            ) : null}
             {tabRenderers[historyTab]()}
           </>
         )}
@@ -1455,6 +1546,7 @@ export function DealActivityPanel({
   activities = [],
   notes = [],
   emails = [],
+  customerEmails = [],
 }: DealActivityPanelProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -1582,6 +1674,7 @@ export function DealActivityPanel({
           actions={actions}
           smsMessages={smsMessages}
           emails={emails}
+          customerEmails={customerEmails}
           onEdit={handleEdit}
           editingActivityId={editingActivity?.id ?? null}
           historyHeaderRef={historyHeaderRef}

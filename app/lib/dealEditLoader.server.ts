@@ -1,6 +1,10 @@
 import type { LoaderFunctionArgs } from 'react-router'
 import { redirect } from 'react-router'
-import { getDealEmailsWithReads } from '~/crud/emails'
+import {
+  type EmailHistory,
+  getCustomerEmailsWithReads,
+  getDealEmailsWithReads,
+} from '~/crud/emails'
 import { db } from '~/db.server'
 import { fetchNotesWithComments } from '~/lib/noteHelpers.server'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
@@ -22,6 +26,23 @@ export interface DealEditLoaderData {
   activities: DealActivity[]
   notes: DealNote[]
   emails: DealEmailHistoryItem[]
+  customerEmails: DealEmailHistoryItem[]
+  imagesCount: number
+  documentsCount: number
+}
+
+function withThreadAttachmentStatus(rawEmails: EmailHistory[]): DealEmailHistoryItem[] {
+  const attachmentByThread = new Map<string, boolean>()
+  for (const email of rawEmails) {
+    if (email.has_attachments) {
+      attachmentByThread.set(email.thread_id, true)
+    }
+  }
+
+  return rawEmails.map(email => ({
+    ...email,
+    thread_has_attachments: attachmentByThread.get(email.thread_id) ?? false,
+  }))
 }
 
 export function createDealEditLoader(
@@ -38,9 +59,17 @@ export function createDealEditLoader(
         list_id: number
         group_id: number
         is_won: Nullable<number>
+        customer_email: Nullable<string>
+        customer_deal_count: number
       }>(
         db,
-        `SELECT d.list_id, l.group_id, d.is_won
+        `SELECT d.list_id, l.group_id, d.is_won, c.email customer_email,
+                (
+                  SELECT COUNT(*)
+                  FROM deals d2
+                  WHERE d2.customer_id = d.customer_id
+                    AND d2.deleted_at IS NULL
+                ) customer_deal_count
          FROM deals d
          JOIN deals_list l ON d.list_id = l.id
          JOIN customers c ON d.customer_id = c.id
@@ -50,9 +79,29 @@ export function createDealEditLoader(
 
       if (!dealRows.length) return redirect(dealsRedirectPath)
 
-      const { list_id, group_id, is_won } = dealRows[0]
+      const { list_id, group_id, is_won, customer_email, customer_deal_count } =
+        dealRows[0]
+      const customerEmail = customer_email?.trim()
+      const customerDealCount = Number(customer_deal_count)
+      const emailHistoryPromise =
+        customerEmail && customerDealCount === 1
+          ? getCustomerEmailsWithReads(customerEmail)
+          : getDealEmailsWithReads(dealId)
+      const customerEmailsPromise =
+        customerEmail && customerDealCount > 1
+          ? getCustomerEmailsWithReads(customerEmail)
+          : Promise.resolve<EmailHistory[]>([])
 
-      const [stages, history, activities, notes, rawEmails] = await Promise.all([
+      const [
+        stages,
+        history,
+        activities,
+        notes,
+        rawEmails,
+        rawCustomerEmails,
+        imagesCountRows,
+        documentsCountRows,
+      ] = await Promise.all([
         selectMany<{ id: number; name: string; position: number }>(
           db,
           'SELECT id, name, position FROM deals_list WHERE group_id = ? AND deleted_at IS NULL ORDER BY position',
@@ -81,19 +130,67 @@ export function createDealEditLoader(
           [dealId, user.company_id],
         ),
         fetchNotesWithComments(db, dealId, user.company_id),
-        getDealEmailsWithReads(dealId),
+        emailHistoryPromise,
+        customerEmailsPromise,
+        selectMany<{ c: number }>(
+          db,
+          `SELECT COUNT(*) AS c
+             FROM deals_images
+            WHERE deal_id = ?
+              AND NOT (
+                LOWER(image_url) LIKE '%.pdf'
+                OR LOWER(image_url) LIKE '%.pdf?%'
+                OR LOWER(image_url) LIKE '%.doc'
+                OR LOWER(image_url) LIKE '%.doc?%'
+                OR LOWER(image_url) LIKE '%.docx'
+                OR LOWER(image_url) LIKE '%.docx?%'
+                OR LOWER(image_url) LIKE '%.xls'
+                OR LOWER(image_url) LIKE '%.xls?%'
+                OR LOWER(image_url) LIKE '%.xlsx'
+                OR LOWER(image_url) LIKE '%.xlsx?%'
+                OR LOWER(image_url) LIKE '%.csv'
+                OR LOWER(image_url) LIKE '%.csv?%'
+                OR LOWER(image_url) LIKE '%.txt'
+                OR LOWER(image_url) LIKE '%.txt?%'
+              )`,
+          [dealId],
+        ),
+        selectMany<{ c: number }>(
+          db,
+          `SELECT (
+              SELECT COUNT(*) FROM deals_documents WHERE deal_id = ?
+            ) + (
+              SELECT COUNT(*)
+              FROM deals_images
+              WHERE deal_id = ?
+                AND (
+                  LOWER(image_url) LIKE '%.pdf'
+                  OR LOWER(image_url) LIKE '%.pdf?%'
+                  OR LOWER(image_url) LIKE '%.doc'
+                  OR LOWER(image_url) LIKE '%.doc?%'
+                  OR LOWER(image_url) LIKE '%.docx'
+                  OR LOWER(image_url) LIKE '%.docx?%'
+                  OR LOWER(image_url) LIKE '%.xls'
+                  OR LOWER(image_url) LIKE '%.xls?%'
+                  OR LOWER(image_url) LIKE '%.xlsx'
+                  OR LOWER(image_url) LIKE '%.xlsx?%'
+                  OR LOWER(image_url) LIKE '%.csv'
+                  OR LOWER(image_url) LIKE '%.csv?%'
+                  OR LOWER(image_url) LIKE '%.txt'
+                  OR LOWER(image_url) LIKE '%.txt?%'
+                )
+            ) AS c`,
+          [dealId, dealId],
+        ),
       ])
 
-      const attachmentByThread = new Map<string, boolean>()
-      for (const email of rawEmails) {
-        if (email.has_attachments) {
-          attachmentByThread.set(email.thread_id, true)
-        }
-      }
-      const emails: DealEmailHistoryItem[] = rawEmails.map(email => ({
-        ...email,
-        thread_has_attachments: attachmentByThread.get(email.thread_id) ?? false,
-      }))
+      const emails = withThreadAttachmentStatus(rawEmails)
+      const dealEmailIds = new Set(emails.map(email => email.id))
+      const customerEmailHistory = withThreadAttachmentStatus(rawCustomerEmails)
+      const hasCustomerEmailsOutsideDeal = customerEmailHistory.some(
+        email => !dealEmailIds.has(email.id),
+      )
+      const customerEmails = hasCustomerEmailsOutsideDeal ? customerEmailHistory : []
 
       const isClosed = is_won === 1 || is_won === 0
 
@@ -114,6 +211,9 @@ export function createDealEditLoader(
         activities,
         notes,
         emails,
+        customerEmails,
+        imagesCount: imagesCountRows[0]?.c ?? 0,
+        documentsCount: documentsCountRows[0]?.c ?? 0,
       }
     } catch {
       return redirect('/login')
