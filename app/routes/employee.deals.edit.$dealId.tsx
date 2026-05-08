@@ -19,6 +19,9 @@ export default function DealEditLayout() {
     activities,
     notes,
     emails,
+    customerEmails,
+    imagesCount,
+    documentsCount,
   } = useLoaderData<DealEditLoaderData>()
   return (
     <DealPage
@@ -31,6 +34,9 @@ export default function DealEditLayout() {
       activities={activities}
       notes={notes}
       emails={emails}
+      customerEmails={customerEmails}
+      imagesCount={imagesCount}
+      documentsCount={documentsCount}
     />
   )
 }

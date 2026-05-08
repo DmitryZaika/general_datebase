@@ -4,6 +4,7 @@ import { selectMany } from '~/utils/queryHelpers'
 
 export interface EmailHistory {
   id: number
+  deal_id: Nullable<number>
   thread_id: string
   subject: string
   body: string
@@ -17,6 +18,7 @@ export interface EmailHistory {
 
 const EMAIL_HISTORY_SELECT = `SELECT
     e.id,
+    e.deal_id,
     e.thread_id,
     e.subject,
     e.body,
@@ -34,6 +36,7 @@ const EMAIL_HISTORY_SELECT = `SELECT
 
 const EMAIL_HISTORY_GROUP_AND_ORDER = `GROUP BY
     e.id,
+    e.deal_id,
     e.thread_id,
     e.subject,
     e.body,
@@ -64,16 +67,20 @@ export async function getDealEmailsWithReads(dealId: number): Promise<EmailHisto
 export async function getCustomerEmailsWithReads(
   customerEmail: string,
 ): Promise<EmailHistory[]> {
+  const normalizedEmail = customerEmail.trim().toLowerCase()
+
   return await selectMany<EmailHistory>(
     db,
     `${EMAIL_HISTORY_SELECT}
     WHERE e.deleted_at IS NULL
       AND e.thread_id IS NOT NULL
       AND (
-        LOWER(e.sender_email) = LOWER(?)
-        OR LOWER(e.receiver_email) = LOWER(?)
+        LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.sender_email, '<', -1), '>', 1))) = ?
+        OR (e.sender_email NOT LIKE '%<%' AND LOWER(TRIM(e.sender_email)) = ?)
+        OR LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.receiver_email, '<', -1), '>', 1))) = ?
+        OR (e.receiver_email NOT LIKE '%<%' AND LOWER(TRIM(e.receiver_email)) = ?)
       )
     ${EMAIL_HISTORY_GROUP_AND_ORDER}`,
-    [customerEmail, customerEmail],
+    [normalizedEmail, normalizedEmail, normalizedEmail, normalizedEmail],
   )
 }
