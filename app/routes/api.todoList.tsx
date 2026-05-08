@@ -13,6 +13,17 @@ import { getEmployeeUser, type User } from '~/utils/session.server'
 export async function action({ request }: ActionFunctionArgs) {
   const user = await getEmployeeUser(request)
 
+  if (request.method === 'DELETE') {
+    await db.execute(`DELETE FROM todolist WHERE user_id = ? AND is_done = 1`, [
+      user.id,
+    ])
+    return Response.json({ success: true })
+  }
+
+  if (request.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405 })
+  }
+
   const raw = await request.json()
   const data = todoListSchema.parse(raw)
 

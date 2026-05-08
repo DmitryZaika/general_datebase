@@ -166,6 +166,13 @@ async function deleteTodo(todoId: number) {
   if (!response.ok) throw Error('Unsuccessfully updated data')
 }
 
+async function deleteAllCompletedTodos() {
+  const response = await fetch('/api/todoList', {
+    method: 'DELETE',
+  })
+  if (!response.ok) throw Error('Unsuccessfully updated data')
+}
+
 function DeleteForm({ todo }: EditFormProps) {
   const form = useForm()
 
@@ -275,6 +282,14 @@ async function onGetTodos(): Promise<Todo[]> {
 
 export function TodoList() {
   const [data, setData] = useState<Todo[]>([])
+  const completedCount = data.filter(todo => todo.is_done).length
+  const { mutate: mutateDeleteAllCompleted, isPending: isDeletingAllCompleted } =
+    useMutation({
+      mutationFn: deleteAllCompletedTodos,
+      onSuccess: () => {
+        queryClient.refetchQueries({ queryKey: ['todos'] })
+      },
+    })
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -352,6 +367,17 @@ export function TodoList() {
                 </SortableContext>
               </DndContext>
             </div>
+            {completedCount > 3 ? (
+              <Button
+                type='button'
+                variant='default'
+                className='mt-3 mb-2 w-full'
+                disabled={isDeletingAllCompleted}
+                onClick={() => mutateDeleteAllCompleted()}
+              >
+                Delete all completed todos
+              </Button>
+            ) : null}
           </div>
         </div>
       </DialogContent>
