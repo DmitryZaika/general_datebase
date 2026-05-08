@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { Search } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Carousel,
   type CarouselApi,
@@ -63,11 +64,50 @@ function ChildrenImagesDialog({
     { images: { id: number; url: string }[] } | undefined
   >()
   const [selectedImage, setSelectedImage] = useState<string | null>(src)
+  const [zoomMode, setZoomMode] = useState(false)
+  const [zoomScale, setZoomScale] = useState(1.5)
+  const [zoomHint, setZoomHint] = useState('')
+  const [lastZoomClickAt, setLastZoomClickAt] = useState<number | null>(null)
+  const [lens, setLens] = useState({
+    visible: false,
+    left: 0,
+    top: 0,
+    bgX: 0,
+    bgY: 0,
+    bgWidth: 0,
+    bgHeight: 0,
+  })
+  const lensSize = 700
+  const zoomHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (zoomHintTimerRef.current) clearTimeout(zoomHintTimerRef.current)
+    }
+  }, [])
+
+  const showZoomHint = (message: string) => {
+    setZoomHint(message)
+    if (zoomHintTimerRef.current) clearTimeout(zoomHintTimerRef.current)
+    zoomHintTimerRef.current = setTimeout(() => {
+      setZoomHint('')
+      zoomHintTimerRef.current = null
+    }, 3000)
+  }
 
   useEffect(() => {
     if (isOpen) {
       getImages()
       setSelectedImage(src)
+      setZoomMode(false)
+      setZoomScale(1.5)
+      setLastZoomClickAt(null)
+      setZoomHint('')
+      if (zoomHintTimerRef.current) {
+        clearTimeout(zoomHintTimerRef.current)
+        zoomHintTimerRef.current = null
+      }
+      setLens(prev => ({ ...prev, visible: false }))
     }
   }, [isOpen, src, id, type])
 
@@ -83,6 +123,76 @@ function ChildrenImagesDialog({
 
   const handleMouseLeaveContainer = () => {
     setSelectedImage(src)
+  }
+
+  const handleZoomToggle = () => {
+    const now = Date.now()
+    if (!zoomMode) {
+      setZoomMode(true)
+      setZoomScale(1.5)
+      setLastZoomClickAt(now)
+      showZoomHint('Magnifier: 1.5x. Click again within 3s for 2x')
+      return
+    }
+
+    if (zoomScale === 1.5) {
+      const withinThreeSeconds =
+        lastZoomClickAt !== null && now - lastZoomClickAt <= 3000
+      if (withinThreeSeconds) {
+        setZoomScale(2)
+        setLastZoomClickAt(now)
+        showZoomHint('Magnifier: 2x. Click again to turn off')
+      } else {
+        setZoomMode(false)
+        setZoomScale(1.5)
+        setLastZoomClickAt(null)
+        setLens(current => ({ ...current, visible: false }))
+        showZoomHint('Magnifier off')
+      }
+      return
+    }
+
+    setZoomMode(false)
+    setZoomScale(1.5)
+    setLastZoomClickAt(null)
+    setLens(current => ({ ...current, visible: false }))
+    showZoomHint('Magnifier off')
+  }
+
+  const handleZoomMove = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!zoomMode || !selectedImage) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const naturalWidth = e.currentTarget.naturalWidth
+    const naturalHeight = e.currentTarget.naturalHeight
+    if (!naturalWidth || !naturalHeight) return
+    const imageScale = Math.min(rect.width / naturalWidth, rect.height / naturalHeight)
+    const imageWidth = naturalWidth * imageScale
+    const imageHeight = naturalHeight * imageScale
+    const imageLeft = (rect.width - imageWidth) / 2
+    const imageTop = (rect.height - imageHeight) / 2
+    const pointerX = e.clientX - rect.left
+    const pointerY = e.clientY - rect.top
+    const inImageBounds =
+      pointerX >= imageLeft &&
+      pointerX <= imageLeft + imageWidth &&
+      pointerY >= imageTop &&
+      pointerY <= imageTop + imageHeight
+    if (!inImageBounds) {
+      setLens(current => ({ ...current, visible: false }))
+      return
+    }
+    const imageX = pointerX - imageLeft
+    const imageY = pointerY - imageTop
+
+    setLens({
+      visible: true,
+      left: pointerX,
+      top: pointerY,
+      bgX: lensSize / 2 - imageX * zoomScale,
+      bgY: lensSize / 2 - imageY * zoomScale,
+      bgWidth: imageWidth * zoomScale,
+      bgHeight: imageHeight * zoomScale,
+    })
   }
 
   const isRegularStock = !!image?.regular_stock
@@ -145,6 +255,20 @@ function ChildrenImagesDialog({
   return (
     <>
       <div className='w-full flex flex-col justify-center items-center relative select-none'>
+        <button
+          type='button'
+          onClick={handleZoomToggle}
+          className='absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-zinc-300 bg-white/90 text-zinc-700 shadow-sm transition-colors hover:bg-white hover:text-zinc-900'
+          aria-label={zoomMode ? `Magnifier ${zoomScale}x active` : 'Enable zoom mode'}
+          title={zoomMode ? `Magnifier ${zoomScale}x` : 'Enable zoom mode'}
+        >
+          <Search className='h-4 w-4' />
+        </button>
+        {zoomHint ? (
+          <div className='absolute left-14 top-3 z-20 rounded-md border border-zinc-300 bg-white/95 px-2 py-1 text-xs font-medium text-zinc-700 shadow-sm'>
+            {zoomHint}
+          </div>
+        ) : null}
         {showInfo && (
           <div className='absolute top-7 left-1/2 z-10 w-max max-w-[min(90vw,28rem)] -translate-x-1/2 bg-black/80 p-3 rounded shadow-lg text-white border border-gray-900 transition-opacity duration-200 hover:opacity-0'>
             <h3 className='text-lg font-bold mb-3 text-center'>
@@ -160,12 +284,42 @@ function ChildrenImagesDialog({
           </div>
         )}
         {selectedImage ? (
-          <img
-            src={selectedImage}
-            alt={alt || name || 'Image'}
-            className='w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] object-contain z-0 select-none'
-            onClick={e => e.stopPropagation()}
-          />
+          <div className='relative w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] overflow-hidden'>
+            <img
+              src={selectedImage}
+              alt={alt || name || 'Image'}
+              className={`h-full w-full object-contain z-0 select-none ${zoomMode && lens.visible ? 'cursor-none' : 'cursor-default'}`}
+              onMouseEnter={e => {
+                if (zoomMode) handleZoomMove(e)
+              }}
+              onMouseMove={handleZoomMove}
+              onMouseLeave={() => {
+                if (!zoomMode) return
+                setLens(current => ({ ...current, visible: false }))
+              }}
+              onClick={e => {
+                e.stopPropagation()
+              }}
+            />
+            {zoomMode && lens.visible ? (
+              <div
+                className='pointer-events-none absolute z-20 rounded-full border-4 border-white bg-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] ring-1 ring-black/20'
+                style={{
+                  width: lensSize,
+                  height: lensSize,
+                  left: lens.left,
+                  top: lens.top,
+                  transform: 'translate(-50%, -50%)',
+                  backgroundImage: `url(${selectedImage})`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: `${lens.bgWidth}px ${lens.bgHeight}px`,
+                  backgroundPosition: `${lens.bgX}px ${lens.bgY}px`,
+                }}
+              >
+                <span className='absolute inset-0 rounded-full shadow-[inset_0_0_18px_rgba(255,255,255,0.35)]' />
+              </div>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
