@@ -268,6 +268,12 @@ function useActivityAction(dealId: number) {
           description: `"${activityName}" marked as done`,
           variant: 'success',
         })
+      } else {
+        toast({
+          title: 'Activity reactivated',
+          description: `"${activityName}" moved to To Do`,
+          variant: 'success',
+        })
       }
     },
     [toggleFetcher.submit, dealId, toast, token],
@@ -734,6 +740,7 @@ function ActivityForm({
   }
 
   const handleSubmit = () => {
+    const activityName = form.name.trim()
     submit()
     if (isEditing) {
       toast({
@@ -742,6 +749,12 @@ function ActivityForm({
         variant: 'success',
       })
       onCancelEdit()
+    } else {
+      toast({
+        title: 'Activity created',
+        description: `"${activityName}" added to To Do`,
+        variant: 'success',
+      })
     }
   }
 

@@ -137,8 +137,10 @@ export function NoteItem({
   return (
     <div
       className={cn(
-        'flex flex-col gap-0.5 rounded-md px-2 py-1.5 transition-colors',
-        isPinned ? 'bg-amber-50 ring-1 ring-amber-200' : 'hover:bg-gray-50',
+        'flex flex-col gap-0.5 rounded-md border px-2 py-1.5 transition-colors',
+        isPinned
+          ? 'border-amber-200 bg-amber-50 ring-1 ring-amber-200'
+          : 'border-gray-200 bg-gray-50 hover:bg-gray-100',
         isDeleting && 'pointer-events-none scale-95 opacity-0',
       )}
     >

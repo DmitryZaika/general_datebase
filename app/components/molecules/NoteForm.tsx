@@ -31,6 +31,11 @@ export function NoteForm({
       setContent('')
       revalidator.revalidate()
       onNoteCreated?.()
+      toast({
+        title: 'Note added',
+        description: 'Your note has been added',
+        variant: 'success',
+      })
     } else {
       toast({
         title: 'Failed to add note',
