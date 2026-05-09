@@ -469,7 +469,11 @@ export function AttachmentImageEditorDialog({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    drawAllShapes(ctx, shapes, pendingShape)
+    drawAllShapes(
+      ctx,
+      shapes.filter(shape => shape.kind !== 'text'),
+      pendingShape,
+    )
   }, [shapes, pendingShape, canvasSize])
 
   useEffect(() => {
@@ -1022,10 +1026,32 @@ export function AttachmentImageEditorDialog({
                 onPointerCancel={tool === 'crop' ? handlePointerUpOrCancel : undefined}
                 onDragStart={event => event.preventDefault()}
               />
+              {shapes.map((shape, index) => {
+                if (shape.kind !== 'text') return null
+                return (
+                  <input
+                    key={`text-${index}`}
+                    type='text'
+                    value={shape.text}
+                    readOnly
+                    tabIndex={-1}
+                    className='pointer-events-none absolute z-10 m-0 min-w-[7.5rem] max-w-full appearance-none rounded-none border-0 bg-transparent px-0 py-0 leading-none shadow-none outline-none'
+                    style={{
+                      left: shape.position.x,
+                      top: shape.position.y,
+                      color: shape.color,
+                      font: `${TEXT_FONT_WEIGHT} ${shape.fontSize}px ${TEXT_FONT_FAMILY}`,
+                      lineHeight: `${shape.fontSize * TEXT_LINE_HEIGHT}px`,
+                      maxWidth: `calc(${canvasSize.width}px - ${shape.position.x}px)`,
+                    }}
+                    aria-hidden
+                  />
+                )
+              })}
               {pendingText && canvasSize.width > 0 ? (
                 <div
                   ref={textEditRootRef}
-                  className='absolute z-10 flex flex-col gap-0.5'
+                  className='absolute z-20 flex flex-col gap-0.5'
                   style={{
                     left: pendingText.position.x,
                     top: pendingText.position.y - TEXT_EDIT_CHROME,

@@ -1,6 +1,7 @@
 import { Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Dialog, DialogContentImage, DialogTrigger } from '~/components/ui/dialog'
+import { useIsMobile } from '~/hooks/use-mobile'
 
 interface ImageProps {
   name?: string
@@ -21,6 +22,7 @@ export function Image({
   id,
   setImage,
 }: ImageProps) {
+  const isMobile = useIsMobile()
   const [zoomMode, setZoomMode] = useState(false)
   const [zoomScale, setZoomScale] = useState(1.5)
   const [zoomHint, setZoomHint] = useState('')
@@ -42,6 +44,19 @@ export function Image({
       if (zoomHintTimerRef.current) clearTimeout(zoomHintTimerRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isMobile) return
+    setZoomMode(false)
+    setZoomScale(1.5)
+    setLastZoomClickAt(null)
+    setZoomHint('')
+    if (zoomHintTimerRef.current) {
+      clearTimeout(zoomHintTimerRef.current)
+      zoomHintTimerRef.current = null
+    }
+    setLens(current => ({ ...current, visible: false }))
+  }, [isMobile])
 
   const showZoomHint = (message: string) => {
     setZoomHint(message)
@@ -115,7 +130,7 @@ export function Image({
   }
 
   const handleZoomMove = (e: React.MouseEvent<HTMLImageElement>) => {
-    if (!zoomMode || !src) return
+    if (isMobile || !zoomMode || !src) return
     const rect = e.currentTarget.getBoundingClientRect()
     const naturalWidth = e.currentTarget.naturalWidth
     const naturalHeight = e.currentTarget.naturalHeight
@@ -184,18 +199,20 @@ export function Image({
 
           {src ? (
             <div className='relative inline-flex max-h-[90vh] max-w-[90vw]'>
-              <button
-                type='button'
-                onClick={handleZoomToggle}
-                className='absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-zinc-300 bg-white/90 text-zinc-700 shadow-sm transition-colors hover:bg-white hover:text-zinc-900'
-                aria-label={
-                  zoomMode ? `Magnifier ${zoomScale}x active` : 'Enable zoom mode'
-                }
-                title={zoomMode ? `Magnifier ${zoomScale}x` : 'Enable zoom mode'}
-              >
-                <Search className='h-4 w-4' />
-              </button>
-              {zoomHint ? (
+              {!isMobile ? (
+                <button
+                  type='button'
+                  onClick={handleZoomToggle}
+                  className='absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-zinc-300 bg-white/90 text-zinc-700 shadow-sm transition-colors hover:bg-white hover:text-zinc-900'
+                  aria-label={
+                    zoomMode ? `Magnifier ${zoomScale}x active` : 'Enable zoom mode'
+                  }
+                  title={zoomMode ? `Magnifier ${zoomScale}x` : 'Enable zoom mode'}
+                >
+                  <Search className='h-4 w-4' />
+                </button>
+              ) : null}
+              {!isMobile && zoomHint ? (
                 <div className='absolute left-14 top-3 z-20 rounded-md border border-zinc-300 bg-white/95 px-2 py-1 text-xs font-medium text-zinc-700 shadow-sm'>
                   {zoomHint}
                 </div>
@@ -203,7 +220,7 @@ export function Image({
               <img
                 src={src}
                 alt={alt || name || 'Image'}
-                className={`h-[90vh] w-auto max-h-[90vh] max-w-[90vw] object-contain ${zoomMode && lens.visible ? 'cursor-none' : 'cursor-default'}`}
+                className={`h-[90vh] w-auto max-h-[90vh] max-w-[90vw] object-contain ${zoomMode && lens.visible && !isMobile ? 'cursor-none' : 'cursor-default'}`}
                 onMouseEnter={e => {
                   if (zoomMode) handleZoomMove(e)
                 }}
@@ -213,7 +230,7 @@ export function Image({
                 }}
                 onClick={e => e.stopPropagation()}
               />
-              {zoomMode && lens.visible ? (
+              {zoomMode && lens.visible && !isMobile ? (
                 <div
                   className='pointer-events-none absolute z-20 rounded-full border-4 border-white bg-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] ring-1 ring-black/20'
                   style={{
