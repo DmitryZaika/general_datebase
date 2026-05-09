@@ -344,6 +344,7 @@ export default function EmployeeDeals() {
         activitiesMap={activitiesMap}
         activitiesIconMap={activitiesIconMap}
         notesMap={notesMap}
+        animateBoard
         groupListSelect={
           <div className='flex gap-2 '>
             {groupSelect}

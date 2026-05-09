@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
+import { motion, type Variants } from 'framer-motion'
 import { MoreVertical, Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
@@ -21,6 +22,37 @@ import { isDateOnlyDeadline, localCalendarDate } from '~/lib/dateHelpers'
 import type { Customer } from '~/types'
 import type { DealCardData } from '~/types/deals'
 import type { Nullable } from '~/types/utils'
+
+const DEALS_BOARD_LIST_VARIANTS: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.07,
+      delayChildren: 0.06,
+    },
+  },
+}
+
+const DEALS_BOARD_COLUMN_VARIANTS: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 400, damping: 30, mass: 0.75 },
+  },
+}
+
+const DEALS_TOOLBAR_MOTION = {
+  initial: { opacity: 0, y: -10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.32, ease: [0.2, 0.78, 0.22, 1] as const },
+}
+
+const DEALS_SHELL_MOTION = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.38, ease: [0.2, 0.78, 0.22, 1] as const },
+}
 
 function compareNearestActivityDeadlines(aDate: string, bDate: string): number {
   const localA = localCalendarDate(aDate)
@@ -81,6 +113,7 @@ interface DealsViewProps {
   readonly?: boolean
   toolbarLeft?: React.ReactNode
   showAddDeal?: boolean
+  animateBoard?: boolean
 }
 
 export default function DealsView({
@@ -97,6 +130,7 @@ export default function DealsView({
   readonly = false,
   toolbarLeft,
   showAddDeal = !readonly,
+  animateBoard = false,
 }: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -442,20 +476,35 @@ export default function DealsView({
     position: d.position ?? undefined,
   })
 
-  const listsContent = (
-    <div className='flex min-h-0 flex-1 max-w-full min-w-0 items-stretch gap-1 md:min-w-0 max-md:h-full max-md:gap-0 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory'>
-      {lists.map(list => (
-        <DealsList
-          key={list.id}
-          title={list.name}
-          customers={(board[list.id] ?? []).map(toListCustomer)}
-          id={list.id}
-          readonly={readonly}
-          highlightedDealId={highlightDealId ?? undefined}
-        />
-      ))}
-    </div>
-  )
+  const listsFlexClassName =
+    'flex min-h-0 flex-1 max-w-full min-w-0 items-stretch gap-1 md:min-w-0 max-md:h-full max-md:gap-0 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory'
+
+  const listColumns = lists.map(list => (
+    <DealsList
+      key={list.id}
+      title={list.name}
+      customers={(board[list.id] ?? []).map(toListCustomer)}
+      id={list.id}
+      readonly={readonly}
+      highlightedDealId={highlightDealId ?? undefined}
+      columnMotionVariants={animateBoard ? DEALS_BOARD_COLUMN_VARIANTS : undefined}
+    />
+  ))
+
+  const listsContent =
+    animateBoard && !readonly ? (
+      <motion.div
+        key={lists.map(l => l.id).join('-')}
+        className={listsFlexClassName}
+        variants={DEALS_BOARD_LIST_VARIANTS}
+        initial='hidden'
+        animate='visible'
+      >
+        {listColumns}
+      </motion.div>
+    ) : (
+      <div className={listsFlexClassName}>{listColumns}</div>
+    )
 
   if (readonly) {
     return (
@@ -467,6 +516,23 @@ export default function DealsView({
       </div>
     )
   }
+
+  const toolbarSticky = (
+    <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
+  )
+
+  const toolbarStickyMotion = (
+    <motion.div
+      className='shrink-0 sticky top-0 z-20 bg-white'
+      {...DEALS_TOOLBAR_MOTION}
+    >
+      {toolbar}
+    </motion.div>
+  )
+
+  const boardArea = (
+    <div className='flex min-h-0 min-w-0 flex-1 flex-col'>{listsContent}</div>
+  )
 
   return (
     <DndContext
@@ -485,10 +551,20 @@ export default function DealsView({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col'>
-        <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
-        <div className='flex min-h-0 min-w-0 flex-1 flex-col'>{listsContent}</div>
-      </div>
+      {animateBoard ? (
+        <motion.div
+          className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col'
+          {...DEALS_SHELL_MOTION}
+        >
+          {toolbarStickyMotion}
+          {boardArea}
+        </motion.div>
+      ) : (
+        <div className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col'>
+          {toolbarSticky}
+          {boardArea}
+        </div>
+      )}
       <DragOverlay>
         {activeId !== null
           ? (() => {
