@@ -22,6 +22,7 @@ import { useNavigate, useNavigation } from 'react-router'
 import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { CopyText } from '~/components/atoms/CopyText'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
+import { AttachmentImageEditorDialog } from '~/components/molecules/AttachmentImageEditorDialog'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { EmailTemplatePickerPopover } from '~/components/molecules/EmailTemplatePickerPopover'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
@@ -654,6 +655,7 @@ export function EmailChat(props: EmailChatProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [attachments, setAttachments] = useState<File[]>([])
+  const [editingAttachment, setEditingAttachment] = useState<File | null>(null)
   const [attachmentPreviews, setAttachmentPreviews] = useState<Record<string, string>>(
     {},
   )
@@ -794,6 +796,10 @@ export function EmailChat(props: EmailChatProps) {
   const lastMessageFromMe = [...chatMessages].reverse().find(m => !m.isFromCustomer)
   const lastReadMessageId = lastMessageFromMe?.read_at ? lastMessageFromMe.id : null
 
+  function getAttachmentPreviewKey(file: File) {
+    return `${file.name}-${file.size}-${file.lastModified}`
+  }
+
   function showDate(message: EmailChatMessage, index: number) {
     return (
       index === 0 ||
@@ -803,7 +809,7 @@ export function EmailChat(props: EmailChatProps) {
   }
 
   const removeAttachment = (file: File) => {
-    const previewKey = `${file.name}-${file.size}-${file.lastModified}`
+    const previewKey = getAttachmentPreviewKey(file)
     const previewUrl = attachmentPreviews[previewKey]
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl)
@@ -814,6 +820,7 @@ export function EmailChat(props: EmailChatProps) {
       })
     }
     setAttachments(prev => prev.filter(f => f !== file))
+    setEditingAttachment(current => (current === file ? null : current))
   }
 
   const formatFileName = (name: string) => {
@@ -847,7 +854,7 @@ export function EmailChat(props: EmailChatProps) {
     setAttachmentPreviews(prev => {
       const next = { ...prev }
       for (const file of newFiles) {
-        const key = `${file.name}-${file.size}-${file.lastModified}`
+        const key = getAttachmentPreviewKey(file)
         const isImageFile = file.type.toLowerCase().startsWith('image/')
         if (isImageFile && !next[key]) {
           next[key] = URL.createObjectURL(file)
@@ -863,6 +870,24 @@ export function EmailChat(props: EmailChatProps) {
       URL.revokeObjectURL(url)
     }
     setAttachmentPreviews({})
+  }
+
+  function replaceAttachment(originalFile: File, editedFile: File) {
+    const originalKey = getAttachmentPreviewKey(originalFile)
+    const originalPreviewUrl = attachmentPreviews[originalKey]
+    if (originalPreviewUrl) URL.revokeObjectURL(originalPreviewUrl)
+    const editedKey = getAttachmentPreviewKey(editedFile)
+    const editedPreviewUrl = URL.createObjectURL(editedFile)
+    setAttachmentPreviews(prev => {
+      const next = { ...prev }
+      delete next[originalKey]
+      next[editedKey] = editedPreviewUrl
+      return next
+    })
+    setAttachments(prev =>
+      prev.map(file => (file === originalFile ? editedFile : file)),
+    )
+    setEditingAttachment(null)
   }
 
   function openAttachment(file: File) {
@@ -1224,6 +1249,9 @@ export function EmailChat(props: EmailChatProps) {
     dealNav?.customerEmail ||
     ''
   ).trim()
+  const editingAttachmentPreviewUrl = editingAttachment
+    ? attachmentPreviews[getAttachmentPreviewKey(editingAttachment)]
+    : undefined
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -1490,7 +1518,7 @@ export function EmailChat(props: EmailChatProps) {
           {isEmployee && attachments.length > 0 && (
             <div className='mb-2 flex flex-wrap gap-2'>
               {attachments.map(file => {
-                const previewKey = `${file.name}-${file.size}-${file.lastModified}`
+                const previewKey = getAttachmentPreviewKey(file)
                 const previewUrl = attachmentPreviews[previewKey]
                 const isImageFile = file.type.toLowerCase().startsWith('image/')
                 return (
@@ -1522,27 +1550,7 @@ export function EmailChat(props: EmailChatProps) {
                         className='size-full cursor-pointer block focus:outline-none'
                         onClick={e => {
                           e.stopPropagation()
-                          const imgs = attachments
-                            .map((attachment, imageIndex) => {
-                              const key = `${attachment.name}-${attachment.size}-${attachment.lastModified}`
-                              const url = attachmentPreviews[key]
-                              if (!url) return null
-                              return {
-                                id: imageIndex,
-                                url,
-                                name: attachment.name,
-                                type: 'email',
-                                available: null,
-                              }
-                            })
-                            .filter(item => item !== null)
-                          setCurrentImages(imgs)
-                          const clickedImageIndex = attachments.findIndex(
-                            attachment =>
-                              `${attachment.name}-${attachment.size}-${attachment.lastModified}` ===
-                              previewKey,
-                          )
-                          setCurrentImageId(clickedImageIndex)
+                          setEditingAttachment(file)
                         }}
                       >
                         <img
@@ -1933,6 +1941,17 @@ export function EmailChat(props: EmailChatProps) {
           </AlertDialogContent>
         </AlertDialog>
       </DialogContent>
+      <AttachmentImageEditorDialog
+        file={editingAttachment}
+        previewUrl={editingAttachmentPreviewUrl}
+        open={!!editingAttachment}
+        onOpenChange={open => {
+          if (!open) setEditingAttachment(null)
+        }}
+        onSave={file => {
+          if (editingAttachment) replaceAttachment(editingAttachment, file)
+        }}
+      />
       <SuperCarousel
         type='email'
         currentId={currentImageId ?? undefined}
