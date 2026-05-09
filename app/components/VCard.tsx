@@ -1,4 +1,6 @@
+import { Loader2, UserPlus } from 'lucide-react'
 import { useState } from 'react'
+import { cn } from '~/lib/utils'
 import { Button } from './ui/button'
 
 type VCardProps = {
@@ -59,7 +61,7 @@ export function VCard({ name, phone, email, company, address, className }: VCard
     if (fields.address) lines.push(`ADR:;;${fields.address};;;;;`)
     lines.push('END:VCARD')
 
-    return lines.join('\r\n') + '\r\n'
+    return `${lines.join('\r\n')}\r\n`
   }
 
   const buildFileName = (value: string) => {
@@ -135,12 +137,20 @@ export function VCard({ name, phone, email, company, address, className }: VCard
 
   return (
     <Button
+      type='button'
       variant='ghost'
-      className={className}
+      size='icon'
+      className={cn(className)}
       onClick={downloadVCard}
       disabled={isDownloading}
+      title={isDownloading ? 'Downloading…' : 'Add to contacts'}
+      aria-label={isDownloading ? 'Downloading contact card' : 'Add to contacts'}
     >
-      {isDownloading ? 'Downloading...' : 'Add to Contacts'}
+      {isDownloading ? (
+        <Loader2 className='animate-spin' aria-hidden />
+      ) : (
+        <UserPlus aria-hidden />
+      )}
     </Button>
   )
 }
