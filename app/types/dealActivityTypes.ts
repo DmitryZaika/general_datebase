@@ -26,4 +26,5 @@ export interface DealActivityPanelProps {
   actions?: CallEntry[]
   emails?: DealEmailHistoryItem[]
   customerEmails?: DealEmailHistoryItem[]
+  currentUserName?: string
 }

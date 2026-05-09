@@ -19,7 +19,19 @@ import { formatTimestamp } from '~/lib/dateHelpers'
 import { buildNoteApiAction } from '~/lib/dealApiHelpers'
 import { cn } from '~/lib/utils'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
+import type { Nullable } from '~/types/utils'
 import type { ApiResponse } from '~/utils/apiResponse.server'
+
+function shouldShowCreatorAttribution(
+  viewerName: string | null | undefined,
+  creatorName: string | null | undefined,
+): boolean {
+  const c = creatorName?.trim()
+  if (!c) return false
+  const v = viewerName?.trim()
+  if (!v) return true
+  return v !== c
+}
 
 export interface NoteItemHandlers {
   dealId: number
@@ -33,9 +45,11 @@ export interface NoteItemHandlers {
 export function NoteItem({
   note,
   handlers,
+  viewerName,
 }: {
   note: DealNote
   handlers: NoteItemHandlers
+  viewerName?: Nullable<string>
 }) {
   const { dealId, token, remove, addComment, editNote, deletingData } = handlers
   const pinFetcher = useFetcher<ApiResponse>({ key: `pin-note-${note.id}` })
@@ -134,18 +148,20 @@ export function NoteItem({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showCommentInput])
 
+  const showCreatorLine = shouldShowCreatorAttribution(viewerName, note.created_by)
+
   return (
     <div
       className={cn(
-        'flex flex-col gap-0.5 rounded-md px-2 py-1.5 transition-colors',
+        'group flex flex-col gap-0.5 rounded-md px-2 py-1.5 transition-colors',
         isPinned
           ? 'bg-amber-50 border border-amber-200'
           : 'bg-gray-50 border border-gray-200 hover:bg-gray-100',
         isDeleting && 'pointer-events-none scale-95 opacity-0',
       )}
     >
-      <div className='flex items-center justify-between gap-2'>
-        <div className='flex min-w-0 flex-1 items-center gap-2'>
+      <div className='flex items-start justify-between gap-2'>
+        <div className='flex items-center justify-end gap-1'>
           <Badge
             className={cn(
               'h-4 shrink-0 border px-1.5 py-0 text-[10px]',
@@ -156,60 +172,64 @@ export function NoteItem({
           >
             {isPinned ? 'Pinned' : 'Note'}
           </Badge>
-          {note.created_by ? (
-            <span className='truncate text-xs text-gray-500'>
-              Created by {note.created_by}
-            </span>
-          ) : null}
+          <div className='flex items-center justify-end gap-1'>
+            {!showCommentInput && (
+              <button
+                type='button'
+                className='whitespace-nowrap px-1 text-[11px] text-blue-500 hover:text-blue-700'
+                onClick={() => setShowCommentInput(true)}
+              >
+                Add a comment
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className='flex shrink-0 items-center gap-1'>
-          {!showCommentInput && (
-            <button
-              type='button'
-              className='text-[11px] text-blue-500 hover:text-blue-700 px-1 whitespace-nowrap'
-              onClick={() => setShowCommentInput(true)}
+        <div className='flex shrink-0 flex-col items-between gap-0.5'>
+          <div>
+            <Button
+              variant='ghost'
+              size='icon'
+              className='h-6 w-6 text-gray-400 opacity-0 transition-opacity hover:text-blue-500 group-hover:opacity-100 focus-visible:opacity-100'
+              onClick={startEditing}
             >
-              Add a comment
-            </button>
-          )}
-          <Button
-            variant='ghost'
-            size='icon'
-            className='h-6 w-6 text-gray-400 hover:text-blue-500'
-            onClick={startEditing}
-          >
-            <Pencil className='h-3 w-3' />
-          </Button>
-          <Button
-            variant='ghost'
-            size='icon'
-            className={cn(
-              'h-6 w-6',
-              isPinned
-                ? 'text-amber-600 hover:text-amber-700'
-                : 'text-gray-400 hover:text-amber-500',
-            )}
-            onClick={pin}
-          >
-            {isPinned ? (
-              <PinOff className='h-3.5 w-3.5' />
-            ) : (
-              <Pin className='h-3.5 w-3.5' />
-            )}
-          </Button>
+              <Pencil className='h-3 w-3' />
+            </Button>
+            <Button
+              variant='ghost'
+              size='icon'
+              className={cn(
+                'h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100',
+                isPinned
+                  ? 'text-amber-600 hover:text-amber-700'
+                  : 'text-gray-400 hover:text-amber-500',
+              )}
+              onClick={pin}
+            >
+              {isPinned ? (
+                <PinOff className='h-3.5 w-3.5' />
+              ) : (
+                <Pin className='h-3.5 w-3.5' />
+              )}
+            </Button>
 
-          <Button
-            variant='ghost'
-            size='icon'
-            className='h-6 w-6 shrink-0 text-gray-600 hover:text-red-500'
-            onClick={() => setShowDeleteConfirm(true)}
-          >
-            <Trash2 className='h-3 w-3' />
-          </Button>
-          <span className='whitespace-nowrap text-right text-[10px] tabular-nums text-gray-500'>
-            {formatTimestamp(note.created_at)}
-          </span>
+            <Button
+              variant='ghost'
+              size='icon'
+              className='h-6 w-6 shrink-0 text-gray-400 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100 focus-visible:opacity-100'
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <Trash2 className='h-3 w-3' />
+            </Button>
+            <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
+              {formatTimestamp(note.created_at)}
+            </span>
+          </div>
+          {showCreatorLine && note.created_by ? (
+            <span className='max-w-[140px] truncate text-[9px] uppercase tracking-wide text-gray-400'>
+              by {note.created_by}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -263,6 +283,7 @@ export function NoteItem({
               comment={comment}
               dealId={dealId}
               token={token}
+              viewerName={viewerName}
             />
           ))}
         </div>
@@ -325,10 +346,12 @@ function CommentItem({
   comment,
   dealId,
   token,
+  viewerName,
 }: {
   comment: DealNote['comments'][number]
   dealId: number
   token: string
+  viewerName?: Nullable<string>
 }) {
   const fetcher = useFetcher<ApiResponse>({
     key: `delete-comment-${comment.id}`,
@@ -357,7 +380,10 @@ function CommentItem({
       <div className='min-w-0'>
         <span className='text-[10px] text-gray-400'>
           {formatTimestamp(comment.created_at)}
-          {comment.created_by && ` · ${comment.created_by}`}
+          {shouldShowCreatorAttribution(viewerName, comment.created_by) &&
+          comment.created_by
+            ? ` · ${comment.created_by}`
+            : null}
         </span>
         <p className='text-xs text-gray-600 leading-relaxed'>{comment.content}</p>
       </div>

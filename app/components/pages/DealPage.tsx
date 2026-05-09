@@ -26,6 +26,7 @@ interface DealPageProps {
   customerEmails?: DealEmailHistoryItem[]
   imagesCount?: number
   documentsCount?: number
+  currentUserName?: string
 }
 
 export default function DealsEdit({
@@ -41,6 +42,7 @@ export default function DealsEdit({
   customerEmails,
   imagesCount = 0,
   documentsCount = 0,
+  currentUserName = '',
 }: DealPageProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -115,6 +117,7 @@ export default function DealsEdit({
               notes={notes}
               emails={emails}
               customerEmails={customerEmails}
+              currentUserName={currentUserName}
             />
           </div>
         </div>
