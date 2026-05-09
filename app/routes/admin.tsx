@@ -1,6 +1,15 @@
+import { motion } from 'framer-motion'
 import type { LoaderFunction, MetaFunction } from 'react-router'
-import { Outlet, redirect } from 'react-router'
+import { Outlet, redirect, useLocation } from 'react-router'
 import { getAdminUser } from '~/utils/session.server'
+
+const ADMIN_VIEW_EASE: [number, number, number, number] = [0.2, 0.78, 0.22, 1]
+
+const ADMIN_VIEW_ENTER = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.38, ease: ADMIN_VIEW_EASE },
+}
 
 export const meta: MetaFunction = () => {
   return [
@@ -23,5 +32,14 @@ export const loader: LoaderFunction = async ({ request }) => {
 }
 
 export default function Admin() {
-  return <Outlet />
+  const location = useLocation()
+  return (
+    <motion.div
+      key={`${location.pathname}${location.search}`}
+      className='w-full min-h-0'
+      {...ADMIN_VIEW_ENTER}
+    >
+      <Outlet />
+    </motion.div>
+  )
 }

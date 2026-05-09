@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { ScanSearch } from 'lucide-react'
 import { type ComponentProps, useEffect, useRef, useState } from 'react'
 import {
@@ -19,6 +20,8 @@ import { useIsMobile } from '~/hooks/use-mobile'
 import { useArrowCarousel } from '~/hooks/useArrowToggle'
 import { cn } from '~/lib/utils'
 import { capitalizeFirstLetter } from '~/utils/words'
+
+const INSTALLED_MOTION_EASE: [number, number, number, number] = [0.2, 0.78, 0.22, 1]
 
 interface ImageInput {
   id: number
@@ -325,6 +328,98 @@ function ChildrenImagesDialog({
     onClick: handleMainImageClick,
   }
 
+  const installedImages = data?.images && data.images.length > 0 ? data.images : null
+  let installedProjectsRow: React.ReactNode = null
+  if (installedImages) {
+    const carousel = (
+      <Carousel
+        className=' flex justify-center items-center w-full  pl-10 pr-10 select-none'
+        opts={{
+          slidesToScroll: 5,
+          align: 'start',
+        }}
+      >
+        <CarouselContent onMouseLeave={handleMouseLeaveContainer}>
+          {installedImages.map((image, index) => (
+            <CarouselItem
+              key={image.id}
+              className='basis-auto max-w-fit pl-2 select-none'
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {isEmployeeStone ? (
+                    <motion.img
+                      src={image.url}
+                      className='w-10 h-10 cursor-pointer'
+                      alt={name || 'Image'}
+                      initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{
+                        duration: 0.36,
+                        delay: index * 0.05,
+                        ease: INSTALLED_MOTION_EASE,
+                      }}
+                      onClick={() => {
+                        setPinnedInstalledUrl(image.url)
+                        setSelectedImage(image.url)
+                      }}
+                      onMouseEnter={() => handleMouseEnter(image.url)}
+                      onAuxClick={e => {
+                        if (e.button === 1) {
+                          e.preventDefault()
+                          window.open(image.url, '_blank')
+                        }
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={image.url}
+                      className='w-10 h-10 cursor-pointer'
+                      alt={name || 'Image'}
+                      onClick={() => {
+                        setPinnedInstalledUrl(image.url)
+                        setSelectedImage(image.url)
+                      }}
+                      onMouseEnter={() => handleMouseEnter(image.url)}
+                      onAuxClick={e => {
+                        if (e.button === 1) {
+                          e.preventDefault()
+                          window.open(image.url, '_blank')
+                        }
+                      }}
+                    />
+                  )}
+                </TooltipTrigger>
+                <TooltipContent side='top' sideOffset={6}>
+                  Lock in this picture
+                </TooltipContent>
+              </Tooltip>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        {installedImages.length >= 7 && (
+          <>
+            <CarouselPrevious className='h-8 w-8 left-0 top-5' />
+            <CarouselNext className='h-8 w-8 right-0 top-5' />
+          </>
+        )}
+      </Carousel>
+    )
+    installedProjectsRow = isEmployeeStone ? (
+      <motion.div
+        key={id}
+        className='w-screen max-w-full'
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.38, ease: INSTALLED_MOTION_EASE }}
+      >
+        {carousel}
+      </motion.div>
+    ) : (
+      <div className='w-screen max-w-full '>{carousel}</div>
+    )
+  }
+
   return (
     <>
       <div className='w-full flex flex-col justify-center items-center relative select-none'>
@@ -422,56 +517,7 @@ function ChildrenImagesDialog({
         ) : null}
       </div>
 
-      {data?.images && data.images.length > 0 && (
-        <div className='w-screen max-w-full '>
-          <Carousel
-            className=' flex justify-center items-center w-full  pl-10 pr-10 select-none'
-            opts={{
-              slidesToScroll: 5,
-              align: 'start',
-            }}
-          >
-            <CarouselContent onMouseLeave={handleMouseLeaveContainer}>
-              {data.images.map(image => (
-                <CarouselItem
-                  key={image.id}
-                  className='basis-auto max-w-fit pl-2 select-none'
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <img
-                        src={image.url}
-                        className='w-10 h-10 cursor-pointer'
-                        alt={name || 'Image'}
-                        onClick={() => {
-                          setPinnedInstalledUrl(image.url)
-                          setSelectedImage(image.url)
-                        }}
-                        onMouseEnter={() => handleMouseEnter(image.url)}
-                        onAuxClick={e => {
-                          if (e.button === 1) {
-                            e.preventDefault()
-                            window.open(image.url, '_blank')
-                          }
-                        }}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent side='top' sideOffset={6}>
-                      Lock in this picture
-                    </TooltipContent>
-                  </Tooltip>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-            {data?.images && data.images.length >= 7 && (
-              <>
-                <CarouselPrevious className='h-8 w-8 left-0 top-5' />
-                <CarouselNext className='h-8 w-8 right-0 top-5' />
-              </>
-            )}
-          </Carousel>
-        </div>
-      )}
+      {installedProjectsRow}
     </>
   )
 }

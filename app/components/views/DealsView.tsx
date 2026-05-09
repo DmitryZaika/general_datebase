@@ -491,22 +491,40 @@ export default function DealsView({
     />
   ))
 
-  const listsContent =
-    animateBoard && !readonly ? (
-      <motion.div
-        key={lists.map(l => l.id).join('-')}
-        className={listsFlexClassName}
-        variants={DEALS_BOARD_LIST_VARIANTS}
-        initial='hidden'
-        animate='visible'
-      >
-        {listColumns}
-      </motion.div>
-    ) : (
-      <div className={listsFlexClassName}>{listColumns}</div>
-    )
+  const listsContent = animateBoard ? (
+    <motion.div
+      key={lists.map(l => l.id).join('-')}
+      className={listsFlexClassName}
+      variants={DEALS_BOARD_LIST_VARIANTS}
+      initial='hidden'
+      animate='visible'
+    >
+      {listColumns}
+    </motion.div>
+  ) : (
+    <div className={listsFlexClassName}>{listColumns}</div>
+  )
 
   if (readonly) {
+    if (animateBoard) {
+      const boardAreaReadonly = (
+        <div className='flex min-h-0 min-w-0 flex-1 flex-col'>{listsContent}</div>
+      )
+      return (
+        <motion.div
+          className='w-full h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col'
+          {...DEALS_SHELL_MOTION}
+        >
+          <motion.div
+            className='shrink-0 sticky top-0 z-20 bg-white'
+            {...DEALS_TOOLBAR_MOTION}
+          >
+            {toolbar}
+          </motion.div>
+          {boardAreaReadonly}
+        </motion.div>
+      )
+    }
     return (
       <div className='w-full h-[calc(100dvh-6.25rem)] min-h-0 flex flex-col h-full'>
         <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
