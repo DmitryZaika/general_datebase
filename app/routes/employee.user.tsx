@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import bcrypt from 'bcryptjs'
+import { motion } from 'framer-motion'
 import { Copy, Send } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef } from 'react'
@@ -11,6 +12,7 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigation,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
@@ -25,6 +27,10 @@ import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import {
+  EMPLOYEE_VIEW_ENTER_EASE,
+  employeeViewMotionKey,
+} from '~/utils/employeeViewEnterMotion'
 import { getQboUrl } from '~/utils/quickbooks.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -55,6 +61,12 @@ const userSchema = z.object({
 })
 
 const resolver = zodResolver(userSchema)
+
+const ACCOUNT_SLIDE_UP = {
+  initial: { opacity: 0, y: 40 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.2, ease: EMPLOYEE_VIEW_ENTER_EASE },
+}
 
 interface UserData extends RowDataPacket {
   name: string | null
@@ -185,6 +197,7 @@ function TelegramLink({ email }: { email: string }) {
 
 export default function UserProfile() {
   const { userData } = useLoaderData<typeof loader>()
+  const location = useLocation()
   const navigation = useNavigation()
   const isSubmitting = navigation.state !== 'idle'
   const token = useAuthenticityToken()
@@ -213,7 +226,11 @@ export default function UserProfile() {
   }, [userData.email_signature])
 
   return (
-    <div className='container  py-5'>
+    <motion.div
+      key={employeeViewMotionKey(location.pathname, location.search)}
+      className='container py-5 w-full min-h-0'
+      {...ACCOUNT_SLIDE_UP}
+    >
       <h1 className='text-2xl  font-bold mb-6 ml-3'>My Account</h1>
 
       <div className='bg-card  rounded-lg shadow p-6 w-full'>
@@ -342,6 +359,6 @@ export default function UserProfile() {
           </Form>
         </FormProvider>
       </div>
-    </div>
+    </motion.div>
   )
 }

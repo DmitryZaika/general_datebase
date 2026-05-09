@@ -237,9 +237,9 @@ export function CustomersListPage() {
   const salesRepParam = searchParams.get('sales_rep')
   const showInvalid = searchParams.get('show_invalid') === '1'
   const pageParam = Number(searchParams.get('page') || '1')
-  const pageSizeParam = Number(searchParams.get('pageSize') || '100')
+  const pageSizeParam = Number(searchParams.get('pageSize') || '50')
   const pageSize =
-    Number.isFinite(pageSizeParam) && pageSizeParam > 0 ? pageSizeParam : 100
+    Number.isFinite(pageSizeParam) && pageSizeParam > 0 ? pageSizeParam : 50
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
   const viewParam = searchParams.get('view') || 'customers'
 
