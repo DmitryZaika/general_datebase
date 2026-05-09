@@ -1,5 +1,5 @@
-import { Search } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { ScanSearch } from 'lucide-react'
+import { type ComponentProps, useEffect, useRef, useState } from 'react'
 import {
   Carousel,
   type CarouselApi,
@@ -14,8 +14,10 @@ import {
   DialogDescription,
   DialogTitle,
 } from '~/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useArrowCarousel } from '~/hooks/useArrowToggle'
+import { cn } from '~/lib/utils'
 import { capitalizeFirstLetter } from '~/utils/words'
 
 interface ImageInput {
@@ -66,6 +68,7 @@ function ChildrenImagesDialog({
     { images: { id: number; url: string }[] } | undefined
   >()
   const [selectedImage, setSelectedImage] = useState<string | null>(src)
+  const [pinnedInstalledUrl, setPinnedInstalledUrl] = useState<string | null>(null)
   const [zoomMode, setZoomMode] = useState(false)
   const [zoomScale, setZoomScale] = useState(1.5)
   const [zoomHint, setZoomHint] = useState('')
@@ -101,6 +104,7 @@ function ChildrenImagesDialog({
     if (isOpen) {
       getImages()
       setSelectedImage(src)
+      setPinnedInstalledUrl(null)
       setZoomMode(false)
       setZoomScale(1.5)
       setLastZoomClickAt(null)
@@ -128,8 +132,18 @@ function ChildrenImagesDialog({
 
   const getImages = () => {
     fetch(`/api/installed_${type}/${id}`)
-      .then(async res => await res.json())
-      .then(setData)
+      .then(async res => {
+        if (!res.ok) return { images: [] }
+        return res.json()
+      })
+      .then(body => {
+        const list =
+          body && typeof body === 'object' && 'images' in body ? body.images : []
+        setData({ images: Array.isArray(list) ? list : [] })
+      })
+      .catch(() => {
+        setData({ images: [] })
+      })
   }
 
   const handleMouseEnter = (imageUrl: string) => {
@@ -137,6 +151,23 @@ function ChildrenImagesDialog({
   }
 
   const handleMouseLeaveContainer = () => {
+    setSelectedImage(pinnedInstalledUrl ?? src)
+  }
+
+  const handleMainImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    e.stopPropagation()
+    if (zoomMode) {
+      setZoomMode(false)
+      setZoomScale(1.5)
+      setLastZoomClickAt(null)
+      setLens(current => ({ ...current, visible: false }))
+      showZoomHint('Magnifier off')
+      return
+    }
+    const showingInstalled =
+      pinnedInstalledUrl !== null || (selectedImage ?? '') !== (src ?? '')
+    if (!showingInstalled) return
+    setPinnedInstalledUrl(null)
     setSelectedImage(src)
   }
 
@@ -244,6 +275,9 @@ function ChildrenImagesDialog({
   const isCustomerSinkOrFaucet =
     userRole === 'customer' && (type === 'sinks' || type === 'faucets')
 
+  const mainImageShowsInstalled =
+    pinnedInstalledUrl !== null || (selectedImage ?? '') !== (src ?? '')
+
   const infoPairs: { key: string; label: string; value: string }[] = [
     { key: 'type', label: 'Type', value: displayedType },
     { key: 'size', label: 'Size', value: `${displayedLength} x ${displayedWidth}` },
@@ -267,6 +301,30 @@ function ChildrenImagesDialog({
     infoPairs.push({ key: 'price', label: 'Price', value: displayedPrice })
   }
 
+  const mainPreviewClassName = cn(
+    'h-full w-full object-contain z-0 select-none',
+    zoomMode
+      ? 'cursor-none'
+      : mainImageShowsInstalled
+        ? 'cursor-pointer'
+        : 'cursor-default',
+  )
+
+  const mainPreviewHandlers: Pick<
+    ComponentProps<'img'>,
+    'onMouseEnter' | 'onMouseMove' | 'onMouseLeave' | 'onClick'
+  > = {
+    onMouseEnter: e => {
+      if (zoomMode) handleZoomMove(e)
+    },
+    onMouseMove: handleZoomMove,
+    onMouseLeave: () => {
+      if (!zoomMode) return
+      setLens(current => ({ ...current, visible: false }))
+    },
+    onClick: handleMainImageClick,
+  }
+
   return (
     <>
       <div className='w-full flex flex-col justify-center items-center relative select-none'>
@@ -274,13 +332,25 @@ function ChildrenImagesDialog({
           <button
             type='button'
             onClick={handleZoomToggle}
-            className='absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-zinc-300 bg-white/90 text-zinc-700 shadow-sm transition-colors hover:bg-white hover:text-zinc-900'
+            className={cn(
+              'absolute left-3 top-3 z-20 flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-200 ease-out',
+              'backdrop-blur-md shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2',
+              zoomMode
+                ? zoomScale === 2
+                  ? 'border-blue-800/95 bg-gradient-to-br from-blue-800 via-blue-900 to-blue-950 text-white shadow-blue-950/45 ring-2 ring-blue-500/45 hover:from-blue-900 hover:via-blue-950 hover:to-blue-950'
+                  : 'border-sky-300/90 bg-gradient-to-br from-sky-500 to-sky-700 text-white shadow-sky-900/30 ring-2 ring-sky-200/50 hover:from-sky-500 hover:to-sky-800'
+                : 'border-white/60 bg-gradient-to-br from-white/90 to-zinc-100/95 text-zinc-800 shadow-black/10 hover:border-sky-200/90 hover:from-white hover:to-sky-50/90 hover:text-sky-950 hover:shadow-xl',
+            )}
             aria-label={
               zoomMode ? `Magnifier ${zoomScale}x active` : 'Enable zoom mode'
             }
             title={zoomMode ? `Magnifier ${zoomScale}x` : 'Enable zoom mode'}
           >
-            <Search className='h-4 w-4' />
+            <ScanSearch
+              className='h-[1.35rem] w-[1.35rem] shrink-0'
+              strokeWidth={zoomScale === 2 ? 2.5 : zoomMode ? 2.35 : 2.1}
+              aria-hidden
+            />
           </button>
         ) : null}
         {!isMobile && zoomHint ? (
@@ -288,7 +358,7 @@ function ChildrenImagesDialog({
             {zoomHint}
           </div>
         ) : null}
-        {showInfo && (
+        {showInfo && type !== 'images' && !zoomMode && (
           <div className='absolute top-7 left-1/2 z-10 w-max max-w-[min(90vw,28rem)] -translate-x-1/2 bg-black/80 p-3 rounded shadow-lg text-white border border-gray-900 transition-opacity duration-200 hover:opacity-0'>
             <h3 className='text-lg font-bold mb-3 text-center'>
               {image?.name || name}
@@ -304,22 +374,32 @@ function ChildrenImagesDialog({
         )}
         {selectedImage ? (
           <div className='relative w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] overflow-hidden'>
-            <img
-              src={selectedImage}
-              alt={alt || name || 'Image'}
-              className={`h-full w-full object-contain z-0 select-none ${zoomMode && lens.visible && !isMobile ? 'cursor-none' : 'cursor-default'}`}
-              onMouseEnter={e => {
-                if (zoomMode) handleZoomMove(e)
-              }}
-              onMouseMove={handleZoomMove}
-              onMouseLeave={() => {
-                if (!zoomMode) return
-                setLens(current => ({ ...current, visible: false }))
-              }}
-              onClick={e => {
-                e.stopPropagation()
-              }}
-            />
+            {mainImageShowsInstalled && !zoomMode ? (
+              <Tooltip delayDuration={200}>
+                <TooltipTrigger asChild>
+                  <img
+                    src={selectedImage}
+                    alt={alt || name || 'Image'}
+                    className={mainPreviewClassName}
+                    {...mainPreviewHandlers}
+                  />
+                </TooltipTrigger>
+                <TooltipContent
+                  side='bottom'
+                  sideOffset={10}
+                  className='max-w-[15rem] border-zinc-600/90 bg-zinc-900 px-3 py-2 text-center text-[11px] font-medium leading-snug text-zinc-50 shadow-lg'
+                >
+                  Click the photo to show the main slab again
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <img
+                src={selectedImage}
+                alt={alt || name || 'Image'}
+                className={mainPreviewClassName}
+                {...mainPreviewHandlers}
+              />
+            )}
             {zoomMode && lens.visible && !isMobile ? (
               <div
                 className='pointer-events-none absolute z-20 rounded-full border-4 border-white bg-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] ring-1 ring-black/20'
@@ -357,19 +437,29 @@ function ChildrenImagesDialog({
                   key={image.id}
                   className='basis-auto max-w-fit pl-2 select-none'
                 >
-                  <img
-                    src={image.url}
-                    className='w-10 h-10 cursor-pointer'
-                    alt={name || 'Image'}
-                    onClick={() => setSelectedImage(image.url)}
-                    onMouseEnter={() => handleMouseEnter(image.url)}
-                    onAuxClick={e => {
-                      if (e.button === 1) {
-                        e.preventDefault()
-                        window.open(image.url, '_blank')
-                      }
-                    }}
-                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <img
+                        src={image.url}
+                        className='w-10 h-10 cursor-pointer'
+                        alt={name || 'Image'}
+                        onClick={() => {
+                          setPinnedInstalledUrl(image.url)
+                          setSelectedImage(image.url)
+                        }}
+                        onMouseEnter={() => handleMouseEnter(image.url)}
+                        onAuxClick={e => {
+                          if (e.button === 1) {
+                            e.preventDefault()
+                            window.open(image.url, '_blank')
+                          }
+                        }}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side='top' sideOffset={6}>
+                      Lock in this picture
+                    </TooltipContent>
+                  </Tooltip>
                 </CarouselItem>
               ))}
             </CarouselContent>
