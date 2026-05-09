@@ -34,13 +34,13 @@ import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
+import { AttachmentImageEditorDialog } from '~/components/molecules/AttachmentImageEditorDialog'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { EmailTemplateSearch } from '~/components/molecules/EmailTemplateSearch'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { MultiEmailRecipientInput } from '~/components/molecules/MultiEmailRecipientInput'
 import { QuillInput } from '~/components/molecules/QuillInput'
-import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -873,10 +873,7 @@ export default function DealEmailDialog() {
   }
 
   const [previews, setPreviews] = useState<Record<string, string>>({})
-  const [currentImages, setCurrentImages] = useState<
-    { id: number; url: string; name: string; type: string; available: null }[]
-  >([])
-  const [currentImageId, setCurrentImageId] = useState<number | null>(null)
+  const [editingAttachment, setEditingAttachment] = useState<File | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files
@@ -957,14 +954,36 @@ export default function DealEmailDialog() {
       const previewKey = `${file.name}-${file.size}-${file.lastModified}`
       setPreviews(prev => {
         const next = { ...prev }
+        const url = next[previewKey]
+        if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
         delete next[previewKey]
         return next
       })
     }
+    setEditingAttachment(current => (current === file ? null : current))
     form.setValue(
       'attachments',
       attachments.filter((_, i) => i !== index),
     )
+  }
+
+  function replaceAttachment(originalFile: File, editedFile: File) {
+    const originalKey = `${originalFile.name}-${originalFile.size}-${originalFile.lastModified}`
+    setPreviews(prev => {
+      const next = { ...prev }
+      const oldUrl = next[originalKey]
+      if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl)
+      delete next[originalKey]
+      const editedKey = `${editedFile.name}-${editedFile.size}-${editedFile.lastModified}`
+      next[editedKey] = URL.createObjectURL(editedFile)
+      return next
+    })
+    const list = form.getValues('attachments')
+    form.setValue(
+      'attachments',
+      list.map(f => (f === originalFile ? editedFile : f)),
+    )
+    setEditingAttachment(null)
   }
 
   const imageExt = new Set([
@@ -994,269 +1013,259 @@ export default function DealEmailDialog() {
     setTimeout(() => URL.revokeObjectURL(fileUrl), 30_000)
   }
 
+  const editingAttachmentPreviewUrl = editingAttachment
+    ? previews[
+        `${editingAttachment.name}-${editingAttachment.size}-${editingAttachment.lastModified}`
+      ]
+    : undefined
+
   return (
-    <>
-      <Dialog open={true} onOpenChange={handleDialogClose}>
-        <DialogContent
-          className={`sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5 transition-colors ${isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`}
-          onPasteCapture={handlePaste}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <DialogHeader>
-            <DialogTitle>Send Email</DialogTitle>
-          </DialogHeader>
-          <FormProvider {...form}>
-            <Form
-              onSubmit={form.handleSubmit(fullSubmit)}
-              className='flex-1 flex flex-col'
-            >
-              <AuthenticityTokenInput />
-              <EmailFormFields
-                form={form}
-                companyId={companyId}
-                selectedTemplate={selectedTemplate}
-                onTemplateChange={setSelectedTemplate}
-                templateVariableData={templateVariableData}
-                canEditTo={!dealId}
-                onFilesDrop={files => {
-                  addFiles(files)
-                  setIsDragging(false)
-                }}
-                toLabels={toLabels}
-                onToLabelsChange={setToLabels}
-              />
-              {form.watch('attachments').length > 0 ? (
-                <div className='flex flex-wrap gap-2'>
-                  {form.watch('attachments').map((file, index) => {
-                    const previewKey = `${file.name}-${file.size}-${file.lastModified}`
-                    const previewUrl = previews[previewKey]
-                    const uniqueKey = `att-${index}-${previewKey}`
-                    return (
-                      <div
-                        key={uniqueKey}
-                        className='group relative size-15 sm:size-25 shrink-0 rounded border border-border overflow-hidden'
+    <Dialog open={true} onOpenChange={handleDialogClose}>
+      <DialogContent
+        className={`sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5 transition-colors ${isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`}
+        onPasteCapture={handlePaste}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <DialogHeader>
+          <DialogTitle>Send Email</DialogTitle>
+        </DialogHeader>
+        <FormProvider {...form}>
+          <Form
+            onSubmit={form.handleSubmit(fullSubmit)}
+            className='flex-1 flex flex-col'
+          >
+            <AuthenticityTokenInput />
+            <EmailFormFields
+              form={form}
+              companyId={companyId}
+              selectedTemplate={selectedTemplate}
+              onTemplateChange={setSelectedTemplate}
+              templateVariableData={templateVariableData}
+              canEditTo={!dealId}
+              onFilesDrop={files => {
+                addFiles(files)
+                setIsDragging(false)
+              }}
+              toLabels={toLabels}
+              onToLabelsChange={setToLabels}
+            />
+            {form.watch('attachments').length > 0 ? (
+              <div className='flex flex-wrap gap-2'>
+                {form.watch('attachments').map((file, index) => {
+                  const previewKey = `${file.name}-${file.size}-${file.lastModified}`
+                  const previewUrl = previews[previewKey]
+                  const uniqueKey = `att-${index}-${previewKey}`
+                  return (
+                    <div
+                      key={uniqueKey}
+                      className='group relative size-15 sm:size-25 shrink-0 rounded border border-border overflow-hidden'
+                    >
+                      <button
+                        type='button'
+                        className='absolute top-0 right-0 z-10 p-0.5 rounded-bl bg-black/60 text-white transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-black/80'
+                        onClick={e => {
+                          e.stopPropagation()
+                          removeAttachment(index)
+                        }}
+                        aria-label='Remove attachment'
                       >
+                        <X className='h-3 w-3 sm:h-4 sm:w-4' />
+                      </button>
+                      {previewUrl ? (
                         <button
                           type='button'
-                          className='absolute top-0 right-0 z-10 p-0.5 rounded-bl bg-black/60 text-white transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-black/80'
+                          className='size-full cursor-pointer block focus:outline-none'
                           onClick={e => {
                             e.stopPropagation()
-                            removeAttachment(index)
+                            setEditingAttachment(file)
                           }}
-                          aria-label='Remove attachment'
                         >
-                          <X className='h-3 w-3 sm:h-4 sm:w-4' />
+                          <img
+                            src={previewUrl}
+                            alt={file.name}
+                            className='size-full object-cover transition-all group-hover:grayscale group-hover:brightness-75'
+                          />
                         </button>
-                        {previewUrl ? (
-                          <button
-                            type='button'
-                            className='size-full cursor-pointer block focus:outline-none'
-                            onClick={e => {
-                              e.stopPropagation()
-                              const imgs =
-                                form
-                                  .getValues('attachments')
-                                  .map((attachment, imageIndex) => {
-                                    const key = `${attachment.name}-${attachment.size}-${attachment.lastModified}`
-                                    const url = previews[key]
-                                    if (!url) return null
-                                    return {
-                                      id: imageIndex,
-                                      url,
-                                      name: attachment.name,
-                                      type: 'email',
-                                      available: null,
-                                    }
-                                  })
-                                  .filter(item => item !== null) || []
-                              setCurrentImages(imgs)
-                              setCurrentImageId(index)
-                            }}
-                          >
-                            <img
-                              src={previewUrl}
-                              alt={file.name}
-                              className='size-full object-cover transition-all group-hover:grayscale group-hover:brightness-75'
-                            />
-                          </button>
-                        ) : (
-                          <button
-                            type='button'
-                            className='size-full flex items-center justify-center bg-muted text-muted-foreground cursor-pointer group-hover:bg-muted/80 transition-colors'
-                            onClick={e => {
-                              e.stopPropagation()
-                              openAttachment(file)
-                            }}
-                          >
-                            {attachmentIcon(file.name)}
-                          </button>
-                        )}
-                        <div className='absolute inset-0 pointer-events-none bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
-                          <span className='text-white text-[10px] text-center line-clamp-2 break-all select-none px-1'>
-                            {file.name}
-                          </span>
-                        </div>
+                      ) : (
+                        <button
+                          type='button'
+                          className='size-full flex items-center justify-center bg-muted text-muted-foreground cursor-pointer group-hover:bg-muted/80 transition-colors'
+                          onClick={e => {
+                            e.stopPropagation()
+                            openAttachment(file)
+                          }}
+                        >
+                          {attachmentIcon(file.name)}
+                        </button>
+                      )}
+                      <div className='absolute inset-0 pointer-events-none bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
+                        <span className='text-white text-[10px] text-center line-clamp-2 break-all select-none px-1'>
+                          {file.name}
+                        </span>
                       </div>
-                    )
-                  })}
-                </div>
-              ) : null}
-              <input
-                ref={fileInputRef}
-                type='file'
-                className='hidden'
-                multiple
-                onChange={handleFileChange}
-              />
-              <div className='mt-4 flex justify-between gap-2 w-full'>
-                <div className='flex items-center gap-2'>
-                  {isMobile ? (
-                    <CustomDropdownMenu
-                      trigger={
-                        <Button variant='outline' size='sm' className='h-9'>
-                          <MoreVertical className='h-4 w-4 mr-1' />
-                          AI Menu
-                        </Button>
-                      }
-                      sections={[
-                        {
-                          title: 'AI Actions',
-                          options: [
-                            {
-                              label: 'AI Settings',
-                              icon: <SettingsIcon className='w-4 h-4' />,
-                              onClick: () => setShowAIMenu(!showAIMenu),
-                            },
-                            {
-                              label: 'Generate',
-                              icon: <Sparkles className='w-4 h-4' />,
-                              onClick: handleGenerateWithAI,
-                            },
-                          ],
-                        },
-                      ]}
-                    />
-                  ) : (
-                    <div className='flex items-center gap-2'>
-                      <Button
-                        type='button'
-                        variant='outline'
-                        size='sm'
-                        className='h-9'
-                        onClick={() => setShowAIMenu(!showAIMenu)}
-                      >
-                        <SettingsIcon className='h-4 w-4 mr-1' />
-                        AI Settings
-                      </Button>
-                      <LoadingButton
-                        loading={_isGenerating}
-                        type='button'
-                        variant='default'
-                        size='sm'
-                        className='h-9'
-                        onClick={handleGenerateWithAI}
-                      >
-                        <Sparkles className='h-4 w-4 mr-1' />
-                        Generate
-                      </LoadingButton>
                     </div>
-                  )}
-                </div>
-
-                <div className='ml-auto flex items-center gap-2'>
-                  <AiImproveButton
-                    getText={() => form.getValues('text')}
-                    setText={value => form.setValue('text', value)}
-                  />
+                  )
+                })}
+              </div>
+            ) : null}
+            <input
+              ref={fileInputRef}
+              type='file'
+              className='hidden'
+              multiple
+              onChange={handleFileChange}
+            />
+            <div className='mt-4 flex justify-between gap-2 w-full'>
+              <div className='flex items-center gap-2'>
+                {isMobile ? (
                   <CustomDropdownMenu
-                    side='top'
                     trigger={
-                      <Button type='button' size='icon' aria-label='Attachment'>
-                        <PaperclipIcon className='h-4 w-4' />
+                      <Button variant='outline' size='sm' className='h-9'>
+                        <MoreVertical className='h-4 w-4 mr-1' />
+                        AI Menu
                       </Button>
                     }
                     sections={[
                       {
+                        title: 'AI Actions',
                         options: [
                           {
-                            label: 'Upload from computer',
-                            icon: <Upload className='h-4 w-4' />,
-                            onClick: () => fileInputRef.current?.click(),
+                            label: 'AI Settings',
+                            icon: <SettingsIcon className='w-4 h-4' />,
+                            onClick: () => setShowAIMenu(!showAIMenu),
                           },
                           {
-                            label: 'From Stones',
-                            icon: <Package className='h-4 w-4' />,
-                            onClick: () => setShowStonesPicker(true),
-                          },
-                          {
-                            label: 'From Images',
-                            icon: <ImageIcon className='h-4 w-4' />,
-                            onClick: () => setShowImagesPicker(true),
-                          },
-                          {
-                            label: 'From Documents',
-                            icon: <FileText className='h-4 w-4' />,
-                            onClick: () => setShowDocumentsPicker(true),
+                            label: 'Generate',
+                            icon: <Sparkles className='w-4 h-4' />,
+                            onClick: handleGenerateWithAI,
                           },
                         ],
                       },
                     ]}
                   />
-                  <LoadingButton loading={isSubmitting || isPending} type='submit'>
-                    <SendIcon className='h-4 w-4' />
-                  </LoadingButton>
-                </div>
+                ) : (
+                  <div className='flex items-center gap-2'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      className='h-9'
+                      onClick={() => setShowAIMenu(!showAIMenu)}
+                    >
+                      <SettingsIcon className='h-4 w-4 mr-1' />
+                      AI Settings
+                    </Button>
+                    <LoadingButton
+                      loading={_isGenerating}
+                      type='button'
+                      variant='default'
+                      size='sm'
+                      className='h-9'
+                      onClick={handleGenerateWithAI}
+                    >
+                      <Sparkles className='h-4 w-4 mr-1' />
+                      Generate
+                    </LoadingButton>
+                  </div>
+                )}
               </div>
-            </Form>
-          </FormProvider>
-          {showAIMenu && (
-            <div className='mt-4'>
-              <AIAssistantMenu aiForm={aiForm} />
+
+              <div className='ml-auto flex items-center gap-2'>
+                <AiImproveButton
+                  getText={() => form.getValues('text')}
+                  setText={value => form.setValue('text', value)}
+                />
+                <CustomDropdownMenu
+                  side='top'
+                  trigger={
+                    <Button type='button' size='icon' aria-label='Attachment'>
+                      <PaperclipIcon className='h-4 w-4' />
+                    </Button>
+                  }
+                  sections={[
+                    {
+                      options: [
+                        {
+                          label: 'Upload from computer',
+                          icon: <Upload className='h-4 w-4' />,
+                          onClick: () => fileInputRef.current?.click(),
+                        },
+                        {
+                          label: 'From Stones',
+                          icon: <Package className='h-4 w-4' />,
+                          onClick: () => setShowStonesPicker(true),
+                        },
+                        {
+                          label: 'From Images',
+                          icon: <ImageIcon className='h-4 w-4' />,
+                          onClick: () => setShowImagesPicker(true),
+                        },
+                        {
+                          label: 'From Documents',
+                          icon: <FileText className='h-4 w-4' />,
+                          onClick: () => setShowDocumentsPicker(true),
+                        },
+                      ],
+                    },
+                  ]}
+                />
+                <LoadingButton loading={isSubmitting || isPending} type='submit'>
+                  <SendIcon className='h-4 w-4' />
+                </LoadingButton>
+              </div>
             </div>
-          )}
-          <AttachmentImagePicker
-            type='stones'
-            companyId={companyId}
-            open={showStonesPicker}
-            onClose={() => setShowStonesPicker(false)}
-            onSelect={files => {
-              addFiles(files)
-              setShowStonesPicker(false)
-            }}
-            onAddFiles={addFiles}
-          />
-          <AttachmentImagePicker
-            type='images'
-            companyId={companyId}
-            open={showImagesPicker}
-            onClose={() => setShowImagesPicker(false)}
-            onSelect={files => {
-              addFiles(files)
-              setShowImagesPicker(false)
-            }}
-          />
-          <AttachmentImagePicker
-            type='documents'
-            companyId={companyId}
-            open={showDocumentsPicker}
-            onClose={() => setShowDocumentsPicker(false)}
-            onSelect={files => {
-              addFiles(files)
-              setShowDocumentsPicker(false)
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-      <SuperCarousel
-        type='email'
-        currentId={currentImageId ?? undefined}
-        setCurrentId={id => setCurrentImageId(id ?? null)}
-        images={currentImages}
-        userRole='employee'
-        showInfo={false}
+          </Form>
+        </FormProvider>
+        {showAIMenu && (
+          <div className='mt-4'>
+            <AIAssistantMenu aiForm={aiForm} />
+          </div>
+        )}
+        <AttachmentImagePicker
+          type='stones'
+          companyId={companyId}
+          open={showStonesPicker}
+          onClose={() => setShowStonesPicker(false)}
+          onSelect={files => {
+            addFiles(files)
+            setShowStonesPicker(false)
+          }}
+          onAddFiles={addFiles}
+        />
+        <AttachmentImagePicker
+          type='images'
+          companyId={companyId}
+          open={showImagesPicker}
+          onClose={() => setShowImagesPicker(false)}
+          onSelect={files => {
+            addFiles(files)
+            setShowImagesPicker(false)
+          }}
+        />
+        <AttachmentImagePicker
+          type='documents'
+          companyId={companyId}
+          open={showDocumentsPicker}
+          onClose={() => setShowDocumentsPicker(false)}
+          onSelect={files => {
+            addFiles(files)
+            setShowDocumentsPicker(false)
+          }}
+        />
+      </DialogContent>
+      <AttachmentImageEditorDialog
+        file={editingAttachment}
+        previewUrl={editingAttachmentPreviewUrl}
+        open={!!editingAttachment}
+        onOpenChange={open => {
+          if (!open) setEditingAttachment(null)
+        }}
+        onSave={file => {
+          if (editingAttachment) replaceAttachment(editingAttachment, file)
+        }}
       />
-    </>
+    </Dialog>
   )
 }
