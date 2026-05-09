@@ -18,7 +18,15 @@ import {
   X,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 import { Link, useFetcher, useLocation, useNavigate, useParams } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import ClipboardIcon from '~/components/icons/ClipboardIcon'
@@ -1550,7 +1558,7 @@ function ActivityList({
                 </Button>
               </div>
             ) : null}
-            {tabRenderers[historyTab]()}
+            <Fragment key={historyTab}>{tabRenderers[historyTab]()}</Fragment>
           </>
         )}
       </div>
