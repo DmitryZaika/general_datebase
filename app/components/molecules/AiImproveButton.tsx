@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Button, type ButtonProps } from '~/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
+import { useToast } from '~/hooks/use-toast'
+import { friendlyAIError } from '~/hooks/useAIStream'
 
 type AiImproveButtonProps = {
   id?: string
@@ -22,6 +24,7 @@ export function AiImproveButton({
   iconClassName,
 }: AiImproveButtonProps) {
   const [loading, setLoading] = useState(false)
+  const { toast } = useToast()
 
   const handleClick = async () => {
     if (loading) return
@@ -39,7 +42,7 @@ export function AiImproveButton({
 
       if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(`Failed to improve text: ${response.status} ${errorText}`)
+        throw new Error(`${response.status} ${errorText}`)
       }
 
       const json: { body?: string } = await response.json()
@@ -47,11 +50,12 @@ export function AiImproveButton({
         setText(json.body.trim())
       }
     } catch (error) {
-      alert(
-        `Failed to improve text: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
-      )
+      const raw = error instanceof Error ? error.message : 'Unknown error'
+      toast({
+        title: 'Could not improve text',
+        description: friendlyAIError(raw),
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }

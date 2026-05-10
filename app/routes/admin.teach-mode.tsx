@@ -18,8 +18,8 @@ import { Switch } from '~/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { db } from '~/db.server'
 import { type toast as toastType, useToast } from '~/hooks/use-toast'
+import { consumeAIStream, friendlyAIError } from '~/hooks/useAIStream'
 import type { InstructionSlim } from '~/types'
-import { DONE_KEY } from '~/utils/constants'
 import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { selectMany } from '../utils/queryHelpers'
@@ -1202,6 +1202,7 @@ export function useQuestionGenerator({
   setSavedQuestions: React.Dispatch<React.SetStateAction<Set<number>>>
   setRejectedQuestions: React.Dispatch<React.SetStateAction<Set<number>>>
 }) {
+  const { toast } = useToast()
   const handleGenerate = React.useCallback(
     (e?: React.MouseEvent, additionalDetails?: string) => {
       if (e) e.stopPropagation()
@@ -1223,7 +1224,11 @@ export function useQuestionGenerator({
 
       const content = getInstructionContent()
       if (!content) {
-        alert('No instruction content available.')
+        toast({
+          title: 'Cannot generate question',
+          description: 'No instruction content available.',
+          variant: 'destructive',
+        })
         setNodeLoading(node.id, false)
         return
       }
@@ -1231,22 +1236,21 @@ export function useQuestionGenerator({
       const prompt = encodeURIComponent(
         buildQuestionPrompt(content.title, content.content, additionalDetails),
       )
-      const sse = new EventSource(`/api/chat?query=${prompt}&isNew=true`)
-
-      sse.addEventListener('message', event => {
-        if (event.data === DONE_KEY) {
-          sse.close()
-          setNodeLoading(node.id, false)
-        } else {
-          appendNodeText(node.id, event.data)
-        }
-      })
-
-      sse.addEventListener('error', () => {
-        // ignore
-        sse.close()
-        setNodeLoading(node.id, false)
-      })
+      consumeAIStream(
+        { url: `/api/chat?query=${prompt}&isNew=true` },
+        {
+          onDelta: chunk => appendNodeText(node.id, chunk),
+          onDone: () => setNodeLoading(node.id, false),
+          onError: message => {
+            setNodeLoading(node.id, false)
+            toast({
+              title: 'Could not generate question',
+              description: friendlyAIError(message),
+              variant: 'destructive',
+            })
+          },
+        },
+      )
     },
     [
       node.id,
@@ -1256,6 +1260,7 @@ export function useQuestionGenerator({
       appendNodeText,
       setSavedQuestions,
       setRejectedQuestions,
+      toast,
     ],
   )
 

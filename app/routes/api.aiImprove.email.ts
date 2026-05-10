@@ -1,18 +1,15 @@
-import OpenAI from 'openai'
 import type { ActionFunctionArgs } from 'react-router'
 import { z } from 'zod'
+import { runTask } from '~/lib/ai/runner.server'
+import { improveEmailTask } from '~/lib/ai/tasks/improveEmail.task'
 import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser } from '~/utils/session.server'
-
-const client = new OpenAI({
-  apiKey: process.env.OPEN_AI_SECRET_KEY,
-})
 
 const improveSchema = z.object({
   body: z.string().min(1),
 })
 
-function createErrorResponse(message: string, status: number): Response {
+function errorResponse(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
     headers: { 'Content-Type': 'application/json' },
@@ -20,11 +17,13 @@ function createErrorResponse(message: string, status: number): Response {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  let userId: number
   try {
-    await getEmployeeUser(request)
+    const user = await getEmployeeUser(request)
+    userId = user.id
   } catch (error) {
     posthogClient.captureException(error)
-    return createErrorResponse('Failed to authorize', 401)
+    return errorResponse('Failed to authorize', 401)
   }
 
   let parsed: z.infer<typeof improveSchema>
@@ -32,31 +31,17 @@ export async function action({ request }: ActionFunctionArgs) {
     parsed = improveSchema.parse(await request.json())
   } catch (error) {
     posthogClient.captureException(error)
-    return createErrorResponse('Invalid request data', 400)
+    return errorResponse('Invalid request data', 400)
   }
 
   try {
-    const completion = await client.chat.completions.create({
-      model: 'gpt-4.1-mini-2025-04-14',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are an expert editor for customer-facing business emails. Improve the provided email body text: fix all grammar, spelling, and style issues, make it sound more professional and clear, keep the same language as the input, preserve the original meaning, and do not add new ideas. If you see the term "wordPress" as a source, replace it with "Web-site". Return only the improved email body text without any explanations or labels.',
-        },
-        { role: 'user', content: parsed.body },
-      ],
-    })
-
-    const content = completion.choices[0]?.message?.content ?? ''
-    const body = typeof content === 'string' ? content.trim() : ''
-
-    return new Response(JSON.stringify({ body }), {
+    const result = await runTask(improveEmailTask, parsed, userId)
+    return new Response(JSON.stringify({ body: result.body }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
   } catch (error) {
     posthogClient.captureException(error)
-    return createErrorResponse('Failed to improve email', 500)
+    return errorResponse('Failed to improve email', 500)
   }
 }

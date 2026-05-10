@@ -65,6 +65,7 @@ import {
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
+import { consumeAIStream, friendlyAIError } from '~/hooks/useAIStream'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
 import type { EmailTemplate } from '~/utils/emailTemplates'
 import {
@@ -116,7 +117,6 @@ interface AIEmailRequest {
   senderPosition?: string
   senderPhoneNumber?: string
   senderEmail?: string
-  variationToken?: string
   skipHistory?: boolean
 }
 
@@ -233,11 +233,9 @@ function buildAIRequestPayload(
   formData: AIEmailFormData,
   dealId: number,
 ): Partial<AIEmailRequest> {
-  const variationToken = Math.random().toString(36).slice(2)
   const payload: Partial<AIEmailRequest> = {
     emailCategory: formData.emailCategory,
     dealId: dealId,
-    variationToken,
     skipHistory: true,
   }
 
@@ -250,49 +248,6 @@ function buildAIRequestPayload(
   return payload
 }
 
-async function processStreamingResponse(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  onStreamSubject?: (text: string) => void,
-  onStreamBody?: (text: string) => void,
-): Promise<AIEmailResponse> {
-  const decoder = new TextDecoder()
-  let fullText = ''
-  let isInBody = false
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    const chunk = decoder.decode(value, { stream: true })
-    const lines = chunk.split('\n')
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = JSON.parse(line.slice(6))
-        if (data.error) throw new Error(data.error)
-        if (data.content) {
-          fullText += data.content
-
-          if (fullText.includes('---BODY---')) {
-            isInBody = true
-            const parts = fullText.split('---BODY---')
-            if (onStreamSubject) onStreamSubject(parts[0].trim())
-            if (onStreamBody) onStreamBody((parts[1] || '').trim())
-          } else if (isInBody) {
-            const parts = fullText.split('---BODY---')
-            if (onStreamBody) onStreamBody((parts[1] || '').trim())
-          } else {
-            if (onStreamSubject) onStreamSubject(fullText.trim())
-          }
-        }
-      }
-    }
-  }
-
-  const parts = fullText.split('---BODY---')
-  return { subject: parts[0]?.trim() || '', bodyText: parts[1]?.trim() || '' }
-}
-
 async function generateAIEmail(
   formData: AIEmailFormData,
   dealId: number,
@@ -301,24 +256,28 @@ async function generateAIEmail(
 ): Promise<AIEmailResponse> {
   const requestPayload = buildAIRequestPayload(formData, dealId)
 
-  const response = await fetch('/api/aiRecommend/email', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestPayload),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Failed to generate AI email: ${response.status} ${errorText}`)
-  }
-
-  if (!response.body) throw new Error('No response body')
-
-  return processStreamingResponse(
-    response.body.getReader(),
-    onStreamSubject,
-    onStreamBody,
+  let result: AIEmailResponse = {}
+  await consumeAIStream<{ subject: string; body: string }>(
+    {
+      url: '/api/aiRecommend/email',
+      init: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestPayload),
+      },
+    },
+    {
+      onDelta: (_chunk, accumulated) => onStreamBody?.(accumulated),
+      onFinal: data => {
+        result = { subject: data.subject, bodyText: data.body }
+        onStreamSubject?.(data.subject)
+      },
+      onError: message => {
+        throw new Error(message)
+      },
+    },
   )
+  return result
 }
 
 // ============================================================================
@@ -704,9 +663,12 @@ export default function DealEmailDialog() {
         body => form.setValue('text', body ?? ''),
       )
     } catch (error) {
-      alert(
-        `Failed to generate AI email: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      )
+      const raw = error instanceof Error ? error.message : 'Unknown error'
+      toast({
+        title: 'Could not generate email',
+        description: friendlyAIError(raw),
+        variant: 'destructive',
+      })
     } finally {
       setIsGenerating(false)
     }

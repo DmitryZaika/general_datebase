@@ -1,13 +1,13 @@
 import type React from 'react'
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogTrigger } from '~/components/ui/dialog'
-import { DONE_KEY } from '~/utils/constants'
+import { friendlyAIError, useAIStream } from '~/hooks/useAIStream'
 import { DialogFullHeader } from '../molecules/DialogFullHeader'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 
 interface Message {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'error'
   content: string
 }
 
@@ -20,18 +20,21 @@ interface MessageBubbleProps {
   message: Message
 }
 
+function bubbleStyles(role: Message['role']): string {
+  if (role === 'user') return 'bg-blue-500 text-white'
+  if (role === 'error')
+    return 'bg-red-50 text-red-800 border border-red-200'
+  return 'bg-gray-200 text-gray-900'
+}
+
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+  const isUser = message.role === 'user'
   return (
-    <div
-      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-    >
-      <div
-        className={`rounded-xl p-3 m-2 max-w-xl ${
-          message.role === 'user'
-            ? 'bg-blue-500 text-white'
-            : 'bg-gray-200 text-gray-900'
-        }`}
-      >
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`rounded-xl p-3 m-2 max-w-xl ${bubbleStyles(message.role)}`}>
+        {message.role === 'error' && (
+          <div className='text-xs font-semibold mb-1'>⚠ Something went wrong</div>
+        )}
         <div>{message.content}</div>
       </div>
     </div>
@@ -53,6 +56,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, isThinking }) => 
   </div>
 )
 
+
 interface ChatProps {
   isAtBottom?: boolean
 }
@@ -60,40 +64,34 @@ interface ChatProps {
 export function Chat({ isAtBottom = false }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState<string>('')
-  const [answer, setAnswer] = useState<string>('')
-  const [isThinking, setIsThinking] = useState<boolean>(false)
 
-  const addMessage = (message: Message) =>
-    setMessages(prevMessages => [...prevMessages, message])
+  const {
+    start,
+    text: answer,
+    isStreaming,
+  } = useAIStream<never>({
+    onDone: full => {
+      if (full) {
+        setMessages(prev => [...prev, { role: 'assistant', content: full }])
+      }
+    },
+    onError: message => {
+      setMessages(prev => [
+        ...prev,
+        { role: 'error', content: friendlyAIError(message) },
+      ])
+    },
+  })
 
   const handleFormSubmit = async (event: React.FormEvent) => {
-    setIsThinking(true)
-    setInput('')
     event.preventDefault()
-
     const formData = new FormData(event.target as HTMLFormElement)
     const query = formData.get('query') as string | null
-    if (answer) {
-      addMessage({ role: 'assistant', content: answer })
-      setAnswer('')
-    }
-    addMessage({ role: 'user', content: query || '' })
-
-    const sse = new EventSource(
-      `/api/chat?query=${query}&isNew=${messages.length === 0}`,
-    )
-
-    sse.addEventListener('message', event => {
-      if (event.data === DONE_KEY) {
-        sse.close()
-        setIsThinking(false)
-      } else {
-        setAnswer(prevResults => prevResults + event.data)
-      }
-    })
-
-    sse.addEventListener('error', () => {
-      sse.close()
+    if (!query) return
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', content: query }])
+    await start({
+      url: `/api/chat?query=${encodeURIComponent(query)}&isNew=${messages.length === 0}`,
     })
   }
 
@@ -132,9 +130,11 @@ export function Chat({ isAtBottom = false }: ChatProps) {
           <ChatMessages
             messages={[
               ...messages,
-              ...(answer ? [{ role: 'assistant' as const, content: answer }] : []),
+              ...(answer && isStreaming
+                ? [{ role: 'assistant' as const, content: answer }]
+                : []),
             ]}
-            isThinking={isThinking && !answer}
+            isThinking={isStreaming && !answer}
           />
 
           <form
@@ -150,7 +150,7 @@ export function Chat({ isAtBottom = false }: ChatProps) {
               autoFocus={true}
             />
             <Button
-              disabled={input.length === 0 || isThinking}
+              disabled={input.length === 0 || isStreaming}
               variant='blue'
               type='submit'
               className='rounded-full'
