@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { cn } from '~/lib/utils'
 
 interface ModuleListProps {
   children: React.ReactNode
@@ -19,11 +20,10 @@ export default function ModuleList({ children, className }: ModuleListProps) {
 
   return (
     <div
-      className={`
-      grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7
-      gap-2 px-2 select-none
-      ${className || ''}
-    `}
+      className={cn(
+        'grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7 gap-2 px-2 select-none',
+        className,
+      )}
     >
       <style>{`
         .module-item {

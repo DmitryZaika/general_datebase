@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import bcrypt from 'bcryptjs'
+import { motion } from 'framer-motion'
 import { Copy, Send } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useEffect, useRef } from 'react'
@@ -11,7 +12,8 @@ import {
   type LoaderFunctionArgs,
   redirect,
   useLoaderData,
-  useNavigation,
+  useLocation,
+  useSubmit,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
@@ -22,21 +24,36 @@ import { Button } from '~/components/ui/button'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
 import { db } from '~/db.server'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import {
+  EMPLOYEE_VIEW_ENTER_EASE,
+  employeeViewMotionKey,
+} from '~/utils/employeeViewEnterMotion'
 import { getQboUrl } from '~/utils/quickbooks.server'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
 const userSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  phone_number: z.union([z.coerce.string().min(10), z.literal('')]).optional(),
+  phone_number: z.coerce
+    .string()
+    .optional()
+    .superRefine((val, ctx) => {
+      if (val === undefined || String(val).trim() === '') return
+      const digits = String(val).replace(/\D/g, '')
+      if (digits.length < 10) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Phone must include at least 10 digits',
+        })
+      }
+    }),
   email: z.email('Invalid email address'),
   password: z.union([z.string(), z.null(), z.undefined()]).optional(),
   email_signature: z.string().optional(),
   email_name: z.string().optional(),
-  cloudtalk_agent_id: z
+  cloudtalk_agent_id: z.coerce
     .string()
     .optional()
     .superRefine((val, ctx) => {
@@ -47,14 +64,16 @@ const userSchema = z.object({
           message: 'CloudTalk agent ID must be at most 36 characters',
         })
       }
-    })
-    .transform((val): string | null => {
-      const t = (val ?? '').trim()
-      return t === '' ? null : t
     }),
 })
 
 const resolver = zodResolver(userSchema)
+
+const ACCOUNT_SLIDE_UP = {
+  initial: { opacity: 0, y: 40 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.2, ease: EMPLOYEE_VIEW_ENTER_EASE },
+}
 
 interface UserData extends RowDataPacket {
   name: string | null
@@ -93,13 +112,16 @@ export async function action({ request }: ActionFunctionArgs) {
       'email_signature = ?',
       'cloudtalk_agent_id = ?',
     ]
+    const cloudtalkTrimmed = (data.cloudtalk_agent_id ?? '').trim()
+    const cloudtalkForDb = cloudtalkTrimmed === '' ? null : cloudtalkTrimmed
+
     const params = [
       data.name,
       data.email,
       data.phone_number ?? null,
       data.email_name ?? null,
       data.email_signature ?? null,
-      data.cloudtalk_agent_id,
+      cloudtalkForDb,
     ]
 
     // Only hash and update password if provided
@@ -185,8 +207,8 @@ function TelegramLink({ email }: { email: string }) {
 
 export default function UserProfile() {
   const { userData } = useLoaderData<typeof loader>()
-  const navigation = useNavigation()
-  const isSubmitting = navigation.state !== 'idle'
+  const location = useLocation()
+  const submit = useSubmit()
   const token = useAuthenticityToken()
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -203,7 +225,18 @@ export default function UserProfile() {
     },
   })
 
-  const fullSubmit = useFullSubmit(form)
+  const isSubmitting = form.formState.isSubmitting
+
+  const handleSave = form.handleSubmit(async data => {
+    const payload: Record<string, string> = { csrf: token }
+    for (const [key, value] of Object.entries(data)) {
+      payload[key] = value == null ? '' : String(value)
+    }
+    await submit(payload, {
+      method: 'POST',
+      encType: 'application/x-www-form-urlencoded',
+    })
+  })
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -213,7 +246,11 @@ export default function UserProfile() {
   }, [userData.email_signature])
 
   return (
-    <div className='container  py-5'>
+    <motion.div
+      key={employeeViewMotionKey(location.pathname, location.search)}
+      className='container py-5 w-full min-h-0'
+      {...ACCOUNT_SLIDE_UP}
+    >
       <h1 className='text-2xl  font-bold mb-6 ml-3'>My Account</h1>
 
       <div className='bg-card  rounded-lg shadow p-6 w-full'>
@@ -231,7 +268,7 @@ export default function UserProfile() {
         )} */}
 
         <FormProvider {...form}>
-          <Form method='post' onSubmit={fullSubmit}>
+          <Form method='post' onSubmit={handleSave}>
             <input type='hidden' name='csrf' value={token} />
 
             <div className='space-y-4 max-w-lg'>
@@ -329,6 +366,12 @@ export default function UserProfile() {
               />
             </div>
 
+            {typeof form.formState.errors.root?.message === 'string' ? (
+              <p className='text-sm text-destructive mt-4 max-w-lg' role='alert'>
+                {form.formState.errors.root.message}
+              </p>
+            ) : null}
+
             <div className='mt-6 flex items-center gap-4'>
               <LoadingButton loading={isSubmitting} type='submit'>
                 Save Changes
@@ -342,6 +385,6 @@ export default function UserProfile() {
           </Form>
         </FormProvider>
       </div>
-    </div>
+    </motion.div>
   )
 }

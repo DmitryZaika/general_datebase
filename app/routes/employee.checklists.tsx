@@ -66,10 +66,25 @@ export default function EmployeeChecklists() {
 
   const [pendingSubmission, setPendingSubmission] =
     useState<PendingChecklistSubmission | null>(null)
+  const [checklistItemsMounted, setChecklistItemsMounted] = useState(false)
 
   useEffect(() => {
     setPendingSubmission(getPending())
   }, [])
+
+  useEffect(() => {
+    if (items.length === 0) {
+      setChecklistItemsMounted(false)
+      return
+    }
+    setChecklistItemsMounted(false)
+    const timer = setTimeout(() => {
+      setChecklistItemsMounted(true)
+    }, 200)
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [items])
 
   return (
     <div className='p-4 mx-auto max-w-4xl'>
@@ -106,12 +121,43 @@ export default function EmployeeChecklists() {
       ) : (
         <div
           className={cn(
-            'grid gap-4',
+            'checklist-items-stagger grid gap-4',
             isMobile ? 'grid-cols-1' : 'grid-cols-2 md:grid-cols-3',
           )}
         >
+          <style>{`
+            .checklist-items-stagger .module-item {
+              opacity: ${checklistItemsMounted ? 1 : 0};
+              transform: ${checklistItemsMounted ? 'translateY(0)' : 'translateY(15px)'};
+              transition: opacity 0.1s ease-out, transform 0.2s ease-out;
+            }
+            .checklist-items-stagger .module-item:nth-child(1) { transition-delay: 0.02s; }
+            .checklist-items-stagger .module-item:nth-child(2) { transition-delay: 0.04s; }
+            .checklist-items-stagger .module-item:nth-child(3) { transition-delay: 0.06s; }
+            .checklist-items-stagger .module-item:nth-child(4) { transition-delay: 0.08s; }
+            .checklist-items-stagger .module-item:nth-child(5) { transition-delay: 0.10s; }
+            .checklist-items-stagger .module-item:nth-child(6) { transition-delay: 0.12s; }
+            .checklist-items-stagger .module-item:nth-child(7) { transition-delay: 0.14s; }
+            .checklist-items-stagger .module-item:nth-child(8) { transition-delay: 0.16s; }
+            .checklist-items-stagger .module-item:nth-child(9) { transition-delay: 0.18s; }
+            .checklist-items-stagger .module-item:nth-child(10) { transition-delay: 0.20s; }
+            .checklist-items-stagger .module-item:nth-child(11) { transition-delay: 0.22s; }
+            .checklist-items-stagger .module-item:nth-child(12) { transition-delay: 0.24s; }
+            .checklist-items-stagger .module-item:nth-child(13) { transition-delay: 0.26s; }
+            .checklist-items-stagger .module-item:nth-child(14) { transition-delay: 0.28s; }
+            .checklist-items-stagger .module-item:nth-child(15) { transition-delay: 0.30s; }
+            .checklist-items-stagger .module-item:nth-child(16) { transition-delay: 0.32s; }
+            .checklist-items-stagger .module-item:nth-child(17) { transition-delay: 0.34s; }
+            .checklist-items-stagger .module-item:nth-child(18) { transition-delay: 0.36s; }
+            .checklist-items-stagger .module-item:nth-child(19) { transition-delay: 0.38s; }
+            .checklist-items-stagger .module-item:nth-child(20) { transition-delay: 0.40s; }
+            .checklist-items-stagger .module-item:nth-child(n+21) { transition-delay: 0.42s; }
+          `}</style>
           {items.map(item => (
-            <Card key={item.id} className='hover:shadow-lg transition-shadow'>
+            <Card
+              key={item.id}
+              className='module-item hover:shadow-lg transition-shadow'
+            >
               <CardHeader>
                 <CardTitle className='text-sm'>{item.customer_name}</CardTitle>
                 <p className='text-xs text-gray-600'>

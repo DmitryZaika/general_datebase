@@ -258,12 +258,14 @@ export default function DealItem({
   const titleLine =
     typeof deal.title === 'string' && deal.title.trim() !== '' ? deal.title.trim() : ''
 
+  const shellClass = `relative flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3 ${isSaving ? 'opacity-60' : ''} ${highlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''} ${!readonly ? 'cursor-grab active:cursor-grabbing' : ''}`
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       id={`deal-${deal.id}`}
-      className={`relative flex-1 flex-col w-full border rounded-lg p-2 shadow-sm hover:shadow-md transition-all flex justify-between items-start gap-3 ${isSaving ? 'opacity-60' : ''} ${highlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''} ${!readonly ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      className={shellClass}
       {...(!readonly ? attributes : {})}
       {...(!readonly ? listeners : {})}
     >

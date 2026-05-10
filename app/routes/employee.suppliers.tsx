@@ -1,8 +1,19 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { Link, type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { motion } from 'framer-motion'
+import {
+  Link,
+  type LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+  useLocation,
+} from 'react-router'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
+import {
+  EMPLOYEE_VIEW_ENTER,
+  employeeViewMotionKey,
+} from '~/utils/employeeViewEnterMotion'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -115,5 +126,14 @@ const getColumns = (
 
 export default function Suppliers() {
   const { suppliers, filesMap } = useLoaderData<typeof loader>()
-  return <DataTable columns={getColumns(filesMap)} data={suppliers} />
+  const location = useLocation()
+  return (
+    <motion.div
+      key={employeeViewMotionKey(location.pathname, location.search)}
+      className='w-full min-h-0'
+      {...EMPLOYEE_VIEW_ENTER}
+    >
+      <DataTable columns={getColumns(filesMap)} data={suppliers} />
+    </motion.div>
+  )
 }

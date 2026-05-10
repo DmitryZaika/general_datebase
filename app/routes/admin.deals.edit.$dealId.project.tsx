@@ -1,5 +1,5 @@
 import type { ColumnDef, Row } from '@tanstack/react-table'
-import { FileText, MapIcon, PhoneIcon } from 'lucide-react'
+import { FileText, Loader2, MapIcon, PhoneIcon } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useState } from 'react'
 import {
@@ -67,6 +67,7 @@ function AddressLinkCell({
   customer: RowDataPacket
 }) {
   const isMobile = useIsMobile()
+  const [mapLoading, setMapLoading] = useState(false)
   const isNameField = row.original.key.toLowerCase() === 'name'
   const isPhoneField = row.original.key.toLowerCase() === 'phone'
   const isEmailField = row.original.key.toLowerCase() === 'email'
@@ -82,7 +83,9 @@ function AddressLinkCell({
     const url =
       'https://www.google.com/maps/dir/?api=1&destination=' +
       encodeURIComponent(address)
+    setMapLoading(true)
     window.open(url, '_blank', 'noopener,noreferrer')
+    window.setTimeout(() => setMapLoading(false), 600)
   }
 
   return (
@@ -114,8 +117,13 @@ function AddressLinkCell({
             size='icon'
             className='h-7'
             onClick={handleAddressClick}
+            disabled={mapLoading}
           >
-            <MapIcon />
+            {mapLoading ? (
+              <Loader2 className='animate-spin' aria-hidden />
+            ) : (
+              <MapIcon aria-hidden />
+            )}
           </Button>
         </div>
       ) : isNameField ? (
@@ -129,7 +137,7 @@ function AddressLinkCell({
         <div className='flex gap-2 justify-end'>
           <div className='flex flex-col items-end gap-2'>
             <VCard
-              className='border-2 h-6 rounded-md px-2'
+              className='border-2 size-8 rounded-md'
               name={customer.name || ''}
               phone={customer.phone || ''}
               email={customer.email || ''}

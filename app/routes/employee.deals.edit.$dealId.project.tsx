@@ -1,6 +1,6 @@
 import { EnvelopeClosedIcon } from '@radix-ui/react-icons'
 import type { ColumnDef, Row } from '@tanstack/react-table'
-import { FileText, MapIcon, PhoneIcon } from 'lucide-react'
+import { FileText, Loader2, MapIcon, PhoneIcon } from 'lucide-react'
 import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { useEffect, useState } from 'react'
 import {
@@ -14,6 +14,7 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useNavigation,
 } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
@@ -198,6 +199,8 @@ function AddressLinkCell({
 }) {
   const isMobile = useIsMobile()
   const location = useLocation()
+  const navigation = useNavigation()
+  const [mapLoading, setMapLoading] = useState(false)
   const keyLower = row.original.key.toLowerCase()
 
   const isNameField = keyLower === 'name'
@@ -216,8 +219,14 @@ function AddressLinkCell({
     const url =
       'https://www.google.com/maps/dir/?api=1&destination=' +
       encodeURIComponent(address)
+    setMapLoading(true)
     window.open(url, '_blank', 'noopener,noreferrer')
+    window.setTimeout(() => setMapLoading(false), 600)
   }
+
+  const emailNavLoading =
+    navigation.state === 'loading' &&
+    Boolean(navigation.location?.pathname?.includes('/project/email'))
 
   return (
     <div className='flex items-center'>
@@ -239,8 +248,18 @@ function AddressLinkCell({
         <div className='flex gap-2 '>
           <CopyText value={row.original.value} className='font-bold' />
           <Link to={`email${location.search}`}>
-            <Button variant='outline' aria-label='Email' size='icon' className='h-7'>
-              <EnvelopeClosedIcon />
+            <Button
+              variant='outline'
+              aria-label='Email'
+              size='icon'
+              className='h-7'
+              disabled={emailNavLoading}
+            >
+              {emailNavLoading ? (
+                <Loader2 className='animate-spin' aria-hidden />
+              ) : (
+                <EnvelopeClosedIcon />
+              )}
             </Button>
           </Link>
         </div>
@@ -253,8 +272,13 @@ function AddressLinkCell({
             size='icon'
             className='h-7'
             onClick={handleAddressClick}
+            disabled={mapLoading}
           >
-            <MapIcon />
+            {mapLoading ? (
+              <Loader2 className='animate-spin' aria-hidden />
+            ) : (
+              <MapIcon aria-hidden />
+            )}
           </Button>
         </div>
       ) : isNameField ? (
@@ -268,7 +292,7 @@ function AddressLinkCell({
         <div className='flex gap-2 justify-end'>
           <div className='flex flex-col items-end gap-2'>
             <VCard
-              className='border-2 h-6 rounded-md px-2'
+              className='border-2 size-8 rounded-md'
               name={customer.name || ''}
               phone={customer.phone || ''}
               email={customer.email || ''}
@@ -397,16 +421,26 @@ export default function DealProjectInfo() {
       fetcher.formData?.get('intent') === 'update_status' &&
       fetcher.formData?.get('is_won') === (status === null ? 'null' : String(status))
 
+    const groupChangeBusy =
+      fetcher.state !== 'idle' && fetcher.formData?.get('intent') === 'change_group'
+
     if (isCurrent) return null
 
     return (
       <Button
         variant={status === 0 ? 'destructive' : status === 1 ? 'success' : 'default'}
-        className='h-7'
-        disabled={isSubmitting}
+        className='h-7 gap-2'
+        disabled={isSubmitting || groupChangeBusy}
         onClick={() => handleStatusChange(status)}
       >
-        {isSubmitting ? 'Saving...' : name[status as keyof typeof name]}
+        {isSubmitting ? (
+          <>
+            <Loader2 className='h-3.5 w-3.5 shrink-0 animate-spin' aria-hidden />
+            Saving…
+          </>
+        ) : (
+          name[status as keyof typeof name]
+        )}
       </Button>
     )
   }
@@ -414,6 +448,12 @@ export default function DealProjectInfo() {
   const currentGroupId = customer.current_group_id
     ? String(customer.current_group_id)
     : undefined
+
+  const groupChangeSubmitting =
+    fetcher.state !== 'idle' && fetcher.formData?.get('intent') === 'change_group'
+
+  const statusSubmitting =
+    fetcher.state !== 'idle' && fetcher.formData?.get('intent') === 'update_status'
 
   return (
     <div className='space-y-4'>
@@ -423,9 +463,18 @@ export default function DealProjectInfo() {
           <MoveButton status={1} isWon={customer.is_won} />
           <MoveButton status={0} isWon={customer.is_won} />
         </div>
-        <Select onValueChange={handleGroupChange} defaultValue={currentGroupId}>
+        <Select
+          onValueChange={handleGroupChange}
+          defaultValue={currentGroupId}
+          disabled={groupChangeSubmitting || statusSubmitting}
+        >
           <SelectTrigger className='w-[150px] h-7'>
-            <SelectValue placeholder='Select Group' />
+            <span className='flex min-w-0 flex-1 items-center gap-2'>
+              {groupChangeSubmitting ? (
+                <Loader2 className='h-3.5 w-3.5 shrink-0 animate-spin' aria-hidden />
+              ) : null}
+              <SelectValue placeholder='Select Group' />
+            </span>
           </SelectTrigger>
           <SelectContent>
             {groupLists.map(group => (

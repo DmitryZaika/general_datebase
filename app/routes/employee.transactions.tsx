@@ -1,4 +1,5 @@
 import type { ColumnDef } from '@tanstack/react-table'
+import { motion } from 'framer-motion'
 import { Calendar, MoreHorizontal, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {
@@ -41,6 +42,10 @@ import {
 import { Switch } from '~/components/ui/switch'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
+import {
+  EMPLOYEE_VIEW_ENTER,
+  employeeViewMotionKey,
+} from '~/utils/employeeViewEnterMotion'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -645,84 +650,90 @@ export default function EmployeeTransactions() {
 
   return (
     <>
-      <PageLayout title='Sales Transactions'>
-        <div className='flex justify-between items-center'>
-          <div className='flex items-center gap-4'>
-            <div className='flex gap-4 items-center'>
-              <div className='w-1/8 min-w-30'>
-                <div className='mb-1 text-sm font-medium'>Sales Rep</div>
-                <Select value={filters.salesRep} onValueChange={handleSalesRepChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder='Sales Rep' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {salesReps.map(rep => (
-                      <SelectItem key={rep} value={rep}>
-                        {rep}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      <motion.div
+        key={employeeViewMotionKey(location.pathname, location.search)}
+        className='w-full min-h-0'
+        {...EMPLOYEE_VIEW_ENTER}
+      >
+        <PageLayout title='Sales Transactions'>
+          <div className='flex justify-between items-center'>
+            <div className='flex items-center gap-4'>
+              <div className='flex gap-4 items-center'>
+                <div className='w-1/8 min-w-30'>
+                  <div className='mb-1 text-sm font-medium'>Sales Rep</div>
+                  <Select value={filters.salesRep} onValueChange={handleSalesRepChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Sales Rep' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {salesReps.map(rep => (
+                        <SelectItem key={rep} value={rep}>
+                          {rep}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className='w-1/8 min-w-30'>
-                <div className='mb-1 text-sm font-medium'>Status</div>
-                <Select value={filters.status} onValueChange={handleStatusChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder='Status' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='in_progress'>In Progress</SelectItem>
-                    <SelectItem value='finished'>Finished</SelectItem>
-                    <SelectItem value='all'>All Statuses</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className='w-1/8 min-w-30'>
+                  <div className='mb-1 text-sm font-medium'>Status</div>
+                  <Select value={filters.status} onValueChange={handleStatusChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Status' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='in_progress'>In Progress</SelectItem>
+                      <SelectItem value='finished'>Finished</SelectItem>
+                      <SelectItem value='all'>All Statuses</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
+            <div className='relative'>
+              <form onSubmit={handleSearchSubmit} className='flex items-center gap-2'>
+                <div className='relative'>
+                  <Search className='absolute left-2 top-2.5 h-4 w-4 text-gray-500' />
+                  <Input
+                    placeholder='Search transactions...'
+                    value={searchValue}
+                    onChange={handleSearchChange}
+                    className='pl-8 w-64'
+                  />
+                  {showCustomers && customers.length > 0 && (
+                    <div className='absolute z-10 w-full mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg'>
+                      <ul className='py-1 divide-y divide-gray-200'>
+                        {customers.map(customer => (
+                          <li
+                            key={customer.id}
+                            className='px-4 py-2 hover:bg-gray-50 cursor-pointer'
+                            onClick={() => handleSelectCustomer(customer)}
+                          >
+                            {customer.name}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <Button type='submit' variant='outline' size='sm'>
+                  Search
+                </Button>
+              </form>
+            </div>
           </div>
-          <div className='relative'>
-            <form onSubmit={handleSearchSubmit} className='flex items-center gap-2'>
-              <div className='relative'>
-                <Search className='absolute left-2 top-2.5 h-4 w-4 text-gray-500' />
-                <Input
-                  placeholder='Search transactions...'
-                  value={searchValue}
-                  onChange={handleSearchChange}
-                  className='pl-8 w-64'
-                />
-                {showCustomers && customers.length > 0 && (
-                  <div className='absolute z-10 w-full mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg'>
-                    <ul className='py-1 divide-y divide-gray-200'>
-                      {customers.map(customer => (
-                        <li
-                          key={customer.id}
-                          className='px-4 py-2 hover:bg-gray-50 cursor-pointer'
-                          onClick={() => handleSelectCustomer(customer)}
-                        >
-                          {customer.name}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <Button type='submit' variant='outline' size='sm'>
-                Search
-              </Button>
-            </form>
-          </div>
-        </div>
-        <DataTable
-          columns={transactionColumns}
-          data={transactions.map(transaction => ({
-            ...transaction,
-            className: 'hover:bg-gray-50 cursor-pointer',
-          }))}
-          onRowClick={row => handleRowClick(row.id)}
-          paginate
-          pageSize={50}
-        />
-      </PageLayout>
+          <DataTable
+            columns={transactionColumns}
+            data={transactions.map(transaction => ({
+              ...transaction,
+              className: 'hover:bg-gray-50 cursor-pointer',
+            }))}
+            onRowClick={row => handleRowClick(row.id)}
+            paginate
+            pageSize={50}
+          />
+        </PageLayout>
+      </motion.div>
 
       <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
         <DialogContent>

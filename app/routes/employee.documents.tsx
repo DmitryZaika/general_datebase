@@ -1,7 +1,17 @@
 import type { ColumnDef } from '@tanstack/react-table'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { motion } from 'framer-motion'
+import {
+  type LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+  useLocation,
+} from 'react-router'
 import { DataTable } from '~/components/ui/data-table'
 import { db } from '~/db.server'
+import {
+  EMPLOYEE_VIEW_ENTER,
+  employeeViewMotionKey,
+} from '~/utils/employeeViewEnterMotion'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 
@@ -43,11 +53,16 @@ const columns: ColumnDef<ItemDocument>[] = [
 
 export default function Documents() {
   const { documents } = useLoaderData<typeof loader>()
+  const location = useLocation()
 
   return (
-    <div className='ml-4'>
+    <motion.div
+      key={employeeViewMotionKey(location.pathname, location.search)}
+      className='ml-4 w-full min-h-0'
+      {...EMPLOYEE_VIEW_ENTER}
+    >
       <h1 className='text-2xl font-bold'>Documents</h1>
       <DataTable columns={columns} data={documents} />
-    </div>
+    </motion.div>
   )
 }

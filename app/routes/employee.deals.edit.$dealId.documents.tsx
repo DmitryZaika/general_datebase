@@ -417,7 +417,7 @@ export default function DealEditDocuments() {
                   type='button'
                   variant='ghost'
                   size='icon'
-                  className='absolute right-11 top-2.5 size-7 rounded-full bg-white/90 p-0 text-slate-600 opacity-0 transition-opacity hover:text-slate-900 group-hover:opacity-100'
+                  className='absolute right-11 top-2.5 size-7 rounded-full bg-white/90 p-0 text-slate-600 opacity-100 transition-opacity hover:text-slate-900 sm:opacity-0 sm:group-hover:opacity-100'
                   title='Edit name'
                   onClick={() => setEditingKey(`${document.source}-${document.id}`)}
                 >
@@ -427,7 +427,7 @@ export default function DealEditDocuments() {
               <Button
                 type='button'
                 onClick={() => handleDeleteClick(document)}
-                className='absolute right-2.5 top-2.5 size-7 rounded-full bg-red-600 p-0 text-white opacity-0 transition-opacity hover:bg-red-700 group-hover:opacity-100'
+                className='absolute right-2.5 top-2.5 size-7 rounded-full bg-red-600 p-0 text-white opacity-100 transition-opacity hover:bg-red-700 sm:opacity-0 sm:group-hover:opacity-100'
                 title='Delete document'
               >
                 <X size={12} />

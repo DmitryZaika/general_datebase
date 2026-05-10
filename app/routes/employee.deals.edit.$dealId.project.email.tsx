@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   Form,
@@ -33,25 +33,16 @@ import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { AiImproveButton } from '~/components/molecules/AiImproveButton'
+import { AttachmentImageEditorDialog } from '~/components/molecules/AttachmentImageEditorDialog'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { EmailTemplateSearch } from '~/components/molecules/EmailTemplateSearch'
 import { InputItem } from '~/components/molecules/InputItem'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { QuillInput } from '~/components/molecules/QuillInput'
 import { Button } from '~/components/ui/button'
-// Server Utilities
-import {
-  Carousel,
-  type CarouselApi,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from '~/components/ui/carousel'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
@@ -74,7 +65,6 @@ import {
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
-import { useArrowCarousel } from '~/hooks/useArrowToggle'
 import { fetchTemplateVariableData } from '~/services/templateVariables.server'
 import type { EmailTemplate } from '~/utils/emailTemplates'
 import {
@@ -723,32 +713,7 @@ export default function DealEmailDialog() {
   }
 
   const [previews, setPreviews] = useState<Record<string, string>>({})
-  const [imageViewerIndex, setImageViewerIndex] = useState<number | null>(null)
-  const [carouselApi, setCarouselApi] = useState<CarouselApi>()
-  useArrowCarousel(carouselApi)
-  const attachments = form.watch('attachments')
-  const carouselImages = attachments
-    .map((file, index) => ({
-      index,
-      name: file.name,
-      previewUrl: previews[`${file.name}-${file.size}-${file.lastModified}`],
-    }))
-    .filter((item): item is { index: number; name: string; previewUrl: string } =>
-      Boolean(item.previewUrl),
-    )
-    .map(({ index, name, previewUrl }) => ({ id: index, url: previewUrl, name }))
-  useEffect(() => {
-    if (!carouselApi) return
-    if (imageViewerIndex !== null) {
-      const idx = carouselImages.findIndex(im => im.id === imageViewerIndex)
-      if (idx !== -1) carouselApi.scrollTo(idx, true)
-    }
-    carouselApi.on('settle', () => {
-      const slides = carouselApi.slidesInView()
-      if (slides.length > 0 && carouselImages[slides[0]])
-        setImageViewerIndex(carouselImages[slides[0]].id)
-    })
-  }, [carouselApi, imageViewerIndex, carouselImages])
+  const [editingAttachment, setEditingAttachment] = useState<File | null>(null)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files
     if (files && files.length > 0) {
@@ -828,14 +793,36 @@ export default function DealEmailDialog() {
       const previewKey = `${file.name}-${file.size}-${file.lastModified}`
       setPreviews(prev => {
         const next = { ...prev }
+        const url = next[previewKey]
+        if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
         delete next[previewKey]
         return next
       })
     }
+    setEditingAttachment(current => (current === file ? null : current))
     form.setValue(
       'attachments',
       attachments.filter((_, i) => i !== index),
     )
+  }
+
+  function replaceAttachment(originalFile: File, editedFile: File) {
+    const originalKey = `${originalFile.name}-${originalFile.size}-${originalFile.lastModified}`
+    setPreviews(prev => {
+      const next = { ...prev }
+      const oldUrl = next[originalKey]
+      if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl)
+      delete next[originalKey]
+      const editedKey = `${editedFile.name}-${editedFile.size}-${editedFile.lastModified}`
+      next[editedKey] = URL.createObjectURL(editedFile)
+      return next
+    })
+    const list = form.getValues('attachments')
+    form.setValue(
+      'attachments',
+      list.map(f => (f === originalFile ? editedFile : f)),
+    )
+    setEditingAttachment(null)
   }
 
   const imageExt = new Set([
@@ -864,6 +851,12 @@ export default function DealEmailDialog() {
     window.open(fileUrl, '_blank', 'noopener,noreferrer')
     setTimeout(() => URL.revokeObjectURL(fileUrl), 30_000)
   }
+
+  const editingAttachmentPreviewUrl = editingAttachment
+    ? previews[
+        `${editingAttachment.name}-${editingAttachment.size}-${editingAttachment.lastModified}`
+      ]
+    : undefined
 
   return (
     <Dialog open={true} onOpenChange={handleDialogClose}>
@@ -924,7 +917,7 @@ export default function DealEmailDialog() {
                           className='size-full cursor-pointer block focus:outline-none'
                           onClick={e => {
                             e.stopPropagation()
-                            setImageViewerIndex(index)
+                            setEditingAttachment(file)
                           }}
                         >
                           <img
@@ -1099,41 +1092,18 @@ export default function DealEmailDialog() {
             setShowDocumentsPicker(false)
           }}
         />
-        <Dialog
-          open={imageViewerIndex !== null}
-          onOpenChange={open => !open && setImageViewerIndex(null)}
-        >
-          <DialogContent
-            closeClassName='z-50 top-40 sm:top-10 md:top-25 lg:top-10 right-0 sm:-right-15 md:-right-25 lg:-right-35 md:opacity-0 md:group-hover:opacity-100'
-            className='flex flex-col justify-center items-center gap-3 bg-transparent group'
-          >
-            <DialogTitle className='sr-only'>Image Gallery</DialogTitle>
-            <DialogDescription className='sr-only'>Image Gallery</DialogDescription>
-            <Carousel
-              className='max-w-screen max-h-screen w-screen h-screen lg:max-w-[90vw] 2xl:max-w-[60vw]'
-              setApi={setCarouselApi}
-              opts={{ dragFree: false }}
-            >
-              <CarouselContent>
-                {carouselImages.map(image => (
-                  <CarouselItem key={image.id}>
-                    <div className='w-full relative select-none'>
-                      <img
-                        src={image.url}
-                        alt={image.name}
-                        className='w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] object-contain z-0 select-none'
-                        onClick={e => e.stopPropagation()}
-                      />
-                    </div>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious />
-              <CarouselNext />
-            </Carousel>
-          </DialogContent>
-        </Dialog>
       </DialogContent>
+      <AttachmentImageEditorDialog
+        file={editingAttachment}
+        previewUrl={editingAttachmentPreviewUrl}
+        open={!!editingAttachment}
+        onOpenChange={open => {
+          if (!open) setEditingAttachment(null)
+        }}
+        onSave={file => {
+          if (editingAttachment) replaceAttachment(editingAttachment, file)
+        }}
+      />
     </Dialog>
   )
 }

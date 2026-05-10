@@ -1,4 +1,4 @@
-import { Outlet, useLocation, useNavigate } from 'react-router'
+import { Outlet, useLocation, useNavigate, useNavigation } from 'react-router'
 import { DealActivityPanel } from '~/components/molecules/DealActivityPanel'
 import { DealProgressBar } from '~/components/molecules/DealProgressBar'
 import {
@@ -7,11 +7,35 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import { Skeleton } from '~/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { DealEmailHistoryItem } from '~/types/dealActivityTypes'
 import type { Nullable } from '~/types/utils'
+
+function dealEditTabMeta(pathname: string): { dealKey: string; tab: string } | null {
+  const m = pathname.match(
+    /\/edit\/([^/]+)\/(project|information|images|documents)(?:\/|$)/,
+  )
+  if (!m) return null
+  return { dealKey: m[1], tab: m[2] }
+}
+
+function DealEditOutletSkeleton() {
+  return (
+    <div className='space-y-4 py-1 min-h-[280px]' aria-busy aria-live='polite'>
+      <Skeleton className='h-9 w-full max-w-md rounded-md' />
+      <Skeleton className='h-32 w-full rounded-lg' />
+      <Skeleton className='h-32 w-full rounded-lg' />
+      <div className='flex flex-wrap gap-2'>
+        <Skeleton className='h-10 min-w-[8rem] flex-1 rounded-md' />
+        <Skeleton className='h-10 w-32 rounded-md' />
+      </div>
+      <Skeleton className='h-24 w-full rounded-lg' />
+    </div>
+  )
+}
 
 interface DealPageProps {
   dealId: number
@@ -26,6 +50,7 @@ interface DealPageProps {
   customerEmails?: DealEmailHistoryItem[]
   imagesCount?: number
   documentsCount?: number
+  currentUserName?: string
 }
 
 export default function DealsEdit({
@@ -41,14 +66,27 @@ export default function DealsEdit({
   customerEmails,
   imagesCount = 0,
   documentsCount = 0,
+  currentUserName = '',
 }: DealPageProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const navigation = useNavigation()
 
   const dealEditTabMatch = location.pathname.match(
     /\/edit\/[^/]+\/(project|information|images|documents)(?:\/|$)/,
   )
   const activeDealTab = dealEditTabMatch?.[1] ?? 'project'
+
+  const showOutletSkeleton =
+    navigation.state === 'loading' &&
+    navigation.location !== undefined &&
+    (() => {
+      const target = dealEditTabMeta(navigation.location.pathname)
+      const current = dealEditTabMeta(location.pathname)
+      if (!target || target.dealKey !== String(dealId)) return false
+      if (!current) return true
+      return current.tab !== target.tab
+    })()
 
   const handleChange = (open: boolean) => {
     if (!open) {
@@ -105,7 +143,7 @@ export default function DealsEdit({
                   ) : null}
                 </TabsTrigger>
               </TabsList>
-              <Outlet />
+              {showOutletSkeleton ? <DealEditOutletSkeleton /> : <Outlet />}
             </Tabs>
           </div>
           <div className='border-t md:border-t-0 md:border-l pt-4 md:pt-0 px-1 sm:px-2 pr-2 md:overflow-auto md:min-h-0'>
@@ -115,6 +153,7 @@ export default function DealsEdit({
               notes={notes}
               emails={emails}
               customerEmails={customerEmails}
+              currentUserName={currentUserName}
             />
           </div>
         </div>

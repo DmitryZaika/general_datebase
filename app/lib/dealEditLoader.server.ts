@@ -12,8 +12,7 @@ import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { DealEmailHistoryItem } from '~/types/dealActivityTypes'
 import type { Nullable } from '~/types/utils'
 import { selectMany } from '~/utils/queryHelpers'
-
-type UserWithCompany = { company_id: number }
+import type { SessionUser } from '~/utils/session.server'
 
 export interface DealEditLoaderData {
   dealId: number
@@ -29,6 +28,7 @@ export interface DealEditLoaderData {
   customerEmails: DealEmailHistoryItem[]
   imagesCount: number
   documentsCount: number
+  currentUserName: string
 }
 
 function withThreadAttachmentStatus(rawEmails: EmailHistory[]): DealEmailHistoryItem[] {
@@ -46,7 +46,7 @@ function withThreadAttachmentStatus(rawEmails: EmailHistory[]): DealEmailHistory
 }
 
 export function createDealEditLoader(
-  getUser: (request: Request) => Promise<UserWithCompany>,
+  getUser: (request: Request) => Promise<SessionUser>,
   dealsRedirectPath: string,
 ) {
   return async function dealEditLoader({ request, params }: LoaderFunctionArgs) {
@@ -214,6 +214,7 @@ export function createDealEditLoader(
         customerEmails,
         imagesCount: imagesCountRows[0]?.c ?? 0,
         documentsCount: documentsCountRows[0]?.c ?? 0,
+        currentUserName: user.name ?? '',
       }
     } catch {
       return redirect('/login')

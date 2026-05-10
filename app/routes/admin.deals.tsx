@@ -289,6 +289,7 @@ export default function AdminDeals() {
         activitiesMap={activitiesMap}
         activitiesIconMap={activitiesIconMap}
         notesMap={notesMap}
+        animateBoard
         readonly
         showAddDeal={false}
         toolbarLeft={<SalesRepsFilter />}

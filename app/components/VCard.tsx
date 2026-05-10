@@ -1,5 +1,6 @@
 import { Loader2, UserPlus } from 'lucide-react'
 import { useState } from 'react'
+import { cn } from '~/lib/utils'
 import { Button } from './ui/button'
 
 type VCardProps = {
@@ -136,18 +137,19 @@ export function VCard({ name, phone, email, company, address, className }: VCard
 
   return (
     <Button
+      type='button'
       variant='ghost'
-      className={className}
+      size='icon'
+      className={cn(className)}
       onClick={downloadVCard}
       disabled={isDownloading}
-      size='icon'
-      aria-label='Add to contact'
-      title='Add to contact'
+      title={isDownloading ? 'Downloading…' : 'Add to contacts'}
+      aria-label={isDownloading ? 'Downloading contact card' : 'Add to contacts'}
     >
       {isDownloading ? (
-        <Loader2 className='h-4 w-4 animate-spin' />
+        <Loader2 className='animate-spin' aria-hidden />
       ) : (
-        <UserPlus className='h-4 w-4' />
+        <UserPlus aria-hidden />
       )}
     </Button>
   )

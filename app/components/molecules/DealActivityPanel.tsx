@@ -18,7 +18,15 @@ import {
   X,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 import { Link, useFetcher, useLocation, useNavigate, useParams } from 'react-router'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
 import ClipboardIcon from '~/components/icons/ClipboardIcon'
@@ -103,6 +111,17 @@ const PRIORITY_DOT_COLOR: Readonly<Record<ActivityPriority, string>> = {
   [ActivityPriority.Low]: 'bg-gray-400',
 }
 
+function shouldShowCreatorAttribution(
+  viewerName: string | null | undefined,
+  creatorName: string | null | undefined,
+): boolean {
+  const c = creatorName?.trim()
+  if (!c) return false
+  const v = viewerName?.trim()
+  if (!v) return true
+  return v !== c
+}
+
 const ITEM_VARIANTS = {
   initial: { opacity: 0, height: 0, scale: 0.95 },
   animate: { opacity: 1, height: 'auto', scale: 1 },
@@ -134,8 +153,6 @@ const EMAIL_ROW_VARIANTS: Variants = {
     },
   },
 }
-
-const EMAIL_ROW_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
 const URGENCY_LABEL_STYLE: Readonly<Record<DeadlineUrgency, string>> = {
   overdue: 'text-red-600 bg-red-50 border-red-200',
@@ -467,11 +484,13 @@ function ActivityItem({
   dealId,
   onEdit,
   isBeingEdited,
+  viewerName,
 }: {
   activity: DealActivity
   dealId: number
   onEdit: (activity: DealActivity) => void
   isBeingEdited: boolean
+  viewerName?: Nullable<string>
 }) {
   const { toggle, remove, isToggling, isDeleting, togglingData } =
     useActivityAction(dealId)
@@ -489,7 +508,7 @@ function ActivityItem({
       <Button
         variant='ghost'
         size='icon'
-        className='h-6 w-6 shrink-0 text-gray-600 hover:text-red-500'
+        className='h-6 w-6 shrink-0 text-gray-400 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100 focus-visible:opacity-100'
         onClick={() => setShowDeleteConfirm(true)}
       >
         <Trash2 className='h-3 w-3' />
@@ -535,7 +554,8 @@ function ActivityItem({
               Done
             </Badge>
             <PriorityBadge priority={activity.priority} />
-            {activity.created_by ? (
+            {shouldShowCreatorAttribution(viewerName, activity.created_by) &&
+            activity.created_by ? (
               <span className='min-w-0 truncate text-xs text-gray-500'>
                 Created by {activity.created_by}
               </span>
@@ -544,7 +564,7 @@ function ActivityItem({
           <div className='flex shrink-0 items-center gap-1'>
             {deleteControl}
             {activity.completed_at ? (
-              <span className='whitespace-nowrap text-right text-[10px] tabular-nums text-gray-500'>
+              <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
                 {formatTimestamp(activity.completed_at)}
               </span>
             ) : null}
@@ -588,7 +608,8 @@ function ActivityItem({
         <div className='mt-0.5 flex flex-wrap items-center gap-1.5'>
           <PriorityBadge priority={activity.priority} />
           {activity.deadline ? <DeadlineLabel deadline={activity.deadline} /> : null}
-          {activity.created_by ? (
+          {shouldShowCreatorAttribution(viewerName, activity.created_by) &&
+          activity.created_by ? (
             <span className='px-1.5 py-0.5 text-[10px] text-gray-900'>
               Created by {activity.created_by}
             </span>
@@ -600,7 +621,7 @@ function ActivityItem({
         <Button
           variant='ghost'
           size='icon'
-          className='h-6 w-6 shrink-0 text-gray-600 hover:text-blue-500'
+          className='h-6 w-6 shrink-0 text-gray-400 opacity-0 transition-opacity hover:text-blue-500 group-hover:opacity-100 focus-visible:opacity-100'
           onClick={() => onEdit(activity)}
         >
           <Pencil className='h-3 w-3' />
@@ -922,15 +943,23 @@ function makeEmailSnippet(body: Nullable<string> | undefined, max = 120): string
   return `${text.slice(0, max).trimEnd()}…`
 }
 
-function SmsHistoryRow({ message }: { message: SmsEntry }) {
+function SmsHistoryRow({
+  message,
+  viewerName,
+}: {
+  message: SmsEntry
+  viewerName?: Nullable<string>
+}) {
   const [isExpanded, setIsExpanded] = useState(false)
   const isOutbound = message.direction === 'outbound'
   const sentLabel = formatTimestamp(message.createdDate)
   const showToggle = message.text.length > 90
   const outboundAgent = isOutbound && message.agent ? message.agent : null
+  const showAgentLine =
+    !!outboundAgent && shouldShowCreatorAttribution(viewerName, outboundAgent)
 
   return (
-    <div className='flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
+    <div className='group flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
       <div className='flex items-start justify-between gap-2'>
         <div className='flex min-w-0 items-start gap-2'>
           <Badge
@@ -952,31 +981,39 @@ function SmsHistoryRow({ message }: { message: SmsEntry }) {
             {message.text}
           </p>
         </div>
-        <div className='flex shrink-0 items-center gap-2'>
-          {showToggle ? (
-            <button
-              type='button'
-              className='text-[10px] font-medium text-blue-600 hover:text-blue-700'
-              onClick={() => setIsExpanded(value => !value)}
-            >
-              {isExpanded ? 'Show less' : 'Show more'}
-            </button>
-          ) : null}
-          {outboundAgent ? (
-            <span className='text-[10px] text-gray-500 truncate max-w-[120px]'>
+        <div className='flex shrink-0 flex-col items-end gap-0.5'>
+          <div className='flex items-center gap-2'>
+            {showToggle ? (
+              <button
+                type='button'
+                className='text-[10px] font-medium text-blue-600 opacity-0 transition-opacity hover:text-blue-700 group-hover:opacity-100 focus-visible:opacity-100'
+                onClick={() => setIsExpanded(value => !value)}
+              >
+                {isExpanded ? 'Show less' : 'Show more'}
+              </button>
+            ) : null}
+            <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
+              {sentLabel}
+            </span>
+          </div>
+          {showAgentLine ? (
+            <span className='max-w-[140px] truncate text-[9px] uppercase tracking-wide text-gray-400'>
               by {outboundAgent}
             </span>
           ) : null}
-          <span className='text-[10px] text-gray-500 text-right tabular-nums whitespace-nowrap'>
-            {sentLabel}
-          </span>
         </div>
       </div>
     </div>
   )
 }
 
-function EmailHistoryRow({ email }: { email: DealEmailHistoryItem }) {
+function EmailHistoryRow({
+  email,
+  viewerName,
+}: {
+  email: DealEmailHistoryItem
+  viewerName?: Nullable<string>
+}) {
   const location = useLocation()
   const params = useParams()
   const isAdmin = location.pathname.includes('/admin/')
@@ -993,6 +1030,8 @@ function EmailHistoryRow({ email }: { email: DealEmailHistoryItem }) {
   const hasAttachments = !!email.has_attachments
   const snippet = makeEmailSnippet(email.body)
   const outboundSender = isSent && email.sender_name ? email.sender_name : null
+  const showSenderLine =
+    !!outboundSender && shouldShowCreatorAttribution(viewerName, outboundSender)
 
   return (
     <Link
@@ -1015,30 +1054,32 @@ function EmailHistoryRow({ email }: { email: DealEmailHistoryItem }) {
             {email.subject || '(no subject)'}
           </span>
         </div>
-        <div className='flex items-center gap-1.5 shrink-0'>
-          <span className='w-3 flex items-center justify-center'>
-            {hasAttachments ? (
-              <Paperclip
-                className='h-3 w-3 text-gray-500'
-                aria-label='Has attachments'
-              />
-            ) : null}
-          </span>
-          <span className='w-3 flex items-center justify-center'>
-            {isRead ? (
-              <Eye className='h-3 w-3 text-blue-500' aria-label='Read' />
-            ) : (
-              <EyeClosed className='h-3 w-3 text-gray-400' aria-label='Unread' />
-            )}
-          </span>
-          {outboundSender ? (
-            <span className='text-[10px] text-gray-500 truncate max-w-[120px]'>
+        <div className='flex shrink-0 flex-col items-end gap-0.5'>
+          <div className='flex items-center gap-1.5'>
+            <span className='flex w-3 items-center justify-center'>
+              {hasAttachments ? (
+                <Paperclip
+                  className='h-3 w-3 text-gray-500'
+                  aria-label='Has attachments'
+                />
+              ) : null}
+            </span>
+            <span className='flex w-3 items-center justify-center'>
+              {isRead ? (
+                <Eye className='h-3 w-3 text-blue-500' aria-label='Read' />
+              ) : (
+                <EyeClosed className='h-3 w-3 text-gray-400' aria-label='Unread' />
+              )}
+            </span>
+            <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
+              {sentLabel}
+            </span>
+          </div>
+          {showSenderLine ? (
+            <span className='max-w-[140px] truncate text-[9px] uppercase tracking-wide text-gray-400'>
               by {outboundSender}
             </span>
           ) : null}
-          <span className='text-[10px] text-gray-500 text-right tabular-nums whitespace-nowrap'>
-            {sentLabel}
-          </span>
         </div>
       </div>
       {snippet ? (
@@ -1095,6 +1136,27 @@ function HistoryTabButtons({
   )
 }
 
+function historyItemMotionKey(
+  item: HistoryItem,
+  updatingNoteId: Nullable<number>,
+): string {
+  if (item.type === 'note' && updatingNoteId === item.data.id) {
+    return `note-skeleton-${item.data.id}`
+  }
+  switch (item.type) {
+    case 'activity':
+      return `activity-${item.data.id}`
+    case 'note':
+      return `note-${item.data.id}`
+    case 'action':
+      return `action-${item.data.callId}`
+    case 'sms':
+      return `sms-${item.data.id}`
+    case 'email':
+      return `email-${item.data.thread_id}-${item.data.id}`
+  }
+}
+
 function ActivityList({
   dealId,
   activities,
@@ -1106,6 +1168,7 @@ function ActivityList({
   onEdit,
   editingActivityId,
   historyHeaderRef,
+  viewerName,
 }: {
   dealId: number
   activities: DealActivity[]
@@ -1117,6 +1180,7 @@ function ActivityList({
   onEdit: (activity: DealActivity) => void
   editingActivityId: Nullable<number>
   historyHeaderRef: React.RefObject<Nullable<HTMLDivElement>>
+  viewerName: string
 }) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(true)
   const toggleHistoryOpen = useCallback(() => setIsHistoryOpen(prev => !prev), [])
@@ -1216,57 +1280,37 @@ function ActivityList({
     smsMessages.length +
     displayedEmails.length
 
-  const emailStaggerIndexById = useMemo(() => {
-    let n = 0
-    const m = new Map<number, number>()
-    for (const item of allHistoryItems) {
-      if (item.type === 'email') {
-        m.set(item.data.id, n)
-        n += 1
-      }
-    }
-    return m
-  }, [allHistoryItems])
-
   const renderHistoryItem = useCallback(
     (item: HistoryItem, isLast: boolean): ReactNode => {
       switch (item.type) {
         case 'activity':
           return (
-            <TimelineItem
-              key={`activity-${item.data.id}`}
-              icon={ClipboardIcon}
-              isLast={isLast}
-            >
+            <TimelineItem icon={ClipboardIcon} isLast={isLast}>
               <ActivityItem
                 activity={item.data}
                 dealId={dealId}
                 onEdit={onEdit}
                 isBeingEdited={editingActivityId === item.data.id}
+                viewerName={viewerName}
               />
             </TimelineItem>
           )
         case 'note':
           if (updatingNoteId === item.data.id) {
-            return (
-              <NoteHistorySkeletonItem
-                key={`note-skeleton-${item.data.id}`}
-                isLast={isLast}
-              />
-            )
+            return <NoteHistorySkeletonItem isLast={isLast} />
           }
           return (
-            <TimelineItem key={`note-${item.data.id}`} icon={NoteIcon} isLast={isLast}>
-              <NoteItem note={item.data} handlers={noteHandlers} />
+            <TimelineItem icon={NoteIcon} isLast={isLast}>
+              <NoteItem
+                note={item.data}
+                handlers={noteHandlers}
+                viewerName={viewerName}
+              />
             </TimelineItem>
           )
         case 'action':
           return (
-            <TimelineItem
-              key={`action-${item.data.callId}`}
-              icon={Phone}
-              isLast={isLast}
-            >
+            <TimelineItem icon={Phone} isLast={isLast}>
               <CallItemContent
                 call={item.data}
                 audioSrc={`/api/cloudtalk/userCallMedia/${item.data.callId}`}
@@ -1277,43 +1321,19 @@ function ActivityList({
           )
         case 'sms':
           return (
-            <TimelineItem
-              key={`sms-${item.data.id}`}
-              icon={MessageSquare}
-              isLast={isLast}
-            >
-              <SmsHistoryRow message={item.data} />
+            <TimelineItem icon={MessageSquare} isLast={isLast}>
+              <SmsHistoryRow message={item.data} viewerName={viewerName} />
             </TimelineItem>
           )
-        case 'email': {
-          const stagger = emailStaggerIndexById.get(item.data.id) ?? 0
+        case 'email':
           return (
-            <motion.div
-              key={`email-${item.data.thread_id}-${item.data.id}`}
-              initial={{ opacity: 0, y: -22 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: stagger * 0.078,
-                duration: 0.42,
-                ease: EMAIL_ROW_EASE,
-              }}
-            >
-              <TimelineItem icon={Mail} isLast={isLast}>
-                <EmailHistoryRow email={item.data} />
-              </TimelineItem>
-            </motion.div>
+            <TimelineItem icon={Mail} isLast={isLast}>
+              <EmailHistoryRow email={item.data} viewerName={viewerName} />
+            </TimelineItem>
           )
-        }
       }
     },
-    [
-      dealId,
-      onEdit,
-      editingActivityId,
-      noteHandlers,
-      updatingNoteId,
-      emailStaggerIndexById,
-    ],
+    [dealId, onEdit, editingActivityId, noteHandlers, updatingNoteId, viewerName],
   )
 
   const tabRenderers = useMemo<Record<HistoryTab, () => ReactNode>>(
@@ -1322,90 +1342,88 @@ function ActivityList({
         if (done.length === 0)
           return <SectionEmptyState label='No completed activities' />
         return (
-          <div>
-            <AnimatePresence initial={false}>
-              {done.map((activity, index) => (
-                <motion.div
-                  key={`activity-${activity.id}`}
-                  layout
-                  variants={ITEM_VARIANTS}
-                  initial='initial'
-                  animate='animate'
-                  exit='exit'
-                  transition={ITEM_TRANSITION}
-                >
-                  <TimelineItem icon={ClipboardIcon} isLast={index === done.length - 1}>
-                    <ActivityItem
-                      activity={activity}
-                      dealId={dealId}
-                      onEdit={onEdit}
-                      isBeingEdited={editingActivityId === activity.id}
-                    />
-                  </TimelineItem>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+          <motion.div variants={EMAIL_LIST_VARIANTS} initial='hidden' animate='visible'>
+            {done.map((activity, index) => (
+              <motion.div key={`activity-${activity.id}`} variants={EMAIL_ROW_VARIANTS}>
+                <TimelineItem icon={ClipboardIcon} isLast={index === done.length - 1}>
+                  <ActivityItem
+                    activity={activity}
+                    dealId={dealId}
+                    onEdit={onEdit}
+                    isBeingEdited={editingActivityId === activity.id}
+                    viewerName={viewerName}
+                  />
+                </TimelineItem>
+              </motion.div>
+            ))}
+          </motion.div>
         )
       },
       notes: () => {
         if (sortedNotes.length === 0) return <SectionEmptyState label='No notes yet' />
         return (
-          <div>
+          <motion.div variants={EMAIL_LIST_VARIANTS} initial='hidden' animate='visible'>
             {sortedNotes.map((note, index) => {
               const isLast = index === sortedNotes.length - 1
               if (updatingNoteId === note.id) {
                 return (
-                  <NoteHistorySkeletonItem
+                  <motion.div
                     key={`note-skeleton-${note.id}`}
-                    isLast={isLast}
-                  />
+                    variants={EMAIL_ROW_VARIANTS}
+                  >
+                    <NoteHistorySkeletonItem isLast={isLast} />
+                  </motion.div>
                 )
               }
               return (
-                <TimelineItem key={`note-${note.id}`} icon={NoteIcon} isLast={isLast}>
-                  <NoteItem note={note} handlers={noteHandlers} />
-                </TimelineItem>
+                <motion.div key={`note-${note.id}`} variants={EMAIL_ROW_VARIANTS}>
+                  <TimelineItem icon={NoteIcon} isLast={isLast}>
+                    <NoteItem
+                      note={note}
+                      handlers={noteHandlers}
+                      viewerName={viewerName}
+                    />
+                  </TimelineItem>
+                </motion.div>
               )
             })}
-          </div>
+          </motion.div>
         )
       },
       actions: () => {
         if (actions.length === 0) return <SectionEmptyState label='No actions yet' />
         return (
-          <div>
+          <motion.div variants={EMAIL_LIST_VARIANTS} initial='hidden' animate='visible'>
             {actions.map((call, index) => (
-              <TimelineItem
-                key={`action-${call.callId}`}
-                icon={Phone}
-                isLast={index === actions.length - 1}
-              >
-                <CallItemContent
-                  call={call}
-                  audioSrc={`/api/cloudtalk/userCallMedia/${call.callId}`}
-                  compact
-                  historyCompact
-                />
-              </TimelineItem>
+              <motion.div key={`action-${call.callId}`} variants={EMAIL_ROW_VARIANTS}>
+                <TimelineItem icon={Phone} isLast={index === actions.length - 1}>
+                  <CallItemContent
+                    call={call}
+                    audioSrc={`/api/cloudtalk/userCallMedia/${call.callId}`}
+                    compact
+                    historyCompact
+                  />
+                </TimelineItem>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )
       },
       sms: () => {
         if (smsMessages.length === 0) return <SectionEmptyState label='No SMS yet' />
         return (
-          <div>
+          <motion.div variants={EMAIL_LIST_VARIANTS} initial='hidden' animate='visible'>
             {smsMessages.map((message, index) => (
-              <TimelineItem
-                key={`sms-${message.id}`}
-                icon={MessageSquare}
-                isLast={index === smsMessages.length - 1}
-              >
-                <SmsHistoryRow message={message} />
-              </TimelineItem>
+              <motion.div key={`sms-${message.id}`} variants={EMAIL_ROW_VARIANTS}>
+                <TimelineItem
+                  icon={MessageSquare}
+                  isLast={index === smsMessages.length - 1}
+                >
+                  <SmsHistoryRow message={message} viewerName={viewerName} />
+                </TimelineItem>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )
       },
       emails: () => {
@@ -1425,7 +1443,7 @@ function ActivityList({
                   variants={EMAIL_ROW_VARIANTS}
                 >
                   <TimelineItem icon={Mail} isLast={index === sortedEmails.length - 1}>
-                    <EmailHistoryRow email={email} />
+                    <EmailHistoryRow email={email} viewerName={viewerName} />
                   </TimelineItem>
                 </motion.div>
               ))}
@@ -1438,11 +1456,16 @@ function ActivityList({
         if (allHistoryItems.length === 0)
           return <SectionEmptyState label='No history yet' />
         return (
-          <div>
-            {allHistoryItems.map((item, index) =>
-              renderHistoryItem(item, index === allHistoryItems.length - 1),
-            )}
-          </div>
+          <motion.div variants={EMAIL_LIST_VARIANTS} initial='hidden' animate='visible'>
+            {allHistoryItems.map((item, index) => (
+              <motion.div
+                key={historyItemMotionKey(item, updatingNoteId)}
+                variants={EMAIL_ROW_VARIANTS}
+              >
+                {renderHistoryItem(item, index === allHistoryItems.length - 1)}
+              </motion.div>
+            ))}
+          </motion.div>
         )
       },
     }),
@@ -1461,6 +1484,7 @@ function ActivityList({
       noteHandlers,
       updatingNoteId,
       renderHistoryItem,
+      viewerName,
     ],
   )
 
@@ -1488,6 +1512,7 @@ function ActivityList({
                       dealId={dealId}
                       onEdit={onEdit}
                       isBeingEdited={editingActivityId === activity.id}
+                      viewerName={viewerName}
                     />
                   </TimelineItem>
                 </motion.div>
@@ -1533,7 +1558,7 @@ function ActivityList({
                 </Button>
               </div>
             ) : null}
-            {tabRenderers[historyTab]()}
+            <Fragment key={historyTab}>{tabRenderers[historyTab]()}</Fragment>
           </>
         )}
       </div>
@@ -1547,6 +1572,7 @@ export function DealActivityPanel({
   notes = [],
   emails = [],
   customerEmails = [],
+  currentUserName = '',
 }: DealActivityPanelProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -1678,6 +1704,7 @@ export function DealActivityPanel({
           onEdit={handleEdit}
           editingActivityId={editingActivity?.id ?? null}
           historyHeaderRef={historyHeaderRef}
+          viewerName={currentUserName}
         />
       </div>
     </div>

@@ -40,7 +40,7 @@ export function CallItemContent({
     const detail = status ?? formatDuration(call.talkingTime)
 
     return (
-      <div className='flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
+      <div className='group flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
         <div className='flex items-center justify-between gap-2'>
           <div className='flex items-center gap-2 min-w-0'>
             <span className={cn('shrink-0', color)}>
@@ -63,13 +63,16 @@ export function CallItemContent({
             {call.recorded ? (
               <button
                 type='button'
-                className='rounded border border-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-50'
+                className={cn(
+                  'rounded border border-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 transition-opacity hover:bg-slate-50 focus-visible:opacity-100',
+                  showRecording ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+                )}
                 onClick={() => setShowRecording(value => !value)}
               >
                 {showRecording ? 'Hide voice call' : 'Voice call'}
               </button>
             ) : null}
-            <span className='text-[10px] text-gray-500 text-right tabular-nums whitespace-nowrap'>
+            <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
               {startedLabel}
             </span>
           </div>

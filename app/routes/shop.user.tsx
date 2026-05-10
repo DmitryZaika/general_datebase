@@ -10,8 +10,9 @@ import {
   Link,
   type LoaderFunctionArgs,
   redirect,
+  useActionData,
   useLoaderData,
-  useNavigation,
+  useSubmit,
 } from 'react-router'
 import { getValidatedFormData } from 'remix-hook-form'
 import { useAuthenticityToken } from 'remix-utils/csrf/react'
@@ -22,7 +23,6 @@ import { Button } from '~/components/ui/button'
 import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
 import { db } from '~/db.server'
-import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
 import { getQboUrl } from '~/utils/quickbooks.server'
@@ -31,27 +31,23 @@ import { toastData } from '~/utils/toastHelpers.server'
 
 const userSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  phone_number: z.union([z.coerce.string().min(10), z.literal('')]).optional(),
+  phone_number: z.coerce
+    .string()
+    .optional()
+    .superRefine((val, ctx) => {
+      if (val === undefined || String(val).trim() === '') return
+      const digits = String(val).replace(/\D/g, '')
+      if (digits.length < 10) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Phone must include at least 10 digits',
+        })
+      }
+    }),
   email: z.email('Invalid email address'),
   password: z.union([z.string(), z.null(), z.undefined()]).optional(),
   email_signature: z.string().optional(),
   email_name: z.string().optional(),
-  cloudtalk_agent_id: z
-    .string()
-    .optional()
-    .superRefine((val, ctx) => {
-      const t = (val ?? '').trim()
-      if (t.length > 36) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'CloudTalk agent ID must be at most 36 characters',
-        })
-      }
-    })
-    .transform((val): string | null => {
-      const t = (val ?? '').trim()
-      return t === '' ? null : t
-    }),
 })
 
 const resolver = zodResolver(userSchema)
@@ -64,6 +60,26 @@ interface UserData extends RowDataPacket {
   email_name: string | null
   cloudtalk_agent_id: string | null
   telegram_id: boolean
+}
+
+type ProfileField =
+  | 'name'
+  | 'phone_number'
+  | 'email'
+  | 'password'
+  | 'email_signature'
+  | 'email_name'
+  | 'cloudtalk_agent_id'
+
+function profileFieldFromKey(key: string): ProfileField | undefined {
+  if (key === 'name') return 'name'
+  if (key === 'phone_number') return 'phone_number'
+  if (key === 'email') return 'email'
+  if (key === 'password') return 'password'
+  if (key === 'email_signature') return 'email_signature'
+  if (key === 'email_name') return 'email_name'
+  if (key === 'cloudtalk_agent_id') return 'cloudtalk_agent_id'
+  return undefined
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -91,15 +107,14 @@ export async function action({ request }: ActionFunctionArgs) {
       'phone_number = ?',
       'email_name = ?',
       'email_signature = ?',
-      'cloudtalk_agent_id = ?',
     ]
+
     const params = [
       data.name,
       data.email,
       data.phone_number ?? null,
       data.email_name ?? null,
       data.email_signature ?? null,
-      data.cloudtalk_agent_id,
     ]
 
     if (data.password && data.password.trim() !== '') {
@@ -183,8 +198,8 @@ function TelegramLink({ email }: { email: string }) {
 
 export default function ShopUserProfile() {
   const { userData } = useLoaderData<typeof loader>()
-  const navigation = useNavigation()
-  const isSubmitting = navigation.state !== 'idle'
+  const actionData = useActionData<typeof action>()
+  const submit = useSubmit()
   const token = useAuthenticityToken()
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -197,11 +212,56 @@ export default function ShopUserProfile() {
       password: '',
       email_signature: userData.email_signature || '',
       email_name: userData.email_name || '',
-      cloudtalk_agent_id: userData.cloudtalk_agent_id ?? '',
     },
   })
 
-  const fullSubmit = useFullSubmit(form)
+  const isSubmitting = form.formState.isSubmitting
+
+  const handleSave = form.handleSubmit(async data => {
+    form.clearErrors()
+    const payload: Record<string, string> = { csrf: token }
+    for (const [key, value] of Object.entries(data)) {
+      payload[key] = value == null ? '' : String(value)
+    }
+    await submit(payload, {
+      method: 'POST',
+      encType: 'application/x-www-form-urlencoded',
+    })
+  })
+
+  useEffect(() => {
+    if (!actionData) return
+    if ('error' in actionData && typeof actionData.error === 'string') {
+      form.setError('root', { type: 'server', message: actionData.error })
+      return
+    }
+    if (
+      'errors' in actionData &&
+      actionData.errors &&
+      typeof actionData.errors === 'object'
+    ) {
+      const errObj = actionData.errors
+      for (const key of Object.keys(errObj)) {
+        const field = profileFieldFromKey(key)
+        if (field === undefined) continue
+        const entry = Reflect.get(errObj, key)
+        if (!entry || typeof entry !== 'object') continue
+        const message = Reflect.get(entry, 'message')
+        if (typeof message === 'string' && message.length > 0) {
+          form.setError(
+            key as
+              | 'name'
+              | 'phone_number'
+              | 'email'
+              | 'password'
+              | 'email_signature'
+              | 'email_name',
+            { type: 'server', message },
+          )
+        }
+      }
+    }
+  }, [actionData, form])
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -221,7 +281,7 @@ export default function ShopUserProfile() {
         <h2 className='text-xl font-semibold mb-4'>Personal Information</h2>
 
         <FormProvider {...form}>
-          <Form method='post' onSubmit={fullSubmit}>
+          <Form method='post' onSubmit={handleSave}>
             <input type='hidden' name='csrf' value={token} />
 
             <div className='space-y-4 max-w-lg'>
@@ -280,17 +340,7 @@ export default function ShopUserProfile() {
                   />
                 )}
               />
-              <FormField
-                control={form.control}
-                name='cloudtalk_agent_id'
-                render={({ field }) => (
-                  <InputItem
-                    name='CloudTalk agent ID'
-                    placeholder='From CloudTalk (optional)'
-                    field={field}
-                  />
-                )}
-              />
+
               <FormField
                 control={form.control}
                 name='email_signature'
@@ -318,6 +368,12 @@ export default function ShopUserProfile() {
                 )}
               />
             </div>
+
+            {typeof form.formState.errors.root?.message === 'string' ? (
+              <p className='text-sm text-destructive mt-4 max-w-lg' role='alert'>
+                {form.formState.errors.root.message}
+              </p>
+            ) : null}
 
             <div className='mt-6 flex gap-4'>
               <LoadingButton loading={isSubmitting} type='submit'>
