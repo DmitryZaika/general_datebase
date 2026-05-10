@@ -6,6 +6,7 @@ const createCloudTalkContact = vi.fn()
 const updateCloudTalkContact = vi.fn()
 const deleteCloudTalkContact = vi.fn()
 const findCloudTalkContactByPhone = vi.fn()
+const getCloudTalkUSCountryId = vi.fn()
 const captureException = vi.fn()
 
 class CloudTalkApiError extends Error {
@@ -32,6 +33,7 @@ vi.mock('~/utils/cloudtalk.server', () => ({
   deleteCloudTalkContact: (...args: unknown[]) => deleteCloudTalkContact(...args),
   findCloudTalkContactByPhone: (...args: unknown[]) =>
     findCloudTalkContactByPhone(...args),
+  getCloudTalkUSCountryId: (...args: unknown[]) => getCloudTalkUSCountryId(...args),
 }))
 
 vi.mock('~/utils/posthog.server', () => ({
@@ -78,6 +80,8 @@ beforeEach(() => {
   deleteCloudTalkContact.mockReset()
   findCloudTalkContactByPhone.mockReset()
   findCloudTalkContactByPhone.mockResolvedValue(null)
+  getCloudTalkUSCountryId.mockReset()
+  getCloudTalkUSCountryId.mockResolvedValue(233)
   captureException.mockReset()
 })
 
@@ -222,7 +226,7 @@ describe('syncCustomerToCloudTalk', () => {
     ])
   })
 
-  it('records last_error and does not throw when CloudTalk API fails', async () => {
+  it('records last_error AND rethrows when CloudTalk API fails', async () => {
     setupQueries([
       {
         match: sql => sql.includes('FROM customers WHERE id = ?'),
@@ -238,7 +242,7 @@ describe('syncCustomerToCloudTalk', () => {
     })
 
     const { syncCustomerToCloudTalk } = await import('./cloudtalkContactSync.server')
-    await expect(syncCustomerToCloudTalk(100)).resolves.toBeUndefined()
+    await expect(syncCustomerToCloudTalk(100)).rejects.toThrow('boom')
 
     const errorWriteCall = dbExecute.mock.calls.find(c =>
       String(c[0]).includes('SET last_error'),
@@ -247,6 +251,84 @@ describe('syncCustomerToCloudTalk', () => {
     expect(errorWriteCall?.[1]?.[0]).toContain('boom')
     expect(captureException).toHaveBeenCalledTimes(1)
     expect(captureException.mock.calls[0][1]).toBe('cloudtalk_sync_customer_failed')
+  })
+
+  it('sends structured address (street, city, state, zip, country_id) for US addresses', async () => {
+    setupQueries([
+      {
+        match: sql => sql.includes('FROM customers WHERE id = ?'),
+        rows: [
+          {
+            ...customerRow,
+            address: '3333 N Tacoma Ave, Indianapolis, IN 46218, USA',
+          },
+        ],
+      },
+      { match: sql => sql.includes('FROM cloudtalk_contacts'), rows: [] },
+      { match: sql => sql.includes('FROM company'), rows: [credsRow] },
+    ])
+    createCloudTalkContact.mockResolvedValue(9999)
+    dbExecute.mockResolvedValue([{ insertId: 1 }])
+
+    const { syncCustomerToCloudTalk } = await import('./cloudtalkContactSync.server')
+    await syncCustomerToCloudTalk(100)
+
+    const payload = createCloudTalkContact.mock.calls[0][1]
+    expect(payload.address).toBe('3333 N Tacoma Ave')
+    expect(payload.city).toBe('Indianapolis')
+    expect(payload.state).toBe('IN')
+    expect(payload.zip).toBe('46218')
+    expect(payload.country_id).toBe(233)
+  })
+
+  it('omits country_id when CloudTalk countries lookup fails', async () => {
+    setupQueries([
+      {
+        match: sql => sql.includes('FROM customers WHERE id = ?'),
+        rows: [
+          {
+            ...customerRow,
+            address: '3333 N Tacoma Ave, Indianapolis, IN 46218, USA',
+          },
+        ],
+      },
+      { match: sql => sql.includes('FROM cloudtalk_contacts'), rows: [] },
+      { match: sql => sql.includes('FROM company'), rows: [credsRow] },
+    ])
+    getCloudTalkUSCountryId.mockResolvedValue(null)
+    createCloudTalkContact.mockResolvedValue(9999)
+    dbExecute.mockResolvedValue([{ insertId: 1 }])
+
+    const { syncCustomerToCloudTalk } = await import('./cloudtalkContactSync.server')
+    await syncCustomerToCloudTalk(100)
+
+    const payload = createCloudTalkContact.mock.calls[0][1]
+    expect(payload.country_id).toBeUndefined()
+    expect(payload.city).toBe('Indianapolis')
+    expect(payload.state).toBe('IN')
+  })
+
+  it('does not tag non-US addresses with US country_id', async () => {
+    setupQueries([
+      {
+        match: sql => sql.includes('FROM customers WHERE id = ?'),
+        rows: [{ ...customerRow, address: '10 Downing St, London SW1A 2AA, UK' }],
+      },
+      { match: sql => sql.includes('FROM cloudtalk_contacts'), rows: [] },
+      { match: sql => sql.includes('FROM company'), rows: [credsRow] },
+    ])
+    createCloudTalkContact.mockResolvedValue(9999)
+    dbExecute.mockResolvedValue([{ insertId: 1 }])
+
+    const { syncCustomerToCloudTalk } = await import('./cloudtalkContactSync.server')
+    await syncCustomerToCloudTalk(100)
+
+    const payload = createCloudTalkContact.mock.calls[0][1]
+    expect(payload.country_id).toBeUndefined()
+    expect(payload.state).toBeUndefined()
+    expect(payload.zip).toBeUndefined()
+    // The whole address text is preserved as the street fallback
+    expect(payload.address).toBe('10 Downing St, London SW1A 2AA, UK')
   })
 })
 
@@ -315,5 +397,31 @@ describe('deleteCustomerFromCloudTalk', () => {
     await deleteCustomerFromCloudTalk(100)
 
     expect(deleteCloudTalkContact).not.toHaveBeenCalled()
+  })
+
+  it('rethrows non-404 errors after recording last_error', async () => {
+    setupQueries([
+      {
+        match: sql => sql.includes('FROM cloudtalk_contacts'),
+        rows: [{ id: 5, cloudtalk_id: 12345 }],
+      },
+      {
+        match: sql => sql.includes('FROM customers WHERE id = ?'),
+        rows: [{ company_id: 7 }],
+      },
+      { match: sql => sql.includes('FROM company'), rows: [credsRow] },
+    ])
+    deleteCloudTalkContact.mockRejectedValue(new CloudTalkApiError(500, 'server error'))
+    dbExecute.mockResolvedValue([{}])
+    vi.spyOn(console, 'error').mockImplementation(() => {
+      // suppress expected error log
+    })
+
+    const { deleteCustomerFromCloudTalk } = await import(
+      './cloudtalkContactSync.server'
+    )
+    await expect(deleteCustomerFromCloudTalk(100)).rejects.toThrow('server error')
+    expect(captureException).toHaveBeenCalledTimes(1)
+    expect(captureException.mock.calls[0][1]).toBe('cloudtalk_delete_customer_failed')
   })
 })

@@ -4,12 +4,25 @@ import mysql from 'mysql2/promise'
 
 dotenv.config()
 
+const PACING_MS = 2200
+const PROGRESS_EVERY = 25
+const USAGE =
+  'Usage: bun run scripts/cloudtalk-backfill.ts --company-id=<id> [--limit=<n>] [--dry-run] [--yes]'
+
 interface Args {
   companyId: number
   limit?: number
   dryRun: boolean
   yes: boolean
 }
+
+interface CompanyRow extends mysql.RowDataPacket {
+  id: number
+  name: string
+  cloudtalk_access_key: string | null
+}
+
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
 function parseArgs(argv: string[]): Args {
   let companyId: number | undefined
@@ -24,18 +37,10 @@ function parseArgs(argv: string[]): Args {
     else if (key === '--yes') yes = true
   }
   if (!companyId || Number.isNaN(companyId)) {
-    console.error(
-      'Usage: bun run scripts/cloudtalk-backfill.ts --company-id=<id> [--limit=<n>] [--dry-run] [--yes]',
-    )
+    console.error(USAGE)
     process.exit(1)
   }
   return { companyId, limit, dryRun, yes }
-}
-
-interface CompanyRow extends mysql.RowDataPacket {
-  id: number
-  name: string
-  cloudtalk_access_key: string | null
 }
 
 async function loadCompany(
@@ -91,8 +96,57 @@ async function confirmInteractive(expected: string): Promise<boolean> {
   }
 }
 
-async function main() {
-  const { companyId, limit, dryRun, yes } = parseArgs(process.argv)
+async function acquireLock(
+  conn: mysql.PoolConnection,
+  name: string,
+): Promise<boolean> {
+  const [rows] = await conn.query<mysql.RowDataPacket[]>(
+    'SELECT GET_LOCK(?, 0) AS got',
+    [name],
+  )
+  return rows[0]?.got === 1
+}
+
+function printSummary(args: Args, company: CompanyRow, total: number): void {
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log(`Database host: ${process.env.DB_HOST ?? '(unset)'}`)
+  console.log(`Database name: ${process.env.DB_DATABASE ?? '(unset)'}`)
+  console.log(`Company:       ${company.name} (id=${company.id})`)
+  console.log(
+    `Customers to sync: ${total}${args.limit ? ` (limit=${args.limit})` : ''}`,
+  )
+  console.log(`Mode:          ${args.dryRun ? 'DRY RUN' : 'WRITE'}`)
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+}
+
+async function runBackfill(ids: number[]): Promise<{ ok: number; failed: number }> {
+  const { syncCustomerToCloudTalk } = await import(
+    '../app/utils/cloudtalkContactSync.server'
+  )
+  let ok = 0
+  let failed = 0
+  const startedAt = Date.now()
+  for (const [i, id] of ids.entries()) {
+    try {
+      await syncCustomerToCloudTalk(id)
+      ok += 1
+    } catch (error) {
+      console.error(`Customer ${id} failed:`, error)
+      failed += 1
+    }
+    if ((i + 1) % PROGRESS_EVERY === 0) {
+      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(0)
+      console.log(
+        `Progress: ${i + 1}/${ids.length} (ok=${ok}, failed=${failed}, ${elapsed}s elapsed)`,
+      )
+    }
+    await sleep(PACING_MS)
+  }
+  return { ok, failed }
+}
+
+async function main(): Promise<void> {
+  const args = parseArgs(process.argv)
   const pool = mysql.createPool({
     user: process.env.DB_USER,
     database: process.env.DB_DATABASE,
@@ -100,107 +154,49 @@ async function main() {
     host: process.env.DB_HOST,
   })
 
-  const company = await loadCompany(pool, companyId)
-  if (!company) {
-    console.error(`Company ${companyId} not found`)
-    await pool.end()
-    process.exit(1)
-  }
-  if (!company.cloudtalk_access_key) {
-    console.error(
-      `Company ${companyId} (${company.name}) has no cloudtalk_access_key — refusing to run.`,
-    )
-    await pool.end()
-    process.exit(1)
-  }
-
-  const ids = await loadCustomerIds(pool, companyId, limit)
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log(`Database host: ${process.env.DB_HOST ?? '(unset)'}`)
-  console.log(`Database name: ${process.env.DB_DATABASE ?? '(unset)'}`)
-  console.log(`Company:       ${company.name} (id=${company.id})`)
-  console.log(`Customers to sync: ${ids.length}${limit ? ` (limit=${limit})` : ''}`)
-  console.log(`Mode:          ${dryRun ? 'DRY RUN' : 'WRITE'}`)
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-
-  if (ids.length === 0) {
-    console.log('Nothing to do.')
-    await pool.end()
-    return
-  }
-  if (dryRun) {
-    await pool.end()
-    return
-  }
-
-  if (!yes) {
-    const ok = await confirmInteractive(company.name)
-    if (!ok) {
-      console.error('Confirmation failed — aborting.')
-      await pool.end()
+  try {
+    const company = await loadCompany(pool, args.companyId)
+    if (!company) {
+      console.error(`Company ${args.companyId} not found`)
       process.exit(1)
     }
-  }
-
-  // Acquire a per-company advisory lock so two backfill processes can't run
-  // against the same company concurrently. The lock auto-releases when the
-  // connection is closed; we hold it on a dedicated connection for the run.
-  const lockName = `cloudtalk_backfill_${companyId}`
-  const lockConn = await pool.getConnection()
-  try {
-    const [lockRows] = await lockConn.query<mysql.RowDataPacket[]>(
-      'SELECT GET_LOCK(?, 0) AS got',
-      [lockName],
-    )
-    if (lockRows[0]?.got !== 1) {
+    if (!company.cloudtalk_access_key) {
       console.error(
-        `Another backfill is already running for company ${companyId}. Refusing.`,
+        `Company ${args.companyId} (${company.name}) has no cloudtalk_access_key — refusing to run.`,
       )
-      lockConn.release()
-      await pool.end()
       process.exit(1)
     }
-  } catch (error) {
-    console.error('Failed to acquire advisory lock:', error)
-    lockConn.release()
-    await pool.end()
-    process.exit(1)
-  }
 
-  const { syncCustomerToCloudTalk } = await import(
-    '../app/utils/cloudtalkContactSync.server'
-  )
+    const ids = await loadCustomerIds(pool, args.companyId, args.limit)
+    printSummary(args, company, ids.length)
 
-  let ok = 0
-  let failed = 0
-  const startedAt = Date.now()
-  try {
-    for (const [i, id] of ids.entries()) {
-      try {
-        await syncCustomerToCloudTalk(id)
-        ok += 1
-      } catch (error) {
-        console.error(`Customer ${id} failed:`, error)
-        failed += 1
-      }
-      if ((i + 1) % 25 === 0) {
-        const elapsed = ((Date.now() - startedAt) / 1000).toFixed(0)
-        console.log(
-          `Progress: ${i + 1}/${ids.length} (ok=${ok}, failed=${failed}, ${elapsed}s elapsed)`,
-        )
-      }
-      // Two API calls per customer (search + create/update). Pace at ~2.2s
-      // per customer to stay under CloudTalk's 60 req/min/company limit.
-      await new Promise(resolve => setTimeout(resolve, 2200))
+    if (ids.length === 0) {
+      console.log('Nothing to do.')
+      return
     }
-    console.log(`Done. ok=${ok}, failed=${failed}, total=${ids.length}`)
-  } finally {
+    if (args.dryRun) return
+
+    if (!args.yes && !(await confirmInteractive(company.name))) {
+      console.error('Confirmation failed — aborting.')
+      process.exit(1)
+    }
+
+    const lockName = `cloudtalk_backfill_${args.companyId}`
+    const lockConn = await pool.getConnection()
     try {
-      await lockConn.query('SELECT RELEASE_LOCK(?)', [lockName])
-    } catch {
-      // best-effort; the lock auto-releases when the connection closes
+      if (!(await acquireLock(lockConn, lockName))) {
+        console.error(
+          `Another backfill is already running for company ${args.companyId}. Refusing.`,
+        )
+        process.exit(1)
+      }
+      const { ok, failed } = await runBackfill(ids)
+      console.log(`Done. ok=${ok}, failed=${failed}, total=${ids.length}`)
+    } finally {
+      await lockConn.query('SELECT RELEASE_LOCK(?)', [lockName]).catch(() => undefined)
+      lockConn.release()
     }
-    lockConn.release()
+  } finally {
     await pool.end()
   }
 }

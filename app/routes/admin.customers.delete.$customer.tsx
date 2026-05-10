@@ -105,7 +105,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
     return { error: 'Failed to delete customer' }
   }
 
-  void deleteCustomerFromCloudTalk(customerId)
+  deleteCustomerFromCloudTalk(customerId).catch(() => undefined)
 
   const url = new URL(request.url)
   const searchParams = url.searchParams.toString()

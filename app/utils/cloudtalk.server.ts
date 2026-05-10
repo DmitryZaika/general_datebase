@@ -1,5 +1,6 @@
 import { db } from '~/db.server'
 import type { Nullable } from '~/types/utils'
+import { normalizeToE164 } from '~/utils/phone'
 import { selectId } from '~/utils/queryHelpers'
 
 export const BASE_URL = 'https://my.cloudtalk.io/api'
@@ -247,16 +248,11 @@ export interface ContactPayload {
   ContactEmail: { email: string }[]
   ExternalUrl?: { name: string; url: string }[]
   address?: string
+  city?: string
+  state?: string
+  zip?: string
+  country_id?: number
 }
-
-interface AddContactResponse {
-  responseData?: { data?: { id?: number } }
-  data?: { id?: number }
-}
-
-const MAX_5XX_RETRIES = 3
-const MAX_429_RETRIES = 5
-const SERVER_BACKOFF_MS = [2000, 4000, 8000]
 
 export class CloudTalkApiError extends Error {
   constructor(
@@ -268,17 +264,23 @@ export class CloudTalkApiError extends Error {
   }
 }
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, ms))
-}
+const MAX_5XX_RETRIES = 3
+const MAX_429_RETRIES = 5
+const SERVER_BACKOFF_MS = [2000, 4000, 8000]
+const POST_CREATE_LOOKUP_RETRIES = 3
+const POST_CREATE_LOOKUP_DELAY_MS = 500
+
+type CtMethod = 'PUT' | 'POST' | 'DELETE' | 'GET'
+
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
+const jitter = () => Math.floor(Math.random() * 500)
 
 async function cloudtalkRequest(
   path: string,
   companyId: number,
-  init: { method: 'PUT' | 'POST' | 'DELETE' | 'GET'; body?: unknown },
+  init: { method: CtMethod; body?: unknown },
 ): Promise<Response> {
   const auth = await getAuthString(companyId)
-  const url = `${BASE_URL}/${path}`
   const requestInit: RequestInit = {
     method: init.method,
     headers: {
@@ -292,8 +294,7 @@ async function cloudtalkRequest(
   let serverAttempt = 0
   let rateLimitAttempt = 0
   while (true) {
-    const response = await fetch(url, requestInit)
-
+    const response = await fetch(`${BASE_URL}/${path}`, requestInit)
     if (response.ok) return response
 
     if (response.status === 429) {
@@ -308,14 +309,13 @@ async function cloudtalkRequest(
         Number.isFinite(reset) && reset > 0
           ? Math.max(reset * 1000 - Date.now(), 0) + 1000
           : 5000
-      // Add a little jitter so concurrent callers don't all wake at the same instant.
-      await sleep(waitMs + Math.floor(Math.random() * 500))
+      await sleep(waitMs + jitter())
       rateLimitAttempt += 1
       continue
     }
 
     if (response.status >= 500 && serverAttempt < MAX_5XX_RETRIES) {
-      await sleep(SERVER_BACKOFF_MS[serverAttempt] + Math.floor(Math.random() * 500))
+      await sleep(SERVER_BACKOFF_MS[serverAttempt] + jitter())
       serverAttempt += 1
       continue
     }
@@ -328,6 +328,72 @@ async function cloudtalkRequest(
   }
 }
 
+interface CloudTalkCountry {
+  id?: number
+  name?: string
+  iso_code?: string
+  iso?: string
+  code?: string
+}
+
+interface CountriesEnvelope {
+  responseData?: {
+    data?: ({ Country?: CloudTalkCountry } | CloudTalkCountry)[]
+  }
+}
+
+const usCountryIdCache = new Map<number, Nullable<number>>()
+
+function isUnitedStates(country: CloudTalkCountry): boolean {
+  const iso = country.iso_code ?? country.iso ?? country.code
+  return iso === 'US' || iso === 'USA' || country.name === 'United States'
+}
+
+export async function getCloudTalkUSCountryId(
+  companyId: number,
+): Promise<Nullable<number>> {
+  if (usCountryIdCache.has(companyId)) {
+    return usCountryIdCache.get(companyId) ?? null
+  }
+  let resolved: Nullable<number> = null
+  try {
+    const response = await cloudtalkRequest('countries/index.json', companyId, {
+      method: 'GET',
+    })
+    const json = (await response.json()) as CountriesEnvelope
+    for (const item of json.responseData?.data ?? []) {
+      const country =
+        (item as { Country?: CloudTalkCountry }).Country ??
+        (item as CloudTalkCountry)
+      if (isUnitedStates(country) && typeof country.id === 'number') {
+        resolved = country.id
+        break
+      }
+    }
+  } catch {
+    // Endpoint optional per account/plan; omit country tag rather than fail.
+  }
+  usCountryIdCache.set(companyId, resolved)
+  return resolved
+}
+
+function findContactId(json: unknown): Nullable<number> {
+  if (!json || typeof json !== 'object') return null
+  const obj = json as Record<string, unknown>
+  const responseData = obj.responseData as Record<string, unknown> | undefined
+  const data = (responseData?.data ?? obj.data) as Record<string, unknown> | undefined
+  const candidates: unknown[] = [
+    (data?.Contact as Record<string, unknown> | undefined)?.id,
+    data?.id,
+    (obj.Contact as Record<string, unknown> | undefined)?.id,
+    obj.id,
+  ]
+  for (const c of candidates) {
+    if (typeof c === 'number' && c > 0) return c
+  }
+  return null
+}
+
 export async function createCloudTalkContact(
   companyId: number,
   payload: ContactPayload,
@@ -336,12 +402,24 @@ export async function createCloudTalkContact(
     method: 'PUT',
     body: payload,
   })
-  const json = (await response.json()) as AddContactResponse
-  const id = json?.responseData?.data?.id ?? json?.data?.id
-  if (!id || typeof id !== 'number') {
-    throw new Error('CloudTalk add.json did not return a contact id')
+  const json = (await response.json().catch(() => null)) as unknown
+
+  const idFromResponse = findContactId(json)
+  if (idFromResponse !== null) return idFromResponse
+
+  // Response shape unfamiliar; the contact still exists with the phone we sent.
+  const phone = payload.ContactNumber[0]?.public_number
+  if (phone) {
+    for (let attempt = 0; attempt < POST_CREATE_LOOKUP_RETRIES; attempt++) {
+      await sleep(POST_CREATE_LOOKUP_DELAY_MS)
+      const found = await findContactByOnePhone(companyId, phone)
+      if (found !== null) return found
+    }
   }
-  return id
+
+  throw new Error(
+    `CloudTalk add.json: unable to resolve contact id from response or phone lookup. Response: ${JSON.stringify(json).slice(0, 500)}`,
+  )
 }
 
 export async function updateCloudTalkContact(
@@ -379,14 +457,14 @@ interface ContactSearchEnvelope {
   responseData?: { data?: ContactSearchHit[] }
 }
 
-function extractPhones(hit: ContactSearchHit): string[] {
+function extractPhones(hit: ContactSearchHit): Nullable<string>[] {
   const node = hit.Contact ?? hit
-  const phones: string[] = []
+  const phones: Nullable<string>[] = []
   for (const p of node.contact_numbers ?? []) {
-    if (typeof p === 'string') phones.push(p)
+    if (typeof p === 'string') phones.push(normalizeToE164(p))
   }
   for (const p of node.ContactNumber ?? []) {
-    if (p?.public_number) phones.push(p.public_number)
+    if (p?.public_number) phones.push(normalizeToE164(p.public_number))
   }
   return phones
 }
@@ -405,10 +483,8 @@ async function findContactByOnePhone(
     { method: 'GET' },
   )
   const json = (await response.json()) as ContactSearchEnvelope
-  const hits = json.responseData?.data ?? []
-  for (const hit of hits) {
-    const phones = extractPhones(hit)
-    if (phones.some(p => p === e164Phone)) {
+  for (const hit of json.responseData?.data ?? []) {
+    if (extractPhones(hit).includes(e164Phone)) {
       const id = extractId(hit)
       if (typeof id === 'number') return id
     }

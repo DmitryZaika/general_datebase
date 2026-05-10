@@ -1,12 +1,14 @@
 import type { ResultSetHeader } from 'mysql2'
 import { db } from '~/db.server'
 import type { Nullable } from '~/types/utils'
+import { parseUSAddress } from '~/utils/address'
 import {
   CloudTalkApiError,
   type ContactPayload,
   createCloudTalkContact,
   deleteCloudTalkContact,
   findCloudTalkContactByPhone,
+  getCloudTalkUSCountryId,
   updateCloudTalkContact,
 } from '~/utils/cloudtalk.server'
 import { normalizeToE164 } from '~/utils/phone'
@@ -34,7 +36,9 @@ interface CompanyCreds {
   cloudtalk_access_secret: Nullable<string>
 }
 
-async function loadCustomer(customerId: number) {
+const MAX_ERROR_LENGTH = 1000
+
+function loadCustomer(customerId: number) {
   return selectId<CustomerForSync>(
     db,
     `SELECT id, company_id, name, phone, phone_2, email, address, deleted_at
@@ -43,7 +47,7 @@ async function loadCustomer(customerId: number) {
   )
 }
 
-async function loadMapping(customerId: number) {
+function loadMapping(customerId: number) {
   return selectId<MappingRow>(
     db,
     'SELECT id, cloudtalk_id FROM cloudtalk_contacts WHERE customer_id = ?',
@@ -61,36 +65,55 @@ async function companyHasCloudTalk(companyId: number): Promise<boolean> {
   return Boolean(creds?.cloudtalk_access_key && creds?.cloudtalk_access_secret)
 }
 
-function buildPayload(customer: CustomerForSync): Nullable<ContactPayload> {
-  const numbers: { public_number: string }[] = []
+function buildPhones(customer: CustomerForSync): { public_number: string }[] {
+  const phones: { public_number: string }[] = []
   for (const raw of [customer.phone, customer.phone_2]) {
     const e164 = normalizeToE164(raw)
-    if (e164) numbers.push({ public_number: e164 })
+    if (e164) phones.push({ public_number: e164 })
   }
-  if (numbers.length === 0) return null
+  return phones
+}
 
-  const emails: { email: string }[] = []
-  if (customer.email && customer.email.trim().length > 0) {
-    emails.push({ email: customer.email.trim() })
-  }
+function buildEmails(customer: CustomerForSync): { email: string }[] {
+  const email = customer.email?.trim()
+  return email ? [{ email }] : []
+}
 
-  const externalUrls: { name: string; url: string }[] = []
+function buildExternalUrls(customer: CustomerForSync): { name: string; url: string }[] {
   const appUrl = process.env.APP_URL
-  if (appUrl) {
-    externalUrls.push({
+  if (!appUrl) return []
+  return [
+    {
       name: 'Granite Manager',
       url: `${appUrl}/employee/customers/info/${customer.id}/info`,
-    })
-  }
+    },
+  ]
+}
 
+function buildPayload(
+  customer: CustomerForSync,
+  usCountryId: Nullable<number>,
+): Nullable<ContactPayload> {
+  const numbers = buildPhones(customer)
+  if (numbers.length === 0) return null
+
+  const externalUrls = buildExternalUrls(customer)
   const payload: ContactPayload = {
     name: customer.name,
     ContactNumber: numbers,
-    ContactEmail: emails,
+    ContactEmail: buildEmails(customer),
   }
   if (externalUrls.length > 0) payload.ExternalUrl = externalUrls
-  if (customer.address && customer.address.trim().length > 0) {
-    payload.address = customer.address.trim()
+
+  const parsed = parseUSAddress(customer.address)
+  if (parsed) {
+    payload.address = parsed.street
+    if (parsed.city) payload.city = parsed.city
+    if (parsed.state) payload.state = parsed.state
+    if (parsed.zip) payload.zip = parsed.zip
+    if (parsed.state && parsed.zip && usCountryId !== null) {
+      payload.country_id = usCountryId
+    }
   }
   return payload
 }
@@ -100,7 +123,7 @@ async function recordError(customerId: number, error: unknown): Promise<void> {
   try {
     await db.execute<ResultSetHeader>(
       `UPDATE cloudtalk_contacts SET last_error = ? WHERE customer_id = ?`,
-      [message.slice(0, 1000), customerId],
+      [message.slice(0, MAX_ERROR_LENGTH), customerId],
     )
   } catch (writeError) {
     // biome-ignore lint/suspicious/noConsole: best-effort sync, errors logged for ops
@@ -111,53 +134,63 @@ async function recordError(customerId: number, error: unknown): Promise<void> {
   }
 }
 
+async function reportFailure(
+  event: 'cloudtalk_sync_customer_failed' | 'cloudtalk_delete_customer_failed',
+  customerId: number,
+  error: unknown,
+): Promise<void> {
+  // biome-ignore lint/suspicious/noConsole: best-effort sync, errors logged for ops
+  console.error(event, { customerId, error })
+  posthogClient.captureException(error, event, { customerId })
+  await recordError(customerId, error)
+}
+
+async function upsertContact(
+  customer: CustomerForSync,
+  payload: ContactPayload,
+  mapping: MappingRow | undefined,
+): Promise<void> {
+  if (mapping) {
+    await updateCloudTalkContact(customer.company_id, mapping.cloudtalk_id, payload)
+    await db.execute<ResultSetHeader>(
+      `UPDATE cloudtalk_contacts SET last_error = NULL WHERE id = ?`,
+      [mapping.id],
+    )
+    return
+  }
+
+  const phones = payload.ContactNumber.map(n => n.public_number)
+  const existingId = await findCloudTalkContactByPhone(customer.company_id, phones)
+
+  let cloudtalkId: number
+  if (existingId) {
+    await updateCloudTalkContact(customer.company_id, existingId, payload)
+    cloudtalkId = existingId
+  } else {
+    cloudtalkId = await createCloudTalkContact(customer.company_id, payload)
+  }
+  await db.execute<ResultSetHeader>(
+    `INSERT INTO cloudtalk_contacts (customer_id, company_id, cloudtalk_id)
+     VALUES (?, ?, ?)`,
+    [customer.id, customer.company_id, cloudtalkId],
+  )
+}
+
 export async function syncCustomerToCloudTalk(customerId: number): Promise<void> {
   try {
     const customer = await loadCustomer(customerId)
     if (!customer || customer.deleted_at) return
     if (!(await companyHasCloudTalk(customer.company_id))) return
 
-    const payload = buildPayload(customer)
+    const usCountryId = await getCloudTalkUSCountryId(customer.company_id)
+    const payload = buildPayload(customer, usCountryId)
     if (!payload) return
 
     const mapping = await loadMapping(customerId)
-    if (mapping) {
-      await updateCloudTalkContact(customer.company_id, mapping.cloudtalk_id, payload)
-      await db.execute<ResultSetHeader>(
-        `UPDATE cloudtalk_contacts SET last_error = NULL WHERE id = ?`,
-        [mapping.id],
-      )
-    } else {
-      // Avoid creating duplicates if a previous run created the contact on
-      // CloudTalk but failed to write the mapping locally, or if the contact
-      // was added in CloudTalk by another path. Search by every E164 phone
-      // we have, not just the first, so multi-phone customers are matched
-      // even when the existing CloudTalk contact only has the secondary number.
-      const e164Phones = payload.ContactNumber.map(n => n.public_number)
-      const existingId = await findCloudTalkContactByPhone(
-        customer.company_id,
-        e164Phones,
-      )
-      let cloudtalkId: number
-      if (existingId) {
-        await updateCloudTalkContact(customer.company_id, existingId, payload)
-        cloudtalkId = existingId
-      } else {
-        cloudtalkId = await createCloudTalkContact(customer.company_id, payload)
-      }
-      await db.execute<ResultSetHeader>(
-        `INSERT INTO cloudtalk_contacts (customer_id, company_id, cloudtalk_id)
-         VALUES (?, ?, ?)`,
-        [customer.id, customer.company_id, cloudtalkId],
-      )
-    }
+    await upsertContact(customer, payload, mapping)
   } catch (error) {
-    // biome-ignore lint/suspicious/noConsole: best-effort sync, errors logged for ops
-    console.error('CloudTalk contact sync failed', { customerId, error })
-    posthogClient.captureException(error, 'cloudtalk_sync_customer_failed', {
-      customerId,
-    })
-    await recordError(customerId, error)
+    await reportFailure('cloudtalk_sync_customer_failed', customerId, error)
+    throw error
   }
 }
 
@@ -176,22 +209,16 @@ export async function deleteCustomerFromCloudTalk(customerId: number): Promise<v
     try {
       await deleteCloudTalkContact(customer.company_id, mapping.cloudtalk_id)
     } catch (error) {
-      // 404 means the contact is already gone (deleted manually in CloudTalk's
-      // UI, retention purge, etc.). Treat that as success so we still drop our
-      // stale mapping row instead of leaking it forever.
       if (!(error instanceof CloudTalkApiError && error.status === 404)) {
         throw error
       }
     }
-    await db.execute<ResultSetHeader>(`DELETE FROM cloudtalk_contacts WHERE id = ?`, [
-      mapping.id,
-    ])
+    await db.execute<ResultSetHeader>(
+      `DELETE FROM cloudtalk_contacts WHERE id = ?`,
+      [mapping.id],
+    )
   } catch (error) {
-    // biome-ignore lint/suspicious/noConsole: best-effort sync, errors logged for ops
-    console.error('CloudTalk contact delete failed', { customerId, error })
-    posthogClient.captureException(error, 'cloudtalk_delete_customer_failed', {
-      customerId,
-    })
-    await recordError(customerId, error)
+    await reportFailure('cloudtalk_delete_customer_failed', customerId, error)
+    throw error
   }
 }

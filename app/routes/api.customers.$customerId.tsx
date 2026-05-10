@@ -103,7 +103,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     )
   }
 
-  void syncCustomerToCloudTalk(customerId)
+  syncCustomerToCloudTalk(customerId).catch(() => undefined)
 
   return data({
     success: true,
