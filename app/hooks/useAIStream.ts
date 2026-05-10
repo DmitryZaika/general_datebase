@@ -7,11 +7,6 @@ export type AIStreamEvent<F = unknown> =
   | { type: 'done' }
   | { type: 'error'; message: string }
 
-/**
- * Translates raw AI-stream error messages into user-friendly text.
- * Use at every AI call-site so users see actionable messages instead
- * of HTTP codes or stack traces.
- */
 export function friendlyAIError(raw: string): string {
   const lower = raw.toLowerCase()
   if (lower.includes('401') || lower.includes('unauthorized')) {
@@ -39,12 +34,6 @@ export interface AIStreamHandlers<F> {
   onError?: (message: string) => void
 }
 
-/**
- * Non-React helper that consumes a unified-protocol AI SSE stream.
- * Use this directly when you need to manage stream lifecycle outside
- * a single React component (e.g., per-row streams in a list).
- * Otherwise prefer the useAIStream hook.
- */
 export async function consumeAIStream<F = unknown>(
   request: { url: string; init?: RequestInit; signal?: AbortSignal },
   handlers: AIStreamHandlers<F>,
@@ -81,9 +70,7 @@ export async function consumeAIStream<F = unknown>(
           } else if (event.type === 'error') {
             handlers.onError?.(event.message)
           }
-        } catch {
-          // ignore malformed line
-        }
+        } catch {}
       }
     }
   } catch (err) {
@@ -103,10 +90,6 @@ interface UseAIStreamResult<F> {
   error: Nullable<string>
 }
 
-/**
- * React hook wrapping consumeAIStream. Manages local state (text,
- * isStreaming, finalData, error) and AbortController lifecycle.
- */
 export function useAIStream<F = unknown>(
   options: AIStreamHandlers<F> = {},
 ): UseAIStreamResult<F> {
