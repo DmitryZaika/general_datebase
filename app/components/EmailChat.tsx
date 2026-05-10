@@ -60,6 +60,7 @@ import {
 } from '~/components/ui/tooltip'
 import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
+import { consumeAIStream, friendlyAIError } from '~/hooks/useAIStream'
 import { cn } from '~/lib/utils'
 import type { Nullable } from '~/types/utils'
 import { dateClass, fileSize } from '~/utils/constants'
@@ -158,52 +159,6 @@ interface AIEmailResponse {
   bodyText?: string
 }
 
-async function processStreamingResponse(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  onStreamBody?: (text: string) => void,
-): Promise<AIEmailResponse> {
-  const decoder = new TextDecoder()
-  let fullText = ''
-  let isInBody = false
-
-  while (true) {
-    const result = await reader.read()
-    if (result.done) {
-      break
-    }
-    const chunk = decoder.decode(result.value, { stream: true })
-    const lines = chunk.split('\n')
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = JSON.parse(line.slice(6))
-        if (data.error) {
-          throw new Error(data.error)
-        }
-        if (data.content) {
-          fullText += data.content
-
-          if (fullText.includes('---BODY---')) {
-            isInBody = true
-            const parts = fullText.split('---BODY---')
-            if (onStreamBody) {
-              onStreamBody((parts[1] || '').trim())
-            }
-          } else if (isInBody) {
-            const parts = fullText.split('---BODY---')
-            if (onStreamBody) {
-              onStreamBody((parts[1] || '').trim())
-            }
-          }
-        }
-      }
-    }
-  }
-
-  const parts = fullText.split('---BODY---')
-  return { subject: parts[0]?.trim() || '', bodyText: parts[1]?.trim() || '' }
-}
-
 async function generateAIEmailForChat(
   emailCategory: string,
   dealId: number | null,
@@ -211,31 +166,34 @@ async function generateAIEmailForChat(
   threadId: string,
   onStreamBody?: (text: string) => void,
 ): Promise<AIEmailResponse> {
-  const variationToken = Math.random().toString(36).slice(2)
   const requestPayload = {
     emailCategory,
     dealId: dealId ?? undefined,
-    variationToken,
     subject: subject ?? undefined,
     threadId,
   }
 
-  const response = await fetch('/api/aiRecommend/email', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestPayload),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Failed to generate AI email: ${response.status} ${errorText}`)
-  }
-
-  if (!response.body) {
-    throw new Error('No response body')
-  }
-
-  return processStreamingResponse(response.body.getReader(), onStreamBody)
+  let result: AIEmailResponse = {}
+  await consumeAIStream<{ subject: string; body: string }>(
+    {
+      url: '/api/aiRecommend/email',
+      init: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestPayload),
+      },
+    },
+    {
+      onDelta: (_chunk, accumulated) => onStreamBody?.(accumulated),
+      onFinal: data => {
+        result = { subject: data.subject, bodyText: data.body }
+      },
+      onError: message => {
+        throw new Error(message)
+      },
+    },
+  )
+  return result
 }
 
 function MessageDate({
@@ -1104,11 +1062,12 @@ export function EmailChat(props: EmailChatProps) {
         body => setMessageText(body),
       )
     } catch (error) {
-      if (error instanceof Error) {
-        alert(`Failed to generate AI email: ${error.message}`)
-      } else {
-        alert('Failed to generate AI email')
-      }
+      const raw = error instanceof Error ? error.message : 'Unknown error'
+      toast({
+        title: 'Could not generate email',
+        description: friendlyAIError(raw),
+        variant: 'destructive',
+      })
     } finally {
       setIsGenerating(false)
     }
