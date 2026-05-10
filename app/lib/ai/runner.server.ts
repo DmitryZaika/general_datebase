@@ -15,7 +15,7 @@ export async function runTask<I, O>(
       model: task.model,
       messages,
       temperature: task.temperature,
-      max_tokens: task.maxTokens,
+      max_completion_tokens: task.maxTokens,
       response_format: zodResponseFormat(task.outputSchema, task.name),
     })
     trackUsage(task.name, completion.usage, userId)
@@ -28,7 +28,7 @@ export async function runTask<I, O>(
     model: task.model,
     messages,
     temperature: task.temperature,
-    max_tokens: task.maxTokens,
+    max_completion_tokens: task.maxTokens,
   })
   trackUsage(task.name, completion.usage, userId)
   const content = completion.choices[0]?.message?.content
@@ -49,7 +49,7 @@ export async function streamTask<I>(
     model: task.model,
     messages,
     temperature: task.temperature,
-    max_tokens: task.maxTokens,
+    max_completion_tokens: task.maxTokens,
     stream_options: { include_usage: true },
   })
 
@@ -83,7 +83,7 @@ export async function streamStructuredTask<I, O>(
     model: task.model,
     messages,
     temperature: task.temperature,
-    max_tokens: task.maxTokens,
+    max_completion_tokens: task.maxTokens,
     stream_options: { include_usage: true },
     response_format: zodResponseFormat(task.outputSchema, task.name),
   })
