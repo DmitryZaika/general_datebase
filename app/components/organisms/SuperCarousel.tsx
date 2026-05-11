@@ -484,7 +484,7 @@ function ChildrenImagesDialog({
                   sideOffset={10}
                   className='max-w-[15rem] border-zinc-600/90 bg-zinc-900 px-3 py-2 text-center text-[11px] font-medium leading-snug text-zinc-50 shadow-lg'
                 >
-                  Click the photo to show the main slab again
+                  Click the main photo to show the slab again
                 </TooltipContent>
               </Tooltip>
             ) : (
