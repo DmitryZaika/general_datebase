@@ -3,6 +3,7 @@ import { type ActionFunctionArgs, data, type LoaderFunctionArgs } from 'react-ro
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
 import type { Customer } from '~/types/customer'
+import { syncCustomerToCloudTalk } from '~/utils/cloudtalkContactSync.server'
 import {
   auditDisplayName,
   fetchUserDisplayNameById,
@@ -101,6 +102,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       [salesRep, customerId],
     )
   }
+
+  syncCustomerToCloudTalk(customerId).catch(() => undefined)
 
   return data({
     success: true,

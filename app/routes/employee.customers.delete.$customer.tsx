@@ -22,6 +22,7 @@ import {
 } from '~/components/ui/dialog'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
+import { deleteCustomerFromCloudTalk } from '~/utils/cloudtalkContactSync.server'
 import { csrf } from '~/utils/csrf.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
@@ -103,6 +104,8 @@ export async function action({ params, request }: ActionFunctionArgs) {
     posthogClient.captureException(error)
     return { error: 'Failed to delete customer' }
   }
+
+  deleteCustomerFromCloudTalk(customerId).catch(() => undefined)
 
   const url = new URL(request.url)
   const searchParams = url.searchParams.toString()

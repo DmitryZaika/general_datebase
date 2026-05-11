@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data } from 'react-router'
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
+import { syncCustomerToCloudTalk } from '~/utils/cloudtalkContactSync.server'
 import {
   auditDisplayName,
   fetchUserDisplayNameById,
@@ -58,6 +59,8 @@ export async function action({ request }: ActionFunctionArgs) {
   )
 
   const customerId = result.insertId
+
+  syncCustomerToCloudTalk(customerId).catch(() => undefined)
 
   if (salesRep !== null && createdBy) {
     const toName = await fetchUserDisplayNameById(db, salesRep)
