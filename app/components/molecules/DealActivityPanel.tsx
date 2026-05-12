@@ -64,6 +64,7 @@ import {
   formatDeadlineLabel,
   formatPickerDeadline,
   formatTimestamp,
+  localCalendarDate,
 } from '~/lib/dateHelpers'
 import { buildActivityApiAction } from '~/lib/dealApiHelpers'
 import { cn } from '~/lib/utils'
@@ -246,7 +247,9 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
     case 'SET_PRIORITY':
       return { ...state, priority: action.payload }
     case 'SET_EDIT': {
-      const d = action.payload.deadline ? new Date(action.payload.deadline) : undefined
+      const d = action.payload.deadline
+        ? localCalendarDate(action.payload.deadline)
+        : undefined
       return {
         name: action.payload.name,
         deadline: d,
