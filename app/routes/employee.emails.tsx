@@ -1,11 +1,5 @@
 import { motion } from 'framer-motion'
-import {
-  type LoaderFunctionArgs,
-  Outlet,
-  redirect,
-  useLoaderData,
-  useLocation,
-} from 'react-router'
+import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
 import DealsEmailsView, { type Email } from '~/components/views/DealsEmailsView'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -182,15 +176,6 @@ const EMPLOYEE_VIEW_ENTER = {
   transition: { duration: 0.38, ease: [0.2, 0.78, 0.22, 1] as const },
 }
 
-function employeeEmailsMotionKey(search: string) {
-  const params = new URLSearchParams(search)
-  return [
-    params.get('folder') ?? 'inbox',
-    params.get('page') ?? '1',
-    params.get('search') ?? '',
-  ].join('|')
-}
-
 export default function EmployeeEmails() {
   const {
     userEmails,
@@ -213,14 +198,9 @@ export default function EmployeeEmails() {
     currentPage: number
     pageSize: number
   }>()
-  const location = useLocation()
 
   return (
-    <motion.div
-      key={employeeEmailsMotionKey(location.search)}
-      className='w-full h-full p-2'
-      {...EMPLOYEE_VIEW_ENTER}
-    >
+    <motion.div className='w-full h-full p-2' {...EMPLOYEE_VIEW_ENTER}>
       <DealsEmailsView
         emails={userEmails}
         currentUserEmail={userEmail}

@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import {
   type LoaderFunctionArgs,
   Outlet,
@@ -192,6 +193,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 }
 
+const ADMIN_EMAILS_VIEW_ENTER = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.38, ease: [0.2, 0.78, 0.22, 1] as const },
+}
+
 export default function AdminEmails() {
   const location = useLocation()
   const {
@@ -218,7 +225,10 @@ export default function AdminEmails() {
   const isChatOpen = location.pathname.includes('/chat/')
 
   return (
-    <div className='w-full h-full p-2 flex flex-col gap-4 relative'>
+    <motion.div
+      className='w-full h-full p-2 flex flex-col gap-4 relative'
+      {...ADMIN_EMAILS_VIEW_ENTER}
+    >
       <div className={`flex-1 min-h-0 ${isChatOpen ? 'pointer-events-none' : ''}`}>
         <DealsEmailsView
           emails={userEmails}
@@ -240,6 +250,6 @@ export default function AdminEmails() {
       ) : (
         <Outlet />
       )}
-    </div>
+    </motion.div>
   )
 }
