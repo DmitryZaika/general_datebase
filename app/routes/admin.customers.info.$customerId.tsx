@@ -145,14 +145,20 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [customerId],
   )
   const firstRepDealAt = firstRepDealRows[0]?.t ?? null
+  const companyRow = await selectId<{ company_id: number }>(
+    db,
+    'SELECT company_id FROM customers WHERE id = ?',
+    customerId,
+  )
   const customerOut: CustomerInfo | undefined =
     customer === undefined
       ? undefined
       : { ...customer, first_rep_deal_created_at: firstRepDealAt }
 
-  const emails = customerOut?.email
-    ? await getCustomerEmailsWithReads(customerOut.email)
-    : []
+  const emails =
+    customerOut?.email && companyRow
+      ? await getCustomerEmailsWithReads(customerOut.email, companyRow.company_id)
+      : []
 
   return {
     customer: customerOut,

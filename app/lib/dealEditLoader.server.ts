@@ -85,11 +85,11 @@ export function createDealEditLoader(
       const customerDealCount = Number(customer_deal_count)
       const emailHistoryPromise =
         customerEmail && customerDealCount === 1
-          ? getCustomerEmailsWithReads(customerEmail)
-          : getDealEmailsWithReads(dealId)
+          ? getCustomerEmailsWithReads(customerEmail, user.company_id)
+          : getDealEmailsWithReads(dealId, user.company_id)
       const customerEmailsPromise =
         customerEmail && customerDealCount > 1
-          ? getCustomerEmailsWithReads(customerEmail)
+          ? getCustomerEmailsWithReads(customerEmail, user.company_id)
           : Promise.resolve<EmailHistory[]>([])
 
       const [

@@ -16,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { getCustomerEmailsWithReads } from '~/crud/emails'
 import { db } from '~/db.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 type CustomerInfo = {
   id: number
@@ -73,8 +73,9 @@ type ProjectInfo = {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  let user: User
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -89,15 +90,18 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return redirect(`${url.pathname}/info${url.search}`)
   }
 
-  const customer = await selectId<Omit<CustomerInfo, 'first_rep_deal_created_at'>>(
+  const customerRows = await selectMany<
+    Omit<CustomerInfo, 'first_rep_deal_created_at'>
+  >(
     db,
     `SELECT c.id, c.name, c.email, c.phone, c.phone_2, c.address, u.name AS sales_rep_name, c.source, c.parent_id, c.company_name, c.created_date, c.created_by
      FROM customers c
      LEFT JOIN deals d ON d.customer_id = c.id AND d.created_at IS NULL
      LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
-     WHERE c.id = ?`,
-    customerId,
+     WHERE c.id = ? AND c.company_id = ?`,
+    [customerId, user.company_id],
   )
+  const customer = customerRows[0]
 
   const hasChildren = await selectMany<{ id: number }>(
     db,
@@ -151,7 +155,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       : { ...customer, first_rep_deal_created_at: firstRepDealAt }
 
   const emails = customerOut?.email
-    ? await getCustomerEmailsWithReads(customerOut.email)
+    ? await getCustomerEmailsWithReads(customerOut.email, user.company_id)
     : []
 
   return {

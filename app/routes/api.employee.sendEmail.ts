@@ -178,6 +178,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     const cleaned = emailSchema.parse(raw)
 
+    if (cleaned.dealId !== undefined) {
+      const dealAccess = await selectMany<{ id: number }>(
+        db,
+        `SELECT d.id FROM deals d
+         INNER JOIN customers c ON c.id = d.customer_id
+         WHERE d.id = ? AND d.deleted_at IS NULL AND c.company_id = ?
+         LIMIT 1`,
+        [cleaned.dealId, user.company_id],
+      )
+      if (!dealAccess.length) {
+        return data({ error: 'Deal not found' }, { status: 400 })
+      }
+    }
+
     const uploadedAttachments: {
       contentType: string
       contentSubtype: string

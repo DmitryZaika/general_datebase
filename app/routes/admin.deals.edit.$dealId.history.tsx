@@ -14,6 +14,8 @@ import {
 } from '~/components/tables/DealEmails'
 import { DataTable } from '~/components/ui/data-table'
 import { getDealEmailsWithReads } from '~/crud/emails'
+import { db } from '~/db.server'
+import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser } from '~/utils/session.server'
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -27,7 +29,18 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const dealId = parseInt(params.dealId, 10)
-  const emails = await getDealEmailsWithReads(dealId)
+  const dealCompanyRows = await selectMany<{ company_id: number }>(
+    db,
+    `SELECT c.company_id
+       FROM deals d
+       JOIN customers c ON d.customer_id = c.id
+      WHERE d.id = ? AND d.deleted_at IS NULL`,
+    [dealId],
+  )
+  if (!dealCompanyRows.length) {
+    return redirect('/admin/deals')
+  }
+  const emails = await getDealEmailsWithReads(dealId, dealCompanyRows[0].company_id)
 
   return { emails }
 }

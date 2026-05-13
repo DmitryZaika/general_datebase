@@ -946,6 +946,18 @@ function makeEmailSnippet(body: Nullable<string> | undefined, max = 120): string
   return `${text.slice(0, max).trimEnd()}…`
 }
 
+function formatAttributionName(raw: string): string {
+  return raw
+    .trim()
+    .split(/\s+/)
+    .map(part => {
+      if (!part) return ''
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+    })
+    .filter(Boolean)
+    .join(' ')
+}
+
 function SmsHistoryRow({
   message,
   viewerName,
@@ -1000,8 +1012,8 @@ function SmsHistoryRow({
             </span>
           </div>
           {showAgentLine ? (
-            <span className='max-w-[140px] truncate text-[9px] uppercase tracking-wide text-gray-400'>
-              by {outboundAgent}
+            <span className='max-w-[140px] truncate text-[9px] text-gray-400'>
+              By {formatAttributionName(outboundAgent)}
             </span>
           ) : null}
         </div>
@@ -1079,8 +1091,8 @@ function EmailHistoryRow({
             </span>
           </div>
           {showSenderLine ? (
-            <span className='max-w-[140px] truncate text-[9px] uppercase tracking-wide text-gray-400'>
-              by {outboundSender}
+            <span className='max-w-[140px] truncate text-[9px] text-gray-400'>
+              By {formatAttributionName(outboundSender)}
             </span>
           ) : null}
         </div>
@@ -1172,6 +1184,7 @@ function ActivityList({
   editingActivityId,
   historyHeaderRef,
   viewerName,
+  historyAsyncReady,
 }: {
   dealId: number
   activities: DealActivity[]
@@ -1184,6 +1197,7 @@ function ActivityList({
   editingActivityId: Nullable<number>
   historyHeaderRef: React.RefObject<Nullable<HTMLDivElement>>
   viewerName: string
+  historyAsyncReady: boolean
 }) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(true)
   const toggleHistoryOpen = useCallback(() => setIsHistoryOpen(prev => !prev), [])
@@ -1561,7 +1575,9 @@ function ActivityList({
                 </Button>
               </div>
             ) : null}
-            <Fragment key={historyTab}>{tabRenderers[historyTab]()}</Fragment>
+            {historyAsyncReady ? (
+              <Fragment key={historyTab}>{tabRenderers[historyTab]()}</Fragment>
+            ) : null}
           </>
         )}
       </div>
@@ -1584,7 +1600,7 @@ export function DealActivityPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const historyHeaderRef = useRef<HTMLDivElement>(null)
 
-  const { data: callsData } = useQuery({
+  const { data: callsData, isPending: isCallsHistoryPending } = useQuery({
     queryKey: ['cloudtalk-deal-calls', dealId],
     queryFn: async () => {
       const r = await fetch(`/api/cloudtalk/dealCalls/${dealId}`)
@@ -1602,7 +1618,7 @@ export function DealActivityPanel({
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
   }, [callsData])
 
-  const { data: smsData } = useQuery({
+  const { data: smsData, isPending: isSmsHistoryPending } = useQuery({
     queryKey: ['cloudtalk-deal-sms', dealId],
     queryFn: async () => {
       const r = await fetch(`/api/cloudtalk/dealSms/${dealId}`)
@@ -1625,6 +1641,8 @@ export function DealActivityPanel({
         (a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime(),
       )
   }, [smsData])
+
+  const historyAsyncReady = !isCallsHistoryPending && !isSmsHistoryPending
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -1708,6 +1726,7 @@ export function DealActivityPanel({
           editingActivityId={editingActivity?.id ?? null}
           historyHeaderRef={historyHeaderRef}
           viewerName={currentUserName}
+          historyAsyncReady={historyAsyncReady}
         />
       </div>
     </div>

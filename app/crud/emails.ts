@@ -43,15 +43,20 @@ const EMAIL_HISTORY_GROUP_AND_ORDER = `GROUP BY
     e.sent_at,
     e.sender_user_id,
     u_sender.name,
+    u_sender.company_id,
     e.employee_read_at
   ORDER BY e.sent_at DESC;`
 
-export async function getDealEmailsWithReads(dealId: number): Promise<EmailHistory[]> {
+export async function getDealEmailsWithReads(
+  dealId: number,
+  companyId: number,
+): Promise<EmailHistory[]> {
   return await selectMany<EmailHistory>(
     db,
     `${EMAIL_HISTORY_SELECT}
     WHERE e.deleted_at IS NULL
       AND e.thread_id IS NOT NULL
+      AND (e.sender_user_id IS NULL OR u_sender.company_id = ?)
       AND e.thread_id IN (
         SELECT DISTINCT e2.thread_id
         FROM emails e2
@@ -60,12 +65,13 @@ export async function getDealEmailsWithReads(dealId: number): Promise<EmailHisto
           AND e2.deleted_at IS NULL
       )
     ${EMAIL_HISTORY_GROUP_AND_ORDER}`,
-    [dealId],
+    [companyId, dealId],
   )
 }
 
 export async function getCustomerEmailsWithReads(
   customerEmail: string,
+  companyId: number,
 ): Promise<EmailHistory[]> {
   const normalizedEmail = customerEmail.trim().toLowerCase()
 
@@ -74,6 +80,7 @@ export async function getCustomerEmailsWithReads(
     `${EMAIL_HISTORY_SELECT}
     WHERE e.deleted_at IS NULL
       AND e.thread_id IS NOT NULL
+      AND (e.sender_user_id IS NULL OR u_sender.company_id = ?)
       AND (
         LOWER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(e.sender_email, '<', -1), '>', 1))) = ?
         OR (e.sender_email NOT LIKE '%<%' AND LOWER(TRIM(e.sender_email)) = ?)
@@ -81,6 +88,6 @@ export async function getCustomerEmailsWithReads(
         OR (e.receiver_email NOT LIKE '%<%' AND LOWER(TRIM(e.receiver_email)) = ?)
       )
     ${EMAIL_HISTORY_GROUP_AND_ORDER}`,
-    [normalizedEmail, normalizedEmail, normalizedEmail, normalizedEmail],
+    [companyId, normalizedEmail, normalizedEmail, normalizedEmail, normalizedEmail],
   )
 }

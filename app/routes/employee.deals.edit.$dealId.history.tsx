@@ -14,11 +14,14 @@ import {
 } from '~/components/tables/DealEmails'
 import { DataTable } from '~/components/ui/data-table'
 import { getDealEmailsWithReads } from '~/crud/emails'
-import { getEmployeeUser } from '~/utils/session.server'
+import { db } from '~/db.server'
+import { selectMany } from '~/utils/queryHelpers'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  let user: User
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
@@ -27,7 +30,18 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const dealId = parseInt(params.dealId, 10)
-  const emails = await getDealEmailsWithReads(dealId)
+  const dealCompanyRows = await selectMany<{ company_id: number }>(
+    db,
+    `SELECT c.company_id
+       FROM deals d
+       JOIN customers c ON d.customer_id = c.id
+      WHERE d.id = ? AND d.deleted_at IS NULL AND c.company_id = ?`,
+    [dealId, user.company_id],
+  )
+  if (!dealCompanyRows.length) {
+    return redirect('/employee/deals')
+  }
+  const emails = await getDealEmailsWithReads(dealId, dealCompanyRows[0].company_id)
 
   return { emails }
 }
