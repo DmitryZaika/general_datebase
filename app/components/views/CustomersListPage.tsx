@@ -391,7 +391,7 @@ export function CustomersListPage() {
       <div className='flex flex-col md:flex-row items-center justify-between'>
         <div className='flex items-center gap-4'>
           <Select value={viewParam} onValueChange={handleViewChange}>
-            <SelectTrigger className='w-[180px] bg-white'>
+            <SelectTrigger className='w-[110px] md:w-[180px] bg-white'>
               <SelectValue placeholder='Select view' />
             </SelectTrigger>
             <SelectContent>
@@ -401,7 +401,7 @@ export function CustomersListPage() {
           </Select>
 
           <Select value={tabParam} onValueChange={handleTabChange}>
-            <SelectTrigger className='w-[180px] bg-white'>
+            <SelectTrigger className='w-[100px] md:w-[180px] bg-white'>
               <SelectValue placeholder='Select Type' />
             </SelectTrigger>
             <SelectContent>
@@ -413,7 +413,7 @@ export function CustomersListPage() {
           </Select>
 
           <Select value={salesRepParam || 'all'} onValueChange={handleSalesRepChange}>
-            <SelectTrigger className='w-[180px] bg-white'>
+            <SelectTrigger className='w-[110px] md:w-[180px] bg-white'>
               <SelectValue placeholder='Select Sales Rep' />
             </SelectTrigger>
             <SelectContent>
