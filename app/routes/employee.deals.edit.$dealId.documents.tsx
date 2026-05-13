@@ -337,103 +337,118 @@ export default function DealEditDocuments() {
     <>
       <div className='space-y-4'>
         <AddDocumentForm />
-        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3'>
-          {documents.map(document => (
-            <div
-              key={`${document.source}-${document.id}`}
-              className='group relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md'
-            >
-              <div className='flex w-full min-w-0 flex-col items-start gap-3'>
-                <a
-                  href={document.image_url}
-                  target='_blank'
-                  rel='noreferrer'
-                  className='text-slate-900 hover:text-blue-700'
-                >
-                  <span className='flex h-10 w-10 items-center justify-center rounded-md bg-blue-50 text-blue-700'>
-                    <FileText className='h-5 w-5' />
-                  </span>
-                </a>
-                {editingKey === `${document.source}-${document.id}` &&
-                document.source === 'documents' ? (
-                  <renameFetcher.Form
-                    method='post'
-                    className='flex w-full min-w-0 self-stretch flex-col gap-2'
+        <div className='grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4'>
+          {documents.map(document => {
+            const docKey = `${document.source}-${document.id}`
+            const displayName =
+              document.name?.trim() || documentName(document.image_url, document.id)
+            const isEditing = editingKey === docKey && document.source === 'documents'
+            return (
+              <div
+                key={docKey}
+                className='group relative flex flex-col items-center rounded-xl border border-slate-200 bg-white px-3 pb-4 pt-10 shadow-sm transition-shadow hover:shadow-md'
+              >
+                {document.source === 'documents' ? (
+                  <Button
+                    type='button'
+                    variant='secondary'
+                    size='icon'
+                    className='absolute left-2 top-2 z-10 size-8 rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm opacity-0 transition-opacity duration-150 hover:bg-slate-50 max-sm:opacity-100 group-hover:opacity-100'
+                    title='Edit name'
+                    onClick={() => setEditingKey(docKey)}
                   >
-                    <AuthenticityTokenInput />
-                    <input type='hidden' name='intent' value='rename_document' />
-                    <input type='hidden' name='id' value={document.id} />
-                    <input type='hidden' name='source' value={document.source} />
-                    <Input
-                      name='name'
-                      defaultValue={
-                        document.name?.trim() ||
-                        documentName(document.image_url, document.id)
-                      }
-                      className='w-full text-sm'
-                      required
-                      maxLength={255}
-                      autoFocus
-                    />
-                    <div className='flex flex-wrap gap-2'>
-                      <Button
-                        type='submit'
-                        size='sm'
-                        disabled={renameFetcher.state !== 'idle'}
-                      >
-                        {renameFetcher.state !== 'idle' ? 'Saving…' : 'Save'}
-                      </Button>
-                      <Button
-                        type='button'
-                        variant='outline'
-                        size='sm'
-                        onClick={() => setEditingKey(null)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                    {renameFetcher.data?.error ? (
-                      <p className='text-xs text-red-600'>{renameFetcher.data.error}</p>
-                    ) : null}
-                  </renameFetcher.Form>
+                    <Pencil className='h-4 w-4' />
+                  </Button>
+                ) : null}
+                <Button
+                  type='button'
+                  variant='destructive'
+                  size='icon'
+                  className='absolute right-2 top-2 z-10 size-8 rounded-full shadow-sm opacity-0 transition-opacity duration-150 hover:bg-red-700 max-sm:opacity-100 group-hover:opacity-100'
+                  title='Delete document'
+                  onClick={() => handleDeleteClick(document)}
+                >
+                  <X className='h-4 w-4' />
+                </Button>
+                {isEditing ? (
+                  <div className='flex w-full min-w-0 flex-col items-center gap-3'>
+                    <a
+                      href={document.image_url}
+                      target='_blank'
+                      rel='noreferrer'
+                      className='flex flex-col items-center gap-1.5 text-slate-900 hover:text-blue-700'
+                    >
+                      <FileText
+                        className='h-12 w-9 text-blue-600'
+                        strokeWidth={1.35}
+                        aria-hidden
+                      />
+                      <span className='text-xs font-medium text-blue-600'>
+                        Open file
+                      </span>
+                    </a>
+                    <renameFetcher.Form
+                      method='post'
+                      className='flex w-full min-w-0 flex-col gap-2'
+                    >
+                      <AuthenticityTokenInput />
+                      <input type='hidden' name='intent' value='rename_document' />
+                      <input type='hidden' name='id' value={document.id} />
+                      <input type='hidden' name='source' value={document.source} />
+                      <Input
+                        name='name'
+                        defaultValue={displayName}
+                        className='w-full text-sm'
+                        required
+                        maxLength={255}
+                        autoFocus
+                      />
+                      <div className='flex flex-wrap justify-center gap-2'>
+                        <Button
+                          type='submit'
+                          size='sm'
+                          disabled={renameFetcher.state !== 'idle'}
+                        >
+                          {renameFetcher.state !== 'idle' ? 'Saving…' : 'Save'}
+                        </Button>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          onClick={() => setEditingKey(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                      {renameFetcher.data?.error ? (
+                        <p className='text-center text-xs text-red-600'>
+                          {renameFetcher.data.error}
+                        </p>
+                      ) : null}
+                    </renameFetcher.Form>
+                  </div>
                 ) : (
                   <a
                     href={document.image_url}
                     target='_blank'
                     rel='noreferrer'
-                    className='w-full min-w-0 break-words text-sm font-medium leading-5 text-slate-800 hover:text-blue-700'
-                    title={
-                      document.name?.trim() ||
-                      documentName(document.image_url, document.id)
-                    }
+                    className='flex w-full min-w-0 flex-col items-center gap-2.5 text-center text-slate-900 hover:text-blue-700'
+                    title={displayName}
                   >
-                    {document.name?.trim() ||
-                      documentName(document.image_url, document.id)}
+                    <FileText
+                      className='h-12 w-9 text-blue-600'
+                      strokeWidth={1.35}
+                      aria-hidden
+                    />
+
+                    <span className='line-clamp-3 w-full max-w-[13rem] break-words text-sm font-medium leading-snug text-slate-800'>
+                      {displayName}
+                    </span>
                   </a>
                 )}
               </div>
-              {document.source === 'documents' ? (
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='icon'
-                  className='absolute right-11 top-2.5 size-7 rounded-full bg-white/90 p-0 text-slate-600 opacity-100 transition-opacity hover:text-slate-900 sm:opacity-0 sm:group-hover:opacity-100'
-                  title='Edit name'
-                  onClick={() => setEditingKey(`${document.source}-${document.id}`)}
-                >
-                  <Pencil className='h-4 w-4' />
-                </Button>
-              ) : null}
-              <Button
-                type='button'
-                onClick={() => handleDeleteClick(document)}
-                className='absolute right-2.5 top-2.5 size-7 rounded-full bg-red-600 p-0 text-white opacity-100 transition-opacity hover:bg-red-700 sm:opacity-0 sm:group-hover:opacity-100'
-                title='Delete document'
-              >
-                <X size={12} />
-              </Button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 

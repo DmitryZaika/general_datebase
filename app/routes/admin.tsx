@@ -11,6 +11,14 @@ const ADMIN_VIEW_ENTER = {
   transition: { duration: 0.38, ease: ADMIN_VIEW_EASE },
 }
 
+function adminShellMotionKey(pathname: string, search: string): string {
+  const dealEdit = /^(\/admin\/deals\/edit\/[^/]+)(?:\/|$)/.exec(pathname)
+  if (dealEdit) {
+    return `${dealEdit[1]}${search}`
+  }
+  return `${pathname}${search}`
+}
+
 export const meta: MetaFunction = () => {
   return [
     { title: 'Granite Depot Database' },
@@ -35,7 +43,7 @@ export default function Admin() {
   const location = useLocation()
   return (
     <motion.div
-      key={`${location.pathname}${location.search}`}
+      key={adminShellMotionKey(location.pathname, location.search)}
       className='w-full min-h-0'
       {...ADMIN_VIEW_ENTER}
     >

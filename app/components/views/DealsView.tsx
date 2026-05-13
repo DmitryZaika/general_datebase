@@ -362,7 +362,7 @@ export default function DealsView({
 
   const toolbar = (
     <div className='w-full flex flex-col sm:flex-row justify-between items-center gap-2 py-1 px-1'>
-      <div className='flex items-center gap-2 w-full sm:w-auto'>
+      <div className='flex items-center justify-center gap-2 w-full sm:w-auto'>
         {readonly ? toolbarLeft : null}
         {!readonly && toolbarLeft}
         {groupListSelect}

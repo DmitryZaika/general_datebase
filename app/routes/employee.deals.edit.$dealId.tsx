@@ -1,12 +1,17 @@
-import { useLoaderData } from 'react-router'
+import { type ShouldRevalidateFunctionArgs, useLoaderData } from 'react-router'
 import DealPage from '~/components/pages/DealPage'
 import {
   createDealEditLoader,
   type DealEditLoaderData,
 } from '~/lib/dealEditLoader.server'
+import { dealsLayoutShouldRevalidate } from '~/utils/dealsLayoutShouldRevalidate'
 import { getEmployeeUser } from '~/utils/session.server'
 
 export const loader = createDealEditLoader(getEmployeeUser, '/employee/deals')
+
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+  return dealsLayoutShouldRevalidate('/employee/deals', args)
+}
 
 export default function DealEditLayout() {
   const {

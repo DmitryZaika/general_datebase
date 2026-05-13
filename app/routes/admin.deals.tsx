@@ -4,6 +4,7 @@ import {
   type LoaderFunctionArgs,
   Outlet,
   redirect,
+  type ShouldRevalidateFunctionArgs,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -22,6 +23,7 @@ import {
 } from '~/components/ui/select'
 import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
+import { dealsLayoutShouldRevalidate } from '~/utils/dealsLayoutShouldRevalidate'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, type User } from '~/utils/session.server'
 
@@ -230,6 +232,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
+}
+
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+  return dealsLayoutShouldRevalidate('/admin/deals', args)
 }
 
 export default function AdminDeals() {

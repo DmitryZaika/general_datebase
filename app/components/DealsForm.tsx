@@ -15,11 +15,9 @@ function MainComponent({
   setCreatedDealId,
   form,
   companyId,
-  dealId,
 }: {
   form: UseFormReturn<DealsDialogSchema>
   companyId: number
-  dealId?: number
   setCreatedDealId: (id: number) => void
 }) {
   return (
@@ -52,12 +50,7 @@ function MainComponent({
         control={form.control}
         name='title'
         render={({ field }) => (
-          <InputItem
-            inputAutoFocus={!!dealId && dealId !== undefined}
-            name={'Title'}
-            placeholder={'Title of the deal'}
-            field={field}
-          />
+          <InputItem name={'Title'} placeholder={'Title of the deal'} field={field} />
         )}
       />
     </>
@@ -97,22 +90,35 @@ export function DealsForm({
           setCreatedDealId={(deal_id: number) => form.setValue('deal_id', deal_id)}
           form={form as UseFormReturn<DealsDialogSchema>}
           companyId={companyId}
-          dealId={dealId}
         />
 
         <DialogFooter>
-          <div className='flex justify-between gap-2 w-full'>
-            {dealId && (
-              <div className='flex justify-start'>
+          <div className='flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2'>
+            {dealId ? (
+              <div className='flex flex-wrap items-center gap-2'>
+                <Link to={`../images${location.search}`} relative='path'>
+                  <Button variant='outline' type='button'>
+                    Images
+                  </Button>
+                </Link>
+                <Link to={`../documents${location.search}`} relative='path'>
+                  <Button variant='outline' type='button'>
+                    Documents
+                  </Button>
+                </Link>
                 <Link to={`../delete${location.search}`} relative='path'>
-                  <Button variant='destructive' type='button' className='mb-4'>
+                  <Button variant='destructive' type='button'>
                     Delete
                   </Button>
                 </Link>
               </div>
-            )}
-            <div className='flex justify-end w-full'>
-              <LoadingButton loading={form.formState.isSubmitting} type='submit'>
+            ) : null}
+            <div className='flex w-full justify-end sm:w-auto sm:ml-auto'>
+              <LoadingButton
+                loading={form.formState.isSubmitting}
+                type='submit'
+                className='w-full sm:w-auto'
+              >
                 {dealId ? 'Save' : 'Create'}
               </LoadingButton>
             </div>

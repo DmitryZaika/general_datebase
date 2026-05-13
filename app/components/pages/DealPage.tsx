@@ -14,29 +14,6 @@ import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { DealEmailHistoryItem } from '~/types/dealActivityTypes'
 import type { Nullable } from '~/types/utils'
 
-function dealEditTabMeta(pathname: string): { dealKey: string; tab: string } | null {
-  const m = pathname.match(
-    /\/edit\/([^/]+)\/(project|information|images|documents)(?:\/|$)/,
-  )
-  if (!m) return null
-  return { dealKey: m[1], tab: m[2] }
-}
-
-function DealEditOutletSkeleton() {
-  return (
-    <div className='space-y-4 py-1 min-h-[280px]' aria-busy aria-live='polite'>
-      <Skeleton className='h-9 w-full max-w-md rounded-md' />
-      <Skeleton className='h-32 w-full rounded-lg' />
-      <Skeleton className='h-32 w-full rounded-lg' />
-      <div className='flex flex-wrap gap-2'>
-        <Skeleton className='h-10 min-w-[8rem] flex-1 rounded-md' />
-        <Skeleton className='h-10 w-32 rounded-md' />
-      </div>
-      <Skeleton className='h-24 w-full rounded-lg' />
-    </div>
-  )
-}
-
 interface DealPageProps {
   dealId: number
   stages?: { id: number; name: string; position: number }[]
@@ -51,6 +28,17 @@ interface DealPageProps {
   imagesCount?: number
   documentsCount?: number
   currentUserName?: string
+}
+
+function DealEditOutletSkeleton() {
+  return (
+    <div className='space-y-3' aria-hidden>
+      <Skeleton className='h-9 w-full max-w-lg' />
+      <Skeleton className='h-9 w-full max-w-lg' />
+      <Skeleton className='h-36 w-full' />
+      <Skeleton className='h-9 w-2/3 max-w-md' />
+    </div>
+  )
 }
 
 export default function DealsEdit({
@@ -71,29 +59,24 @@ export default function DealsEdit({
   const navigate = useNavigate()
   const location = useLocation()
   const navigation = useNavigation()
+  const dealsBase = location.pathname.includes('/admin/')
+    ? '/admin/deals'
+    : '/employee/deals'
 
   const dealEditTabMatch = location.pathname.match(
     /\/edit\/[^/]+\/(project|information|images|documents)(?:\/|$)/,
   )
   const activeDealTab = dealEditTabMatch?.[1] ?? 'project'
 
+  const navPath = navigation.location?.pathname ?? ''
   const showOutletSkeleton =
     navigation.state === 'loading' &&
-    navigation.location !== undefined &&
-    (() => {
-      const target = dealEditTabMeta(navigation.location.pathname)
-      const current = dealEditTabMeta(location.pathname)
-      if (!target || target.dealKey !== String(dealId)) return false
-      if (!current) return true
-      return current.tab !== target.tab
-    })()
+    navPath.includes(`/edit/${dealId}/`) &&
+    navPath !== location.pathname
 
   const handleChange = (open: boolean) => {
     if (!open) {
-      const basePath = location.pathname.includes('/admin/')
-        ? '/admin/deals'
-        : '/employee/deals'
-      navigate(`${basePath}${location.search}`, { state: { shouldRevalidate: true } })
+      navigate(`${dealsBase}${location.search}`, { state: { shouldRevalidate: true } })
     }
   }
 
@@ -121,7 +104,9 @@ export default function DealsEdit({
           <div className='px-1 sm:px-1 md:overflow-auto md:min-h-0'>
             <Tabs
               value={activeDealTab}
-              onValueChange={value => navigate(`${value}${location.search}`)}
+              onValueChange={value =>
+                navigate(`${dealsBase}/edit/${dealId}/${value}${location.search}`)
+              }
             >
               <TabsList className='mb-5 grid grid-cols-4'>
                 <TabsTrigger value='project'>Project</TabsTrigger>

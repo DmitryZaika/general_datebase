@@ -16,10 +16,10 @@ import { DataTable } from '~/components/ui/data-table'
 import { VCard } from '~/components/VCard'
 import { db } from '~/db.server'
 import { useIsMobile } from '~/hooks/use-mobile'
-import { getEmployeeUser, type User } from '~/utils/session.server'
+import { getAdminUser, type User } from '~/utils/session.server'
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const user: User = await getEmployeeUser(request)
+  const user: User = await getAdminUser(request)
   if (!params.dealId) {
     throw new Error('Deal ID is missing')
   }
@@ -36,7 +36,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     [dealId, user.company_id],
   )
   if (!rows || rows.length === 0) {
-    return redirect('/employee/deals')
+    return redirect('/admin/deals')
   }
   return { customer: rows[0] }
 }
@@ -250,7 +250,7 @@ export default function DealProjectInfo() {
         currentId={currentId}
         setCurrentId={setCurrentId}
         images={images}
-        userRole='employee'
+        userRole='admin'
         showInfo={false}
       />
     </div>

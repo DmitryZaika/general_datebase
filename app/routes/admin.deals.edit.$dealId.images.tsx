@@ -284,7 +284,7 @@ export default function DealEditImages() {
                 className='w-full h-32 object-cover rounded-lg'
                 onClick={() => handleImageClick(image.id)}
               />
-              <div className='absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300'>
+              <div className='absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300'>
                 <Button
                   type='button'
                   onClick={() => handleDeleteClick(image.id)}
