@@ -1944,10 +1944,6 @@
 
     "negotiator": ["negotiator@0.6.4", "", {}, ""],
 
-    "node": ["node@26.1.0", "", { "dependencies": { "node-bin-setup": "^1.0.0" }, "bin": { "node": "bin/node" } }, "sha512-EZ69jjl0lHMHSWb30aeClcC3qu4tkXtQivVWDQ2cRfzb8YieFgtfIFSAErAidd3l2RHRbRSM/H5nV+FLqQg0+Q=="],
-
-    "node-bin-setup": ["node-bin-setup@1.1.4", "", {}, "sha512-vWNHOne0ZUavArqPP5LJta50+S8R261Fr5SvGul37HbEDcowvLjwdvd0ZeSr0r2lTSrPxl6okq9QUw8BFGiAxA=="],
-
     "node-domexception": ["node-domexception@1.0.0", "", {}, ""],
 
     "node-fetch": ["node-fetch@3.3.2", "", { "dependencies": { "data-uri-to-buffer": "^4.0.0", "fetch-blob": "^3.1.4", "formdata-polyfill": "^4.0.10" } }, ""],
