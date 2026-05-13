@@ -12,6 +12,9 @@ const ADMIN_VIEW_ENTER = {
 }
 
 function adminShellMotionKey(pathname: string, search: string): string {
+  if (pathname.startsWith('/admin/emails')) {
+    return '/admin/emails'
+  }
   const dealEdit = /^(\/admin\/deals\/edit\/[^/]+)(?:\/|$)/.exec(pathname)
   if (dealEdit) {
     return `${dealEdit[1]}${search}`
