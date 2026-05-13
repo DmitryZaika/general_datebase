@@ -49,9 +49,7 @@ type CustomerActivityFilterType = CallFilterType | 'sms' | 'emails'
 
 const FILTER_OPTIONS: { value: CustomerActivityFilterType; label: string }[] = [
   { value: 'all', label: 'All' },
-  { value: 'incoming', label: 'Incoming' },
-  { value: 'outgoing', label: 'Outgoing' },
-  { value: 'missed', label: 'Missed' },
+  { value: 'calls', label: 'Calls' },
   { value: 'voicemail', label: 'Voicemail' },
   { value: 'sms', label: 'SMS' },
   { value: 'emails', label: 'Emails' },
@@ -331,13 +329,21 @@ function EmptyFiltered({
     )
   }
 
-  const filterLabel = FILTER_OPTIONS.find(o => o.value === filter)?.label.toLowerCase()
-  const noun = filter === 'sms' ? 'messages' : filter === 'emails' ? 'emails' : 'calls'
+  const emptyDetail =
+    filter === 'sms'
+      ? 'SMS messages'
+      : filter === 'emails'
+        ? 'emails'
+        : filter === 'calls'
+          ? 'calls'
+          : filter === 'voicemail'
+            ? 'voicemail'
+            : 'activity'
 
   return (
     <div className='flex flex-col items-center py-6 text-center'>
       <div className='text-sm text-slate-500'>
-        No {filterLabel} {noun} found for this customer
+        No {emptyDetail} found for this customer
       </div>
       <button
         type='button'

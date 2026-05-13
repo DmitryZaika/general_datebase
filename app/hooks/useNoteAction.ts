@@ -83,6 +83,7 @@ export function useNoteAction(dealId: number) {
 
   const remove = useCallback(
     (noteId: number) => {
+      if (dealId <= 0) return
       deleteSubmitted.current = true
       deleteFetcher.submit(
         { intent: 'delete', noteId: String(noteId), csrf: token },
@@ -94,6 +95,7 @@ export function useNoteAction(dealId: number) {
 
   const addComment = useCallback(
     (noteId: number, content: string) => {
+      if (dealId <= 0) return
       commentSubmitted.current = true
       commentFetcher.submit(
         { intent: 'add-comment', noteId: String(noteId), content, csrf: token },
@@ -105,6 +107,7 @@ export function useNoteAction(dealId: number) {
 
   const editNote = useCallback(
     (noteId: number, content: string) => {
+      if (dealId <= 0) return
       editSubmitted.current = true
       editFetcher.submit(
         { intent: 'update', noteId: String(noteId), content, csrf: token },

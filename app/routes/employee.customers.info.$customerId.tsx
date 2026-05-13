@@ -15,6 +15,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { getCustomerEmailsWithReads } from '~/crud/emails'
 import { db } from '~/db.server'
+import { fetchCustomerDealActivityNoteHistory } from '~/lib/customerDealHistory.server'
 import { selectId, selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 
@@ -158,21 +159,38 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     ? await getCustomerEmailsWithReads(customerOut.email, user.company_id)
     : []
 
+  const dealActivityNoteHistory =
+    customerOut !== undefined
+      ? await fetchCustomerDealActivityNoteHistory(db, customerId, user.company_id)
+      : { activities: [], notes: [] }
+
   return {
     customer: customerOut,
     deals,
     project,
     emails,
     reassignments,
+    dealActivities: dealActivityNoteHistory.activities,
+    dealNotes: dealActivityNoteHistory.notes,
     hasTabs: !!(customerOut?.company_name || hasChildren.length > 0),
+    viewerName: user.name,
   }
 }
 
 export default function CustomerInfoDialog() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { customer, deals, project, emails, reassignments, hasTabs } =
-    useLoaderData<typeof loader>()
+  const {
+    customer,
+    deals,
+    project,
+    emails,
+    reassignments,
+    dealActivities,
+    dealNotes,
+    hasTabs,
+    viewerName,
+  } = useLoaderData<typeof loader>()
 
   const handleChange = (open: boolean) => {
     if (open === false) navigate(`..${location.search}`)
@@ -198,12 +216,34 @@ export default function CustomerInfoDialog() {
               <TabsTrigger value='projects'>Projects</TabsTrigger>
             </TabsList>
             <div className='mt-4'>
-              <Outlet context={{ customer, deals, project, emails, reassignments }} />
+              <Outlet
+                context={{
+                  customer,
+                  deals,
+                  project,
+                  emails,
+                  reassignments,
+                  dealActivities,
+                  dealNotes,
+                  viewerName,
+                }}
+              />
             </div>
           </Tabs>
         ) : (
           <div className='mt-4'>
-            <Outlet context={{ customer, deals, project, emails, reassignments }} />
+            <Outlet
+              context={{
+                customer,
+                deals,
+                project,
+                emails,
+                reassignments,
+                dealActivities,
+                dealNotes,
+                viewerName,
+              }}
+            />
           </div>
         )}
       </DialogContent>

@@ -1,6 +1,7 @@
 import type { EmailHistory } from '~/crud/emails'
 import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
+import type { Nullable } from '~/types/utils'
 import type { CallEntry } from '~/utils/callDisplayHelpers'
 import type { SmsEntry } from '~/utils/smsDisplayHelpers'
 
@@ -27,4 +28,6 @@ export interface DealActivityPanelProps {
   emails?: DealEmailHistoryItem[]
   customerEmails?: DealEmailHistoryItem[]
   currentUserName?: string
+  readOnly?: boolean
+  customerPhones?: { phone: Nullable<string>; phone2: Nullable<string> }
 }

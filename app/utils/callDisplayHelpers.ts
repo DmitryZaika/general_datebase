@@ -79,13 +79,15 @@ export function getStatusColor(status: string): string {
   }
 }
 
-export type CallFilterType = 'all' | 'incoming' | 'outgoing' | 'missed' | 'voicemail'
+export type CallFilterType = 'all' | 'calls' | 'voicemail'
 
 export type ActivityFilterType = CallFilterType | 'sms'
 
 export function matchesCallFilter(call: CallEntry, filter: CallFilterType): boolean {
   if (filter === 'all') return true
   if (filter === 'voicemail') return call.isVoicemail
-  if (filter === 'missed') return call.talkingTime === 0 && call.type === 'incoming'
-  return call.type === filter
+  if (filter === 'calls') {
+    return call.type === 'incoming' || call.type === 'outgoing'
+  }
+  return false
 }

@@ -83,6 +83,7 @@ import type {
 import type { Nullable } from '~/types/utils'
 import { type CallEntry, mapToCallEntry } from '~/utils/callDisplayHelpers'
 import type { Calls200Response } from '~/utils/cloudtalk.server'
+import { phoneDigitsOnly } from '~/utils/phone'
 import { mapRowToSmsEntry, type SmsEntry, type SmsRow } from '~/utils/smsDisplayHelpers'
 import { stripHtmlTags } from '~/utils/stringHelpers'
 import { NoteForm } from './NoteForm'
@@ -304,6 +305,7 @@ function useActivityAction(dealId: number) {
 
   const toggle = useCallback(
     (activityId: number, activityName: string, isCurrentlyDone: boolean) => {
+      if (dealId <= 0) return
       toggleFetcher.submit(
         { intent: 'toggle', activityId: String(activityId), csrf: token },
         { method: 'POST', action: buildActivityApiAction(dealId) },
@@ -327,6 +329,7 @@ function useActivityAction(dealId: number) {
 
   const remove = useCallback(
     (activityId: number, activityName: string) => {
+      if (dealId <= 0) return
       deleteFetcher.submit(
         { intent: 'delete', activityId: String(activityId), csrf: token },
         { method: 'POST', action: buildActivityApiAction(dealId) },
@@ -343,10 +346,66 @@ function useActivityAction(dealId: number) {
   return {
     toggle,
     remove,
-    isToggling: toggleFetcher.state !== 'idle',
-    isDeleting: deleteFetcher.state !== 'idle',
-    togglingData: toggleFetcher.formData,
+    isToggling: dealId <= 0 ? false : toggleFetcher.state !== 'idle',
+    isDeleting: dealId <= 0 ? false : deleteFetcher.state !== 'idle',
+    togglingData: dealId <= 0 ? undefined : toggleFetcher.formData,
   }
+}
+
+function ActivityItemReadOnly({
+  activity,
+  viewerName,
+}: {
+  activity: DealActivity
+  viewerName?: Nullable<string>
+}) {
+  const done = !!activity.is_completed
+  const urgency: DeadlineUrgency =
+    !done && activity.deadline
+      ? formatDeadlineLabel(activity.deadline).urgency
+      : 'normal'
+  const when = formatTimestamp(activity.completed_at || activity.created_at)
+
+  return (
+    <div
+      className={cn(
+        'flex flex-col gap-0.5 rounded-md px-2 py-1.5',
+        !done && URGENCY_BORDER_STYLE[urgency],
+      )}
+    >
+      <div className='flex items-start justify-between gap-2'>
+        <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2'>
+          {done ? (
+            <Badge className='h-4 shrink-0 border border-gray-200 bg-gray-100 px-1.5 py-0 text-[10px] text-gray-700'>
+              Done
+            </Badge>
+          ) : null}
+          <PriorityBadge priority={activity.priority} />
+          {shouldShowCreatorAttribution(viewerName, activity.created_by) &&
+          activity.created_by ? (
+            <span className='min-w-0 truncate text-xs text-gray-500'>
+              Created by {activity.created_by}
+            </span>
+          ) : null}
+        </div>
+        {when ? (
+          <div className='flex shrink-0 flex-col items-end gap-0.5'>
+            <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
+              {when}
+            </span>
+          </div>
+        ) : null}
+      </div>
+      <p className='mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800'>
+        {activity.name}
+      </p>
+      {!done && activity.deadline ? (
+        <div className='mt-0.5 flex flex-wrap items-center gap-1.5'>
+          <DeadlineLabel deadline={activity.deadline} />
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 function PriorityDot({ priority }: { priority: ActivityPriority }) {
@@ -391,6 +450,67 @@ function getFormDataNoteId(formData: FormData | undefined): Nullable<number> {
   if (typeof value !== 'string') return null
   const id = Number(value)
   return Number.isFinite(id) ? id : null
+}
+
+function NoteHistoryReadOnly({
+  note,
+  viewerName,
+}: {
+  note: DealNote
+  viewerName?: Nullable<string>
+}) {
+  const pinned = !!note.is_pinned
+  const when = formatTimestamp(note.created_at)
+  const showCreatorLine =
+    !!note.created_by && shouldShowCreatorAttribution(viewerName, note.created_by)
+
+  return (
+    <div className='flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
+      <div className='flex items-start justify-between gap-2'>
+        <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2'>
+          {pinned ? (
+            <Badge className='text-[10px] px-1.5 py-0 h-4 border bg-amber-100 text-amber-800 border-amber-200'>
+              Pinned
+            </Badge>
+          ) : null}
+        </div>
+        <div className='flex shrink-0 flex-col items-end gap-0.5'>
+          <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
+            {when}
+          </span>
+          {showCreatorLine && note.created_by ? (
+            <span className='max-w-[140px] truncate text-[9px] text-gray-400'>
+              By {formatAttributionName(note.created_by)}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <p className='mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-800'>
+        {note.content}
+      </p>
+      {note.comments.length > 0 ? (
+        <div className='mt-2.5 space-y-1.5 border-l-2 border-gray-200 pl-3'>
+          {note.comments.map(c => (
+            <div key={c.id} className='flex flex-col gap-0.5'>
+              <div className='flex justify-end'>
+                <div className='flex flex-col items-end gap-0.5'>
+                  <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
+                    {formatTimestamp(c.created_at)}
+                  </span>
+                  {c.created_by ? (
+                    <span className='max-w-[140px] truncate text-[9px] text-gray-400'>
+                      By {formatAttributionName(c.created_by)}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <p className='text-xs text-gray-600 leading-relaxed'>{c.content}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 function NoteHistorySkeletonItem({ isLast = false }: { isLast?: boolean }) {
@@ -1185,6 +1305,7 @@ function ActivityList({
   historyHeaderRef,
   viewerName,
   historyAsyncReady,
+  readOnly = false,
 }: {
   dealId: number
   activities: DealActivity[]
@@ -1198,6 +1319,7 @@ function ActivityList({
   historyHeaderRef: React.RefObject<Nullable<HTMLDivElement>>
   viewerName: string
   historyAsyncReady: boolean
+  readOnly?: boolean
 }) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(true)
   const toggleHistoryOpen = useCallback(() => setIsHistoryOpen(prev => !prev), [])
@@ -1210,6 +1332,17 @@ function ActivityList({
     getFormDataNoteId(noteHandlers.deletingData)
 
   const { todo, done } = useMemo(() => partitionActivities(activities), [activities])
+
+  const historyActivitiesSorted = useMemo(() => {
+    if (!readOnly) return done
+    return [...activities].sort((a, b) => {
+      const ta = new Date(a.completed_at || a.created_at).getTime()
+      const tb = new Date(b.completed_at || b.created_at).getTime()
+      return tb - ta
+    })
+  }, [readOnly, activities, done])
+
+  const activitiesForHistoryTabs = readOnly ? historyActivitiesSorted : done
 
   const displayedEmails =
     showCustomerEmails && customerEmails.length > 0 ? customerEmails : emails
@@ -1234,7 +1367,7 @@ function ActivityList({
 
   const allHistoryItems = useMemo<HistoryItem[]>(() => {
     const items: HistoryItem[] = [
-      ...done.map(
+      ...activitiesForHistoryTabs.map(
         a =>
           ({
             type: 'activity',
@@ -1288,10 +1421,10 @@ function ActivityList({
     })
 
     return items
-  }, [done, notes, actions, smsMessages, displayedEmails])
+  }, [activitiesForHistoryTabs, notes, actions, smsMessages, displayedEmails])
 
   const historyCount =
-    done.length +
+    activitiesForHistoryTabs.length +
     notes.length +
     actions.length +
     smsMessages.length +
@@ -1303,26 +1436,34 @@ function ActivityList({
         case 'activity':
           return (
             <TimelineItem icon={ClipboardIcon} isLast={isLast}>
-              <ActivityItem
-                activity={item.data}
-                dealId={dealId}
-                onEdit={onEdit}
-                isBeingEdited={editingActivityId === item.data.id}
-                viewerName={viewerName}
-              />
+              {readOnly ? (
+                <ActivityItemReadOnly activity={item.data} viewerName={viewerName} />
+              ) : (
+                <ActivityItem
+                  activity={item.data}
+                  dealId={dealId}
+                  onEdit={onEdit}
+                  isBeingEdited={editingActivityId === item.data.id}
+                  viewerName={viewerName}
+                />
+              )}
             </TimelineItem>
           )
         case 'note':
-          if (updatingNoteId === item.data.id) {
+          if (!readOnly && updatingNoteId === item.data.id) {
             return <NoteHistorySkeletonItem isLast={isLast} />
           }
           return (
             <TimelineItem icon={NoteIcon} isLast={isLast}>
-              <NoteItem
-                note={item.data}
-                handlers={noteHandlers}
-                viewerName={viewerName}
-              />
+              {readOnly ? (
+                <NoteHistoryReadOnly note={item.data} viewerName={viewerName} />
+              ) : (
+                <NoteItem
+                  note={item.data}
+                  handlers={noteHandlers}
+                  viewerName={viewerName}
+                />
+              )}
             </TimelineItem>
           )
         case 'action':
@@ -1350,26 +1491,45 @@ function ActivityList({
           )
       }
     },
-    [dealId, onEdit, editingActivityId, noteHandlers, updatingNoteId, viewerName],
+    [
+      dealId,
+      onEdit,
+      editingActivityId,
+      noteHandlers,
+      updatingNoteId,
+      viewerName,
+      readOnly,
+    ],
   )
 
   const tabRenderers = useMemo<Record<HistoryTab, () => ReactNode>>(
     () => ({
       activities: () => {
-        if (done.length === 0)
-          return <SectionEmptyState label='No completed activities' />
+        if (activitiesForHistoryTabs.length === 0)
+          return (
+            <SectionEmptyState
+              label={readOnly ? 'No activities' : 'No completed activities'}
+            />
+          )
         return (
           <motion.div variants={EMAIL_LIST_VARIANTS} initial='hidden' animate='visible'>
-            {done.map((activity, index) => (
+            {activitiesForHistoryTabs.map((activity, index) => (
               <motion.div key={`activity-${activity.id}`} variants={EMAIL_ROW_VARIANTS}>
-                <TimelineItem icon={ClipboardIcon} isLast={index === done.length - 1}>
-                  <ActivityItem
-                    activity={activity}
-                    dealId={dealId}
-                    onEdit={onEdit}
-                    isBeingEdited={editingActivityId === activity.id}
-                    viewerName={viewerName}
-                  />
+                <TimelineItem
+                  icon={ClipboardIcon}
+                  isLast={index === activitiesForHistoryTabs.length - 1}
+                >
+                  {readOnly ? (
+                    <ActivityItemReadOnly activity={activity} viewerName={viewerName} />
+                  ) : (
+                    <ActivityItem
+                      activity={activity}
+                      dealId={dealId}
+                      onEdit={onEdit}
+                      isBeingEdited={editingActivityId === activity.id}
+                      viewerName={viewerName}
+                    />
+                  )}
                 </TimelineItem>
               </motion.div>
             ))}
@@ -1382,7 +1542,7 @@ function ActivityList({
           <motion.div variants={EMAIL_LIST_VARIANTS} initial='hidden' animate='visible'>
             {sortedNotes.map((note, index) => {
               const isLast = index === sortedNotes.length - 1
-              if (updatingNoteId === note.id) {
+              if (!readOnly && updatingNoteId === note.id) {
                 return (
                   <motion.div
                     key={`note-skeleton-${note.id}`}
@@ -1395,11 +1555,15 @@ function ActivityList({
               return (
                 <motion.div key={`note-${note.id}`} variants={EMAIL_ROW_VARIANTS}>
                   <TimelineItem icon={NoteIcon} isLast={isLast}>
-                    <NoteItem
-                      note={note}
-                      handlers={noteHandlers}
-                      viewerName={viewerName}
-                    />
+                    {readOnly ? (
+                      <NoteHistoryReadOnly note={note} viewerName={viewerName} />
+                    ) : (
+                      <NoteItem
+                        note={note}
+                        handlers={noteHandlers}
+                        viewerName={viewerName}
+                      />
+                    )}
                   </TimelineItem>
                 </motion.div>
               )
@@ -1488,6 +1652,8 @@ function ActivityList({
     }),
     [
       done,
+      activitiesForHistoryTabs,
+      readOnly,
       sortedNotes,
       sortedEmails,
       customerEmails.length,
@@ -1507,54 +1673,61 @@ function ActivityList({
 
   return (
     <div className='space-y-4'>
-      <div>
-        <SectionHeader label='To Do' count={todo.length} />
-        {todo.length > 0 ? (
-          <div>
-            <AnimatePresence initial={false}>
-              {todo.map((activity, index) => (
-                <motion.div
-                  key={activity.id}
-                  layout
-                  variants={ITEM_VARIANTS}
-                  initial='initial'
-                  animate='animate'
-                  exit='exit'
-                  transition={ITEM_TRANSITION}
-                  style={{ overflow: 'hidden' }}
-                >
-                  <TimelineItem icon={ClipboardIcon} isLast={index === todo.length - 1}>
-                    <ActivityItem
-                      activity={activity}
-                      dealId={dealId}
-                      onEdit={onEdit}
-                      isBeingEdited={editingActivityId === activity.id}
-                      viewerName={viewerName}
-                    />
-                  </TimelineItem>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        ) : (
-          <SectionEmptyState label='No tasks yet' />
-        )}
-      </div>
+      {!readOnly ? (
+        <div>
+          <SectionHeader label='To Do' count={todo.length} />
+          {todo.length > 0 ? (
+            <div>
+              <AnimatePresence initial={false}>
+                {todo.map((activity, index) => (
+                  <motion.div
+                    key={activity.id}
+                    layout
+                    variants={ITEM_VARIANTS}
+                    initial='initial'
+                    animate='animate'
+                    exit='exit'
+                    transition={ITEM_TRANSITION}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <TimelineItem
+                      icon={ClipboardIcon}
+                      isLast={index === todo.length - 1}
+                    >
+                      <ActivityItem
+                        activity={activity}
+                        dealId={dealId}
+                        onEdit={onEdit}
+                        isBeingEdited={editingActivityId === activity.id}
+                        viewerName={viewerName}
+                      />
+                    </TimelineItem>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <SectionEmptyState label='No tasks yet' />
+          )}
+        </div>
+      ) : null}
 
       <div ref={historyHeaderRef}>
-        <SectionHeader
-          label='History'
-          count={historyCount}
-          collapsible
-          isOpen={isHistoryOpen}
-          onToggle={toggleHistoryOpen}
-        />
-        {isHistoryOpen && (
+        {!readOnly ? (
+          <SectionHeader
+            label='History'
+            count={historyCount}
+            collapsible
+            isOpen={isHistoryOpen}
+            onToggle={toggleHistoryOpen}
+          />
+        ) : null}
+        {(readOnly || isHistoryOpen) && (
           <>
             <HistoryTabButtons
               activeTab={historyTab}
               onTabChange={setHistoryTab}
-              activitiesCount={done.length}
+              activitiesCount={activitiesForHistoryTabs.length}
               notesCount={notes.length}
               actionsCount={actions.length}
               smsCount={smsMessages.length}
@@ -1592,6 +1765,8 @@ export function DealActivityPanel({
   emails = [],
   customerEmails = [],
   currentUserName = '',
+  readOnly = false,
+  customerPhones,
 }: DealActivityPanelProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -1600,6 +1775,18 @@ export function DealActivityPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const historyHeaderRef = useRef<HTMLDivElement>(null)
 
+  const hasCustomerPhones =
+    readOnly && !!(customerPhones?.phone?.trim() || customerPhones?.phone2?.trim())
+
+  const customerPhoneDigitsLocal = useMemo(
+    () =>
+      [customerPhones?.phone, customerPhones?.phone2]
+        .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+        .map(p => phoneDigitsOnly(p.trim()))
+        .filter(d => d.length >= 10),
+    [customerPhones?.phone, customerPhones?.phone2],
+  )
+
   const { data: callsData, isPending: isCallsHistoryPending } = useQuery({
     queryKey: ['cloudtalk-deal-calls', dealId],
     queryFn: async () => {
@@ -1607,16 +1794,38 @@ export function DealActivityPanel({
       if (!r.ok) throw new Error(`CloudTalk ${r.status}`)
       return (await r.json()) as { items: Calls200Response[] }
     },
-    enabled: !!dealId,
+    enabled: !readOnly && !!dealId,
     staleTime: 60_000,
   })
 
+  const { data: customerCallsData, isPending: isCustomerCallsPending } = useQuery({
+    queryKey: [
+      'cloudtalk-customer-calls',
+      customerPhones?.phone ?? '',
+      customerPhones?.phone2 ?? '',
+    ],
+    queryFn: async () => {
+      const qs = new URLSearchParams()
+      const p1 = customerPhones?.phone?.trim()
+      const p2 = customerPhones?.phone2?.trim()
+      if (p1) qs.set('phone', p1)
+      if (p2) qs.set('phone2', p2)
+      const r = await fetch(`/api/cloudtalk/customerCalls?${qs}`)
+      if (!r.ok) throw new Error(`CloudTalk ${r.status}`)
+      return (await r.json()) as { items: Calls200Response[] }
+    },
+    enabled: readOnly && hasCustomerPhones,
+    staleTime: 60_000,
+  })
+
+  const mergedCallsData = readOnly ? customerCallsData : callsData
+
   const actions = useMemo(() => {
-    const raw = callsData?.items ?? []
+    const raw = mergedCallsData?.items ?? []
     return raw
       .map(mapToCallEntry)
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-  }, [callsData])
+  }, [mergedCallsData])
 
   const { data: smsData, isPending: isSmsHistoryPending } = useQuery({
     queryKey: ['cloudtalk-deal-sms', dealId],
@@ -1628,23 +1837,61 @@ export function DealActivityPanel({
         customerPhoneDigits: string[]
       }
     },
-    enabled: !!dealId,
+    enabled: !readOnly && !!dealId,
     staleTime: 60_000,
   })
 
+  const { data: customerSmsData, isPending: isCustomerSmsPending } = useQuery({
+    queryKey: [
+      'cloudtalk-customer-sms',
+      customerPhones?.phone ?? '',
+      customerPhones?.phone2 ?? '',
+    ],
+    queryFn: async () => {
+      const qs = new URLSearchParams()
+      const p1 = customerPhones?.phone?.trim()
+      const p2 = customerPhones?.phone2?.trim()
+      if (p1) qs.set('phone', p1)
+      if (p2) qs.set('phone2', p2)
+      const r = await fetch(`/api/cloudtalk/customerSms?${qs}`)
+      if (!r.ok) throw new Error(`SMS ${r.status}`)
+      return (await r.json()) as {
+        items: SmsRow[]
+        customerPhoneDigits: string[]
+      }
+    },
+    enabled: readOnly && hasCustomerPhones,
+    staleTime: 60_000,
+  })
+
+  const mergedSmsData = readOnly ? customerSmsData : smsData
+
   const smsMessages = useMemo(() => {
-    const rows = smsData?.items ?? []
-    const digits = smsData?.customerPhoneDigits ?? []
+    const rows = mergedSmsData?.items ?? []
+    const digits =
+      mergedSmsData?.customerPhoneDigits ?? (readOnly ? customerPhoneDigitsLocal : [])
     return rows
       .map(r => mapRowToSmsEntry(r, digits))
       .sort(
         (a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime(),
       )
-  }, [smsData])
+  }, [mergedSmsData, readOnly, customerPhoneDigitsLocal])
 
-  const historyAsyncReady = !isCallsHistoryPending && !isSmsHistoryPending
+  const isCallsPendingResolved = readOnly
+    ? hasCustomerPhones
+      ? isCustomerCallsPending
+      : false
+    : isCallsHistoryPending
+  const isSmsPendingResolved = readOnly
+    ? hasCustomerPhones
+      ? isCustomerSmsPending
+      : false
+    : isSmsHistoryPending
+
+  const historyAsyncReady = !isCallsPendingResolved && !isSmsPendingResolved
 
   useEffect(() => {
+    if (readOnly) return
     const params = new URLSearchParams(location.search)
     const raw = params.get('editActivity')
     if (raw === null || raw === '') return
@@ -1668,7 +1915,7 @@ export function DealActivityPanel({
       setActiveTab('activity')
     }
     goReplace()
-  }, [activities, location.search, location.pathname, navigate])
+  }, [readOnly, activities, location.search, location.pathname, navigate])
 
   const handleEdit = (activity: DealActivity) => {
     setEditingActivity(activity)
@@ -1689,33 +1936,40 @@ export function DealActivityPanel({
     })
   }, [])
 
+  const listDealId = readOnly ? 0 : dealId
+
   return (
     <div className='flex flex-col h-full'>
-      <Tabs
-        value={activeTab}
-        onValueChange={value => {
-          setActiveTab(value as 'activity' | 'notes')
-          setEditingActivity(null)
-        }}
+      {readOnly ? null : (
+        <Tabs
+          value={activeTab}
+          onValueChange={value => {
+            setActiveTab(value as 'activity' | 'notes')
+            setEditingActivity(null)
+          }}
+        >
+          <TabsList className='mb-3 grid grid-cols-2'>
+            <TabsTrigger value='activity'>Activity</TabsTrigger>
+            <TabsTrigger value='notes'>Notes</TabsTrigger>
+          </TabsList>
+          <TabsContent value='activity'>
+            <ActivityForm
+              dealId={dealId}
+              editingActivity={editingActivity}
+              onCancelEdit={() => setEditingActivity(null)}
+            />
+          </TabsContent>
+          <TabsContent value='notes'>
+            <NoteForm dealId={dealId} onNoteCreated={scrollToHistory} />
+          </TabsContent>
+        </Tabs>
+      )}
+      <div
+        ref={scrollRef}
+        className={cn('flex-1 overflow-y-auto min-h-0', readOnly && 'min-h-[240px]')}
       >
-        <TabsList className='mb-3 grid grid-cols-2'>
-          <TabsTrigger value='activity'>Activity</TabsTrigger>
-          <TabsTrigger value='notes'>Notes</TabsTrigger>
-        </TabsList>
-        <TabsContent value='activity'>
-          <ActivityForm
-            dealId={dealId}
-            editingActivity={editingActivity}
-            onCancelEdit={() => setEditingActivity(null)}
-          />
-        </TabsContent>
-        <TabsContent value='notes'>
-          <NoteForm dealId={dealId} onNoteCreated={scrollToHistory} />
-        </TabsContent>
-      </Tabs>
-      <div ref={scrollRef} className='flex-1 overflow-y-auto min-h-0'>
         <ActivityList
-          dealId={dealId}
+          dealId={listDealId}
           activities={activities}
           notes={notes}
           actions={actions}
@@ -1727,6 +1981,7 @@ export function DealActivityPanel({
           historyHeaderRef={historyHeaderRef}
           viewerName={currentUserName}
           historyAsyncReady={historyAsyncReady}
+          readOnly={readOnly}
         />
       </div>
     </div>

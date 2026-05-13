@@ -2,8 +2,11 @@ import { format } from 'date-fns'
 import { useOutletContext } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
 import { CustomerHistorySection } from '~/components/molecules/CustomerHistorySection'
-import { CustomerActivityTimeline } from '~/components/organisms/CustomerActivityTimeline'
+import { DealActivityPanel } from '~/components/molecules/DealActivityPanel'
 import type { EmailHistory } from '~/crud/emails'
+import type { CustomerDealActivityHistory } from '~/lib/customerDealHistory.server'
+import type { DealNote } from '~/routes/api.deal-notes.$dealId'
+import type { DealEmailHistoryItem } from '~/types/dealActivityTypes'
 
 type CustomerInfo = {
   id: number
@@ -64,12 +67,24 @@ type ReassignmentRow = {
 }
 
 export default function CustomerInfoTab() {
-  const { customer, deals, project, emails, reassignments } = useOutletContext<{
+  const {
+    customer,
+    deals,
+    project,
+    emails,
+    reassignments,
+    dealActivities,
+    dealNotes,
+    viewerName,
+  } = useOutletContext<{
     customer: CustomerInfo | null
     deals: DealRow[]
     project: ProjectInfo | null
     emails: EmailHistory[]
     reassignments: ReassignmentRow[]
+    dealActivities: CustomerDealActivityHistory[]
+    dealNotes: DealNote[]
+    viewerName: string
   }>()
 
   if (!customer) {
@@ -204,6 +219,20 @@ export default function CustomerInfoTab() {
         )}
       </div>
 
+      <div className='border rounded p-4'>
+        <div className='text-md font-semibold mb-2'>Activity</div>
+        <DealActivityPanel
+          dealId={0}
+          activities={dealActivities}
+          notes={dealNotes}
+          emails={emails as DealEmailHistoryItem[]}
+          customerEmails={[]}
+          currentUserName={viewerName}
+          readOnly
+          customerPhones={{ phone: customer.phone, phone2: customer.phone_2 }}
+        />
+      </div>
+
       <CustomerHistorySection
         created_by={customer.created_by}
         created_date={customer.created_date}
@@ -211,12 +240,6 @@ export default function CustomerInfoTab() {
         sales_rep_name={customer.sales_rep_name}
         first_rep_deal_created_at={customer.first_rep_deal_created_at}
         reassignments={reassignments}
-      />
-
-      <CustomerActivityTimeline
-        phone={customer.phone}
-        phone2={customer.phone_2}
-        emails={emails}
       />
     </div>
   )
