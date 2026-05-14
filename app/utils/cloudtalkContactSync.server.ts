@@ -1,4 +1,4 @@
-import type { ResultSetHeader } from 'mysql2'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { db } from '~/db.server'
 import type { Nullable } from '~/types/utils'
 import { parseUSAddress } from '~/utils/address'
@@ -145,34 +145,58 @@ async function reportFailure(
   await recordError(customerId, error)
 }
 
+async function findLocalCloudTalkIdByPhone(
+  companyId: number,
+  e164Phones: string[],
+): Promise<Nullable<number>> {
+  if (e164Phones.length === 0) return null
+  const placeholders = e164Phones.map(() => '?').join(',')
+  const [rows] = await db.query<(RowDataPacket & { cloudtalk_id: number })[]>(
+    `(SELECT cloudtalk_id FROM cloudtalk_contacts
+        WHERE company_id = ? AND phone_e164_1 IN (${placeholders}) LIMIT 1)
+     UNION ALL
+     (SELECT cloudtalk_id FROM cloudtalk_contacts
+        WHERE company_id = ? AND phone_e164_2 IN (${placeholders}) LIMIT 1)
+     LIMIT 1`,
+    [companyId, ...e164Phones, companyId, ...e164Phones],
+  )
+  return rows[0]?.cloudtalk_id ?? null
+}
+
 async function upsertContact(
   customer: CustomerForSync,
   payload: ContactPayload,
   mapping: MappingRow | undefined,
 ): Promise<void> {
+  const phones = payload.ContactNumber.map(n => n.public_number)
+  const phone1 = phones[0] ?? null
+  const phone2 = phones[1] ?? null
+
   if (mapping) {
     await updateCloudTalkContact(customer.company_id, mapping.cloudtalk_id, payload)
     await db.execute<ResultSetHeader>(
-      `UPDATE cloudtalk_contacts SET last_error = NULL WHERE id = ?`,
-      [mapping.id],
+      `UPDATE cloudtalk_contacts
+          SET last_error = NULL, phone_e164_1 = ?, phone_e164_2 = ?
+        WHERE id = ?`,
+      [phone1, phone2, mapping.id],
     )
     return
   }
 
-  const phones = payload.ContactNumber.map(n => n.public_number)
-  const existingId = await findCloudTalkContactByPhone(customer.company_id, phones)
+  const existingId =
+    (await findLocalCloudTalkIdByPhone(customer.company_id, phones)) ??
+    (await findCloudTalkContactByPhone(customer.company_id, phones))
 
-  let cloudtalkId: number
   if (existingId) {
     await updateCloudTalkContact(customer.company_id, existingId, payload)
-    cloudtalkId = existingId
-  } else {
-    cloudtalkId = await createCloudTalkContact(customer.company_id, payload)
   }
+  const cloudtalkId =
+    existingId ?? (await createCloudTalkContact(customer.company_id, payload))
+
   await db.execute<ResultSetHeader>(
-    `INSERT INTO cloudtalk_contacts (customer_id, company_id, cloudtalk_id)
-     VALUES (?, ?, ?)`,
-    [customer.id, customer.company_id, cloudtalkId],
+    `INSERT INTO cloudtalk_contacts (customer_id, company_id, cloudtalk_id, phone_e164_1, phone_e164_2)
+     VALUES (?, ?, ?, ?, ?)`,
+    [customer.id, customer.company_id, cloudtalkId, phone1, phone2],
   )
 }
 
@@ -213,10 +237,9 @@ export async function deleteCustomerFromCloudTalk(customerId: number): Promise<v
         throw error
       }
     }
-    await db.execute<ResultSetHeader>(
-      `DELETE FROM cloudtalk_contacts WHERE id = ?`,
-      [mapping.id],
-    )
+    await db.execute<ResultSetHeader>(`DELETE FROM cloudtalk_contacts WHERE id = ?`, [
+      mapping.id,
+    ])
   } catch (error) {
     await reportFailure('cloudtalk_delete_customer_failed', customerId, error)
     throw error

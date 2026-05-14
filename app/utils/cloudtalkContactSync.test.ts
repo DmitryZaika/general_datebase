@@ -117,10 +117,39 @@ describe('syncCustomerToCloudTalk', () => {
       String(c[0]).includes('INSERT INTO cloudtalk_contacts'),
     )
     expect(insertCall).toBeDefined()
-    expect(insertCall?.[1]).toEqual([100, 7, 9999])
+    expect(insertCall?.[1]).toEqual([100, 7, 9999, '+13173161456', null])
   })
 
-  it('links to an existing CloudTalk contact when one is found by phone (no create)', async () => {
+  it('reuses a CloudTalk id from a same-phone customer already in cloudtalk_contacts', async () => {
+    setupQueries([
+      {
+        match: sql => sql.includes('FROM customers WHERE id = ?'),
+        rows: [customerRow],
+      },
+      {
+        match: sql => sql.includes('phone_e164_1'),
+        rows: [{ cloudtalk_id: 4242 }],
+      },
+      { match: sql => sql.includes('FROM cloudtalk_contacts'), rows: [] },
+      { match: sql => sql.includes('FROM company'), rows: [credsRow] },
+    ])
+    dbExecute.mockResolvedValue([{ insertId: 1 }])
+
+    const { syncCustomerToCloudTalk } = await import('./cloudtalkContactSync.server')
+    await syncCustomerToCloudTalk(100)
+
+    expect(findCloudTalkContactByPhone).not.toHaveBeenCalled()
+    expect(createCloudTalkContact).not.toHaveBeenCalled()
+    expect(updateCloudTalkContact).toHaveBeenCalledTimes(1)
+    expect(updateCloudTalkContact.mock.calls[0][1]).toBe(4242)
+
+    const insertCall = dbExecute.mock.calls.find(c =>
+      String(c[0]).includes('INSERT INTO cloudtalk_contacts'),
+    )
+    expect(insertCall?.[1]).toEqual([100, 7, 4242, '+13173161456', null])
+  })
+
+  it('falls back to CloudTalk search when no local same-phone mapping exists', async () => {
     setupQueries([
       {
         match: sql => sql.includes('FROM customers WHERE id = ?'),
@@ -143,7 +172,7 @@ describe('syncCustomerToCloudTalk', () => {
     const insertCall = dbExecute.mock.calls.find(c =>
       String(c[0]).includes('INSERT INTO cloudtalk_contacts'),
     )
-    expect(insertCall?.[1]).toEqual([100, 7, 7777])
+    expect(insertCall?.[1]).toEqual([100, 7, 7777, '+13173161456', null])
   })
 
   it('updates an existing contact when mapping is present', async () => {
@@ -167,6 +196,14 @@ describe('syncCustomerToCloudTalk', () => {
     expect(updateCloudTalkContact.mock.calls[0][0]).toBe(7)
     expect(updateCloudTalkContact.mock.calls[0][1]).toBe(12345)
     expect(createCloudTalkContact).not.toHaveBeenCalled()
+
+    const refreshCall = dbExecute.mock.calls.find(
+      c =>
+        String(c[0]).includes('UPDATE cloudtalk_contacts') &&
+        String(c[0]).includes('phone_e164_1'),
+    )
+    expect(refreshCall).toBeDefined()
+    expect(refreshCall?.[1]).toEqual(['+13173161456', null, 5])
   })
 
   it('skips silently when company has no CloudTalk credentials', async () => {
@@ -224,6 +261,11 @@ describe('syncCustomerToCloudTalk', () => {
       '+13173161456',
       '+14155550100',
     ])
+
+    const insertCall = dbExecute.mock.calls.find(c =>
+      String(c[0]).includes('INSERT INTO cloudtalk_contacts'),
+    )
+    expect(insertCall?.[1]).toEqual([100, 7, 9999, '+13173161456', '+14155550100'])
   })
 
   it('records last_error AND rethrows when CloudTalk API fails', async () => {
