@@ -141,6 +141,42 @@ describe('createCloudTalkContact', () => {
     expect(await createCloudTalkContact(7, payload)).toBe(555)
     expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
+
+  it('does not leak the CloudTalk response body into the thrown error message', async () => {
+    const pii = 'Jane Doe 555-867-5309 jane@example.com'
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(`{"error":"validation","echo":"${pii}"}`, {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    const { createCloudTalkContact } = await import('./cloudtalk.server')
+
+    const err = (await createCloudTalkContact(7, payload).catch(e => e)) as Error
+    expect(err).toBeInstanceOf(Error)
+    expect(err.message).not.toContain(pii)
+    expect(err.message).toContain('400')
+  })
+
+  it('does not leak the unparseable response preview into the thrown error message', async () => {
+    const pii = 'Jane Doe 555-867-5309'
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: unknown) => {
+      const url = typeof input === 'string' ? input : (input as Request).url
+      if (url.includes('contacts/add.json')) {
+        return okJsonResponse({ responseData: { weird_shape: pii } })
+      }
+      return okJsonResponse({ responseData: { data: [] } })
+    })
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    const { createCloudTalkContact } = await import('./cloudtalk.server')
+
+    const err = (await createCloudTalkContact(7, payload).catch(e => e)) as Error
+    expect(err.message).toContain('unable to resolve contact id')
+    expect(err.message).not.toContain(pii)
+  })
 })
 
 describe('getCloudTalkUSCountryId', () => {

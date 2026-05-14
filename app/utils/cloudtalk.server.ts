@@ -378,10 +378,19 @@ async function cloudtalkRequest(
       continue
     }
 
-    const text = await response.text().catch(() => '')
+    const body = await response.text().catch(() => '')
+    if (body) {
+      // biome-ignore lint/suspicious/noConsole: server-only PII-safe ops log
+      console.error('[cloudtalk-error-body]', {
+        endpoint: `${init.method} ${path.split('?')[0]}`,
+        companyId,
+        status: response.status,
+        body: body.slice(0, 1000),
+      })
+    }
     throw new CloudTalkApiError(
       response.status,
-      `CloudTalk API error: ${response.status} ${response.statusText} ${text}`,
+      `CloudTalk API error: ${response.status} ${response.statusText}`,
     )
   }
 }
@@ -489,9 +498,13 @@ export async function createCloudTalkContact(
     }
   }
 
-  throw new Error(
-    `CloudTalk add.json: unable to resolve contact id from response or phone lookup. Response: ${JSON.stringify(json).slice(0, 500)}`,
-  )
+  // biome-ignore lint/suspicious/noConsole: server-only PII-safe ops log
+  console.error('[cloudtalk-unparseable-response]', {
+    endpoint: 'PUT contacts/add.json',
+    companyId,
+    preview: JSON.stringify(json).slice(0, 500),
+  })
+  throw new Error('CloudTalk add.json: unable to resolve contact id')
 }
 
 export async function updateCloudTalkContact(
