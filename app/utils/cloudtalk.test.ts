@@ -24,8 +24,11 @@ beforeEach(async () => {
     cloudtalk_access_key: 'key',
     cloudtalk_access_secret: 'secret',
   })
-  const { resetRateLimiter } = await import('./cloudtalk.server')
+  const { resetRateLimiter, resetCloudTalkAuthCache } = await import(
+    './cloudtalk.server'
+  )
   resetRateLimiter()
+  resetCloudTalkAuthCache()
 })
 
 afterEach(() => {
@@ -204,5 +207,40 @@ describe('RateLimiter', () => {
     })
     await vi.advanceTimersByTimeAsync(100)
     expect(resolved).toBe(false)
+  })
+})
+
+describe('getAuthString cache', () => {
+  it('hits the DB once per company across repeated calls', async () => {
+    const { getAuthString } = await import('./cloudtalk.server')
+
+    await getAuthString(7)
+    await getAuthString(7)
+    await getAuthString(7)
+
+    expect(selectId).toHaveBeenCalledTimes(1)
+  })
+
+  it('refetches after resetCloudTalkAuthCache', async () => {
+    const { getAuthString, resetCloudTalkAuthCache } = await import(
+      './cloudtalk.server'
+    )
+
+    await getAuthString(7)
+    expect(selectId).toHaveBeenCalledTimes(1)
+
+    resetCloudTalkAuthCache()
+    await getAuthString(7)
+    expect(selectId).toHaveBeenCalledTimes(2)
+  })
+
+  it('caches per company independently', async () => {
+    const { getAuthString } = await import('./cloudtalk.server')
+
+    await getAuthString(7)
+    await getAuthString(8)
+    await getAuthString(7)
+
+    expect(selectId).toHaveBeenCalledTimes(2)
   })
 })

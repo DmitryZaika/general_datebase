@@ -72,7 +72,7 @@ const credsRow = {
   cloudtalk_access_secret: 'secret',
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   dbExecute.mockReset()
   dbQuery.mockReset()
   createCloudTalkContact.mockReset()
@@ -83,6 +83,10 @@ beforeEach(() => {
   getCloudTalkUSCountryId.mockReset()
   getCloudTalkUSCountryId.mockResolvedValue(233)
   captureException.mockReset()
+  const { resetCompanyHasCloudTalkCache } = await import(
+    './cloudtalkContactSync.server'
+  )
+  resetCompanyHasCloudTalkCache()
 })
 
 afterEach(() => {
@@ -224,6 +228,51 @@ describe('syncCustomerToCloudTalk', () => {
 
     expect(createCloudTalkContact).not.toHaveBeenCalled()
     expect(updateCloudTalkContact).not.toHaveBeenCalled()
+  })
+
+  it('caches a positive companyHasCloudTalk result across syncs', async () => {
+    setupQueries([
+      {
+        match: sql => sql.includes('FROM customers WHERE id = ?'),
+        rows: [customerRow],
+      },
+      { match: sql => sql.includes('FROM cloudtalk_contacts'), rows: [] },
+      { match: sql => sql.includes('FROM company'), rows: [credsRow] },
+    ])
+    createCloudTalkContact.mockResolvedValue(9999)
+    dbExecute.mockResolvedValue([{ insertId: 1 }])
+
+    const { syncCustomerToCloudTalk } = await import('./cloudtalkContactSync.server')
+    await syncCustomerToCloudTalk(100)
+    await syncCustomerToCloudTalk(100)
+
+    const companyQueryCount = dbQuery.mock.calls.filter(c =>
+      String(c[0]).includes('FROM company'),
+    ).length
+    expect(companyQueryCount).toBe(1)
+  })
+
+  it('does not cache a negative companyHasCloudTalk result', async () => {
+    setupQueries([
+      {
+        match: sql => sql.includes('FROM customers WHERE id = ?'),
+        rows: [customerRow],
+      },
+      { match: sql => sql.includes('FROM cloudtalk_contacts'), rows: [] },
+      {
+        match: sql => sql.includes('FROM company'),
+        rows: [{ cloudtalk_access_key: null, cloudtalk_access_secret: null }],
+      },
+    ])
+
+    const { syncCustomerToCloudTalk } = await import('./cloudtalkContactSync.server')
+    await syncCustomerToCloudTalk(100)
+    await syncCustomerToCloudTalk(100)
+
+    const companyQueryCount = dbQuery.mock.calls.filter(c =>
+      String(c[0]).includes('FROM company'),
+    ).length
+    expect(companyQueryCount).toBe(2)
   })
 
   it('skips when customer has no usable phone', async () => {

@@ -55,14 +55,25 @@ function loadMapping(customerId: number) {
   )
 }
 
+const companiesWithCloudTalk = new Set<number>()
+
+export function resetCompanyHasCloudTalkCache(): void {
+  companiesWithCloudTalk.clear()
+}
+
 async function companyHasCloudTalk(companyId: number): Promise<boolean> {
+  if (companiesWithCloudTalk.has(companyId)) return true
   const creds = await selectId<CompanyCreds>(
     db,
     `SELECT cloudtalk_access_key, cloudtalk_access_secret
        FROM company WHERE id = ?`,
     companyId,
   )
-  return Boolean(creds?.cloudtalk_access_key && creds?.cloudtalk_access_secret)
+  const hasCreds = Boolean(
+    creds?.cloudtalk_access_key && creds?.cloudtalk_access_secret,
+  )
+  if (hasCreds) companiesWithCloudTalk.add(companyId)
+  return hasCreds
 }
 
 function buildPhones(customer: CustomerForSync): { public_number: string }[] {
@@ -202,7 +213,10 @@ async function upsertContact(
 
 export async function syncCustomerToCloudTalk(customerId: number): Promise<void> {
   try {
-    const customer = await loadCustomer(customerId)
+    const [customer, mapping] = await Promise.all([
+      loadCustomer(customerId),
+      loadMapping(customerId),
+    ])
     if (!customer || customer.deleted_at) return
     if (!(await companyHasCloudTalk(customer.company_id))) return
 
@@ -210,7 +224,6 @@ export async function syncCustomerToCloudTalk(customerId: number): Promise<void>
     const payload = buildPayload(customer, usCountryId)
     if (!payload) return
 
-    const mapping = await loadMapping(customerId)
     await upsertContact(customer, payload, mapping)
   } catch (error) {
     await reportFailure('cloudtalk_sync_customer_failed', customerId, error)

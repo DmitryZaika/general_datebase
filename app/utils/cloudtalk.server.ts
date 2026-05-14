@@ -182,11 +182,19 @@ export type Calls200Response = {
 }
 
 interface CompanyInfo {
-  cloudtalk_access_key: string | null
-  cloudtalk_access_secret: string | null
+  cloudtalk_access_key: Nullable<string>
+  cloudtalk_access_secret: Nullable<string>
 }
 
-export async function getAuthString(companyId: number) {
+const authStringCache = new Map<number, string>()
+
+export function resetCloudTalkAuthCache(): void {
+  authStringCache.clear()
+}
+
+export async function getAuthString(companyId: number): Promise<string> {
+  const cached = authStringCache.get(companyId)
+  if (cached !== undefined) return cached
   const companyInfo = await selectId<CompanyInfo>(
     db,
     'SELECT cloudtalk_access_key, cloudtalk_access_secret FROM company WHERE id = ?',
@@ -199,9 +207,11 @@ export async function getAuthString(companyId: number) {
   ) {
     throw new Error('CloudTalk API credentials not found')
   }
-  return btoa(
+  const authString = btoa(
     `${companyInfo.cloudtalk_access_key}:${companyInfo.cloudtalk_access_secret}`,
   )
+  authStringCache.set(companyId, authString)
+  return authString
 }
 
 export async function fetchValueRaw(
@@ -275,59 +285,6 @@ type CtMethod = 'PUT' | 'POST' | 'DELETE' | 'GET'
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 const jitter = () => Math.floor(Math.random() * 500)
 
-interface RequestSample {
-  endpoint: string
-  durationMs: number
-  retries: number
-  status: number
-}
-
-const requestSamples: RequestSample[] = []
-
-export function resetRequestStats(): void {
-  requestSamples.length = 0
-}
-
-export function getRequestStats(): readonly RequestSample[] {
-  return requestSamples
-}
-
-function percentile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0
-  const i = Math.min(sorted.length - 1, Math.floor((sorted.length * p) / 100))
-  return sorted[i]
-}
-
-export function summarizeRequestStats(): string {
-  if (requestSamples.length === 0) return 'No CloudTalk requests recorded.'
-  const byEndpoint = new Map<string, number[]>()
-  let totalRetries = 0
-  let totalDurationMs = 0
-  for (const s of requestSamples) {
-    const arr = byEndpoint.get(s.endpoint) ?? []
-    arr.push(s.durationMs)
-    byEndpoint.set(s.endpoint, arr)
-    totalRetries += s.retries
-    totalDurationMs += s.durationMs
-  }
-  const lines = [
-    `CloudTalk requests: ${requestSamples.length} (retries=${totalRetries}, total=${(totalDurationMs / 1000).toFixed(1)}s)`,
-    `${'endpoint'.padEnd(45)}  n  mean   p50   p90   p99`,
-  ]
-  for (const [endpoint, durations] of byEndpoint) {
-    const sorted = [...durations].sort((a, b) => a - b)
-    const mean = sorted.reduce((a, b) => a + b, 0) / sorted.length
-    lines.push(
-      `${endpoint.padEnd(45)}  ${String(sorted.length).padStart(2)}  ${mean.toFixed(0).padStart(4)}  ${String(percentile(sorted, 50)).padStart(4)}  ${String(percentile(sorted, 90)).padStart(4)}  ${String(percentile(sorted, 99)).padStart(4)}`,
-    )
-  }
-  return lines.join('\n')
-}
-
-function cloudtalkVerbose(): boolean {
-  return process.env.CLOUDTALK_VERBOSE === '1'
-}
-
 export class RateLimiter {
   private tokens: number
   private lastRefillAt: number
@@ -389,62 +346,43 @@ async function cloudtalkRequest(
     body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
   }
 
-  const startedAt = Date.now()
   let serverAttempt = 0
   let rateLimitAttempt = 0
-  let lastStatus = 0
   const limiter = getRateLimiter()
 
-  try {
-    while (true) {
-      await limiter.acquire()
-      const response = await fetch(`${BASE_URL}/${path}`, requestInit)
-      lastStatus = response.status
-      if (response.ok) return response
+  while (true) {
+    await limiter.acquire()
+    const response = await fetch(`${BASE_URL}/${path}`, requestInit)
+    if (response.ok) return response
 
-      if (response.status === 429) {
-        if (rateLimitAttempt >= MAX_429_RETRIES) {
-          throw new CloudTalkApiError(
-            429,
-            `CloudTalk rate limit: max retries (${MAX_429_RETRIES}) exceeded`,
-          )
-        }
-        const reset = Number(response.headers.get('X-CloudTalkAPI-ResetTime'))
-        const waitMs =
-          Number.isFinite(reset) && reset > 0
-            ? Math.max(reset * 1000 - Date.now(), 0) + 1000
-            : 5000
-        await sleep(waitMs + jitter())
-        rateLimitAttempt += 1
-        continue
+    if (response.status === 429) {
+      if (rateLimitAttempt >= MAX_429_RETRIES) {
+        throw new CloudTalkApiError(
+          429,
+          `CloudTalk rate limit: max retries (${MAX_429_RETRIES}) exceeded`,
+        )
       }
+      const reset = Number(response.headers.get('X-CloudTalkAPI-ResetTime'))
+      const waitMs =
+        Number.isFinite(reset) && reset > 0
+          ? Math.max(reset * 1000 - Date.now(), 0) + 1000
+          : 5000
+      await sleep(waitMs + jitter())
+      rateLimitAttempt += 1
+      continue
+    }
 
-      if (response.status >= 500 && serverAttempt < MAX_5XX_RETRIES) {
-        await sleep(SERVER_BACKOFF_MS[serverAttempt] + jitter())
-        serverAttempt += 1
-        continue
-      }
+    if (response.status >= 500 && serverAttempt < MAX_5XX_RETRIES) {
+      await sleep(SERVER_BACKOFF_MS[serverAttempt] + jitter())
+      serverAttempt += 1
+      continue
+    }
 
-      const text = await response.text().catch(() => '')
-      throw new CloudTalkApiError(
-        response.status,
-        `CloudTalk API error: ${response.status} ${response.statusText} ${text}`,
-      )
-    }
-  } finally {
-    const sample: RequestSample = {
-      endpoint: `${init.method} ${path.split('?')[0]}`,
-      durationMs: Date.now() - startedAt,
-      retries: serverAttempt + rateLimitAttempt,
-      status: lastStatus,
-    }
-    requestSamples.push(sample)
-    if (cloudtalkVerbose()) {
-      // biome-ignore lint/suspicious/noConsole: --verbose timing log
-      console.error(
-        `[ct] ${sample.endpoint} ${sample.durationMs}ms retries=${sample.retries} status=${sample.status}`,
-      )
-    }
+    const text = await response.text().catch(() => '')
+    throw new CloudTalkApiError(
+      response.status,
+      `CloudTalk API error: ${response.status} ${response.statusText} ${text}`,
+    )
   }
 }
 
