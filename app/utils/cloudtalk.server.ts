@@ -329,7 +329,7 @@ async function cloudtalkRequest(
 }
 
 interface CloudTalkCountry {
-  id?: number
+  id?: number | string
   name?: string
   iso_code?: string
   iso?: string
@@ -363,11 +363,13 @@ export async function getCloudTalkUSCountryId(
     const json = (await response.json()) as CountriesEnvelope
     for (const item of json.responseData?.data ?? []) {
       const country =
-        (item as { Country?: CloudTalkCountry }).Country ??
-        (item as CloudTalkCountry)
-      if (isUnitedStates(country) && typeof country.id === 'number') {
-        resolved = country.id
-        break
+        (item as { Country?: CloudTalkCountry }).Country ?? (item as CloudTalkCountry)
+      if (isUnitedStates(country)) {
+        const id = coerceId(country.id)
+        if (id !== null) {
+          resolved = id
+          break
+        }
       }
     }
   } catch {
@@ -375,6 +377,17 @@ export async function getCloudTalkUSCountryId(
   }
   usCountryIdCache.set(companyId, resolved)
   return resolved
+}
+
+export function coerceId(value: unknown): Nullable<number> {
+  if (typeof value === 'number') {
+    return Number.isSafeInteger(value) && value > 0 ? value : null
+  }
+  if (typeof value === 'string' && /^\d+$/.test(value)) {
+    const n = Number(value)
+    return Number.isSafeInteger(n) && n > 0 ? n : null
+  }
+  return null
 }
 
 function findContactId(json: unknown): Nullable<number> {
@@ -389,7 +402,8 @@ function findContactId(json: unknown): Nullable<number> {
     obj.id,
   ]
   for (const c of candidates) {
-    if (typeof c === 'number' && c > 0) return c
+    const id = coerceId(c)
+    if (id !== null) return id
   }
   return null
 }
@@ -444,11 +458,11 @@ export async function deleteCloudTalkContact(
 
 interface ContactSearchHit {
   Contact?: {
-    id?: number
+    id?: number | string
     contact_numbers?: string[]
     ContactNumber?: { public_number?: string }[]
   }
-  id?: number
+  id?: number | string
   contact_numbers?: string[]
   ContactNumber?: { public_number?: string }[]
 }
@@ -469,8 +483,8 @@ function extractPhones(hit: ContactSearchHit): Nullable<string>[] {
   return phones
 }
 
-function extractId(hit: ContactSearchHit): number | undefined {
-  return hit.Contact?.id ?? hit.id
+function extractId(hit: ContactSearchHit): Nullable<number> {
+  return coerceId(hit.Contact?.id ?? hit.id)
 }
 
 async function findContactByOnePhone(
@@ -486,7 +500,7 @@ async function findContactByOnePhone(
   for (const hit of json.responseData?.data ?? []) {
     if (extractPhones(hit).includes(e164Phone)) {
       const id = extractId(hit)
-      if (typeof id === 'number') return id
+      if (id !== null) return id
     }
   }
   return null
