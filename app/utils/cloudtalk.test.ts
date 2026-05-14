@@ -18,12 +18,14 @@ const payload = {
   ContactEmail: [],
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   selectId.mockReset()
   selectId.mockResolvedValue({
     cloudtalk_access_key: 'key',
     cloudtalk_access_secret: 'secret',
   })
+  const { resetRateLimiter } = await import('./cloudtalk.server')
+  resetRateLimiter()
 })
 
 afterEach(() => {
@@ -151,5 +153,56 @@ describe('getCloudTalkUSCountryId', () => {
     const { getCloudTalkUSCountryId } = await import('./cloudtalk.server')
 
     expect(await getCloudTalkUSCountryId(999)).toBe(233)
+  })
+})
+
+describe('RateLimiter', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('allows immediate burst up to capacity', async () => {
+    const { RateLimiter } = await import('./cloudtalk.server')
+    const limiter = new RateLimiter(60)
+    for (let i = 0; i < 60; i++) await limiter.acquire()
+  })
+
+  it('blocks when capacity is exhausted and unblocks when a token refills', async () => {
+    const { RateLimiter } = await import('./cloudtalk.server')
+    const limiter = new RateLimiter(60)
+    for (let i = 0; i < 60; i++) await limiter.acquire()
+
+    let resolved = false
+    const pending = limiter.acquire().then(() => {
+      resolved = true
+    })
+
+    await vi.advanceTimersByTimeAsync(500)
+    expect(resolved).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(600)
+    await pending
+    expect(resolved).toBe(true)
+  })
+
+  it('refills tokens proportionally to elapsed time', async () => {
+    const { RateLimiter } = await import('./cloudtalk.server')
+    const limiter = new RateLimiter(60)
+    for (let i = 0; i < 60; i++) await limiter.acquire()
+
+    await vi.advanceTimersByTimeAsync(5000)
+
+    for (let i = 0; i < 5; i++) await limiter.acquire()
+
+    let resolved = false
+    limiter.acquire().then(() => {
+      resolved = true
+    })
+    await vi.advanceTimersByTimeAsync(100)
+    expect(resolved).toBe(false)
   })
 })

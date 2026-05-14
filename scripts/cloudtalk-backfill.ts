@@ -4,16 +4,17 @@ import mysql from 'mysql2/promise'
 
 dotenv.config()
 
-const PACING_MS = 2200
 const PROGRESS_EVERY = 25
 const USAGE =
-  'Usage: bun run scripts/cloudtalk-backfill.ts --company-id=<id> [--limit=<n>] [--dry-run] [--yes]'
+  'Usage: bun run scripts/cloudtalk-backfill.ts --company-id=<id> [--limit=<n>] [--dry-run] [--yes] [--verbose] [--rate-limit-rpm=<n>]'
 
 interface Args {
   companyId: number
   limit?: number
   dryRun: boolean
   yes: boolean
+  verbose: boolean
+  rateLimitRpm?: number
 }
 
 interface CompanyRow extends mysql.RowDataPacket {
@@ -22,25 +23,27 @@ interface CompanyRow extends mysql.RowDataPacket {
   cloudtalk_access_key: string | null
 }
 
-const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
-
 function parseArgs(argv: string[]): Args {
   let companyId: number | undefined
   let limit: number | undefined
   let dryRun = false
   let yes = false
+  let verbose = false
+  let rateLimitRpm: number | undefined
   for (const arg of argv.slice(2)) {
     const [key, value] = arg.split('=')
     if (key === '--company-id') companyId = Number.parseInt(value, 10)
     else if (key === '--limit') limit = Number.parseInt(value, 10)
     else if (key === '--dry-run') dryRun = true
     else if (key === '--yes') yes = true
+    else if (key === '--verbose') verbose = true
+    else if (key === '--rate-limit-rpm') rateLimitRpm = Number.parseInt(value, 10)
   }
   if (!companyId || Number.isNaN(companyId)) {
     console.error(USAGE)
     process.exit(1)
   }
-  return { companyId, limit, dryRun, yes }
+  return { companyId, limit, dryRun, yes, verbose, rateLimitRpm }
 }
 
 async function loadCompany(
@@ -119,14 +122,22 @@ function printSummary(args: Args, company: CompanyRow, total: number): void {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 }
 
-async function runBackfill(ids: number[]): Promise<{ ok: number; failed: number }> {
+async function runBackfill(
+  ids: number[],
+  verbose: boolean,
+): Promise<{ ok: number; failed: number }> {
   const { syncCustomerToCloudTalk } = await import(
     '../app/utils/cloudtalkContactSync.server'
   )
+  const { resetRequestStats, summarizeRequestStats } = await import(
+    '../app/utils/cloudtalk.server'
+  )
+  resetRequestStats()
   let ok = 0
   let failed = 0
   const startedAt = Date.now()
   for (const [i, id] of ids.entries()) {
+    const customerStartedAt = Date.now()
     try {
       await syncCustomerToCloudTalk(id)
       ok += 1
@@ -134,19 +145,31 @@ async function runBackfill(ids: number[]): Promise<{ ok: number; failed: number 
       console.error(`Customer ${id} failed:`, error)
       failed += 1
     }
+    if (verbose) {
+      console.error(`[customer] id=${id} ${Date.now() - customerStartedAt}ms`)
+    }
     if ((i + 1) % PROGRESS_EVERY === 0) {
       const elapsed = ((Date.now() - startedAt) / 1000).toFixed(0)
       console.log(
         `Progress: ${i + 1}/${ids.length} (ok=${ok}, failed=${failed}, ${elapsed}s elapsed)`,
       )
     }
-    await sleep(PACING_MS)
   }
+  const totalSeconds = (Date.now() - startedAt) / 1000
+  const rate = ids.length / (totalSeconds / 60)
+  console.log(
+    `\nWall time: ${totalSeconds.toFixed(1)}s (${rate.toFixed(1)} customers/min)`,
+  )
+  console.log(summarizeRequestStats())
   return { ok, failed }
 }
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv)
+  if (args.verbose) process.env.CLOUDTALK_VERBOSE = '1'
+  if (args.rateLimitRpm) {
+    process.env.CLOUDTALK_RATE_LIMIT_RPM = String(args.rateLimitRpm)
+  }
   const pool = mysql.createPool({
     user: process.env.DB_USER,
     database: process.env.DB_DATABASE,
@@ -190,7 +213,7 @@ async function main(): Promise<void> {
         )
         process.exit(1)
       }
-      const { ok, failed } = await runBackfill(ids)
+      const { ok, failed } = await runBackfill(ids, args.verbose)
       console.log(`Done. ok=${ok}, failed=${failed}, total=${ids.length}`)
     } finally {
       await lockConn.query('SELECT RELEASE_LOCK(?)', [lockName]).catch(() => undefined)
