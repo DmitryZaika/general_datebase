@@ -6,10 +6,12 @@ export function StoneTable({
   stones,
   columns,
   enableHighlight = false,
+  animateRowEntrance = false,
 }: {
   stones: Stone[]
   columns: ColumnDef<Stone>[]
   enableHighlight?: boolean
+  animateRowEntrance?: boolean
 }) {
   const getHighlight = (stone: Stone) => {
     const imp = stone.samples_importance ?? 1 // 1 low,2 medium,3 high
@@ -39,6 +41,7 @@ export function StoneTable({
           className:
             `${enableHighlight ? getHighlight(stone) : ''} cursor-pointer ${enableHighlight ? 'no-hover' : ''} ${stone.is_display ? '' : 'opacity-60'}`.trim(),
         }))}
+        animateRowEntrance={animateRowEntrance}
       />
     </div>
   )

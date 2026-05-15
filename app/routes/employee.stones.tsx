@@ -1,11 +1,12 @@
 import { GridIcon, TableIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
   Outlet,
   redirect,
+  type ShouldRevalidateFunctionArgs,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -13,6 +14,7 @@ import {
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
+import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
 import { ImageCard } from '~/components/organisms/ImageCard'
 import { StoneTable } from '~/components/organisms/StoneTable'
@@ -23,6 +25,7 @@ import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
 import { getEmployeeUser } from '~/utils/session.server'
+import { stoneListShouldRevalidate } from '~/utils/stoneListShouldRevalidate'
 import { capitalizeFirstLetter } from '~/utils/words'
 
 type ViewMode = 'grid' | 'table'
@@ -38,7 +41,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const queryParams = new URLSearchParams(searchParams)
   const filters = stoneFilterSchema.parse(cleanParams(queryParams))
   const stones = await stoneQueryBuilder(filters, user.company_id)
-  return { stones, companyId: user.company_id }
+  return { stones, companyId: user.company_id, viewMode: filters.viewMode }
+}
+
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+  return stoneListShouldRevalidate(args)
 }
 
 function InteractiveCard({
@@ -148,31 +155,45 @@ function InteractiveCard({
 }
 
 export default function Stones() {
-  const { stones, companyId } = useLoaderData<typeof loader>()
+  const {
+    stones,
+    companyId,
+    viewMode: viewModeFromLoader,
+  } = useLoaderData<typeof loader>()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [isViewTogglePending, startViewToggleTransition] = useTransition()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones)
 
-  // Получаем viewMode из URL или используем "grid" по умолчанию
-  const viewModeParam = searchParams.get('viewMode') as ViewMode | null
+  const rawViewMode = searchParams.get('viewMode')
+  const viewModeParam =
+    rawViewMode === 'grid' || rawViewMode === 'table' ? rawViewMode : null
 
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (viewModeParam) return viewModeParam
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('stoneViewMode') as ViewMode
-      if (stored === 'grid' || stored === 'table') return stored
-    }
-    return 'grid'
+    if (viewModeParam === 'grid' || viewModeParam === 'table') return viewModeParam
+    return viewModeFromLoader
   })
 
   useEffect(() => {
-    if (viewModeParam && viewModeParam !== viewMode) {
+    if (viewModeParam === 'grid' || viewModeParam === 'table') {
       setViewMode(viewModeParam)
       if (typeof window !== 'undefined') {
         localStorage.setItem('stoneViewMode', viewModeParam)
       }
     }
-  }, [viewModeParam, viewMode])
+  }, [viewModeParam])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const raw = new URLSearchParams(window.location.search).get('viewMode')
+    if (raw === 'grid' || raw === 'table') return
+    const stored = localStorage.getItem('stoneViewMode')
+    if (stored !== 'grid' && stored !== 'table') return
+    setViewMode(stored)
+    const next = new URLSearchParams(window.location.search)
+    next.set('viewMode', stored)
+    setSearchParams(next, { replace: true })
+  }, [setSearchParams])
 
   const navigate = useNavigate()
   const location = useLocation()
@@ -206,137 +227,141 @@ export default function Stones() {
   }, [stones])
 
   const toggleViewMode = () => {
-    const newViewMode = viewMode === 'grid' ? 'table' : 'grid'
-
-    // Обновить состояние
-    setViewMode(newViewMode)
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('stoneViewMode', newViewMode)
-    }
-
-    // Обновить URL параметры
-    const newParams = new URLSearchParams(searchParams)
-    newParams.set('viewMode', newViewMode)
-    setSearchParams(newParams)
+    startViewToggleTransition(() => {
+      const newViewMode = viewMode === 'grid' ? 'table' : 'grid'
+      setViewMode(newViewMode)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('stoneViewMode', newViewMode)
+      }
+      const newParams = new URLSearchParams(searchParams)
+      newParams.set('viewMode', newViewMode)
+      setSearchParams(newParams)
+    })
   }
 
-  const columns: ColumnDef<Stone>[] = [
-    {
-      id: 'image',
-      header: 'Image',
-      cell: ({ row }) => {
-        const stone = row.original
-        const isOutOfStock = stone.available === 0
-        const isRegularStock = !!stone.regular_stock
+  const columns = useMemo<ColumnDef<Stone>[]>(
+    () => [
+      {
+        id: 'image',
+        header: 'Image',
+        cell: ({ row }) => {
+          const stone = row.original
+          const isOutOfStock = stone.available === 0
+          const isRegularStock = !!stone.regular_stock
 
-        return (
-          <div
-            className='w-12 h-12 overflow-hidden cursor-pointer relative'
-            onClick={e => {
-              e.stopPropagation()
-              setCurrentId(stone.id)
-            }}
-          >
-            {stone.url ? (
-              <img
-                src={withIconSuffix(stone.url)}
-                alt={stone.name}
-                className='object-cover w-full h-full'
-              />
-            ) : (
-              <div className='w-full h-full bg-gray-200' />
-            )}
-            {isOutOfStock && !isRegularStock && (
-              <div className='absolute inset-0 flex items-center justify-center bg-red-500/70'>
-                <span className='text-white text-[8px] font-bold rotate-0 text-center leading-tight px-0.5'>
-                  Out of Stock
-                </span>
-              </div>
-            )}
-          </div>
-        )
+          return (
+            <div
+              className='w-12 h-12 overflow-hidden cursor-pointer relative'
+              onClick={e => {
+                e.stopPropagation()
+                setCurrentId(stone.id)
+              }}
+            >
+              {stone.url ? (
+                <img
+                  src={withIconSuffix(stone.url)}
+                  alt={stone.name}
+                  className='object-cover w-full h-full'
+                />
+              ) : (
+                <div className='w-full h-full bg-gray-200' />
+              )}
+              {isOutOfStock && !isRegularStock && (
+                <div className='absolute inset-0 flex items-center justify-center bg-red-500/70'>
+                  <span className='text-white text-[8px] font-bold rotate-0 text-center leading-tight px-0.5'>
+                    Out of Stock
+                  </span>
+                </div>
+              )}
+            </div>
+          )
+        },
       },
-    },
-    {
-      accessorKey: 'name',
-      header: ({ column }) => <SortableHeader column={column} title='Name' />,
-      cell: ({ row }) => {
-        return (
-          <div
-            className='font-medium cursor-pointer'
-            onClick={() => navigate(`slabs/${row.original.id}${location.search}`)}
-          >
-            {row.original.name}
-          </div>
-        )
+      {
+        accessorKey: 'name',
+        header: ({ column }) => <SortableHeader column={column} title='Name' />,
+        cell: ({ row }) => {
+          return (
+            <div
+              className='font-medium cursor-pointer'
+              onClick={() => navigate(`slabs/${row.original.id}${location.search}`)}
+            >
+              {row.original.name}
+            </div>
+          )
+        },
       },
-    },
-    {
-      accessorKey: 'type',
-      header: ({ column }) => <SortableHeader column={column} title='Type' />,
-      cell: ({ row }) => capitalizeFirstLetter(row.original.type),
-    },
-    {
-      accessorFn: row => {
-        const length = row.length || 0
-        const width = row.width || 0
-        return length * width
+      {
+        accessorKey: 'type',
+        header: ({ column }) => <SortableHeader column={column} title='Type' />,
+        cell: ({ row }) => capitalizeFirstLetter(row.original.type),
       },
-      id: 'size',
-      header: ({ column }) => <SortableHeader column={column} title='Size' />,
-      cell: ({ row }) => {
-        const stone = row.original
-        const displayedWidth = stone.width && stone.width > 0 ? stone.width : '—'
-        const displayedLength = stone.length && stone.length > 0 ? stone.length : '—'
-        return `${displayedLength} × ${displayedWidth}`
+      {
+        accessorFn: row => {
+          const length = row.length || 0
+          const width = row.width || 0
+          return length * width
+        },
+        id: 'size',
+        header: ({ column }) => <SortableHeader column={column} title='Size' />,
+        cell: ({ row }) => {
+          const stone = row.original
+          const displayedWidth = stone.width && stone.width > 0 ? stone.width : '—'
+          const displayedLength = stone.length && stone.length > 0 ? stone.length : '—'
+          return `${displayedLength} × ${displayedWidth}`
+        },
       },
-    },
-    {
-      accessorKey: 'available',
-      header: ({ column }) => <SortableHeader column={column} title='Available' />,
-      cell: ({ row }) => {
-        const stone = row.original
-        const isRegularStock = !!stone.regular_stock
-        if (isRegularStock && stone.whole_available === 0) {
-          return 'Regular Stock'
-        }
-        if (stone.whole_available > 0) {
-          return stone.whole_available
-        }
-        if (stone.available > 0) {
-          return 'Remnants Only'
-        }
-        return stone.available
+      {
+        accessorKey: 'available',
+        header: ({ column }) => <SortableHeader column={column} title='Available' />,
+        cell: ({ row }) => {
+          const stone = row.original
+          const isRegularStock = !!stone.regular_stock
+          if (isRegularStock && stone.whole_available === 0) {
+            return 'Regular Stock'
+          }
+          if (stone.whole_available > 0) {
+            return stone.whole_available
+          }
+          if (stone.available > 0) {
+            return 'Remnants Only'
+          }
+          return stone.available
+        },
       },
-    },
-    {
-      accessorKey: 'amount',
-      header: ({ column }) => <SortableHeader column={column} title='Amount' />,
-      cell: ({ row }) => row.original.amount || '—',
-    },
-    {
-      accessorFn: row => row.retail_price || 0,
-      id: 'retailPrice',
-      header: ({ column }) => <SortableHeader column={column} title='Retail Price' />,
-      cell: ({ row }) =>
-        row.original.retail_price ? `$${row.original.retail_price}` : '—',
-    },
-    {
-      accessorFn: row => row.cost_per_sqft || 0,
-      id: 'costPerSqft',
-      header: ({ column }) => <SortableHeader column={column} title='Cost per Sqft' />,
-      cell: ({ row }) =>
-        row.original.cost_per_sqft ? `$${row.original.cost_per_sqft}` : '—',
-    },
-  ]
+      {
+        accessorKey: 'amount',
+        header: ({ column }) => <SortableHeader column={column} title='Amount' />,
+        cell: ({ row }) => row.original.amount || '—',
+      },
+      {
+        accessorFn: row => row.retail_price || 0,
+        id: 'retailPrice',
+        header: ({ column }) => <SortableHeader column={column} title='Retail Price' />,
+        cell: ({ row }) =>
+          row.original.retail_price ? `$${row.original.retail_price}` : '—',
+      },
+      {
+        accessorFn: row => row.cost_per_sqft || 0,
+        id: 'costPerSqft',
+        header: ({ column }) => (
+          <SortableHeader column={column} title='Cost per Sqft' />
+        ),
+        cell: ({ row }) =>
+          row.original.cost_per_sqft ? `$${row.original.cost_per_sqft}` : '—',
+      },
+    ],
+    [navigate, location.search],
+  )
 
   return (
     <>
       <div className='flex justify-between flex-wrap items-center items-end mb-2'>
         <div className='flex items-center gap-4'>
-          <Button
+          <LoadingButton
             variant='outline'
+            type='button'
+            loading={isViewTogglePending}
             onClick={toggleViewMode}
             className='ml-2'
             title={viewMode === 'grid' ? 'Switch to Table View' : 'Switch to Grid View'}
@@ -347,7 +372,7 @@ export default function Stones() {
               <GridIcon className='mr-1' />
             )}
             {viewMode === 'grid' ? 'Table View' : 'Grid View'}
-          </Button>
+          </LoadingButton>
 
           <Link to={`sell-slab${location.search}`}>
             <Button variant='default'>Sell Slab</Button>
@@ -380,7 +405,7 @@ export default function Stones() {
           ))}
         </ModuleList>
       ) : (
-        <StoneTable stones={sortedStones} columns={columns} />
+        <StoneTable stones={sortedStones} columns={columns} animateRowEntrance />
       )}
 
       <Outlet />

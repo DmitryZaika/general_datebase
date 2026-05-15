@@ -12,7 +12,7 @@ import {
 } from '@dnd-kit/core'
 import { motion, type Variants } from 'framer-motion'
 import { MoreVertical, Plus } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import DealsList from '~/components/DealsList'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
@@ -213,6 +213,9 @@ export default function DealsView({
   const [activeId, setActiveId] = useState<Nullable<number>>(null)
   const [highlightDealId, setHighlightDealId] = useState<Nullable<number>>(null)
   const highlightTimeoutRef = useRef<Nullable<NodeJS.Timeout>>(null)
+  const mobileBoardScrollRef = useRef<Nullable<HTMLDivElement>>(null)
+  const dragPointerClientXRef = useRef<Nullable<number>>(null)
+  const lastMobileColumnSlideAtRef = useRef(0)
 
   useEffect(() => setBoard(initialBoard), [JSON.stringify(initialBoard)])
 
@@ -300,13 +303,85 @@ export default function DealsView({
   const handleDragStart = (event: DragStartEvent) => {
     const id = Number(event.active.id)
     setActiveId(id)
+    lastMobileColumnSlideAtRef.current = 0
+    dragPointerClientXRef.current = null
+    const ae = event.activatorEvent
+    if ('touches' in ae && ae.touches.length > 0) {
+      dragPointerClientXRef.current = ae.touches[0].clientX
+    } else if ('clientX' in ae && typeof ae.clientX === 'number') {
+      dragPointerClientXRef.current = ae.clientX
+    }
   }
+
+  const slideMobileBoardOneColumn = useCallback((direction: -1 | 1) => {
+    const el = mobileBoardScrollRef.current
+    if (!el) return
+    const now = Date.now()
+    if (now - lastMobileColumnSlideAtRef.current < 1000) return
+    const w = el.clientWidth
+    const maxScroll = Math.max(0, el.scrollWidth - w)
+    if (direction < 0 && el.scrollLeft <= 1) return
+    if (direction > 0 && el.scrollLeft >= maxScroll - 1) return
+    lastMobileColumnSlideAtRef.current = now
+    el.scrollBy({ left: direction * w, behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => {
+    if (readonly || activeId === null) return
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(max-width: 767px)')
+    const updateClientX = (clientX: number) => {
+      if (!mq.matches) return
+      dragPointerClientXRef.current = clientX
+    }
+    const onPointerMove = (e: PointerEvent) => {
+      updateClientX(e.clientX)
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      const t = e.touches[0]
+      if (t) updateClientX(t.clientX)
+    }
+    const tickMobileBoardEdgeScroll = () => {
+      if (!mq.matches) return
+      const clientX = dragPointerClientXRef.current
+      if (clientX === null) return
+      const el = mobileBoardScrollRef.current
+      if (!el) return
+      const bounds = el.getBoundingClientRect()
+      const edge = bounds.width * 0.14
+      if (clientX < bounds.left + edge) slideMobileBoardOneColumn(-1)
+      else if (clientX > bounds.right - edge) slideMobileBoardOneColumn(1)
+    }
+    window.addEventListener('pointermove', onPointerMove, {
+      capture: true,
+      passive: true,
+    })
+    window.addEventListener('touchmove', onTouchMove, { capture: true, passive: true })
+    const intervalId = window.setInterval(tickMobileBoardEdgeScroll, 150)
+    const rafId = window.requestAnimationFrame(() => tickMobileBoardEdgeScroll())
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove, true)
+      window.removeEventListener('touchmove', onTouchMove, true)
+      window.clearInterval(intervalId)
+      window.cancelAnimationFrame(rafId)
+    }
+  }, [activeId, readonly, slideMobileBoardOneColumn])
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
-    if (!over) return
+    const dragDealId = Number(active.id)
 
-    const activeId = Number(active.id)
+    const finishDrag = () => {
+      dragPointerClientXRef.current = null
+      setActiveId(null)
+      lastMobileColumnSlideAtRef.current = 0
+    }
+
+    if (!over) {
+      finishDrag()
+      return
+    }
+
     let toListId: number | undefined
     const overData = over.data?.current
     if (overData?.type === 'list') {
@@ -324,16 +399,22 @@ export default function DealsView({
       }
     }
 
-    const fromListId = findContainerOfDeal(activeId)
-    if (fromListId === undefined || toListId === undefined) return
+    const fromListId = findContainerOfDeal(dragDealId)
+    if (fromListId === undefined || toListId === undefined) {
+      finishDrag()
+      return
+    }
 
-    if (fromListId === toListId) return
+    if (fromListId === toListId) {
+      finishDrag()
+      return
+    }
 
     setBoard(prev => {
       const copy = { ...prev }
       const fromArr = [...(copy[fromListId] || [])]
       const toArr = [...(copy[toListId] || [])]
-      const idx = fromArr.findIndex(d => d.id === activeId)
+      const idx = fromArr.findIndex(d => d.id === dragDealId)
       if (idx === -1) return prev
       const fromClosed = fromArr[idx].is_won === 1 || fromArr[idx].is_won === 0
       const moved = {
@@ -350,14 +431,17 @@ export default function DealsView({
       return copy
     })
 
-    await fetch('/api/deals/reorder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        updates: [{ id: activeId, list_id: toListId, position: 0 }],
-      }),
-    })
-    setActiveId(null)
+    try {
+      await fetch('/api/deals/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          updates: [{ id: dragDealId, list_id: toListId, position: 0 }],
+        }),
+      })
+    } finally {
+      finishDrag()
+    }
   }
 
   const toolbar = (
@@ -477,7 +561,9 @@ export default function DealsView({
   })
 
   const listsFlexClassName =
-    'flex min-h-0 flex-1 max-w-full min-w-0 items-stretch gap-1 md:min-w-0 max-md:h-full max-md:gap-0 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory'
+    activeId !== null
+      ? 'flex min-h-0 flex-1 max-w-full min-w-0 items-stretch gap-1 md:min-w-0 max-md:h-full max-md:gap-0 max-md:overflow-x-hidden max-md:overflow-y-hidden max-md:overscroll-x-none'
+      : 'flex min-h-0 flex-1 max-w-full min-w-0 items-stretch gap-1 md:min-w-0 max-md:h-full max-md:gap-0 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:overscroll-x-contain max-md:snap-x max-md:snap-mandatory'
 
   const listColumns = lists.map(list => (
     <DealsList
@@ -494,6 +580,7 @@ export default function DealsView({
   const listsContent = animateBoard ? (
     <motion.div
       key={lists.map(l => l.id).join('-')}
+      ref={mobileBoardScrollRef}
       className={listsFlexClassName}
       variants={DEALS_BOARD_LIST_VARIANTS}
       initial='hidden'
@@ -502,7 +589,9 @@ export default function DealsView({
       {listColumns}
     </motion.div>
   ) : (
-    <div className={listsFlexClassName}>{listColumns}</div>
+    <div ref={mobileBoardScrollRef} className={listsFlexClassName}>
+      {listColumns}
+    </div>
   )
 
   if (readonly) {
@@ -567,7 +656,11 @@ export default function DealsView({
       }}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => setActiveId(null)}
+      onDragCancel={() => {
+        dragPointerClientXRef.current = null
+        setActiveId(null)
+        lastMobileColumnSlideAtRef.current = 0
+      }}
     >
       {animateBoard ? (
         <motion.div

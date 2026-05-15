@@ -50,6 +50,7 @@ export function AdminMultiImageUploadForm({
               id={fileInputId}
               type='image'
               multiple
+              selectedFiles={field.value}
               onChange={field.onChange}
             />
           )}

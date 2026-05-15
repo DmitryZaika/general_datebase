@@ -4,19 +4,27 @@ import { cn } from '~/lib/utils'
 interface ModuleListProps {
   children: React.ReactNode
   className?: string
+  skipItemMountAnimation?: boolean
 }
 
-export default function ModuleList({ children, className }: ModuleListProps) {
-  const [mounted, setMounted] = useState(false)
+export default function ModuleList({
+  children,
+  className,
+  skipItemMountAnimation = false,
+}: ModuleListProps) {
+  const [mounted, setMounted] = useState(skipItemMountAnimation)
 
-  // Базовая анимация при монтировании
   useEffect(() => {
+    if (skipItemMountAnimation) {
+      setMounted(true)
+      return
+    }
     const timer = setTimeout(() => {
       setMounted(true)
     }, 200)
 
     return () => clearTimeout(timer)
-  }, [])
+  }, [skipItemMountAnimation])
 
   return (
     <div

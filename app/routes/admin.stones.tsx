@@ -3,11 +3,12 @@
 import { GridIcon, TableIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Pencil, Plus, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
   Outlet,
+  type ShouldRevalidateFunctionArgs,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -18,23 +19,19 @@ import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
 import { SortableHeader } from '~/components/molecules/DataTable/SortableHeader'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { StoneSearch } from '~/components/molecules/StoneSearch'
-import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
 import { cleanParams, useSafeSearchParams } from '~/hooks/use-safe-search-params'
 import { stoneFilterSchema } from '~/schemas/stones'
 import { withIconSuffix } from '~/utils/files'
 import { type Stone, stoneQueryBuilder } from '~/utils/queries.server'
 import { getAdminUser } from '~/utils/session.server'
+import { stoneListShouldRevalidate } from '~/utils/stoneListShouldRevalidate'
 import { capitalizeFirstLetter } from '~/utils/words'
-
-type ViewMode = 'grid' | 'table'
 
 const VIEW_MODE = {
   GRID: 'grid',
   TABLE: 'table',
 } as const
-
-const DEFAULT_VIEW_MODE: ViewMode = VIEW_MODE.GRID
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = await getAdminUser(request)
@@ -44,6 +41,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const stones = await stoneQueryBuilder(filters, user.company_id, true)
 
   return { stones, companyId: user.company_id }
+}
+
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+  return stoneListShouldRevalidate(args)
 }
 
 function StoneTable({ stones }: { stones: Stone[] }) {
@@ -181,21 +182,31 @@ function StoneTable({ stones }: { stones: Stone[] }) {
       ) => `hover:bg-blue-100 active:bg-blue-200 cursor-pointer transition-all duration-200
                    hover:shadow-md ${stone?.is_display ? '' : 'opacity-60'}`}
       data={stones}
+      animateRowEntrance
     />
   )
 }
 
 export default function AdminStones() {
   const { stones, companyId } = useLoaderData<typeof loader>()
-  const [searchParams, setSearchParams] = useSafeSearchParams(stoneFilterSchema)
+  const [searchParams, updateSearchParams] = useSafeSearchParams(stoneFilterSchema)
   const navigation = useNavigation()
   const navigate = useNavigate()
   const [isAddingStone, setIsAddingStone] = useState(false)
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones)
   const location = useLocation()
+  const [isViewTogglePending, startViewToggleTransition] = useTransition()
 
-  // Получаем viewMode из searchParams
-  const viewMode: ViewMode = searchParams.viewMode || DEFAULT_VIEW_MODE
+  const viewMode = searchParams.viewMode
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const raw = new URLSearchParams(window.location.search).get('viewMode')
+    if (raw === 'grid' || raw === 'table') return
+    const stored = localStorage.getItem('stoneViewMode')
+    if (stored !== 'grid' && stored !== 'table') return
+    updateSearchParams({ viewMode: stored })
+  }, [updateSearchParams])
 
   useEffect(() => {
     const withImage = stones.filter(
@@ -240,18 +251,22 @@ export default function AdminStones() {
   }
 
   const toggleViewMode = (): void => {
-    const newViewMode: ViewMode =
-      viewMode === VIEW_MODE.GRID ? VIEW_MODE.TABLE : VIEW_MODE.GRID
-
-    // Обновить URL параметры
-    setSearchParams({ ...searchParams, viewMode: newViewMode })
+    startViewToggleTransition(() => {
+      const next = viewMode === VIEW_MODE.GRID ? VIEW_MODE.TABLE : VIEW_MODE.GRID
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('stoneViewMode', next)
+      }
+      updateSearchParams({ viewMode: next })
+    })
   }
   return (
     <>
       <div className='flex justify-between flex-wrap items-center items-end mb-2'>
         <div className='flex items-center gap-4'>
-          <Button
+          <LoadingButton
             variant='outline'
+            type='button'
+            loading={isViewTogglePending}
             onClick={toggleViewMode}
             className='ml-2'
             title={
@@ -266,7 +281,7 @@ export default function AdminStones() {
               <GridIcon className='mr-1' />
             )}
             {viewMode === VIEW_MODE.GRID ? 'Table View' : 'Grid View'}
-          </Button>
+          </LoadingButton>
 
           <Link
             to={`add${location.search}`}

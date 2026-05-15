@@ -229,6 +229,7 @@ function AddImageForm() {
               id='deal-image'
               type='image'
               multiple
+              selectedFiles={field.value}
               onChange={field.onChange}
             />
           )}

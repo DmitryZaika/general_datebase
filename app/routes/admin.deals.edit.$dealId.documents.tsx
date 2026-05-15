@@ -273,6 +273,7 @@ function AddDocumentForm() {
               inputName='documents'
               id='deal-document'
               type='document'
+              selectedFiles={field.value}
               onChange={field.onChange}
             />
           )}

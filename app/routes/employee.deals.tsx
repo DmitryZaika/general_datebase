@@ -5,6 +5,7 @@ import {
   type LoaderFunctionArgs,
   Outlet,
   redirect,
+  type ShouldRevalidateFunctionArgs,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -24,6 +25,7 @@ import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import { dealsLayoutShouldRevalidate } from '~/utils/dealsLayoutShouldRevalidate'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -240,6 +242,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
+}
+
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+  return dealsLayoutShouldRevalidate('/employee/deals', args)
 }
 
 export default function EmployeeDeals() {
