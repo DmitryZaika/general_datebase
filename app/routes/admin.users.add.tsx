@@ -35,6 +35,7 @@ import { POSITIONS } from '~/constants/positions'
 import { db } from '~/db.server'
 import { useFullSubmit } from '~/hooks/useFullSubmit'
 import { commitSession, getSession } from '~/sessions.server'
+import { optionalTrimmedEmailOrEmpty } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getSuperUser } from '~/utils/session.server'
@@ -47,9 +48,14 @@ interface Company {
 }
 
 const userschema = z.object({
-  name: z.string().min(1),
-  phone_number: z.union([z.coerce.string().min(10), z.literal('')]).optional(),
-  email: z.union([z.email().optional(), z.literal('')]),
+  name: z.string().trim().min(1),
+  phone_number: z
+    .preprocess(
+      val => (typeof val === 'string' ? val.trim() : val),
+      z.union([z.coerce.string().min(10), z.literal('')]),
+    )
+    .optional(),
+  email: optionalTrimmedEmailOrEmpty,
   password: z.coerce.string().min(4),
   company_id: z.coerce.number(),
   positions: z.union([

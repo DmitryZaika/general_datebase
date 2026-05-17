@@ -24,13 +24,14 @@ import { FormField, FormProvider } from '~/components/ui/form'
 import { Textarea } from '~/components/ui/textarea'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
+import { zodEmail } from '~/utils/constants'
 import { csrf } from '~/utils/csrf.server'
 import { getQboUrl } from '~/utils/quickbooks.server'
 import { getShopWorkerUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
 
 const userSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().trim().min(1, 'Name is required'),
   phone_number: z.coerce
     .string()
     .optional()
@@ -44,7 +45,7 @@ const userSchema = z.object({
         })
       }
     }),
-  email: z.email('Invalid email address'),
+  email: zodEmail,
   password: z.union([z.string(), z.null(), z.undefined()]).optional(),
   email_signature: z.string().optional(),
   email_name: z.string().optional(),

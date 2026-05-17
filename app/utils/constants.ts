@@ -46,13 +46,19 @@ export const getSearchString = (url: URL) => {
   return searchParams ? `?${searchParams}` : ''
 }
 
-export const zodEmail = z
-  .email('Invalid email address')
-  .transform(val => val?.trim().toLowerCase())
+export const zodEmail = z.preprocess(
+  val => (typeof val === 'string' ? val.trim() : val),
+  z.email('Invalid email address').transform(val => val.toLowerCase()),
+)
 
 export const optionalEmailSchema = z.preprocess(
   val => (typeof val === 'string' && val.trim() === '' ? undefined : val),
   zodEmail.optional(),
+)
+
+export const optionalTrimmedEmailOrEmpty = z.preprocess(
+  val => (typeof val === 'string' ? val.trim() : val),
+  z.union([z.email().optional(), z.literal('')]),
 )
 
 export const dateClass = 'text-center text-xs text-gray-500 my-1'

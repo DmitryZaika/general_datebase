@@ -58,7 +58,7 @@ export default function Documents() {
   return (
     <motion.div
       key={employeeViewMotionKey(location.pathname, location.search)}
-      className='ml-4 w-full min-h-0'
+      className='w-full min-h-0'
       {...EMPLOYEE_VIEW_ENTER}
     >
       <h1 className='text-2xl font-bold'>Documents</h1>

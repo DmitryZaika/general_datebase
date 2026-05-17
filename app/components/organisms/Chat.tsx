@@ -257,10 +257,12 @@ export function Chat() {
     }
   }
 
-  const displayMessages: Message[] = [
-    ...messages,
-    ...(answer ? [{ role: 'assistant', content: answer }] : []),
-  ]
+  const assistantMessage: Message | null = answer
+    ? { role: 'assistant', content: answer }
+    : null
+  const displayMessages: Message[] = assistantMessage
+    ? [...messages, assistantMessage]
+    : messages
 
   if (!ready) {
     return null
