@@ -66,7 +66,8 @@ export function Posthog() {
       import('posthog-js').then(({ default: posthog }) => {
         if (!posthog.__loaded) {
           posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
-            api_host: 'https://us.i.posthog.com',
+            api_host: 'https://t.granite-manager.com',
+            ui_host: 'https://us.posthog.com',
             person_profiles: 'always',
           })
         }
