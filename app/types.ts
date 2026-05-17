@@ -107,6 +107,7 @@ export interface Customer {
   city?: string | null
   deal_id?: number | null
   deal_is_won?: number | null
+  deal_group_id?: number | null
 }
 
 export interface StoneSearchResult {

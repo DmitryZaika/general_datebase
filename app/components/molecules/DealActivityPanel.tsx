@@ -513,6 +513,28 @@ function NoteHistoryReadOnly({
   )
 }
 
+function HistoryAsyncSkeleton({
+  icon: Icon,
+  count = 2,
+}: {
+  icon: typeof Phone
+  count?: number
+}) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, index) => (
+        <TimelineItem key={index} icon={Icon} isLast={index === count - 1}>
+          <div className='flex flex-col gap-2 rounded-md border border-gray-200 px-2 py-2'>
+            <Skeleton className='h-3 w-28' />
+            <Skeleton className='h-4 w-full' />
+            <Skeleton className='h-4 w-4/5' />
+          </div>
+        </TimelineItem>
+      ))}
+    </>
+  )
+}
+
 function NoteHistorySkeletonItem({ isLast = false }: { isLast?: boolean }) {
   return (
     <TimelineItem icon={NoteIcon} isLast={isLast}>
@@ -1304,7 +1326,8 @@ function ActivityList({
   editingActivityId,
   historyHeaderRef,
   viewerName,
-  historyAsyncReady,
+  isActionsPending,
+  isSmsPending,
   readOnly = false,
 }: {
   dealId: number
@@ -1318,7 +1341,8 @@ function ActivityList({
   editingActivityId: Nullable<number>
   historyHeaderRef: React.RefObject<Nullable<HTMLDivElement>>
   viewerName: string
-  historyAsyncReady: boolean
+  isActionsPending: boolean
+  isSmsPending: boolean
   readOnly?: boolean
 }) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(true)
@@ -1572,6 +1596,9 @@ function ActivityList({
         )
       },
       actions: () => {
+        if (isActionsPending) {
+          return <HistoryAsyncSkeleton icon={Phone} />
+        }
         if (actions.length === 0) return <SectionEmptyState label='No actions yet' />
         return (
           <motion.div variants={EMAIL_LIST_VARIANTS} initial='hidden' animate='visible'>
@@ -1591,6 +1618,9 @@ function ActivityList({
         )
       },
       sms: () => {
+        if (isSmsPending) {
+          return <HistoryAsyncSkeleton icon={MessageSquare} />
+        }
         if (smsMessages.length === 0) return <SectionEmptyState label='No SMS yet' />
         return (
           <motion.div variants={EMAIL_LIST_VARIANTS} initial='hidden' animate='visible'>
@@ -1660,6 +1690,8 @@ function ActivityList({
       showCustomerEmails,
       actions,
       smsMessages,
+      isActionsPending,
+      isSmsPending,
       allHistoryItems,
       dealId,
       onEdit,
@@ -1748,9 +1780,7 @@ function ActivityList({
                 </Button>
               </div>
             ) : null}
-            {historyAsyncReady ? (
-              <Fragment key={historyTab}>{tabRenderers[historyTab]()}</Fragment>
-            ) : null}
+            <Fragment key={historyTab}>{tabRenderers[historyTab]()}</Fragment>
           </>
         )}
       </div>
@@ -1888,8 +1918,6 @@ export function DealActivityPanel({
       : false
     : isSmsHistoryPending
 
-  const historyAsyncReady = !isCallsPendingResolved && !isSmsPendingResolved
-
   useEffect(() => {
     if (readOnly) return
     const params = new URLSearchParams(location.search)
@@ -1980,7 +2008,8 @@ export function DealActivityPanel({
           editingActivityId={editingActivity?.id ?? null}
           historyHeaderRef={historyHeaderRef}
           viewerName={currentUserName}
-          historyAsyncReady={historyAsyncReady}
+          isActionsPending={isCallsPendingResolved}
+          isSmsPending={isSmsPendingResolved}
           readOnly={readOnly}
         />
       </div>

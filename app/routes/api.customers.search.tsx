@@ -6,6 +6,11 @@ import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
 
+const LATEST_DEAL_SELECT = `
+(SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
+(SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won,
+(SELECT l.group_id FROM deals d INNER JOIN deals_list l ON d.list_id = l.id WHERE d.customer_id = c.id AND d.deleted_at IS NULL ORDER BY d.id DESC LIMIT 1) as deal_group_id`
+
 function levenshtein(a: string, b: string) {
   if (a === b) return 0
   const aLen = a.length
@@ -103,8 +108,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       customers = await selectMany<Customer>(
         db,
         `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
-         (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
-         (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
+         ${LATEST_DEAL_SELECT}
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
          WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -145,8 +149,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         customers = await selectMany<Customer>(
           db,
           `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
-           (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
-           (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
+           ${LATEST_DEAL_SELECT}
            FROM customers c
            LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
            WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -185,8 +188,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         customers = await selectMany<Customer>(
           db,
           `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
-           (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
-           (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
+           ${LATEST_DEAL_SELECT}
            FROM customers c
            LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
            WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -227,8 +229,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       customers = await selectMany<Customer>(
         db,
         `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
-         (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
-         (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
+         ${LATEST_DEAL_SELECT}
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
          WHERE c.company_id = ? AND c.deleted_at IS NULL
@@ -255,8 +256,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       customers = await selectMany<Customer>(
         db,
         `SELECT DISTINCT c.id, c.name, c.address, c.phone, c.phone_2, c.email, c.company_name,
-         (SELECT id FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_id,
-         (SELECT is_won FROM deals WHERE customer_id = c.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as deal_is_won
+         ${LATEST_DEAL_SELECT}
          FROM customers c
          LEFT JOIN deals d ON d.customer_id = c.id AND d.user_id = ? AND d.deleted_at IS NULL
          WHERE c.company_id = ? AND c.deleted_at IS NULL

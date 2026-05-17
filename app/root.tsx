@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import type { RowDataPacket } from 'mysql2'
 import { posthog } from 'posthog-js'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect } from 'react'
 import type { LinksFunction, LoaderFunctionArgs } from 'react-router'
 import {
   data,
@@ -343,21 +343,6 @@ export default function App() {
     segments[2] !== 'stones' &&
     segments[2] !== 'sinks' &&
     segments[2] !== 'faucets'
-  const mainRef = useRef<HTMLElement | null>(null)
-  const [isAtBottom, setIsAtBottom] = useState(false)
-  useEffect(() => {
-    const el = mainRef.current
-    if (!el) return
-    const onScroll = () => {
-      const distance = el.scrollHeight - el.scrollTop - el.clientHeight
-      setIsAtBottom(distance <= 8)
-    }
-    onScroll()
-    el.addEventListener('scroll', onScroll)
-    return () => {
-      el.removeEventListener('scroll', onScroll)
-    }
-  }, [])
   useEffect(() => {
     if (message !== null && message !== undefined) {
       toast({
@@ -412,10 +397,7 @@ export default function App() {
                   colors={colors}
                 />
               )}
-              <main
-                ref={mainRef}
-                className='h-screen overflow-y-auto bg-gray-100 w-full'
-              >
+              <main className='h-screen overflow-y-auto bg-gray-100 w-full'>
                 {isExternalMarketing ||
                 isCheckIn ||
                 isInstallerRoute ||
@@ -440,9 +422,7 @@ export default function App() {
                 <ScrollRestoration />
                 <Scripts />
                 <Posthog />
-                {!isInstallerRoute && !isCheckIn && user && (
-                  <Chat isAtBottom={isAtBottom} />
-                )}
+                {!isInstallerRoute && !isCheckIn && user && <Chat />}
                 {/* <ScrollToTopButton /> */}
               </main>
             </AuthenticityTokenProvider>

@@ -517,8 +517,21 @@ export default function DealsView({
             else if (isWonStatus === 0) newStatus = '0'
 
             const params = new URLSearchParams(searchParams)
+            let needsNavigate = false
             if (params.get('is_won') !== newStatus) {
               params.set('is_won', newStatus)
+              needsNavigate = true
+            }
+            const groupId = customer.deal_group_id
+            if (
+              groupId != null &&
+              groupId > 0 &&
+              params.get('view') !== String(groupId)
+            ) {
+              params.set('view', String(groupId))
+              needsNavigate = true
+            }
+            if (needsNavigate) {
               params.set('highlight', String(dealId))
               navigate({ pathname: location.pathname, search: params.toString() })
               return
