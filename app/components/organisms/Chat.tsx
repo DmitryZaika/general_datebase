@@ -11,9 +11,9 @@ interface Message {
   content: string
 }
 
-interface ChatPosition {
-  x: number
-  y: number
+interface ChatAnchorPercent {
+  rightPercent: number
+  bottomPercent: number
 }
 
 interface ChatMessagesProps {
@@ -29,45 +29,147 @@ const CHAT_POSITION_KEY = 'floatingChatPosition'
 const FAB_SIZE = 56
 const DRAG_THRESHOLD = 6
 const VIEWPORT_PADDING = 8
+const DEFAULT_OFFSET = 20
 const FIXED_BASE_CLASS = 'fixed z-50 touch-none'
 const DEFAULT_ANCHOR_CLASS = 'bottom-5 right-5'
 const APPEARANCE_CLASS = 'transition-opacity duration-300 ease-out'
 
-function clampPosition(position: ChatPosition): ChatPosition {
-  if (typeof window === 'undefined') return position
-  const maxX = window.innerWidth - FAB_SIZE - VIEWPORT_PADDING
-  const maxY = window.innerHeight - FAB_SIZE - VIEWPORT_PADDING
+function getViewportSize() {
+  if (typeof window === 'undefined') {
+    return { width: 0, height: 0 }
+  }
+  return { width: window.innerWidth, height: window.innerHeight }
+}
+
+function defaultAnchorPercent(): ChatAnchorPercent {
+  const { width, height } = getViewportSize()
+  if (width === 0 || height === 0) {
+    return { rightPercent: 2, bottomPercent: 2 }
+  }
   return {
-    x: Math.max(VIEWPORT_PADDING, Math.min(position.x, maxX)),
-    y: Math.max(VIEWPORT_PADDING, Math.min(position.y, maxY)),
+    rightPercent: (DEFAULT_OFFSET / width) * 100,
+    bottomPercent: (DEFAULT_OFFSET / height) * 100,
   }
 }
 
-function loadStoredPosition(): ChatPosition | null {
+function clampPercent(percent: ChatAnchorPercent): ChatAnchorPercent {
+  const { width, height } = getViewportSize()
+  if (width === 0 || height === 0) return percent
+
+  const minRightPercent = (VIEWPORT_PADDING / width) * 100
+  const maxRightPercent = ((width - FAB_SIZE - VIEWPORT_PADDING) / width) * 100
+  const minBottomPercent = (VIEWPORT_PADDING / height) * 100
+  const maxBottomPercent = ((height - FAB_SIZE - VIEWPORT_PADDING) / height) * 100
+
+  return {
+    rightPercent: Math.max(
+      minRightPercent,
+      Math.min(percent.rightPercent, maxRightPercent),
+    ),
+    bottomPercent: Math.max(
+      minBottomPercent,
+      Math.min(percent.bottomPercent, maxBottomPercent),
+    ),
+  }
+}
+
+function percentFromPixels(left: number, top: number): ChatAnchorPercent {
+  const { width, height } = getViewportSize()
+  if (width === 0 || height === 0) return defaultAnchorPercent()
+
+  const rightPixels = width - left - FAB_SIZE
+  const bottomPixels = height - top - FAB_SIZE
+  return clampPercent({
+    rightPercent: (rightPixels / width) * 100,
+    bottomPercent: (bottomPixels / height) * 100,
+  })
+}
+
+function pixelsFromPercent(percent: ChatAnchorPercent): {
+  right: number
+  bottom: number
+} {
+  const { width, height } = getViewportSize()
+  return {
+    right: (percent.rightPercent / 100) * width,
+    bottom: (percent.bottomPercent / 100) * height,
+  }
+}
+
+function leftTopFromPercent(percent: ChatAnchorPercent): {
+  left: number
+  top: number
+} {
+  const { width, height } = getViewportSize()
+  const { right, bottom } = pixelsFromPercent(percent)
+  return {
+    left: width - right - FAB_SIZE,
+    top: height - bottom - FAB_SIZE,
+  }
+}
+
+function percentFromPixelAnchor(right: number, bottom: number): ChatAnchorPercent {
+  const { width, height } = getViewportSize()
+  if (width === 0 || height === 0) return defaultAnchorPercent()
+  return clampPercent({
+    rightPercent: (right / width) * 100,
+    bottomPercent: (bottom / height) * 100,
+  })
+}
+
+function parseStoredPercent(data: unknown): ChatAnchorPercent | null {
+  if (!data || typeof data !== 'object' || typeof window === 'undefined') {
+    return null
+  }
+
+  if (
+    'rightPercent' in data &&
+    'bottomPercent' in data &&
+    typeof data.rightPercent === 'number' &&
+    typeof data.bottomPercent === 'number'
+  ) {
+    return clampPercent({
+      rightPercent: data.rightPercent,
+      bottomPercent: data.bottomPercent,
+    })
+  }
+
+  if (
+    'right' in data &&
+    'bottom' in data &&
+    typeof data.right === 'number' &&
+    typeof data.bottom === 'number'
+  ) {
+    return percentFromPixelAnchor(data.right, data.bottom)
+  }
+
+  if (
+    'x' in data &&
+    'y' in data &&
+    typeof data.x === 'number' &&
+    typeof data.y === 'number'
+  ) {
+    return percentFromPixels(data.x, data.y)
+  }
+
+  return null
+}
+
+function loadStoredPercent(): ChatAnchorPercent | null {
   if (typeof window === 'undefined') return null
   try {
     const raw = localStorage.getItem(CHAT_POSITION_KEY)
     if (!raw) return null
     const data: unknown = JSON.parse(raw)
-    if (
-      data &&
-      typeof data === 'object' &&
-      'x' in data &&
-      'y' in data &&
-      typeof data.x === 'number' &&
-      typeof data.y === 'number'
-    ) {
-      return { x: data.x, y: data.y }
-    }
+    return parseStoredPercent(data)
   } catch {
     return null
   }
-  return null
 }
 
-function savePosition(position: ChatPosition) {
+function savePercent(percent: ChatAnchorPercent) {
   if (typeof window === 'undefined') return
-  localStorage.setItem(CHAT_POSITION_KEY, JSON.stringify(position))
+  localStorage.setItem(CHAT_POSITION_KEY, JSON.stringify(percent))
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
@@ -107,8 +209,8 @@ interface DragState {
   pointerId: number
   startX: number
   startY: number
-  originX: number
-  originY: number
+  originLeft: number
+  originTop: number
   didMove: boolean
 }
 
@@ -119,33 +221,33 @@ export function Chat() {
   const [isThinking, setIsThinking] = useState<boolean>(false)
   const [open, setOpen] = useState(false)
   const [useCustomPosition, setUseCustomPosition] = useState(false)
-  const [position, setPosition] = useState<ChatPosition>({ x: 0, y: 0 })
+  const [anchor, setAnchor] = useState<ChatAnchorPercent>(defaultAnchorPercent)
   const [ready, setReady] = useState(false)
   const [visible, setVisible] = useState(false)
-  const positionRef = useRef(position)
+  const [viewportRevision, setViewportRevision] = useState(0)
+  const anchorRef = useRef(anchor)
   const useCustomPositionRef = useRef(useCustomPosition)
   const dragStateRef = useRef<DragState | null>(null)
 
-  positionRef.current = position
+  anchorRef.current = anchor
   useCustomPositionRef.current = useCustomPosition
 
-  const applyPosition = useCallback((next: ChatPosition) => {
-    const clamped = clampPosition(next)
-    positionRef.current = clamped
-    setPosition(clamped)
+  const applyAnchorFromPixels = useCallback((left: number, top: number) => {
+    const clamped = percentFromPixels(left, top)
+    anchorRef.current = clamped
+    setAnchor(clamped)
     return clamped
   }, [])
 
-  const persistPosition = useCallback(() => {
-    savePosition(positionRef.current)
+  const persistAnchor = useCallback(() => {
+    savePercent(anchorRef.current)
   }, [])
 
   useLayoutEffect(() => {
-    const stored = loadStoredPosition()
+    const stored = loadStoredPercent()
     if (stored) {
-      const clamped = clampPosition(stored)
-      positionRef.current = clamped
-      setPosition(clamped)
+      anchorRef.current = stored
+      setAnchor(stored)
       setUseCustomPosition(true)
     }
     setReady(true)
@@ -162,7 +264,7 @@ export function Chat() {
   useEffect(() => {
     if (!useCustomPosition) return
     const onResize = () => {
-      setPosition(prev => clampPosition(prev))
+      setViewportRevision(revision => revision + 1)
     }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
@@ -204,15 +306,14 @@ export function Chat() {
     })
   }
 
-  const resolveDragOrigin = (e: React.PointerEvent): ChatPosition => {
+  const resolveDragOrigin = (e: React.PointerEvent): { left: number; top: number } => {
     if (useCustomPositionRef.current) {
-      return positionRef.current
+      return leftTopFromPercent(anchorRef.current)
     }
     const rect = e.currentTarget.getBoundingClientRect()
-    const origin = { x: rect.left, y: rect.top }
     setUseCustomPosition(true)
-    applyPosition(origin)
-    return positionRef.current
+    applyAnchorFromPixels(rect.left, rect.top)
+    return leftTopFromPercent(anchorRef.current)
   }
 
   const startDrag = (e: React.PointerEvent) => {
@@ -222,8 +323,8 @@ export function Chat() {
       pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
-      originX: origin.x,
-      originY: origin.y,
+      originLeft: origin.left,
+      originTop: origin.top,
       didMove: false,
     }
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -239,7 +340,7 @@ export function Chat() {
     if (!useCustomPositionRef.current) {
       setUseCustomPosition(true)
     }
-    applyPosition({ x: drag.originX + dx, y: drag.originY + dy })
+    applyAnchorFromPixels(drag.originLeft + dx, drag.originTop + dy)
   }
 
   const endDrag = (e: React.PointerEvent) => {
@@ -250,8 +351,7 @@ export function Chat() {
       e.currentTarget.releasePointerCapture(e.pointerId)
     }
     if (drag.didMove) {
-      applyPosition(positionRef.current)
-      persistPosition()
+      persistAnchor()
     } else {
       setOpen(true)
     }
@@ -268,8 +368,10 @@ export function Chat() {
     return null
   }
 
-  const positionStyle = useCustomPosition
-    ? { left: position.x, top: position.y }
+  const pixelAnchor =
+    useCustomPosition && viewportRevision >= 0 ? pixelsFromPercent(anchor) : null
+  const positionStyle = pixelAnchor
+    ? { right: pixelAnchor.right, bottom: pixelAnchor.bottom }
     : undefined
   const anchorClass = useCustomPosition ? '' : DEFAULT_ANCHOR_CLASS
   const visibilityClass = visible ? 'opacity-100' : 'opacity-0'
@@ -285,7 +387,7 @@ export function Chat() {
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
         onPointerCancel={e => {
-          if (dragStateRef.current?.didMove) persistPosition()
+          if (dragStateRef.current?.didMove) persistAnchor()
           dragStateRef.current = null
           if (e.currentTarget.hasPointerCapture(e.pointerId)) {
             e.currentTarget.releasePointerCapture(e.pointerId)
