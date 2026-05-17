@@ -1,6 +1,14 @@
 import { motion } from 'framer-motion'
 import { ScanSearch } from 'lucide-react'
-import { type ComponentProps, useEffect, useRef, useState } from 'react'
+import {
+  type ComponentProps,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
+import { createPortal } from 'react-dom'
+import { Spinner } from '~/components/atoms/Spinner'
 import {
   Carousel,
   type CarouselApi,
@@ -22,6 +30,19 @@ import { cn } from '~/lib/utils'
 import { capitalizeFirstLetter } from '~/utils/words'
 
 const INSTALLED_MOTION_EASE: [number, number, number, number] = [0.2, 0.78, 0.22, 1]
+const loadedMainImageUrls = new Set<string>()
+
+function isMainImageCached(url: string): boolean {
+  if (loadedMainImageUrls.has(url)) return true
+  if (typeof window === 'undefined') return false
+  const probe = document.createElement('img')
+  probe.src = url
+  if (probe.complete && probe.naturalWidth > 0) {
+    loadedMainImageUrls.add(url)
+    return true
+  }
+  return false
+}
 
 interface ImageInput {
   id: number
@@ -55,6 +76,155 @@ interface ImageProps {
   userRole?: string
 }
 
+interface InstalledThumbnailProps {
+  image: { id: number; url: string }
+  name?: string
+  index: number
+  animated: boolean
+  showLoadingSpinner: boolean
+  onSelect: () => void
+  onHover: () => void
+}
+
+function InstalledThumbnail({
+  image,
+  name,
+  index,
+  animated,
+  showLoadingSpinner,
+  onSelect,
+  onHover,
+}: InstalledThumbnailProps) {
+  const imageUrlRef = useRef(image.url)
+  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [loading, setLoading] = useState(
+    () => showLoadingSpinner && !isMainImageCached(image.url),
+  )
+  const [reveal, setReveal] = useState(() =>
+    showLoadingSpinner && !isMainImageCached(image.url) ? 0 : 100,
+  )
+
+  imageUrlRef.current = image.url
+
+  useLayoutEffect(() => {
+    if (revealTimerRef.current) {
+      clearInterval(revealTimerRef.current)
+      revealTimerRef.current = null
+    }
+
+    if (!showLoadingSpinner) {
+      setLoading(false)
+      setReveal(100)
+      return
+    }
+
+    if (isMainImageCached(image.url)) {
+      setLoading(false)
+      setReveal(100)
+      return
+    }
+
+    setLoading(true)
+    setReveal(0)
+
+    revealTimerRef.current = setInterval(() => {
+      setReveal(prev => {
+        if (prev >= 92) return prev
+        return Math.min(92, prev + 6 + Math.random() * 8)
+      })
+    }, 50)
+
+    return () => {
+      if (revealTimerRef.current) {
+        clearInterval(revealTimerRef.current)
+        revealTimerRef.current = null
+      }
+    }
+  }, [image.url, showLoadingSpinner])
+
+  useEffect(() => {
+    return () => {
+      if (revealTimerRef.current) clearInterval(revealTimerRef.current)
+    }
+  }, [])
+
+  const finishLoad = () => {
+    if (revealTimerRef.current) {
+      clearInterval(revealTimerRef.current)
+      revealTimerRef.current = null
+    }
+    loadedMainImageUrls.add(imageUrlRef.current)
+    setReveal(100)
+    setLoading(false)
+  }
+
+  const handleRef = (node: HTMLImageElement | null) => {
+    if (!showLoadingSpinner || !node) return
+    if (node.complete && node.naturalWidth > 0) finishLoad()
+  }
+
+  const imageStyle: React.CSSProperties | undefined = showLoadingSpinner
+    ? {
+        clipPath: loading ? `circle(${Math.max(0, reveal)}% at 50% 50%)` : undefined,
+        transition: loading ? 'clip-path 0.14s ease-out' : undefined,
+      }
+    : undefined
+
+  const imageProps = {
+    src: image.url,
+    alt: name || 'Image',
+    className: 'h-10 w-10 cursor-pointer object-cover',
+    style: imageStyle,
+    onClick: onSelect,
+    onMouseEnter: onHover,
+    onAuxClick: (e: React.MouseEvent<HTMLImageElement>) => {
+      if (e.button === 1) {
+        e.preventDefault()
+        window.open(image.url, '_blank')
+      }
+    },
+    onLoad: showLoadingSpinner ? finishLoad : undefined,
+    onError: showLoadingSpinner ? finishLoad : undefined,
+    ref: showLoadingSpinner ? handleRef : undefined,
+  }
+
+  return (
+    <div className='relative h-10 w-10 shrink-0 overflow-hidden'>
+      {showLoadingSpinner && loading ? (
+        <div className='absolute inset-0 z-10 flex items-center justify-center pointer-events-none'>
+          <Spinner size={18} className='text-zinc-500' />
+        </div>
+      ) : null}
+      <Tooltip delayDuration={200}>
+        <TooltipTrigger asChild>
+          {animated ? (
+            <motion.img
+              {...imageProps}
+              decoding='async'
+              initial={{ opacity: 0, y: 10, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{
+                duration: 0.36,
+                delay: index * 0.05,
+                ease: INSTALLED_MOTION_EASE,
+              }}
+            />
+          ) : (
+            <img {...imageProps} decoding='async' />
+          )}
+        </TooltipTrigger>
+        <TooltipContent
+          side='top'
+          sideOffset={6}
+          className='z-[100] max-w-[14rem] text-center'
+        >
+          Lock in this picture
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  )
+}
+
 function ChildrenImagesDialog({
   src,
   name,
@@ -71,6 +241,10 @@ function ChildrenImagesDialog({
     { images: { id: number; url: string }[] } | undefined
   >()
   const [selectedImage, setSelectedImage] = useState<string | null>(src)
+  const [mainImageLoading, setMainImageLoading] = useState(false)
+  const [mainImageReveal, setMainImageReveal] = useState(100)
+  const mainImageRevealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const selectedImageRef = useRef<string | null>(src)
   const [pinnedInstalledUrl, setPinnedInstalledUrl] = useState<string | null>(null)
   const [zoomMode, setZoomMode] = useState(false)
   const [zoomScale, setZoomScale] = useState(1.5)
@@ -91,8 +265,12 @@ function ChildrenImagesDialog({
   useEffect(() => {
     return () => {
       if (zoomHintTimerRef.current) clearTimeout(zoomHintTimerRef.current)
+      if (mainImageRevealTimerRef.current)
+        clearInterval(mainImageRevealTimerRef.current)
     }
   }, [])
+
+  selectedImageRef.current = selectedImage
 
   const showZoomHint = (message: string) => {
     setZoomHint(message)
@@ -132,6 +310,67 @@ function ChildrenImagesDialog({
     }
     setLens(current => ({ ...current, visible: false }))
   }, [isMobile])
+
+  const isEmployeeInventoryView =
+    userRole === 'employee' && (type === 'stones' || type === 'sinks')
+
+  useLayoutEffect(() => {
+    if (mainImageRevealTimerRef.current) {
+      clearInterval(mainImageRevealTimerRef.current)
+      mainImageRevealTimerRef.current = null
+    }
+
+    if (!isEmployeeInventoryView || !selectedImage) {
+      setMainImageLoading(false)
+      setMainImageReveal(100)
+      return
+    }
+
+    if (isMainImageCached(selectedImage)) {
+      setMainImageLoading(false)
+      setMainImageReveal(100)
+      return
+    }
+
+    setMainImageLoading(true)
+    setMainImageReveal(0)
+
+    mainImageRevealTimerRef.current = setInterval(() => {
+      setMainImageReveal(prev => {
+        if (prev >= 92) return prev
+        return Math.min(92, prev + 6 + Math.random() * 8)
+      })
+    }, 50)
+
+    return () => {
+      if (mainImageRevealTimerRef.current) {
+        clearInterval(mainImageRevealTimerRef.current)
+        mainImageRevealTimerRef.current = null
+      }
+    }
+  }, [selectedImage, isEmployeeInventoryView])
+
+  const finishMainImageLoad = () => {
+    if (mainImageRevealTimerRef.current) {
+      clearInterval(mainImageRevealTimerRef.current)
+      mainImageRevealTimerRef.current = null
+    }
+    const url = selectedImageRef.current
+    if (url) loadedMainImageUrls.add(url)
+    setMainImageReveal(100)
+    setMainImageLoading(false)
+  }
+
+  const handleMainImageLoaded = () => {
+    finishMainImageLoad()
+  }
+
+  const handleMainImageRef = (node: HTMLImageElement | null) => {
+    if (!isEmployeeInventoryView || !node) return
+    if (node.complete && node.naturalWidth > 0) {
+      finishMainImageLoad()
+    }
+  }
 
   const getImages = () => {
     fetch(`/api/installed_${type}/${id}`)
@@ -235,8 +474,8 @@ function ChildrenImagesDialog({
 
     setLens({
       visible: true,
-      left: pointerX,
-      top: pointerY,
+      left: e.clientX,
+      top: e.clientY,
       bgX: lensSize / 2 - imageX * zoomScale,
       bgY: lensSize / 2 - imageY * zoomScale,
       bgWidth: imageWidth * zoomScale,
@@ -275,6 +514,7 @@ function ChildrenImagesDialog({
   const isStoneCarousel = type === 'stones'
   const isCustomerStone = isStoneCarousel && userRole === 'customer'
   const isEmployeeStone = isStoneCarousel && userRole === 'employee'
+  const showInstalledThumbnailMotion = isEmployeeInventoryView
   const isCustomerSinkOrFaucet =
     userRole === 'customer' && (type === 'sinks' || type === 'faucets')
 
@@ -313,6 +553,26 @@ function ChildrenImagesDialog({
         : 'cursor-default',
   )
 
+  const mainPreviewStyle: React.CSSProperties | undefined = isEmployeeInventoryView
+    ? {
+        clipPath: mainImageLoading
+          ? `circle(${Math.max(0, mainImageReveal)}% at 50% 50%)`
+          : undefined,
+        transition: mainImageLoading ? 'clip-path 0.14s ease-out' : undefined,
+      }
+    : undefined
+
+  const mainImageLoadHandlers: Pick<
+    ComponentProps<'img'>,
+    'ref' | 'onLoad' | 'onError'
+  > = isEmployeeInventoryView
+    ? {
+        ref: handleMainImageRef,
+        onLoad: handleMainImageLoaded,
+        onError: handleMainImageLoaded,
+      }
+    : {}
+
   const mainPreviewHandlers: Pick<
     ComponentProps<'img'>,
     'onMouseEnter' | 'onMouseMove' | 'onMouseLeave' | 'onClick'
@@ -345,55 +605,18 @@ function ChildrenImagesDialog({
               key={image.id}
               className='basis-auto max-w-fit pl-2 select-none'
             >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {isEmployeeStone ? (
-                    <motion.img
-                      src={image.url}
-                      className='w-10 h-10 cursor-pointer'
-                      alt={name || 'Image'}
-                      initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{
-                        duration: 0.36,
-                        delay: index * 0.05,
-                        ease: INSTALLED_MOTION_EASE,
-                      }}
-                      onClick={() => {
-                        setPinnedInstalledUrl(image.url)
-                        setSelectedImage(image.url)
-                      }}
-                      onMouseEnter={() => handleMouseEnter(image.url)}
-                      onAuxClick={e => {
-                        if (e.button === 1) {
-                          e.preventDefault()
-                          window.open(image.url, '_blank')
-                        }
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={image.url}
-                      className='w-10 h-10 cursor-pointer'
-                      alt={name || 'Image'}
-                      onClick={() => {
-                        setPinnedInstalledUrl(image.url)
-                        setSelectedImage(image.url)
-                      }}
-                      onMouseEnter={() => handleMouseEnter(image.url)}
-                      onAuxClick={e => {
-                        if (e.button === 1) {
-                          e.preventDefault()
-                          window.open(image.url, '_blank')
-                        }
-                      }}
-                    />
-                  )}
-                </TooltipTrigger>
-                <TooltipContent side='top' sideOffset={6}>
-                  Lock in this picture
-                </TooltipContent>
-              </Tooltip>
+              <InstalledThumbnail
+                image={image}
+                name={name}
+                index={index}
+                animated={showInstalledThumbnailMotion}
+                showLoadingSpinner={isEmployeeInventoryView}
+                onSelect={() => {
+                  setPinnedInstalledUrl(image.url)
+                  setSelectedImage(image.url)
+                }}
+                onHover={() => handleMouseEnter(image.url)}
+              />
             </CarouselItem>
           ))}
         </CarouselContent>
@@ -405,7 +628,7 @@ function ChildrenImagesDialog({
         )}
       </Carousel>
     )
-    installedProjectsRow = isEmployeeStone ? (
+    installedProjectsRow = showInstalledThumbnailMotion ? (
       <motion.div
         key={id}
         className='w-screen max-w-full'
@@ -469,6 +692,14 @@ function ChildrenImagesDialog({
         )}
         {selectedImage ? (
           <div className='relative w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] overflow-hidden'>
+            {isEmployeeInventoryView && mainImageLoading ? (
+              <div
+                className='absolute inset-0 z-[60] flex items-center justify-center pointer-events-none'
+                aria-hidden
+              >
+                <Spinner size={52} className='text-white drop-shadow-md' />
+              </div>
+            ) : null}
             {mainImageShowsInstalled && !zoomMode ? (
               <Tooltip delayDuration={200}>
                 <TooltipTrigger asChild>
@@ -476,6 +707,9 @@ function ChildrenImagesDialog({
                     src={selectedImage}
                     alt={alt || name || 'Image'}
                     className={mainPreviewClassName}
+                    style={mainPreviewStyle}
+                    decoding='async'
+                    {...mainImageLoadHandlers}
                     {...mainPreviewHandlers}
                   />
                 </TooltipTrigger>
@@ -492,32 +726,38 @@ function ChildrenImagesDialog({
                 src={selectedImage}
                 alt={alt || name || 'Image'}
                 className={mainPreviewClassName}
+                style={mainPreviewStyle}
+                decoding='async'
+                {...mainImageLoadHandlers}
                 {...mainPreviewHandlers}
               />
             )}
-            {zoomMode && lens.visible && !isMobile ? (
-              <div
-                className='pointer-events-none absolute z-20 rounded-full border-4 border-white bg-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] ring-1 ring-black/20'
-                style={{
-                  width: lensSize,
-                  height: lensSize,
-                  left: lens.left,
-                  top: lens.top,
-                  transform: 'translate(-50%, -50%)',
-                  backgroundImage: `url(${selectedImage})`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundSize: `${lens.bgWidth}px ${lens.bgHeight}px`,
-                  backgroundPosition: `${lens.bgX}px ${lens.bgY}px`,
-                }}
-              >
-                <span className='absolute inset-0 rounded-full shadow-[inset_0_0_18px_rgba(255,255,255,0.35)]' />
-              </div>
-            ) : null}
           </div>
         ) : null}
       </div>
 
       {installedProjectsRow}
+      {zoomMode && lens.visible && !isMobile
+        ? createPortal(
+            <div
+              className='pointer-events-none fixed z-[9999] rounded-full border-4 border-white bg-white shadow-[0_12px_40px_rgba(0,0,0,0.35)] ring-1 ring-black/20'
+              style={{
+                width: lensSize,
+                height: lensSize,
+                left: lens.left,
+                top: lens.top,
+                transform: 'translate(-50%, -50%)',
+                backgroundImage: `url(${selectedImage})`,
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: `${lens.bgWidth}px ${lens.bgHeight}px`,
+                backgroundPosition: `${lens.bgX}px ${lens.bgY}px`,
+              }}
+            >
+              <span className='absolute inset-0 rounded-full shadow-[inset_0_0_18px_rgba(255,255,255,0.35)]' />
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   )
 }

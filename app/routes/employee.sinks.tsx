@@ -158,6 +158,7 @@ export default function Sinks() {
             currentId={currentId}
             setCurrentId={handleSetCurrentId}
             images={sortedSinks}
+            userRole='employee'
           />
         </div>
         {sortedSinks.map(sink => (
