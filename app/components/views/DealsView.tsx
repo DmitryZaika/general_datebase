@@ -114,6 +114,7 @@ interface DealsViewProps {
   toolbarLeft?: React.ReactNode
   showAddDeal?: boolean
   animateBoard?: boolean
+  groupQueryParam?: string
 }
 
 export default function DealsView({
@@ -131,6 +132,7 @@ export default function DealsView({
   toolbarLeft,
   showAddDeal = !readonly,
   animateBoard = false,
+  groupQueryParam = 'view',
 }: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -306,9 +308,9 @@ export default function DealsView({
     lastMobileColumnSlideAtRef.current = 0
     dragPointerClientXRef.current = null
     const ae = event.activatorEvent
-    if ('touches' in ae && ae.touches.length > 0) {
+    if (ae instanceof TouchEvent && ae.touches.length > 0) {
       dragPointerClientXRef.current = ae.touches[0].clientX
-    } else if ('clientX' in ae && typeof ae.clientX === 'number') {
+    } else if (ae instanceof MouseEvent) {
       dragPointerClientXRef.current = ae.clientX
     }
   }
@@ -460,6 +462,7 @@ export default function DealsView({
                   return params.toString()
                 })()}`}
                 relative='path'
+                prefetch='none'
               >
                 <Button variant='outline' size='sm' className='flex gap-2 h-9'>
                   <Plus className='w-4 h-4' /> Add Deal
@@ -526,9 +529,9 @@ export default function DealsView({
             if (
               groupId != null &&
               groupId > 0 &&
-              params.get('view') !== String(groupId)
+              params.get(groupQueryParam) !== String(groupId)
             ) {
-              params.set('view', String(groupId))
+              params.set(groupQueryParam, String(groupId))
               needsNavigate = true
             }
             if (needsNavigate) {

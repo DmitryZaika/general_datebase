@@ -6,6 +6,10 @@ const access: PoolOptions = {
   password: process.env.DB_PASSWORD,
   host: process.env.DB_HOST,
   timezone: 'Z',
+  connectionLimit: 20,
+  waitForConnections: true,
+  queueLimit: 0,
+  enableKeepAlive: true,
 }
 
 export const db = mysql.createPool(access)

@@ -373,7 +373,7 @@ function ChildrenImagesDialog({
   }
 
   const getImages = () => {
-    fetch(`/api/installed_${type}/${id}`)
+    fetch(`/api/installed_${type}/${id}`, { credentials: 'same-origin' })
       .then(async res => {
         if (!res.ok) return { images: [] }
         return res.json()

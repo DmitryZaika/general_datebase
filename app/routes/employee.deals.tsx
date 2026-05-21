@@ -25,6 +25,10 @@ import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
+import {
+  emptyDealsBoardMaps,
+  loadDealsBoardMaps,
+} from '~/utils/dealsBoardLoader.server'
 import { dealsLayoutShouldRevalidate } from '~/utils/dealsLayoutShouldRevalidate'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser } from '~/utils/session.server'
@@ -79,7 +83,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     )
 
     // Default to the first group if no view param or invalid
-    const activeGroupId = viewParam ? parseInt(viewParam, 10) : groups[0]?.id
+    const parsedView = viewParam ? parseInt(viewParam, 10) : Number.NaN
+    const activeGroupId = groups.find(g => g.id === parsedView)?.id ?? groups[0]?.id
 
     if (!activeGroupId && groups.length > 0) {
       // Handle case where activeGroupId might be NaN or 0 if that's not intended
@@ -101,6 +106,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       [activeGroupId],
     )
 
+    const listIds = lists.map(l => l.id)
+    if (listIds.length === 0) {
+      const customers = await selectMany<{
+        id: number
+        name: string
+        company_name?: string
+      }>(
+        db,
+        'SELECT id, name, company_name FROM customers WHERE company_id = ? AND deleted_at IS NULL',
+        [user.company_id],
+      )
+      const emptyMaps = emptyDealsBoardMaps()
+      return {
+        deals: [],
+        customers,
+        lists,
+        ...emptyMaps,
+        groups,
+        activeGroupId,
+        isWon,
+      }
+    }
+
+    const listIn = listIds.map(() => '?').join(', ')
     let deals: FullDeal[]
 
     if (isWon === null) {
@@ -109,111 +138,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         `SELECT id, customer_id, amount, title, status, lost_reason, list_id, position,
          DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at, is_won
          FROM deals
-         WHERE deleted_at IS NULL AND user_id = ? AND is_won IS NULL`,
-        [user.id],
+         WHERE deleted_at IS NULL AND user_id = ? AND is_won IS NULL AND list_id IN (${listIn})`,
+        [user.id, ...listIds],
       )
     } else {
       deals = await selectMany<FullDeal>(
         db,
-        `SELECT d.id, d.customer_id, d.amount, d.title, d.status, d.lost_reason,
-         d.list_id,
-         d.position, DATE_FORMAT(d.due_date, '%Y-%m-%d') as due_date, d.deleted_at, d.is_won
-         FROM deals d
-         WHERE d.deleted_at IS NULL AND d.user_id = ? AND d.is_won = ?`,
-        [user.id, isWon],
+        `SELECT id, customer_id, amount, title, status, lost_reason, list_id, position,
+         DATE_FORMAT(due_date, '%Y-%m-%d') as due_date, deleted_at, is_won
+         FROM deals
+         WHERE deleted_at IS NULL AND user_id = ? AND is_won = ? AND list_id IN (${listIn})`,
+        [user.id, isWon, ...listIds],
       )
     }
-    const imagesCounts = await selectMany<{ deal_id: number; count: number }>(
-      db,
-      'SELECT deal_id, COUNT(*) as count FROM deals_images GROUP BY deal_id',
-    )
-    const imagesMap: Record<number, boolean> = {}
-    for (const row of imagesCounts) imagesMap[row.deal_id] = Number(row.count) > 0
-    const emailCounts = await selectMany<{ deal_id: number; count: number }>(
-      db,
-      'SELECT deal_id, COUNT(*) as count FROM emails WHERE deleted_at IS NULL AND deal_id IS NOT NULL GROUP BY deal_id',
-    )
-    const emailsMap: Record<number, boolean> = {}
-    for (const row of emailCounts) emailsMap[row.deal_id] = Number(row.count) > 0
 
-    const nearestActivities = await selectMany<{
-      id: number
-      deal_id: number
-      name: string
-      deadline: string | null
-      priority: string
-    }>(
-      db,
-      `SELECT id, deal_id, name, priority, DATE_FORMAT(deadline, '%Y-%m-%dT%H:%i:%sZ') AS deadline
-       FROM deal_activities
-       WHERE deleted_at IS NULL AND is_completed = 0 AND company_id = ?
-       ORDER BY
-         CASE WHEN deadline IS NULL THEN 1 ELSE 0 END,
-         deadline ASC,
-         CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,
-         created_at ASC`,
-      [user.company_id],
-    )
-    const nearestActivityMap: Record<
-      number,
-      { id: number; name: string; deadline: string | null; priority: string }
-    > = {}
-    for (const a of nearestActivities) {
-      if (!nearestActivityMap[a.deal_id]) {
-        nearestActivityMap[a.deal_id] = {
-          id: a.id,
-          name: a.name,
-          deadline: a.deadline,
-          priority: a.priority,
-        }
-      }
-    }
-
-    const activitiesCounts = await selectMany<{ deal_id: number; count: number }>(
-      db,
-      `SELECT deal_id, COUNT(*) as count FROM deal_activities WHERE company_id = ? AND deleted_at IS NULL AND is_completed = 0 GROUP BY deal_id`,
-      [user.company_id],
-    )
-    const activitiesMap: Record<number, boolean> = {}
-    for (const row of activitiesCounts)
-      activitiesMap[row.deal_id] = Number(row.count) > 1
-
-    const activitiesDeadlines = await selectMany<{
-      deal_id: number
-      deadline: string | null
-    }>(
-      db,
-      `SELECT deal_id, deadline FROM deal_activities WHERE company_id = ? AND deleted_at IS NULL AND is_completed = 0`,
-      [user.company_id],
-    )
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const activitiesIconMap: Record<number, 'red' | 'yellow' | 'gray'> = {}
-    for (const row of activitiesDeadlines) {
-      const current = activitiesIconMap[row.deal_id]
-      if (current === 'red') continue
-      const d = row.deadline ? new Date(row.deadline) : null
-      if (!d || Number.isNaN(d.getTime())) {
-        if (current === undefined) activitiesIconMap[row.deal_id] = 'gray'
-        continue
-      }
-      const deadlineDate = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-      if (deadlineDate.getTime() < today.getTime()) {
-        activitiesIconMap[row.deal_id] = 'red'
-      } else if (deadlineDate.getTime() === today.getTime()) {
-        activitiesIconMap[row.deal_id] = 'yellow'
-      } else if (current === undefined) {
-        activitiesIconMap[row.deal_id] = 'gray'
-      }
-    }
-
-    const notesCounts = await selectMany<{ deal_id: number; count: number }>(
-      db,
-      `SELECT deal_id, COUNT(*) as count FROM deal_notes WHERE company_id = ? AND deleted_at IS NULL GROUP BY deal_id`,
-      [user.company_id],
-    )
-    const notesMap: Record<number, boolean> = {}
-    for (const row of notesCounts) notesMap[row.deal_id] = Number(row.count) >= 1
+    const dealIds = deals.map(d => d.id)
+    const {
+      imagesMap,
+      emailsMap,
+      nearestActivityMap,
+      activitiesMap,
+      activitiesIconMap,
+      notesMap,
+    } = await loadDealsBoardMaps(db, dealIds, user.company_id)
 
     const customers = await selectMany<{
       id: number
