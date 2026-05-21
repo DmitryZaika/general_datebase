@@ -12,6 +12,7 @@ import {
   type LucideProps,
   Mail,
   MailIcon,
+  MessageSquare,
   Package,
   PanelLeftClose,
   PanelLeftOpen,
@@ -48,6 +49,7 @@ import type { ISupplier } from '~/schemas/suppliers'
 import { getMirroredUrl } from '~/utils/headerNav'
 import { getBase } from '~/utils/urlHelpers'
 import { FaucetsFilters } from './FaucetsFilters'
+import { SidebarCloudtalkBadge } from './SidebarCloudtalkBadge'
 import { SinksFilters } from './SinksFilters'
 import { StonesFilters } from './StonesFilters'
 
@@ -140,6 +142,11 @@ const getItems = (
       title: 'Emails',
       url: `/employee/emails`,
       icon: MailIcon,
+    })
+    finalList.push({
+      title: 'CloudTalk SMS',
+      url: `/employee/cloudtalk`,
+      icon: MessageSquare,
     })
   }
   if (['admin', 'employee'].includes(base)) {
@@ -349,7 +356,7 @@ export function EmployeeSidebar({
 
   const inventoryTitles = ['Stones', 'Sinks', 'Faucets']
 
-  const crmTitles = ['Customers', 'Deals', 'Statistic', 'Emails']
+  const crmTitles = ['Customers', 'Deals', 'Statistic', 'Emails', 'CloudTalk SMS']
   const resourceTitles = [
     'Suppliers',
     'Supports',
@@ -544,6 +551,9 @@ export function EmployeeSidebar({
                                   <span className='ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white'>
                                     {unreadEmailCount}
                                   </span>
+                                ) : null}
+                                {sub.title === 'CloudTalk SMS' ? (
+                                  <SidebarCloudtalkBadge />
                                 ) : null}
                               </a>
                             </SidebarMenuSubButton>
