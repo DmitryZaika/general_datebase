@@ -65,8 +65,10 @@ export function Posthog() {
     if (typeof window !== 'undefined') {
       import('posthog-js').then(({ default: posthog }) => {
         if (!posthog.__loaded) {
-          posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
-            api_host: 'https://t.granite-manager.com',
+          const posthogKey = import.meta.env.VITE_POSTHOG_KEY
+          if (!posthogKey) return
+          posthog.init(posthogKey, {
+            api_host: `${window.location.origin}/ingest`,
             ui_host: 'https://us.posthog.com',
             person_profiles: 'always',
           })

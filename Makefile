@@ -41,8 +41,10 @@ setup-host:
 		sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose && \
 		sudo ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose"
 
+VITE_POSTHOG_KEY := $(shell grep '^VITE_POSTHOG_KEY=' .env.prod | cut -d= -f2-)
+
 build-push: login
-	docker build -t $(REPO_NAME) .
+	docker build --build-arg VITE_POSTHOG_KEY=$(VITE_POSTHOG_KEY) -t $(REPO_NAME) .
 	docker tag $(REPO_NAME):latest $(IMAGE_URI)
 	docker push $(IMAGE_URI)
 

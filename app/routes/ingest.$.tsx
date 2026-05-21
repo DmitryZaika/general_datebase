@@ -1,7 +1,7 @@
 import type { ActionFunction, LoaderFunction } from 'react-router'
 
-const API_HOST = 'eu.i.posthog.com'
-const ASSET_HOST = 'eu-assets.i.posthog.com'
+const API_HOST = 'us.i.posthog.com'
+const ASSET_HOST = 'us-assets.i.posthog.com'
 
 const posthogProxy = async (request: Request) => {
   const url = new URL(request.url)
