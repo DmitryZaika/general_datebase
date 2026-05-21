@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 import type { ZodSchema } from 'zod'
 
@@ -9,7 +10,11 @@ function objectToURLSearchParams(obj: Record<string, unknown>): URLSearchParams 
       sp.set(key, 'null')
       continue
     }
-    if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+    if (
+      typeof val === 'string' ||
+      typeof val === 'number' ||
+      typeof val === 'boolean'
+    ) {
       sp.set(key, String(val))
       continue
     }
@@ -36,16 +41,23 @@ export function useSafeSearchParams<T>(
 ): [T, (values: Partial<T>) => void] {
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const rawObj = cleanParams(searchParams)
+  const currentValues = useMemo(() => {
+    const rawObj = cleanParams(searchParams)
+    return schema.parse(rawObj)
+  }, [searchParams, schema])
 
-  const currentValues = schema.parse(rawObj)
-
-  const updateSearchParams = (newValues: Partial<T>) => {
-    const merged = { ...currentValues, ...newValues }
-    const nextParsed = schema.parse(merged)
-    const sp = objectToURLSearchParams(nextParsed as Record<string, unknown>)
-    setSearchParams(sp)
-  }
+  const updateSearchParams = useCallback(
+    (newValues: Partial<T>) => {
+      const merged = { ...currentValues, ...newValues }
+      const nextParsed = schema.parse(merged)
+      const sp = objectToURLSearchParams(nextParsed as Record<string, unknown>)
+      if (sp.toString() === searchParams.toString()) {
+        return
+      }
+      setSearchParams(sp, { replace: true })
+    },
+    [currentValues, searchParams, schema, setSearchParams],
+  )
 
   return [currentValues, updateSearchParams]
 }

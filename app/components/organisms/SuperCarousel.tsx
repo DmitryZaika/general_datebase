@@ -645,7 +645,12 @@ function ChildrenImagesDialog({
 
   return (
     <>
-      <div className='w-full flex flex-col justify-center items-center relative select-none'>
+      <div
+        className={cn(
+          'w-full flex flex-col items-center relative select-none',
+          isMobile ? 'min-h-0 justify-start px-2 pb-4' : 'justify-center',
+        )}
+      >
         {!isMobile ? (
           <button
             type='button'
@@ -677,7 +682,14 @@ function ChildrenImagesDialog({
           </div>
         ) : null}
         {showInfo && type !== 'images' && !zoomMode && (
-          <div className='absolute top-7 left-1/2 z-10 w-max max-w-[min(90vw,28rem)] -translate-x-1/2 bg-black/80 p-3 rounded shadow-lg text-white border border-gray-900 transition-opacity duration-200 hover:opacity-0'>
+          <div
+            className={cn(
+              'z-30 bg-black/80 p-3 rounded shadow-lg text-white border border-gray-900',
+              isMobile
+                ? 'sticky top-0 z-40 w-full max-w-full shrink-0 mb-2 pt-[max(2.75rem,env(safe-area-inset-top)+2rem)]'
+                : 'absolute top-7 left-1/2 w-max max-w-[min(90vw,28rem)] -translate-x-1/2 transition-opacity duration-200 hover:opacity-0',
+            )}
+          >
             <h3 className='text-lg font-bold mb-3 text-center'>
               {image?.name || name}
             </h3>
@@ -691,7 +703,14 @@ function ChildrenImagesDialog({
           </div>
         )}
         {selectedImage ? (
-          <div className='relative w-full h-[85vh] md:h-[87vh] 2xl:h-[93vh] overflow-hidden'>
+          <div
+            className={cn(
+              'relative w-full overflow-hidden shrink-0',
+              isMobile
+                ? 'h-[52dvh] max-h-[58vh] min-h-[220px]'
+                : 'h-[85vh] md:h-[87vh] 2xl:h-[93vh]',
+            )}
+          >
             {isEmployeeInventoryView && mainImageLoading ? (
               <div
                 className='absolute inset-0 z-[60] flex items-center justify-center pointer-events-none'
@@ -777,6 +796,7 @@ export function SuperCarousel({
   userRole?: string
   showInfo?: boolean
 }) {
+  const isMobile = useIsMobile()
   const [api, setApi] = useState<CarouselApi>()
   const _ = useArrowCarousel(api)
 
@@ -802,13 +822,27 @@ export function SuperCarousel({
       onOpenChange={open => !open && setCurrentId?.(undefined)}
     >
       <DialogContent
-        closeClassName='z-50 top-40 sm:top-10 md:top-25 lg:top-10 right-0 sm:-right-15 md:-right-25 lg:-right-35'
-        className='flex flex-col justify-center items-center gap-3 bg-transparent'
+        closeClassName={cn(
+          'z-50 right-3 sm:right-0',
+          isMobile
+            ? 'top-[max(0.5rem,env(safe-area-inset-top))]'
+            : 'top-40 sm:top-10 md:top-25 lg:top-10 sm:-right-15 md:-right-25 lg:-right-35',
+        )}
+        className={cn(
+          'flex flex-col gap-3 bg-transparent',
+          isMobile
+            ? '!fixed !inset-0 !left-0 !top-0 !h-[100dvh] !max-h-[100dvh] !w-full !max-w-none !translate-x-0 !translate-y-0 overflow-y-auto overscroll-y-contain p-0'
+            : 'justify-center items-center',
+        )}
       >
         <DialogTitle className='sr-only'>Image Gallery</DialogTitle>
         <DialogDescription className='sr-only'>Image Gallery</DialogDescription>
         <Carousel
-          className='max-w-screen max-h-screen w-screen h-screen lg:max-w-[90vw] 2xl:max-w-[60vw]'
+          className={cn(
+            isMobile
+              ? 'w-full min-h-0'
+              : 'max-w-screen max-h-screen w-screen h-screen lg:max-w-[90vw] 2xl:max-w-[60vw]',
+          )}
           setApi={setApi}
           opts={{
             dragFree: false,
@@ -831,8 +865,12 @@ export function SuperCarousel({
               </CarouselItem>
             ))}
           </CarouselContent>
-          <CarouselPrevious />
-          <CarouselNext />
+          {!isMobile ? (
+            <>
+              <CarouselPrevious />
+              <CarouselNext />
+            </>
+          ) : null}
         </Carousel>
       </DialogContent>
     </Dialog>

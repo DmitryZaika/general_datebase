@@ -3,7 +3,7 @@
 import { GridIcon, TableIcon } from '@radix-ui/react-icons'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Pencil, Plus, X } from 'lucide-react'
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import {
   Link,
   type LoaderFunctionArgs,
@@ -13,6 +13,7 @@ import {
   useLocation,
   useNavigate,
   useNavigation,
+  useSearchParams,
 } from 'react-router'
 import ModuleList from '~/components/ModuleList'
 import { ActionDropdown } from '~/components/molecules/DataTable/ActionDropdown'
@@ -190,23 +191,35 @@ function StoneTable({ stones }: { stones: Stone[] }) {
 export default function AdminStones() {
   const { stones, companyId } = useLoaderData<typeof loader>()
   const [searchParams, updateSearchParams] = useSafeSearchParams(stoneFilterSchema)
+  const [, setSearchParams] = useSearchParams()
   const navigation = useNavigation()
   const navigate = useNavigate()
   const [isAddingStone, setIsAddingStone] = useState(false)
   const [sortedStones, setSortedStones] = useState<Stone[]>(stones)
   const location = useLocation()
   const [isViewTogglePending, startViewToggleTransition] = useTransition()
+  const viewModeHydratedRef = useRef(false)
 
   const viewMode = searchParams.viewMode
 
   useEffect(() => {
+    if (viewModeHydratedRef.current) return
     if (typeof window === 'undefined') return
     const raw = new URLSearchParams(window.location.search).get('viewMode')
-    if (raw === 'grid' || raw === 'table') return
+    if (raw === 'grid' || raw === 'table') {
+      viewModeHydratedRef.current = true
+      return
+    }
     const stored = localStorage.getItem('stoneViewMode')
-    if (stored !== 'grid' && stored !== 'table') return
-    updateSearchParams({ viewMode: stored })
-  }, [updateSearchParams])
+    if (stored !== 'grid' && stored !== 'table') {
+      viewModeHydratedRef.current = true
+      return
+    }
+    viewModeHydratedRef.current = true
+    const next = new URLSearchParams(window.location.search)
+    next.set('viewMode', stored)
+    setSearchParams(next, { replace: true })
+  }, [setSearchParams])
 
   useEffect(() => {
     const withImage = stones.filter(
