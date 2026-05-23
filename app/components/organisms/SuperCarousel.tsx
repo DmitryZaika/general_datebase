@@ -312,7 +312,8 @@ function ChildrenImagesDialog({
   }, [isMobile])
 
   const isEmployeeInventoryView =
-    userRole === 'employee' && (type === 'stones' || type === 'sinks')
+    userRole === 'employee' &&
+    (type === 'stones' || type === 'sinks' || type === 'images')
 
   useLayoutEffect(() => {
     if (mainImageRevealTimerRef.current) {
@@ -825,13 +826,13 @@ export function SuperCarousel({
         closeClassName={cn(
           'z-50 right-3 sm:right-0',
           isMobile
-            ? 'top-[max(0.5rem,env(safe-area-inset-top))]'
+            ? '!top-3'
             : 'top-40 sm:top-10 md:top-25 lg:top-10 sm:-right-15 md:-right-25 lg:-right-35',
         )}
         className={cn(
           'flex flex-col gap-3 bg-transparent',
           isMobile
-            ? '!fixed !inset-0 !left-0 !top-0 !h-[100dvh] !max-h-[100dvh] !w-full !max-w-none !translate-x-0 !translate-y-0 overflow-y-auto overscroll-y-contain p-0'
+            ? '!fixed !left-0 !right-0 !top-[env(safe-area-inset-top,0px)] !bottom-[env(safe-area-inset-bottom,0px)] !h-auto !max-h-none !w-full !max-w-none !translate-x-0 !translate-y-0 overflow-y-auto overscroll-y-contain p-0'
             : 'justify-center items-center',
         )}
       >

@@ -16,10 +16,14 @@ const posthogProxy = async (request: Request) => {
   const headers = new Headers(request.headers)
   headers.set('host', hostname)
 
+  const method = request.method.toUpperCase()
+  const hasBody = method !== 'GET' && method !== 'HEAD'
+  const body = hasBody ? await request.arrayBuffer() : undefined
+
   const response = await fetch(newUrl, {
     method: request.method,
     headers,
-    body: request.body,
+    body,
   })
 
   return new Response(response.body, {

@@ -1,12 +1,21 @@
-import { useEffect, useState } from 'react'
-import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { motion } from 'framer-motion'
+import {
+  type LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+  useLocation,
+} from 'react-router'
 import ModuleList from '~/components/ModuleList'
-import { ImageCard } from '~/components/organisms/ImageCard'
-import { SuperCarousel } from '~/components/organisms/SuperCarousel'
+import { Image } from '~/components/molecules/Image'
 import { Accordion, AccordionContent, AccordionItem } from '~/components/ui/accordion'
 import { db } from '~/db.server'
+import { useArrowToggle } from '~/hooks/useArrowToggle'
+import {
+  EMPLOYEE_VIEW_ENTER_EASE,
+  employeeViewMotionKey,
+} from '~/utils/employeeViewEnterMotion'
 import { selectMany } from '~/utils/queryHelpers'
-import { getEmployeeUser } from '~/utils/session.server'
+import { getEmployeeUser, type User } from '~/utils/session.server'
 
 interface ItemImage {
   id: number
@@ -14,65 +23,13 @@ interface ItemImage {
   url: string | null
 }
 
-function itemToCarouselInput(row: ItemImage) {
-  return {
-    id: row.id,
-    url: row.url,
-    name: row.name,
-    type: 'images',
-    available: null,
-    retail_price: null,
-    cost_per_sqft: 0,
-  }
-}
-
-function InteractiveImageCard({
-  image,
-  setCurrentId,
-}: {
-  image: ItemImage
-  setCurrentId: (value: number) => void
-}) {
-  return (
-    <div
-      className='relative group w-full module-item overflow-hidden'
-      onAuxClick={e => {
-        if (e.button === 1 && image.url) {
-          e.preventDefault()
-          window.open(image.url, '_blank')
-        }
-      }}
-    >
-      <ImageCard disabled={true} title={image.name}>
-        {image.url ? (
-          <img
-            src={image.url}
-            alt={image.name || 'Image'}
-            className='object-cover w-full h-40 border-2 border-gray-300 rounded cursor-pointer transition duration-200 ease-in-out transform hover:scale-[105%] hover:shadow-lg select-none'
-            loading='lazy'
-            onClick={() => setCurrentId(image.id)}
-          />
-        ) : (
-          <div
-            className='w-full h-40 border-2 border-gray-300 rounded cursor-pointer bg-gray-200'
-            onClick={() => setCurrentId(image.id)}
-            role='button'
-            tabIndex={0}
-            onKeyDown={e => e.key === 'Enter' && setCurrentId(image.id)}
-          />
-        )}
-      </ImageCard>
-    </div>
-  )
-}
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  let user: User
   try {
-    await getEmployeeUser(request)
+    user = await getEmployeeUser(request)
   } catch (error) {
     return redirect(`/login?error=${error}`)
   }
-  const user = await getEmployeeUser(request)
   const images = await selectMany<ItemImage>(
     db,
     'SELECT id, name, url FROM images WHERE company_id = ?',
@@ -81,44 +38,47 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { images }
 }
 
+const IMAGES_SLIDE_UP = {
+  initial: { opacity: 0, y: 40 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.42, ease: EMPLOYEE_VIEW_ENTER_EASE },
+}
+
 export default function Images() {
   const { images } = useLoaderData<typeof loader>()
-  const [currentId, setCurrentId] = useState<number | undefined>(undefined)
-  const [sortedImages, setSortedImages] = useState<ItemImage[]>(images)
-
-  useEffect(() => {
-    setSortedImages([...images].sort((a, b) => a.name.localeCompare(b.name)))
-  }, [images])
-
-  const carouselImages = sortedImages.map(itemToCarouselInput)
-
+  const location = useLocation()
+  const ids = images.map(item => item.id)
+  const { currentId, setCurrentId } = useArrowToggle(ids)
   return (
-    <Accordion type='single' defaultValue='images' className=''>
-      <AccordionItem value='images'>
-        <AccordionContent>
-          <Accordion type='multiple'>
-            <AccordionContent>
-              <ModuleList>
-                <div className='w-full col-span-full'>
-                  <SuperCarousel
-                    type='images'
-                    currentId={currentId}
-                    setCurrentId={setCurrentId}
-                    images={carouselImages}
-                  />
-                </div>
-                {sortedImages.map(image => (
-                  <InteractiveImageCard
-                    key={image.id}
-                    image={image}
-                    setCurrentId={setCurrentId}
-                  />
-                ))}
-              </ModuleList>
-            </AccordionContent>
-          </Accordion>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+    <motion.div
+      key={employeeViewMotionKey(location.pathname, location.search)}
+      className='w-full min-h-0'
+      {...IMAGES_SLIDE_UP}
+    >
+      <Accordion type='single' defaultValue='images'>
+        <AccordionItem value='images'>
+          <AccordionContent>
+            <Accordion type='multiple'>
+              <AccordionContent>
+                <ModuleList>
+                  {images.map(image => (
+                    <Image
+                      id={image.id}
+                      key={image.id}
+                      src={image.url}
+                      alt={image.name}
+                      name={image.name}
+                      setImage={setCurrentId}
+                      isOpen={currentId === image.id}
+                      carouselLens
+                    />
+                  ))}
+                </ModuleList>
+              </AccordionContent>
+            </Accordion>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </motion.div>
   )
 }

@@ -228,6 +228,10 @@ export function Chat() {
   const anchorRef = useRef(anchor)
   const useCustomPositionRef = useRef(useCustomPosition)
   const dragStateRef = useRef<DragState | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const sseRef = useRef<EventSource | null>(null)
+  const answerRef = useRef('')
+  const responseFinishedRef = useRef(false)
 
   anchorRef.current = anchor
   useCustomPositionRef.current = useCustomPosition
@@ -273,36 +277,68 @@ export function Chat() {
   const addMessage = (message: Message) =>
     setMessages(prevMessages => [...prevMessages, message])
 
-  const handleFormSubmit = async (event: React.FormEvent) => {
+  const focusInput = useCallback(() => {
+    requestAnimationFrame(() => {
+      inputRef.current?.focus()
+    })
+  }, [])
+
+  const finishResponse = useCallback(
+    (sse: EventSource) => {
+      if (responseFinishedRef.current) return
+      responseFinishedRef.current = true
+      sse.close()
+      if (sseRef.current === sse) {
+        sseRef.current = null
+      }
+      const content = answerRef.current
+      answerRef.current = ''
+      setAnswer('')
+      setIsThinking(false)
+      if (content.length > 0) {
+        setMessages(msgs => [...msgs, { role: 'assistant', content }])
+      }
+      focusInput()
+    },
+    [focusInput],
+  )
+
+  useEffect(() => {
+    return () => {
+      sseRef.current?.close()
+    }
+  }, [])
+
+  const handleFormSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    const query = input.trim()
+    if (!query || isThinking) return
+
+    const isNewChat = messages.length === 0
+    responseFinishedRef.current = false
+    answerRef.current = ''
+    setAnswer('')
     setIsThinking(true)
     setInput('')
-    event.preventDefault()
-
-    if (!(event.target instanceof HTMLFormElement)) return
-    const formData = new FormData(event.target)
-    const queryValue = formData.get('query')
-    const query = typeof queryValue === 'string' ? queryValue : ''
-    if (answer) {
-      addMessage({ role: 'assistant', content: answer })
-      setAnswer('')
-    }
     addMessage({ role: 'user', content: query })
 
+    sseRef.current?.close()
     const sse = new EventSource(
-      `/api/chat?query=${encodeURIComponent(query)}&isNew=${messages.length === 0}`,
+      `/api/chat?query=${encodeURIComponent(query)}&isNew=${isNewChat}`,
     )
+    sseRef.current = sse
 
     sse.addEventListener('message', event => {
       if (event.data === DONE_KEY) {
-        sse.close()
-        setIsThinking(false)
-      } else {
-        setAnswer(prevResults => prevResults + event.data)
+        finishResponse(sse)
+        return
       }
+      answerRef.current += event.data
+      setAnswer(answerRef.current)
     })
 
     sse.addEventListener('error', () => {
-      sse.close()
+      finishResponse(sse)
     })
   }
 
@@ -357,12 +393,10 @@ export function Chat() {
     }
   }
 
-  const assistantMessage: Message | null = answer
-    ? { role: 'assistant', content: answer }
-    : null
-  const displayMessages: Message[] = assistantMessage
-    ? [...messages, assistantMessage]
-    : messages
+  const displayMessages: Message[] =
+    isThinking && answer.length > 0
+      ? [...messages, { role: 'assistant', content: answer }]
+      : messages
 
   if (!ready) {
     return null
@@ -427,15 +461,17 @@ export function Chat() {
             className='p-4 bg-gray-100 border-t border-gray-300 flex items-center gap-2'
           >
             <Input
+              ref={inputRef}
               name='query'
               value={input}
               onChange={event => setInput(event.target.value)}
               placeholder='Type your message...'
               className='rounded-full'
               autoFocus={true}
+              enterKeyHint='send'
             />
             <Button
-              disabled={input.length === 0 || isThinking}
+              disabled={input.trim().length === 0 || isThinking}
               variant='blue'
               type='submit'
               className='rounded-full'

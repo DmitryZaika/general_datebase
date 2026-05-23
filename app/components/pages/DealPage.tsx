@@ -85,7 +85,10 @@ export default function DealsEdit({
 
   return (
     <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[1100px] xl:max-w-[1200px] overflow-auto md:overflow-hidden flex flex-col justify-baseline h-auto min-h-[600px] max-h-[95vh] md:h-[95vh] py-4 px-1 sm:px-2 sm:py-5'>
+      <DialogContent
+        closeClassName='max-md:!right-3 max-md:!top-3'
+        className='flex h-auto max-h-[95dvh] min-h-[600px] flex-col justify-baseline overflow-auto px-1 py-4 max-md:!fixed max-md:!left-0 max-md:!right-0 max-md:!top-[env(safe-area-inset-top,0px)] max-md:!bottom-[env(safe-area-inset-bottom,0px)] max-md:!h-auto max-md:!max-h-none max-md:!min-h-0 max-md:!w-full max-md:!max-w-none max-md:!translate-x-0 max-md:!translate-y-0 max-md:rounded-none sm:max-w-[1100px] sm:px-2 sm:py-5 md:h-[95vh] md:overflow-hidden xl:max-w-[1200px]'
+      >
         <DialogHeader>
           <DialogTitle className='px-1 sm:px-2'>Edit Deal</DialogTitle>
         </DialogHeader>
