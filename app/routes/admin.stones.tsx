@@ -216,6 +216,9 @@ export default function AdminStones() {
       return
     }
     viewModeHydratedRef.current = true
+    if (stored === 'grid') {
+      return
+    }
     const next = new URLSearchParams(window.location.search)
     next.set('viewMode', stored)
     setSearchParams(next, { replace: true })

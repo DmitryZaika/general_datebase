@@ -207,15 +207,15 @@ export function Image({
     <div
       className={cn(
         'flex w-full select-none justify-center',
-        carouselMagnifier.isMobile ? 'min-h-0 px-2 pb-4' : '',
+        carouselMagnifier.isMobile ? 'min-h-0 px-2 pb-4' : 'py-2',
       )}
     >
       <div
         className={cn(
-          'relative inline-flex overflow-hidden shrink-0',
+          'relative w-fit max-w-full shrink-0',
           carouselMagnifier.isMobile
-            ? 'h-[52dvh] max-h-[58vh] min-h-[220px] max-w-full'
-            : 'max-h-[85vh] max-w-[90vw] md:max-h-[87vh] 2xl:max-h-[93vh] lg:max-w-[90vw] 2xl:max-w-[60vw]',
+            ? 'max-w-full'
+            : 'max-w-[90vw] lg:max-w-[90vw] 2xl:max-w-[60vw]',
         )}
       >
         <CarouselMagnifierControls
@@ -225,14 +225,26 @@ export function Image({
           zoomHint={carouselMagnifier.zoomHint}
           onZoomToggle={carouselMagnifier.handleZoomToggle}
         />
+        <button
+          type='button'
+          onClick={handleClose}
+          className='absolute right-3 top-3 z-20 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-white/60 bg-gradient-to-br from-white/90 to-zinc-100/95 text-zinc-800 shadow-lg backdrop-blur-md transition-all duration-200 ease-out hover:border-sky-200/90 hover:from-white hover:to-sky-50/90 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2'
+          aria-label='Close'
+        >
+          <X
+            className='h-[1.35rem] w-[1.35rem] shrink-0'
+            strokeWidth={2.1}
+            aria-hidden
+          />
+        </button>
         <img
           src={src}
           alt={alt || name || 'Image'}
           className={cn(
-            'z-0 w-auto max-w-full select-none object-contain',
+            'block w-auto max-w-full select-none object-contain',
             carouselMagnifier.isMobile
-              ? 'h-[52dvh] max-h-[58vh] min-h-[220px]'
-              : 'h-[85vh] md:h-[87vh] 2xl:h-[93vh]',
+              ? 'h-[100dvh] max-h-[100dvh] min-h-[220px]'
+              : 'h-[100vh] max-h-[100vh]',
             carouselMagnifier.zoomMode ? 'cursor-none' : 'cursor-default',
           )}
           decoding='async'
@@ -307,17 +319,12 @@ export function Image({
 
         {carouselLens ? (
           <DialogContent
-            closeClassName={cn(
-              'z-50 right-3 sm:right-0',
-              carouselMagnifier.isMobile
-                ? '!top-3'
-                : 'top-40 sm:top-10 md:top-25 lg:top-10 sm:-right-15 md:-right-25 lg:-right-35',
-            )}
+            hideClose
             className={cn(
-              'flex flex-col gap-3 border-0 bg-transparent p-0 shadow-none',
+              'flex flex-col gap-3 border-0 !bg-transparent p-0 shadow-none',
               carouselMagnifier.isMobile
                 ? '!fixed !left-0 !right-0 !top-[env(safe-area-inset-top,0px)] !bottom-[env(safe-area-inset-bottom,0px)] !h-auto !max-h-none !w-full !max-w-none !translate-x-0 !translate-y-0 overflow-y-auto overscroll-y-contain'
-                : 'max-w-none justify-center items-center',
+                : '!max-w-none items-center justify-center',
             )}
           >
             {carouselPreview}

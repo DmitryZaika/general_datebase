@@ -170,33 +170,14 @@ export function MultiEmailRecipientInput({
     suggestion => !normalizedValue.includes(normalizeEmail(suggestion.email)),
   )
 
+  const hasFuzzyCustomerMatch =
+    manualEmailSuggestion.length > 0 &&
+    visibleSuggestions.some(
+      suggestion => normalizeEmail(suggestion.email) !== manualEmailSuggestion,
+    )
+
   const options = useMemo<RecipientOption[]>(() => {
     const next: RecipientOption[] = []
-
-    if (manualEmailSuggestion && !normalizedValue.includes(manualEmailSuggestion)) {
-      next.push({
-        key: `manual-${manualEmailSuggestion}`,
-        label: manualEmailSuggestion,
-        email: manualEmailSuggestion,
-        description: 'Add email address',
-        kind: 'manual',
-      })
-    }
-
-    for (const suggestion of domainSuggestions) {
-      if (
-        suggestion !== manualEmailSuggestion &&
-        !next.some(option => option.email === suggestion)
-      ) {
-        next.push({
-          key: `domain-${suggestion}`,
-          label: suggestion,
-          email: suggestion,
-          description: 'Complete email',
-          kind: 'domain',
-        })
-      }
-    }
 
     for (const suggestion of visibleSuggestions) {
       const email = normalizeEmail(suggestion.email)
@@ -211,8 +192,41 @@ export function MultiEmailRecipientInput({
       }
     }
 
+    for (const suggestion of domainSuggestions) {
+      if (
+        suggestion !== manualEmailSuggestion &&
+        !next.some(option => option.email === suggestion)
+      ) {
+        next.push({
+          key: `domain-${suggestion}`,
+          label: suggestion,
+          email: suggestion,
+          description: '',
+          kind: 'domain',
+        })
+      }
+    }
+
+    if (manualEmailSuggestion && !normalizedValue.includes(manualEmailSuggestion)) {
+      if (!hasFuzzyCustomerMatch) {
+        next.push({
+          key: `manual-${manualEmailSuggestion}`,
+          label: manualEmailSuggestion,
+          email: manualEmailSuggestion,
+          description: 'Add email address',
+          kind: 'manual',
+        })
+      }
+    }
+
     return next
-  }, [domainSuggestions, manualEmailSuggestion, normalizedValue, visibleSuggestions])
+  }, [
+    domainSuggestions,
+    hasFuzzyCustomerMatch,
+    manualEmailSuggestion,
+    normalizedValue,
+    visibleSuggestions,
+  ])
 
   return (
     <div ref={rootRef} className='relative'>
@@ -249,7 +263,9 @@ export function MultiEmailRecipientInput({
             disabled={disabled}
             onFocus={() => setIsOpen(true)}
             onBlur={() => {
-              if (manualEmailSuggestion) addSingleRecipient(manualEmailSuggestion)
+              if (manualEmailSuggestion && !hasFuzzyCustomerMatch) {
+                addSingleRecipient(manualEmailSuggestion)
+              }
             }}
             onChange={event => {
               const raw = event.target.value
@@ -328,9 +344,11 @@ export function MultiEmailRecipientInput({
                 <div className='min-w-0 flex-1'>
                   <div className='font-medium'>{option.label}</div>
                   <div className='truncate text-xs text-zinc-500'>{option.email}</div>
-                  <div className='truncate text-xs text-zinc-400'>
-                    {option.description}
-                  </div>
+                  {option.description ? (
+                    <div className='truncate text-xs text-zinc-400'>
+                      {option.description}
+                    </div>
+                  ) : null}
                 </div>
               </button>
             ))}

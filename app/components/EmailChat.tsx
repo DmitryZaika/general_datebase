@@ -17,7 +17,14 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useNavigate, useNavigation } from 'react-router'
 import { AttachmentImagePicker } from '~/components/AttachmentImagePicker'
 import { CopyText } from '~/components/atoms/CopyText'
@@ -58,7 +65,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '~/components/ui/tooltip'
-import { useIsMobile } from '~/hooks/use-mobile'
 import { useToast } from '~/hooks/use-toast'
 import { cn } from '~/lib/utils'
 import type { Nullable } from '~/types/utils'
@@ -680,7 +686,24 @@ export function EmailChat(props: EmailChatProps) {
   const [dealNavLoading, setDealNavLoading] = useState(false)
   const [dealNavRouteActive, setDealNavRouteActive] = useState(false)
   const { toast } = useToast()
-  const isMobile = useIsMobile()
+
+  const focusComposer = useCallback(() => {
+    if (targetMessageId !== null) return
+    textareaRef.current?.focus()
+  }, [targetMessageId])
+
+  useLayoutEffect(() => {
+    if (!isEmployee || targetMessageId !== null) return
+    focusComposer()
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      const timerA = setTimeout(focusComposer, 100)
+      const timerB = setTimeout(focusComposer, 350)
+      return () => {
+        clearTimeout(timerA)
+        clearTimeout(timerB)
+      }
+    }
+  }, [isEmployee, targetMessageId, focusComposer])
 
   const { data: mobileTemplates = [], isLoading: mobileTemplatesLoading } = useQuery({
     queryKey: templateQueryKey(employeeProps?.companyId ?? 0),
@@ -1263,10 +1286,9 @@ export function EmailChat(props: EmailChatProps) {
         onOpenAutoFocus={
           isEmployee
             ? e => {
-                if (!isMobile) {
-                  e.preventDefault()
-                  setTimeout(() => textareaRef.current?.focus(), 100)
-                }
+                if (targetMessageId !== null) return
+                e.preventDefault()
+                focusComposer()
               }
             : undefined
         }
@@ -1785,7 +1807,6 @@ export function EmailChat(props: EmailChatProps) {
                   }}
                   placeholder='Send a message'
                   rows={1}
-                  autoFocus={!isMobile}
                   className='flex-1 min-h-9.5 w-full max-h-30 rounded-sm border-none bg-transparent px-1 sm:px-4 py-2 text-base md:text-sm outline-none resize-none overflow-y-auto'
                 />
 
