@@ -3,10 +3,13 @@ async function fetchFromLambda<T>(
   data: T | undefined = undefined,
 ): Promise<Response> {
   const url = `${process.env.LAMBDA_URL}/${path}`
+  if (!process.env.LAMBDA_KEY) throw new Error('LAMBDA_KEY not set')
   return await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+
+      Authorization: process.env.LAMBDA_KEY,
     },
     body: JSON.stringify(data),
   })
