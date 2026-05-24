@@ -134,10 +134,7 @@ async function confirmInteractive(expected: string): Promise<boolean> {
   }
 }
 
-async function acquireLock(
-  conn: mysql.PoolConnection,
-  name: string,
-): Promise<boolean> {
+async function acquireLock(conn: mysql.PoolConnection, name: string): Promise<boolean> {
   const [rows] = await conn.query<mysql.RowDataPacket[]>(
     'SELECT GET_LOCK(?, 0) AS got',
     [name],
@@ -161,9 +158,7 @@ async function runBackfill(
   ids: number[],
   companyId: number,
 ): Promise<{ ok: number; failed: number; stopped: boolean }> {
-  const { syncCustomerToCloudTalk } = await import(
-    '../app/services/lambda.server'
-  )
+  const { syncCustomerToCloudTalk } = await import('../app/services/lambda.server')
 
   let ok = 0
   let failed = 0
