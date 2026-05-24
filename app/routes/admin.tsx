@@ -37,6 +37,9 @@ function adminShellMotionKey(pathname: string, search: string): string {
   if (pathname.startsWith('/admin/sinks')) {
     return `/admin/sinks${search}`
   }
+  if (pathname.startsWith('/admin/images')) {
+    return `/admin/images${search}`
+  }
   return `${pathname}${search}`
 }
 
