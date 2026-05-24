@@ -184,8 +184,8 @@ export default function DealsView({
       const aDate = a.nearest_activity_deadline
       const bDate = b.nearest_activity_deadline
       if (!aDate && !bDate) return 0
-      if (!aDate) return 1
-      if (!bDate) return -1
+      if (!aDate) return -1
+      if (!bDate) return 1
       return compareNearestActivityDeadlines(aDate, bDate)
     })
     return copy

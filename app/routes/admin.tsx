@@ -11,6 +11,15 @@ const ADMIN_VIEW_ENTER = {
   transition: { duration: 0.38, ease: ADMIN_VIEW_EASE },
 }
 
+function adminListMotionSearch(search: string, omitKeys: readonly string[]): string {
+  const params = new URLSearchParams(search)
+  for (const key of omitKeys) {
+    params.delete(key)
+  }
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
 function adminShellMotionKey(pathname: string, search: string): string {
   if (pathname.startsWith('/admin/emails')) {
     return '/admin/emails'
@@ -18,6 +27,15 @@ function adminShellMotionKey(pathname: string, search: string): string {
   const dealEdit = /^(\/admin\/deals\/edit\/[^/]+)(?:\/|$)/.exec(pathname)
   if (dealEdit) {
     return `${dealEdit[1]}${search}`
+  }
+  if (pathname.startsWith('/admin/stones')) {
+    return `/admin/stones${adminListMotionSearch(search, ['viewMode'])}`
+  }
+  if (pathname.startsWith('/admin/faucets')) {
+    return `/admin/faucets${search}`
+  }
+  if (pathname.startsWith('/admin/sinks')) {
+    return `/admin/sinks${search}`
   }
   return `${pathname}${search}`
 }

@@ -243,6 +243,7 @@ export default function DealsEmailsView({
   const listScrollRef = useRef<HTMLDivElement>(null)
   const savedScrollTopRef = useRef<number>(0)
   const wasOnChatRef = useRef(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   const clearEmployeeGmailBarTimer = () => {
     if (employeeGmailBarTimerRef.current) {
@@ -765,10 +766,16 @@ export default function DealsEmailsView({
     navigate({ search: params.toString() })
   }
 
-  const SidebarContent = () => (
+  const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => (
     <div className='flex flex-col h-full py-4 pr-4'>
       {!adminMode ? (
-        <Button className='w-full' onClick={() => navigate('sendEmail')}>
+        <Button
+          className='w-full'
+          onClick={() => {
+            navigate('sendEmail')
+            onNavigate?.()
+          }}
+        >
           New email
         </Button>
       ) : (
@@ -797,6 +804,7 @@ export default function DealsEmailsView({
             onClick={() => {
               setActiveTab(item.id as Tab)
               setSelectedThreads(new Set())
+              onNavigate?.()
             }}
             className={cn(
               'w-full flex items-center gap-3 px-6 py-2 rounded-r-full text-sm font-medium transition-colors cursor-pointer',
@@ -896,14 +904,14 @@ export default function DealsEmailsView({
         <div className='flex flex-col gap-2 md:flex-row md:items-stretch md:gap-4 px-2 py-2 md:px-3 md:py-3 border-b border-gray-200 bg-white'>
           <div className='flex w-full min-w-0 items-stretch gap-2 md:min-h-0 md:flex-1'>
             <div className='shrink-0 self-center md:hidden'>
-              <Sheet>
+              <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
                 <SheetTrigger asChild>
                   <Button variant='ghost' size='icon'>
                     <Menu className='h-5 w-5' />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side='left' className='w-64 p-0 bg-white'>
-                  <SidebarContent />
+                  <SidebarContent onNavigate={() => setMobileNavOpen(false)} />
                 </SheetContent>
               </Sheet>
             </div>

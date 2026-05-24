@@ -278,10 +278,21 @@ export function Chat() {
     setMessages(prevMessages => [...prevMessages, message])
 
   const focusInput = useCallback(() => {
-    requestAnimationFrame(() => {
+    const focus = () => {
       inputRef.current?.focus()
-    })
+    }
+    requestAnimationFrame(focus)
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setTimeout(focus, 100)
+      setTimeout(focus, 350)
+    }
   }, [])
+
+  useEffect(() => {
+    if (open) {
+      focusInput()
+    }
+  }, [open, focusInput])
 
   const finishResponse = useCallback(
     (sse: EventSource) => {
@@ -447,6 +458,10 @@ export function Chat() {
         hideClose
         className='h-full p-0 gap-0'
         position='br'
+        onOpenAutoFocus={e => {
+          e.preventDefault()
+          focusInput()
+        }}
         onInteractOutside={e => {
           e.preventDefault()
         }}
@@ -467,7 +482,6 @@ export function Chat() {
               onChange={event => setInput(event.target.value)}
               placeholder='Type your message...'
               className='rounded-full'
-              autoFocus={true}
               enterKeyHint='send'
             />
             <Button
