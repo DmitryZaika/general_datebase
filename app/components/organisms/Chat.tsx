@@ -55,9 +55,10 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, isThinking }) => 
 
 interface ChatProps {
   isAtBottom?: boolean
+  companyId?: number
 }
 
-export function Chat({ isAtBottom = false }: ChatProps) {
+export function Chat({ isAtBottom = false, companyId }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState<string>('')
   const [answer, setAnswer] = useState<string>('')
@@ -80,7 +81,7 @@ export function Chat({ isAtBottom = false }: ChatProps) {
     addMessage({ role: 'user', content: query || '' })
 
     const sse = new EventSource(
-      `/api/chat?query=${query}&isNew=${messages.length === 0}`,
+      `/api/chat?query=${query}&isNew=${messages.length === 0}${companyId ? `&companyId=${companyId}` : ''}`,
     )
 
     sse.addEventListener('message', event => {

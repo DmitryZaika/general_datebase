@@ -16,7 +16,15 @@ export const sinkSchema = z.object({
 })
 
 export const sinkFilterSchema = z.object({
-  type: z.array(z.enum(SINK_TYPES)).prefault([]),
+  type: z
+    .preprocess(val => {
+      const arr = typeof val === 'string' ? [val] : val
+      if (Array.isArray(arr)) {
+        return arr.filter(v => (SINK_TYPES as readonly string[]).includes(v))
+      }
+      return arr
+    }, z.array(z.enum(SINK_TYPES)))
+    .prefault([]),
   show_sold_out: z
     .preprocess(value => {
       if (typeof value === 'boolean') return value

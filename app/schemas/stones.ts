@@ -86,7 +86,15 @@ export type TLeftoverStone = Extract<TQuickAddStoneSchema, { leftover: true }>
 export type TRegularStone = Extract<TQuickAddStoneSchema, { leftover: false }>
 
 export const stoneFilterSchema = z.object({
-  type: z.array(z.enum(STONE_TYPES)).prefault([]),
+  type: z
+    .preprocess(val => {
+      const arr = typeof val === 'string' ? [val] : val
+      if (Array.isArray(arr)) {
+        return arr.filter(v => (STONE_TYPES as readonly string[]).includes(v))
+      }
+      return arr
+    }, z.array(z.enum(STONE_TYPES)))
+    .prefault([]),
   show_sold_out: z
     .preprocess(value => {
       if (typeof value === 'boolean') return value
@@ -95,8 +103,26 @@ export const stoneFilterSchema = z.object({
     .prefault(false),
   supplier: z.number().gte(0).prefault(0),
   colors: z.any().optional(),
-  level: z.array(z.number()).prefault([]),
-  finishing: z.array(z.enum(STONE_FINISHES)).prefault([]),
+  level: z
+    .preprocess(val => {
+      const arr = typeof val === 'number' || typeof val === 'string' ? [val] : val
+      if (Array.isArray(arr)) {
+        return arr
+          .map(v => (typeof v === 'string' ? Number.parseInt(v, 10) : v))
+          .filter(v => typeof v === 'number' && !Number.isNaN(v))
+      }
+      return arr
+    }, z.array(z.number()))
+    .prefault([]),
+  finishing: z
+    .preprocess(val => {
+      const arr = typeof val === 'string' ? [val] : val
+      if (Array.isArray(arr)) {
+        return arr.filter(v => (STONE_FINISHES as readonly string[]).includes(v))
+      }
+      return arr
+    }, z.array(z.enum(STONE_FINISHES)))
+    .prefault([]),
   viewMode: z.enum(['grid', 'table']).optional().prefault('grid'),
 })
 export type StoneFilter = z.infer<typeof stoneFilterSchema>

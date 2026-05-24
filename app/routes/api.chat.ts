@@ -7,6 +7,7 @@ import type { InstructionSlim } from '~/types'
 import { DONE_KEY } from '~/utils/constants'
 import { selectMany } from '../utils/queryHelpers'
 import { getUserBySessionId } from '../utils/session.server'
+import { htmlToPlainText } from '~/utils/stringHelpers'
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_SECRET_KEY,
@@ -18,14 +19,21 @@ interface Message {
 }
 
 async function getContext(
-  user_id: number,
+  user_id: number | null,
   query: string,
-): Promise<{ messages: Message[]; id: number }> {
+): Promise<{ messages: Message[]; id: number | undefined }> {
+  if (!user_id) {
+    return { messages: [{ role: 'user', content: query }], id: undefined }
+  }
   const history = await selectMany<{ history: Message[]; id: number }>(
     db,
     'SELECT id, history from chat_history WHERE user_id = ?',
     [user_id],
   )
+
+  if (history.length === 0) {
+    return { messages: [{ role: 'user', content: query }], id: undefined }
+  }
 
   const currentConvo = history[0].history
   currentConvo.push({ role: 'user', content: query })
@@ -33,20 +41,39 @@ async function getContext(
 }
 
 async function newContext(
-  user_id: number,
+  user_id: number | null,
   company_id: number,
   query: string,
 ): Promise<{ history: Message[]; id: number | undefined }> {
+  const isEmployee = user_id !== null && user_id !== undefined
+  const publicFlag = isEmployee ? 0 : 1
+
   const instructions = await selectMany<InstructionSlim>(
     db,
-    'SELECT id, title, rich_text from instructions WHERE company_id = ?',
-    [company_id],
+    'SELECT id, title, rich_text from instructions WHERE company_id = ? AND public = ?',
+    [company_id, publicFlag],
   )
-  const chatHistory = await selectMany<{ id: number }>(
-    db,
-    'SELECT id from chat_history WHERE user_id = ?',
-    [user_id],
-  )
+
+  const cleanedInstructions = instructions.map(inst => ({
+    ...inst,
+    rich_text: htmlToPlainText(inst.rich_text),
+  }))
+
+  const systemPrompt = `Here is your context: ${JSON.stringify(cleanedInstructions)}.
+        Follow ALL instructions strictly without exceptions.
+        Your task is to provide the MOST complete and accurate answer to the user's request based ONLY on this context.
+        Do NOT add unnecessary information, assumptions, or commentary.
+        Return only what is explicitly required by the request and the given instructions.`
+
+  console.log('System Prompt:', systemPrompt)
+
+  const chatHistory = user_id
+    ? await selectMany<{ id: number }>(
+        db,
+        'SELECT id from chat_history WHERE user_id = ?',
+        [user_id],
+      )
+    : []
 
   let chatHistoryId: number | undefined
   if (chatHistory.length > 0) {
@@ -56,11 +83,7 @@ async function newContext(
     history: [
       {
         role: 'system',
-        content: `Here is your context: ${JSON.stringify(instructions)}.
-        Follow ALL instructions strictly without exceptions.
-        Your task is to provide the MOST complete and accurate answer to the user's request based ONLY on this context.
-        Do NOT add unnecessary information, assumptions, or commentary.
-        Return only what is explicitly required by the request and the given instructions.`,
+        content: systemPrompt,
       },
       {
         role: 'user',
@@ -98,26 +121,28 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url).searchParams
   const query = url.get('query') || ''
   const isNew = url.get('isNew') === 'true'
+  const urlCompanyId = url.get('companyId') ? Number(url.get('companyId')) : null
 
-  if (!activeSession) {
+  if (!activeSession && !urlCompanyId) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const user = (await getUserBySessionId(activeSession)) || null
+  const user = activeSession ? (await getUserBySessionId(activeSession)) || null : null
+  const companyId = user?.company_id || urlCompanyId
 
-  if (!user) {
-    return new Response('Unauthorized', { status: 401 })
+  if (!companyId) {
+    return new Response('Company not identified', { status: 400 })
   }
 
   let messages: Message[] = []
   let chatHistoryId: number | undefined
 
   if (isNew) {
-    const result = await newContext(user.id, user.company_id, query)
+    const result = await newContext(user?.id || null, companyId, query)
     messages = result.history
     chatHistoryId = result.id
   } else {
-    const result = await getContext(user.id, query)
+    const result = await getContext(user?.id || null, query)
     messages = result.messages
     chatHistoryId = result.id
   }
@@ -156,10 +181,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
           send({ data: DONE_KEY })
 
-          if (chatHistoryId) {
-            updateContext(user.id, chatHistoryId, messages, answer)
-          } else {
-            insertContext(user.id, messages, answer)
+          if (user) {
+            if (chatHistoryId) {
+              updateContext(user.id, chatHistoryId, messages, answer)
+            } else {
+              insertContext(user.id, messages, answer)
+            }
           }
         } catch (error) {
           send({

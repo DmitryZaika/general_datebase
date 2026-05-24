@@ -131,10 +131,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const url = new URL(request.url)
   const isContractors = url.pathname.startsWith('/contractors/')
+  const isCustomerRoute = url.pathname.startsWith('/customer/')
 
-  if (companyId === undefined && isContractors) {
+  if (companyId === undefined && (isContractors || isCustomerRoute)) {
     const parts = url.pathname.split('/')
-    if (parts[1] === 'contractors' && parts[2]) {
+    const base = parts[1]
+    if ((base === 'contractors' || base === 'customer') && parts[2]) {
       const id = parseInt(parts[2], 10)
       if (!Number.isNaN(id)) {
         companyId = id
@@ -142,7 +144,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
-  if (companyId !== undefined && isContractors && !companyName) {
+  if (companyId !== undefined && (isContractors || isCustomerRoute) && !companyName) {
     const company = await selectId<{ name: string }>(
       db,
       'SELECT name FROM company WHERE id = ?',
@@ -289,6 +291,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       token,
       user,
       companyName,
+      companyId,
       stoneSuppliers,
       sinkSuppliers,
       faucetSuppliers,
@@ -315,6 +318,7 @@ export default function App() {
     token,
     user,
     companyName,
+    companyId,
     stoneSuppliers,
     sinkSuppliers,
     faucetSuppliers,
@@ -440,8 +444,8 @@ export default function App() {
                 <ScrollRestoration />
                 <Scripts />
                 <Posthog />
-                {!isInstallerRoute && !isCheckIn && user && (
-                  <Chat isAtBottom={isAtBottom} />
+                {!isInstallerRoute && !isCheckIn && (user || companyId) && (
+                  <Chat isAtBottom={isAtBottom} companyId={companyId} />
                 )}
                 {/* <ScrollToTopButton /> */}
               </main>
