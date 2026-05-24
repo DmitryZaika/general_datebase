@@ -18,33 +18,14 @@ interface Message {
   content: string
 }
 
-async function getContext(
-  user_id: number | null,
-  query: string,
-): Promise<{ messages: Message[]; id: number | undefined }> {
-  if (!user_id) {
-    return { messages: [{ role: 'user', content: query }], id: undefined }
-  }
-  const history = await selectMany<{ history: Message[]; id: number }>(
-    db,
-    'SELECT id, history from chat_history WHERE user_id = ?',
-    [user_id],
-  )
-
-  if (history.length === 0) {
-    return { messages: [{ role: 'user', content: query }], id: undefined }
-  }
-
-  const currentConvo = history[0].history
-  currentConvo.push({ role: 'user', content: query })
-  return { messages: currentConvo, id: history[0].id }
-}
-
-async function newContext(
+async function getChatMessages(
   user_id: number | null,
   company_id: number,
   query: string,
-): Promise<{ history: Message[]; id: number | undefined }> {
+  isNew: boolean,
+  clientHistory: Message[] = [],
+): Promise<{ messages: Message[]; chatHistoryId: number | undefined }> {
+  // 1. Get Instructions for System Prompt
   const isEmployee = user_id !== null && user_id !== undefined
   const publicFlag = isEmployee ? 0 : 1
 
@@ -59,45 +40,72 @@ async function newContext(
     rich_text: htmlToPlainText(inst.rich_text),
   }))
 
-  const systemPrompt = `Here is your context: ${JSON.stringify(cleanedInstructions)}.
-        Follow ALL instructions strictly without exceptions.
-        Your task is to provide the MOST complete and accurate answer to the user's request based ONLY on this context.
-        Do NOT add unnecessary information, assumptions, or commentary.
-        Return only what is explicitly required by the request and the given instructions.`
+  const contextText = cleanedInstructions
+    .map(inst => `[INSTRUCTION: ${inst.title}]\n${inst.rich_text}`)
+    .join('\n\n')
 
-  console.log('System Prompt:', systemPrompt)
+  const systemPrompt = `You are a Context-Locked Company Assistant. 
+You have access to the following COMPANY_INSTRUCTIONS.
 
-  const chatHistory = user_id
-    ? await selectMany<{ id: number }>(
-        db,
-        'SELECT id from chat_history WHERE user_id = ?',
-        [user_id],
-      )
-    : []
+STRICT ADHERENCE RULES:
+1. Use ONLY the wording and facts found in COMPANY_INSTRUCTIONS.
+2. If the user asks you to finish a sentence or provides a partial statement from the instructions, you MUST complete it using the EXACT text from the instructions.
+3. DO NOT use any outside knowledge, assumptions, or "helpful" information not explicitly written in the context.
+4. DO NOT provide commentary, introductions, or pleasantries. Return only the requested information.
+5. If the information is not present in the instructions, respond: "I do not have that information in my instructions."
 
+COMPANY_INSTRUCTIONS:
+${contextText}
+
+END OF CONTEXT. 
+Now, process the user request strictly following the rules above.`
+
+  console.log('--- System Prompt ---')
+  console.log(systemPrompt)
+  console.log('---------------------')
+
+  // 2. Build Message History
+  const messages: Message[] = [{ role: 'system', content: systemPrompt }]
   let chatHistoryId: number | undefined
-  if (chatHistory.length > 0) {
-    chatHistoryId = chatHistory[0].id
+
+  if (user_id) {
+    // Employee logic: Get history from DB
+    const history = await selectMany<{ history: Message[]; id: number }>(
+      db,
+      'SELECT id, history from chat_history WHERE user_id = ?',
+      [user_id],
+    )
+
+    if (history.length > 0 && !isNew) {
+      chatHistoryId = history[0].id
+      // Filter out any old system prompts and prepend the new one
+      const previousConvo = history[0].history.filter(m => m.role !== 'system')
+      messages.push(...previousConvo)
+    }
+  } else {
+    // Guest logic: Use history from client
+    if (clientHistory.length > 0) {
+      // Filter out any client-side system prompts just in case
+      messages.push(...clientHistory.filter(m => m.role !== 'system'))
+    }
   }
-  return {
-    history: [
-      {
-        role: 'system',
-        content: systemPrompt,
-      },
-      {
-        role: 'user',
-        content: `Answer the question as best as you can.\n\nQuestion: ${query}\n\nAnswer:`,
-      },
-    ],
-    id: chatHistoryId,
+
+  // Add the current query if it's not already the last message
+  if (
+    messages.length === 0 ||
+    messages[messages.length - 1].content !== query ||
+    messages[messages.length - 1].role !== 'user'
+  ) {
+    messages.push({ role: 'user', content: query })
   }
+
+  return { messages, chatHistoryId }
 }
 
 async function insertContext(user_id: number, messages: Message[], answer: string) {
-  messages.push({ role: 'assistant', content: answer })
+  const historyToSave = [...messages, { role: 'assistant' as const, content: answer }]
   await db.execute(`INSERT INTO chat_history (history, user_id) VALUES (?, ?);`, [
-    JSON.stringify(messages),
+    JSON.stringify(historyToSave),
     user_id,
   ])
 }
@@ -108,10 +116,10 @@ async function updateContext(
   messages: Message[],
   answer: string,
 ) {
-  messages.push({ role: 'assistant', content: answer })
+  const historyToSave = [...messages, { role: 'assistant' as const, content: answer }]
   await db.execute(
     `UPDATE chat_history SET history = ? WHERE id = ? AND user_id = ?;`,
-    [JSON.stringify(messages), chatHistoryId, userId],
+    [JSON.stringify(historyToSave), chatHistoryId, userId],
   )
 }
 
@@ -122,6 +130,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const query = url.get('query') || ''
   const isNew = url.get('isNew') === 'true'
   const urlCompanyId = url.get('companyId') ? Number(url.get('companyId')) : null
+  const historyRaw = url.get('history')
+  let clientHistory: Message[] = []
+
+  if (historyRaw) {
+    try {
+      clientHistory = JSON.parse(decodeURIComponent(historyRaw))
+    } catch (e) {
+      console.error('Failed to parse history from URL', e)
+    }
+  }
 
   if (!activeSession && !urlCompanyId) {
     return new Response('Unauthorized', { status: 401 })
@@ -134,18 +152,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return new Response('Company not identified', { status: 400 })
   }
 
-  let messages: Message[] = []
-  let chatHistoryId: number | undefined
-
-  if (isNew) {
-    const result = await newContext(user?.id || null, companyId, query)
-    messages = result.history
-    chatHistoryId = result.id
-  } else {
-    const result = await getContext(user?.id || null, query)
-    messages = result.messages
-    chatHistoryId = result.id
-  }
+  const { messages, chatHistoryId } = await getChatMessages(
+    user?.id || null,
+    companyId,
+    query,
+    isNew,
+    clientHistory,
+  )
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4.1-mini-2025-04-14',

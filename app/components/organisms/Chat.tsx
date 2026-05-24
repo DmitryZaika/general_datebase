@@ -1,5 +1,5 @@
 import type React from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogTrigger } from '~/components/ui/dialog'
 import { DONE_KEY } from '~/utils/constants'
 import { DialogFullHeader } from '../molecules/DialogFullHeader'
@@ -7,7 +7,7 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 
 interface Message {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
 }
 
@@ -41,7 +41,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, isThinking }) => (
   <div className='flex flex-col p-4 overflow-y-auto h-full text-wrap whitespace-pre-wrap'>
     {messages.map((message, index) => (
-      <MessageBubble key={index} message={message} />
+      message.role !== 'system' && <MessageBubble key={index} message={message} />
     ))}
     {isThinking && (
       <div className='flex items-center justify-start m-2'>
@@ -58,30 +58,60 @@ interface ChatProps {
   companyId?: number
 }
 
+const STORAGE_KEY = 'chat_messages'
+
 export function Chat({ isAtBottom = false, companyId }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState<string>('')
   const [answer, setAnswer] = useState<string>('')
   const [isThinking, setIsThinking] = useState<boolean>(false)
 
-  const addMessage = (message: Message) =>
-    setMessages(prevMessages => [...prevMessages, message])
+  // Load messages from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      try {
+        setMessages(JSON.parse(saved))
+      } catch (e) {
+        console.error('Failed to parse saved messages', e)
+      }
+    }
+  }, [])
+
+  // Save messages to localStorage when they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+    }
+  }, [messages])
 
   const handleFormSubmit = async (event: React.FormEvent) => {
-    setIsThinking(true)
-    setInput('')
     event.preventDefault()
+    if (!input.trim() || isThinking) return
 
-    const formData = new FormData(event.target as HTMLFormElement)
-    const query = formData.get('query') as string | null
+    setIsThinking(true)
+    const query = input
+    setInput('')
+
+    // Append current answer if it exists (for continuity)
+    const currentMessages = [...messages]
     if (answer) {
-      addMessage({ role: 'assistant', content: answer })
+      currentMessages.push({ role: 'assistant', content: answer })
       setAnswer('')
     }
-    addMessage({ role: 'user', content: query || '' })
+
+    // Add user message immediately
+    const userMsg: Message = { role: 'user', content: query }
+    const updatedMessages = [...currentMessages, userMsg]
+    setMessages(updatedMessages)
+
+    // Send history to help server maintain context for guests
+    // We limit history to last 10 messages to keep URL size reasonable
+    const historyParam = encodeURIComponent(JSON.stringify(updatedMessages.slice(-10)))
+    const isNew = updatedMessages.length <= 1
 
     const sse = new EventSource(
-      `/api/chat?query=${query}&isNew=${messages.length === 0}${companyId ? `&companyId=${companyId}` : ''}`,
+      `/api/chat?query=${encodeURIComponent(query)}&isNew=${isNew}${companyId ? `&companyId=${companyId}` : ''}&history=${historyParam}`,
     )
 
     sse.addEventListener('message', event => {
@@ -95,7 +125,14 @@ export function Chat({ isAtBottom = false, companyId }: ChatProps) {
 
     sse.addEventListener('error', () => {
       sse.close()
+      setIsThinking(false)
     })
+  }
+
+  const clearChat = () => {
+    setMessages([])
+    setAnswer('')
+    localStorage.removeItem(STORAGE_KEY)
   }
 
   return (
@@ -127,7 +164,7 @@ export function Chat({ isAtBottom = false, companyId }: ChatProps) {
         }}
       >
         <div className='h-full w-full bg-white border-l border-gray-300 shadow-lg flex flex-col overflow-y-auto'>
-          <DialogFullHeader>
+          <DialogFullHeader onAction={clearChat}>
             <span className='text-lg font-bold'>Chat</span>
           </DialogFullHeader>
           <ChatMessages
@@ -149,9 +186,10 @@ export function Chat({ isAtBottom = false, companyId }: ChatProps) {
               placeholder='Type your message...'
               className='rounded-full'
               autoFocus={true}
+              disabled={isThinking}
             />
             <Button
-              disabled={input.length === 0 || isThinking}
+              disabled={input.trim().length === 0 || isThinking}
               variant='blue'
               type='submit'
               className='rounded-full'
