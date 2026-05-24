@@ -103,7 +103,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     )
   }
 
-  await syncCustomerToCloudTalk(customerId, validatedData.company_id)
+  await syncCustomerToCloudTalk(validatedData.company_id, customerId)
 
   return data({
     success: true,

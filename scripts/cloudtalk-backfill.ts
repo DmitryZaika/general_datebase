@@ -168,7 +168,7 @@ async function runBackfill(
   for (const id of ids) {
     if (stopRequested) break
     try {
-      await syncCustomerToCloudTalk(id, companyId)
+      await syncCustomerToCloudTalk(companyId, id)
       ok += 1
     } catch (error) {
       console.error(`Customer ${id} failed:`, error)

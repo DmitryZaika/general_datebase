@@ -60,7 +60,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const customerId = result.insertId
 
-  await syncCustomerToCloudTalk(customerId, validatedData.company_id)
+  await syncCustomerToCloudTalk(validatedData.company_id, customerId)
 
   if (salesRep !== null && createdBy) {
     const toName = await fetchUserDisplayNameById(db, salesRep)
