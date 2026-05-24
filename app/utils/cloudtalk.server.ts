@@ -395,57 +395,6 @@ async function cloudtalkRequest(
   }
 }
 
-interface CloudTalkCountry {
-  id?: number | string
-  name?: string
-  iso_code?: string
-  iso?: string
-  code?: string
-}
-
-interface CountriesEnvelope {
-  responseData?: {
-    data?: ({ Country?: CloudTalkCountry } | CloudTalkCountry)[]
-  }
-}
-
-const usCountryIdCache = new Map<number, Nullable<number>>()
-
-function isUnitedStates(country: CloudTalkCountry): boolean {
-  const iso = country.iso_code ?? country.iso ?? country.code
-  return iso === 'US' || iso === 'USA' || country.name === 'United States'
-}
-
-export async function getCloudTalkUSCountryId(
-  companyId: number,
-): Promise<Nullable<number>> {
-  if (usCountryIdCache.has(companyId)) {
-    return usCountryIdCache.get(companyId) ?? null
-  }
-  let resolved: Nullable<number> = null
-  try {
-    const response = await cloudtalkRequest('countries/index.json', companyId, {
-      method: 'GET',
-    })
-    const json = (await response.json()) as CountriesEnvelope
-    for (const item of json.responseData?.data ?? []) {
-      const country =
-        (item as { Country?: CloudTalkCountry }).Country ?? (item as CloudTalkCountry)
-      if (isUnitedStates(country)) {
-        const id = coerceId(country.id)
-        if (id !== null) {
-          resolved = id
-          break
-        }
-      }
-    }
-  } catch {
-    // Endpoint optional per account/plan; omit country tag rather than fail.
-  }
-  usCountryIdCache.set(companyId, resolved)
-  return resolved
-}
-
 export function coerceId(value: unknown): Nullable<number> {
   if (typeof value === 'number') {
     return Number.isSafeInteger(value) && value > 0 ? value : null

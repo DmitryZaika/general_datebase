@@ -159,9 +159,10 @@ function printSummary(args: Args, company: CompanyRow, total: number): void {
 
 async function runBackfill(
   ids: number[],
+  companyId: number,
 ): Promise<{ ok: number; failed: number; stopped: boolean }> {
   const { syncCustomerToCloudTalk } = await import(
-    '../app/utils/cloudtalkContactSync.server'
+    '../app/services/lambda.server'
   )
 
   let ok = 0
@@ -172,7 +173,7 @@ async function runBackfill(
   for (const id of ids) {
     if (stopRequested) break
     try {
-      await syncCustomerToCloudTalk(id)
+      await syncCustomerToCloudTalk(id, companyId)
       ok += 1
     } catch (error) {
       console.error(`Customer ${id} failed:`, error)
@@ -246,7 +247,7 @@ async function main(): Promise<void> {
         )
         process.exit(1)
       }
-      const result = await runBackfill(ids)
+      const result = await runBackfill(ids, company.id)
       if (result.stopped) {
         process.exitCode = SIGINT_EXIT_CODE
       } else {

@@ -2,8 +2,8 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { type ActionFunctionArgs, data, type LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
 import { customerSignupSchema } from '~/schemas/customers'
+import { syncCustomerToCloudTalk } from '~/services/lambda.server'
 import type { Customer } from '~/types/customer'
-import { syncCustomerToCloudTalk } from '~/utils/cloudtalkContactSync.server'
 import {
   auditDisplayName,
   fetchUserDisplayNameById,
@@ -103,7 +103,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     )
   }
 
-  syncCustomerToCloudTalk(customerId).catch(() => undefined)
+  syncCustomerToCloudTalk(customerId, validatedData.company_id).catch(() => undefined)
 
   return data({
     success: true,

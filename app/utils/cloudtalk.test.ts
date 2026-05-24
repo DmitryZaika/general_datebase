@@ -179,22 +179,6 @@ describe('createCloudTalkContact', () => {
   })
 })
 
-describe('getCloudTalkUSCountryId', () => {
-  it('returns the US country id when CloudTalk responds with a string id', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      okJsonResponse({
-        responseData: {
-          data: [{ Country: { id: '233', iso_code: 'US', name: 'United States' } }],
-        },
-      }),
-    )
-
-    const { getCloudTalkUSCountryId } = await import('./cloudtalk.server')
-
-    expect(await getCloudTalkUSCountryId(999)).toBe(233)
-  })
-})
-
 describe('RateLimiter', () => {
   beforeEach(() => {
     vi.useFakeTimers()
