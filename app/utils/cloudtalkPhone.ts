@@ -23,29 +23,36 @@ export function isIosDevice() {
   return /iPhone|iPad|iPod/i.test(navigator.userAgent)
 }
 
-export function isMobileDevice() {
-  if (typeof navigator === 'undefined') return false
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+export function formatTelNumber(phone: string) {
+  const digits = phoneDigits(phone)
+  if (!digits) return ''
+  if (digits.startsWith('+')) return digits
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+  return `+${digits}`
 }
 
-export function buildCloudTalkCallHref(
-  phone: string,
-  options?: { mobileLayout?: boolean },
-) {
-  const cleanPhone = phoneDigits(phone)
-  if (!cleanPhone) return ''
+export function buildTelHref(phone: string) {
+  const telNumber = formatTelNumber(phone)
+  if (!telNumber) return ''
+  return `tel:${telNumber}`
+}
 
-  if (typeof navigator === 'undefined') {
-    return `tel:${cleanPhone}`
+export function buildAndroidCloudTalkDialIntent(phone: string) {
+  const telHref = buildTelHref(phone)
+  if (!telHref) return ''
+
+  const encodedTelHref = encodeURIComponent(telHref)
+  return `intent:#Intent;action=android.intent.action.DIAL;data=${encodedTelHref};package=${CLOUDTALK_GO_PACKAGE};S.browser_fallback_url=${encodedTelHref};end`
+}
+
+export function buildCloudTalkCallHref(phone: string) {
+  const telHref = buildTelHref(phone)
+  if (!telHref) return ''
+
+  if (typeof navigator !== 'undefined' && isAndroidDevice()) {
+    return buildAndroidCloudTalkDialIntent(phone)
   }
 
-  if (isAndroidDevice() || (options?.mobileLayout && !isIosDevice())) {
-    return `intent://call?number=${cleanPhone}#Intent;scheme=cloudtalk;package=${CLOUDTALK_GO_PACKAGE};end;`
-  }
-
-  if (isIosDevice() || options?.mobileLayout) {
-    return `cloudtalk://call?number=${cleanPhone}`
-  }
-
-  return `tel:${cleanPhone}`
+  return telHref
 }

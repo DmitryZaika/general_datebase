@@ -1,7 +1,7 @@
 import { PhoneIcon } from 'lucide-react'
 import { CloudTalkLink } from '~/components/molecules/CloudTalkLink'
 import { useIsMobile } from '~/hooks/use-mobile'
-import { hasCloudTalkAgentId, phoneDigits } from '~/utils/cloudtalkPhone'
+import { buildTelHref, hasCloudTalkAgentId, phoneDigits } from '~/utils/cloudtalkPhone'
 
 interface DealPhoneCallLinkProps {
   phone: string
@@ -29,7 +29,7 @@ export function DealPhoneCallLink({ phone, cloudtalkAgentId }: DealPhoneCallLink
   }
 
   return (
-    <a href={`tel:${digits}`} className={linkClassName}>
+    <a href={buildTelHref(phone)} className={linkClassName}>
       <PhoneIcon size={17} />
     </a>
   )

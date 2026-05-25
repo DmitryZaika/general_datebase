@@ -1,5 +1,4 @@
 import { type ReactNode, useMemo } from 'react'
-import { useIsMobile } from '~/hooks/use-mobile'
 import { buildCloudTalkCallHref, phoneDigits } from '~/utils/cloudtalkPhone'
 
 interface CloudTalkLinkProps {
@@ -9,13 +8,12 @@ interface CloudTalkLinkProps {
 }
 
 export function CloudTalkLink({ phone, className, children }: CloudTalkLinkProps) {
-  const isMobileLayout = useIsMobile()
   const href = useMemo(() => {
     if (typeof window === 'undefined') {
       return `tel:${phoneDigits(phone)}`
     }
-    return buildCloudTalkCallHref(phone, { mobileLayout: isMobileLayout })
-  }, [phone, isMobileLayout])
+    return buildCloudTalkCallHref(phone)
+  }, [phone])
 
   const cleanPhone = phoneDigits(phone)
   if (!cleanPhone || !href) return null
