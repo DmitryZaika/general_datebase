@@ -1,7 +1,12 @@
 import { PhoneIcon } from 'lucide-react'
-import { CloudTalkLink } from '~/components/molecules/CloudTalkLink'
+import type { MouseEvent } from 'react'
+import { CopyText } from '~/components/atoms/CopyText'
 import { useIsMobile } from '~/hooks/use-mobile'
-import { buildTelHref, hasCloudTalkAgentId, phoneDigits } from '~/utils/cloudtalkPhone'
+import {
+  buildTelHref,
+  phoneDigits,
+  shouldShowPhoneCallLink,
+} from '~/utils/cloudtalkPhone'
 
 interface DealPhoneCallLinkProps {
   phone: string
@@ -9,28 +14,94 @@ interface DealPhoneCallLinkProps {
 }
 
 export function DealPhoneCallLink({ phone, cloudtalkAgentId }: DealPhoneCallLinkProps) {
-  const isMobile = useIsMobile()
-  const digits = phoneDigits(phone)
+  const isMobileLayout = useIsMobile()
+  const telHref = buildTelHref(phone)
   const linkClassName =
     'inline-flex h-7 items-center justify-center rounded-md border-2 border-gray-300 px-2'
 
-  if (!digits) return null
+  if (!phoneDigits(phone) || !telHref) return null
 
-  if (hasCloudTalkAgentId(cloudtalkAgentId)) {
-    return (
-      <CloudTalkLink phone={phone} className={linkClassName}>
-        <PhoneIcon size={17} />
-      </CloudTalkLink>
-    )
-  }
-
-  if (!isMobile) {
+  if (
+    !shouldShowPhoneCallLink({
+      isMobileLayout,
+      cloudtalkAgentId,
+    })
+  ) {
     return null
   }
 
+  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.stopPropagation()
+    window.location.href = telHref
+  }
+
   return (
-    <a href={buildTelHref(phone)} className={linkClassName}>
+    <a href={telHref} className={linkClassName} onClick={handleClick}>
       <PhoneIcon size={17} />
     </a>
+  )
+}
+
+export function DealPhoneNumberLink({
+  phone,
+  cloudtalkAgentId,
+  className,
+}: {
+  phone: string
+  cloudtalkAgentId: string | null
+  className?: string
+}) {
+  const isMobileLayout = useIsMobile()
+  const telHref = buildTelHref(phone)
+
+  if (!phoneDigits(phone) || !telHref) return null
+
+  if (
+    !shouldShowPhoneCallLink({
+      isMobileLayout,
+      cloudtalkAgentId,
+    })
+  ) {
+    return null
+  }
+
+  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.stopPropagation()
+    window.location.href = telHref
+  }
+
+  return (
+    <a href={telHref} className={className} onClick={handleClick}>
+      {phone}
+    </a>
+  )
+}
+
+export function DealPhoneField({
+  phone,
+  cloudtalkAgentId,
+}: {
+  phone: string
+  cloudtalkAgentId: string | null
+}) {
+  const isMobileLayout = useIsMobile()
+  const showCall = shouldShowPhoneCallLink({
+    isMobileLayout,
+    cloudtalkAgentId,
+  })
+
+  return (
+    <div className='flex gap-2'>
+      {showCall ? (
+        <DealPhoneNumberLink
+          phone={phone}
+          cloudtalkAgentId={cloudtalkAgentId}
+          className='font-bold'
+        />
+      ) : (
+        <CopyText value={phone} className='font-bold' />
+      )}
+      <DealPhoneCallLink phone={phone} cloudtalkAgentId={cloudtalkAgentId} />
+    </div>
   )
 }

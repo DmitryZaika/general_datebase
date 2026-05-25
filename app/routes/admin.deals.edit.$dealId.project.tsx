@@ -4,7 +4,7 @@ import type { RowDataPacket } from 'mysql2'
 import { useState } from 'react'
 import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
-import { DealPhoneCallLink } from '~/components/molecules/DealPhoneCallLink'
+import { DealPhoneField } from '~/components/molecules/DealPhoneCallLink'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
@@ -92,13 +92,10 @@ function AddressLinkCell({
   return (
     <div className='flex items-center'>
       {isPhoneField ? (
-        <div className='flex gap-2'>
-          <CopyText value={row.original.value} className='font-bold' />
-          <DealPhoneCallLink
-            phone={row.original.value}
-            cloudtalkAgentId={cloudtalkAgentId}
-          />
-        </div>
+        <DealPhoneField
+          phone={row.original.value}
+          cloudtalkAgentId={cloudtalkAgentId}
+        />
       ) : isEmailField ? (
         <div className='flex gap-2 '>
           <CopyText value={row.original.value} className='font-bold' />
