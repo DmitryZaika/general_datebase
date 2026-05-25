@@ -127,6 +127,7 @@ export class TestDataFactory {
       is_admin: false,
       is_superuser: false,
       company_id: 1,
+      cloudtalk_agent_id: null,
       ...overrides,
     }
   }

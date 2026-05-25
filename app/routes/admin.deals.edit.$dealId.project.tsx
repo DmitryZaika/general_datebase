@@ -1,15 +1,10 @@
 import type { ColumnDef, Row } from '@tanstack/react-table'
-import { FileText, Loader2, MapIcon, PhoneIcon } from 'lucide-react'
+import { FileText, Loader2, MapIcon } from 'lucide-react'
 import type { RowDataPacket } from 'mysql2'
 import { useState } from 'react'
-import {
-  Link,
-  type LoaderFunctionArgs,
-  Outlet,
-  redirect,
-  useLoaderData,
-} from 'react-router'
+import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
 import { CopyText } from '~/components/atoms/CopyText'
+import { DealPhoneCallLink } from '~/components/molecules/DealPhoneCallLink'
 import { SuperCarousel } from '~/components/organisms/SuperCarousel'
 import { Button } from '~/components/ui/button'
 import { DataTable } from '~/components/ui/data-table'
@@ -38,7 +33,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!rows || rows.length === 0) {
     return redirect('/admin/deals')
   }
-  return { customer: rows[0] }
+
+  return {
+    customer: rows[0],
+    cloudtalkAgentId: user.cloudtalk_agent_id,
+  }
 }
 
 function attachedFileName(url: string) {
@@ -62,9 +61,11 @@ function attachedFileName(url: string) {
 function AddressLinkCell({
   row,
   customer,
+  cloudtalkAgentId,
 }: {
   row: Row<{ key: string; value: string }>
   customer: RowDataPacket
+  cloudtalkAgentId: string | null
 }) {
   const isMobile = useIsMobile()
   const [mapLoading, setMapLoading] = useState(false)
@@ -91,19 +92,13 @@ function AddressLinkCell({
   return (
     <div className='flex items-center'>
       {isPhoneField ? (
-        isMobile ? (
-          <div className='flex gap-2 '>
-            <CopyText value={row.original.value} className='font-bold' />
-            <Link
-              to={`tel:${(String(row.original.value || '').match(/[+\d]/g) || []).join('')}`}
-              className='font-bold break-words whitespace-normal text-ellipsis overflow-hidden border-2 border-gray-300 rounded-md px-2'
-            >
-              <PhoneIcon size={17} />
-            </Link>
-          </div>
-        ) : (
+        <div className='flex gap-2'>
           <CopyText value={row.original.value} className='font-bold' />
-        )
+          <DealPhoneCallLink
+            phone={row.original.value}
+            cloudtalkAgentId={cloudtalkAgentId}
+          />
+        </div>
       ) : isEmailField ? (
         <div className='flex gap-2 '>
           <CopyText value={row.original.value} className='font-bold' />
@@ -156,7 +151,7 @@ function AddressLinkCell({
 }
 
 export default function DealProjectInfo() {
-  const { customer } = useLoaderData<typeof loader>()
+  const { customer, cloudtalkAgentId } = useLoaderData<typeof loader>()
   const [currentId, setCurrentId] = useState<number | undefined>(undefined)
   const columns: ColumnDef<{ key: string; value: string }>[] = [
     {
@@ -166,7 +161,13 @@ export default function DealProjectInfo() {
     {
       header: 'Value',
       accessorKey: 'value',
-      cell: ({ row }) => <AddressLinkCell row={row} customer={customer} />,
+      cell: ({ row }) => (
+        <AddressLinkCell
+          row={row}
+          customer={customer}
+          cloudtalkAgentId={cloudtalkAgentId}
+        />
+      ),
     },
   ]
 
