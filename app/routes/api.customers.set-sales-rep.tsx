@@ -6,6 +6,7 @@ import {
   fetchUserDisplayNameById,
   normalizeSalesRepId,
   recordCustomerReassignment,
+  recordLeadManagerAssignmentBeforeReassign,
 } from '~/utils/customerAudit.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { getEmployeeUser, type SessionUser } from '~/utils/session.server'
@@ -36,6 +37,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const nextRep = normalizeSalesRepId(sales_rep)
     const repChanged = prevRep !== nextRep
     if (repChanged) {
+      await recordLeadManagerAssignmentBeforeReassign(db, customer_id, prevRep)
       await db.query(
         `UPDATE customers SET sales_rep = ? WHERE id = ? AND deleted_at IS NULL`,
         [sales_rep, customer_id],

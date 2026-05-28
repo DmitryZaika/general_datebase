@@ -33,6 +33,7 @@ export default function CustomersAdd() {
 
   return (
     <CustomerForm
+      embedded
       handleChange={handleChange}
       onSuccess={onSuccess}
       companyId={user.company_id}

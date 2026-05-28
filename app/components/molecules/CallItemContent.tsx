@@ -2,6 +2,14 @@ import { format } from 'date-fns'
 import { Star } from 'lucide-react'
 import { useState } from 'react'
 import { AudioWaveformPlayer } from '~/components/molecules/AudioWaveformPlayer'
+import {
+  CallTranscription,
+  CallTranscriptionError,
+  CallTranscriptionMenu,
+  CallTranscriptionPrimaryButtons,
+  CallTranscriptionProvider,
+  CallTranscriptionText,
+} from '~/components/molecules/CallTranscription'
 import { formatTimestamp } from '~/lib/dateHelpers'
 import { cn } from '~/lib/utils'
 import {
@@ -17,6 +25,7 @@ interface CallItemContentProps {
   audioSrc: string
   compact?: boolean
   historyCompact?: boolean
+  dealId?: number
 }
 
 export function CallItemContent({
@@ -24,6 +33,7 @@ export function CallItemContent({
   audioSrc,
   compact = false,
   historyCompact = false,
+  dealId,
 }: CallItemContentProps) {
   const [showRecording, setShowRecording] = useState(false)
   const { Icon, color } = getCallIcon(call)
@@ -41,42 +51,79 @@ export function CallItemContent({
 
     return (
       <div className='group flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
-        <div className='flex items-center justify-between gap-2'>
-          <div className='flex items-center gap-2 min-w-0'>
-            <span className={cn('shrink-0', color)}>
-              <Icon size={14} />
-            </span>
-            <span className='text-sm font-medium truncate'>{label}</span>
-            <span className='min-w-0 truncate text-xs text-gray-500'>
-              Agent: {call.agentName}
-            </span>
-            <span
-              className={cn(
-                'text-[10px] shrink-0',
-                status ? getStatusColor(status) : 'text-gray-500',
-              )}
-            >
-              {detail}
-            </span>
-          </div>
-          <div className='flex shrink-0 items-center gap-2'>
-            {call.recorded ? (
-              <button
-                type='button'
+        {call.recorded ? (
+          <CallTranscriptionProvider
+            callId={call.callId}
+            recordingLink={call.recordingLink}
+            dealId={dealId}
+            callStartedAt={call.startedAt}
+          >
+            <div className='flex items-center justify-between gap-2'>
+              <div className='flex items-center gap-2 min-w-0'>
+                <span className={cn('shrink-0', color)}>
+                  <Icon size={14} />
+                </span>
+                <span className='text-sm font-medium truncate'>{label}</span>
+                <span className='min-w-0 truncate text-xs text-gray-500'>
+                  Agent: {call.agentName}
+                </span>
+                <span
+                  className={cn(
+                    'text-[10px] shrink-0',
+                    status ? getStatusColor(status) : 'text-gray-500',
+                  )}
+                >
+                  {detail}
+                </span>
+              </div>
+              <div className='flex shrink-0 items-center gap-2'>
+                <div
+                  className={cn(
+                    'flex items-center gap-1',
+                    showRecording ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+                  )}
+                >
+                  {dealId ? (
+                    <CallTranscriptionPrimaryButtons buttonClassName='opacity-100' />
+                  ) : null}
+                  <CallTranscriptionMenu
+                    showRecording={showRecording}
+                    onToggleRecording={() => setShowRecording(value => !value)}
+                    buttonClassName='opacity-100'
+                  />
+                </div>
+                <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
+                  {startedLabel}
+                </span>
+              </div>
+            </div>
+            <CallTranscriptionText textClassName='text-xs text-gray-500' />
+            <CallTranscriptionError />
+          </CallTranscriptionProvider>
+        ) : (
+          <div className='flex items-center justify-between gap-2'>
+            <div className='flex items-center gap-2 min-w-0'>
+              <span className={cn('shrink-0', color)}>
+                <Icon size={14} />
+              </span>
+              <span className='text-sm font-medium truncate'>{label}</span>
+              <span className='min-w-0 truncate text-xs text-gray-500'>
+                Agent: {call.agentName}
+              </span>
+              <span
                 className={cn(
-                  'rounded border border-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 transition-opacity hover:bg-slate-50 focus-visible:opacity-100',
-                  showRecording ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+                  'text-[10px] shrink-0',
+                  status ? getStatusColor(status) : 'text-gray-500',
                 )}
-                onClick={() => setShowRecording(value => !value)}
               >
-                {showRecording ? 'Hide voice call' : 'Voice call'}
-              </button>
-            ) : null}
+                {detail}
+              </span>
+            </div>
             <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
               {startedLabel}
             </span>
           </div>
-        </div>
+        )}
         {showRecording ? (
           <div className='mt-1'>
             <AudioWaveformPlayer audioSrc={audioSrc} compact />
@@ -169,6 +216,15 @@ export function CallItemContent({
         {call.recorded && (
           <div className={cn(compact ? 'mt-1.5' : 'mt-1')}>
             <AudioWaveformPlayer audioSrc={audioSrc} compact={compact} />
+            <CallTranscription
+              callId={call.callId}
+              recordingLink={call.recordingLink}
+              dealId={dealId}
+              callStartedAt={call.startedAt}
+              showRecording={showRecording}
+              onToggleRecording={() => setShowRecording(value => !value)}
+              buttonClassName='opacity-100'
+            />
           </div>
         )}
       </div>

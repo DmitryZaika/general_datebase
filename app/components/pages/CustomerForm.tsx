@@ -38,6 +38,7 @@ interface CustomerFormProps {
   source?: (typeof sourceEnum)[number]
   initialName?: string
   oldData?: CustomerDialogSchema & { sales_rep_name?: string }
+  embedded?: boolean
 }
 
 type SourceOptions = {
@@ -74,6 +75,7 @@ export function CustomerForm({
   source,
   initialName,
   oldData,
+  embedded = false,
 }: CustomerFormProps) {
   const { toast: toastFn } = useToast()
   const successToast = (message: string) =>
@@ -173,125 +175,141 @@ export function CustomerForm({
   const dialogTitle = customerId ? 'Edit Customer' : 'Add Customer'
   const sourceOptions = getSourceOptions(form.watch('source'))
 
+  const duplicateDialog = (
+    <Dialog open={dupOpen} onOpenChange={setDupOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            <div className='font-bold min-h-10'>
+              <p className='mb-3'> Customer {dupInfo?.name} already exists </p>
+              <p> Sales rep: {dupInfo?.sales_rep_name || 'Unassigned'} </p>
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+      </DialogContent>
+    </Dialog>
+  )
+
+  const formContent = (
+    <FormProvider {...form}>
+      <form
+        id='customerForm'
+        onSubmit={e => {
+          e.preventDefault()
+          e.stopPropagation()
+          form.handleSubmit(onSubmit)()
+        }}
+      >
+        <FormField
+          control={form.control}
+          name='name'
+          render={({ field }) => (
+            <InputItem
+              name={'Name*'}
+              placeholder={'Name of the customer'}
+              field={field}
+              inputAutoFocus={true}
+            />
+          )}
+        />
+        <FormField
+          control={form.control}
+          name='email'
+          render={({ field }) => <EmailInput field={field} />}
+        />
+        <FormField
+          control={form.control}
+          name='phone'
+          render={({ field }) => <PhoneInput field={field} inputName='Phone 1' />}
+        />
+        <FormField
+          control={form.control}
+          name='phone_2'
+          render={({ field }) => <PhoneInput field={field} inputName='Phone 2' />}
+        />
+        <AddressInput form={form} field='address' type='billing' />
+        <FormField
+          control={form.control}
+          name='source'
+          render={({ field }) => (
+            <SelectInput field={field} options={sourceOptions} name='Source' />
+          )}
+        />
+        <FormField
+          control={form.control}
+          name='sales_rep'
+          render={({ field }) => (
+            <SelectInput
+              field={field}
+              options={salesRepOptions}
+              name='Sales Rep'
+              placeholder='Select'
+            />
+          )}
+        />
+        <div className='flex items-center space-x-2 my-2'>
+          <FormField
+            control={form.control}
+            name='builder'
+            render={({ field }) => (
+              <Switch
+                checked={field.value}
+                onCheckedChange={value => {
+                  field.onChange(value)
+                  if (!value) {
+                    form.setValue('company_name', '')
+                  }
+                }}
+                id='builder_switch'
+                label='Company'
+                className=''
+              />
+            )}
+          />
+        </div>
+        {form.watch('builder') && (
+          <InputItem
+            name='Company Name'
+            placeholder='Company Name'
+            field={form.register('company_name')}
+          />
+        )}
+        <FormLabel>Notes</FormLabel>
+        <FormField
+          control={form.control}
+          name='your_message'
+          render={({ field }) => (
+            <Textarea {...field} value={(field.value as string) ?? ''} name='Notes' />
+          )}
+        />
+
+        <DialogFooter>
+          <LoadingButton loading={isPending}>Submit</LoadingButton>
+        </DialogFooter>
+      </form>
+    </FormProvider>
+  )
+
+  if (embedded) {
+    return (
+      <>
+        <DialogHeader>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+        </DialogHeader>
+        {duplicateDialog}
+        {formContent}
+      </>
+    )
+  }
+
   return (
     <Dialog open={true} onOpenChange={handleChange}>
       <DialogContent className='max-h-[95vh] overflow-y-auto'>
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
-        <Dialog open={dupOpen} onOpenChange={setDupOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                <div className='font-bold min-h-10'>
-                  <p className='mb-3'> Customer {dupInfo?.name} already exists </p>
-                  <p> Sales rep: {dupInfo?.sales_rep_name || 'Unassigned'} </p>
-                </div>
-              </DialogTitle>
-            </DialogHeader>
-          </DialogContent>
-        </Dialog>
-        <FormProvider {...form}>
-          <form
-            id='customerForm'
-            onSubmit={e => {
-              e.preventDefault()
-              e.stopPropagation()
-              form.handleSubmit(onSubmit)()
-            }}
-          >
-            <FormField
-              control={form.control}
-              name='name'
-              render={({ field }) => (
-                <InputItem
-                  name={'Name*'}
-                  placeholder={'Name of the customer'}
-                  field={field}
-                  inputAutoFocus={true}
-                />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name='email'
-              render={({ field }) => <EmailInput field={field} />}
-            />
-            <FormField
-              control={form.control}
-              name='phone'
-              render={({ field }) => <PhoneInput field={field} inputName='Phone 1' />}
-            />
-            <FormField
-              control={form.control}
-              name='phone_2'
-              render={({ field }) => <PhoneInput field={field} inputName='Phone 2' />}
-            />
-            <AddressInput form={form} field='address' type='billing' />
-            <FormField
-              control={form.control}
-              name='source'
-              render={({ field }) => (
-                <SelectInput field={field} options={sourceOptions} name='Source' />
-              )}
-            />
-            <FormField
-              control={form.control}
-              name='sales_rep'
-              render={({ field }) => (
-                <SelectInput
-                  field={field}
-                  options={salesRepOptions}
-                  name='Sales Rep'
-                  placeholder='Select'
-                />
-              )}
-            />
-            <div className='flex items-center space-x-2 my-2'>
-              <FormField
-                control={form.control}
-                name='builder'
-                render={({ field }) => (
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={value => {
-                      field.onChange(value)
-                      if (!value) {
-                        form.setValue('company_name', '')
-                      }
-                    }}
-                    id='builder_switch'
-                    label='Company'
-                    className=''
-                  />
-                )}
-              />
-            </div>
-            {form.watch('builder') && (
-              <InputItem
-                name='Company Name'
-                placeholder='Company Name'
-                field={form.register('company_name')}
-              />
-            )}
-            <FormLabel>Notes</FormLabel>
-            <FormField
-              control={form.control}
-              name='your_message'
-              render={({ field }) => (
-                <Textarea
-                  {...field}
-                  value={(field.value as string) ?? ''}
-                  name='Notes'
-                />
-              )}
-            />
-
-            <DialogFooter>
-              <LoadingButton loading={isPending}>Submit</LoadingButton>
-            </DialogFooter>
-          </form>
-        </FormProvider>
+        {duplicateDialog}
+        {formContent}
       </DialogContent>
     </Dialog>
   )

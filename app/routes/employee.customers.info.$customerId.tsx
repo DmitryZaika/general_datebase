@@ -6,12 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
+import { DialogHeader, DialogTitle } from '~/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { getCustomerEmailsWithReads } from '~/crud/emails'
 import { db } from '~/db.server'
@@ -30,9 +25,11 @@ type CustomerInfo = {
   source: string | null
   created_date: string | null
   created_by: string | null
+  assigned_date: string | null
   parent_id: number | null
   company_name: string | null
   first_rep_deal_created_at: string | null
+  initial_sales_rep_name: string | null
 }
 
 type DealRow = {
@@ -95,7 +92,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     Omit<CustomerInfo, 'first_rep_deal_created_at'>
   >(
     db,
-    `SELECT c.id, c.name, c.email, c.phone, c.phone_2, c.address, u.name AS sales_rep_name, c.source, c.parent_id, c.company_name, c.created_date, c.created_by
+    `SELECT c.id, c.name, c.email, c.phone, c.phone_2, c.address, u.name AS sales_rep_name, c.source, c.parent_id, c.company_name, c.created_date, c.created_by, c.assigned_date
      FROM customers c
      LEFT JOIN deals d ON d.customer_id = c.id AND d.created_at IS NULL
      LEFT JOIN users u ON c.sales_rep = u.id AND u.is_deleted = 0
@@ -139,21 +136,26 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   )
   // Temporary: assignment time for the sales-manager lead line is inferred from the first deal
   // for this customer where deal.user_id matches customer.sales_rep. Replace when history stores it.
-  const firstRepDealRows = await selectMany<{ t: string }>(
+  const firstRepDealRows = await selectMany<{ t: string; rep_name: string | null }>(
     db,
-    `SELECT DATE_FORMAT(d.created_at, '%Y-%m-%dT%H:%i:%sZ') AS t
+    `SELECT DATE_FORMAT(d.created_at, '%Y-%m-%dT%H:%i:%sZ') AS t, u.name AS rep_name
      FROM deals d
-     INNER JOIN customers c ON c.id = d.customer_id AND c.sales_rep = d.user_id
+     LEFT JOIN users u ON u.id = d.user_id AND u.is_deleted = 0
      WHERE d.customer_id = ? AND d.deleted_at IS NULL
      ORDER BY d.created_at ASC, d.id ASC
      LIMIT 1`,
     [customerId],
   )
   const firstRepDealAt = firstRepDealRows[0]?.t ?? null
+  const initialSalesRepName = firstRepDealRows[0]?.rep_name ?? null
   const customerOut: CustomerInfo | undefined =
     customer === undefined
       ? undefined
-      : { ...customer, first_rep_deal_created_at: firstRepDealAt }
+      : {
+          ...customer,
+          first_rep_deal_created_at: firstRepDealAt,
+          initial_sales_rep_name: initialSalesRepName,
+        }
 
   const emails = customerOut?.email
     ? await getCustomerEmailsWithReads(customerOut.email, user.company_id)
@@ -192,45 +194,24 @@ export default function CustomerInfoDialog() {
     viewerName,
   } = useLoaderData<typeof loader>()
 
-  const handleChange = (open: boolean) => {
-    if (open === false) navigate(`..${location.search}`)
-  }
-
   const currentTab = location.pathname.split('/').pop() || 'info'
 
   return (
-    <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[560px] overflow-auto flex flex-col justify-baseline min-h-[95vh] max-h-[95vh] p-5'>
-        <DialogHeader>
-          <DialogTitle>Customer Information</DialogTitle>
-        </DialogHeader>
+    <>
+      <DialogHeader>
+        <DialogTitle>Customer Information</DialogTitle>
+      </DialogHeader>
 
-        {hasTabs ? (
-          <Tabs
-            value={currentTab}
-            onValueChange={value => navigate(`${value}${location.search}`)}
-            className='w-full'
-          >
-            <TabsList className='grid w-full grid-cols-2'>
-              <TabsTrigger value='info'>Company info</TabsTrigger>
-              <TabsTrigger value='projects'>Projects</TabsTrigger>
-            </TabsList>
-            <div className='mt-4'>
-              <Outlet
-                context={{
-                  customer,
-                  deals,
-                  project,
-                  emails,
-                  reassignments,
-                  dealActivities,
-                  dealNotes,
-                  viewerName,
-                }}
-              />
-            </div>
-          </Tabs>
-        ) : (
+      {hasTabs ? (
+        <Tabs
+          value={currentTab}
+          onValueChange={value => navigate(`${value}${location.search}`)}
+          className='w-full'
+        >
+          <TabsList className='grid w-full grid-cols-2'>
+            <TabsTrigger value='info'>Company info</TabsTrigger>
+            <TabsTrigger value='projects'>Projects</TabsTrigger>
+          </TabsList>
           <div className='mt-4'>
             <Outlet
               context={{
@@ -245,8 +226,23 @@ export default function CustomerInfoDialog() {
               }}
             />
           </div>
-        )}
-      </DialogContent>
-    </Dialog>
+        </Tabs>
+      ) : (
+        <div className='mt-4'>
+          <Outlet
+            context={{
+              customer,
+              deals,
+              project,
+              emails,
+              reassignments,
+              dealActivities,
+              dealNotes,
+              viewerName,
+            }}
+          />
+        </div>
+      )}
+    </>
   )
 }

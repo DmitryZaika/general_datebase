@@ -1,15 +1,13 @@
 import type { LoaderFunctionArgs } from 'react-router'
 import { db } from '~/db.server'
+import {
+  getAttachmentsForCompanyTemplates,
+  groupAttachmentsByTemplateId,
+} from '~/utils/emailTemplateAttachments.server'
+import { type EmailTemplate, mapTemplateAttachmentRows } from '~/utils/emailTemplates'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { getEmployeeUser, type User } from '~/utils/session.server'
-
-interface EmailTemplate {
-  id: number
-  template_name: string
-  template_subject: string
-  template_body: string
-}
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   let user: User
@@ -35,5 +33,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     [companyId],
   )
 
-  return Response.json({ templates })
+  const attachmentRows = await getAttachmentsForCompanyTemplates(companyId)
+  const attachmentsByTemplate = groupAttachmentsByTemplateId(attachmentRows)
+
+  const templatesWithAttachments = templates.map(template => ({
+    ...template,
+    attachments: mapTemplateAttachmentRows(
+      attachmentsByTemplate.get(template.id) ?? [],
+    ),
+  }))
+
+  return Response.json({ templates: templatesWithAttachments })
 }
