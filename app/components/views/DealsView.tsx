@@ -13,10 +13,17 @@ import {
 import { motion, type Variants } from 'framer-motion'
 import { MoreVertical, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useNavigation,
+  useSearchParams,
+} from 'react-router'
 import DealsList from '~/components/DealsList'
 import { CustomDropdownMenu } from '~/components/molecules/DropdownMenu'
 import { FindCustomer } from '~/components/molecules/FindCustomer'
+import { DealsBoardSkeleton } from '~/components/organisms/DealsBoardSkeleton'
 import { Button } from '~/components/ui/button'
 import { isDateOnlyDeadline, localCalendarDate } from '~/lib/dateHelpers'
 import type { Customer } from '~/types'
@@ -136,7 +143,18 @@ export default function DealsView({
 }: DealsViewProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const navigation = useNavigation()
   const [searchParams] = useSearchParams()
+  const isListLoading =
+    navigation.state === 'loading' &&
+    navigation.location?.pathname === location.pathname
+  const [showBoardEntrance, setShowBoardEntrance] = useState(animateBoard)
+
+  useEffect(() => {
+    if (!animateBoard || !showBoardEntrance) return
+    const timeoutId = window.setTimeout(() => setShowBoardEntrance(false), 450)
+    return () => window.clearTimeout(timeoutId)
+  }, [animateBoard, showBoardEntrance])
 
   const toDeal = (d: FullDeal): Deal => {
     const customer = customers.find(c => c.id === d.customer_id)
@@ -589,13 +607,18 @@ export default function DealsView({
       id={list.id}
       readonly={readonly}
       highlightedDealId={highlightDealId ?? undefined}
-      columnMotionVariants={animateBoard ? DEALS_BOARD_COLUMN_VARIANTS : undefined}
+      columnMotionVariants={
+        animateBoard && showBoardEntrance && !isListLoading
+          ? DEALS_BOARD_COLUMN_VARIANTS
+          : undefined
+      }
     />
   ))
 
-  const listsContent = animateBoard ? (
+  const listsContent = isListLoading ? (
+    <DealsBoardSkeleton />
+  ) : animateBoard && showBoardEntrance ? (
     <motion.div
-      key={lists.map(l => l.id).join('-')}
       ref={mobileBoardScrollRef}
       className={listsFlexClassName}
       variants={DEALS_BOARD_LIST_VARIANTS}
@@ -611,7 +634,7 @@ export default function DealsView({
   )
 
   if (readonly) {
-    if (animateBoard) {
+    if (animateBoard && showBoardEntrance && !isListLoading) {
       const boardAreaReadonly = (
         <div className='flex min-h-0 min-w-0 flex-1 flex-col'>{listsContent}</div>
       )
@@ -644,14 +667,17 @@ export default function DealsView({
     <div className='shrink-0 sticky top-0 z-20 bg-white'>{toolbar}</div>
   )
 
-  const toolbarStickyMotion = (
-    <motion.div
-      className='shrink-0 sticky top-0 z-20 bg-white'
-      {...DEALS_TOOLBAR_MOTION}
-    >
-      {toolbar}
-    </motion.div>
-  )
+  const toolbarStickyMotion =
+    animateBoard && showBoardEntrance && !isListLoading ? (
+      <motion.div
+        className='shrink-0 sticky top-0 z-20 bg-white'
+        {...DEALS_TOOLBAR_MOTION}
+      >
+        {toolbar}
+      </motion.div>
+    ) : (
+      toolbarSticky
+    )
 
   const boardArea = (
     <div className='flex min-h-0 min-w-0 flex-1 flex-col'>{listsContent}</div>
@@ -678,7 +704,7 @@ export default function DealsView({
         lastMobileColumnSlideAtRef.current = 0
       }}
     >
-      {animateBoard ? (
+      {animateBoard && showBoardEntrance && !isListLoading ? (
         <motion.div
           className='w-full  h-[calc(100dvh-4.50rem)] md:h-[calc(100dvh-6.25rem)] flex flex-col'
           {...DEALS_SHELL_MOTION}
