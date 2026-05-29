@@ -40,6 +40,12 @@ function adminShellMotionKey(pathname: string, search: string): string {
   if (pathname.startsWith('/admin/images')) {
     return `/admin/images${search}`
   }
+  if (pathname.startsWith('/admin/customers')) {
+    return '/admin/customers'
+  }
+  if (pathname === '/admin/deals' || pathname === '/admin/deals/') {
+    return '/admin/deals'
+  }
   return `${pathname}${search}`
 }
 

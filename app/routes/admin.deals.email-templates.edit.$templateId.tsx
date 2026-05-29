@@ -6,13 +6,21 @@ import {
   redirect,
   useLoaderData,
 } from 'react-router'
-import { getValidatedFormData } from 'remix-hook-form'
 import { z } from 'zod'
-import { EmailTemplateForm } from '~/components/molecules/EmailTemplateForm'
+import {
+  EmailTemplateForm,
+  type EmailTemplateFormData,
+} from '~/components/molecules/EmailTemplateForm'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
 import { csrf } from '~/utils/csrf.server'
-import { validateTemplateBody } from '~/utils/emailTemplateVariables'
+import {
+  getTemplateAttachments,
+  parseEmailTemplateMultipartRequest,
+  saveTemplateAttachments,
+} from '~/utils/emailTemplateAttachments.server'
+import { emailTemplateTextSchema } from '~/utils/emailTemplateSchema'
+import { mapTemplateAttachmentRows } from '~/utils/emailTemplates'
 import { selectMany } from '~/utils/queryHelpers'
 import { getAdminUser, type User } from '~/utils/session.server'
 import { toastData } from '~/utils/toastHelpers.server'
@@ -24,27 +32,12 @@ interface EmailTemplate {
   template_body: string
 }
 
-const templateSchema = z.object({
-  template_name: z.string().min(1, 'Template name is required'),
-  template_subject: z.string().min(1, 'Template subject is required'),
-  template_body: z
-    .string()
-    .min(1, 'Template body is required')
-    .refine(
-      (val: string) => {
-        const text = val.replace(/<[^>]*>/g, '')
-        const validation = validateTemplateBody(text)
-        return validation.isValid
-      },
-      {
-        message: 'Invalid template body format. Check for unclosed {{ or }}.',
-      },
-    ),
+const templateFormSchema = emailTemplateTextSchema.extend({
+  attachments: z.array(z.instanceof(File)),
+  removed_attachment_ids: z.array(z.number()),
 })
 
-type FormData = z.infer<typeof templateSchema>
-
-const resolver = zodResolver(templateSchema)
+const resolver = zodResolver(templateFormSchema)
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   let user: User
@@ -71,7 +64,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return redirect('..')
   }
 
-  return { template: templates[0] }
+  const attachmentRows = await getTemplateAttachments(templateId)
+
+  return {
+    template: templates[0],
+    companyId: user.company_id,
+    attachments: mapTemplateAttachmentRows(attachmentRows),
+  }
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -93,9 +92,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return redirect('..')
   }
 
-  const { errors, data } = await getValidatedFormData(request, resolver)
-  if (errors) {
-    return { errors }
+  const parsed = await parseEmailTemplateMultipartRequest(request)
+  if (parsed.errors) {
+    return { errors: parsed.errors }
+  }
+  if (!parsed.data) {
+    return { error: 'Invalid template data' }
+  }
+
+  const validated = templateFormSchema.safeParse(parsed.data)
+  if (!validated.success) {
+    return { errors: validated.error.flatten().fieldErrors }
   }
 
   await db.execute(
@@ -103,12 +110,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
      SET template_name = ?, template_subject = ?, template_body = ?
      WHERE id = ? AND company_id = ?`,
     [
-      data.template_name,
-      data.template_subject,
-      data.template_body,
+      validated.data.template_name,
+      validated.data.template_subject,
+      validated.data.template_body,
       templateId,
       user.company_id,
     ],
+  )
+
+  await saveTemplateAttachments(
+    templateId,
+    validated.data.attachments,
+    validated.data.removed_attachment_ids,
   )
 
   const session = await getSession(request.headers.get('Cookie'))
@@ -120,16 +133,26 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function EditEmailTemplate() {
-  const { template } = useLoaderData<typeof loader>()
+  const { template, companyId, attachments } = useLoaderData<typeof loader>()
 
-  const form = useForm<FormData>({
+  const form = useForm<EmailTemplateFormData>({
     resolver,
     defaultValues: {
       template_name: template.template_name,
       template_subject: template.template_subject,
       template_body: template.template_body,
+      attachments: [],
+      removed_attachment_ids: [],
     },
   })
 
-  return <EmailTemplateForm title='Edit Email Template' form={form} isEditMode />
+  return (
+    <EmailTemplateForm
+      title='Edit Email Template'
+      form={form}
+      companyId={companyId}
+      existingAttachments={attachments}
+      isEditMode
+    />
+  )
 }

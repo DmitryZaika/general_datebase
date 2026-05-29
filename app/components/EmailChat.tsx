@@ -68,6 +68,7 @@ import {
 import { useToast } from '~/hooks/use-toast'
 import { cn } from '~/lib/utils'
 import type { Nullable } from '~/types/utils'
+import { applyEmailTemplateContent } from '~/utils/applyEmailTemplate.client'
 import { dateClass, fileSize } from '~/utils/constants'
 import {
   type EmailTemplate,
@@ -80,7 +81,6 @@ import {
 import {
   getUnfilledCustomVariables,
   hasAnyVariables,
-  replaceTemplateVariables,
   type TemplateVariableData,
 } from '~/utils/emailTemplateVariables'
 import { htmlToPlainText } from '~/utils/stringHelpers'
@@ -932,14 +932,17 @@ export function EmailChat(props: EmailChatProps) {
     handleGenerate(value)
   }
 
-  const applyEmailTemplate = (template: EmailTemplate) => {
+  const applyEmailTemplate = async (template: EmailTemplate) => {
     if (!employeeProps) return
 
     const variableData: TemplateVariableData = templateVariableData ?? {}
-    const replaced = replaceTemplateVariables(template.template_body, variableData)
-    const plainText = htmlToPlainText(replaced)
+    const applied = await applyEmailTemplateContent(template, variableData)
+    const plainText = htmlToPlainText(applied.body)
     setMessageText(plainText)
     setActiveTemplateId(template.id)
+    clearAttachmentPreviews()
+    setAttachments(applied.attachments)
+    setAttachmentPreviews(applied.previews)
 
     const customVars = getUnfilledCustomVariables(plainText)
     if (customVars.length > 0) {
@@ -956,13 +959,13 @@ export function EmailChat(props: EmailChatProps) {
       setPendingTemplate(template)
       return false
     }
-    applyEmailTemplate(template)
+    void applyEmailTemplate(template)
     return true
   }
 
   const handleConfirmTemplateReplace = () => {
     if (!pendingTemplate) return
-    applyEmailTemplate(pendingTemplate)
+    void applyEmailTemplate(pendingTemplate)
     setPendingTemplate(null)
     setShowMobileTemplatePicker(false)
     setMobileTemplateSearch('')
