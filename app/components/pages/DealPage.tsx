@@ -1,5 +1,12 @@
-import { Outlet, useLocation, useNavigate, useNavigation } from 'react-router'
+import {
+  Outlet,
+  useLocation,
+  useNavigate,
+  useNavigation,
+  useOutletContext,
+} from 'react-router'
 import { DealActivityPanel } from '~/components/molecules/DealActivityPanel'
+import { DealEditDialogClose } from '~/components/molecules/DealEditDialogClose'
 import { DealProgressBar } from '~/components/molecules/DealProgressBar'
 import {
   Dialog,
@@ -13,6 +20,10 @@ import type { DealActivity } from '~/routes/api.deal-activities.$dealId'
 import type { DealNote } from '~/routes/api.deal-notes.$dealId'
 import type { DealEmailHistoryItem } from '~/types/dealActivityTypes'
 import type { Nullable } from '~/types/utils'
+import {
+  DEAL_EDIT_DIALOG_CLASS,
+  type DealsBoardOutletContext,
+} from '~/utils/dealsBoardShell'
 
 interface DealPageProps {
   dealId: number
@@ -59,6 +70,8 @@ export default function DealsEdit({
   const navigate = useNavigate()
   const location = useLocation()
   const navigation = useNavigation()
+  const outletContext = useOutletContext<DealsBoardOutletContext | null>()
+  const embedded = outletContext?.dealEditEmbedded === true
   const dealsBase = location.pathname.includes('/admin/')
     ? '/admin/deals'
     : '/employee/deals'
@@ -76,24 +89,25 @@ export default function DealsEdit({
 
   const handleChange = (open: boolean) => {
     if (!open) {
-      navigate(`${dealsBase}${location.search}`, { state: { shouldRevalidate: true } })
+      outletContext?.dismissDealEdit?.()
+      navigate(`${dealsBase}${location.search}`, { replace: true })
     }
   }
 
   const showProgress =
     stages && stages.length > 0 && history && currentListId !== undefined
 
-  return (
-    <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent
-        closeClassName='max-md:!right-3 max-md:!top-3'
-        className='flex h-auto max-h-[95dvh] min-h-[600px] flex-col justify-baseline overflow-auto px-1 py-4 max-md:!fixed max-md:!left-0 max-md:!right-0 max-md:!top-[env(safe-area-inset-top,0px)] max-md:!bottom-[env(safe-area-inset-bottom,0px)] max-md:!h-auto max-md:!max-h-none max-md:!min-h-0 max-md:!w-full max-md:!max-w-none max-md:!translate-x-0 max-md:!translate-y-0 max-md:rounded-none sm:max-w-[1100px] sm:px-2 sm:py-5 md:h-[95vh] md:overflow-hidden xl:max-w-[1200px]'
-      >
-        <DialogHeader>
-          <DialogTitle className='px-1 sm:px-2'>Edit Deal</DialogTitle>
-        </DialogHeader>
-        {showProgress && (
-          <div className='mb-2'>
+  const pageInner = (
+    <>
+      <div className='shrink-0'>
+        <div className='flex items-center justify-between gap-3 px-1 sm:px-2'>
+          <DialogHeader className='space-y-0 text-left'>
+            <DialogTitle>Edit Deal</DialogTitle>
+          </DialogHeader>
+          <DealEditDialogClose />
+        </div>
+        {showProgress ? (
+          <div className='mb-2 px-1 sm:px-2'>
             <DealProgressBar
               stages={stages}
               history={history}
@@ -102,49 +116,63 @@ export default function DealsEdit({
               closedAt={closedAt}
             />
           </div>
-        )}
-        <div className='grid grid-cols-1 md:grid-cols-[2fr_2fr] flex-1 min-h-0 overflow-auto md:overflow-hidden'>
-          <div className='px-1 sm:px-1 md:overflow-auto md:min-h-0'>
-            <Tabs
-              value={activeDealTab}
-              onValueChange={value =>
-                navigate(`${dealsBase}/edit/${dealId}/${value}${location.search}`)
-              }
-            >
-              <TabsList className='mb-5 grid grid-cols-4'>
-                <TabsTrigger value='project'>Project</TabsTrigger>
-                <TabsTrigger value='information'>General</TabsTrigger>
-                <TabsTrigger value='images'>
-                  Images
-                  {imagesCount > 0 ? (
-                    <span className='ml-1 rounded-full bg-zinc-200 px-1.5 py-0 text-[10px] font-semibold leading-4 text-zinc-700'>
-                      {imagesCount}
-                    </span>
-                  ) : null}
-                </TabsTrigger>
-                <TabsTrigger value='documents'>
-                  Documents
-                  {documentsCount > 0 ? (
-                    <span className='ml-1 rounded-full bg-zinc-200 px-1.5 py-0 text-[10px] font-semibold leading-4 text-zinc-700'>
-                      {documentsCount}
-                    </span>
-                  ) : null}
-                </TabsTrigger>
-              </TabsList>
-              {showOutletSkeleton ? <DealEditOutletSkeleton /> : <Outlet />}
-            </Tabs>
-          </div>
-          <div className='border-t md:border-t-0 md:border-l pt-4 md:pt-0 px-1 sm:px-2 pr-2 md:overflow-auto md:min-h-0'>
-            <DealActivityPanel
-              dealId={dealId}
-              activities={activities}
-              notes={notes}
-              emails={emails}
-              customerEmails={customerEmails}
-              currentUserName={currentUserName}
-            />
-          </div>
+        ) : null}
+      </div>
+      <div className='grid min-h-0 flex-1 grid-cols-1 overflow-auto md:overflow-hidden md:grid-cols-[2fr_2fr]'>
+        <div className='px-1 sm:px-1 md:min-h-0 md:overflow-auto'>
+          <Tabs
+            value={activeDealTab}
+            onValueChange={value =>
+              navigate(`${dealsBase}/edit/${dealId}/${value}${location.search}`)
+            }
+          >
+            <TabsList className='mb-5 grid grid-cols-4'>
+              <TabsTrigger value='project'>Project</TabsTrigger>
+              <TabsTrigger value='information'>General</TabsTrigger>
+              <TabsTrigger value='images'>
+                Images
+                {imagesCount > 0 ? (
+                  <span className='ml-1 rounded-full bg-zinc-200 px-1.5 py-0 text-[10px] font-semibold leading-4 text-zinc-700'>
+                    {imagesCount}
+                  </span>
+                ) : null}
+              </TabsTrigger>
+              <TabsTrigger value='documents'>
+                Documents
+                {documentsCount > 0 ? (
+                  <span className='ml-1 rounded-full bg-zinc-200 px-1.5 py-0 text-[10px] font-semibold leading-4 text-zinc-700'>
+                    {documentsCount}
+                  </span>
+                ) : null}
+              </TabsTrigger>
+            </TabsList>
+            {showOutletSkeleton ? <DealEditOutletSkeleton /> : <Outlet />}
+          </Tabs>
         </div>
+        <div className='border-t px-1 pt-4 sm:px-2 pr-2 md:min-h-0 md:border-l md:border-t-0 md:overflow-auto md:pt-0'>
+          <DealActivityPanel
+            dealId={dealId}
+            activities={activities}
+            notes={notes}
+            emails={emails}
+            customerEmails={customerEmails}
+            currentUserName={currentUserName}
+          />
+        </div>
+      </div>
+    </>
+  )
+
+  if (embedded) {
+    return (
+      <div className='flex h-full min-h-0 flex-col overflow-hidden'>{pageInner}</div>
+    )
+  }
+
+  return (
+    <Dialog open={true} onOpenChange={handleChange}>
+      <DialogContent hideClose className={DEAL_EDIT_DIALOG_CLASS}>
+        {pageInner}
       </DialogContent>
     </Dialog>
   )

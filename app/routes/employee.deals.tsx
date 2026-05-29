@@ -3,7 +3,6 @@ import { useEffect } from 'react'
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
-  Outlet,
   redirect,
   type ShouldRevalidateFunctionArgs,
   useLoaderData,
@@ -20,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { DealsBoardShell } from '~/components/views/DealsBoardShell'
 import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
 import { type DealsDialogSchema, dealsSchema } from '~/schemas/deals'
@@ -286,7 +286,7 @@ export default function EmployeeDeals() {
   )
 
   return (
-    <>
+    <DealsBoardShell dealsBasePath='/employee/deals'>
       <DealsView
         deals={deals}
         customers={customers}
@@ -305,8 +305,6 @@ export default function EmployeeDeals() {
           </div>
         }
       />
-
-      <Outlet />
-    </>
+    </DealsBoardShell>
   )
 }

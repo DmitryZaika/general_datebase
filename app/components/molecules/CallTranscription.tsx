@@ -379,13 +379,26 @@ export function CallTranscriptionMenu({
   showRecording,
   onToggleRecording,
   buttonClassName,
+  includePrimaryActions = false,
 }: {
   showRecording: boolean
   onToggleRecording: () => void
   buttonClassName?: string
+  includePrimaryActions?: boolean
 }) {
-  const { loading, text, visible, handleToggleText, handleTranscribe } =
-    useCallTranscriptionContext()
+  const {
+    loading,
+    text,
+    visible,
+    handleToggleText,
+    handleTranscribe,
+    noteLoading,
+    noteCreated,
+    activityLoading,
+    activityCreated,
+    handleCreateNote,
+    handleCreateActivity,
+  } = useCallTranscriptionContext()
 
   const transcriptLabel = loading
     ? 'Transcribing…'
@@ -394,6 +407,27 @@ export function CallTranscriptionMenu({
         ? 'Hide text'
         : 'Show text'
       : 'Transcribe'
+
+  const primaryActionOptions = includePrimaryActions
+    ? [
+        {
+          label: noteLoading ? 'Adding note…' : noteCreated ? 'Note added' : 'Add note',
+          disabled: noteLoading || noteCreated,
+          className: 'md:hidden',
+          onClick: () => void handleCreateNote(),
+        },
+        {
+          label: activityLoading
+            ? 'Adding activity…'
+            : activityCreated
+              ? 'Activity added'
+              : 'Add Activity',
+          disabled: activityLoading || activityCreated,
+          className: 'md:hidden',
+          onClick: () => void handleCreateActivity(),
+        },
+      ]
+    : []
 
   return (
     <CustomDropdownMenu
@@ -409,6 +443,7 @@ export function CallTranscriptionMenu({
         </Button>
       }
       options={[
+        ...primaryActionOptions,
         {
           label: showRecording ? 'Hide voice call' : 'Voice call',
           onClick: onToggleRecording,
@@ -481,12 +516,15 @@ export function CallTranscription({
       <div className='flex flex-col gap-1'>
         <div className='flex items-center justify-end gap-1'>
           {dealId ? (
-            <CallTranscriptionPrimaryButtons buttonClassName={buttonClassName} />
+            <div className='hidden md:flex'>
+              <CallTranscriptionPrimaryButtons buttonClassName={buttonClassName} />
+            </div>
           ) : null}
           <CallTranscriptionMenu
             showRecording={showRecording}
             onToggleRecording={onToggleRecording}
             buttonClassName={buttonClassName}
+            includePrimaryActions={!!dealId}
           />
         </div>
         <CallTranscriptionError />

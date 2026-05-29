@@ -42,12 +42,7 @@ import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { MultiEmailRecipientInput } from '~/components/molecules/MultiEmailRecipientInput'
 import { QuillInput } from '~/components/molecules/QuillInput'
 import { Button } from '~/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
+import { DialogHeader, DialogTitle } from '~/components/ui/dialog'
 import {
   FormControl,
   FormField,
@@ -836,10 +831,6 @@ export default function DealEmailDialog() {
     mutate(values)
   }
 
-  const handleDialogClose = (open: boolean) => {
-    if (!open) navigate(`/employee/emails${location.search}`)
-  }
-
   const isMobile = useIsMobile()
 
   const handleGenerateWithAI = async () => {
@@ -1030,9 +1021,9 @@ export default function DealEmailDialog() {
     : undefined
 
   return (
-    <Dialog open={true} onOpenChange={handleDialogClose}>
-      <DialogContent
-        className={`sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5 transition-colors ${isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`}
+    <>
+      <div
+        className={`flex min-h-[500px] flex-1 flex-col transition-colors ${isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`}
         onPasteCapture={handlePaste}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -1264,7 +1255,7 @@ export default function DealEmailDialog() {
             setShowDocumentsPicker(false)
           }}
         />
-      </DialogContent>
+      </div>
       <AttachmentImageEditorDialog
         file={editingAttachment}
         previewUrl={editingAttachmentPreviewUrl}
@@ -1276,6 +1267,6 @@ export default function DealEmailDialog() {
           if (editingAttachment) replaceAttachment(editingAttachment, file)
         }}
       />
-    </Dialog>
+    </>
   )
 }

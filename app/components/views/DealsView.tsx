@@ -147,7 +147,8 @@ export default function DealsView({
   const [searchParams] = useSearchParams()
   const isListLoading =
     navigation.state === 'loading' &&
-    navigation.location?.pathname === location.pathname
+    navigation.location?.pathname === location.pathname &&
+    navigation.location.search !== location.search
   const [showBoardEntrance, setShowBoardEntrance] = useState(animateBoard)
 
   useEffect(() => {

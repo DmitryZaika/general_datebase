@@ -2,7 +2,6 @@ import { Mail, Menu, SettingsIcon } from 'lucide-react'
 import { useEffect } from 'react'
 import {
   type LoaderFunctionArgs,
-  Outlet,
   redirect,
   type ShouldRevalidateFunctionArgs,
   useLoaderData,
@@ -21,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { DealsBoardShell } from '~/components/views/DealsBoardShell'
 import DealsView from '~/components/views/DealsView'
 import { db } from '~/db.server'
 import {
@@ -230,7 +230,7 @@ export default function AdminDeals() {
   }))
 
   return (
-    <div className='w-full'>
+    <DealsBoardShell dealsBasePath='/admin/deals'>
       <DealsView
         deals={normalizedDeals}
         customers={customers}
@@ -311,7 +311,6 @@ export default function AdminDeals() {
           </>
         }
       />
-      <Outlet />
-    </div>
+    </DealsBoardShell>
   )
 }

@@ -1,11 +1,6 @@
 import { motion } from 'framer-motion'
-import {
-  type LoaderFunctionArgs,
-  Outlet,
-  redirect,
-  useLoaderData,
-  useLocation,
-} from 'react-router'
+import { type LoaderFunctionArgs, redirect, useLoaderData } from 'react-router'
+import { AdminEmailsShell } from '~/components/views/AdminEmailsShell'
 import DealsEmailsView, { type Email } from '~/components/views/DealsEmailsView'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -200,7 +195,6 @@ const ADMIN_EMAILS_VIEW_ENTER = {
 }
 
 export default function AdminEmails() {
-  const location = useLocation()
   const {
     userEmails,
     userEmail,
@@ -222,14 +216,12 @@ export default function AdminEmails() {
     currentPage: number
     pageSize: number
   }>()
-  const isChatOpen = location.pathname.includes('/chat/')
-
   return (
     <motion.div
       className='w-full h-full p-2 flex flex-col gap-4 relative'
       {...ADMIN_EMAILS_VIEW_ENTER}
     >
-      <div className={`flex-1 min-h-0 ${isChatOpen ? 'pointer-events-none' : ''}`}>
+      <AdminEmailsShell>
         <DealsEmailsView
           emails={userEmails}
           currentUserEmail={userEmail}
@@ -242,14 +234,7 @@ export default function AdminEmails() {
           currentPage={currentPage}
           pageSize={pageSize}
         />
-      </div>
-      {isChatOpen ? (
-        <div className='fixed inset-0 z-50'>
-          <Outlet />
-        </div>
-      ) : (
-        <Outlet />
-      )}
+      </AdminEmailsShell>
     </motion.div>
   )
 }

@@ -1,5 +1,17 @@
 import { motion } from 'framer-motion'
-import { type LoaderFunctionArgs, Outlet, redirect, useLoaderData } from 'react-router'
+import { useEffect, useState } from 'react'
+import {
+  type LoaderFunctionArgs,
+  Outlet,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useNavigation,
+} from 'react-router'
+import { EmailChatSkeletonContent } from '~/components/organisms/EmailChatSkeletonContent'
+import { EmailSendDialogSkeletonContent } from '~/components/organisms/EmailSendDialogSkeletonContent'
+import { Dialog, DialogContent } from '~/components/ui/dialog'
 import DealsEmailsView, { type Email } from '~/components/views/DealsEmailsView'
 import { db } from '~/db.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -176,7 +188,33 @@ const EMPLOYEE_VIEW_ENTER = {
   transition: { duration: 0.38, ease: [0.2, 0.78, 0.22, 1] as const },
 }
 
+function isEmployeeEmailActionPath(pathname: string) {
+  return (
+    pathname.includes('/employee/emails/chat/') ||
+    pathname.endsWith('/employee/emails/sendEmail')
+  )
+}
+
+function isSendEmailAction(pathname: string) {
+  return pathname.endsWith('/employee/emails/sendEmail')
+}
+
+function getEmailDialogClassName(pathname: string) {
+  if (isSendEmailAction(pathname)) {
+    return 'sm:max-w-[700px] overflow-auto flex flex-col min-h-[500px] max-h-[95vh] p-5'
+  }
+  return 'max-w-[100%] sm:max-w-[90%] sm:max-w-[900px] h-[95%] p-0 flex flex-col overflow-hidden'
+}
+
+export type EmployeeEmailsOutletContext = {
+  dismissEmailAction: () => void
+}
+
 export default function EmployeeEmails() {
+  const location = useLocation()
+  const navigation = useNavigation()
+  const navigate = useNavigate()
+  const [emailActionDismissed, setEmailActionDismissed] = useState(false)
   const {
     userEmails,
     userEmail,
@@ -199,20 +237,88 @@ export default function EmployeeEmails() {
     pageSize: number
   }>()
 
+  const navPath = navigation.location?.pathname ?? ''
+  const isOnEmailAction = isEmployeeEmailActionPath(location.pathname)
+  const isNavigatingToEmailAction =
+    navigation.state === 'loading' &&
+    navPath !== location.pathname &&
+    isEmployeeEmailActionPath(navPath)
+  const isEmailActionLoading = isNavigatingToEmailAction
+  const showEmailDialog =
+    !emailActionDismissed && (isOnEmailAction || isNavigatingToEmailAction)
+  const emailActionPath = isOnEmailAction ? location.pathname : navPath
+  const isSendEmail = isSendEmailAction(location.pathname) || isSendEmailAction(navPath)
+
+  useEffect(() => {
+    if (navigation.state === 'idle' && !isEmployeeEmailActionPath(location.pathname)) {
+      setEmailActionDismissed(false)
+    }
+  }, [navigation.state, location.pathname])
+
+  useEffect(() => {
+    if (
+      emailActionDismissed &&
+      navigation.state === 'idle' &&
+      isEmployeeEmailActionPath(location.pathname)
+    ) {
+      navigate(
+        { pathname: '/employee/emails', search: location.search },
+        { replace: true },
+      )
+    }
+  }, [
+    emailActionDismissed,
+    navigation.state,
+    location.pathname,
+    location.search,
+    navigate,
+  ])
+
+  const dismissEmailAction = () => {
+    setEmailActionDismissed(true)
+  }
+
+  const handleEmailDialogClose = (open: boolean) => {
+    if (!open) {
+      dismissEmailAction()
+      navigate({ pathname: '/employee/emails', search: location.search })
+    }
+  }
+
   return (
-    <motion.div className='w-full h-full p-2' {...EMPLOYEE_VIEW_ENTER}>
-      <DealsEmailsView
-        emails={userEmails}
-        currentUserEmail={userEmail}
-        currentUserId={userId}
-        initialFolder={folder}
-        inboxUnreadCount={inboxUnreadCount}
-        trashCount={trashCount}
-        totalCount={totalCount}
-        currentPage={currentPage}
-        pageSize={pageSize}
-      />
-      <Outlet />
+    <motion.div className='relative w-full h-full p-2' {...EMPLOYEE_VIEW_ENTER}>
+      <div className={showEmailDialog ? 'pointer-events-none' : undefined}>
+        <DealsEmailsView
+          emails={userEmails}
+          currentUserEmail={userEmail}
+          currentUserId={userId}
+          initialFolder={folder}
+          inboxUnreadCount={inboxUnreadCount}
+          trashCount={trashCount}
+          totalCount={totalCount}
+          currentPage={currentPage}
+          pageSize={pageSize}
+        />
+      </div>
+      {showEmailDialog ? (
+        <div className='fixed inset-0 z-50'>
+          <Dialog open={true} onOpenChange={handleEmailDialogClose}>
+            <DialogContent className={getEmailDialogClassName(emailActionPath)}>
+              {isEmailActionLoading ? (
+                isSendEmail ? (
+                  <EmailSendDialogSkeletonContent />
+                ) : (
+                  <EmailChatSkeletonContent />
+                )
+              ) : (
+                <Outlet
+                  context={{ dismissEmailAction } satisfies EmployeeEmailsOutletContext}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
+        </div>
+      ) : null}
     </motion.div>
   )
 }

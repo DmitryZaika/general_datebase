@@ -5,9 +5,11 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useOutletContext,
 } from 'react-router'
 import { EmailChat } from '~/components/EmailChat'
 import { db } from '~/db.server'
+import type { EmployeeEmailsOutletContext } from '~/routes/employee.emails'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
 import { presignIfS3Uri } from '~/utils/s3Presign.server'
@@ -216,13 +218,18 @@ export default function EmployeeEmailsChatRoute() {
   const navigate = useNavigate()
   const location = useLocation()
   const data = useLoaderData<typeof loader>()
+  const { dismissEmailAction } = useOutletContext<EmployeeEmailsOutletContext>()
 
   return (
     <EmailChat
       variant='employee'
       customerName={data.customerName}
       messages={data.messages}
-      onClose={() => navigate(`/employee/emails${location.search}`)}
+      onClose={() => {
+        dismissEmailAction()
+        navigate(`/employee/emails${location.search}`)
+      }}
+      embedded
       dealId={data.dealId}
       subject={data.subject}
       threadId={data.threadId}

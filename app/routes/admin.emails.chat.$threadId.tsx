@@ -5,8 +5,10 @@ import {
   useLoaderData,
   useLocation,
   useNavigate,
+  useOutletContext,
 } from 'react-router'
 import { EmailChat } from '~/components/EmailChat'
+import type { AdminEmailsOutletContext } from '~/components/views/AdminEmailsShell'
 import { db } from '~/db.server'
 import { posthogClient } from '~/utils/posthog.server'
 import { selectMany } from '~/utils/queryHelpers'
@@ -204,13 +206,18 @@ export default function AdminEmailsChatRoute() {
   const navigate = useNavigate()
   const location = useLocation()
   const data = useLoaderData<typeof loader>()
+  const { dismissEmailAction } = useOutletContext<AdminEmailsOutletContext>()
 
   return (
     <EmailChat
       variant='admin'
       customerName={data.customerName}
       messages={data.messages}
-      onClose={() => navigate(`/admin/emails${location.search}`)}
+      onClose={() => {
+        dismissEmailAction()
+        navigate(`/admin/emails${location.search}`)
+      }}
+      embedded
       dealNav={{
         companyId: data.companyId,
         customerEmail: data.customerEmail,

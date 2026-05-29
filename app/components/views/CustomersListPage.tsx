@@ -17,6 +17,7 @@ import { FindCustomer } from '~/components/molecules/FindCustomer'
 import { LoadingButton } from '~/components/molecules/LoadingButton'
 import { SelectInput } from '~/components/molecules/SelectItem'
 import { CustomerActionDialogSkeletonContent } from '~/components/organisms/CustomerActionDialogSkeleton'
+import { CustomerCompactActionDialogSkeletonContent } from '~/components/organisms/CustomerCompactActionDialogSkeleton'
 import { CustomersTableSkeleton } from '~/components/organisms/CustomersTableSkeleton'
 import { PageLayout } from '~/components/PageLayout'
 import { Button } from '~/components/ui/button'
@@ -225,7 +226,15 @@ function isCustomerActionPath(pathname: string) {
   return (
     pathname.includes('/customers/info/') ||
     pathname.includes('/customers/edit/') ||
+    pathname.includes('/customers/invalid/') ||
+    pathname.includes('/customers/delete/') ||
     pathname.includes('/customers/add')
+  )
+}
+
+function isCompactCustomerAction(pathname: string) {
+  return (
+    pathname.includes('/customers/invalid/') || pathname.includes('/customers/delete/')
   )
 }
 
@@ -267,6 +276,12 @@ export function CustomersListPage() {
     !isSameCustomerActionNavigation(location.pathname, navPath)
   const showCustomerDialog =
     !customerActionDismissed && (isOnCustomerAction || isNavigatingToCustomerAction)
+  const compactCustomerAction = isCompactCustomerAction(location.pathname)
+  const compactCustomerActionNav = isCompactCustomerAction(navPath)
+  const showCompactActionSkeleton =
+    isCustomerActionLoading && (compactCustomerAction || compactCustomerActionNav)
+  const showCustomerActionSkeleton =
+    isCustomerActionLoading && !compactCustomerAction && !compactCustomerActionNav
 
   useEffect(() => {
     if (navigation.state === 'idle' && !isCustomerActionPath(location.pathname)) {
@@ -592,9 +607,17 @@ export function CustomersListPage() {
       />
       {showCustomerDialog ? (
         <Dialog open={true} onOpenChange={handleCustomerDialogClose}>
-          <DialogContent className='sm:max-w-[560px] overflow-auto flex flex-col justify-baseline min-h-[95vh] max-h-[95vh] p-5'>
-            {isCustomerActionLoading ? (
+          <DialogContent
+            className={
+              compactCustomerAction || compactCustomerActionNav
+                ? 'sm:max-w-[425px] overflow-auto p-5'
+                : 'sm:max-w-[560px] overflow-auto flex flex-col justify-baseline min-h-[95vh] max-h-[95vh] p-5'
+            }
+          >
+            {showCustomerActionSkeleton ? (
               <CustomerActionDialogSkeletonContent />
+            ) : showCompactActionSkeleton ? (
+              <CustomerCompactActionDialogSkeletonContent />
             ) : (
               <Outlet />
             )}

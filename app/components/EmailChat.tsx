@@ -141,6 +141,7 @@ interface EmailChatBaseProps {
   onClose: () => void
   scrollToMessageId?: number | null
   dealNav?: EmailChatDealNav
+  embedded?: boolean
 }
 
 interface EmailChatEmployeeProps extends EmailChatBaseProps {
@@ -636,7 +637,15 @@ function DealChoiceList({
 }
 
 export function EmailChat(props: EmailChatProps) {
-  const { variant, customerName, messages, onClose, scrollToMessageId, dealNav } = props
+  const {
+    variant,
+    customerName,
+    messages,
+    onClose,
+    scrollToMessageId,
+    dealNav,
+    embedded = false,
+  } = props
   const navigate = useNavigate()
   const navigation = useNavigation()
 
@@ -1263,7 +1272,23 @@ export function EmailChat(props: EmailChatProps) {
     }
   }
 
-  const dialogContentClass = `max-w-[100%] sm:max-w-[90%] sm:max-w-[900px] h-[95%] p-0 flex flex-col transition-colors ${isEmployee && isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`
+  const dialogContentClass = embedded
+    ? `flex h-full min-h-0 w-full flex-col p-0 transition-colors ${isEmployee && isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`
+    : `max-w-[100%] sm:max-w-[90%] sm:max-w-[900px] h-[95%] p-0 flex flex-col transition-colors ${isEmployee && isDragging ? 'bg-blue-50 ring-2 ring-blue-300 ring-dashed' : ''}`
+
+  const panelSurfaceProps = {
+    className: dialogContentClass,
+    onDragOver: handleDragOver,
+    onDragLeave: handleDragLeave,
+    onDrop: isEmployee ? handleDrop : undefined,
+    onOpenAutoFocus: isEmployee
+      ? (e: Event) => {
+          if (targetMessageId !== null) return
+          e.preventDefault()
+          focusComposer()
+        }
+      : undefined,
+  }
 
   const rowClass =
     variant === 'admin'
@@ -1279,385 +1304,526 @@ export function EmailChat(props: EmailChatProps) {
     ? attachmentPreviews[getAttachmentPreviewKey(editingAttachment)]
     : undefined
 
-  return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent
-        className={dialogContentClass}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={isEmployee ? handleDrop : undefined}
-        onOpenAutoFocus={
-          isEmployee
-            ? e => {
-                if (targetMessageId !== null) return
-                e.preventDefault()
-                focusComposer()
-              }
-            : undefined
-        }
-      >
-        <DialogHeader className='border-b p-2'>
-          <div className='flex w-full items-start gap-3'>
-            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-500 font-bold text-white'>
-              {getInitials(customerName)}
-            </div>
-            <div className='min-w-0 flex-1'>
-              <div className='flex flex-wrap items-center gap-2'>
-                <DialogTitle className='text-lg font-semibold'>
-                  {customerName.trim() ? (
-                    <CopyText
-                      value={customerName.trim()}
-                      display={customerName.trim()}
-                      className='text-lg font-semibold'
-                    />
-                  ) : (
-                    customerName
-                  )}
-                </DialogTitle>
-                {dealNav ? (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <LoadingButton
-                          type='button'
-                          size='sm'
-                          className='shrink-0 gap-1.5'
-                          loading={dealNavButtonLoading}
-                          onClick={() => void handleDealNavClick()}
-                        >
-                          <ExternalLink className='h-4 w-4' />
-                          <span className='hidden sm:inline'>Go to Deal</span>
-                        </LoadingButton>
-                      </TooltipTrigger>
-                      <TooltipContent>Open customer deal</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ) : null}
-              </div>
-              {headerCustomerEmail ? (
-                <div className='flex min-w-0 flex-wrap items-center gap-2'>
+  const panelInner = (
+    <>
+      <DialogHeader className='border-b p-2'>
+        <div className='flex w-full items-start gap-3'>
+          <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-500 font-bold text-white'>
+            {getInitials(customerName)}
+          </div>
+          <div className='min-w-0 flex-1'>
+            <div className='flex flex-wrap items-center gap-2'>
+              <DialogTitle className='text-lg font-semibold'>
+                {customerName.trim() ? (
                   <CopyText
-                    value={headerCustomerEmail}
-                    className='text-sm font-medium text-gray-600 break-words text-left'
+                    value={customerName.trim()}
+                    display={customerName.trim()}
+                    className='text-lg font-semibold'
                   />
-                </div>
+                ) : (
+                  customerName
+                )}
+              </DialogTitle>
+              {dealNav ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <LoadingButton
+                        type='button'
+                        size='sm'
+                        className='shrink-0 gap-1.5'
+                        loading={dealNavButtonLoading}
+                        onClick={() => void handleDealNavClick()}
+                      >
+                        <ExternalLink className='h-4 w-4' />
+                        <span className='hidden sm:inline'>Go to Deal</span>
+                      </LoadingButton>
+                    </TooltipTrigger>
+                    <TooltipContent>Open customer deal</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               ) : null}
             </div>
+            {headerCustomerEmail ? (
+              <div className='flex min-w-0 flex-wrap items-center gap-2'>
+                <CopyText
+                  value={headerCustomerEmail}
+                  className='text-sm font-medium text-gray-600 break-words text-left'
+                />
+              </div>
+            ) : null}
           </div>
-        </DialogHeader>
+        </div>
+      </DialogHeader>
 
-        <div ref={scrollContainerRef} className='flex-1 overflow-y-auto'>
-          {chatMessages.map((message, index) => (
-            <div key={message.id}>
-              {showDate(message, index) && (
-                <div className={dateClass}>
-                  {format(new Date(message.sent_at), 'MMM d, yyyy')}
-                </div>
-              )}
+      <div ref={scrollContainerRef} className='flex-1 overflow-y-auto'>
+        {chatMessages.map((message, index) => (
+          <div key={message.id}>
+            {showDate(message, index) && (
+              <div className={dateClass}>
+                {format(new Date(message.sent_at), 'MMM d, yyyy')}
+              </div>
+            )}
+            <div
+              className={`${rowClass} ${message.isFromCustomer ? 'flex-row-reverse justify-end pl-2' : 'flex-row-reverse justify-start pr-2'}`}
+            >
               <div
-                className={`${rowClass} ${message.isFromCustomer ? 'flex-row-reverse justify-end pl-2' : 'flex-row-reverse justify-start pr-2'}`}
+                ref={node => {
+                  if (node) {
+                    messageRefs.current.set(message.id, node)
+                  } else {
+                    messageRefs.current.delete(message.id)
+                  }
+                }}
+                className={cn(
+                  message.isFromCustomer
+                    ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%] break-words'
+                    : 'bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative pb-6 min-w-21.25 break-words',
+                  'transition-all duration-300 ease-out will-change-transform',
+                  highlightedMessageId === message.id &&
+                    'ring-1 ring-white/40 shadow-[0_22px_60px_-18px_rgba(15,23,42,0.55),0_8px_24px_-12px_rgba(15,23,42,0.4)] scale-[1.020] z-10',
+                )}
               >
                 <div
-                  ref={node => {
-                    if (node) {
-                      messageRefs.current.set(message.id, node)
-                    } else {
-                      messageRefs.current.delete(message.id)
-                    }
-                  }}
                   className={cn(
+                    'email-message-body break-words text-base leading-[1.45] [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_p]:my-0 [&_strong]:font-semibold [&_ul]:space-y-0.5 [&_ol]:space-y-0.5',
                     message.isFromCustomer
-                      ? 'bg-gray-200 text-black rounded-2xl px-2 py-2 max-w-[75%] break-words'
-                      : 'bg-blue-500 text-white rounded-2xl px-2 py-2 max-w-[75%] relative pb-6 min-w-21.25 break-words',
-                    'transition-all duration-300 ease-out will-change-transform',
-                    highlightedMessageId === message.id &&
-                      'ring-1 ring-white/40 shadow-[0_22px_60px_-18px_rgba(15,23,42,0.55),0_8px_24px_-12px_rgba(15,23,42,0.4)] scale-[1.020] z-10',
+                      ? '[&_a]:text-blue-700 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5'
+                      : 'text-white [&_*]:!text-white [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5',
                   )}
-                >
-                  <div
-                    className={cn(
-                      'email-message-body break-words text-base leading-[1.45] [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_p]:my-0 [&_strong]:font-semibold [&_ul]:space-y-0.5 [&_ol]:space-y-0.5',
-                      message.isFromCustomer
-                        ? '[&_a]:text-blue-700 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5'
-                        : 'text-white [&_*]:!text-white [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5',
-                    )}
-                    // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
-                    dangerouslySetInnerHTML={{
-                      __html: formatEmailBody(
-                        message.body,
-                        message.isFromCustomer ? null : message.signature,
-                      ),
-                    }}
-                  />
-                  {message.isFromCustomer ? null : (
-                    <div className='absolute bottom-1 right-2 flex items-center gap-2'>
-                      {message.signature && message.signature.trim() !== '' ? (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
-                                <Pencil size={16} className='w-2 h-2 opacity-70' />
-                                Signature
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent
-                              side='top'
-                              className='max-w-90 whitespace-pre-wrap select-none bg-zinc-900 text-zinc-100 border-zinc-800 shadow-xl'
-                            >
-                              {message.signature}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      ) : null}
-                    </div>
-                  )}
-                  <MessageDate
-                    message={message}
-                    className={`text-black absolute -bottom-3.5 ${message.isFromCustomer ? 'left-2' : 'right-2'}`}
-                  />
-                  {message.attachments && message.attachments.length > 0 ? (
-                    <div className='mt-3 flex flex-wrap gap-3'>
-                      {message.attachments.map(attachment => {
-                        const mime = `${attachment.content_type}/${attachment.content_subtype}`
-                        const label = attachment.filename || mime
-                        const contentType = attachment.content_type.toLowerCase()
-                        const isImage =
-                          contentType === 'image' || contentType.startsWith('image/')
-                        const isPdf =
-                          (contentType === 'application' &&
-                            attachment.content_subtype.toLowerCase() === 'pdf') ||
-                          mime.toLowerCase().includes('pdf')
-                        const href = attachment.signed_url || attachment.url
-                        const linkClass = message.isFromCustomer
-                          ? 'text-blue-700 underline'
-                          : 'text-white underline'
-                        const canAddToDeal =
-                          isEmployee && !!employeeProps && !!href && attachment.id > 0
-
-                        return (
-                          <div
-                            key={attachment.id}
-                            className='group relative space-y-2 max-w-[140px]'
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: Its safe
+                  dangerouslySetInnerHTML={{
+                    __html: formatEmailBody(
+                      message.body,
+                      message.isFromCustomer ? null : message.signature,
+                    ),
+                  }}
+                />
+                {message.isFromCustomer ? null : (
+                  <div className='absolute bottom-1 right-2 flex items-center gap-2'>
+                    {message.signature && message.signature.trim() !== '' ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className='flex items-center gap-1 text-[9px] font-medium tracking-tight bg-white/15 text-white/80 border border-white/10 rounded-full px-2 py-0.5 select-none cursor-help hover:bg-white/25 hover:text-white transition-all duration-200'>
+                              <Pencil size={16} className='w-2 h-2 opacity-70' />
+                              Signature
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side='top'
+                            className='max-w-90 whitespace-pre-wrap select-none bg-zinc-900 text-zinc-100 border-zinc-800 shadow-xl'
                           >
-                            {canAddToDeal ? (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger
-                                    type='button'
-                                    className='absolute top-1 right-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-1 ring-black/10 opacity-100 transition-opacity hover:bg-emerald-50 hover:text-emerald-700 md:opacity-0 md:group-hover:opacity-100'
-                                    onClick={e => {
-                                      e.preventDefault()
-                                      e.stopPropagation()
-                                      handleAddAttachmentToDeal(attachment)
-                                    }}
-                                    disabled={isAddingAttachmentToDeal}
-                                    aria-label='Add the file to the deal'
-                                  >
-                                    <Plus className='h-3.5 w-3.5' />
-                                  </TooltipTrigger>
-                                  <TooltipContent side='top'>
-                                    Add the file to the deal
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : null}
-                            {isPdf && href ? (
-                              <a
-                                href={href}
-                                target='_blank'
-                                rel='noreferrer'
-                                className='block'
-                              >
-                                <div
-                                  className={`${fileSize} bg-zinc-600 rounded-md border border-zinc-800 flex flex-col items-center justify-center text-zinc-900 hover:bg-zinc-800 transition-colors p-2 shadow-md`}
+                            {message.signature}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : null}
+                  </div>
+                )}
+                <MessageDate
+                  message={message}
+                  className={`text-black absolute -bottom-3.5 ${message.isFromCustomer ? 'left-2' : 'right-2'}`}
+                />
+                {message.attachments && message.attachments.length > 0 ? (
+                  <div className='mt-3 flex flex-wrap gap-3'>
+                    {message.attachments.map(attachment => {
+                      const mime = `${attachment.content_type}/${attachment.content_subtype}`
+                      const label = attachment.filename || mime
+                      const contentType = attachment.content_type.toLowerCase()
+                      const isImage =
+                        contentType === 'image' || contentType.startsWith('image/')
+                      const isPdf =
+                        (contentType === 'application' &&
+                          attachment.content_subtype.toLowerCase() === 'pdf') ||
+                        mime.toLowerCase().includes('pdf')
+                      const href = attachment.signed_url || attachment.url
+                      const linkClass = message.isFromCustomer
+                        ? 'text-blue-700 underline'
+                        : 'text-white underline'
+                      const canAddToDeal =
+                        isEmployee && !!employeeProps && !!href && attachment.id > 0
+
+                      return (
+                        <div
+                          key={attachment.id}
+                          className='group relative space-y-2 max-w-[140px]'
+                        >
+                          {canAddToDeal ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger
+                                  type='button'
+                                  className='absolute top-1 right-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-1 ring-black/10 opacity-100 transition-opacity hover:bg-emerald-50 hover:text-emerald-700 md:opacity-0 md:group-hover:opacity-100'
+                                  onClick={e => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleAddAttachmentToDeal(attachment)
+                                  }}
+                                  disabled={isAddingAttachmentToDeal}
+                                  aria-label='Add the file to the deal'
                                 >
-                                  <FileText className='h-10 w-10 mb-2 text-blue-600' />
-                                  <span className='text-[10px] font-semibold text-center break-all line-clamp-2 leading-tight'>
-                                    {label}
-                                  </span>
-                                </div>
-                              </a>
-                            ) : !isImage && href ? (
-                              <a
-                                href={href}
-                                target='_blank'
-                                rel='noreferrer'
-                                className={linkClass}
+                                  <Plus className='h-3.5 w-3.5' />
+                                </TooltipTrigger>
+                                <TooltipContent side='top'>
+                                  Add the file to the deal
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : null}
+                          {isPdf && href ? (
+                            <a
+                              href={href}
+                              target='_blank'
+                              rel='noreferrer'
+                              className='block'
+                            >
+                              <div
+                                className={`${fileSize} bg-zinc-600 rounded-md border border-zinc-800 flex flex-col items-center justify-center text-zinc-900 hover:bg-zinc-800 transition-colors p-2 shadow-md`}
                               >
-                                <span className='inline-flex items-center gap-1'>
-                                  <FileText className='h-4 w-4' />
-                                  <span>{label}</span>
+                                <FileText className='h-10 w-10 mb-2 text-blue-600' />
+                                <span className='text-[10px] font-semibold text-center break-all line-clamp-2 leading-tight'>
+                                  {label}
                                 </span>
-                              </a>
-                            ) : null}
-                            {isImage && href ? (
-                              <button
-                                type='button'
-                                className='block cursor-pointer'
-                                onClick={() => {
-                                  const imgs =
-                                    message.attachments
-                                      ?.filter(
-                                        a =>
-                                          a.content_type.toLowerCase() === 'image' &&
-                                          (a.signed_url || a.url),
-                                      )
-                                      .map(img => ({
-                                        id: img.id,
-                                        url: img.signed_url || img.url,
-                                        name:
-                                          img.filename ||
-                                          `${img.content_type}/${img.content_subtype}`,
-                                        type: 'email',
-                                        available: null,
-                                      })) || []
-                                  setCurrentImages(imgs)
-                                  setCurrentImageId(attachment.id)
-                                }}
-                              >
-                                <img
-                                  src={href}
-                                  alt={label}
-                                  className={`${fileSize} object-cover rounded-md border border-black/10`}
-                                />
-                              </button>
-                            ) : null}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : null}
-                </div>
-                <div className='flex items-center gap-2'>
-                  {!message.isFromCustomer && message.id === lastReadMessageId && (
-                    <p className='text-xs text-gray-500'>Read</p>
-                  )}
-                </div>
+                              </div>
+                            </a>
+                          ) : !isImage && href ? (
+                            <a
+                              href={href}
+                              target='_blank'
+                              rel='noreferrer'
+                              className={linkClass}
+                            >
+                              <span className='inline-flex items-center gap-1'>
+                                <FileText className='h-4 w-4' />
+                                <span>{label}</span>
+                              </span>
+                            </a>
+                          ) : null}
+                          {isImage && href ? (
+                            <button
+                              type='button'
+                              className='block cursor-pointer'
+                              onClick={() => {
+                                const imgs =
+                                  message.attachments
+                                    ?.filter(
+                                      a =>
+                                        a.content_type.toLowerCase() === 'image' &&
+                                        (a.signed_url || a.url),
+                                    )
+                                    .map(img => ({
+                                      id: img.id,
+                                      url: img.signed_url || img.url,
+                                      name:
+                                        img.filename ||
+                                        `${img.content_type}/${img.content_subtype}`,
+                                      type: 'email',
+                                      available: null,
+                                    })) || []
+                                setCurrentImages(imgs)
+                                setCurrentImageId(attachment.id)
+                              }}
+                            >
+                              <img
+                                src={href}
+                                alt={label}
+                                className={`${fileSize} object-cover rounded-md border border-black/10`}
+                              />
+                            </button>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : null}
+              </div>
+              <div className='flex items-center gap-2'>
+                {!message.isFromCustomer && message.id === lastReadMessageId && (
+                  <p className='text-xs text-gray-500'>Read</p>
+                )}
               </div>
             </div>
-          ))}
-          <div ref={bottomRef} />
-        </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
 
-        <div className='p-2 border-t'>
-          {isEmployee && attachments.length > 0 && (
-            <div className='mb-2 flex flex-wrap gap-2'>
-              {attachments.map(file => {
-                const previewKey = getAttachmentPreviewKey(file)
-                const previewUrl = attachmentPreviews[previewKey]
-                const isImageFile = file.type.toLowerCase().startsWith('image/')
-                return (
-                  <div
-                    key={previewKey}
-                    className={`group relative size-15 shrink-0 rounded border border-border overflow-hidden ${!isImageFile ? 'cursor-pointer' : ''}`}
-                    onClick={
-                      isImageFile
-                        ? undefined
-                        : () => {
-                            openAttachment(file)
-                          }
-                    }
+      <div className='p-2 border-t'>
+        {isEmployee && attachments.length > 0 && (
+          <div className='mb-2 flex flex-wrap gap-2'>
+            {attachments.map(file => {
+              const previewKey = getAttachmentPreviewKey(file)
+              const previewUrl = attachmentPreviews[previewKey]
+              const isImageFile = file.type.toLowerCase().startsWith('image/')
+              return (
+                <div
+                  key={previewKey}
+                  className={`group relative size-15 shrink-0 rounded border border-border overflow-hidden ${!isImageFile ? 'cursor-pointer' : ''}`}
+                  onClick={
+                    isImageFile
+                      ? undefined
+                      : () => {
+                          openAttachment(file)
+                        }
+                  }
+                >
+                  <button
+                    type='button'
+                    className='absolute top-0 right-0 z-10 p-0.5 rounded-bl bg-black/60 text-white transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-black/80'
+                    onClick={e => {
+                      e.stopPropagation()
+                      removeAttachment(file)
+                    }}
+                    aria-label='Remove attachment'
                   >
+                    <X className='h-3 w-3' />
+                  </button>
+                  {isImageFile && previewUrl ? (
                     <button
                       type='button'
-                      className='absolute top-0 right-0 z-10 p-0.5 rounded-bl bg-black/60 text-white transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-black/80'
+                      className='size-full cursor-pointer block focus:outline-none'
                       onClick={e => {
                         e.stopPropagation()
-                        removeAttachment(file)
+                        setEditingAttachment(file)
                       }}
-                      aria-label='Remove attachment'
                     >
-                      <X className='h-3 w-3' />
+                      <img
+                        src={previewUrl}
+                        alt={file.name}
+                        className='size-full object-cover transition-all group-hover:grayscale group-hover:brightness-75'
+                      />
                     </button>
-                    {isImageFile && previewUrl ? (
-                      <button
-                        type='button'
-                        className='size-full cursor-pointer block focus:outline-none'
-                        onClick={e => {
-                          e.stopPropagation()
-                          setEditingAttachment(file)
-                        }}
-                      >
-                        <img
-                          src={previewUrl}
-                          alt={file.name}
-                          className='size-full object-cover transition-all group-hover:grayscale group-hover:brightness-75'
-                        />
-                      </button>
-                    ) : (
-                      <div className='size-full flex items-center justify-center bg-muted text-muted-foreground group-hover:bg-muted/80 transition-colors cursor-pointer'>
-                        {attachmentIcon(file.name)}
-                      </div>
-                    )}
-                    <div className='absolute inset-0 pointer-events-none bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
-                      <span className='text-white text-[10px] text-center line-clamp-2 break-all select-none px-1'>
-                        {formatFileName(file.name)}
-                      </span>
+                  ) : (
+                    <div className='size-full flex items-center justify-center bg-muted text-muted-foreground group-hover:bg-muted/80 transition-colors cursor-pointer'>
+                      {attachmentIcon(file.name)}
                     </div>
+                  )}
+                  <div className='absolute inset-0 pointer-events-none bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
+                    <span className='text-white text-[10px] text-center line-clamp-2 break-all select-none px-1'>
+                      {formatFileName(file.name)}
+                    </span>
                   </div>
-                )
-              })}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {isEmployee && unfilled.length > 0 && (
+          <div className='mb-2 p-2.5 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md'>
+            <p>
+              <strong>Action required:</strong> Please replace the following
+              placeholders with actual values before sending:
+            </p>
+            <ul className='mt-1 list-disc list-inside'>
+              {unfilled.map(variable => (
+                <li key={variable}>
+                  <code className='bg-amber-100 px-1 rounded'>{`{{${variable}}}`}</code>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {isEmployee && employeeProps ? (
+          <div className='flex flex-col md:flex-row flex-1 gap-2'>
+            <div className='hidden md:flex items-end gap-2'>
+              {showSelect ? (
+                <div className='flex gap-2 items-end'>
+                  <Select
+                    open={selectActive}
+                    onOpenChange={setSelectActive}
+                    value={selectedTemplate}
+                    onValueChange={value => handleTemplateSelect(value)}
+                  >
+                    <SelectTrigger className='w-37.5'>
+                      <SelectValue placeholder='Select template' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='follow-up'>Follow-up</SelectItem>
+                      <SelectItem value='reply'>Reply</SelectItem>
+                      <SelectItem value='thank-you'>Thank You</SelectItem>
+                      <SelectItem value='feedback-request'>Feedback Request</SelectItem>
+                      <SelectItem value='referral'>Referral</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <LoadingButton
+                    loading={isGenerating}
+                    type='button'
+                    onClick={() => handleGenerate()}
+                  >
+                    Generate
+                  </LoadingButton>
+                </div>
+              ) : (
+                <Button
+                  type='button'
+                  onClick={() => {
+                    setShowSelect(true)
+                    setSelectActive(true)
+                  }}
+                >
+                  Generate with AI
+                </Button>
+              )}
+              <AiImproveButton
+                getText={() => messageText}
+                setText={value => setMessageText(value)}
+                buttonSize='icon'
+                iconClassName='text-lg'
+              />
             </div>
-          )}
-          {isEmployee && unfilled.length > 0 && (
-            <div className='mb-2 p-2.5 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md'>
-              <p>
-                <strong>Action required:</strong> Please replace the following
-                placeholders with actual values before sending:
-              </p>
-              <ul className='mt-1 list-disc list-inside'>
-                {unfilled.map(variable => (
-                  <li key={variable}>
-                    <code className='bg-amber-100 px-1 rounded'>{`{{${variable}}}`}</code>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {isEmployee && employeeProps ? (
-            <div className='flex flex-col md:flex-row flex-1 gap-2'>
-              <div className='hidden md:flex items-end gap-2'>
-                {showSelect ? (
-                  <div className='flex gap-2 items-end'>
-                    <Select
-                      open={selectActive}
-                      onOpenChange={setSelectActive}
-                      value={selectedTemplate}
-                      onValueChange={value => handleTemplateSelect(value)}
-                    >
-                      <SelectTrigger className='w-37.5'>
-                        <SelectValue placeholder='Select template' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='follow-up'>Follow-up</SelectItem>
-                        <SelectItem value='reply'>Reply</SelectItem>
-                        <SelectItem value='thank-you'>Thank You</SelectItem>
-                        <SelectItem value='feedback-request'>
-                          Feedback Request
-                        </SelectItem>
-                        <SelectItem value='referral'>Referral</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <LoadingButton
-                      loading={isGenerating}
-                      type='button'
-                      onClick={() => handleGenerate()}
-                    >
-                      Generate
-                    </LoadingButton>
-                  </div>
+
+            <div className='flex items-end flex-1 gap-1 max-h-30 relative'>
+              <div className='md:hidden flex items-center self-center'>
+                <CustomDropdownMenu
+                  align='start'
+                  trigger={
+                    <Button variant='ghost' size='icon' className='h-9 w-9'>
+                      <MoreVertical className='h-5 w-5' />
+                    </Button>
+                  }
+                  sections={[
+                    {
+                      title: 'Actions',
+                      options: [
+                        {
+                          label: 'Upload from computer',
+                          icon: <Upload className='w-4 h-4' />,
+                          onClick: () => fileInputRef.current?.click(),
+                        },
+                        ...(employeeProps.companyId > 0
+                          ? [
+                              {
+                                label: 'From Stones',
+                                icon: <Package className='w-4 h-4' />,
+                                onClick: () => setShowStonesPicker(true),
+                              },
+                              {
+                                label: 'From Images',
+                                icon: <ImageIcon className='w-4 h-4' />,
+                                onClick: () => setShowImagesPicker(true),
+                              },
+                              {
+                                label: 'From Documents',
+                                icon: <FileText className='w-4 h-4' />,
+                                onClick: () => setShowDocumentsPicker(true),
+                              },
+                            ]
+                          : []),
+                        {
+                          label: 'Use Template',
+                          icon: <FileText className='w-4 h-4' />,
+                          onClick: () => setShowMobileTemplatePicker(true),
+                        },
+                        {
+                          label: 'Generate with AI',
+                          icon: <Sparkles className='w-4 h-4' />,
+                          onClick: () => {
+                            setShowSelect(true)
+                            setSelectActive(true)
+                          },
+                        },
+                        {
+                          label: 'Improve message',
+                          icon: <Pencil className='w-4 h-4' />,
+                          onClick: () => {
+                            const improveBtn = document.getElementById(
+                              'mobile-improve-trigger',
+                            )
+                            if (improveBtn) improveBtn.click()
+                          },
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              </div>
+
+              <div className='hidden md:flex items-end gap-1'>
+                {employeeProps.companyId > 0 ? (
+                  <CustomDropdownMenu
+                    side='top'
+                    trigger={
+                      <Button type='button' size='icon' aria-label='Attachment'>
+                        <PaperclipIcon className='h-5 w-5' />
+                      </Button>
+                    }
+                    sections={[
+                      {
+                        options: [
+                          {
+                            label: 'Upload from computer',
+                            icon: <Upload className='h-4 w-4' />,
+                            onClick: () => fileInputRef.current?.click(),
+                          },
+                          {
+                            label: 'From Stones',
+                            icon: <Package className='h-4 w-4' />,
+                            onClick: () => setShowStonesPicker(true),
+                          },
+                          {
+                            label: 'From Images',
+                            icon: <ImageIcon className='h-4 w-4' />,
+                            onClick: () => setShowImagesPicker(true),
+                          },
+                          {
+                            label: 'From Documents',
+                            icon: <FileText className='h-4 w-4' />,
+                            onClick: () => setShowDocumentsPicker(true),
+                          },
+                        ],
+                      },
+                    ]}
+                  />
                 ) : (
                   <Button
                     type='button'
-                    onClick={() => {
-                      setShowSelect(true)
-                      setSelectActive(true)
-                    }}
+                    size='icon'
+                    onClick={() => fileInputRef.current?.click()}
                   >
-                    Generate with AI
+                    <PaperclipIcon className='h-5 w-5' />
                   </Button>
                 )}
+                <EmailTemplatePickerPopover
+                  companyId={employeeProps.companyId}
+                  onSelect={handleEmailTemplateSelect}
+                  activeTemplateId={activeTemplateId}
+                />
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type='file'
+                className='hidden'
+                multiple
+                onChange={e => {
+                  const files = e.currentTarget.files
+                  if (files && files.length > 0) {
+                    appendAttachments(Array.from(files))
+                  }
+                  e.currentTarget.value = ''
+                }}
+              />
+
+              <textarea
+                ref={textareaRef}
+                value={messageText}
+                onChange={e => {
+                  setMessageText(e.target.value)
+                  setActiveTemplateId(null)
+                  if (textareaRef.current) {
+                    textareaRef.current.style.height = 'auto'
+                    textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+                  }
+                }}
+                placeholder='Send a message'
+                rows={1}
+                className='flex-1 min-h-9.5 w-full max-h-30 rounded-sm border-none bg-transparent px-1 sm:px-4 py-2 text-base md:text-sm outline-none resize-none overflow-y-auto'
+              />
+
+              <div className='hidden'>
                 <AiImproveButton
+                  id='mobile-improve-trigger'
                   getText={() => messageText}
                   setText={value => setMessageText(value)}
                   buttonSize='icon'
@@ -1665,306 +1831,151 @@ export function EmailChat(props: EmailChatProps) {
                 />
               </div>
 
-              <div className='flex items-end flex-1 gap-1 max-h-30 relative'>
-                <div className='md:hidden flex items-center self-center'>
-                  <CustomDropdownMenu
-                    align='start'
-                    trigger={
-                      <Button variant='ghost' size='icon' className='h-9 w-9'>
-                        <MoreVertical className='h-5 w-5' />
-                      </Button>
-                    }
-                    sections={[
-                      {
-                        title: 'Actions',
-                        options: [
-                          {
-                            label: 'Upload from computer',
-                            icon: <Upload className='w-4 h-4' />,
-                            onClick: () => fileInputRef.current?.click(),
-                          },
-                          ...(employeeProps.companyId > 0
-                            ? [
-                                {
-                                  label: 'From Stones',
-                                  icon: <Package className='w-4 h-4' />,
-                                  onClick: () => setShowStonesPicker(true),
-                                },
-                                {
-                                  label: 'From Images',
-                                  icon: <ImageIcon className='w-4 h-4' />,
-                                  onClick: () => setShowImagesPicker(true),
-                                },
-                                {
-                                  label: 'From Documents',
-                                  icon: <FileText className='w-4 h-4' />,
-                                  onClick: () => setShowDocumentsPicker(true),
-                                },
-                              ]
-                            : []),
-                          {
-                            label: 'Use Template',
-                            icon: <FileText className='w-4 h-4' />,
-                            onClick: () => setShowMobileTemplatePicker(true),
-                          },
-                          {
-                            label: 'Generate with AI',
-                            icon: <Sparkles className='w-4 h-4' />,
-                            onClick: () => {
-                              setShowSelect(true)
-                              setSelectActive(true)
-                            },
-                          },
-                          {
-                            label: 'Improve message',
-                            icon: <Pencil className='w-4 h-4' />,
-                            onClick: () => {
-                              const improveBtn = document.getElementById(
-                                'mobile-improve-trigger',
-                              )
-                              if (improveBtn) improveBtn.click()
-                            },
-                          },
-                        ],
-                      },
-                    ]}
-                  />
-                </div>
-
-                <div className='hidden md:flex items-end gap-1'>
-                  {employeeProps.companyId > 0 ? (
-                    <CustomDropdownMenu
-                      side='top'
-                      trigger={
-                        <Button type='button' size='icon' aria-label='Attachment'>
-                          <PaperclipIcon className='h-5 w-5' />
-                        </Button>
-                      }
-                      sections={[
-                        {
-                          options: [
-                            {
-                              label: 'Upload from computer',
-                              icon: <Upload className='h-4 w-4' />,
-                              onClick: () => fileInputRef.current?.click(),
-                            },
-                            {
-                              label: 'From Stones',
-                              icon: <Package className='h-4 w-4' />,
-                              onClick: () => setShowStonesPicker(true),
-                            },
-                            {
-                              label: 'From Images',
-                              icon: <ImageIcon className='h-4 w-4' />,
-                              onClick: () => setShowImagesPicker(true),
-                            },
-                            {
-                              label: 'From Documents',
-                              icon: <FileText className='h-4 w-4' />,
-                              onClick: () => setShowDocumentsPicker(true),
-                            },
-                          ],
-                        },
-                      ]}
-                    />
-                  ) : (
-                    <Button
-                      type='button'
-                      size='icon'
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <PaperclipIcon className='h-5 w-5' />
-                    </Button>
-                  )}
-                  <EmailTemplatePickerPopover
-                    companyId={employeeProps.companyId}
-                    onSelect={handleEmailTemplateSelect}
-                    activeTemplateId={activeTemplateId}
-                  />
-                </div>
-
-                <input
-                  ref={fileInputRef}
-                  type='file'
-                  className='hidden'
-                  multiple
-                  onChange={e => {
-                    const files = e.currentTarget.files
-                    if (files && files.length > 0) {
-                      appendAttachments(Array.from(files))
-                    }
-                    e.currentTarget.value = ''
-                  }}
-                />
-
-                <textarea
-                  ref={textareaRef}
-                  value={messageText}
-                  onChange={e => {
-                    setMessageText(e.target.value)
-                    setActiveTemplateId(null)
-                    if (textareaRef.current) {
-                      textareaRef.current.style.height = 'auto'
-                      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-                    }
-                  }}
-                  placeholder='Send a message'
-                  rows={1}
-                  className='flex-1 min-h-9.5 w-full max-h-30 rounded-sm border-none bg-transparent px-1 sm:px-4 py-2 text-base md:text-sm outline-none resize-none overflow-y-auto'
-                />
-
-                <div className='hidden'>
-                  <AiImproveButton
-                    id='mobile-improve-trigger'
-                    getText={() => messageText}
-                    setText={value => setMessageText(value)}
-                    buttonSize='icon'
-                    iconClassName='text-lg'
-                  />
-                </div>
-
-                <div className='flex gap-1'>
-                  <LoadingButton
-                    loading={isSending}
-                    type='button'
-                    variant='default'
-                    size='icon'
-                    disabled={
-                      isSending ||
-                      (messageText.trim() === '' && attachments.length === 0)
-                    }
-                    onClick={handleSend}
-                  >
-                    <SendIcon className='h-2 w-2' />
-                  </LoadingButton>
-                </div>
+              <div className='flex gap-1'>
+                <LoadingButton
+                  loading={isSending}
+                  type='button'
+                  variant='default'
+                  size='icon'
+                  disabled={
+                    isSending || (messageText.trim() === '' && attachments.length === 0)
+                  }
+                  onClick={handleSend}
+                >
+                  <SendIcon className='h-2 w-2' />
+                </LoadingButton>
               </div>
             </div>
-          ) : (
-            <div className='flex flex-col md:flex-row flex-1 gap-2' />
-          )}
-        </div>
-        {isEmployee && employeeProps && employeeProps.companyId > 0 && (
-          <>
-            <AttachmentImagePicker
-              type='stones'
-              companyId={employeeProps.companyId}
-              open={showStonesPicker}
-              onClose={() => setShowStonesPicker(false)}
-              onSelect={files => {
-                appendAttachments(files)
-                setShowStonesPicker(false)
-              }}
-              onAddFiles={appendAttachments}
-            />
-            <AttachmentImagePicker
-              type='images'
-              companyId={employeeProps.companyId}
-              open={showImagesPicker}
-              onClose={() => setShowImagesPicker(false)}
-              onSelect={files => {
-                appendAttachments(files)
-                setShowImagesPicker(false)
-              }}
-            />
-            <AttachmentImagePicker
-              type='documents'
-              companyId={employeeProps.companyId}
-              open={showDocumentsPicker}
-              onClose={() => setShowDocumentsPicker(false)}
-              onSelect={files => {
-                appendAttachments(files)
-                setShowDocumentsPicker(false)
-              }}
-            />
-          </>
+          </div>
+        ) : (
+          <div className='flex flex-col md:flex-row flex-1 gap-2' />
         )}
-        {isEmployee && employeeProps && (
-          <MobileTemplatePicker
-            open={showMobileTemplatePicker}
-            onOpenChange={open => {
-              setShowMobileTemplatePicker(open)
-              if (!open) setMobileTemplateSearch('')
+      </div>
+      {isEmployee && employeeProps && employeeProps.companyId > 0 && (
+        <>
+          <AttachmentImagePicker
+            type='stones'
+            companyId={employeeProps.companyId}
+            open={showStonesPicker}
+            onClose={() => setShowStonesPicker(false)}
+            onSelect={files => {
+              appendAttachments(files)
+              setShowStonesPicker(false)
             }}
-            templates={filteredMobileTemplates}
-            isLoading={mobileTemplatesLoading}
-            searchQuery={mobileTemplateSearch}
-            onSearchChange={setMobileTemplateSearch}
-            onSelect={template => {
-              const applied = handleEmailTemplateSelect(template)
-              if (applied) {
-                setShowMobileTemplatePicker(false)
-                setMobileTemplateSearch('')
-              }
-            }}
-            activeTemplateId={activeTemplateId}
+            onAddFiles={appendAttachments}
           />
-        )}
-        {isEmployee && employeeProps && (
-          <Dialog
-            open={!!pendingDealAttachment && attachmentDealChoices.length > 0}
-            onOpenChange={open => {
-              if (!open) closeAttachmentDealDialog()
+          <AttachmentImagePicker
+            type='images'
+            companyId={employeeProps.companyId}
+            open={showImagesPicker}
+            onClose={() => setShowImagesPicker(false)}
+            onSelect={files => {
+              appendAttachments(files)
+              setShowImagesPicker(false)
             }}
-          >
-            <DialogContent className='max-w-md rounded-xl'>
-              <DialogHeader>
-                <DialogTitle>Choose a deal</DialogTitle>
-              </DialogHeader>
-              <DealChoiceList
-                deals={attachmentDealChoices}
-                disabled={!pendingDealAttachment || isAddingAttachmentToDeal}
-                onSelectDeal={dealId => {
-                  if (!pendingDealAttachment) return
-                  void handleAddAttachmentToDeal(pendingDealAttachment, dealId)
-                }}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
-        {dealNav ? (
-          <Dialog
-            open={dealNavPickerOpen}
-            onOpenChange={open => {
-              if (!open) closeDealNavPicker()
+          />
+          <AttachmentImagePicker
+            type='documents'
+            companyId={employeeProps.companyId}
+            open={showDocumentsPicker}
+            onClose={() => setShowDocumentsPicker(false)}
+            onSelect={files => {
+              appendAttachments(files)
+              setShowDocumentsPicker(false)
             }}
-          >
-            <DialogContent className='max-w-md rounded-xl'>
-              <DialogHeader>
-                <DialogTitle>Choose a deal</DialogTitle>
-              </DialogHeader>
-              <DealChoiceList
-                deals={dealNavChoices}
-                onSelectDeal={dealId => {
-                  goToDeal(dealId)
-                  closeDealNavPicker()
-                }}
-              />
-            </DialogContent>
-          </Dialog>
-        ) : null}
-        <AlertDialog
-          open={!!pendingTemplate}
+          />
+        </>
+      )}
+      {isEmployee && employeeProps && (
+        <MobileTemplatePicker
+          open={showMobileTemplatePicker}
           onOpenChange={open => {
-            if (!open) setPendingTemplate(null)
+            setShowMobileTemplatePicker(open)
+            if (!open) setMobileTemplateSearch('')
+          }}
+          templates={filteredMobileTemplates}
+          isLoading={mobileTemplatesLoading}
+          searchQuery={mobileTemplateSearch}
+          onSearchChange={setMobileTemplateSearch}
+          onSelect={template => {
+            const applied = handleEmailTemplateSelect(template)
+            if (applied) {
+              setShowMobileTemplatePicker(false)
+              setMobileTemplateSearch('')
+            }
+          }}
+          activeTemplateId={activeTemplateId}
+        />
+      )}
+      {isEmployee && employeeProps && (
+        <Dialog
+          open={!!pendingDealAttachment && attachmentDealChoices.length > 0}
+          onOpenChange={open => {
+            if (!open) closeAttachmentDealDialog()
           }}
         >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Replace message</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will replace your current message with the template. Continue?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmTemplateReplace}>
-                Replace
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </DialogContent>
+          <DialogContent className='max-w-md rounded-xl'>
+            <DialogHeader>
+              <DialogTitle>Choose a deal</DialogTitle>
+            </DialogHeader>
+            <DealChoiceList
+              deals={attachmentDealChoices}
+              disabled={!pendingDealAttachment || isAddingAttachmentToDeal}
+              onSelectDeal={dealId => {
+                if (!pendingDealAttachment) return
+                void handleAddAttachmentToDeal(pendingDealAttachment, dealId)
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+      {dealNav ? (
+        <Dialog
+          open={dealNavPickerOpen}
+          onOpenChange={open => {
+            if (!open) closeDealNavPicker()
+          }}
+        >
+          <DialogContent className='max-w-md rounded-xl'>
+            <DialogHeader>
+              <DialogTitle>Choose a deal</DialogTitle>
+            </DialogHeader>
+            <DealChoiceList
+              deals={dealNavChoices}
+              onSelectDeal={dealId => {
+                goToDeal(dealId)
+                closeDealNavPicker()
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      ) : null}
+      <AlertDialog
+        open={!!pendingTemplate}
+        onOpenChange={open => {
+          if (!open) setPendingTemplate(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace message</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will replace your current message with the template. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmTemplateReplace}>
+              Replace
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+
+  const panelExtras = (
+    <>
       <AttachmentImageEditorDialog
         file={editingAttachment}
         previewUrl={editingAttachmentPreviewUrl}
@@ -1984,6 +1995,27 @@ export function EmailChat(props: EmailChatProps) {
         userRole={variant}
         showInfo={false}
       />
+    </>
+  )
+
+  if (embedded) {
+    return (
+      <>
+        <div {...panelSurfaceProps}>{panelInner}</div>
+        {panelExtras}
+      </>
+    )
+  }
+
+  return (
+    <Dialog
+      open={true}
+      onOpenChange={open => {
+        if (!open) onClose()
+      }}
+    >
+      <DialogContent {...panelSurfaceProps}>{panelInner}</DialogContent>
+      {panelExtras}
     </Dialog>
   )
 }

@@ -12,12 +12,7 @@ import { AuthenticityTokenInput } from 'remix-utils/csrf/react'
 import { z } from 'zod'
 import { SelectInputOther } from '~/components/molecules/SelectInputOther'
 import { Button } from '~/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
+import { DialogHeader, DialogTitle } from '~/components/ui/dialog'
 import { FormField } from '~/components/ui/form'
 import { db } from '~/db.server'
 import { commitSession, getSession } from '~/sessions.server'
@@ -119,40 +114,38 @@ export default function InvalidCustomerDialog() {
     defaultValues: { invalid_lead: initialValue },
   })
 
-  const handleChange = (open: boolean) => {
-    if (open === false) navigate(`..${location.search}`)
-  }
-
   return (
-    <Dialog open={true} onOpenChange={handleChange}>
-      <DialogContent className='sm:max-w-[420px] max-h-[90vh] overflow-y-auto'>
-        <DialogHeader>
-          <DialogTitle>Mark invalid: {customer_name}</DialogTitle>
-        </DialogHeader>
-        <FormProvider {...form}>
-          <form method='post'>
-            <AuthenticityTokenInput />
-            <FormField
-              control={form.control}
-              name='invalid_lead'
-              render={({ field }) => (
-                <SelectInputOther
-                  name='Reason'
-                  options={options}
-                  field={field}
-                  placeholder='Select reason'
-                />
-              )}
-            />
-            <div className='flex justify-end gap-2 mt-4'>
-              <Button type='button' variant='outline' onClick={() => navigate('..')}>
-                Cancel
-              </Button>
-              <Button type='submit'>Save</Button>
-            </div>
-          </form>
-        </FormProvider>
-      </DialogContent>
-    </Dialog>
+    <>
+      <DialogHeader>
+        <DialogTitle>Mark invalid: {customer_name}</DialogTitle>
+      </DialogHeader>
+      <FormProvider {...form}>
+        <form method='post'>
+          <AuthenticityTokenInput />
+          <FormField
+            control={form.control}
+            name='invalid_lead'
+            render={({ field }) => (
+              <SelectInputOther
+                name='Reason'
+                options={options}
+                field={field}
+                placeholder='Select reason'
+              />
+            )}
+          />
+          <div className='flex justify-end gap-2 mt-4'>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => navigate(`..${location.search}`)}
+            >
+              Cancel
+            </Button>
+            <Button type='submit'>Save</Button>
+          </div>
+        </form>
+      </FormProvider>
+    </>
   )
 }

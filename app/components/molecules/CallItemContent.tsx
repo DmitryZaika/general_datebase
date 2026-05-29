@@ -41,16 +41,10 @@ export function CallItemContent({
 
   if (historyCompact) {
     const startedLabel = formatTimestamp(call.startedAt)
-    const label =
-      call.type === 'outgoing'
-        ? 'Outgoing'
-        : call.type === 'incoming'
-          ? 'Incoming'
-          : 'Call'
     const detail = status ?? formatDuration(call.talkingTime)
 
     return (
-      <div className='group flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
+      <div className='flex flex-col gap-0.5 rounded-md px-2 py-1.5'>
         {call.recorded ? (
           <CallTranscriptionProvider
             callId={call.callId}
@@ -63,7 +57,6 @@ export function CallItemContent({
                 <span className={cn('shrink-0', color)}>
                   <Icon size={14} />
                 </span>
-                <span className='text-sm font-medium truncate'>{label}</span>
                 <span className='min-w-0 truncate text-xs text-gray-500'>
                   Agent: {call.agentName}
                 </span>
@@ -77,19 +70,17 @@ export function CallItemContent({
                 </span>
               </div>
               <div className='flex shrink-0 items-center gap-2'>
-                <div
-                  className={cn(
-                    'flex items-center gap-1',
-                    showRecording ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-                  )}
-                >
+                <div className='flex items-center gap-1'>
                   {dealId ? (
-                    <CallTranscriptionPrimaryButtons buttonClassName='opacity-100' />
+                    <div className='hidden md:flex'>
+                      <CallTranscriptionPrimaryButtons buttonClassName='opacity-100' />
+                    </div>
                   ) : null}
                   <CallTranscriptionMenu
                     showRecording={showRecording}
                     onToggleRecording={() => setShowRecording(value => !value)}
                     buttonClassName='opacity-100'
+                    includePrimaryActions={!!dealId}
                   />
                 </div>
                 <span className='whitespace-nowrap text-right text-[11px] font-medium tabular-nums text-gray-700'>
@@ -106,7 +97,6 @@ export function CallItemContent({
               <span className={cn('shrink-0', color)}>
                 <Icon size={14} />
               </span>
-              <span className='text-sm font-medium truncate'>{label}</span>
               <span className='min-w-0 truncate text-xs text-gray-500'>
                 Agent: {call.agentName}
               </span>
