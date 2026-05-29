@@ -107,7 +107,7 @@ export default function DealsEdit({
           <DealEditDialogClose />
         </div>
         {showProgress ? (
-          <div className='mb-2 px-1 sm:px-2'>
+          <div className='mb-2 px-1 pt-2'>
             <DealProgressBar
               stages={stages}
               history={history}

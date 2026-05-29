@@ -990,10 +990,12 @@ export function EmailChat(props: EmailChatProps) {
     setDealNavChoices([])
   }
 
-  const goToDeal = (dealId: number) => {
-    if (!dealNav) return
+  const goToDeal = (dealId: number): boolean => {
+    if (!dealNav) return false
+    setDealNavLoading(true)
     setDealNavRouteActive(true)
     navigate(`/${dealNav.pathPrefix}/deals/edit/${dealId}/project`)
+    return true
   }
 
   const dealNavButtonLoading =
@@ -1019,6 +1021,7 @@ export function EmailChat(props: EmailChatProps) {
     }
 
     setDealNavLoading(true)
+    let navigatingToDeal = false
     try {
       const params = new URLSearchParams()
       if (dealNav.customerEmail.trim()) {
@@ -1040,7 +1043,7 @@ export function EmailChat(props: EmailChatProps) {
 
       if (deals.length === 0) {
         if (dealNav.threadDealId !== null) {
-          goToDeal(dealNav.threadDealId)
+          navigatingToDeal = goToDeal(dealNav.threadDealId)
           return
         }
         toast({
@@ -1051,7 +1054,7 @@ export function EmailChat(props: EmailChatProps) {
         return
       }
       if (deals.length === 1) {
-        goToDeal(deals[0].id)
+        navigatingToDeal = goToDeal(deals[0].id)
         return
       }
       setDealNavChoices(deals)
@@ -1063,7 +1066,9 @@ export function EmailChat(props: EmailChatProps) {
         variant: 'destructive',
       })
     } finally {
-      setDealNavLoading(false)
+      if (!navigatingToDeal) {
+        setDealNavLoading(false)
+      }
     }
   }
 

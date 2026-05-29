@@ -4,7 +4,7 @@ import { Skeleton } from '~/components/ui/skeleton'
 export function DealEditDialogSkeleton() {
   return (
     <div className='flex min-h-[600px] flex-col gap-4' aria-hidden>
-      <div className='flex items-center justify-between gap-3 px-1 sm:px-2'>
+      <div className='flex items-center justify-between pt-5 gap-3 px-1 sm:px-2'>
         <Skeleton className='h-8 w-48' />
         <DealEditDialogClose />
       </div>

@@ -9,3 +9,28 @@ export type DealsBoardOutletContext = {
 export function isDealEditPath(pathname: string, dealsBasePath: string) {
   return pathname.includes(`${dealsBasePath}/edit/`)
 }
+
+export function getDealEditRoot(
+  pathname: string,
+  dealsBasePath: string,
+): string | null {
+  const head = `${dealsBasePath}/edit/`
+  if (!pathname.startsWith(head)) return null
+  const rest = pathname.slice(head.length)
+  const idMatch = /^(\d+)/.exec(rest)
+  if (!idMatch) return null
+  return `${head}${idMatch[1]}`
+}
+
+export function isSameDealEditNavigation(
+  currentPathname: string,
+  nextPathname: string,
+  dealsBasePath: string,
+): boolean {
+  if (!isDealEditPath(currentPathname, dealsBasePath)) return false
+  if (!isDealEditPath(nextPathname, dealsBasePath)) return false
+  return (
+    getDealEditRoot(currentPathname, dealsBasePath) ===
+    getDealEditRoot(nextPathname, dealsBasePath)
+  )
+}

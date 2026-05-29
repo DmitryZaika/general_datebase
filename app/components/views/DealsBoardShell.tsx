@@ -6,6 +6,7 @@ import {
   DEAL_EDIT_DIALOG_CLASS,
   type DealsBoardOutletContext,
   isDealEditPath,
+  isSameDealEditNavigation,
 } from '~/utils/dealsBoardShell'
 
 export function DealsBoardShell({
@@ -32,7 +33,13 @@ export function DealsBoardShell({
     navPath !== '' &&
     !isDealEditPath(navPath, dealsBasePath)
   const isClosingDealEdit = dealEditDismissed || isNavigatingAwayFromDealEdit
-  const isDealEditLoading = isNavigatingToDealEdit && !isClosingDealEdit
+  const isSameDealTabSwitch = isSameDealEditNavigation(
+    location.pathname,
+    navPath,
+    dealsBasePath,
+  )
+  const isDealEditLoading =
+    isNavigatingToDealEdit && !isClosingDealEdit && !isSameDealTabSwitch
   const showDealEditDialog =
     !isClosingDealEdit && (isOnDealEdit || isNavigatingToDealEdit)
 
