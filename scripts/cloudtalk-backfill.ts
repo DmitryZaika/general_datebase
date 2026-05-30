@@ -134,10 +134,7 @@ async function confirmInteractive(expected: string): Promise<boolean> {
   }
 }
 
-async function acquireLock(
-  conn: mysql.PoolConnection,
-  name: string,
-): Promise<boolean> {
+async function acquireLock(conn: mysql.PoolConnection, name: string): Promise<boolean> {
   const [rows] = await conn.query<mysql.RowDataPacket[]>(
     'SELECT GET_LOCK(?, 0) AS got',
     [name],
@@ -159,10 +156,9 @@ function printSummary(args: Args, company: CompanyRow, total: number): void {
 
 async function runBackfill(
   ids: number[],
+  companyId: number,
 ): Promise<{ ok: number; failed: number; stopped: boolean }> {
-  const { syncCustomerToCloudTalk } = await import(
-    '../app/utils/cloudtalkContactSync.server'
-  )
+  const { syncCustomerToCloudTalk } = await import('../app/services/lambda.server')
 
   let ok = 0
   let failed = 0
@@ -172,7 +168,7 @@ async function runBackfill(
   for (const id of ids) {
     if (stopRequested) break
     try {
-      await syncCustomerToCloudTalk(id)
+      await syncCustomerToCloudTalk(companyId, id)
       ok += 1
     } catch (error) {
       console.error(`Customer ${id} failed:`, error)
@@ -246,7 +242,7 @@ async function main(): Promise<void> {
         )
         process.exit(1)
       }
-      const result = await runBackfill(ids)
+      const result = await runBackfill(ids, company.id)
       if (result.stopped) {
         process.exitCode = SIGINT_EXIT_CODE
       } else {
